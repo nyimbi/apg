@@ -30,10 +30,12 @@ def test_contract_shape_is_valid():
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "grph"
-	assert len(contract["ui"]["routes"]) >= 12
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert len(contract["ui"]["routes"]) >= 14
+	assert len(contract["rule_engine"]["rules"]) >= 43
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "service.GrphService"
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert contract["theme"]["tokens"]["border.radius"]
 
 
@@ -53,8 +55,12 @@ def test_app_entrypoint_is_publishable():
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "grph" in model["capabilities"]
 	assert model["capabilities"]["grph"]["runtime"]["service"] == "service.GrphService"
-	assert model["capabilities"]["grph"]["streaming"]["engine"] == "bytewax"
+	assert model["capabilities"]["grph"]["agents"]["first_class"] is True
+	assert model["capabilities"]["grph"]["streaming"]["required_processor"] == "bytewax"
 	assert "audit" in model["capabilities"]["grph"]["screens"]
+	assert "agents" in model["capabilities"]["grph"]["screens"]
+	assert model["capabilities"]["grph"]["graph_lifecycle"]["lifecycle_batch"] == "GrphLifecycleBatchRecord"
+	assert model["composition"]["capability_dependencies"]["grph"] == ["mdm", "meta", "etlp", "srch", "aicr", "conf"]
 	assert committed_model == model
 	for generated_doc in ("README.md", "SPECIFICATION.md", "PLAN.md"):
 		assert (PACKAGE_DIR / generated_doc).is_file()
@@ -70,8 +76,9 @@ def test_app_entrypoint_is_publishable():
 		"app.py",
 	}
 	assert committed_report["ok"] is True
-	assert committed_report["evidence"]["contracts"]["capability_contract"]["route_count"] >= 12
-	assert committed_report["evidence"]["contracts"]["capability_contract"]["rule_count"] >= 30
+	assert committed_report["evidence"]["contracts"]["capability_contract"]["route_count"] >= 14
+	assert committed_report["evidence"]["contracts"]["capability_contract"]["rule_count"] >= 43
+	assert committed_report["evidence"]["agents"]["first_class"] is True
 	assert committed_report["evidence"]["runtime"]["event_stream"] == "bytewax"
 	assert committed_report["evidence"]["runtime"]["generated_app_runtime"] == "service.GrphService"
 

@@ -19,6 +19,8 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"route_count": len(contract["ui"]["routes"]),
 		"rule_count": len(contract["rule_engine"]["rules"]),
 		"record_count": len(SERVICE.list_records(tenant_id)),
+		"agent_count": len(SERVICE.list_graph_agents(tenant_id)),
+		"lifecycle_batch_count": len(SERVICE.list_lifecycle_batches(tenant_id)),
 		"summary": SERVICE.dashboard_summary(tenant_id),
 	}
 
@@ -135,8 +137,41 @@ def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_graph_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_graph_agent(
+		agent_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload["name"]),
+		runtime=str(payload["runtime"]),
+		role=str(payload["role"]),
+		scope=str(payload["scope"]),
+		owner=str(payload["owner"]),
+		purpose=str(payload["purpose"]),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", True)),
+		human_approval_required=bool(payload.get("human_approval_required", False)),
+	)
+
+
+def validate_grph_lifecycle_batch(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_grph_lifecycle_batch(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
+		mutation_count=int(payload.get("mutation_count", 1)),
+		operation=str(payload.get("operation") or "graph_agent_batch"),
+		batch_id=payload.get("id") or payload.get("batch_id"),
+	)
+
+
 def list_records(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_records(tenant_id)
+
+
+def list_graph_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_graph_agents(tenant_id)
+
+
+def list_lifecycle_batches(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_lifecycle_batches(tenant_id)
 
 
 def dashboard_summary(tenant_id: str | None = None) -> dict[str, Any]:
@@ -150,6 +185,8 @@ def list_graph_data(tenant_id: str = "default") -> dict[str, Any]:
 		"edges": SERVICE.list_edges(tenant_id),
 		"traversals": SERVICE.list_traversals(tenant_id),
 		"quality_reports": SERVICE.list_quality_reports(tenant_id),
+		"graph_agents": SERVICE.list_graph_agents(tenant_id),
+		"lifecycle_batches": SERVICE.list_lifecycle_batches(tenant_id),
 		"audit_events": SERVICE.list_audit_events(tenant_id),
 		"summary": SERVICE.dashboard_summary(tenant_id),
 	}

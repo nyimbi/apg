@@ -9,8 +9,10 @@ from .capability_contract import evaluate_capability_rules, get_capability_contr
 from .graph_runtime import GraphQualityInspector, GraphTraversalPlanner
 from .models import (
 	GraphAuditEventRecord,
+	GraphAgentRecord,
 	GraphEdge,
 	GraphKind,
+	GrphLifecycleBatchRecord,
 	GraphNode,
 	GraphQualityReport,
 	GraphSchema,
@@ -28,10 +30,17 @@ class GrphService:
 		self._edges: dict[str, GraphEdge] = {}
 		self._traversals: dict[str, GraphTraversalResult] = {}
 		self._quality_reports: dict[str, GraphQualityReport] = {}
+		self._graph_agents: dict[str, GraphAgentRecord] = {}
+		self._lifecycle_batches: dict[str, GrphLifecycleBatchRecord] = {}
 		self._audit_events: dict[str, GraphAuditEventRecord] = {}
 		self._counter = count(1)
 		self._traversal_planner = GraphTraversalPlanner()
 		self._quality_inspector = GraphQualityInspector()
+		contract = get_capability_contract()
+		self._agent_runtimes = set(contract["agents"]["supported_runtimes"])
+		self._agent_roles = set(contract["agents"]["supported_roles"])
+		self._privileged_agent_roles = set(contract["agents"]["privileged_roles"])
+		self._lifecycle_operations = set(contract["streaming"]["required_operations"])
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -348,6 +357,108 @@ class GrphService:
 			review_recorded=True,
 		)
 
+	def register_graph_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> dict[str, Any]:
+		runtime_value = _normalize_token(runtime)
+		role_value = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(str(tenant_id or "").strip()),
+			"operation": "register_graph_agent",
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"scope_present": bool(str(scope or "").strip()),
+			"owner_present": bool(str(owner or "").strip()),
+			"purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+		})
+		self._raise_if_denied(result)
+		if not str(agent_id or "").strip():
+			raise ValueError("graph_agent_id_required")
+		if not str(name or "").strip():
+			raise ValueError("graph_agent_name_required")
+		status = "pending_review" if result["decision"] == "require_review" else "active"
+		record = GraphAgentRecord(
+			id=str(agent_id).strip(),
+			tenant_id=tenant_id,
+			name=str(name).strip(),
+			runtime=runtime_value,
+			role=role_value,
+			scope=str(scope).strip(),
+			owner=str(owner).strip(),
+			purpose=str(purpose).strip(),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+			status=status,
+		)
+		self._graph_agents[self._tenant_record_key(tenant_id, record.id)] = record
+		self._record_event(
+			tenant_id,
+			"graph_agent_registered",
+			record.id,
+			f"Graph agent registered: {name}",
+			owner,
+			"medium" if status == "pending_review" else "low",
+		)
+		return record.to_dict()
+
+	def validate_grph_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "graph_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		mutation_count = int(mutation_count)
+		if mutation_count <= 0:
+			raise ValueError("grph_lifecycle_batch_empty")
+		stream_value = _normalize_token(event_stream)
+		operation_value = _normalize_token(operation)
+		if operation_value not in self._lifecycle_operations:
+			raise ValueError(f"unsupported_grph_lifecycle_operation:{operation_value}")
+		result = self.evaluate({
+			"tenant_context_present": bool(str(tenant_id or "").strip()),
+			"operation": "validate_grph_lifecycle_batch",
+			"event_stream": stream_value,
+		})
+		accepted = result["decision"] == "allow"
+		record = GrphLifecycleBatchRecord(
+			id=batch_id or f"grphbatch:{len(self._lifecycle_batches) + 1:06d}",
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			operation=operation_value,
+			accepted=accepted,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			status="accepted" if accepted else "denied",
+		)
+		self._lifecycle_batches[self._tenant_record_key(tenant_id, record.id)] = record
+		self._record_event(
+			tenant_id,
+			f"grph_lifecycle_batch_{record.status}",
+			record.id,
+			f"Validated GRPH lifecycle batch: {record.id}",
+			"grph",
+			"medium" if not accepted else "low",
+		)
+		if not accepted:
+			self._raise_if_denied(result)
+		return record.to_dict()
+
 	def list_schemas(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._schemas, tenant_id)
 
@@ -363,12 +474,18 @@ class GrphService:
 	def list_quality_reports(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._quality_reports, tenant_id)
 
+	def list_graph_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._graph_agents, tenant_id)
+
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._lifecycle_batches, tenant_id)
+
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events, tenant_id)
 
 	def list_records(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		records: list[dict[str, Any]] = []
-		for store in (self._schemas, self._nodes, self._edges, self._traversals, self._quality_reports):
+		for store in (self._schemas, self._nodes, self._edges, self._traversals, self._quality_reports, self._graph_agents, self._lifecycle_batches):
 			records.extend(self._list(store, tenant_id))
 		return sorted(records, key=lambda item: (item["kind"], item["id"]))
 
@@ -384,6 +501,10 @@ class GrphService:
 			"restricted_edge_count": len(restricted_edges),
 			"traversal_count": len(self.list_traversals(tenant_id)),
 			"quality_report_count": len(self.list_quality_reports(tenant_id)),
+			"graph_agent_count": len(self.list_graph_agents(tenant_id)),
+			"pending_agent_review_count": len([item for item in self.list_graph_agents(tenant_id) if item["status"] == "pending_review"]),
+			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
+			"denied_lifecycle_batch_count": len([item for item in self.list_lifecycle_batches(tenant_id) if item["status"] == "denied"]),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 		}
 
@@ -392,6 +513,11 @@ class GrphService:
 			return
 		reasons = ", ".join(action.get("reason", "graph_policy_blocked") for action in result["actions"])
 		raise PermissionError(reasons or "graph_policy_blocked")
+
+	def _raise_if_denied(self, result: dict[str, Any]) -> None:
+		if result["decision"] == "deny":
+			reasons = ", ".join(action.get("reason", "graph_policy_blocked") for action in result["actions"])
+			raise PermissionError(reasons or "graph_policy_blocked")
 
 	def _record_event(
 		self,
@@ -418,3 +544,10 @@ class GrphService:
 		if tenant_id is not None:
 			items = [item for item in items if item.tenant_id == tenant_id]
 		return [item.to_dict() for item in sorted(items, key=lambda item: item.id)]
+
+	def _tenant_record_key(self, tenant_id: str, record_id: str) -> str:
+		return f"{tenant_id}:{record_id}"
+
+
+def _normalize_token(value: str) -> str:
+	return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")

@@ -2,7 +2,8 @@
 
 GRPH provides the APG graph foundation: tenant-scoped schemas, nodes, edges,
 lineage graphs, relationship governance, bounded traversal, graph quality
-inspection, audit evidence, UI view models, and package metadata for generated
+inspection, first-class graph-agent composition, Bytewax lifecycle batch
+governance, audit evidence, UI view models, and package metadata for generated
 applications.
 
 Use GRPH when an application needs to model connected business objects: customer
@@ -21,6 +22,10 @@ tests and offline composition.
 - Bounded traversal and lineage path queries.
 - Quality reporting for orphan nodes, missing owners, restricted edges, and
   graph health.
+- Provider-neutral AI graph-agent registration for Codex, Claude Code,
+  opencode, Pi, and future runtimes.
+- Bytewax-only lifecycle batch validation for schema, node, edge, traversal,
+  lineage, impact, quality, and graph-agent changes.
 - Audit events for graph mutations, traversal decisions, review-required paths,
   and state changes.
 - UI route metadata and view models for graph operations.
@@ -44,8 +49,11 @@ tests and offline composition.
 3. Register typed edges between tenant-local nodes.
 4. Run traversals, lineage paths, neighborhood views, or impact analysis.
 5. Generate quality reports and review restricted relationships.
-6. Inspect audit events and operational metrics.
-7. Retire graph schemas or relationships with review evidence.
+6. Register graph agents for schema, relationship, traversal, lineage, impact,
+   quality, and lifecycle governance work.
+7. Validate lifecycle batches through Bytewax processor policy.
+8. Inspect audit events and operational metrics.
+9. Retire graph schemas or relationships with review evidence.
 
 ## Example
 
@@ -95,6 +103,22 @@ path = service.lineage_path(
     start_node_id=source["id"],
     max_depth=2,
 )
+agent = service.register_graph_agent(
+    agent_id="graph-steward",
+    tenant_id="tenant-a",
+    name="Graph Steward",
+    runtime="codex",
+    role="graph_steward",
+    scope="orders lineage schema and edge quality",
+    owner="data-platform",
+    purpose="review relationship quality and lineage impact",
+)
+batch = service.validate_grph_lifecycle_batch(
+    tenant_id="tenant-a",
+    event_stream="bytewax",
+    mutation_count=1,
+    operation="graph_agent_batch",
+)
 ```
 
 ## Guardrails
@@ -103,11 +127,16 @@ GRPH denies graph operations without tenant context, required schema/node/edge
 identity, owners, source/target nodes, schema-defined types, or lineage source
 assets. It requires review evidence for restricted edges, deep traversals,
 unknown schema kinds, non-allowlisted labels/properties, high-volume mutation
-batches, schema retirement, and state-changing operations without audit events.
+batches, privileged graph-agent roles, schema retirement, and state-changing
+operations without audit events. It denies graph-agent registrations that use an
+unsupported runtime or role, omit scope, owner, or purpose, or hide machine
+contribution. It denies lifecycle batches that are not routed through Bytewax.
 
 ## Composition
 
-GRPH depends on MDM, META, and ETLP for data-governance context. Optional
-adapters connect to AUTH, AUDL, MONI, CACH, SRCH, AICR, KNGR, and Bytewax-backed
-event streams. The generated package can be composed into larger applications
-through its semantic model, UI manifest, API helpers, and service runtime.
+GRPH depends on MDM, META, ETLP, SRCH, AICR, and CONF for data-governance,
+search, AI-agent, and configuration context. Optional adapters connect to AUTH,
+AUDL, MONI, CACH, KNGR, and Bytewax-backed event streams. The generated package
+can be composed into larger applications through its semantic model, UI
+manifest, API helpers, first-class agent manifest, streaming manifest, and
+service runtime.

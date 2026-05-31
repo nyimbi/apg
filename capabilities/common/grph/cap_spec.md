@@ -6,7 +6,8 @@ The GRPH capability is defined by the packet documents and executable contract:
 - `SPECIFICATION.md` defines the required functionality and guardrails.
 - `PLAN.md` records the implementation and verification plan.
 - `capability_contract.py` is the executable contract consumed by package
-  generation, tests, and composition tooling.
+  generation, tests, and composition tooling, including first-class graph-agent
+  and Bytewax lifecycle batch manifests.
 
 Keep this file as a short compatibility pointer. Update the packet documents
 and contract when GRPH behavior changes.

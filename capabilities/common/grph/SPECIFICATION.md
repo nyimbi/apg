@@ -19,6 +19,10 @@ GRPH must support:
 - Bounded traversal, lineage paths, impact analysis, and neighborhood views.
 - Quality reports and operational summaries.
 - Audit evidence for mutations, review decisions, and state changes.
+- First-class AI graph-agent composition for Codex, Claude Code, opencode,
+  Pi, and future provider-neutral runtimes.
+- Bytewax-only lifecycle batch governance for schema, node, edge, traversal,
+  lineage, impact, quality, and graph-agent batches.
 - UI route metadata and view models.
 - Visual theming for graph-oriented generated applications.
 - Bytewax event-stream adapter evidence.
@@ -36,6 +40,10 @@ The contract exposes configuration sections for:
 - `quality`: orphan, missing-owner, restricted-edge, and density thresholds.
 - `security`: tenant isolation, RBAC filters, and restricted relationship
   access.
+- `agents`: first-class graph-agent runtime, role, scope, owner, purpose,
+  contribution-disclosure, and human-approval requirements.
+- `streaming`: Bytewax lifecycle stream, required processor, lifecycle
+  operations, and graph event topics.
 - `governance`: audit and review requirements.
 - `observability`: metrics, traces, audit, quality metrics, and Bytewax stream
   evidence.
@@ -60,6 +68,11 @@ GRPH uses deterministic rules. Rules must cover:
 - lineage query source asset checks,
 - quality threshold reviews,
 - batch/event-stream requirements,
+- graph-agent supported runtime and role checks,
+- graph-agent explicit scope, owner, purpose, and contribution-disclosure
+  checks,
+- human review for privileged graph-agent roles,
+- Bytewax-only graph lifecycle batch checks,
 - schema retirement review, and
 - audit evidence for state changes.
 
@@ -79,6 +92,8 @@ The service runtime must:
 - generate neighborhood and impact views,
 - compute quality reports,
 - record audit events,
+- register provider-neutral graph agents,
+- validate Bytewax graph lifecycle batches,
 - expose list and dashboard surfaces,
 - provide APG `create_record` compatibility, and
 - enforce the contract guardrails before mutating state.
@@ -97,6 +112,8 @@ The generated UI manifest must include routes for:
 - impact,
 - quality,
 - governance,
+- agents,
+- lifecycle,
 - audit, and
 - settings.
 
@@ -123,6 +140,6 @@ and APG compatibility.
 ## Out of Scope
 
 This packet does not require a live graph database, rendered browser UI, live
-Bytewax pipeline execution, or external adapter calls. Those integrations are
-represented as explicit adapter surfaces and can be bound by larger generated
-applications.
+Bytewax pipeline execution, external graph-agent CLI calls, or external adapter
+calls. Those integrations are represented as explicit adapter surfaces and can
+be bound by larger generated applications.

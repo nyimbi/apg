@@ -6,6 +6,27 @@ from copy import deepcopy
 from typing import Any
 
 
+SUPPORTED_GRPH_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_GRPH_AGENT_ROLES = [
+	"schema_reviewer",
+	"node_quality_reviewer",
+	"edge_policy_reviewer",
+	"traversal_reviewer",
+	"lineage_reviewer",
+	"impact_reviewer",
+	"quality_reviewer",
+	"lifecycle_batch_reviewer",
+	"graph_steward",
+]
+PRIVILEGED_GRPH_AGENT_ROLES = [
+	"edge_policy_reviewer",
+	"traversal_reviewer",
+	"lineage_reviewer",
+	"impact_reviewer",
+	"lifecycle_batch_reviewer",
+]
+
+
 DEFAULT_CONFIGURATION: dict[str, Any] = {
 	"tenant_id": "default",
 	"schemas": {
@@ -57,6 +78,45 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"restricted_relationship_filter_required": True,
 		"rbac_filter_required": True,
 	},
+	"agents": {
+		"first_class": True,
+		"supported_runtimes": SUPPORTED_GRPH_AGENT_RUNTIMES,
+		"supported_roles": SUPPORTED_GRPH_AGENT_ROLES,
+		"privileged_roles": PRIVILEGED_GRPH_AGENT_ROLES,
+		"require_owner": True,
+		"require_purpose": True,
+		"require_scope": True,
+		"require_contribution_disclosure": True,
+		"require_human_approval_for_privileged_roles": True,
+		"adapter_contract": "aicr_provider_neutral_graph_agent_adapter",
+	},
+	"streaming": {
+		"engine": "bytewax",
+		"lifecycle_stream": "grph.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"schema_batch",
+			"node_batch",
+			"edge_batch",
+			"traversal_batch",
+			"lineage_batch",
+			"impact_batch",
+			"quality_batch",
+			"graph_agent_batch",
+		],
+		"topics": [
+			"grph.schemas",
+			"grph.nodes",
+			"grph.edges",
+			"grph.traversals",
+			"grph.lineage",
+			"grph.impact",
+			"grph.quality",
+			"grph.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	},
 	"governance": {
 		"require_tenant_context": True,
 		"audit_mutations": True,
@@ -98,6 +158,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"enable_impact": True,
 		"enable_quality": True,
 		"enable_governance": True,
+		"enable_graph_agent_roster": True,
+		"enable_lifecycle_batch_monitor": True,
 		"enable_audit": True,
 		"enable_settings": True,
 	},
@@ -116,6 +178,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"lineage",
 		"quality",
 		"security",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
@@ -130,6 +194,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"lineage",
 		"quality",
 		"security",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
@@ -175,6 +241,14 @@ RULES: list[dict[str, Any]] = [
 	{"name": "batch_mutation_requires_bytewax", "description": "Batch graph mutations must use Bytewax event streams.", "condition": {"operation": "batch_mutation", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}},
 	{"name": "schema_retire_requires_review", "description": "Schema retirement requires review evidence.", "condition": {"operation": "retire_schema", "review_recorded": False}, "effect": {"decision": "deny", "reason": "schema_retire_review_required", "required_action": "record_schema_retire_review"}},
 	{"name": "graph_state_change_requires_audit", "description": "Graph state changes require audit events.", "condition": {"state_change_requested": True, "audit_event_recorded": False}, "effect": {"decision": "deny", "reason": "audit_event_required", "required_action": "record_audit_event"}},
+	{"name": "graph_agent_runtime_supported", "description": "Graph agents must use supported runtimes.", "condition": {"operation": "register_graph_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_graph_agent_runtime", "required_action": "choose_supported_graph_agent_runtime"}},
+	{"name": "graph_agent_role_supported", "description": "Graph agents must use supported graph-governance roles.", "condition": {"operation": "register_graph_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_graph_agent_role", "required_action": "choose_supported_graph_agent_role"}},
+	{"name": "graph_agent_requires_scope", "description": "Graph agents require an explicit bounded graph scope.", "condition": {"operation": "register_graph_agent", "scope_present": False}, "effect": {"decision": "deny", "reason": "graph_agent_scope_required", "required_action": "declare_graph_agent_scope"}},
+	{"name": "graph_agent_requires_owner", "description": "Graph agents require an accountable owner.", "condition": {"operation": "register_graph_agent", "owner_present": False}, "effect": {"decision": "deny", "reason": "graph_agent_owner_required", "required_action": "assign_graph_agent_owner"}},
+	{"name": "graph_agent_requires_purpose", "description": "Graph agents require a documented purpose.", "condition": {"operation": "register_graph_agent", "purpose_present": False}, "effect": {"decision": "deny", "reason": "graph_agent_purpose_required", "required_action": "document_graph_agent_purpose"}},
+	{"name": "graph_agent_requires_contribution_disclosure", "description": "Graph agents must disclose machine-authored graph-governance contributions.", "condition": {"operation": "register_graph_agent", "contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "graph_agent_contribution_disclosure_required", "required_action": "disclose_machine_contribution"}},
+	{"name": "graph_agent_privileged_role_requires_human_approval", "description": "Privileged graph-agent roles require human approval evidence.", "condition": {"operation": "register_graph_agent", "privileged_role": True, "human_approval_required": False}, "effect": {"decision": "require_review", "reason": "graph_agent_human_approval_required", "required_action": "record_human_graph_agent_approval"}},
+	{"name": "bytewax_grph_stream_required", "description": "GRPH lifecycle batches must be routed through Bytewax.", "condition": {"operation": "validate_grph_lifecycle_batch", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_grph_lifecycle_batch_to_bytewax"}},
 ]
 
 
@@ -189,6 +263,8 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "impact", "path": "/grph/impact", "component": "GraphImpactAnalysis", "permission": "grph:query", "nav_group": "Lineage"},
 	{"name": "quality", "path": "/grph/quality", "component": "GraphQualityConsole", "permission": "grph:govern", "nav_group": "Quality"},
 	{"name": "governance", "path": "/grph/governance", "component": "GraphGovernance", "permission": "grph:govern", "nav_group": "Governance"},
+	{"name": "agents", "path": "/grph/agents", "component": "GraphAgentRoster", "permission": "grph:govern", "nav_group": "Governance"},
+	{"name": "lifecycle", "path": "/grph/lifecycle", "component": "GRPHLifecycleBatchMonitor", "permission": "grph:admin", "nav_group": "Operations"},
 	{"name": "audit", "path": "/grph/audit", "component": "GraphAuditTimeline", "permission": "grph:audit", "nav_group": "Governance"},
 	{"name": "settings", "path": "/grph/settings", "component": "GRPHSettings", "permission": "grph:admin", "nav_group": "Administration"},
 ]
@@ -217,9 +293,63 @@ THEME: dict[str, Any] = {
 		"lineage_path": {"visual": "path-trace", "threshold_style": "depth-band"},
 		"impact_map": {"visual": "dependency-map", "status_style": "blast-radius-chip"},
 		"quality_panel": {"visual": "quality-scorecard", "status_style": "health-chip"},
+		"graph_agent_roster": {"icon": "bot", "status_indicator": "agent-approval-chip", "risk_style": "relationship-scope-band"},
+		"bytewax_lifecycle_panel": {"icon": "git-branch", "status_indicator": "stream-chip", "risk_style": "processor-band"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "evidence-chip"},
 	},
 }
+
+
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class GRPH agent composition manifest."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_GRPH_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_GRPH_AGENT_ROLES),
+		"privileged_roles": list(PRIVILEGED_GRPH_AGENT_ROLES),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles",
+		],
+		"adapter_contract": "aicr_provider_neutral_graph_agent_adapter",
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return the GRPH Bytewax lifecycle stream contract."""
+	return {
+		"engine": "bytewax",
+		"lifecycle_stream": "grph.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"schema_batch",
+			"node_batch",
+			"edge_batch",
+			"traversal_batch",
+			"lineage_batch",
+			"impact_batch",
+			"quality_batch",
+			"graph_agent_batch",
+		],
+		"topics": [
+			"grph.schemas",
+			"grph.nodes",
+			"grph.edges",
+			"grph.traversals",
+			"grph.lineage",
+			"grph.impact",
+			"grph.quality",
+			"grph.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	}
 
 
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -231,6 +361,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "grph",
 		"display_name": "Graph Data Management",
+		"provides": ["graph_data_management", "relationship_intelligence", "graph_agent_composition"],
+		"requires": ["mdm", "meta", "etlp", "srch", "aicr", "conf"],
 		"configuration": config,
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},
@@ -242,6 +374,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"template_roots": ["templates/", "static/"],
 			"requires_theme": True,
 		},
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
 		"theme": deepcopy(THEME),
 	}
 

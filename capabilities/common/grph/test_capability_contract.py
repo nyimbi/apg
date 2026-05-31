@@ -24,13 +24,15 @@ def test_contract_exposes_full_lifecycle_configuration_rules_ui_and_theme():
 		"lineage",
 		"quality",
 		"security",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
 		"ui",
 		"theme",
 	]
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert len(contract["rule_engine"]["rules"]) >= 43
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
 		"explorer",
@@ -42,15 +44,24 @@ def test_contract_exposes_full_lifecycle_configuration_rules_ui_and_theme():
 		"impact",
 		"quality",
 		"governance",
+		"agents",
+		"lifecycle",
 		"audit",
 		"settings",
 	}
+	assert contract["provides"] == ["graph_data_management", "relationship_intelligence", "graph_agent_composition"]
+	assert contract["requires"] == ["mdm", "meta", "etlp", "srch", "aicr", "conf"]
+	assert contract["agents"]["first_class"] is True
+	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert "lineage_reviewer" in contract["agents"]["privileged_roles"]
+	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert "graph_agent_batch" in contract["streaming"]["required_operations"]
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "service.GrphService"
 	assert next(route for route in contract["ui"]["routes"] if route["name"] == "audit")["permission"] == "grph:audit"
 	assert contract["ui"]["api_prefix"] == "/grph/api/v1"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
-	assert {"graph_canvas", "node_panel", "edge_panel", "traversal_panel", "impact_map", "audit_timeline"} <= set(contract["theme"]["components"])
+	assert {"graph_canvas", "node_panel", "edge_panel", "traversal_panel", "impact_map", "graph_agent_roster", "bytewax_lifecycle_panel", "audit_timeline"} <= set(contract["theme"]["components"])
 
 
 def test_rule_engine_enforces_graph_guardrails():
@@ -85,6 +96,23 @@ def test_rule_engine_enforces_graph_guardrails():
 		"state_change_requested": True,
 		"audit_event_recorded": False,
 	})
+	agent_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_graph_agent",
+		"agent_runtime_supported": False,
+		"agent_role_supported": False,
+		"scope_present": False,
+		"owner_present": False,
+		"purpose_present": False,
+		"contribution_disclosed": False,
+		"privileged_role": True,
+		"human_approval_required": False,
+	})
+	lifecycle_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "validate_grph_lifecycle_batch",
+		"event_stream": "kafka",
+	})
 
 	assert result["decision"] == "deny"
 	assert {
@@ -109,6 +137,18 @@ def test_rule_engine_enforces_graph_guardrails():
 		"restricted_traversal_requires_rbac_filter",
 	}
 	assert state_change_result["matched_rules"] == ["graph_state_change_requires_audit"]
+	assert agent_result["decision"] == "deny"
+	assert {
+		"graph_agent_runtime_supported",
+		"graph_agent_role_supported",
+		"graph_agent_requires_scope",
+		"graph_agent_requires_owner",
+		"graph_agent_requires_purpose",
+		"graph_agent_requires_contribution_disclosure",
+		"graph_agent_privileged_role_requires_human_approval",
+	} <= set(agent_result["matched_rules"])
+	assert lifecycle_result["decision"] == "deny"
+	assert lifecycle_result["matched_rules"] == ["bytewax_grph_stream_required"]
 
 
 def test_registration_includes_full_capability_contract():
@@ -118,12 +158,19 @@ def test_registration_includes_full_capability_contract():
 	assert registration["configuration"]["tenant_id"] == "default"
 	assert registration["rule_engine"]["type"] == "deterministic"
 	assert registration["adapters"]["event_stream"] == "bytewax"
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["required_processor"] == "bytewax"
 	assert registration["ui_manifest"]["requires_theme"] is True
 	assert registration["theme"]["name"] == "grph_relationship_console"
 	assert registration["ui_components"]["schemas"] == "/grph/schemas"
+	assert registration["ui_components"]["agents"] == "/grph/agents"
+	assert registration["ui_components"]["lifecycle"] == "/grph/lifecycle"
 	assert registration["ui_components"]["audit"] == "/grph/audit"
 	assert "mdm" in registration["dependencies"]
+	assert "aicr" in registration["dependencies"]
 	assert "impact_analysis" in registration["capabilities"]
+	assert "graph_agent_composition" in registration["capabilities"]
+	assert "graph_lifecycle_batches" in registration["capabilities"]
 	assert "graph_audit" in registration["capabilities"]
 	assert "grph:audit" in registration["permissions"]
 
@@ -181,12 +228,34 @@ def test_graph_lifecycle_and_view_models_execute():
 	)
 	impact = service.impact_analysis("impact-orders", "tenant-graph", source["id"], max_depth=2, rbac_filter_applied=True)
 	quality = service.quality_report("quality-lineage", "tenant-graph", schema["id"])
+	agent = service.register_graph_agent(
+		agent_id="graph-agent-1",
+		tenant_id="tenant-graph",
+		name="Graph Steward",
+		runtime="codex",
+		role="graph_steward",
+		scope="schema node edge lineage quality review",
+		owner="graph-platform",
+		purpose="govern lineage and relationship quality",
+	)
+	batch = service.validate_grph_lifecycle_batch(
+		tenant_id="tenant-graph",
+		event_stream="bytewax",
+		mutation_count=3,
+		operation="graph_agent_batch",
+		batch_id="grph-batch-001",
+	)
 
 	assert edge["classification"] == "restricted"
 	assert traversal["node_ids"] == ["dataset-bronze", "dataset-silver"]
 	assert traversal["edge_ids"] == ["edge-transform"]
 	assert impact["edge_ids"] == ["edge-transform"]
 	assert quality["status"] == "healthy"
+	assert agent["runtime"] == "codex"
+	assert agent["status"] == "active"
+	assert batch["required_processor"] == "bytewax"
+	assert service.dashboard_summary("tenant-graph")["graph_agent_count"] == 1
+	assert service.dashboard_summary("tenant-graph")["lifecycle_batch_count"] == 1
 	assert service.dashboard_summary("tenant-graph")["audit_event_count"] >= 6
 	assert views.dashboard_model(service, "tenant-graph")["summary"]["node_count"] == 2
 	assert views.graph_explorer_model(service, "tenant-graph")["edges"][0]["id"] == "edge-transform"
@@ -198,8 +267,12 @@ def test_graph_lifecycle_and_view_models_execute():
 	assert views.impact_analysis_model(service, "tenant-graph")["traversals"]
 	assert views.quality_console_model(service, "tenant-graph")["reports"][0]["id"] == "quality-lineage"
 	assert views.governance_model(service, "tenant-graph")["restricted_edges"][0]["id"] == "edge-transform"
+	assert views.governance_model(service, "tenant-graph")["agents"]["first_class"] is True
+	assert views.graph_agent_roster_model(service, "tenant-graph")["agents"][0]["id"] == "graph-agent-1"
+	assert views.lifecycle_batch_model(service, "tenant-graph")["batches"][0]["id"] == "grph-batch-001"
 	assert views.audit_timeline_model(service, "tenant-graph")["audit_events"]
 	assert views.settings_model("tenant-graph")["theme"]["name"] == "grph_relationship_console"
+	assert views.settings_model("tenant-graph")["streaming"]["required_processor"] == "bytewax"
 
 
 def test_graph_service_enforces_policy_guardrails():
@@ -268,6 +341,66 @@ def test_graph_service_enforces_policy_guardrails():
 
 	with pytest.raises(PermissionError, match="start_node_required"):
 		service.traverse("missing-start", "tenant-graph", "missing", max_depth=1)
+
+
+def test_graph_agent_and_lifecycle_guardrails_execute():
+	service = GrphService()
+	tenant_id = "tenant-agents"
+
+	with pytest.raises(PermissionError, match="unsupported_graph_agent_runtime"):
+		service.register_graph_agent(
+			"agent-bad-runtime",
+			tenant_id,
+			"Bad Runtime",
+			"unknown",
+			"graph_steward",
+			"schema review",
+			"owner",
+			"purpose",
+		)
+
+	with pytest.raises(PermissionError, match="graph_agent_scope_required"):
+		service.register_graph_agent("agent-no-scope", tenant_id, "No Scope", "codex", "graph_steward", "", "owner", "purpose")
+
+	with pytest.raises(PermissionError, match="graph_agent_contribution_disclosure_required"):
+		service.register_graph_agent(
+			"agent-no-disclosure",
+			tenant_id,
+			"No Disclosure",
+			"codex",
+			"graph_steward",
+			"schema review",
+			"owner",
+			"purpose",
+			contribution_disclosed=False,
+		)
+
+	agent = service.register_graph_agent(
+		"agent-privileged",
+		tenant_id,
+		"Privileged Agent",
+		"claude-code",
+		"lineage reviewer",
+		"lineage and impact policy",
+		"owner",
+		"review privileged graph decisions",
+		human_approval_required=False,
+	)
+	assert agent["runtime"] == "claude_code"
+	assert agent["role"] == "lineage_reviewer"
+	assert agent["status"] == "pending_review"
+	assert service.dashboard_summary(tenant_id)["pending_agent_review_count"] == 1
+
+	with pytest.raises(ValueError, match="grph_lifecycle_batch_empty"):
+		service.validate_grph_lifecycle_batch(tenant_id, "bytewax", 0)
+
+	with pytest.raises(ValueError, match="unsupported_grph_lifecycle_operation"):
+		service.validate_grph_lifecycle_batch(tenant_id, "bytewax", 1, "unknown_batch")
+
+	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
+		service.validate_grph_lifecycle_batch(tenant_id, "kafka", 1)
+
+	assert service.dashboard_summary(tenant_id)["denied_lifecycle_batch_count"] == 1
 
 
 def test_review_evidence_unlocks_review_required_paths():
@@ -350,10 +483,33 @@ def test_api_helpers_expose_graph_surfaces():
 	})
 	traversal = api.traverse({"id": "trav-api", "tenant_id": "tenant-api", "start_node_id": node_a["id"]})
 	quality = api.quality_report({"id": "quality-api", "tenant_id": "tenant-api", "schema_id": schema["id"]})
+	agent = api.register_graph_agent({
+		"id": "api-agent",
+		"tenant_id": "tenant-api",
+		"name": "API Graph Agent",
+		"runtime": "opencode",
+		"role": "quality_reviewer",
+		"scope": "quality and edge review",
+		"owner": "owner",
+		"purpose": "review graph quality",
+	})
+	batch = api.validate_grph_lifecycle_batch({
+		"id": "api-batch",
+		"tenant_id": "tenant-api",
+		"event_stream": "bytewax",
+		"mutation_count": 2,
+		"operation": "quality_batch",
+	})
 	status = api.capability_status("tenant-api")
 	graph_data = api.list_graph_data("tenant-api")
 
 	assert traversal["node_ids"] == ["node-api-a", "node-api-b"]
 	assert quality["status"] == "healthy"
+	assert agent["id"] == "api-agent"
+	assert batch["status"] == "accepted"
+	assert api.list_graph_agents("tenant-api")[0]["id"] == "api-agent"
+	assert api.list_lifecycle_batches("tenant-api")[0]["id"] == "api-batch"
 	assert status["summary"]["edge_count"] == 1
+	assert status["agent_count"] == 1
 	assert graph_data["summary"]["audit_event_count"] >= 5
+	assert graph_data["graph_agents"][0]["runtime"] == "opencode"

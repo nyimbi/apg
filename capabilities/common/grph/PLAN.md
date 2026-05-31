@@ -15,22 +15,27 @@ focused tests, review, and progress-log evidence.
    - Replace `cap_spec.md` with a short pointer to the packet docs and contract.
 
 2. Expand the executable contract.
-   - Add complete configuration sections.
-   - Expand deterministic rules to cover lifecycle and guardrails.
-   - Expand UI routes to 12 generated-app screens.
-   - Add adapter evidence, including Bytewax event streaming.
-   - Add graph-specific theme components.
+	- Add complete configuration sections.
+	- Expand deterministic rules to cover lifecycle and guardrails.
+	- Add first-class graph-agent composition metadata for Codex, Claude Code,
+	  opencode, Pi, and future provider-neutral runtimes.
+	- Add Bytewax lifecycle stream metadata and processor guardrails.
+	- Expand UI routes to 14 generated-app screens.
+	- Add adapter evidence, including Bytewax event streaming.
+	- Add graph-specific theme components.
 
 3. Harden runtime behavior.
    - Enforce required schema, node, edge, traversal, lineage, and audit inputs.
-   - Add executable review-evidence paths.
-   - Record audit events for mutations and review-relevant actions.
-   - Keep the runtime dependency-light and deterministic.
+	- Add executable review-evidence paths.
+	- Add provider-neutral graph-agent registration state.
+	- Add Bytewax lifecycle batch validation state.
+	- Record audit events for mutations and review-relevant actions.
+	- Keep the runtime dependency-light and deterministic.
 
 4. Expand UI and API surfaces.
-   - Add route-aligned view models.
-   - Expose API helpers for schema, node, edge, traversal, lineage, quality,
-     audit, and summary surfaces.
+	- Add route-aligned view models.
+	- Expose API helpers for schema, node, edge, traversal, lineage, quality,
+	  graph agents, lifecycle batches, audit, and summary surfaces.
 
 5. Refresh package evidence.
    - Replace static app evidence with contract-derived semantic models.
@@ -53,9 +58,11 @@ Run focused checks only:
 - `app.self_test()`.
 - `apg capabilities implementation-audit --root capabilities/common/grph --json`.
 - `apg capabilities publish-plan capabilities/common/grph --json`.
+- service smoke for schema -> node -> edge -> traversal -> graph agent ->
+  Bytewax lifecycle batch.
 - stale-marker scan over GRPH files.
 - `git diff --check`.
 
 Full repository tests, live graph database checks, rendered browser UI, live
-Bytewax streams, external adapter calls, migrations, and performance benchmarks
-are deferred.
+Bytewax streams, external Codex/Claude Code/OpenCode/Pi clients, external
+adapter calls, migrations, and performance benchmarks are deferred.

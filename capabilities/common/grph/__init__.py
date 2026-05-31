@@ -10,7 +10,7 @@ from .capability_contract import evaluate_capability_rules, get_capability_contr
 __version__ = "1.0.0"
 __capability_id__ = "grph"
 __capability_name__ = "Graph Data Management"
-__apg_dependencies__ = ["mdm", "meta", "etlp"]
+__apg_dependencies__ = ["mdm", "meta", "etlp", "srch", "aicr", "conf"]
 
 capability_metadata: dict[str, Any] = {
 	"name": "grph",
@@ -24,7 +24,7 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["graph_store", "relationship_modeling", "graph_traversal", "lineage_graphs", "impact_analysis", "graph_quality", "graph_audit"],
+	"provides": ["graph_store", "relationship_modeling", "graph_traversal", "lineage_graphs", "impact_analysis", "graph_quality", "graph_agent_composition", "graph_lifecycle_batches", "graph_audit"],
 	"permissions": ["grph:view", "grph:query", "grph:write", "grph:manage_schema", "grph:govern", "grph:audit", "grph:admin"]
 }
 
@@ -44,6 +44,8 @@ def register_capability() -> dict[str, Any]:
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
 		"adapters": contract["configuration"]["adapters"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"capabilities": {
 			"graph_store": "Persist tenant-scoped nodes, edges, properties, and labels",
 			"relationship_modeling": "Govern relationship schema and entity links",
@@ -51,6 +53,8 @@ def register_capability() -> dict[str, Any]:
 			"lineage_graphs": "Represent lineage and dependency graphs for data assets",
 			"impact_analysis": "Trace dependency and lineage impact paths",
 			"graph_quality": "Inspect graph completeness, ownership, and relationship health",
+			"graph_agent_composition": "Register provider-neutral AI graph agents with runtime, role, scope, owner, purpose, disclosure, and human-review guardrails",
+			"graph_lifecycle_batches": "Validate graph lifecycle batches against Bytewax-only lifecycle stream policy",
 			"graph_audit": "Expose graph mutation and query audit events",
 			"capability_rules": "Evaluate deterministic graph-governance rules",
 			"visual_theming": "Apply graph-console theme tokens and components"
@@ -63,6 +67,8 @@ def register_capability() -> dict[str, Any]:
 			"lineage": "/grph/api/v1/lineage",
 			"impact": "/grph/api/v1/impact",
 			"quality": "/grph/api/v1/quality",
+			"agents": "/grph/api/v1/agents",
+			"lifecycle": "/grph/api/v1/lifecycle",
 			"audit": "/grph/api/v1/audit"
 		},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},

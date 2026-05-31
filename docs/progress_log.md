@@ -16,6 +16,67 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-31 07:10 EAT
+
+GRPH graph-agent composition and Bytewax lifecycle guardrail packet:
+
+- Extended `capabilities/common/grph/SPECIFICATION.md`, `PLAN.md`,
+  `README.md`, and `cap_spec.md` to define GRPH as a first-class graph data
+  management capability with provider-neutral graph agents and Bytewax
+  lifecycle batches.
+- Added top-level graph-agent contract metadata for Codex, Claude Code,
+  opencode, and Pi runtimes across schema, node quality, edge policy,
+  traversal, lineage, impact, quality, lifecycle batch, and graph-steward
+  roles.
+- Added deterministic graph-agent guardrails for supported runtime, supported
+  role, explicit scope, accountable owner, declared purpose, machine
+  contribution disclosure, and privileged-role human approval status.
+- Added GRPH Bytewax lifecycle stream metadata for `grph.lifecycle`, schema,
+  node, edge, traversal, lineage, impact, quality, and graph-agent batches,
+  plus a rule that rejects non-Bytewax lifecycle processors.
+- Added dependency-light `GraphAgentRecord` and `GrphLifecycleBatchRecord`
+  runtime state, service registration/validation methods, API helpers,
+  generated UI models, dashboard/governance summaries, audit events,
+  semantic-model publication, and focused tests.
+- Added `/grph/agents` and `/grph/lifecycle` route metadata plus theme
+  components for graph-agent rosters and Bytewax lifecycle monitoring.
+- Refreshed `semantic_model.json` and `release_report.json` from the live
+  executable app surface.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for GRPH contract, models,
+  graph runtime, service, API, view models, app, package init, and focused
+  tests passed.
+- `./.venv/bin/python capabilities/common/grph/app.py` passed package
+  self-test.
+- `./.venv/bin/pytest -q capabilities/common/grph/test_capability_contract.py
+  capabilities/common/grph/tests/test_package_contract.py` passed with 11
+  tests and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/apg capabilities inspect grph --json` confirmed `ok: true`, 14
+  routes, 43 rules, Bytewax streaming, and first-class agents.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/grph --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, no warnings, and no blocking gaps.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/grph --json`
+  confirmed side-effect-free publish planning with no warnings.
+- Service smoke executed schema -> node -> edge -> graph agent -> Bytewax
+  lifecycle batch and printed `codex active bytewax 1`.
+- GRPH stale-marker scan returned no TODO/FIXME/placeholder/stub/baseline
+  matches across the capability packet.
+- `git diff --check -- capabilities/common/grph docs/progress_log.md` passed.
+- Local code review found no blocking issues; residual risks remain around live
+  graph databases, rendered UI, durable stores, external agent clients, and
+  live Bytewax topology.
+
+Known gaps:
+
+- Did not run full repository tests, rendered browser UI checks, live graph
+  database adapters, durable Bytewax topology, external Codex/Claude
+  Code/OpenCode/Pi clients, SRCH/AICR/MDM/META/ETLP/CONF live adapters, load
+  checks, migration checks, or traversal-performance benchmarks during this
+  battery-conscious slice.
+
 ### 2026-05-31 06:35 EAT
 
 MLCM model-lifecycle-agent and Bytewax lifecycle guardrail packet:
