@@ -22,6 +22,8 @@ def dashboard_model(
 		"tenant_id": tenant_id,
 		"routes": capability_routes(tenant_id),
 		"summary": service.dashboard_summary(tenant_id),
+		"search_agents": service.list_search_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
 	}
@@ -79,6 +81,8 @@ def bulk_index_model(
 		"tenant_id": tenant_id,
 		"indices": service.list_indices(tenant_id),
 		"event_stream": contract["configuration"]["adapters"]["event_stream"],
+		"streaming": contract["streaming"],
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
 		"max_documents_per_batch": contract["configuration"]["indexing"]["max_documents_per_batch"],
 		"lineage_required": contract["configuration"]["indexing"]["bulk_lineage_required"],
 	}
@@ -151,10 +155,15 @@ def governance_model(
 	tenant_id: str = "default",
 ) -> dict[str, object]:
 	service = service or SrchService()
+	contract = service.describe(tenant_id)
 	return {
 		"route": "/srch/governance",
 		"tenant_id": tenant_id,
 		"audit_events": service.list_audit_events(tenant_id),
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
+		"search_agents": service.list_search_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
 		"restricted_indices": [
 			index
 			for index in service.list_indices(tenant_id)
@@ -165,6 +174,42 @@ def governance_model(
 			for query in service.list_queries(tenant_id)
 			if query["status"] == "review_required"
 		],
+	}
+
+
+def search_agent_roster_model(
+	service: SrchService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or SrchService()
+	contract = service.describe(tenant_id)
+	agents = service.list_search_agents(tenant_id)
+	return {
+		"route": "/srch/agents",
+		"tenant_id": tenant_id,
+		"agents": agents,
+		"pending_review": [item for item in agents if item["status"] == "pending_review"],
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+	}
+
+
+def lifecycle_batch_model(
+	service: SrchService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or SrchService()
+	contract = service.describe(tenant_id)
+	batches = service.list_lifecycle_batches(tenant_id)
+	return {
+		"route": "/srch/lifecycle",
+		"tenant_id": tenant_id,
+		"batches": batches,
+		"denied": [item for item in batches if item["status"] == "denied"],
+		"required_processor": contract["streaming"]["required_processor"],
+		"required_operations": contract["streaming"]["required_operations"],
+		"topics": contract["streaming"]["topics"],
 	}
 
 
@@ -186,5 +231,7 @@ def settings_model(tenant_id: str = "default") -> dict[str, object]:
 		"route": "/srch/settings",
 		"tenant_id": tenant_id,
 		"configuration": contract["configuration"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 	}

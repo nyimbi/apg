@@ -27,13 +27,15 @@ def test_contract_exposes_full_lifecycle_configuration_rules_ui_and_theme():
 		"ranking",
 		"facets",
 		"security",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
 		"ui",
 		"theme",
 	]
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert len(contract["rule_engine"]["rules"]) >= 39
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
 		"search",
@@ -45,15 +47,29 @@ def test_contract_exposes_full_lifecycle_configuration_rules_ui_and_theme():
 		"ranking",
 		"access",
 		"governance",
+		"agents",
+		"lifecycle",
 		"audit",
 		"settings",
 	}
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "service.SrchService"
+	assert contract["agents"]["first_class"] is True
+	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert contract["streaming"]["lifecycle_stream"] == "srch.lifecycle"
 	assert next(route for route in contract["ui"]["routes"] if route["name"] == "audit")["permission"] == "srch:audit"
 	assert contract["ui"]["api_prefix"] == "/srch/api/v1"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
-	assert {"result_card", "facet_panel", "bulk_queue", "ranking_panel", "audit_timeline"} <= set(contract["theme"]["components"])
+	assert {
+		"result_card",
+		"facet_panel",
+		"bulk_queue",
+		"ranking_panel",
+		"search_agent_roster",
+		"bytewax_lifecycle_panel",
+		"audit_timeline",
+	} <= set(contract["theme"]["components"])
 
 
 def test_rule_engine_enforces_search_guardrails():
@@ -87,6 +103,23 @@ def test_rule_engine_enforces_search_guardrails():
 		"state_change_requested": True,
 		"audit_event_recorded": False,
 	})
+	agent_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_search_agent",
+		"agent_runtime_supported": False,
+		"agent_role_supported": True,
+		"scope_present": True,
+		"owner_present": True,
+		"purpose_present": True,
+		"contribution_disclosed": True,
+		"privileged_role": False,
+		"human_approval_required": False,
+	})
+	lifecycle_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "validate_srch_lifecycle_batch",
+		"event_stream": "kafka",
+	})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) == {
@@ -101,6 +134,10 @@ def test_rule_engine_enforces_search_guardrails():
 	assert set(bulk_result["matched_rules"]) == {"bulk_index_requires_documents", "bulk_index_requires_lineage"}
 	assert batch_result["matched_rules"] == ["batch_indexing_requires_bytewax"]
 	assert state_change_result["matched_rules"] == ["search_state_change_requires_audit"]
+	assert agent_result["matched_rules"] == ["search_agent_runtime_supported"]
+	assert agent_result["actions"][0]["reason"] == "unsupported_search_agent_runtime"
+	assert lifecycle_result["matched_rules"] == ["bytewax_srch_stream_required"]
+	assert lifecycle_result["actions"][0]["reason"] == "bytewax_lifecycle_stream_required"
 
 
 def test_registration_includes_full_capability_contract():
@@ -110,13 +147,20 @@ def test_registration_includes_full_capability_contract():
 	assert registration["configuration"]["tenant_id"] == "default"
 	assert registration["rule_engine"]["type"] == "deterministic"
 	assert registration["adapters"]["event_stream"] == "bytewax"
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["required_processor"] == "bytewax"
 	assert registration["ui_manifest"]["requires_theme"] is True
 	assert registration["theme"]["name"] == "srch_discovery_console"
 	assert registration["ui_components"]["indices"] == "/srch/indices"
+	assert registration["ui_components"]["agents"] == "/srch/agents"
+	assert registration["ui_components"]["lifecycle"] == "/srch/lifecycle"
 	assert registration["ui_components"]["audit"] == "/srch/audit"
 	assert "nlpc" in registration["dependencies"]
+	assert "aicr" in registration["dependencies"]
 	assert "bulk_indexing" in registration["capabilities"]
 	assert "query_analytics" in registration["capabilities"]
+	assert "search_agent_composition" in registration["capabilities"]
+	assert "lifecycle_batch_governance" in registration["capabilities"]
 	assert "srch:audit" in registration["permissions"]
 
 
@@ -160,6 +204,23 @@ def test_search_index_document_query_and_view_lifecycle_executes():
 		result_window=10,
 		rbac_filter_applied=True,
 	)
+	agent = service.register_search_agent(
+		agent_id="search-agent-1",
+		tenant_id="tenant-a",
+		name="Search Steward",
+		runtime="codex",
+		role="search_steward",
+		scope="index document query review",
+		owner="search-owner",
+		purpose="govern search lifecycle changes",
+	)
+	batch = service.validate_srch_lifecycle_batch(
+		tenant_id="tenant-a",
+		event_stream="bytewax",
+		mutation_count=2,
+		operation="search_agent_batch",
+		batch_id="srch-batch-001",
+	)
 	summary = service.dashboard_summary("tenant-a")
 	dashboard = views.dashboard_model(service, "tenant-a")
 	console = views.search_console_model(service, "tenant-a")
@@ -171,6 +232,8 @@ def test_search_index_document_query_and_view_lifecycle_executes():
 	ranking = views.ranking_model(service, "tenant-a")
 	access = views.access_review_model(service, "tenant-a")
 	governance = views.governance_model(service, "tenant-a")
+	agent_roster = views.search_agent_roster_model(service, "tenant-a")
+	lifecycle = views.lifecycle_batch_model(service, "tenant-a")
 	audit = views.audit_timeline_model(service, "tenant-a")
 
 	assert ready_index["embedding_index_ready"] is True
@@ -179,9 +242,17 @@ def test_search_index_document_query_and_view_lifecycle_executes():
 	assert response["query"]["result_count"] == 1
 	assert response["results"][0]["document_id"] == "doc-1"
 	assert response["facets"]["module"]["platform"] == 2
+	assert agent["runtime"] == "codex"
+	assert agent["status"] == "active"
+	assert batch["required_processor"] == "bytewax"
+	assert batch["status"] == "accepted"
 	assert summary["index_count"] == 1
 	assert summary["document_count"] == 2
+	assert summary["search_agent_count"] == 1
+	assert summary["lifecycle_batch_count"] == 1
 	assert dashboard["summary"]["query_count"] == 1
+	assert dashboard["search_agents"][0]["id"] == "search-agent-1"
+	assert dashboard["lifecycle_batches"][0]["id"] == "srch-batch-001"
 	assert console["query_types"] == ["keyword", "semantic", "hybrid"]
 	assert indices["classifications"] == ["public", "internal", "confidential", "restricted"]
 	assert documents_view["lineage_required"] is True
@@ -191,6 +262,9 @@ def test_search_index_document_query_and_view_lifecycle_executes():
 	assert ranking["ranking"]["explain_ranking"] is True
 	assert access["denied_queries"] == []
 	assert governance["review_required_queries"] == []
+	assert governance["agents"]["first_class"] is True
+	assert agent_roster["agents"][0]["role"] == "search_steward"
+	assert lifecycle["batches"][0]["operation"] == "search_agent_batch"
 	assert audit["audit_events"]
 
 
@@ -347,6 +421,74 @@ def test_search_review_evidence_unlocks_review_required_lifecycle_paths():
 	assert reviewed_query["query"]["query_type"] == "expansion"
 
 
+def test_service_enforces_search_agent_and_lifecycle_guardrails():
+	service = SrchService()
+	tenant_id = "tenant-agent"
+
+	with pytest.raises(PermissionError, match="unsupported_search_agent_runtime"):
+		service.register_search_agent(
+			"agent-bad-runtime",
+			tenant_id,
+			"Bad Runtime",
+			"unknown",
+			"search_steward",
+			"query review",
+			"owner",
+			"purpose",
+		)
+
+	with pytest.raises(PermissionError, match="search_agent_scope_required"):
+		service.register_search_agent(
+			"agent-no-scope",
+			tenant_id,
+			"No Scope",
+			"codex",
+			"search_steward",
+			"",
+			"owner",
+			"purpose",
+		)
+
+	with pytest.raises(PermissionError, match="search_agent_contribution_disclosure_required"):
+		service.register_search_agent(
+			"agent-no-disclosure",
+			tenant_id,
+			"No Disclosure",
+			"codex",
+			"search_steward",
+			"query review",
+			"owner",
+			"purpose",
+			contribution_disclosed=False,
+		)
+
+	agent = service.register_search_agent(
+		"agent-review",
+		tenant_id,
+		"Review Agent",
+		"claude-code",
+		"access policy reviewer",
+		"restricted query policy review",
+		"owner",
+		"purpose",
+	)
+
+	assert agent["runtime"] == "claude_code"
+	assert agent["role"] == "access_policy_reviewer"
+	assert agent["status"] == "pending_review"
+	assert service.dashboard_summary(tenant_id)["pending_agent_review_count"] == 1
+
+	with pytest.raises(ValueError, match="srch_lifecycle_batch_empty"):
+		service.validate_srch_lifecycle_batch(tenant_id, "bytewax", 0)
+	with pytest.raises(ValueError, match="unsupported_srch_lifecycle_operation"):
+		service.validate_srch_lifecycle_batch(tenant_id, "bytewax", 1, "unknown_batch")
+	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
+		service.validate_srch_lifecycle_batch(tenant_id, "kafka", 1)
+
+	assert service.list_lifecycle_batches(tenant_id)[0]["status"] == "denied"
+	assert service.dashboard_summary(tenant_id)["denied_lifecycle_batch_count"] == 1
+
+
 def test_api_helpers_expose_search_engine_surfaces():
 	local_service = SrchService()
 	api.SERVICE = local_service
@@ -410,12 +552,35 @@ def test_api_helpers_expose_search_engine_surfaces():
 		"query_type": "hybrid",
 		"result_window": 25,
 	})
+	agent = api.register_search_agent({
+		"id": "api-agent",
+		"tenant_id": "tenant-b",
+		"name": "API Search Agent",
+		"runtime": "opencode",
+		"role": "search_steward",
+		"scope": "policy search review",
+		"owner": "policy-owner",
+		"purpose": "govern policy search lifecycle changes",
+	})
+	batch = api.validate_srch_lifecycle_batch({
+		"id": "api-batch",
+		"tenant_id": "tenant-b",
+		"event_stream": "bytewax",
+		"mutation_count": 1,
+		"operation": "search_agent_batch",
+	})
 
 	status = api.capability_status("tenant-b")
 	search_engine = api.list_search_engine("tenant-b")
 	settings = views.settings_model("tenant-b")
 
 	assert search_result["query"]["status"] == "completed"
+	assert agent["runtime"] == "opencode"
+	assert batch["status"] == "accepted"
+	assert api.list_search_agents("tenant-b")[0]["id"] == "api-agent"
+	assert api.list_lifecycle_batches("tenant-b")[0]["id"] == "api-batch"
 	assert status["index_count"] == 2
+	assert status["search_agent_count"] == 1
 	assert search_engine["summary"]["document_count"] == 2
+	assert search_engine["summary"]["lifecycle_batch_count"] == 1
 	assert settings["theme"]["name"] == "srch_discovery_console"

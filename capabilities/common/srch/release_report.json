@@ -1,16 +1,26 @@
 {
   "evidence": {
+    "agents": {
+      "first_class": true,
+      "role_count": 9,
+      "runtime_count": 4
+    },
     "contracts": {
       "capability_contract": {
         "display_name": "Search Engine",
         "errors": [],
-        "route_count": 12,
-        "rule_count": 31
+        "route_count": 14,
+        "rule_count": 39
       }
     },
     "runtime": {
+      "api": "api.py",
+      "entrypoint": "app.py",
       "event_stream": "bytewax",
-      "generated_app_runtime": "service.SrchService"
+      "generated_app_runtime": "service.SrchService",
+      "helper_runtime": "search_runtime.py",
+      "production_runtime": "service.SrchService",
+      "views": "views.py"
     },
     "self_test": {
       "capability": "srch",
@@ -27,6 +37,11 @@
     "semantic_model": {
       "capability": "srch",
       "format": "apg.semantic-model.v1"
+    },
+    "streaming": {
+      "engine": "bytewax",
+      "lifecycle_stream": "srch.lifecycle",
+      "required_processor": "bytewax"
     }
   },
   "format": "apg.release-report.v1",

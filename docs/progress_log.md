@@ -21794,3 +21794,66 @@ Not run to preserve battery:
 - Live monitoring ingest, live Bytewax topology, live PRED/AICR/MONI/CONF/
   AUTH/AUDL/WFLO/NTFY/HLTH/CACH adapters, rendered browser UI, external
   AI-agent runtime clients, and performance/load/precision/recall benchmarks.
+
+### 2026-05-31 07:37 EAT
+
+SRCH search-agent composition and Bytewax lifecycle guardrail packet:
+
+- Selected `capabilities/common/srch` as the next ordered capability after
+  ANOM.
+- Extended the SRCH executable contract with first-class search-agent metadata,
+  supported runtimes `codex`, `claude_code`, `opencode`, and `pi`, supported
+  search-governance roles, privileged-role metadata, Bytewax lifecycle stream
+  metadata, route metadata, theme components, and contract
+  `provides`/`requires`.
+- Added deterministic guardrails for unsupported search-agent runtime,
+  unsupported search-agent role, missing agent scope, owner, purpose, missing
+  machine contribution disclosure, privileged search-agent registration
+  without human approval, and non-Bytewax SRCH lifecycle batch routing.
+- Added `SearchAgentRecord`, `SrchLifecycleBatchRecord`, tenant-qualified
+  search-agent storage, lifecycle-batch storage, registration, listing, audit
+  events, dashboard counts, search-agent roster view models, and
+  lifecycle-batch monitor view models.
+- Added `/srch/agents`, `/srch/lifecycle`, search-agent roster theme metadata,
+  and Bytewax lifecycle panel theme metadata.
+- Regenerated `semantic_model.json` and `release_report.json` from the live
+  `app.py` contract.
+- Refreshed `README.md`, `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md` so
+  the documented packet matches the executable contract and keeps external
+  AI-agent runtimes, embedding providers, vector stores, and Bytewax workers
+  behind adapter boundaries.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/srch/__init__.py capabilities/common/srch/capability_contract.py capabilities/common/srch/models.py capabilities/common/srch/search_runtime.py capabilities/common/srch/service.py capabilities/common/srch/api.py capabilities/common/srch/views.py capabilities/common/srch/app.py capabilities/common/srch/test_capability_contract.py capabilities/common/srch/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/python capabilities/common/srch/app.py` passed with `passed:
+  true`.
+- `./.venv/bin/python -m json.tool capabilities/common/srch/semantic_model.json`
+  passed.
+- `./.venv/bin/python -m json.tool capabilities/common/srch/release_report.json`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/srch/test_capability_contract.py capabilities/common/srch/tests/test_package_contract.py`
+  passed with 11 tests and only existing shared-module deprecation warnings.
+- `./.venv/bin/apg capabilities inspect srch --json` passed with `ok: true`,
+  14 APG Python routes, 39 deterministic rules, first-class agents, and
+  Bytewax streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/srch --json`
+  passed with `ok: true`; SRCH remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/srch --json`
+  passed with side-effect-free package evidence and no warnings.
+- `./.venv/bin/python -c "... SrchService ... register_search_agent ... validate_srch_lifecycle_batch ..."`
+  returned one `codex` active search steward and one `bytewax`
+  lifecycle-batch evidence record.
+- Focused stale-marker scan over touched SRCH packet source, docs, tests, and
+  evidence returned only intentional Kafka-denial tests.
+- `git diff --check -- capabilities/common/srch docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live search backends, live vector databases, live embedding providers, live
+  Bytewax topology, live ETLP/META/NLPC/AICR/CONF/AUTH/AUDL/CACH/MONI
+  adapters, rendered browser UI, external AI-agent runtime clients, and
+  performance/load/recall/ranking benchmarks.

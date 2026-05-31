@@ -7,9 +7,11 @@ from typing import Any
 from .capability_contract import evaluate_capability_rules, get_capability_contract
 from .search_runtime import (
 	QueryRecord,
+	SearchAgentRecord,
 	SearchAuditEventRecord,
 	SearchDocumentRecord,
 	SearchIndexRecord,
+	SrchLifecycleBatchRecord,
 	normalize_classification,
 	normalize_query_type,
 	search_required_actions,
@@ -25,7 +27,14 @@ class SrchService:
 		self.indices: dict[str, SearchIndexRecord] = {}
 		self.documents: dict[str, SearchDocumentRecord] = {}
 		self.queries: dict[str, QueryRecord] = {}
+		self.search_agents: dict[str, SearchAgentRecord] = {}
+		self.lifecycle_batches: dict[str, SrchLifecycleBatchRecord] = {}
 		self.audit_events: dict[str, SearchAuditEventRecord] = {}
+		contract = get_capability_contract()
+		self._agent_runtimes = set(contract["agents"]["supported_runtimes"])
+		self._agent_roles = set(contract["agents"]["supported_roles"])
+		self._privileged_agent_roles = set(contract["agents"]["privileged_roles"])
+		self._lifecycle_operations = set(contract["streaming"]["required_operations"])
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -293,6 +302,112 @@ class SrchService:
 	def list_queries(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.queries, tenant_id)
 
+	def register_search_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> dict[str, Any]:
+		runtime_value = _normalize_token(runtime)
+		role_value = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(str(tenant_id or "").strip()),
+			"operation": "register_search_agent",
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"scope_present": bool(str(scope or "").strip()),
+			"owner_present": bool(str(owner or "").strip()),
+			"purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+		})
+		self._raise_if_denied(result)
+		if not name:
+			raise ValueError("search_agent_name_required")
+		status = "pending_review" if result["decision"] == "require_review" else "active"
+		record = SearchAgentRecord(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=name,
+			runtime=runtime_value,
+			role=role_value,
+			scope=str(scope).strip(),
+			owner=str(owner).strip(),
+			purpose=str(purpose).strip(),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+			status=status,
+		)
+		self.search_agents[self._tenant_record_key(tenant_id, record.id)] = record
+		self._record_event(
+			tenant_id,
+			"search_agent_registered",
+			record.id,
+			f"Search agent registered: {name}",
+			owner,
+			severity="medium" if status == "pending_review" else "low",
+		)
+		return record.to_dict()
+
+	def validate_srch_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "search_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		mutation_count = int(mutation_count)
+		if mutation_count <= 0:
+			raise ValueError("srch_lifecycle_batch_empty")
+		stream_value = _normalize_token(event_stream)
+		operation_value = _normalize_token(operation)
+		if operation_value not in self._lifecycle_operations:
+			raise ValueError(f"unsupported_srch_lifecycle_operation:{operation_value}")
+		result = self.evaluate({
+			"tenant_context_present": bool(str(tenant_id or "").strip()),
+			"operation": "validate_srch_lifecycle_batch",
+			"event_stream": stream_value,
+		})
+		accepted = result["decision"] == "allow"
+		record = SrchLifecycleBatchRecord(
+			id=batch_id or f"srchbatch:{len(self.lifecycle_batches) + 1:06d}",
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			operation=operation_value,
+			accepted=accepted,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			status="accepted" if accepted else "denied",
+		)
+		self.lifecycle_batches[self._tenant_record_key(tenant_id, record.id)] = record
+		self._record_event(
+			tenant_id,
+			f"srch_lifecycle_batch_{record.status}",
+			record.id,
+			f"Validated SRCH lifecycle batch: {record.id}",
+			"srch",
+			severity="medium" if not accepted else "low",
+		)
+		if not accepted:
+			self._raise_if_denied(result)
+		return record.to_dict()
+
+	def list_search_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.search_agents, tenant_id)
+
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.lifecycle_batches, tenant_id)
+
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.audit_events, tenant_id)
 
@@ -309,6 +424,10 @@ class SrchService:
 			"query_count": len(queries),
 			"review_required_query_count": sum(1 for item in queries if item["status"] == "review_required"),
 			"denied_query_count": sum(1 for item in queries if item["status"] == "denied"),
+			"search_agent_count": len(self.list_search_agents(tenant_id)),
+			"pending_agent_review_count": len([item for item in self.list_search_agents(tenant_id) if item["status"] == "pending_review"]),
+			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
+			"denied_lifecycle_batch_count": len([item for item in self.list_lifecycle_batches(tenant_id) if item["status"] == "denied"]),
 			"recent_events": self.list_audit_events(tenant_id)[-5:],
 		}
 
@@ -324,6 +443,10 @@ class SrchService:
 		if result["decision"] == "allow":
 			return
 		self._raise_policy(result)
+
+	def _raise_if_denied(self, result: dict[str, Any]) -> None:
+		if result["decision"] == "deny":
+			self._raise_policy(result)
 
 	def _get_index(self, tenant_id: str, index_id: str) -> SearchIndexRecord:
 		index = self.indices.get(index_id)
@@ -418,3 +541,10 @@ class SrchService:
 		if tenant_id is not None:
 			items = [item for item in items if item["tenant_id"] == tenant_id]
 		return sorted(items, key=lambda item: item["id"])
+
+	def _tenant_record_key(self, tenant_id: str, record_id: str) -> str:
+		return f"{tenant_id}:{record_id}"
+
+
+def _normalize_token(value: str) -> str:
+	return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")

@@ -10,7 +10,7 @@ from .capability_contract import evaluate_capability_rules, get_capability_contr
 __version__ = "1.0.0"
 __capability_id__ = "srch"
 __capability_name__ = "Search Engine"
-__apg_dependencies__ = ["etlp", "meta", "nlpc"]
+__apg_dependencies__ = ["etlp", "meta", "nlpc", "aicr", "conf"]
 
 capability_metadata: dict[str, Any] = {
 	"name": "srch",
@@ -24,7 +24,7 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["indexing", "keyword_search", "semantic_search", "hybrid_search", "faceted_search", "access_filtered_retrieval", "query_analytics"],
+	"provides": ["indexing", "keyword_search", "semantic_search", "hybrid_search", "faceted_search", "access_filtered_retrieval", "query_analytics", "search_agent_composition", "lifecycle_batch_governance"],
 	"permissions": ["srch:view", "srch:query", "srch:index", "srch:manage_indices", "srch:govern", "srch:audit", "srch:admin"]
 }
 
@@ -39,11 +39,13 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["auth", "audl", "cach", "aicr"],
+		"optional_dependencies": ["auth", "audl", "cach", "moni"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
 		"adapters": contract["configuration"]["adapters"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"capabilities": {
 			"indexing": "Index tenant-scoped structured and unstructured content",
 			"bulk_indexing": "Coordinate lineage-protected Bytewax-backed indexing batches",
@@ -53,6 +55,8 @@ def register_capability() -> dict[str, Any]:
 			"access_filtered_retrieval": "Apply tenant, RBAC, and classification filters before result return",
 			"facet_navigation": "Expose governed facet counts and filters",
 			"query_analytics": "Track query decisions, reviews, denials, and retrieval health",
+			"search_agent_composition": "Register provider-neutral AI search agents with runtime, role, scope, owner, purpose, disclosure, and human-review guardrails",
+			"lifecycle_batch_governance": "Validate search lifecycle mutations through Bytewax-only batch contracts",
 			"capability_rules": "Evaluate deterministic search-governance rules",
 			"visual_theming": "Apply search-console theme tokens and components"
 		},
@@ -63,6 +67,8 @@ def register_capability() -> dict[str, Any]:
 			"bulk": "/srch/api/v1/bulk",
 			"facets": "/srch/api/v1/facets",
 			"analytics": "/srch/api/v1/analytics",
+			"agents": "/srch/api/v1/agents",
+			"lifecycle": "/srch/api/v1/lifecycle",
 			"audit": "/srch/api/v1/audit"
 		},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},

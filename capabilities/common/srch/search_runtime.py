@@ -108,6 +108,47 @@ class QueryRecord:
 
 
 @dataclass(slots=True)
+class SearchAgentRecord:
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	owner: str
+	purpose: str
+	contribution_disclosed: bool
+	human_approval_required: bool
+	status: str = "active"
+	created_at: str = field(default_factory=utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		data = serialize(self)
+		data["agent_id"] = self.id
+		return data
+
+
+@dataclass(slots=True)
+class SrchLifecycleBatchRecord:
+	id: str
+	tenant_id: str
+	event_stream: str
+	mutation_count: int
+	operation: str
+	accepted: bool
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	required_processor: str = "bytewax"
+	status: str = "accepted"
+	created_at: str = field(default_factory=utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		data = serialize(self)
+		data["batch_id"] = self.id
+		return data
+
+
+@dataclass(slots=True)
 class SearchAuditEventRecord:
 	id: str
 	tenant_id: str
@@ -127,9 +168,11 @@ __all__ = [
 	"INDEX_STATES",
 	"QUERY_TYPES",
 	"QueryRecord",
+	"SearchAgentRecord",
 	"SearchAuditEventRecord",
 	"SearchDocumentRecord",
 	"SearchIndexRecord",
+	"SrchLifecycleBatchRecord",
 	"normalize_classification",
 	"normalize_query_type",
 	"search_required_actions",

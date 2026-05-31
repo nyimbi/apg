@@ -5,7 +5,8 @@
 SRCH provides APG with first-class enterprise search for generated
 applications. It supports governed indexing, document ingestion, bulk indexing,
 keyword search, semantic search, hybrid search, faceted navigation, access
-filtering, query analytics, UI composition, and auditable policy enforcement.
+filtering, query analytics, first-class AI search-agent composition, Bytewax
+lifecycle batch validation, UI composition, and auditable policy enforcement.
 
 ## Scope
 
@@ -15,6 +16,9 @@ This packet establishes the executable baseline for SRCH:
   routes, and visual theme tokens.
 - A dependency-light runtime service for generated applications.
 - UI view models that can be composed into APG screens.
+- Provider-neutral AI search agents as executable state with runtime, role,
+  scope, owner, purpose, disclosure, human-review status, and audit evidence.
+- Bytewax-only lifecycle batch validation for search mutations.
 - Package evidence that can be published and self-tested from the current
   executable contract.
 - Focused tests for the contract, lifecycle, guardrails, view models, and
@@ -27,6 +31,9 @@ This packet establishes the executable baseline for SRCH:
 - Search user: runs governed keyword, semantic, and hybrid queries.
 - Governance reviewer: reviews restricted search, large result windows, facets,
   and denied query evidence.
+- AI search agent: assists with source curation, index review, document
+  quality, query relevance, ranking, access policy, facet taxonomy, and
+  lifecycle batch review while remaining provider-neutral.
 - Platform operator: configures Bytewax streams, ETLP, META, NLPC, AICR, auth,
   audit, cache, metrics, and generated app deployment.
 
@@ -67,10 +74,36 @@ This packet establishes the executable baseline for SRCH:
 - Record query status, matched rules, required actions, result count, and audit
   events.
 
+### AI Agent Lifecycle
+
+- Register search agents with tenant, name, runtime, role, scope, owner,
+  purpose, machine-contribution disclosure, and human-approval metadata.
+- Support provider-neutral runtimes `codex`, `claude_code`, `opencode`, and
+  `pi`.
+- Support roles for source curation, index review, document-quality review,
+  query-relevance review, ranking review, access-policy review,
+  facet-taxonomy review, lifecycle-batch review, and search stewardship.
+- Deny unsupported runtimes, unsupported roles, missing scope, missing owner,
+  missing purpose, and missing machine-contribution disclosure.
+- Put privileged search-agent roles into pending review when human approval
+  evidence is absent.
+- Keep live agent invocation, credentials, and provider-specific routing behind
+  the AICR adapter boundary.
+
+### Bytewax Lifecycle Batches
+
+- Validate SRCH lifecycle mutation batches through the declared Bytewax stream
+  contract.
+- Accept only configured lifecycle operations: index, document, bulk indexing,
+  query, facet, ranking, access-policy, and search-agent batches.
+- Deny non-Bytewax lifecycle streams while preserving denied-batch evidence for
+  audit and UI review.
+
 ### UI and Theming
 
 - Expose routes for dashboard, search, indices, documents, bulk indexing,
-  facets, analytics, ranking, access review, governance, audit, and settings.
+  facets, analytics, ranking, access review, governance, agents, lifecycle
+  batches, audit, and settings.
 - Provide route-specific view models.
 - Publish discovery-console theme tokens and component hints.
 
@@ -86,6 +119,7 @@ This packet establishes the executable baseline for SRCH:
   integration.
 - Live Bytewax stream execution.
 - Live embedding provider calls.
+- Live AI-agent CLI/API invocation.
 - Persistent database migrations.
 - Browser-rendered UI validation.
 - Load, latency, recall, ranking, and throughput benchmarking.
@@ -95,11 +129,11 @@ stable.
 
 ## Acceptance Criteria
 
-- `get_capability_contract()` exposes at least 30 deterministic rules, at least
-  12 UI routes, Bytewax adapter evidence, runtime adapter evidence, and theme
-  component metadata.
+- `get_capability_contract()` exposes at least 39 deterministic rules, at least
+  14 UI routes, first-class agent metadata, Bytewax lifecycle metadata, runtime
+  adapter evidence, and theme component metadata.
 - `SrchService` executes index, document, bulk, query, facet, list, dashboard,
-  audit, and APG record compatibility flows.
+  search-agent, lifecycle-batch, audit, and APG record compatibility flows.
 - Guardrail tests prove denied or review-required cases fail before invalid
   state is accepted.
 - `app.self_test()` passes and fails if route, rule, Bytewax, or runtime

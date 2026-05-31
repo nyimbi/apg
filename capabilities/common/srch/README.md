@@ -19,8 +19,14 @@ deterministic guardrails.
 - Keyword, semantic, and hybrid query execution with RBAC filtering,
   restricted-content enforcement, embedding readiness checks, large-window
   review, query records, facets, and audit events.
+- First-class AI search-agent composition for `codex`, `claude_code`,
+  `opencode`, and `pi`, with role, scope, owner, purpose, contribution
+  disclosure, and privileged-role review guardrails.
+- Bytewax lifecycle batch validation for index, document, bulk indexing, query,
+  facet, ranking, access-policy, and search-agent mutations.
 - UI view models for dashboard, search, indices, documents, bulk indexing,
-  facets, analytics, ranking, access review, governance, audit, and settings.
+  facets, analytics, ranking, access review, governance, agents, lifecycle
+  batches, audit, and settings.
 - Adapter configuration for ETLP, META, NLPC, AICR, AUTH, AUDL, CACH, MONI,
   and Bytewax event streaming.
 
@@ -69,6 +75,23 @@ response = service.query(
 	result_window=10,
 	rbac_filter_applied=True,
 )
+agent = service.register_search_agent(
+	"agent-001",
+	"tenant-a",
+	"Search Steward",
+	"codex",
+	"search_steward",
+	"index document query review",
+	"search-owner",
+	"govern search lifecycle changes",
+)
+batch = service.validate_srch_lifecycle_batch(
+	"tenant-a",
+	"bytewax",
+	1,
+	"search_agent_batch",
+	"batch-001",
+)
 ```
 
 ## Guardrails
@@ -82,6 +105,26 @@ non-positive result windows, cross-tenant search, non-Bytewax batch indexing,
 index retirement without review, and state changes without audit evidence. SRCH
 requires review for unknown content types, unknown classifications, large bulk
 batches, unknown query types, large result windows, and unapproved facet keys.
+AI search-agent guardrails also block unsupported runtimes, unsupported roles,
+missing scope, missing owner, missing purpose, missing machine-contribution
+disclosure, and route privileged roles through pending human review when
+approval evidence is absent. Lifecycle mutation batches are accepted only
+through the declared Bytewax processor contract.
+
+## AI Agent Composition
+
+SRCH treats search-governance agents as first-class APG citizens. Generated
+applications can compose agents from rapidly changing tool runtimes without
+binding indexing, retrieval, ranking, or access-policy logic to a single
+provider. The executable contract supports `codex`, `claude_code`, `opencode`,
+and `pi`; roles include source curation, index review, document-quality review,
+query-relevance review, ranking review, access-policy review, facet-taxonomy
+review, lifecycle-batch review, and search stewardship.
+
+The runtime stores provider-neutral agent metadata only. Live CLI/API
+invocation, credentials, embedding-provider calls, vector database operations,
+and remote agent orchestration belong behind AICR, NLPC, and search-provider
+adapter boundaries.
 
 ## Focused Verification
 

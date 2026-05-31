@@ -30,10 +30,12 @@ def test_contract_shape_is_valid():
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "srch"
-	assert len(contract["ui"]["routes"]) >= 12
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert len(contract["ui"]["routes"]) >= 14
+	assert len(contract["rule_engine"]["rules"]) >= 39
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "service.SrchService"
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert contract["theme"]["tokens"]["border.radius"]
 
 
@@ -54,6 +56,11 @@ def test_app_entrypoint_is_publishable():
 	assert "srch" in model["capabilities"]
 	assert model["capabilities"]["srch"]["runtime"]["service"] == "service.SrchService"
 	assert model["capabilities"]["srch"]["streaming"]["engine"] == "bytewax"
+	assert model["capabilities"]["srch"]["streaming"]["required_processor"] == "bytewax"
+	assert model["capabilities"]["srch"]["agents"]["first_class"] is True
+	assert model["composition"]["capability_dependencies"]["srch"] == ["etlp", "meta", "nlpc", "aicr", "conf"]
+	assert model["composition"]["agent_teams"]["srch_retrieval_governance"]["stream"] == "srch.lifecycle"
+	assert model["capabilities"]["srch"]["search_lifecycle"]["lifecycle_batch"] == "SrchLifecycleBatchRecord"
 	assert "audit" in model["capabilities"]["srch"]["screens"]
 	assert committed_model == model
 	for generated_doc in ("README.md", "SPECIFICATION.md", "PLAN.md"):
@@ -64,16 +71,19 @@ def test_app_entrypoint_is_publishable():
 		"SPECIFICATION.md",
 		"PLAN.md",
 		"capability_contract.py",
+		"models.py",
 		"search_runtime.py",
 		"service.py",
 		"views.py",
 		"app.py",
 	}
 	assert committed_report["ok"] is True
-	assert committed_report["evidence"]["contracts"]["capability_contract"]["route_count"] >= 12
-	assert committed_report["evidence"]["contracts"]["capability_contract"]["rule_count"] >= 30
+	assert committed_report["evidence"]["contracts"]["capability_contract"]["route_count"] >= 14
+	assert committed_report["evidence"]["contracts"]["capability_contract"]["rule_count"] >= 39
 	assert committed_report["evidence"]["runtime"]["event_stream"] == "bytewax"
 	assert committed_report["evidence"]["runtime"]["generated_app_runtime"] == "service.SrchService"
+	assert committed_report["evidence"]["agents"]["first_class"] is True
+	assert committed_report["evidence"]["streaming"]["required_processor"] == "bytewax"
 
 
 def test_package_runtime_compatibility_surface_creates_index():

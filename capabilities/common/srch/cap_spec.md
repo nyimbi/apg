@@ -7,6 +7,8 @@ The current SRCH scope is defined by:
 - `PLAN.md` for the implementation and verification plan.
 - `capability_contract.py` for the executable configuration, rules, UI routes,
   adapters, and visual theme.
+- `service.py` for executable index, document, bulk, query, search-agent,
+  lifecycle-batch, summary, facet, and audit behavior.
 
 Keep this file as a concise pointer so the executable packet has one canonical
 specification and one canonical contract.

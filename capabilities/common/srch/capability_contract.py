@@ -6,6 +6,25 @@ from copy import deepcopy
 from typing import Any
 
 
+SUPPORTED_SRCH_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_SRCH_AGENT_ROLES = [
+	"source_curator",
+	"index_reviewer",
+	"document_quality_reviewer",
+	"query_relevance_reviewer",
+	"ranking_reviewer",
+	"access_policy_reviewer",
+	"facet_taxonomy_reviewer",
+	"lifecycle_batch_reviewer",
+	"search_steward",
+]
+PRIVILEGED_SRCH_AGENT_ROLES = [
+	"ranking_reviewer",
+	"access_policy_reviewer",
+	"lifecycle_batch_reviewer",
+]
+
+
 DEFAULT_CONFIGURATION: dict[str, Any] = {
 	"tenant_id": "default",
 	"indices": {
@@ -54,6 +73,45 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"cross_tenant_search_allowed": False,
 		"rbac_filter_required": True,
 	},
+	"agents": {
+		"first_class": True,
+		"supported_runtimes": SUPPORTED_SRCH_AGENT_RUNTIMES,
+		"supported_roles": SUPPORTED_SRCH_AGENT_ROLES,
+		"privileged_roles": PRIVILEGED_SRCH_AGENT_ROLES,
+		"require_owner": True,
+		"require_purpose": True,
+		"require_scope": True,
+		"require_contribution_disclosure": True,
+		"require_human_approval_for_privileged_roles": True,
+		"adapter_contract": "aicr_provider_neutral_search_agent_adapter",
+	},
+	"streaming": {
+		"engine": "bytewax",
+		"lifecycle_stream": "srch.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"index_batch",
+			"document_batch",
+			"bulk_index_batch",
+			"query_batch",
+			"facet_batch",
+			"ranking_batch",
+			"access_policy_batch",
+			"search_agent_batch",
+		],
+		"topics": [
+			"srch.indices",
+			"srch.documents",
+			"srch.bulk",
+			"srch.queries",
+			"srch.facets",
+			"srch.ranking",
+			"srch.access",
+			"srch.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	},
 	"governance": {
 		"require_tenant_context": True,
 		"audit_queries": True,
@@ -94,6 +152,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"enable_ranking": True,
 		"enable_access_review": True,
 		"enable_governance": True,
+		"enable_search_agent_roster": True,
+		"enable_lifecycle_batch_monitor": True,
 		"enable_audit": True,
 		"enable_settings": True,
 	},
@@ -112,6 +172,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"ranking",
 		"facets",
 		"security",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
@@ -126,6 +188,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"ranking",
 		"facets",
 		"security",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
@@ -167,6 +231,14 @@ RULES: list[dict[str, Any]] = [
 	{"name": "batch_indexing_requires_bytewax", "description": "Batch indexing streams must use Bytewax.", "condition": {"operation": "configure_batch_indexing", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}},
 	{"name": "index_retire_requires_review", "description": "Index retirement requires review evidence.", "condition": {"operation": "retire_index", "review_recorded": False}, "effect": {"decision": "deny", "reason": "index_retire_review_required", "required_action": "record_retire_review"}},
 	{"name": "search_state_change_requires_audit", "description": "Search state changes require audit events.", "condition": {"state_change_requested": True, "audit_event_recorded": False}, "effect": {"decision": "deny", "reason": "audit_event_required", "required_action": "record_audit_event"}},
+	{"name": "search_agent_runtime_supported", "description": "Search agents must use supported runtimes.", "condition": {"operation": "register_search_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_search_agent_runtime", "required_action": "choose_supported_search_agent_runtime"}},
+	{"name": "search_agent_role_supported", "description": "Search agents must use supported search-governance roles.", "condition": {"operation": "register_search_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_search_agent_role", "required_action": "choose_supported_search_agent_role"}},
+	{"name": "search_agent_requires_scope", "description": "Search agents require an explicit bounded scope.", "condition": {"operation": "register_search_agent", "scope_present": False}, "effect": {"decision": "deny", "reason": "search_agent_scope_required", "required_action": "declare_search_agent_scope"}},
+	{"name": "search_agent_requires_owner", "description": "Search agents require an accountable owner.", "condition": {"operation": "register_search_agent", "owner_present": False}, "effect": {"decision": "deny", "reason": "search_agent_owner_required", "required_action": "assign_search_agent_owner"}},
+	{"name": "search_agent_requires_purpose", "description": "Search agents require a documented purpose.", "condition": {"operation": "register_search_agent", "purpose_present": False}, "effect": {"decision": "deny", "reason": "search_agent_purpose_required", "required_action": "document_search_agent_purpose"}},
+	{"name": "search_agent_requires_contribution_disclosure", "description": "Search agents must disclose machine-authored search-governance contributions.", "condition": {"operation": "register_search_agent", "contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "search_agent_contribution_disclosure_required", "required_action": "disclose_machine_contribution"}},
+	{"name": "search_agent_privileged_role_requires_human_approval", "description": "Privileged search-agent roles require human approval evidence.", "condition": {"operation": "register_search_agent", "privileged_role": True, "human_approval_required": False}, "effect": {"decision": "require_review", "reason": "search_agent_human_approval_required", "required_action": "record_human_search_agent_approval"}},
+	{"name": "bytewax_srch_stream_required", "description": "SRCH lifecycle batches must be routed through Bytewax.", "condition": {"operation": "validate_srch_lifecycle_batch", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_srch_lifecycle_batch_to_bytewax"}},
 ]
 
 
@@ -181,6 +253,8 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "ranking", "path": "/srch/ranking", "component": "RankingWorkbench", "permission": "srch:govern", "nav_group": "Operations"},
 	{"name": "access", "path": "/srch/access", "component": "SearchAccessReview", "permission": "srch:govern", "nav_group": "Governance"},
 	{"name": "governance", "path": "/srch/governance", "component": "SearchGovernance", "permission": "srch:govern", "nav_group": "Governance"},
+	{"name": "agents", "path": "/srch/agents", "component": "SearchAgentRoster", "permission": "srch:govern", "nav_group": "Governance"},
+	{"name": "lifecycle", "path": "/srch/lifecycle", "component": "SRCHLifecycleBatchMonitor", "permission": "srch:admin", "nav_group": "Operations"},
 	{"name": "audit", "path": "/srch/audit", "component": "SearchAuditTimeline", "permission": "srch:audit", "nav_group": "Governance"},
 	{"name": "settings", "path": "/srch/settings", "component": "SRCHSettings", "permission": "srch:admin", "nav_group": "Administration"},
 ]
@@ -208,10 +282,64 @@ THEME: dict[str, Any] = {
 		"bulk_queue": {"visual": "queue-table", "status_style": "bytewax-chip"},
 		"ranking_panel": {"visual": "weight-grid", "status_style": "explain-chip"},
 		"access_review": {"visual": "policy-table", "status_style": "rbac-chip"},
+		"search_agent_roster": {"icon": "bot", "status_indicator": "agent-approval-chip", "risk_style": "query-scope-band"},
+		"bytewax_lifecycle_panel": {"icon": "git-branch", "status_indicator": "stream-chip", "risk_style": "processor-band"},
 		"query_trace": {"visual": "retrieval-timeline", "threshold_style": "latency-band"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "evidence-chip"},
 	},
 }
+
+
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class SRCH agent composition manifest."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_SRCH_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_SRCH_AGENT_ROLES),
+		"privileged_roles": list(PRIVILEGED_SRCH_AGENT_ROLES),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles",
+		],
+		"adapter_contract": "aicr_provider_neutral_search_agent_adapter",
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return the SRCH Bytewax lifecycle stream contract."""
+	return {
+		"engine": "bytewax",
+		"lifecycle_stream": "srch.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"index_batch",
+			"document_batch",
+			"bulk_index_batch",
+			"query_batch",
+			"facet_batch",
+			"ranking_batch",
+			"access_policy_batch",
+			"search_agent_batch",
+		],
+		"topics": [
+			"srch.indices",
+			"srch.documents",
+			"srch.bulk",
+			"srch.queries",
+			"srch.facets",
+			"srch.ranking",
+			"srch.access",
+			"srch.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	}
 
 
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -223,6 +351,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "srch",
 		"display_name": "Search Engine",
+		"provides": ["enterprise_search", "semantic_retrieval", "search_agent_composition"],
+		"requires": ["etlp", "meta", "nlpc", "aicr", "conf"],
 		"configuration": config,
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},
@@ -234,6 +364,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"template_roots": ["templates/", "static/"],
 			"requires_theme": True,
 		},
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
 		"theme": deepcopy(THEME),
 	}
 
