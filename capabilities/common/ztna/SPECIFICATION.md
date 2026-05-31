@@ -28,6 +28,8 @@ In scope:
 - access requests with approved, review-required, active, and denied outcomes;
 - independent access review;
 - governed session start, reevaluation, revocation, and closure;
+- first-class AI-agent composition for zero-trust governance and response;
+- Bytewax lifecycle-batch validation for zero-trust mutations;
 - append-only audit events;
 - route, permission, view-model, theme, and adapter metadata;
 - package self-test, semantic model, manifest, release report, audit, and
@@ -43,6 +45,7 @@ Out of scope for the local package:
 - browser rendering;
 - persistent database migrations;
 - live Bytewax execution.
+- live external AI-agent runtime clients.
 
 ## Users
 
@@ -62,6 +65,8 @@ The runtime owns these records:
 - `ZeroTrustAccessRequestRecord`
 - `ZeroTrustSessionRecord`
 - `ZeroTrustAuditEventRecord`
+- `ZeroTrustAgentRecord`
+- `ZtnaLifecycleBatchRecord`
 
 All business IDs include tenant context so repeated business keys in different
 tenants produce different record IDs.
@@ -119,6 +124,24 @@ tenants produce different record IDs.
 4. Failed identity or posture context revokes the session.
 5. Session closure requires an actor and records audit.
 
+### Agent
+
+1. Register zero-trust agents as tenant-local first-class records.
+2. Support provider-neutral runtimes: `codex`, `claude_code`, `opencode`, and
+   `pi`.
+3. Require role, scope, owner, purpose, and machine-contribution disclosure.
+4. Require review for privileged resource-access, session-risk, segmentation,
+   access-review, lifecycle-batch, and steward roles unless human approval is
+   recorded.
+5. Keep provider clients behind the AICR adapter contract.
+
+### Bytewax Lifecycle Batch
+
+1. Accept only configured zero-trust lifecycle operations.
+2. Require a positive mutation count.
+3. Require `event_stream="bytewax"`.
+4. Record accepted and denied lifecycle-batch evidence.
+
 ## Deterministic Rules
 
 The contract currently exposes at least 30 rules covering:
@@ -141,6 +164,10 @@ The contract currently exposes at least 30 rules covering:
 - Bytewax for batch zero-trust mutation;
 - cross-tenant access denial;
 - zero-trust audit evidence for state changes.
+- supported zero-trust agent runtime, role, scope, owner, purpose, and
+  contribution disclosure;
+- privileged zero-trust agent human approval;
+- zero-trust lifecycle mutation count and Bytewax lifecycle stream routing.
 
 Rule decisions are one of:
 
@@ -166,6 +193,8 @@ Required configuration sections:
 - `governance`
 - `observability`
 - `adapters`
+- `agents`
+- `streaming`
 - `ui`
 - `theme`
 
@@ -183,6 +212,8 @@ Key defaults:
 - continuous session verification;
 - independent review required;
 - Bytewax event stream for batch mutations;
+- Bytewax lifecycle stream for lifecycle mutation batches;
+- first-class zero-trust agents with provider-neutral runtimes;
 - tenant isolation required;
 - audit required for access decisions and state changes.
 
@@ -199,6 +230,8 @@ Routes:
 - `/ztna/sessions`
 - `/ztna/risk`
 - `/ztna/reviews`
+- `/ztna/agents`
+- `/ztna/lifecycle`
 - `/ztna/audit`
 - `/ztna/settings`
 
@@ -219,6 +252,8 @@ Theme components:
 - `session_monitor`
 - `risk_console`
 - `review_queue`
+- `zero_trust_agent_roster`
+- `bytewax_lifecycle_panel`
 - `audit_timeline`
 
 Generated UIs should use compact density, 8px card radius, status chips, and
@@ -238,6 +273,7 @@ Adapter keys are declared in the capability contract:
 - `message_bus`: `mqeb`
 - `cache`: `cach`
 - `event_stream`: `bytewax`
+- `agent_adapter`: `aicr_provider_neutral_zero_trust_agent_adapter`
 
 Adapters must not be required for local package self-tests.
 
@@ -245,11 +281,13 @@ Adapters must not be required for local package self-tests.
 
 - Contract exposes configuration, schema, deterministic rules, UI routes,
   theme, and adapters.
-- Rule count is at least 30.
-- UI route count is at least 10.
+- Rule count is at least 42 after agent/lifecycle extension.
+- UI route count is at least 13.
 - Bytewax is the event-stream adapter.
+- Agents are first-class and expose supported runtimes/roles.
+- Bytewax lifecycle batch metadata is present and executable.
 - Service executes identity, device, resource, access, review, session, and
-  audit lifecycles.
+  audit lifecycles, plus agent registration and lifecycle-batch validation.
 - Privileged access requires MFA and independent review or explicit JIT
   approval.
 - High-risk access requires review before session start.

@@ -22519,3 +22519,69 @@ Not run to preserve battery:
   AUDL/MQEB/SRCH/COMP/MONI/CACH adapters; rendered browser UI; external
   AI-agent runtime clients; DLP appliance interoperability, data residency
   certification, and load/performance checks.
+
+### 2026-05-31 11:07 EAT
+
+ZTNA zero-trust agent composition and Bytewax lifecycle guardrail packet:
+
+- Selected `capabilities/common/ztna` as the next ordered capability packet
+  after DLPD and preserved its existing identity, device posture, protected
+  resource, access request, review, governed session, risk reevaluation,
+  audit, and tenant-isolation lifecycle.
+- Extended the ZTNA executable contract with first-class zero-trust
+  governance-agent metadata, supported runtimes `codex`, `claude_code`,
+  `opencode`, and `pi`, supported access-governance roles, privileged-role
+  metadata, Bytewax lifecycle stream metadata, route metadata, theme
+  components, and expanded `provides`/`requires` evidence.
+- Added deterministic guardrails for unsupported zero-trust-agent runtime,
+  unsupported role, missing scope, owner, purpose, missing machine
+  contribution disclosure, privileged zero-trust-agent registration without
+  human approval, empty lifecycle batches, unsupported lifecycle operations,
+  and non-Bytewax ZTNA lifecycle batch routing.
+- Added `ZeroTrustAgentRecord`, `ZtnaLifecycleBatchRecord`,
+  tenant-qualified agent storage, lifecycle-batch storage, registration,
+  listing, audit events, dashboard counts, zero-trust-agent roster view
+  models, lifecycle-batch monitor view models, and API helpers.
+- Added `/ztna/agents`, `/ztna/lifecycle`, zero-trust-agent roster theme
+  metadata, and Bytewax lifecycle panel theme metadata.
+- Regenerated `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract and refreshed `README.md`,
+  `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md`.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/ztna/__init__.py capabilities/common/ztna/capability_contract.py capabilities/common/ztna/zero_trust_runtime.py capabilities/common/ztna/models.py capabilities/common/ztna/service.py capabilities/common/ztna/api.py capabilities/common/ztna/views.py capabilities/common/ztna/app.py capabilities/common/ztna/test_capability_contract.py capabilities/common/ztna/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/python capabilities/common/ztna/app.py` passed the package
+  self-test.
+- `./.venv/bin/pytest -q capabilities/common/ztna/test_capability_contract.py capabilities/common/ztna/tests/test_package_contract.py`
+  passed with 20 tests and only existing shared-module deprecation warnings.
+- `./.venv/bin/apg capabilities inspect ztna --json` passed with `ok: true`,
+  13 APG Python routes, 42 deterministic rules, first-class agents, and
+  Bytewax streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/ztna --json`
+  passed with `ok: true`; ZTNA remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/ztna --json`
+  passed with `side_effect_free: true` and no warnings.
+- `./.venv/bin/python -m json.tool capabilities/common/ztna/semantic_model.json`,
+  `./.venv/bin/python -m json.tool capabilities/common/ztna/release_report.json`,
+  and `./.venv/bin/python -m json.tool capabilities/common/ztna/package_manifest.json`
+  passed.
+- Runtime smoke returned one approved access request, one active session, one
+  active `codex` zero-trust steward agent, and one accepted `bytewax`
+  lifecycle-batch evidence record.
+- Focused stale-marker scan over touched ZTNA packet source, docs, tests, and
+  evidence returned only intentional non-Bytewax denial examples and
+  no-broker-core/Kafka dependency documentation.
+- `git diff --check -- capabilities/common/ztna docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live tunnel establishment, service mesh policy pushes, gateway enforcement,
+  packet inspection, live endpoint posture collection, live IdP or MFA
+  handshakes, production databases, durable Bytewax topology, live AUTH/SECU/
+  MFAU/MONI/AUDL/IDFD/ANOM/MQEB/CACH adapters, rendered browser UI, external
+  AI-agent runtime clients, zero-trust interoperability certification, and
+  load/performance checks.

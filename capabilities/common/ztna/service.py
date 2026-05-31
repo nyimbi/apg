@@ -4,14 +4,16 @@ from __future__ import annotations
 
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import DEFAULT_CONFIGURATION, evaluate_capability_rules, get_capability_contract
 from .zero_trust_runtime import (
 	ZeroTrustAccessRequestRecord,
+	ZeroTrustAgentRecord,
 	ZeroTrustAuditEventRecord,
 	ZeroTrustDeviceRecord,
 	ZeroTrustIdentityRecord,
 	ZeroTrustResourceRecord,
 	ZeroTrustSessionRecord,
+	ZtnaLifecycleBatchRecord,
 	bounded_score,
 	stable_id,
 	utc_now,
@@ -27,7 +29,13 @@ class ZtnaService:
 		self._resources: dict[str, ZeroTrustResourceRecord] = {}
 		self._access_requests: dict[str, ZeroTrustAccessRequestRecord] = {}
 		self._sessions: dict[str, ZeroTrustSessionRecord] = {}
+		self._zero_trust_agents: dict[str, ZeroTrustAgentRecord] = {}
+		self._lifecycle_batches: dict[str, ZtnaLifecycleBatchRecord] = {}
 		self._audit_events: list[ZeroTrustAuditEventRecord] = []
+		self._agent_runtimes = set(DEFAULT_CONFIGURATION["agents"]["supported_runtimes"])
+		self._agent_roles = set(DEFAULT_CONFIGURATION["agents"]["supported_roles"])
+		self._privileged_agent_roles = set(DEFAULT_CONFIGURATION["agents"]["privileged_roles"])
+		self._lifecycle_operations = set(DEFAULT_CONFIGURATION["streaming"]["required_operations"])
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -378,6 +386,97 @@ class ZtnaService:
 		self._audit(session.tenant_id, "session_closed", session.id, actor_id, {})
 		return session.to_dict()
 
+	def register_zero_trust_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		record_id = stable_id("ztna_agent", tenant_id, agent_id)
+		if record_id in self._zero_trust_agents:
+			raise ValueError(f"zero_trust_agent_already_exists:{agent_id}")
+		runtime_value = _normalize_token(runtime)
+		role_value = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_zero_trust_agent",
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"scope_present": bool(str(scope or "").strip()),
+			"owner_present": bool(str(owner or "").strip()),
+			"purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+		})
+		self._raise_if_denied(result)
+		if not str(name or "").strip():
+			raise ValueError("zero_trust_agent_name_required")
+		agent = ZeroTrustAgentRecord(
+			id=record_id,
+			tenant_id=tenant_id,
+			name=str(name).strip(),
+			runtime=runtime_value,
+			role=role_value,
+			scope=str(scope).strip(),
+			owner=str(owner).strip(),
+			purpose=str(purpose).strip(),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+			status="pending_review" if result["decision"] == "require_review" else "active",
+		)
+		self._zero_trust_agents[record_id] = agent
+		self._audit(tenant_id, "zero_trust_agent_registered", record_id, owner, {**agent.to_dict(), "rule_decision": result["decision"]})
+		return agent.to_dict()
+
+	def validate_ztna_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "ztna_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		mutation_count = int(mutation_count)
+		if mutation_count <= 0:
+			raise ValueError("ztna_lifecycle_batch_empty")
+		stream_value = _normalize_token(event_stream)
+		operation_value = _normalize_token(operation)
+		if operation_value not in self._lifecycle_operations:
+			raise ValueError(f"unsupported_ztna_lifecycle_operation:{operation_value}")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "validate_ztna_lifecycle_batch",
+			"event_stream": stream_value,
+			"mutation_count": mutation_count,
+		})
+		accepted = result["decision"] == "allow"
+		record_id = stable_id("ztna_batch", tenant_id, batch_id or len(self._lifecycle_batches) + 1)
+		record = ZtnaLifecycleBatchRecord(
+			id=record_id,
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			operation=operation_value,
+			accepted=accepted,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			status="accepted" if accepted else "denied",
+		)
+		self._lifecycle_batches[record_id] = record
+		self._audit(tenant_id, f"ztna_lifecycle_batch_{record.status}", record_id, "bytewax", record.to_dict())
+		self._raise_if_denied(result)
+		return record.to_dict()
+
 	def list_identities(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return [record.to_dict() for record in sorted(self._filter(self._identities.values(), tenant_id), key=lambda item: item.display_name)]
 
@@ -392,6 +491,12 @@ class ZtnaService:
 
 	def list_sessions(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return [record.to_dict() for record in sorted(self._filter(self._sessions.values(), tenant_id), key=lambda item: item.started_at)]
+
+	def list_zero_trust_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return [record.to_dict() for record in sorted(self._filter(self._zero_trust_agents.values(), tenant_id), key=lambda item: item.name)]
+
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return [record.to_dict() for record in sorted(self._filter(self._lifecycle_batches.values(), tenant_id), key=lambda item: item.created_at)]
 
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return [record.to_dict() for record in sorted(self._filter(self._audit_events, tenant_id), key=lambda item: item.created_at)]
@@ -414,6 +519,10 @@ class ZtnaService:
 			"access_review_count": sum(1 for request in requests if request["status"] == "review_required"),
 			"active_session_count": sum(1 for session in sessions if session["status"] == "active"),
 			"revoked_session_count": sum(1 for session in sessions if session["status"] == "revoked"),
+			"zero_trust_agent_count": len(self.list_zero_trust_agents(tenant_id)),
+			"pending_agent_review_count": sum(1 for item in self.list_zero_trust_agents(tenant_id) if item["status"] == "pending_review"),
+			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
+			"denied_lifecycle_batch_count": sum(1 for item in self.list_lifecycle_batches(tenant_id) if item["status"] == "denied"),
 		}
 
 	def create_record(
@@ -513,3 +622,7 @@ class ZtnaService:
 		if tenant_id is None:
 			return items
 		return [record for record in items if record.tenant_id == tenant_id]
+
+
+def _normalize_token(value: str) -> str:
+	return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")

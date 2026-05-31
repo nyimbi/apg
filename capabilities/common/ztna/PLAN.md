@@ -2,9 +2,9 @@
 
 ## Goal
 
-Deliver one coherent lifecycle and guardrail packet for `ztna`: specification,
-contract, runtime, API helpers, view models, tests, generated evidence, review,
-and progress log entry.
+Extend `ztna` into one coherent AI-agent and Bytewax lifecycle guardrail
+packet: specification, contract, runtime, API helpers, view models, tests,
+generated evidence, review, and progress log entry.
 
 ## Implementation Packets
 
@@ -15,6 +15,10 @@ and progress log entry.
   UI, and theme.
 - Keep deterministic rules terse but explicit.
 - Add routes for identity console, review queue, and audit timeline.
+- Add first-class zero-trust agent metadata for `codex`, `claude_code`,
+  `opencode`, and `pi`.
+- Add Bytewax lifecycle stream metadata and zero-trust lifecycle batch
+  operations.
 - Declare Bytewax as the batch/event stream adapter.
 - Keep adapters pluggable and side-effect-free.
 
@@ -26,6 +30,9 @@ and progress log entry.
 - Deny hard failures and route review-required states without silently
   approving.
 - Track audit events for state changes.
+- Register zero-trust agents with scope, owner, purpose, contribution
+  disclosure, and privileged-role review semantics.
+- Validate lifecycle batches through Bytewax-only stream metadata.
 - Preserve compatibility helpers by mapping generic records to protected
   resources.
 
@@ -34,6 +41,7 @@ and progress log entry.
 - Pass through request controls for MFA, review evidence, JIT approval,
   least-privilege scope, explicit decision evidence, and risk score.
 - Add data-only view models for identity console, review queue, and audit.
+- Add agent roster and lifecycle batch view/API surfaces.
 - Keep UI models independent of web frameworks and databases.
 
 ### 4. Documentation
@@ -53,6 +61,7 @@ and progress log entry.
 - Cover high-risk review before session start.
 - Cover request-specific guardrails and duplicate pending review blocking.
 - Cover tenant-local IDs and cross-tenant denial.
+- Cover zero-trust agent guardrails and Bytewax lifecycle batch guardrails.
 - Cover API helpers and view models.
 
 ### 6. Evidence
@@ -71,6 +80,9 @@ and progress log entry.
 - Request-specific rules execute because runtime sets `operation`.
 - API helpers expose all service controls needed by generated apps.
 - View models cover every declared route family.
+- Provider-neutral agent runtimes stay behind the AICR adapter contract.
+- Lifecycle batches stay Bytewax-first and do not introduce Kafka or
+  broker-core coupling.
 - Docs describe current behavior, not planned provider integrations.
 - Stale-marker scan has no primary-slice hits.
 
@@ -93,4 +105,5 @@ git diff --check -- capabilities/common/ztna docs/progress_log.md
 - Live gateway, service mesh, or packet filtering enforcement.
 - Browser-rendered UI validation.
 - Bytewax runtime deployment.
+- External AI-agent runtime clients.
 - Performance, scale, interoperability, or security certification.

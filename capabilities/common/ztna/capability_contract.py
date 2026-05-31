@@ -7,6 +7,30 @@ from numbers import Number
 from typing import Any
 
 
+SUPPORTED_ZTNA_AGENT_RUNTIMES: list[str] = ["codex", "claude_code", "opencode", "pi"]
+
+SUPPORTED_ZTNA_AGENT_ROLES: list[str] = [
+	"policy_reviewer",
+	"identity_context_reviewer",
+	"device_posture_reviewer",
+	"resource_access_reviewer",
+	"session_risk_reviewer",
+	"segmentation_reviewer",
+	"access_review_reviewer",
+	"lifecycle_batch_reviewer",
+	"zero_trust_steward",
+]
+
+PRIVILEGED_ZTNA_AGENT_ROLES: list[str] = [
+	"resource_access_reviewer",
+	"session_risk_reviewer",
+	"segmentation_reviewer",
+	"access_review_reviewer",
+	"lifecycle_batch_reviewer",
+	"zero_trust_steward",
+]
+
+
 DEFAULT_CONFIGURATION: dict[str, Any] = {
 	"tenant_id": "default",
 	"identities": {
@@ -72,6 +96,45 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"trace_required": True,
 		"event_stream": "bytewax",
 	},
+	"agents": {
+		"first_class": True,
+		"supported_runtimes": SUPPORTED_ZTNA_AGENT_RUNTIMES,
+		"supported_roles": SUPPORTED_ZTNA_AGENT_ROLES,
+		"privileged_roles": PRIVILEGED_ZTNA_AGENT_ROLES,
+		"require_scope": True,
+		"require_owner": True,
+		"require_purpose": True,
+		"require_contribution_disclosure": True,
+		"require_human_approval_for_privileged_roles": True,
+		"adapter_contract": "aicr_provider_neutral_zero_trust_agent_adapter",
+	},
+	"streaming": {
+		"engine": "bytewax",
+		"lifecycle_stream": "ztna.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"identity_batch",
+			"device_posture_batch",
+			"resource_batch",
+			"access_request_batch",
+			"session_batch",
+			"review_batch",
+			"policy_batch",
+			"ztna_agent_batch",
+		],
+		"topics": [
+			"ztna.identities",
+			"ztna.devices",
+			"ztna.resources",
+			"ztna.access",
+			"ztna.sessions",
+			"ztna.reviews",
+			"ztna.policies",
+			"ztna.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	},
 	"adapters": {
 		"generated_app_runtime": "service.ZtnaService",
 		"helper_runtime": "zero_trust_runtime.py",
@@ -90,6 +153,7 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"anomaly_detection": "anom",
 		"message_bus": "mqeb",
 		"cache": "cach",
+		"agent_adapter": "aicr_provider_neutral_zero_trust_agent_adapter",
 	},
 	"ui": {
 		"enable_dashboard": True,
@@ -101,6 +165,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"enable_session_monitor": True,
 		"enable_risk_console": True,
 		"enable_review_queue": True,
+		"enable_zero_trust_agent_roster": True,
+		"enable_lifecycle_batch_monitor": True,
 		"enable_audit": True,
 		"enable_settings": True,
 	},
@@ -122,6 +188,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"security",
 		"governance",
 		"observability",
+		"agents",
+		"streaming",
 		"adapters",
 		"ui",
 		"theme",
@@ -137,6 +205,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"security",
 		"governance",
 		"observability",
+		"agents",
+		"streaming",
 		"adapters",
 		"ui",
 		"theme",
@@ -178,6 +248,15 @@ RULES: list[dict[str, Any]] = [
 	{"name": "batch_ztna_mutation_requires_bytewax", "description": "Batch zero-trust mutations must use Bytewax event streams.", "condition": {"operation": "batch_ztna_mutation", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}},
 	{"name": "cross_tenant_zero_trust_access_denied", "description": "Zero-trust records may not cross tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_zero_trust_access_denied", "required_action": "use_tenant_local_context"}},
 	{"name": "zero_trust_state_change_requires_audit", "description": "Zero-trust state changes require audit evidence.", "condition": {"state_change_requested": True, "audit_event_recorded": False}, "effect": {"decision": "deny", "reason": "zero_trust_audit_event_required", "required_action": "record_zero_trust_audit_event"}},
+	{"name": "ztna_agent_runtime_supported", "description": "Zero-trust agents must use supported provider-neutral runtimes.", "condition": {"operation": "register_zero_trust_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_ztna_agent_runtime", "required_action": "choose_supported_ztna_agent_runtime"}},
+	{"name": "ztna_agent_role_supported", "description": "Zero-trust agents must use supported access-governance roles.", "condition": {"operation": "register_zero_trust_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_ztna_agent_role", "required_action": "choose_supported_ztna_agent_role"}},
+	{"name": "ztna_agent_requires_scope", "description": "Zero-trust agents require an explicit identity, device, resource, access, session, policy, segment, review, or lifecycle scope.", "condition": {"operation": "register_zero_trust_agent", "scope_present": False}, "effect": {"decision": "deny", "reason": "ztna_agent_scope_required", "required_action": "declare_ztna_agent_scope"}},
+	{"name": "ztna_agent_requires_owner", "description": "Zero-trust agents require an accountable owner.", "condition": {"operation": "register_zero_trust_agent", "owner_present": False}, "effect": {"decision": "deny", "reason": "ztna_agent_owner_required", "required_action": "assign_ztna_agent_owner"}},
+	{"name": "ztna_agent_requires_purpose", "description": "Zero-trust agents require a documented access-governance purpose.", "condition": {"operation": "register_zero_trust_agent", "purpose_present": False}, "effect": {"decision": "deny", "reason": "ztna_agent_purpose_required", "required_action": "document_ztna_agent_purpose"}},
+	{"name": "ztna_agent_requires_contribution_disclosure", "description": "Zero-trust agents must disclose machine-authored identity, device, resource, access, session, policy, segment, review, and lifecycle contributions.", "condition": {"operation": "register_zero_trust_agent", "contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "ztna_agent_contribution_disclosure_required", "required_action": "disclose_machine_contribution"}},
+	{"name": "ztna_agent_privileged_role_requires_human_approval", "description": "Privileged zero-trust agent roles require human approval evidence.", "condition": {"operation": "register_zero_trust_agent", "privileged_role": True, "human_approval_required": False}, "effect": {"decision": "require_review", "reason": "ztna_agent_human_approval_required", "required_action": "record_human_ztna_agent_approval"}},
+	{"name": "ztna_lifecycle_batch_requires_mutations", "description": "ZTNA lifecycle batches must include at least one mutation.", "condition": {"operation": "validate_ztna_lifecycle_batch", "mutation_count_lte": 0}, "effect": {"decision": "deny", "reason": "ztna_lifecycle_batch_empty", "required_action": "include_ztna_lifecycle_mutations"}},
+	{"name": "bytewax_ztna_stream_required", "description": "ZTNA lifecycle batches must be routed through Bytewax.", "condition": {"operation": "validate_ztna_lifecycle_batch", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_ztna_lifecycle_batch_to_bytewax"}},
 ]
 
 
@@ -191,6 +270,8 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "sessions", "path": "/ztna/sessions", "component": "SessionMonitor", "permission": "ztna:view", "nav_group": "Operations"},
 	{"name": "risk", "path": "/ztna/risk", "component": "AccessRiskConsole", "permission": "ztna:view", "nav_group": "Operations"},
 	{"name": "reviews", "path": "/ztna/reviews", "component": "AccessReviewQueue", "permission": "ztna:review", "nav_group": "Governance"},
+	{"name": "agents", "path": "/ztna/agents", "component": "ZeroTrustAgentRoster", "permission": "ztna:admin", "nav_group": "Governance"},
+	{"name": "lifecycle", "path": "/ztna/lifecycle", "component": "ZTNALifecycleBatchMonitor", "permission": "ztna:admin", "nav_group": "Operations"},
 	{"name": "audit", "path": "/ztna/audit", "component": "ZTNAAuditTrail", "permission": "ztna:audit", "nav_group": "Governance"},
 	{"name": "settings", "path": "/ztna/settings", "component": "ZTNASettings", "permission": "ztna:admin", "nav_group": "Administration"},
 ]
@@ -219,6 +300,8 @@ THEME: dict[str, Any] = {
 		"session_monitor": {"visual": "active-session-table", "status_style": "reauth-chip"},
 		"risk_console": {"visual": "risk-lanes", "status_style": "risk-chip"},
 		"review_queue": {"visual": "decision-lane", "status_style": "review-chip"},
+		"zero_trust_agent_roster": {"icon": "bot", "status_indicator": "agent-approval-chip", "risk_style": "access-scope-band"},
+		"bytewax_lifecycle_panel": {"icon": "git-branch", "status_indicator": "stream-chip", "risk_style": "processor-band"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "decision-chip"},
 	},
 }
@@ -236,6 +319,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		"configuration": config,
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
 		"ui": {
 			"shell": "apg_python",
 			"view_module": "views.py",
@@ -245,6 +330,42 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"requires_theme": True,
 		},
 		"theme": deepcopy(THEME),
+	}
+
+
+def agent_manifest() -> dict[str, Any]:
+	"""Return provider-neutral zero-trust agent composition metadata."""
+	agents = DEFAULT_CONFIGURATION["agents"]
+	return {
+		"first_class": bool(agents["first_class"]),
+		"supported_runtimes": list(agents["supported_runtimes"]),
+		"supported_roles": list(agents["supported_roles"]),
+		"privileged_roles": list(agents["privileged_roles"]),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles",
+		],
+		"adapter_contract": agents["adapter_contract"],
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return Bytewax lifecycle stream metadata for ZTNA composition."""
+	streaming = DEFAULT_CONFIGURATION["streaming"]
+	return {
+		"engine": streaming["engine"],
+		"lifecycle_stream": streaming["lifecycle_stream"],
+		"watermark": streaming["watermark"],
+		"required_processor": streaming["required_processor"],
+		"required_operations": list(streaming["required_operations"]),
+		"topics": list(streaming["topics"]),
+		"broker_core_dependency_allowed": bool(streaming["broker_core_dependency_allowed"]),
 	}
 
 

@@ -10,7 +10,7 @@ from .capability_contract import evaluate_capability_rules, get_capability_contr
 __version__ = "1.0.0"
 __capability_id__ = "ztna"
 __capability_name__ = "Zero Trust Network Access"
-__apg_dependencies__ = ["auth", "secu", "mfau", "moni"]
+__apg_dependencies__ = ["auth", "secu", "mfau", "moni", "audl", "idfd", "anom", "mqeb", "cach"]
 
 capability_metadata: dict[str, Any] = {
 	"name": "ztna",
@@ -34,6 +34,8 @@ capability_metadata: dict[str, Any] = {
 		"session_governance",
 		"access_reviews",
 		"zero_trust_audit",
+		"zero_trust_agent_composition",
+		"bytewax_lifecycle_batches",
 	],
 	"permissions": ["ztna:view", "ztna:manage_policies", "ztna:approve_access", "ztna:manage_devices", "ztna:review", "ztna:audit", "ztna:admin"]
 }
@@ -49,10 +51,12 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["audl", "idfd", "anom", "mqeb", "cach"],
+		"optional_dependencies": [],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"capabilities": {
 			"zero_trust_policies": "Bind access decisions to user, device, resource, risk, and tenant policy",
 			"identity_context": "Track verified, federated, privileged, and suspended identity context",
@@ -62,6 +66,8 @@ def register_capability() -> dict[str, Any]:
 			"session_governance": "Start, reevaluate, close, and audit governed resource sessions",
 			"access_reviews": "Route high-risk and privileged access through explicit review",
 			"zero_trust_audit": "Record access, session, policy, identity, device, and resource audit events",
+			"zero_trust_agent_composition": "Register provider-neutral AI agents for governed zero-trust review and lifecycle scopes",
+			"bytewax_lifecycle_batches": "Validate zero-trust lifecycle mutation batches through Bytewax stream metadata",
 			"capability_rules": "Evaluate deterministic zero-trust access rules",
 			"visual_theming": "Apply zero-trust operations theme tokens and components"
 		},
@@ -75,6 +81,8 @@ def register_capability() -> dict[str, Any]:
 			"sessions": "/ztna/api/v1/sessions",
 			"risk": "/ztna/api/v1/risk",
 			"reviews": "/ztna/api/v1/reviews",
+			"agents": "/ztna/api/v1/agents",
+			"lifecycle": "/ztna/api/v1/lifecycle",
 			"audit": "/ztna/api/v1/audit"
 		},
 		"adapters": contract["configuration"]["adapters"],

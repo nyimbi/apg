@@ -26,6 +26,10 @@ streams remain APG adapter boundaries.
 - Audit events for zero-trust state changes.
 - UI view models for dashboard, identities, devices, resources, policies,
   access, sessions, risk, reviews, audit, and settings.
+- First-class zero-trust AI-agent composition for policy, identity, device,
+  resource, session-risk, segmentation, access-review, and lifecycle work.
+- Bytewax lifecycle-batch validation for identity, device posture, resource,
+  access, session, review, policy, and agent mutations.
 - Contract-derived semantic model, package manifest, release report, and
   publish-plan support.
 
@@ -92,6 +96,25 @@ request = service.request_access(
 	requested_by="user-1",
 )
 session = service.start_session(request["id"], actor_id="access-broker")
+
+agent = service.register_zero_trust_agent(
+	agent_id="agent-zero-trust-steward",
+	tenant_id="tenant-a",
+	name="Zero Trust Steward",
+	runtime="codex",
+	role="zero_trust_steward",
+	scope="tenant:tenant-a",
+	owner="security-platform",
+	purpose="review zero-trust lifecycle batches",
+	human_approval_required=True,
+)
+
+batch = service.validate_ztna_lifecycle_batch(
+	tenant_id="tenant-a",
+	event_stream="bytewax",
+	mutation_count=2,
+	operation="ztna_agent_batch",
+)
 ```
 
 ## Privileged Access
@@ -143,6 +166,36 @@ Important adapters:
 - `audit_sink`: `audl`
 - `identity_federation`: `idfd`
 - `anomaly_detection`: `anom`
+- `agent_adapter`: `aicr_provider_neutral_zero_trust_agent_adapter`
+
+## Agent Composition
+
+ZTNA agents are first-class records. They are provider-neutral and may use
+`codex`, `claude_code`, `opencode`, or `pi` behind the AICR adapter contract.
+Each agent requires tenant context, name, runtime, role, scope, owner, purpose,
+and machine-contribution disclosure. Privileged roles such as resource access,
+session risk, segmentation, access review, lifecycle batch, and zero-trust
+steward agents enter `pending_review` unless human approval is recorded.
+
+Supported roles:
+
+- `policy_reviewer`
+- `identity_context_reviewer`
+- `device_posture_reviewer`
+- `resource_access_reviewer`
+- `session_risk_reviewer`
+- `segmentation_reviewer`
+- `access_review_reviewer`
+- `lifecycle_batch_reviewer`
+- `zero_trust_steward`
+
+## Lifecycle Batches
+
+ZTNA lifecycle batches are explicit Bytewax-governed records. The generated
+runtime accepts `identity_batch`, `device_posture_batch`, `resource_batch`,
+`access_request_batch`, `session_batch`, `review_batch`, `policy_batch`, and
+`ztna_agent_batch` only when they contain mutations and declare
+`event_stream="bytewax"`. Kafka or broker-core routing is intentionally denied.
 
 ## UI Surfaces
 
@@ -157,6 +210,8 @@ The contract exposes these route names:
 - `sessions`
 - `risk`
 - `reviews`
+- `agents`
+- `lifecycle`
 - `audit`
 - `settings`
 

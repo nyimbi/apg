@@ -70,13 +70,17 @@ def test_package_contract_shape_and_entrypoint_are_publishable():
 	assert contract["capability"] == "ztna"
 	assert contract["ui"]["routes"]
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert len(contract["rule_engine"]["rules"]) >= 42
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert self_test["passed"] is True
 	assert manifest["kind"] == "apg.generated_application"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "ztna" in model["capabilities"]
 	assert model["capabilities"]["ztna"]["streaming"]["engine"] == "bytewax"
+	assert model["capabilities"]["ztna"]["agents"]["first_class"] is True
+	assert model["contracts"]["ztna"]["streaming"]["required_processor"] == "bytewax"
 	assert model["capabilities"]["ztna"]["runtime"]["service"] == "service.ZtnaService"
 
 
@@ -265,13 +269,34 @@ def test_api_helpers_expose_zero_trust_lifecycle():
 	})
 	request = api.request_access({"identity_id": identity["id"], "device_id": device["id"], "resource_id": resource["id"], "requested_by": "api-1"})
 	session = api.start_session(request["id"], actor_id="broker")
+	agent = api.register_zero_trust_agent({
+		"id": "api-agent",
+		"tenant_id": "tenant-api",
+		"name": "API Access Reviewer",
+		"runtime": "codex",
+		"role": "policy_reviewer",
+		"scope": "policy:*",
+		"owner": "security-ops",
+		"purpose": "review generated zero-trust policy",
+	})
+	batch = api.validate_lifecycle_batch({
+		"id": "api-batch",
+		"tenant_id": "tenant-api",
+		"event_stream": "bytewax",
+		"mutation_count": 2,
+		"operation": "policy_batch",
+	})
 	status = api.capability_status("tenant-api")
 	listing = api.list_zero_trust_access("tenant-api")
 
 	assert session["status"] == "active"
+	assert agent["runtime"] == "codex"
+	assert batch["status"] == "accepted"
 	assert status["identity_count"] == 1
 	assert status["active_session_count"] == 1
+	assert status["zero_trust_agent_count"] == 1
 	assert listing["access_requests"][0]["id"] == request["id"]
+	assert listing["zero_trust_agents"][0]["id"] == agent["id"]
 
 
 def test_view_models_match_routes_theme_and_runtime_state():
@@ -289,6 +314,8 @@ def test_view_models_match_routes_theme_and_runtime_state():
 	sessions = views.session_monitor_model(service, "tenant-ztna")
 	risk = views.risk_console_model(service, "tenant-ztna")
 	reviews = views.review_queue_model(service, "tenant-ztna")
+	agents = views.zero_trust_agent_roster_model(service, "tenant-ztna")
+	lifecycle = views.lifecycle_batch_model(service, "tenant-ztna")
 	audit = views.audit_model(service, "tenant-ztna")
 	settings = views.settings_model("tenant-ztna")
 
@@ -301,5 +328,7 @@ def test_view_models_match_routes_theme_and_runtime_state():
 	assert sessions["sessions"][0]["id"] == session["id"]
 	assert risk["signals"]["revocation_rate"] == 0.0
 	assert reviews["review_required"] == []
+	assert agents["supported_runtimes"]
+	assert lifecycle["streaming"]["required_processor"] == "bytewax"
 	assert audit["audit_events"]
 	assert settings["theme"]["name"] == "ztna_zero_trust_ops"

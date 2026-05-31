@@ -18,9 +18,12 @@ that still expects `cap_spec.md`.
 - access requests with deterministic allow, deny, and review decisions;
 - independent access review;
 - governed session start, reevaluation, revocation, and closure;
+- first-class provider-neutral zero-trust agents;
+- Bytewax lifecycle-batch validation for zero-trust mutations;
 - append-only audit events;
 - UI route, view-model, theme, and adapter metadata;
-- Bytewax as the required event-stream adapter for batch zero-trust mutation.
+- Bytewax as the required event-stream adapter for batch zero-trust mutation
+  and lifecycle-batch validation.
 
 ## Proof Commands
 

@@ -23,6 +23,10 @@ def dashboard_model(
 		"summary": service.dashboard_summary(tenant_id),
 		"routes": capability_routes(tenant_id),
 		"recent_audit_events": service.list_audit_events(tenant_id)[-10:],
+		"zero_trust_agents": service.list_zero_trust_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
 	}
@@ -134,6 +138,34 @@ def review_queue_model(service: ZtnaService | None = None, tenant_id: str = "def
 		"review_required": [request for request in requests if request["status"] == "review_required"],
 		"review_rules": [rule for rule in contract["rule_engine"]["rules"] if rule["effect"]["decision"] == "require_review"],
 		"theme_component": "review_queue",
+	}
+
+
+def zero_trust_agent_roster_model(service: ZtnaService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or ZtnaService()
+	contract = service.describe(tenant_id)
+	return {
+		"route": "/ztna/agents",
+		"tenant_id": tenant_id,
+		"agents": service.list_zero_trust_agents(tenant_id),
+		"agent_manifest": contract["agents"],
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+		"theme_component": "zero_trust_agent_roster",
+	}
+
+
+def lifecycle_batch_model(service: ZtnaService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or ZtnaService()
+	contract = service.describe(tenant_id)
+	return {
+		"route": "/ztna/lifecycle",
+		"tenant_id": tenant_id,
+		"streaming": contract["streaming"],
+		"batches": service.list_lifecycle_batches(tenant_id),
+		"required_operations": contract["streaming"]["required_operations"],
+		"theme_component": "bytewax_lifecycle_panel",
 	}
 
 

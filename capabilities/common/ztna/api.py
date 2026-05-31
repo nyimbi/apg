@@ -19,11 +19,15 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"tenant_id": tenant_id,
 		"route_count": len(contract["ui"]["routes"]),
 		"rule_count": len(contract["rule_engine"]["rules"]),
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"identity_count": summary["identity_count"],
 		"device_count": summary["device_count"],
 		"resource_count": summary["resource_count"],
 		"access_request_count": summary["access_request_count"],
 		"active_session_count": summary["active_session_count"],
+		"zero_trust_agent_count": summary["zero_trust_agent_count"],
+		"lifecycle_batch_count": summary["lifecycle_batch_count"],
 	}
 
 
@@ -127,6 +131,31 @@ def close_session(session_id: str, actor_id: str) -> dict[str, Any]:
 	return SERVICE.close_session(session_id, actor_id)
 
 
+def register_zero_trust_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_zero_trust_agent(
+		agent_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload["name"]),
+		runtime=str(payload["runtime"]),
+		role=str(payload["role"]),
+		scope=str(payload["scope"]),
+		owner=str(payload["owner"]),
+		purpose=str(payload["purpose"]),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", True)),
+		human_approval_required=bool(payload.get("human_approval_required", False)),
+	)
+
+
+def validate_lifecycle_batch(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_ztna_lifecycle_batch(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
+		mutation_count=int(payload.get("mutation_count", 1)),
+		operation=str(payload.get("operation") or "ztna_agent_batch"),
+		batch_id=payload.get("id"),
+	)
+
+
 def list_zero_trust_access(tenant_id: str | None = None) -> dict[str, list[dict[str, Any]]]:
 	return {
 		"identities": SERVICE.list_identities(tenant_id),
@@ -134,6 +163,8 @@ def list_zero_trust_access(tenant_id: str | None = None) -> dict[str, list[dict[
 		"resources": SERVICE.list_resources(tenant_id),
 		"access_requests": SERVICE.list_access_requests(tenant_id),
 		"sessions": SERVICE.list_sessions(tenant_id),
+		"zero_trust_agents": SERVICE.list_zero_trust_agents(tenant_id),
+		"lifecycle_batches": SERVICE.list_lifecycle_batches(tenant_id),
 		"audit_events": SERVICE.list_audit_events(tenant_id),
 	}
 
