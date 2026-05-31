@@ -17,7 +17,7 @@ capability_metadata: dict[str, Any] = {
 	"name": "chat",
 	"version": __version__,
 	"display_name": __capability_name__,
-	"description": "Tenant-aware direct messaging, rooms, moderation, retention, AI-agent participation, realtime delivery, and collaboration hooks",
+	"description": "Tenant-aware direct messaging, rooms, moderation, retention, first-class AI-agent composition, Bytewax lifecycle batches, realtime delivery, and collaboration hooks",
 	"category": "collaboration_communication",
 	"subcategory": "chat",
 	"vendor": "Datacraft",
@@ -25,7 +25,7 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["direct_messages", "team_rooms", "message_moderation", "presence", "message_retention", "agent_participants", "delivery_audit"],
+	"provides": ["direct_messages", "team_rooms", "message_moderation", "presence", "message_retention", "agent_participants", "chat_agent_composition", "bytewax_lifecycle_batches", "delivery_audit"],
 	"permissions": ["chat:view", "chat:send", "chat:manage_rooms", "chat:moderate", "chat:audit", "chat:admin"]
 }
 
@@ -40,7 +40,7 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["audl", "nlpc", "colb", "mten", "secu", "cach"],
+		"optional_dependencies": ["audl", "nlpc", "colb", "mten", "secu", "cach", "aicr"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
@@ -50,6 +50,8 @@ def register_capability() -> dict[str, Any]:
 			"message_moderation": "Moderate content, attachments, retention, and policy actions",
 			"presence": "Track online, typing, receipt, and availability state",
 			"agent_participants": "Register scoped AI agents as disclosed chat participants",
+			"chat_agent_composition": "Compose Codex, Claude Code, OpenCode, Pi, and future runtimes through provider-neutral chat-agent adapters",
+			"bytewax_lifecycle_batches": "Validate room, message, moderation, retention, presence, guest, thread, and chat-agent lifecycle batches through Bytewax",
 			"delivery_audit": "Audit rooms, messages, moderation decisions, and state changes",
 			"capability_rules": "Evaluate deterministic chat-governance rules",
 			"visual_theming": "Apply team-chat theme tokens and components"
@@ -61,11 +63,14 @@ def register_capability() -> dict[str, Any]:
 			"moderation": "/chat/api/v1/moderation",
 			"retention": "/chat/api/v1/retention",
 			"agents": "/chat/api/v1/agents",
+			"lifecycle": "/chat/api/v1/lifecycle",
 			"audit": "/chat/api/v1/audit"
 		},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"adapters": contract["configuration"]["adapters"],
 		"permissions": capability_metadata["permissions"]
 	}

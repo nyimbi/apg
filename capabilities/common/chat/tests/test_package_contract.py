@@ -35,14 +35,18 @@ def test_package_contract_shape_and_entrypoint_are_publishable():
 	model = app_module.semantic_model()
 
 	assert contract["capability"] == "chat"
-	assert len(contract["ui"]["routes"]) >= 10
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert len(contract["ui"]["routes"]) >= 12
+	assert len(contract["rule_engine"]["rules"]) >= 42
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert self_test["passed"] is True
 	assert manifest["kind"] == "apg.generated_application"
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
-	assert model["capabilities"]["chat"]["streaming"]["engine"] == "bytewax"
+	assert model["capabilities"]["chat"]["streaming"]["required_processor"] == "bytewax"
+	assert model["capabilities"]["chat"]["agents"]["first_class"] is True
+	assert model["capabilities"]["chat"]["chat_lifecycle"]["lifecycle_batch"] == "ChatLifecycleBatchRecord"
 	assert model["capabilities"]["chat"]["runtime"]["service"] == "service.ChatService"
 
 
@@ -51,13 +55,20 @@ def test_api_helpers_execute_chat_lifecycle():
 	room = api.create_room({"id": "api-room", "tenant_id": "tenant-api", "name": "API Room", "owner": "owner", "members": ["owner", "member"], "retention_policy": "retain-30-days"})
 	message = api.send_message({"id": "api-message", "tenant_id": "tenant-api", "room_id": room["id"], "sender": "member", "body": "hello"})
 	presence = api.update_presence({"tenant_id": "tenant-api", "room_id": room["id"], "user_id": "member", "status": "online", "typing": True})
+	agent = api.register_chat_agent({"id": "api-agent", "tenant_id": "tenant-api", "name": "API Agent", "runtime": "codex", "role": "room_reviewer", "scope": "room:api-room", "owner": "owner", "purpose": "review room health"})
+	batch = api.validate_lifecycle_batch({"tenant_id": "tenant-api", "event_stream": "bytewax", "mutation_count": 2, "operation": "chat_agent_batch", "batch_id": "batch-api"})
 	state = api.capability_status("tenant-api")
 
 	assert room["status"] == "active"
 	assert message["status"] == "delivered"
 	assert presence["typing"] is True
+	assert agent["status"] == "active"
+	assert batch["status"] == "accepted"
 	assert state["room_count"] == 1
 	assert state["message_count"] == 1
+	assert state["chat_agent_count"] == 1
+	assert state["lifecycle_batch_count"] == 1
+	assert state["agents"]["first_class"] is True
 
 
 def test_view_models_match_service_state():
@@ -65,12 +76,16 @@ def test_view_models_match_service_state():
 	service.create_room("view-room", "tenant-view", "View Room", "owner", ["owner", "member"], "retain-30-days")
 	service.send_message("view-message", "tenant-view", "view-room", "member", "message", attachments=["report.txt"])
 	service.update_presence("tenant-view", "member", "online", room_id="view-room", typing=True)
+	service.register_chat_agent("view-agent", "tenant-view", "View Agent", "codex", "thread_reviewer", "thread:*", "owner", "review thread quality")
+	service.validate_chat_lifecycle_batch("tenant-view", "bytewax", 1, "thread_batch", "view-batch")
 
 	dashboard = views.dashboard_model(service, "tenant-view")
 	rooms = views.room_manager_model(service, "tenant-view")
 	messages = views.message_console_model(service, "tenant-view", "view-room")
 	moderation = views.moderation_queue_model(service, "tenant-view")
 	agents = views.agent_participant_model("tenant-view")
+	roster = views.chat_agent_roster_model(service, "tenant-view")
+	lifecycle = views.lifecycle_batch_model(service, "tenant-view")
 	analytics = views.analytics_model(service, "tenant-view")
 	audit = views.audit_model(service, "tenant-view")
 	settings = views.settings_model("tenant-view")
@@ -80,6 +95,9 @@ def test_view_models_match_service_state():
 	assert messages["messages"][0]["id"] == "view-message"
 	assert moderation["pending"] == []
 	assert agents["enabled"] is True
+	assert roster["active"][0]["id"] == "view-agent"
+	assert lifecycle["accepted"][0]["id"] == "view-batch"
+	assert lifecycle["required_processor"] == "bytewax"
 	assert analytics["attachment_rate"] == 1.0
 	assert audit["audit_events"]
 	assert settings["theme"]["name"] == "chat_team_messaging"

@@ -4,9 +4,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	PRIVILEGED_CHAT_AGENT_ROLES,
+	SUPPORTED_CHAT_AGENT_ROLES,
+	SUPPORTED_CHAT_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
 from .chat_engine import ChatEngine
-from .models import ChatAuditEvent, ChatMessage, ChatPresence, ChatRoom, ModerationItem
+from .models import ChatAgentRecord, ChatAuditEvent, ChatLifecycleBatchRecord, ChatMessage, ChatPresence, ChatRoom, ModerationItem
 
 
 class ChatService:
@@ -18,8 +24,17 @@ class ChatService:
 		self._presence: dict[str, ChatPresence] = {}
 		self._moderation: dict[str, ModerationItem] = {}
 		self._audit_events: dict[str, ChatAuditEvent] = {}
+		self._chat_agents: dict[str, ChatAgentRecord] = {}
+		self._lifecycle_batches: dict[str, ChatLifecycleBatchRecord] = {}
 		self._engine = ChatEngine()
 		self._restricted_terms = ("secret", "credential", "restricted")
+		self._agent_runtimes = {_normalize_token(item) for item in SUPPORTED_CHAT_AGENT_RUNTIMES}
+		self._agent_roles = {_normalize_token(item) for item in SUPPORTED_CHAT_AGENT_ROLES}
+		self._privileged_agent_roles = {_normalize_token(item) for item in PRIVILEGED_CHAT_AGENT_ROLES}
+		self._lifecycle_operations = {
+			_normalize_token(item)
+			for item in get_capability_contract()["streaming"]["required_operations"]
+		}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -318,6 +333,129 @@ class ChatService:
 			events = [item for item in events if item.tenant_id == tenant_id]
 		return [item.to_dict() for item in sorted(events, key=lambda item: item.id)]
 
+	def register_chat_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		record_key = self._key(tenant_id, agent_id)
+		if record_key in self._chat_agents:
+			raise ValueError(f"chat_agent_already_exists:{agent_id}")
+		runtime_value = _normalize_token(runtime)
+		role_value = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_chat_agent",
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"scope_present": bool(str(scope or "").strip()),
+			"owner_present": bool(str(owner or "").strip()),
+			"purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		self._raise_if_denied(result)
+		if not str(name or "").strip():
+			raise ValueError("chat_agent_name_required")
+		agent = ChatAgentRecord(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=str(name).strip(),
+			runtime=runtime_value,
+			role=role_value,
+			scope=str(scope).strip(),
+			owner=str(owner).strip(),
+			purpose=str(purpose).strip(),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+			status="pending_review" if result["decision"] == "require_review" else "active",
+		)
+		self._chat_agents[record_key] = agent
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=agent_id,
+			event_type="chat_agent_registered",
+			actor=agent.owner,
+			decision=result["decision"],
+			reasons=tuple(action.get("reason", "") for action in result["actions"]),
+			metadata=agent.to_dict(),
+		)
+		return agent.to_dict()
+
+	def validate_chat_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "chat_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		mutation_count = int(mutation_count)
+		if mutation_count <= 0:
+			raise ValueError("chat_lifecycle_batch_empty")
+		stream_value = _normalize_token(event_stream)
+		operation_value = _normalize_token(operation)
+		if operation_value not in self._lifecycle_operations:
+			raise ValueError(f"unsupported_chat_lifecycle_operation:{operation_value}")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "validate_chat_lifecycle_batch",
+			"event_stream": stream_value,
+			"mutation_count": mutation_count,
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		accepted = result["decision"] == "allow"
+		record_id = batch_id or f"chat-batch-{len(self._lifecycle_batches) + 1:06d}"
+		record = ChatLifecycleBatchRecord(
+			id=record_id,
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			operation=operation_value,
+			accepted=accepted,
+			decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			status="accepted" if accepted else "denied",
+		)
+		self._lifecycle_batches[self._key(tenant_id, record_id)] = record
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=record_id,
+			event_type=f"chat_lifecycle_batch_{record.status}",
+			actor="bytewax",
+			decision=record.decision,
+			reasons=tuple(action.get("reason", "") for action in result["actions"]),
+			metadata=record.to_dict(),
+		)
+		self._raise_if_denied(result)
+		return record.to_dict()
+
+	def list_chat_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		agents = list(self._chat_agents.values())
+		if tenant_id is not None:
+			agents = [item for item in agents if item.tenant_id == tenant_id]
+		return [item.to_dict() for item in sorted(agents, key=lambda item: item.id)]
+
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		batches = list(self._lifecycle_batches.values())
+		if tenant_id is not None:
+			batches = [item for item in batches if item.tenant_id == tenant_id]
+		return [item.to_dict() for item in sorted(batches, key=lambda item: item.id)]
+
 	def list_records(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		"""Compatibility surface exposing messages as CHAT records."""
 		return self.list_messages(tenant_id)
@@ -353,6 +491,10 @@ class ChatService:
 			"attachment_count": sum(len(item["attachments"]) for item in messages),
 			"presence_count": len(self.list_presence(tenant_id)),
 			"moderation_queue_count": len([item for item in moderation if item["status"] == "pending"]),
+			"chat_agent_count": len(self.list_chat_agents(tenant_id)),
+			"pending_agent_review_count": len([item for item in self.list_chat_agents(tenant_id) if item["status"] == "pending_review"]),
+			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
+			"denied_lifecycle_batch_count": len([item for item in self.list_lifecycle_batches(tenant_id) if item["status"] == "denied"]),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 		}
 
@@ -427,3 +569,7 @@ class ChatService:
 			if record.id == record_id:
 				return record
 		return None
+
+
+def _normalize_token(value: str) -> str:
+	return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")

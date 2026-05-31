@@ -19326,36 +19326,50 @@ Not run to preserve battery:
 - Live Bytewax stream execution.
 - External MQEB, AUTH, MTEN, AUDL, AICR, COLB, MCHN, SECU, or CACH adapters.
 
-### 2026-05-30 13:31 EAT
+### 2026-05-31 11:38 EAT
 
-CHAT lifecycle and guardrail packet:
+CHAT first-class agent composition and Bytewax lifecycle guardrail packet:
 
 - Selected `capabilities/common/chat` as the next common capability after NTFY.
 - Added local `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
   `cap_spec.md` with a compatibility pointer to the active specification.
 - Expanded the executable CHAT contract to cover rooms, direct-message spaces,
-  messaging, presence, moderation, AI-agent participants, security, governance,
-  retention, observability, Bytewax event streaming, APG adapters, UI routes,
-  and visual theme tokens.
-- Expanded deterministic guardrails to 33 rules covering tenant context, room
+  messaging, presence, moderation, AI-agent participants, first-class
+  provider-neutral chat agents, security, governance, retention, observability,
+  Bytewax lifecycle streaming, APG adapters, UI routes, and visual theme tokens.
+- Added top-level `agents` and `streaming` manifests for provider-neutral
+  runtimes `codex`, `claude_code`, `opencode`, and `pi`, supported
+  chat-governance roles, privileged-role metadata, adapter contract metadata,
+  `chat.lifecycle`, required Bytewax processor evidence, lifecycle operations,
+  and lifecycle topics.
+- Expanded deterministic guardrails to 42 rules covering tenant context, room
   ownership/name/member/retention/guest-policy/guest-expiry/large-room review,
   active rooms, authenticated senders, sender membership, message payloads,
   message length, restricted-content moderation, attachment scan evidence, DLP
   for external sharing, event-bus evidence, audit evidence, thread roots,
   reactions, edit/delete authorization, presence identity, typing membership,
   moderation reviewer and decision evidence, retention export approval,
-  AI-agent registration/scope/disclosure, duplicate message IDs, tenant
-  isolation, and Bytewax batch mutation.
+  AI-agent registration/scope/disclosure, first-class chat-agent runtime, role,
+  scope, owner, purpose, contribution-disclosure, privileged-role approval,
+  lifecycle mutation count, lifecycle Bytewax routing, duplicate message IDs,
+  tenant isolation, and Bytewax batch mutation.
 - Hardened `ChatService` to use tenant-qualified room, message, moderation, and
   audit storage keys while preserving public business IDs across tenants.
 - Routed room, message, presence, moderation, attachment, DLP, duplicate-ID, and
   AI-agent participant decisions through the deterministic rule engine.
+- Added `ChatAgentRecord`, `ChatLifecycleBatchRecord`, tenant-qualified
+  chat-agent storage, lifecycle-batch storage, registration, listing, audit
+  events, dashboard counts, roster view models, lifecycle monitor view models,
+  and API helpers.
 - Added API helper coverage for guest expiry, tenant-aware room approval,
-  attachment scan evidence, DLP evidence, and AI-agent guardrails.
-- Added agent participant, analytics, audit, and settings view models.
+  attachment scan evidence, DLP evidence, AI-agent guardrails, chat-agent
+  registration, and lifecycle-batch validation.
+- Added `/chat/agents`, `/chat/lifecycle`, chat-agent roster theme metadata,
+  Bytewax lifecycle panel theme metadata, agent participant, analytics, audit,
+  and settings view models.
 - Replaced embedded semantic evidence with a contract-derived semantic model
-  and self-test that checks route count, rule count, Bytewax event streaming,
-  and generated runtime metadata.
+  and self-test that checks route count, rule count, first-class agents,
+  Bytewax lifecycle streaming, and generated runtime metadata.
 - Refreshed `semantic_model.json`, `release_report.json`, and
   `package_manifest.json` from the live contract.
 - Renamed the focused package test away from stale package-test terminology and
@@ -19369,21 +19383,35 @@ Battery-conscious verification:
 
 - `./.venv/bin/python -m py_compile capabilities/common/chat/__init__.py capabilities/common/chat/capability_contract.py capabilities/common/chat/chat_engine.py capabilities/common/chat/models.py capabilities/common/chat/service.py capabilities/common/chat/api.py capabilities/common/chat/views.py capabilities/common/chat/app.py capabilities/common/chat/test_capability_contract.py capabilities/common/chat/tests/test_package_contract.py` passed.
 - `./.venv/bin/pytest -q capabilities/common/chat/test_capability_contract.py capabilities/common/chat/tests/test_package_contract.py` passed with 10 tests and only unrelated shared-module deprecation warnings.
-- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, no errors, and CHAT capability evidence.
+- `./.venv/bin/python capabilities/common/chat/app.py` passed the package self-test.
+- `./.venv/bin/apg capabilities inspect chat --json` passed with `ok: true`,
+  12 APG Python routes, 42 deterministic rules, first-class agents, and
+  Bytewax lifecycle streaming metadata.
 - `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/chat --json` passed with `ok: true`; CHAT remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
-- `./.venv/bin/apg capabilities publish-plan capabilities/common/chat --json` passed with 11 UI routes, 33 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
-- `rg -n -e "World-class" -e "world-class" -e "WORLD_CLASS" -e "Revolutionary" -e "revolutionary" -e "10x" -e "Gartner" -e "Magic Quadrant" -e "mock data" -e "mock calculation" -e "materialized" -e "Materialized" -e "placeholder" capabilities/common/chat/README.md capabilities/common/chat/SPECIFICATION.md capabilities/common/chat/PLAN.md capabilities/common/chat/cap_spec.md capabilities/common/chat/__init__.py capabilities/common/chat/capability_contract.py capabilities/common/chat/chat_engine.py capabilities/common/chat/models.py capabilities/common/chat/service.py capabilities/common/chat/api.py capabilities/common/chat/views.py capabilities/common/chat/app.py capabilities/common/chat/test_capability_contract.py capabilities/common/chat/tests/test_package_contract.py capabilities/common/chat/package_manifest.json capabilities/common/chat/release_report.json capabilities/common/chat/semantic_model.json` returned no primary-slice stale markers.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/chat --json` passed with side-effect-free package evidence and no publish warnings.
+- `./.venv/bin/python -m json.tool capabilities/common/chat/semantic_model.json`,
+  `./.venv/bin/python -m json.tool capabilities/common/chat/package_manifest.json`,
+  and `./.venv/bin/python -m json.tool capabilities/common/chat/release_report.json`
+  passed.
+- Runtime smoke executed room creation, message send, active `codex`
+  chat-steward registration, and accepted `bytewax` lifecycle-batch validation,
+  returning `codex active bytewax accepted 1 1`.
+- Focused stale-marker scan over touched CHAT packet source, docs, tests, and
+  evidence returned only intentional non-Bytewax denial examples and
+  no-broker-core dependency metadata.
 - `git diff --check -- capabilities/common/chat docs/progress_log.md` passed.
 
 Not run to preserve battery:
 
 - Full repository pytest suite.
-- Live WebSocket servers, durable message brokers, push notification providers,
-  identity providers, external AI-agent CLIs, file scanning services, DLP
-  services, database persistence, and browser-rendered UI behavior.
+- Live WebSocket servers, durable message brokers, notification providers,
+  identity providers, external Codex/Claude Code/OpenCode/Pi runtime clients,
+  file scanning services, DLP services, database persistence, and
+  browser-rendered UI behavior.
 - Persistent database migrations.
-- Live Bytewax stream execution.
-- External NTFY, MQEB, AUTH, MTEN, AUDL, NLPC, COLB, SECU, or CACH adapters.
+- Durable Bytewax topology and live stream execution.
+- External NTFY, MQEB, AUTH, MTEN, AUDL, NLPC, AICR, COLB, SECU, or CACH
+  adapters.
 
 ### 2026-05-30 13:43 EAT
 

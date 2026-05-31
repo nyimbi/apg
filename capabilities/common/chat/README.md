@@ -8,7 +8,8 @@
 - Message delivery with message fingerprints, thread keys, attachments, delivery receipts, moderation status, and audit records.
 - Presence state for online status and typing indicators.
 - Moderation queues for restricted content and room-access review.
-- AI-agent participant guardrails for registered, scoped, disclosed agent responses across runtimes such as Codex, Claude Code, OpenCode, and Pi.
+- First-class AI-agent composition for registered, scoped, owned, purpose-bound, disclosed chat agents across runtimes such as Codex, Claude Code, OpenCode, and Pi.
+- Bytewax lifecycle batch validation for room, message, thread, reaction, presence, moderation, retention, guest-access, and chat-agent mutations.
 - Deterministic rules for room governance, sender identity, membership, moderation, attachments, DLP, audit, retention exports, and Bytewax batch mutation.
 - APG UI route metadata, view models, theme tokens, package manifest, semantic model, and release evidence.
 
@@ -23,10 +24,14 @@ Primary methods:
 - `send_message(...)`
 - `update_presence(...)`
 - `review_moderation(...)`
+- `register_chat_agent(...)`
+- `validate_chat_lifecycle_batch(...)`
 - `list_rooms(...)`
 - `list_messages(...)`
 - `list_presence(...)`
 - `list_moderation_items(...)`
+- `list_chat_agents(...)`
+- `list_lifecycle_batches(...)`
 - `list_audit_events(...)`
 - `conversation_summary(...)`
 
@@ -45,6 +50,17 @@ API helpers in `api.py` wrap the same runtime for generated applications.
 
 The contract declares Bytewax as the event-stream adapter. Batch chat mutations must use Bytewax; Kafka is intentionally not part of this packet.
 
+## Agent And Lifecycle Composition
+
+CHAT treats AI agents as first-class application citizens. The contract exposes a top-level `agents` manifest with:
+
+- supported runtimes: `codex`, `claude_code`, `opencode`, and `pi`
+- supported roles for room, message, moderation, retention, presence, guest access, attachment, thread, lifecycle, and chat-steward review
+- privileged roles that require human approval evidence before they become active
+- a provider-neutral adapter contract: `aicr_provider_neutral_chat_agent_adapter`
+
+The contract also exposes a top-level `streaming` manifest. `validate_chat_lifecycle_batch(...)` accepts only Bytewax-backed lifecycle batches with declared operations and non-empty mutation counts. This gives generated applications a clear lifecycle guardrail before durable workers are attached.
+
 ## UI Surfaces
 
 The generated application exposes these route contracts:
@@ -55,6 +71,7 @@ The generated application exposes these route contracts:
 - messages
 - presence
 - agents
+- lifecycle
 - moderation
 - retention
 - audit
@@ -83,6 +100,23 @@ message = service.send_message(
     room["id"],
     "operator",
     "handover complete",
+)
+agent = service.register_chat_agent(
+    "agent-1",
+    "tenant-1",
+    "Ops Chat Steward",
+    "codex",
+    "chat_steward",
+    "room:ops-room",
+    "owner",
+    "review operational chat lifecycle",
+    human_approval_required=True,
+)
+batch = service.validate_chat_lifecycle_batch(
+    "tenant-1",
+    "bytewax",
+    2,
+    "chat_agent_batch",
 )
 ```
 

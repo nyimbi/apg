@@ -16,6 +16,7 @@
 
 2. Contract
    - Expand configuration sections for rooms, messaging, presence, moderation, AI agents, security, governance, retention, observability, adapters, UI, and theme.
+   - Add first-class `agents` and `streaming` manifests so CHAT composes provider-neutral AI agents and Bytewax lifecycle processors.
    - Expand deterministic rules to cover the full lifecycle.
    - Declare Bytewax as the event-stream adapter.
 
@@ -23,11 +24,12 @@
    - Keep `ChatService` as the generated runtime.
    - Enforce tenant-qualified storage keys.
    - Route room, message, presence, moderation, and AI-agent decisions through the rule engine.
+   - Add chat-agent registration and lifecycle batch validation records with audit events.
    - Preserve dependency-light operation.
 
 4. API and views
    - Update API helpers for new runtime options.
-   - Add view models for agents, analytics, audit, and settings.
+   - Add view models for chat-agent rosters, lifecycle batches, agents, analytics, audit, and settings.
 
 5. Package evidence
    - Replace static semantic evidence with contract-derived semantic model output.
@@ -43,6 +45,8 @@
 - Tenant IDs are required and storage keys are tenant scoped.
 - Public room and message IDs can repeat across tenants.
 - Restricted content, attachments, DLP, duplicate messages, and AI-agent responses have guardrails.
+- First-class chat agents require supported runtimes, supported roles, explicit scope, accountable owners, declared purposes, contribution disclosure, and approval review for privileged roles.
+- Lifecycle batches require Bytewax, supported operations, non-empty mutation counts, audit, and tenant context.
 - UI routes, semantic model, package manifest, and release report all derive from or agree with the live contract.
 - No Kafka dependency is introduced.
 - No live provider or browser requirement is introduced.

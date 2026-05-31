@@ -25,6 +25,8 @@ def dashboard_model(
 		"rooms": service.list_rooms(tenant_id),
 		"messages": service.list_messages(tenant_id),
 		"presence": service.list_presence(tenant_id),
+		"chat_agents": service.list_chat_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
 		"moderation_queue": [
 			item for item in service.list_moderation_items(tenant_id)
 			if item["status"] == "pending"
@@ -88,6 +90,48 @@ def agent_participant_model(tenant_id: str = "default") -> dict[str, object]:
 			"agent_response_disclosure_required",
 		],
 		"theme": contract["theme"]["components"]["agent_panel"],
+	}
+
+
+def chat_agent_roster_model(
+	service: ChatService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or ChatService()
+	contract = service.describe(tenant_id)
+	agents = service.list_chat_agents(tenant_id)
+	return {
+		"route": "/chat/agents",
+		"tenant_id": tenant_id,
+		"agents": agents,
+		"active": [agent for agent in agents if agent["status"] == "active"],
+		"pending_review": [agent for agent in agents if agent["status"] == "pending_review"],
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+		"actions": ["register_chat_agent", "record_human_chat_agent_approval"],
+		"theme_component": "chat_agent_roster",
+	}
+
+
+def lifecycle_batch_model(
+	service: ChatService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or ChatService()
+	contract = service.describe(tenant_id)
+	batches = service.list_lifecycle_batches(tenant_id)
+	return {
+		"route": "/chat/lifecycle",
+		"tenant_id": tenant_id,
+		"lifecycle_stream": contract["streaming"]["lifecycle_stream"],
+		"required_processor": contract["streaming"]["required_processor"],
+		"required_operations": contract["streaming"]["required_operations"],
+		"batches": batches,
+		"accepted": [batch for batch in batches if batch["status"] == "accepted"],
+		"denied": [batch for batch in batches if batch["status"] == "denied"],
+		"actions": ["validate_lifecycle_batch", "inspect_bytewax_lifecycle"],
+		"theme_component": "bytewax_lifecycle_panel",
 	}
 
 

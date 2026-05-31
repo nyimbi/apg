@@ -14,7 +14,8 @@ The capability must support:
 - Presence and typing indicators.
 - Large-room access review.
 - Moderation review for restricted content and access-review items.
-- AI-agent participants with registration, scope, and response disclosure.
+- First-class AI-agent participants and governance agents with registration, supported runtimes, supported roles, explicit scope, accountable owner, declared purpose, contribution disclosure, and human approval evidence for privileged roles.
+- Bytewax lifecycle batch validation for room, message, thread, reaction, presence, moderation, retention, guest-access, and chat-agent mutation streams.
 - UI route contracts and view models for operational use.
 - Bytewax-backed event-stream configuration for batch chat mutations.
 
@@ -43,6 +44,8 @@ The authoritative configuration lives in `capability_contract.py` and includes:
 - `governance`
 - `retention`
 - `observability`
+- `agents`
+- `streaming`
 - `adapters`
 - `ui`
 - `theme`
@@ -63,6 +66,8 @@ The rule engine must be deterministic and side-effect free. The minimum guardrai
 - moderation reviewer and decision checks
 - retention export approval
 - AI-agent registration, scope, and disclosure checks
+- first-class chat-agent runtime, role, scope, owner, purpose, contribution-disclosure, and privileged-role approval checks
+- Bytewax lifecycle batch operation and mutation-count checks
 - cross-tenant access denial
 - Bytewax batch mutation enforcement
 
@@ -74,6 +79,8 @@ The rule engine must be deterministic and side-effect free. The minimum guardrai
 - messages
 - presence
 - moderation queue items
+- chat agents
+- lifecycle batch records
 - audit events
 
 The service uses tenant-qualified storage keys so public business IDs can repeat safely across tenants.
@@ -88,6 +95,7 @@ The UI contract must expose these screens:
 - messages
 - presence
 - agents
+- lifecycle
 - moderation
 - retention
 - audit
@@ -98,15 +106,25 @@ Each screen must have route metadata, permissions, and theme-backed view model s
 
 ## AI-Agent Composition
 
-AI agents are first-class chat participants when enabled by configuration. A generated application may add agents backed by Codex, Claude Code, OpenCode, Pi, or another adapter, but every agent message must satisfy:
+AI agents are first-class chat participants and governable application components when enabled by configuration. A generated application may add agents backed by Codex, Claude Code, OpenCode, Pi, or another adapter, but every agent message or lifecycle contribution must satisfy:
 
 - registered agent identity
 - explicit room scope
+- supported runtime
+- supported role
+- accountable owner
+- declared purpose
+- machine contribution disclosure
+- human approval evidence for privileged moderation, retention, guest-access, attachment, lifecycle, and chat-steward roles
 - visible response disclosure
 - tenant-local access
 - audit evidence
 
 The capability does not invoke external agent CLIs directly.
+
+## Lifecycle Composition
+
+CHAT lifecycle batches must be Bytewax-backed. The top-level `streaming` manifest declares the `chat.lifecycle` stream, `event_time` watermarking, the required `bytewax` processor, supported mutation operations, and the topic names generated applications should use when connecting durable infrastructure. The in-memory runtime validates these batches before they can be treated as accepted lifecycle state.
 
 ## Out Of Scope
 

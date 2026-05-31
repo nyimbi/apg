@@ -10,6 +10,10 @@ from capabilities.common.chat import views
 
 def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
 	contract = get_capability_contract("tenant-chat", {"rooms": {"max_members_per_room": 1000}})
+	overridden = get_capability_contract("tenant-chat", {
+		"agents": {"adapter_contract": "custom_chat_agent_adapter"},
+		"streaming": {"lifecycle_stream": "chat.custom"},
+	})
 
 	assert contract["capability"] == "chat"
 	assert contract["configuration"]["tenant_id"] == "tenant-chat"
@@ -25,17 +29,27 @@ def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
 		"governance",
 		"retention",
 		"observability",
+		"agents",
+		"streaming",
 		"adapters",
 		"ui",
 		"theme",
 	}
-	assert len(contract["rule_engine"]["rules"]) >= 30
-	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "rooms", "direct", "messages", "presence", "agents", "moderation", "retention", "audit", "analytics", "settings"}
+	assert len(contract["rule_engine"]["rules"]) >= 42
+	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "rooms", "direct", "messages", "presence", "agents", "lifecycle", "moderation", "retention", "audit", "analytics", "settings"}
 	assert contract["ui"]["api_prefix"] == "/chat/api/v1"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "message_thread" in contract["theme"]["components"]
+	assert "chat_agent_roster" in contract["theme"]["components"]
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert "codex" in contract["configuration"]["ai_agents"]["supported_runtimes"]
+	assert contract["agents"]["first_class"] is True
+	assert "chat_steward" in contract["agents"]["supported_roles"]
+	assert contract["agents"]["adapter_contract"] == "aicr_provider_neutral_chat_agent_adapter"
+	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert "chat_agent_batch" in contract["streaming"]["required_operations"]
+	assert overridden["agents"]["adapter_contract"] == "custom_chat_agent_adapter"
+	assert overridden["streaming"]["lifecycle_stream"] == "chat.custom"
 
 
 def test_rule_engine_enforces_chat_guardrails():
@@ -73,6 +87,19 @@ def test_rule_engine_enforces_chat_guardrails():
 		"access_review_recorded": False,
 	})
 	stream_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_chat_mutation", "event_stream": "kafka"})
+	agent_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_chat_agent",
+		"agent_runtime_supported": False,
+		"agent_role_supported": False,
+		"scope_present": False,
+		"owner_present": False,
+		"purpose_present": False,
+		"contribution_disclosed": False,
+		"privileged_role": True,
+		"human_approval_required": False,
+	})
+	lifecycle_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "validate_chat_lifecycle_batch", "event_stream": "kafka", "mutation_count": 1})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) >= {
@@ -95,6 +122,18 @@ def test_rule_engine_enforces_chat_guardrails():
 	}
 	assert stream_result["decision"] == "deny"
 	assert "batch_chat_mutation_requires_bytewax" in stream_result["matched_rules"]
+	assert agent_result["decision"] == "deny"
+	assert set(agent_result["matched_rules"]) >= {
+		"chat_agent_runtime_supported",
+		"chat_agent_role_supported",
+		"chat_agent_requires_scope",
+		"chat_agent_requires_owner",
+		"chat_agent_requires_purpose",
+		"chat_agent_requires_contribution_disclosure",
+		"chat_agent_privileged_role_requires_human_approval",
+	}
+	assert lifecycle_result["decision"] == "deny"
+	assert "bytewax_chat_stream_required" in lifecycle_result["matched_rules"]
 
 
 def test_registration_includes_full_capability_contract():
@@ -107,8 +146,11 @@ def test_registration_includes_full_capability_contract():
 	assert registration["theme"]["name"] == "chat_team_messaging"
 	assert registration["ui_components"]["rooms"] == "/chat/rooms"
 	assert registration["ui_components"]["agents"] == "/chat/agents"
+	assert registration["ui_components"]["lifecycle"] == "/chat/lifecycle"
 	assert "ntfy" in registration["dependencies"]
 	assert registration["adapters"]["event_stream"] == "bytewax"
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["required_processor"] == "bytewax"
 	assert "chat:send" in registration["permissions"]
 	assert "chat:audit" in registration["permissions"]
 
@@ -140,6 +182,24 @@ def test_service_creates_rooms_messages_presence_and_dashboard_state():
 		room_id="ops-room",
 		typing=True,
 	)
+	agent = service.register_chat_agent(
+		agent_id="agent-steward",
+		tenant_id="tenant-chat",
+		name="Chat Steward",
+		runtime="codex",
+		role="chat_steward",
+		scope="room:ops-room",
+		owner="room-owner",
+		purpose="review governed chat lifecycle",
+		human_approval_required=True,
+	)
+	batch = service.validate_chat_lifecycle_batch(
+		tenant_id="tenant-chat",
+		event_stream="bytewax",
+		mutation_count=2,
+		operation="chat_agent_batch",
+		batch_id="batch-agent",
+	)
 	model = views.dashboard_model(service, "tenant-chat")
 
 	assert room["status"] == "active"
@@ -148,9 +208,17 @@ def test_service_creates_rooms_messages_presence_and_dashboard_state():
 	assert len(message["fingerprint"]) == 64
 	assert message["delivery_receipts"] == ["room-owner"]
 	assert presence["typing"] is True
+	assert agent["runtime"] == "codex"
+	assert agent["status"] == "active"
+	assert batch["status"] == "accepted"
 	assert model["summary"]["room_count"] == 1
 	assert model["summary"]["message_count"] == 1
 	assert model["summary"]["presence_count"] == 1
+	assert model["summary"]["chat_agent_count"] == 1
+	assert model["summary"]["lifecycle_batch_count"] == 1
+	assert views.chat_agent_roster_model(service, "tenant-chat")["active"][0]["id"] == "agent-steward"
+	assert views.lifecycle_batch_model(service, "tenant-chat")["accepted"][0]["id"] == "batch-agent"
+	assert views.lifecycle_batch_model(service, "tenant-chat")["required_processor"] == "bytewax"
 	assert model["summary"]["audit_event_count"] >= 2
 	assert views.analytics_model(service, "tenant-chat")["attachment_rate"] == 1.0
 	assert views.agent_participant_model("tenant-chat")["enabled"] is True
@@ -181,10 +249,22 @@ def test_service_enforces_room_message_agent_and_moderation_guardrails():
 		service.send_message("unique", "tenant-chat", "moderated-room", "member", "second")
 	with pytest.raises(PermissionError, match="typing_room_membership_required"):
 		service.update_presence("tenant-chat", "outsider", "online", room_id="moderated-room", typing=True)
+	with pytest.raises(PermissionError, match="unsupported_chat_agent_runtime"):
+		service.register_chat_agent("agent-unsupported", "tenant-chat", "Unsupported", "kafka_agent", "room_reviewer", "room:*", "ops", "review rooms")
+	with pytest.raises(PermissionError, match="chat_agent_contribution_disclosure_required"):
+		service.register_chat_agent("agent-undisclosed", "tenant-chat", "Undisclosed", "codex", "room_reviewer", "room:*", "ops", "review rooms", contribution_disclosed=False)
+	pending = service.register_chat_agent("agent-pending", "tenant-chat", "Pending", "codex", "chat_steward", "room:*", "ops", "review rooms")
+	with pytest.raises(ValueError, match="chat_lifecycle_batch_empty"):
+		service.validate_chat_lifecycle_batch("tenant-chat", "bytewax", 0)
+	with pytest.raises(ValueError, match="unsupported_chat_lifecycle_operation"):
+		service.validate_chat_lifecycle_batch("tenant-chat", "bytewax", 1, "unknown_batch")
+	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
+		service.validate_chat_lifecycle_batch("tenant-chat", "kafka", 1, "chat_agent_batch")
 
 	reviewed = service.review_moderation("mod:000001", reviewer="moderator", decision="rejected", tenant_id="tenant-chat")
 	approved_message = service.send_message("approved-message", "tenant-chat", "moderated-room", "member", "contains restricted credential", moderation_completed=True)
 
+	assert pending["status"] == "pending_review"
 	assert reviewed["status"] == "rejected"
 	assert reviewed["reason"] == "moderation_required"
 	assert approved_message["moderation_status"] == "approved"

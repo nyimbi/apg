@@ -2,13 +2,16 @@
   "evidence": {
     "contracts": {
       "capability_contract": {
+        "agents_first_class": true,
         "display_name": "Chat and Messaging",
         "errors": [],
-        "route_count": 11,
-        "rule_count": 33
+        "route_count": 12,
+        "rule_count": 42,
+        "streaming_required_processor": "bytewax"
       }
     },
     "runtime": {
+      "agent_adapter": "aicr_provider_neutral_chat_agent_adapter",
       "event_stream": "bytewax",
       "generated_app_runtime": "service.ChatService",
       "helper_runtime": "service.py"

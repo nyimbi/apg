@@ -7,6 +7,31 @@ from numbers import Number
 from typing import Any
 
 
+SUPPORTED_CHAT_AGENT_RUNTIMES: list[str] = ["codex", "claude_code", "opencode", "pi"]
+
+SUPPORTED_CHAT_AGENT_ROLES: list[str] = [
+	"room_reviewer",
+	"message_reviewer",
+	"moderation_reviewer",
+	"retention_reviewer",
+	"presence_reviewer",
+	"guest_access_reviewer",
+	"attachment_reviewer",
+	"thread_reviewer",
+	"lifecycle_batch_reviewer",
+	"chat_steward",
+]
+
+PRIVILEGED_CHAT_AGENT_ROLES: list[str] = [
+	"moderation_reviewer",
+	"retention_reviewer",
+	"guest_access_reviewer",
+	"attachment_reviewer",
+	"lifecycle_batch_reviewer",
+	"chat_steward",
+]
+
+
 DEFAULT_CONFIGURATION: dict[str, Any] = {
 	"tenant_id": "default",
 	"rooms": {
@@ -48,7 +73,7 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"agent_registration_required": True,
 		"agent_scope_required": True,
 		"agent_response_disclosure_required": True,
-		"supported_runtimes": ["codex", "claude_code", "opencode", "pi"],
+		"supported_runtimes": SUPPORTED_CHAT_AGENT_RUNTIMES,
 	},
 	"security": {
 		"tenant_isolation_required": True,
@@ -77,6 +102,47 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"audit_required": True,
 		"event_stream": "bytewax",
 	},
+	"agents": {
+		"first_class": True,
+		"supported_runtimes": SUPPORTED_CHAT_AGENT_RUNTIMES,
+		"supported_roles": SUPPORTED_CHAT_AGENT_ROLES,
+		"privileged_roles": PRIVILEGED_CHAT_AGENT_ROLES,
+		"require_scope": True,
+		"require_owner": True,
+		"require_purpose": True,
+		"require_contribution_disclosure": True,
+		"require_human_approval_for_privileged_roles": True,
+		"adapter_contract": "aicr_provider_neutral_chat_agent_adapter",
+	},
+	"streaming": {
+		"engine": "bytewax",
+		"lifecycle_stream": "chat.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"room_batch",
+			"message_batch",
+			"thread_batch",
+			"reaction_batch",
+			"presence_batch",
+			"moderation_batch",
+			"retention_batch",
+			"guest_access_batch",
+			"chat_agent_batch",
+		],
+		"topics": [
+			"chat.rooms",
+			"chat.messages",
+			"chat.threads",
+			"chat.reactions",
+			"chat.presence",
+			"chat.moderation",
+			"chat.retention",
+			"chat.guests",
+			"chat.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	},
 	"adapters": {
 		"generated_app_runtime": "service.ChatService",
 		"helper_runtime": "service.py",
@@ -92,6 +158,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"collaboration": "colb",
 		"security": "secu",
 		"cache": "cach",
+		"ai_orchestration": "aicr",
+		"agent_adapter": "aicr_provider_neutral_chat_agent_adapter",
 	},
 	"ui": {
 		"enable_chat_console": True,
@@ -100,6 +168,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"enable_moderation_queue": True,
 		"enable_presence_panel": True,
 		"enable_agent_panel": True,
+		"enable_chat_agent_roster": True,
+		"enable_lifecycle_batch_monitor": True,
 		"enable_retention_console": True,
 		"enable_audit": True,
 		"enable_analytics": True,
@@ -122,6 +192,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"governance",
 		"retention",
 		"observability",
+		"agents",
+		"streaming",
 		"adapters",
 		"ui",
 		"theme",
@@ -136,6 +208,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"governance",
 		"retention",
 		"observability",
+		"agents",
+		"streaming",
 		"adapters",
 		"ui",
 		"theme",
@@ -174,6 +248,15 @@ RULES: list[dict[str, Any]] = [
 	{"name": "ai_agent_requires_registration", "description": "AI chat participants must be registered.", "condition": {"ai_agent_participant": True, "agent_registered": False}, "effect": {"decision": "deny", "reason": "ai_agent_registration_required", "required_action": "register_ai_agent"}},
 	{"name": "ai_agent_requires_scope", "description": "AI chat participants require explicit room scope.", "condition": {"ai_agent_participant": True, "agent_scope_present": False}, "effect": {"decision": "deny", "reason": "ai_agent_scope_required", "required_action": "set_agent_scope"}},
 	{"name": "ai_response_requires_disclosure", "description": "AI responses require visible disclosure.", "condition": {"ai_agent_participant": True, "ai_response_disclosed": False}, "effect": {"decision": "deny", "reason": "ai_response_disclosure_required", "required_action": "disclose_ai_response"}},
+	{"name": "chat_agent_runtime_supported", "description": "Chat agents must use supported provider-neutral runtimes.", "condition": {"operation": "register_chat_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_chat_agent_runtime", "required_action": "choose_supported_chat_agent_runtime"}},
+	{"name": "chat_agent_role_supported", "description": "Chat agents must use supported chat-governance roles.", "condition": {"operation": "register_chat_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_chat_agent_role", "required_action": "choose_supported_chat_agent_role"}},
+	{"name": "chat_agent_requires_scope", "description": "Chat agents require explicit room, message, moderation, retention, presence, guest, attachment, thread, or lifecycle scope.", "condition": {"operation": "register_chat_agent", "scope_present": False}, "effect": {"decision": "deny", "reason": "chat_agent_scope_required", "required_action": "declare_chat_agent_scope"}},
+	{"name": "chat_agent_requires_owner", "description": "Chat agents require an accountable owner.", "condition": {"operation": "register_chat_agent", "owner_present": False}, "effect": {"decision": "deny", "reason": "chat_agent_owner_required", "required_action": "assign_chat_agent_owner"}},
+	{"name": "chat_agent_requires_purpose", "description": "Chat agents require a documented communication-governance purpose.", "condition": {"operation": "register_chat_agent", "purpose_present": False}, "effect": {"decision": "deny", "reason": "chat_agent_purpose_required", "required_action": "document_chat_agent_purpose"}},
+	{"name": "chat_agent_requires_contribution_disclosure", "description": "Chat agents must disclose machine-authored room, message, moderation, retention, and lifecycle contributions.", "condition": {"operation": "register_chat_agent", "contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "chat_agent_contribution_disclosure_required", "required_action": "disclose_machine_contribution"}},
+	{"name": "chat_agent_privileged_role_requires_human_approval", "description": "Privileged chat-agent roles require human approval evidence.", "condition": {"operation": "register_chat_agent", "privileged_role": True, "human_approval_required": False}, "effect": {"decision": "require_review", "reason": "chat_agent_human_approval_required", "required_action": "record_human_chat_agent_approval"}},
+	{"name": "chat_lifecycle_batch_requires_mutations", "description": "CHAT lifecycle batches must include at least one mutation.", "condition": {"operation": "validate_chat_lifecycle_batch", "mutation_count_lte": 0}, "effect": {"decision": "deny", "reason": "chat_lifecycle_batch_empty", "required_action": "include_chat_lifecycle_mutations"}},
+	{"name": "bytewax_chat_stream_required", "description": "CHAT lifecycle batches must be routed through Bytewax.", "condition": {"operation": "validate_chat_lifecycle_batch", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_chat_lifecycle_batch_to_bytewax"}},
 	{"name": "duplicate_message_id_blocked", "description": "Duplicate message IDs are blocked within a tenant.", "condition": {"operation": "send_message", "duplicate_message_id": True}, "effect": {"decision": "deny", "reason": "duplicate_message_id", "required_action": "reuse_existing_message"}},
 	{"name": "cross_tenant_chat_access_denied", "description": "Chat records may not cross tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_chat_access_denied", "required_action": "use_tenant_local_context"}},
 	{"name": "batch_chat_mutation_requires_bytewax", "description": "Batch chat mutations must use Bytewax event streams.", "condition": {"operation": "batch_chat_mutation", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}},
@@ -186,7 +269,8 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "direct", "path": "/chat/direct", "component": "DirectMessages", "permission": "chat:send", "nav_group": "Messaging"},
 	{"name": "messages", "path": "/chat/messages", "component": "MessageConsole", "permission": "chat:send", "nav_group": "Messaging"},
 	{"name": "presence", "path": "/chat/presence", "component": "PresencePanel", "permission": "chat:view", "nav_group": "Messaging"},
-	{"name": "agents", "path": "/chat/agents", "component": "AgentParticipants", "permission": "chat:manage_rooms", "nav_group": "Messaging"},
+	{"name": "agents", "path": "/chat/agents", "component": "ChatAgentRoster", "permission": "chat:manage_rooms", "nav_group": "Messaging"},
+	{"name": "lifecycle", "path": "/chat/lifecycle", "component": "CHATLifecycleBatchMonitor", "permission": "chat:admin", "nav_group": "Operations"},
 	{"name": "moderation", "path": "/chat/moderation", "component": "ModerationQueue", "permission": "chat:moderate", "nav_group": "Governance"},
 	{"name": "retention", "path": "/chat/retention", "component": "RetentionPolicy", "permission": "chat:admin", "nav_group": "Governance"},
 	{"name": "audit", "path": "/chat/audit", "component": "ChatAuditTrail", "permission": "chat:audit", "nav_group": "Governance"},
@@ -216,6 +300,8 @@ THEME: dict[str, Any] = {
 		"direct_messages": {"visual": "conversation-list", "status_style": "receipt-chip"},
 		"presence_panel": {"visual": "availability-grid", "status_style": "presence-chip"},
 		"agent_panel": {"visual": "agent-roster", "status_style": "scope-chip"},
+		"chat_agent_roster": {"icon": "bot", "visual": "agent-roster", "status_style": "scope-chip"},
+		"bytewax_lifecycle_panel": {"icon": "activity", "visual": "lifecycle-batch-list", "status_style": "stream-chip"},
 		"moderation_queue": {"visual": "review-lanes", "status_style": "policy-chip"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "delivery-chip"},
 	},
@@ -243,6 +329,44 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"requires_theme": True,
 		},
 		"theme": deepcopy(THEME),
+		"agents": agent_manifest(config),
+		"streaming": streaming_manifest(config),
+	}
+
+
+def agent_manifest(config: dict[str, Any] | None = None) -> dict[str, Any]:
+	"""Return provider-neutral chat agent composition metadata."""
+	agents = (config or DEFAULT_CONFIGURATION)["agents"]
+	return {
+		"first_class": bool(agents["first_class"]),
+		"supported_runtimes": list(agents["supported_runtimes"]),
+		"supported_roles": list(agents["supported_roles"]),
+		"privileged_roles": list(agents["privileged_roles"]),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles",
+		],
+		"adapter_contract": agents["adapter_contract"],
+	}
+
+
+def streaming_manifest(config: dict[str, Any] | None = None) -> dict[str, Any]:
+	"""Return Bytewax lifecycle stream metadata for CHAT composition."""
+	streaming = (config or DEFAULT_CONFIGURATION)["streaming"]
+	return {
+		"engine": streaming["engine"],
+		"lifecycle_stream": streaming["lifecycle_stream"],
+		"watermark": streaming["watermark"],
+		"required_processor": streaming["required_processor"],
+		"required_operations": list(streaming["required_operations"]),
+		"topics": list(streaming["topics"]),
+		"broker_core_dependency_allowed": bool(streaming["broker_core_dependency_allowed"]),
 	}
 
 
