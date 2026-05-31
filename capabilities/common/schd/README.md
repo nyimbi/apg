@@ -4,7 +4,8 @@
 job definitions, worker pools, run recovery, and scheduler operations. It gives
 generated applications a dependency-light runtime that can define jobs, attach
 them to tenant calendar policies and worker pools, trigger runs, recover failed
-runs, expose scheduler UI models, and enforce deterministic rules before live
+runs, compose first-class scheduler agents, validate Bytewax lifecycle batches,
+expose scheduler UI models, and enforce deterministic rules before live
 adapters are connected.
 
 ## What It Provides
@@ -21,8 +22,11 @@ adapters are connected.
 - Run lifecycle behavior for start, completion, cancellation, retry,
   dead-letter, metrics, logs, completion evidence, parent retry linkage, and
   Bytewax stream policy.
-- AI scheduler agents as first-class records for schedule design, run
-  observation, retry advice, capacity planning, and calendar audit assistance.
+- First-class scheduler agents with provider-neutral runtime (`codex`,
+  `claude_code`, `opencode`, `pi`), governance role, owner, purpose, scope,
+  disclosure, privileged-role review, and audit events.
+- Bytewax lifecycle batch validation for calendar, worker, job, schedule, run,
+  retry, dead-letter, scheduler-agent, and audit mutations.
 - Rule-engine, UI-route, visual-theme, adapter, semantic-model, release, and
   publish-plan metadata for APG composition.
 
@@ -56,6 +60,19 @@ schedule = service.create_schedule(
 )
 run = service.trigger_run("tenant-a", schedule["id"], "scheduler")
 service.complete_run("tenant-a", run["id"], records_processed=100)
+service.register_scheduler_agent(
+    "agent-1",
+    "tenant-a",
+    "Run Observer",
+    "codex",
+    "run_observer",
+    schedule["id"],
+    "ops",
+    True,
+    owner_ref="ops",
+    purpose="Observe scheduled runs and flag blocked work.",
+)
+service.validate_lifecycle_batch("tenant-a", "bytewax", 1, "scheduler_agent_batch")
 ```
 
 Dependency-light API helpers in `api.py` wrap the same service methods for
@@ -74,13 +91,41 @@ The deterministic rule engine blocks or flags:
 - triggering disabled, paused, or offline-worker schedules;
 - completing runs without valid non-negative metrics and audit evidence;
 - retrying non-failed runs or exceeding attempt limits;
-- unregistered, unsupported, unscoped, or undisclosed scheduler agents;
+- unsupported, unnamed, unowned, purposeless, unscoped, or undisclosed scheduler
+  agents;
+- privileged scheduler agents without human approval evidence, which are held
+  in review instead of silently activated;
+- empty, unsupported, or non-Bytewax scheduler lifecycle batches;
 - cross-tenant access and batch scheduler mutation without Bytewax.
+
+## Scheduler Agents
+
+Scheduler agents are first-class APG composition citizens. SCHD records their
+stable ID, name, runtime, role, owner, purpose, scheduler scope, contribution
+disclosure, human-approval treatment, and review status. SCHD does not invoke
+external Codex, Claude Code, OpenCode, Pi, or other agent clients directly;
+those integrations belong behind the AICR provider-neutral adapter contract
+named in the capability contract.
+
+Privileged roles such as `retry_advisor`, `capacity_planner`,
+`worker_coordinator`, `lifecycle_batch_reviewer`, and `scheduler_steward`
+require human approval evidence to become active immediately. Without that
+evidence, SCHD keeps the agent in `pending_review`.
+
+## Bytewax Lifecycle Batches
+
+SCHD validates lifecycle batches through `validate_lifecycle_batch(...)`.
+Accepted batches must use the Bytewax stream, include at least one mutation, and
+name a configured operation such as `calendar_batch`, `worker_pool_batch`,
+`job_batch`, `schedule_batch`, `run_batch`, `retry_batch`,
+`dead_letter_batch`, or `scheduler_agent_batch`. The packet exposes Bytewax
+metadata and guardrails without starting a live worker in dependency-light
+generated applications.
 
 ## Composition
 
-Required capabilities are `wflo`, `mqeb`, `moni`, and `audl`. Optional
-production adapters include `ntfy`, `cach`, `comp`, and `them`.
+Required capabilities are `wflo`, `mqeb`, `moni`, `audl`, and `aicr`.
+Optional production adapters include `ntfy`, `cach`, `comp`, and `them`.
 
 The local package does not start live schedulers, distributed workers, message
 buses, audit stores, monitoring systems, notification providers, external AI

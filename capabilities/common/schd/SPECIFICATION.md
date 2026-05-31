@@ -5,8 +5,8 @@
 `schd` is the APG common capability for governed scheduling and operational job
 orchestration. It lets generated applications compose schedules, calendar
 policies, job definitions, worker pools, runs, recovery flows, AI scheduler
-agents, audit events, UI screens, visual theming, and Bytewax event-stream
-policy.
+agents, Bytewax lifecycle batches, audit events, UI screens, visual theming,
+and Bytewax event-stream policy.
 
 ## Scope
 
@@ -28,10 +28,13 @@ The capability must support:
   start and completion timestamps.
 - Recovery flows for failed runs: retry, dead-letter, cancellation, and
   operator-visible state changes.
-- AI scheduler agents as first-class records, with supported runtime, role,
-  scope, registration actor, status, and visible contribution disclosure.
-- Bytewax-backed event-stream configuration for batch scheduler mutation and
-  runtime events.
+- AI scheduler agents as first-class records, with stable ID, readable name,
+  supported provider-neutral runtime, supported role, owner, purpose, scope,
+  registration actor, status, human-review treatment for privileged roles, and
+  visible contribution disclosure.
+- Bytewax-backed event-stream configuration for batch scheduler mutation,
+  runtime events, and lifecycle batches across calendars, worker pools, jobs,
+  schedules, runs, retries, dead letters, scheduler agents, and audit.
 - UI route contracts and dependency-light view models for generated
   applications.
 
@@ -57,8 +60,10 @@ The authoritative configuration lives in `capability_contract.py` and includes:
 - `job_runs`
 - `workers`
 - `scheduler_agents`
+- `agents`
 - `governance`
 - `observability`
+- `streaming`
 - `adapters`
 - `ui`
 - `theme`
@@ -79,8 +84,10 @@ The deterministic rule engine covers:
 - run audit evidence and non-negative metrics
 - retry eligibility
 - cancellation and dead-letter reasons
-- scheduler-agent registration, runtime, scope, role, and contribution
-  disclosure
+- scheduler-agent stable ID, readable name, runtime, role, scope, owner,
+  purpose, contribution disclosure, and privileged-role human approval
+- Bytewax lifecycle batch mutation count, supported operation, and lifecycle
+  stream enforcement
 - scheduler state-change audit
 - tenant isolation
 - Bytewax batch mutation enforcement
@@ -96,6 +103,7 @@ deterministic in-memory state for:
 - schedules
 - job runs
 - scheduler agents
+- lifecycle batches
 - audit events
 
 The runtime enforces the same guardrails exposed by the contract rule engine
@@ -112,6 +120,7 @@ The UI contract exposes:
 - workers
 - calendars
 - agents
+- lifecycle
 - audit
 - analytics
 - settings
@@ -130,6 +139,11 @@ APG composition layer.
   theme, streaming, and adapter metadata.
 - Runtime/API/view tests prove positive lifecycle behavior and negative
   guardrail behavior.
+- First-class scheduler-agent composition is provider-neutral across `codex`,
+  `claude_code`, `opencode`, and `pi`; external clients remain behind AICR
+  adapter contracts.
+- Lifecycle batch governance uses Bytewax metadata only and does not introduce
+  Kafka or broker-core processing.
 - `semantic_model.json`, `package_manifest.json`, and `release_report.json`
   match the current contract.
 - Focused compile, pytest, self-test, implementation audit, publish-plan,

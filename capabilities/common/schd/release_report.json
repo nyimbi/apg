@@ -2,15 +2,24 @@
   "evidence": {
     "contracts": {
       "capability_contract": {
+        "agents_first_class": true,
         "display_name": "Scheduling and Job Orchestration",
         "errors": [],
-        "route_count": 10,
-        "rule_count": 36
+        "route_count": 11,
+        "rule_count": 44,
+        "streaming_required_processor": "bytewax"
       }
     },
     "self_test": {
       "capability": "schd",
+      "errors": [],
       "passed": true,
+      "routes": [
+        "/health",
+        "/self-test",
+        "/component.json",
+        "/semantic-model.json"
+      ],
       "status": "ok"
     },
     "semantic_model": {

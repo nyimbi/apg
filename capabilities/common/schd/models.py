@@ -251,6 +251,9 @@ class SchedulerAgent:
 	scope_ref: str
 	registered_by: str
 	contribution_disclosed: bool
+	owner_ref: str
+	purpose: str
+	human_approval_required: bool = False
 	status: str = "active"
 	created_at: datetime | None = None
 
@@ -264,7 +267,40 @@ class SchedulerAgent:
 			"scope_ref": self.scope_ref,
 			"registered_by": self.registered_by,
 			"contribution_disclosed": self.contribution_disclosed,
+			"owner_ref": self.owner_ref,
+			"purpose": self.purpose,
+			"human_approval_required": self.human_approval_required,
 			"status": self.status,
+			"created_at": self.created_at.isoformat() if self.created_at else None,
+		}
+
+
+@dataclass
+class SchdLifecycleBatch:
+	"""Bytewax lifecycle batch validation record for scheduler mutations."""
+
+	id: str
+	tenant_id: str
+	event_stream: str
+	operation: str
+	mutation_count: int
+	processor: str = "bytewax"
+	status: str = "accepted"
+	matched_rules: list[str] = field(default_factory=list)
+	required_actions: list[str] = field(default_factory=list)
+	created_at: datetime | None = None
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"event_stream": self.event_stream,
+			"operation": self.operation,
+			"mutation_count": self.mutation_count,
+			"processor": self.processor,
+			"status": self.status,
+			"matched_rules": list(self.matched_rules),
+			"required_actions": list(self.required_actions),
 			"created_at": self.created_at.isoformat() if self.created_at else None,
 		}
 

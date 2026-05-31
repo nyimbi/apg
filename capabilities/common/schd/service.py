@@ -4,8 +4,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from .capability_contract import DEFAULT_CONFIGURATION, evaluate_capability_rules, get_capability_contract
-from .models import CalendarPolicy, JobDefinition, JobRun, ScheduleDefinition, SchdAuditEvent, SchedulerAgent, WorkerPool
+from .capability_contract import (
+	DEFAULT_CONFIGURATION,
+	PRIVILEGED_SCHD_AGENT_ROLES,
+	SUPPORTED_SCHD_AGENT_ROLES,
+	SUPPORTED_SCHD_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
+from .models import CalendarPolicy, JobDefinition, JobRun, ScheduleDefinition, SchdAuditEvent, SchdLifecycleBatch, SchedulerAgent, WorkerPool
 from .scheduling_runtime import (
 	backoff_seconds,
 	next_run_hint,
@@ -32,7 +39,12 @@ class SchdService:
 		self._schedules: dict[str, ScheduleDefinition] = {}
 		self._runs: dict[str, JobRun] = {}
 		self._agents: dict[str, SchedulerAgent] = {}
+		self._lifecycle_batches: dict[str, SchdLifecycleBatch] = {}
 		self._audit_events: list[SchdAuditEvent] = []
+		self._agent_runtimes = {self._normalize_token(value) for value in SUPPORTED_SCHD_AGENT_RUNTIMES}
+		self._agent_roles = {self._normalize_token(value) for value in SUPPORTED_SCHD_AGENT_ROLES}
+		self._privileged_agent_roles = {self._normalize_token(value) for value in PRIVILEGED_SCHD_AGENT_ROLES}
+		self._lifecycle_operations = {self._normalize_token(value) for value in DEFAULT_CONFIGURATION["streaming"]["required_operations"]}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -477,36 +489,51 @@ class SchdService:
 		scope_ref: str,
 		registered_by: str,
 		contribution_disclosed: bool,
+		owner_ref: str = "",
+		purpose: str = "",
+		human_approval_required: bool = False,
 	) -> dict[str, Any]:
-		config = DEFAULT_CONFIGURATION["scheduler_agents"]
+		runtime_value = self._normalize_token(runtime)
+		role_value = self._normalize_token(role)
+		owner_value = str(owner_ref or "").strip()
+		purpose_value = str(purpose or "").strip()
+		approval_recorded = self._coerce_bool(human_approval_required)
 		result = self.evaluate({
-			"tenant_context_present": bool(tenant_id),
-			"scheduler_agent_present": True,
-			"agent_registered": bool(name and registered_by),
-			"agent_runtime_supported": runtime in config["supported_runtimes"],
+			"tenant_context_present": bool(str(tenant_id or "").strip()),
+			"operation": "register_scheduler_agent",
+			"agent_id_present": bool(str(agent_id or "").strip()),
+			"agent_name_present": bool(str(name or "").strip()),
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
 			"agent_scope_present": bool(str(scope_ref or "").strip()),
-			"agent_contribution_disclosed": bool(contribution_disclosed),
+			"agent_owner_present": bool(owner_value),
+			"agent_purpose_present": bool(purpose_value),
+			"agent_contribution_disclosed": self._coerce_bool(contribution_disclosed),
+			"privileged_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": approval_recorded,
 			"state_change_requested": True,
 			"audit_event_recorded": True,
 		})
 		if result["decision"] == "deny":
 			self._raise_policy_result(result)
-		if role not in config["allowed_roles"]:
-			raise PermissionError("scheduler_agent_role_not_supported")
 		if not self._scope_exists_for_tenant(tenant_id, scope_ref):
 			raise KeyError("scheduler_agent_scope_not_found")
 		agent = SchedulerAgent(
 			id=agent_id,
 			tenant_id=tenant_id,
 			name=name,
-			runtime=runtime,
-			role=role,
+			runtime=runtime_value,
+			role=role_value,
 			scope_ref=scope_ref,
 			registered_by=registered_by,
-			contribution_disclosed=bool(contribution_disclosed),
+			contribution_disclosed=self._coerce_bool(contribution_disclosed),
+			owner_ref=owner_value,
+			purpose=purpose_value,
+			human_approval_required=approval_recorded,
+			status="pending_review" if result["decision"] == "require_review" else "active",
 			created_at=utc_now(),
 		)
-		self._agents[agent.id] = agent
+		self._agents[self._tenant_key(tenant_id, agent.id)] = agent
 		self._record_event(tenant_id, "scheduler_agent_registered", agent.id, f"Scheduler agent {name} registered.", registered_by)
 		return agent.to_dict()
 
@@ -515,6 +542,43 @@ class SchdService:
 		if result["decision"] == "deny":
 			self._raise_policy_result(result)
 		return result
+
+	def validate_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "scheduler_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		operation_value = self._normalize_token(operation)
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "validate_schd_lifecycle_batch",
+			"event_stream": self._normalize_token(event_stream),
+			"mutation_count": int(mutation_count),
+			"lifecycle_operation_supported": operation_value in self._lifecycle_operations,
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy_result(result)
+		record_id = batch_id or stable_id("schd_lifecycle_batch", tenant_id, operation_value, len(self._lifecycle_batches))
+		batch = SchdLifecycleBatch(
+			id=record_id,
+			tenant_id=tenant_id,
+			event_stream=self._normalize_token(event_stream),
+			operation=operation_value,
+			mutation_count=int(mutation_count),
+			status="accepted" if result["decision"] == "allow" else "review_required",
+			matched_rules=list(result["matched_rules"]),
+			required_actions=self._required_actions(result),
+			created_at=utc_now(),
+		)
+		self._lifecycle_batches[self._tenant_key(tenant_id, record_id)] = batch
+		self._record_event(tenant_id, "schd_lifecycle_batch_validated", batch.id, f"SCHD lifecycle batch {batch.status}: {operation_value}", "schd")
+		return batch.to_dict()
 
 	def create_record(
 		self,
@@ -564,6 +628,9 @@ class SchdService:
 	def list_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._agents, tenant_id)
 
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._lifecycle_batches, tenant_id)
+
 	def audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		events = self._audit_events
 		if tenant_id is not None:
@@ -585,11 +652,36 @@ class SchdService:
 			"failed_run_count": sum(1 for item in runs if item["status"] in {"failed", "dead_lettered"}),
 			"calendar_count": len(self.list_calendars(tenant_id)),
 			"agent_count": len(self.list_agents(tenant_id)),
+			"pending_agent_review_count": sum(1 for item in self.list_agents(tenant_id) if item["status"] == "pending_review"),
+			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
+			"denied_lifecycle_batch_count": sum(1 for item in self.list_lifecycle_batches(tenant_id) if item["status"] not in {"accepted", "review_required"}),
 		}
 
 	def _require_tenant(self, tenant_id: str) -> None:
 		if not tenant_id:
 			self._raise_policy({"tenant_context_present": False})
+
+	def _tenant_key(self, tenant_id: str, record_id: str) -> str:
+		return f"{str(tenant_id or '').strip()}::{str(record_id or '').strip()}"
+
+	def _normalize_token(self, value: object) -> str:
+		return str(value or "").strip().lower()
+
+	def _coerce_bool(self, value: object) -> bool:
+		if isinstance(value, bool):
+			return value
+		if value is None:
+			return False
+		if isinstance(value, str):
+			return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+		return bool(value)
+
+	def _required_actions(self, result: dict[str, Any]) -> list[str]:
+		return [
+			str(action["required_action"])
+			for action in result.get("actions", [])
+			if action.get("required_action")
+		]
 
 	def _require_owned(self, store: dict[str, Any], object_id: str, tenant_id: str, missing_reason: str) -> Any:
 		item = store.get(object_id)
@@ -598,8 +690,10 @@ class SchdService:
 		return item
 
 	def _scope_exists_for_tenant(self, tenant_id: str, scope_ref: str) -> bool:
-		for store in (self._calendars, self._workers, self._jobs, self._schedules, self._runs):
+		for store in (self._calendars, self._workers, self._jobs, self._schedules, self._runs, self._lifecycle_batches):
 			item = store.get(scope_ref)
+			if item is None:
+				item = store.get(self._tenant_key(tenant_id, scope_ref))
 			if item is not None:
 				return item.tenant_id == tenant_id
 		return False

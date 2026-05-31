@@ -10,13 +10,13 @@ from .capability_contract import evaluate_capability_rules, get_capability_contr
 __version__ = "1.0.0"
 __capability_id__ = "schd"
 __capability_name__ = "Scheduling and Job Orchestration"
-__apg_dependencies__ = ["wflo", "mqeb", "moni", "audl"]
+__apg_dependencies__ = ["wflo", "mqeb", "moni", "audl", "aicr"]
 
 capability_metadata: dict[str, Any] = {
 	"name": "schd",
 	"version": __version__,
 	"display_name": __capability_name__,
-	"description": "Tenant-aware schedules, jobs, triggers, workers, retries, recovery, scheduler agents, calendars, and operational job monitoring",
+	"description": "Tenant-aware schedules, jobs, triggers, workers, retries, recovery, first-class provider-neutral scheduler agents, Bytewax lifecycle governance, calendars, and operational job monitoring",
 	"category": "workflow_automation",
 	"subcategory": "scheduling",
 	"vendor": "Datacraft",
@@ -24,7 +24,7 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["job_scheduling", "calendar_triggers", "worker_orchestration", "retry_policies", "job_monitoring", "scheduler_agents", "run_recovery"],
+	"provides": ["job_scheduling", "calendar_triggers", "worker_orchestration", "retry_policies", "job_monitoring", "scheduler_agent_composition", "run_recovery", "bytewax_scheduler_lifecycle"],
 	"permissions": ["schd:view", "schd:schedule", "schd:run_jobs", "schd:manage_workers", "schd:audit", "schd:admin"]
 }
 
@@ -48,8 +48,9 @@ def register_capability() -> dict[str, Any]:
 			"calendar_triggers": "Apply timezone, holiday, blackout, and business-calendar controls",
 			"worker_orchestration": "Assign jobs to workers, queues, pools, and capacity lanes",
 			"retry_policies": "Govern retries, dead letters, backoff, and compensation hooks",
-			"scheduler_agents": "Register scoped AI scheduler assistants for design, recovery, capacity, and audit support",
+			"scheduler_agent_composition": "Register first-class provider-neutral scheduler agents for design, recovery, capacity, worker, lifecycle, and audit support",
 			"run_recovery": "Pause, resume, cancel, retry, and dead-letter scheduler work with evidence",
+			"bytewax_scheduler_lifecycle": "Validate scheduler lifecycle batches through Bytewax-only processor metadata",
 			"capability_rules": "Evaluate deterministic scheduling-governance rules",
 			"visual_theming": "Apply scheduler-operations theme tokens and components"
 		},
@@ -60,11 +61,13 @@ def register_capability() -> dict[str, Any]:
 			"calendars": "/schd/api/v1/calendars",
 			"runs": "/schd/api/v1/runs",
 			"agents": "/schd/api/v1/agents",
+			"lifecycle": "/schd/api/v1/lifecycle",
 			"audit": "/schd/api/v1/audit"
 		},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
+		"agents": contract["agents"],
 		"streaming": contract["streaming"],
 		"permissions": capability_metadata["permissions"]
 	}

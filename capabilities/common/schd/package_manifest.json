@@ -1,10 +1,59 @@
 {
+  "agents": {
+    "adapter_contract": "aicr_provider_neutral_schd_agent_adapter",
+    "first_class": true,
+    "guardrails": [
+      "supported_runtime",
+      "supported_role",
+      "stable_identifier",
+      "readable_name",
+      "explicit_scope",
+      "accountable_owner",
+      "declared_purpose",
+      "machine_contribution_disclosure",
+      "human_approval_for_privileged_roles"
+    ],
+    "privileged_roles": [
+      "retry_advisor",
+      "capacity_planner",
+      "worker_coordinator",
+      "lifecycle_batch_reviewer",
+      "scheduler_steward"
+    ],
+    "required_fields": [
+      "tenant_id",
+      "agent_id",
+      "name",
+      "runtime",
+      "role",
+      "scope",
+      "owner",
+      "purpose"
+    ],
+    "supported_roles": [
+      "schedule_designer",
+      "run_observer",
+      "retry_advisor",
+      "capacity_planner",
+      "calendar_auditor",
+      "worker_coordinator",
+      "lifecycle_batch_reviewer",
+      "scheduler_steward"
+    ],
+    "supported_runtimes": [
+      "codex",
+      "claude_code",
+      "opencode",
+      "pi"
+    ]
+  },
   "base_target": "python",
   "display_name": "Scheduling and Job Orchestration",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
     "cap_spec.md",
     "models.py",
+    "scheduling_runtime.py",
     "service.py",
     "api.py",
     "views.py",
@@ -17,5 +66,34 @@
   "profile_artifacts": [
     "package_manifest.json"
   ],
+  "streaming": {
+    "broker_core_dependency_allowed": false,
+    "engine": "bytewax",
+    "lifecycle_stream": "schd.lifecycle",
+    "required_operations": [
+      "calendar_batch",
+      "worker_pool_batch",
+      "job_batch",
+      "schedule_batch",
+      "run_batch",
+      "retry_batch",
+      "dead_letter_batch",
+      "scheduler_agent_batch",
+      "audit_batch"
+    ],
+    "required_processor": "bytewax",
+    "topics": [
+      "schd.calendars",
+      "schd.worker_pools",
+      "schd.jobs",
+      "schd.schedules",
+      "schd.runs",
+      "schd.retries",
+      "schd.dead_letters",
+      "schd.agents",
+      "schd.audit"
+    ],
+    "watermark": "event_time"
+  },
   "version": "1.0.0"
 }

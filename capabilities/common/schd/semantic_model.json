@@ -1,5 +1,38 @@
 {
-  "agents": {},
+  "agents": {
+    "schd": {
+      "adapter_contract": "aicr_provider_neutral_schd_agent_adapter",
+      "first_class": true,
+      "privileged_roles": [
+        "retry_advisor",
+        "capacity_planner",
+        "worker_coordinator",
+        "lifecycle_batch_reviewer",
+        "scheduler_steward"
+      ],
+      "require_contribution_disclosure": true,
+      "require_human_approval_for_privileged_roles": true,
+      "require_owner": true,
+      "require_purpose": true,
+      "require_scope": true,
+      "supported_roles": [
+        "schedule_designer",
+        "run_observer",
+        "retry_advisor",
+        "capacity_planner",
+        "calendar_auditor",
+        "worker_coordinator",
+        "lifecycle_batch_reviewer",
+        "scheduler_steward"
+      ],
+      "supported_runtimes": [
+        "codex",
+        "claude_code",
+        "opencode",
+        "pi"
+      ]
+    }
+  },
   "app": {
     "description": "Scheduling and Job Orchestration package-backed APG capability",
     "entity_count": 0,
@@ -8,11 +41,66 @@
   },
   "capabilities": {
     "schd": {
-      "approvals": {},
+      "adapters": {
+        "agent_adapter": "aicr_provider_neutral_schd_agent_adapter",
+        "ai_orchestration": "aicr",
+        "api_helpers": "api.py",
+        "audit_sink": "audl",
+        "cache": "cach",
+        "compensation": "comp",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "service.SchdService",
+        "message_bus": "mqeb",
+        "monitoring": "moni",
+        "notifications": "ntfy",
+        "runtime_helpers": "scheduling_runtime.py",
+        "theme": "them",
+        "view_models": "views.py",
+        "workflow": "wflo"
+      },
+      "agents": {
+        "adapter_contract": "aicr_provider_neutral_schd_agent_adapter",
+        "first_class": true,
+        "privileged_roles": [
+          "retry_advisor",
+          "capacity_planner",
+          "worker_coordinator",
+          "lifecycle_batch_reviewer",
+          "scheduler_steward"
+        ],
+        "require_contribution_disclosure": true,
+        "require_human_approval_for_privileged_roles": true,
+        "require_owner": true,
+        "require_purpose": true,
+        "require_scope": true,
+        "supported_roles": [
+          "schedule_designer",
+          "run_observer",
+          "retry_advisor",
+          "capacity_planner",
+          "calendar_auditor",
+          "worker_coordinator",
+          "lifecycle_batch_reviewer",
+          "scheduler_steward"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
+      "approvals": {
+        "external_job_approval": "ExternalJobApproval",
+        "long_running_job_review": "LongRunningJobReview",
+        "privileged_scheduler_agent_review": "SchedulerAgentHumanApprovalReview"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
         "adapters": {
+          "agent_adapter": "aicr_provider_neutral_schd_agent_adapter",
+          "ai_orchestration": "aicr",
           "api_helpers": "api.py",
           "audit_sink": "audl",
           "cache": "cach",
@@ -26,6 +114,38 @@
           "theme": "them",
           "view_models": "views.py",
           "workflow": "wflo"
+        },
+        "agents": {
+          "adapter_contract": "aicr_provider_neutral_schd_agent_adapter",
+          "first_class": true,
+          "privileged_roles": [
+            "retry_advisor",
+            "capacity_planner",
+            "worker_coordinator",
+            "lifecycle_batch_reviewer",
+            "scheduler_steward"
+          ],
+          "require_contribution_disclosure": true,
+          "require_human_approval_for_privileged_roles": true,
+          "require_owner": true,
+          "require_purpose": true,
+          "require_scope": true,
+          "supported_roles": [
+            "schedule_designer",
+            "run_observer",
+            "retry_advisor",
+            "capacity_planner",
+            "calendar_auditor",
+            "worker_coordinator",
+            "lifecycle_batch_reviewer",
+            "scheduler_steward"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "governance": {
           "audit_job_runs": true,
@@ -69,7 +189,10 @@
             "run_observer",
             "retry_advisor",
             "capacity_planner",
-            "calendar_auditor"
+            "calendar_auditor",
+            "worker_coordinator",
+            "lifecycle_batch_reviewer",
+            "scheduler_steward"
           ],
           "supported_runtimes": [
             "codex",
@@ -87,6 +210,35 @@
           "schedule_owner_required": true,
           "timezone_required": true
         },
+        "streaming": {
+          "broker_core_dependency_allowed": false,
+          "engine": "bytewax",
+          "lifecycle_stream": "schd.lifecycle",
+          "required_operations": [
+            "calendar_batch",
+            "worker_pool_batch",
+            "job_batch",
+            "schedule_batch",
+            "run_batch",
+            "retry_batch",
+            "dead_letter_batch",
+            "scheduler_agent_batch",
+            "audit_batch"
+          ],
+          "required_processor": "bytewax",
+          "topics": [
+            "schd.calendars",
+            "schd.worker_pools",
+            "schd.jobs",
+            "schd.schedules",
+            "schd.runs",
+            "schd.retries",
+            "schd.dead_letters",
+            "schd.agents",
+            "schd.audit"
+          ],
+          "watermark": "event_time"
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
@@ -98,6 +250,7 @@
           "enable_audit": true,
           "enable_calendar_manager": true,
           "enable_job_monitor": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_schedule_console": true,
           "enable_worker_dashboard": true
         },
@@ -122,14 +275,16 @@
         "worker_orchestration",
         "retry_policies",
         "job_monitoring",
-        "scheduler_agents",
-        "run_recovery"
+        "scheduler_agent_composition",
+        "run_recovery",
+        "bytewax_scheduler_lifecycle"
       ],
       "requires": [
         "wflo",
         "mqeb",
         "moni",
-        "audl"
+        "audl",
+        "aicr"
       ],
       "rule_engine": {
         "rules": [
@@ -515,23 +670,36 @@
           },
           {
             "condition": {
-              "agent_registered": false,
-              "scheduler_agent_present": true
+              "agent_id_present": false,
+              "operation": "register_scheduler_agent"
             },
-            "description": "AI scheduler agents must be registered.",
+            "description": "First-class scheduler agents require stable identifiers.",
             "effect": {
               "decision": "deny",
-              "reason": "scheduler_agent_registration_required",
-              "required_action": "register_scheduler_agent"
+              "reason": "scheduler_agent_id_required",
+              "required_action": "assign_scheduler_agent_id"
             },
-            "name": "scheduler_agent_requires_registration"
+            "name": "scheduler_agent_requires_id"
+          },
+          {
+            "condition": {
+              "agent_name_present": false,
+              "operation": "register_scheduler_agent"
+            },
+            "description": "First-class scheduler agents require readable names.",
+            "effect": {
+              "decision": "deny",
+              "reason": "scheduler_agent_name_required",
+              "required_action": "name_scheduler_agent"
+            },
+            "name": "scheduler_agent_requires_name"
           },
           {
             "condition": {
               "agent_runtime_supported": false,
-              "scheduler_agent_present": true
+              "operation": "register_scheduler_agent"
             },
-            "description": "AI scheduler agents must use a configured runtime.",
+            "description": "First-class scheduler agents must use a configured provider-neutral runtime.",
             "effect": {
               "decision": "deny",
               "reason": "scheduler_agent_runtime_not_supported",
@@ -541,10 +709,23 @@
           },
           {
             "condition": {
-              "agent_scope_present": false,
-              "scheduler_agent_present": true
+              "agent_role_supported": false,
+              "operation": "register_scheduler_agent"
             },
-            "description": "AI scheduler agents require schedule, job, run, or worker scope.",
+            "description": "First-class scheduler agents must use supported scheduler-governance roles.",
+            "effect": {
+              "decision": "deny",
+              "reason": "scheduler_agent_role_not_supported",
+              "required_action": "choose_supported_scheduler_agent_role"
+            },
+            "name": "scheduler_agent_role_supported"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "operation": "register_scheduler_agent"
+            },
+            "description": "First-class scheduler agents require calendar, worker, job, schedule, run, retry, dead-letter, or lifecycle scope.",
             "effect": {
               "decision": "deny",
               "reason": "scheduler_agent_scope_required",
@@ -554,16 +735,95 @@
           },
           {
             "condition": {
-              "agent_contribution_disclosed": false,
-              "scheduler_agent_present": true
+              "agent_owner_present": false,
+              "operation": "register_scheduler_agent"
             },
-            "description": "AI scheduler agent contributions require disclosure.",
+            "description": "First-class scheduler agents require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "scheduler_agent_owner_required",
+              "required_action": "assign_scheduler_agent_owner"
+            },
+            "name": "scheduler_agent_requires_owner"
+          },
+          {
+            "condition": {
+              "agent_purpose_present": false,
+              "operation": "register_scheduler_agent"
+            },
+            "description": "First-class scheduler agents require a documented scheduler-governance purpose.",
+            "effect": {
+              "decision": "deny",
+              "reason": "scheduler_agent_purpose_required",
+              "required_action": "document_scheduler_agent_purpose"
+            },
+            "name": "scheduler_agent_requires_purpose"
+          },
+          {
+            "condition": {
+              "agent_contribution_disclosed": false,
+              "operation": "register_scheduler_agent"
+            },
+            "description": "First-class scheduler agent contributions require visible machine-contribution disclosure.",
             "effect": {
               "decision": "deny",
               "reason": "scheduler_agent_disclosure_required",
               "required_action": "disclose_scheduler_agent"
             },
             "name": "scheduler_agent_requires_disclosure"
+          },
+          {
+            "condition": {
+              "human_approval_required": false,
+              "operation": "register_scheduler_agent",
+              "privileged_role": true
+            },
+            "description": "Privileged scheduler-agent roles require human approval evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "scheduler_agent_human_approval_required",
+              "required_action": "record_scheduler_agent_human_approval"
+            },
+            "name": "scheduler_agent_privileged_role_requires_human_approval"
+          },
+          {
+            "condition": {
+              "mutation_count_lte": 0,
+              "operation": "validate_schd_lifecycle_batch"
+            },
+            "description": "SCHD lifecycle batches must include at least one mutation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "schd_lifecycle_batch_empty",
+              "required_action": "include_schd_lifecycle_mutations"
+            },
+            "name": "schd_lifecycle_batch_requires_mutations"
+          },
+          {
+            "condition": {
+              "lifecycle_operation_supported": false,
+              "operation": "validate_schd_lifecycle_batch"
+            },
+            "description": "SCHD lifecycle batches must use configured lifecycle operations.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_schd_lifecycle_operation",
+              "required_action": "choose_supported_schd_lifecycle_operation"
+            },
+            "name": "schd_lifecycle_operation_supported"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "validate_schd_lifecycle_batch"
+            },
+            "description": "SCHD lifecycle batches must be routed through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_lifecycle_stream_required",
+              "required_action": "route_schd_lifecycle_batch_to_bytewax"
+            },
+            "name": "bytewax_schd_lifecycle_stream_required"
           },
           {
             "condition": {
@@ -989,23 +1249,36 @@
         },
         {
           "condition": {
-            "agent_registered": false,
-            "scheduler_agent_present": true
+            "agent_id_present": false,
+            "operation": "register_scheduler_agent"
           },
-          "description": "AI scheduler agents must be registered.",
+          "description": "First-class scheduler agents require stable identifiers.",
           "effect": {
             "decision": "deny",
-            "reason": "scheduler_agent_registration_required",
-            "required_action": "register_scheduler_agent"
+            "reason": "scheduler_agent_id_required",
+            "required_action": "assign_scheduler_agent_id"
           },
-          "name": "scheduler_agent_requires_registration"
+          "name": "scheduler_agent_requires_id"
+        },
+        {
+          "condition": {
+            "agent_name_present": false,
+            "operation": "register_scheduler_agent"
+          },
+          "description": "First-class scheduler agents require readable names.",
+          "effect": {
+            "decision": "deny",
+            "reason": "scheduler_agent_name_required",
+            "required_action": "name_scheduler_agent"
+          },
+          "name": "scheduler_agent_requires_name"
         },
         {
           "condition": {
             "agent_runtime_supported": false,
-            "scheduler_agent_present": true
+            "operation": "register_scheduler_agent"
           },
-          "description": "AI scheduler agents must use a configured runtime.",
+          "description": "First-class scheduler agents must use a configured provider-neutral runtime.",
           "effect": {
             "decision": "deny",
             "reason": "scheduler_agent_runtime_not_supported",
@@ -1015,10 +1288,23 @@
         },
         {
           "condition": {
-            "agent_scope_present": false,
-            "scheduler_agent_present": true
+            "agent_role_supported": false,
+            "operation": "register_scheduler_agent"
           },
-          "description": "AI scheduler agents require schedule, job, run, or worker scope.",
+          "description": "First-class scheduler agents must use supported scheduler-governance roles.",
+          "effect": {
+            "decision": "deny",
+            "reason": "scheduler_agent_role_not_supported",
+            "required_action": "choose_supported_scheduler_agent_role"
+          },
+          "name": "scheduler_agent_role_supported"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "operation": "register_scheduler_agent"
+          },
+          "description": "First-class scheduler agents require calendar, worker, job, schedule, run, retry, dead-letter, or lifecycle scope.",
           "effect": {
             "decision": "deny",
             "reason": "scheduler_agent_scope_required",
@@ -1028,16 +1314,95 @@
         },
         {
           "condition": {
-            "agent_contribution_disclosed": false,
-            "scheduler_agent_present": true
+            "agent_owner_present": false,
+            "operation": "register_scheduler_agent"
           },
-          "description": "AI scheduler agent contributions require disclosure.",
+          "description": "First-class scheduler agents require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "scheduler_agent_owner_required",
+            "required_action": "assign_scheduler_agent_owner"
+          },
+          "name": "scheduler_agent_requires_owner"
+        },
+        {
+          "condition": {
+            "agent_purpose_present": false,
+            "operation": "register_scheduler_agent"
+          },
+          "description": "First-class scheduler agents require a documented scheduler-governance purpose.",
+          "effect": {
+            "decision": "deny",
+            "reason": "scheduler_agent_purpose_required",
+            "required_action": "document_scheduler_agent_purpose"
+          },
+          "name": "scheduler_agent_requires_purpose"
+        },
+        {
+          "condition": {
+            "agent_contribution_disclosed": false,
+            "operation": "register_scheduler_agent"
+          },
+          "description": "First-class scheduler agent contributions require visible machine-contribution disclosure.",
           "effect": {
             "decision": "deny",
             "reason": "scheduler_agent_disclosure_required",
             "required_action": "disclose_scheduler_agent"
           },
           "name": "scheduler_agent_requires_disclosure"
+        },
+        {
+          "condition": {
+            "human_approval_required": false,
+            "operation": "register_scheduler_agent",
+            "privileged_role": true
+          },
+          "description": "Privileged scheduler-agent roles require human approval evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "scheduler_agent_human_approval_required",
+            "required_action": "record_scheduler_agent_human_approval"
+          },
+          "name": "scheduler_agent_privileged_role_requires_human_approval"
+        },
+        {
+          "condition": {
+            "mutation_count_lte": 0,
+            "operation": "validate_schd_lifecycle_batch"
+          },
+          "description": "SCHD lifecycle batches must include at least one mutation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "schd_lifecycle_batch_empty",
+            "required_action": "include_schd_lifecycle_mutations"
+          },
+          "name": "schd_lifecycle_batch_requires_mutations"
+        },
+        {
+          "condition": {
+            "lifecycle_operation_supported": false,
+            "operation": "validate_schd_lifecycle_batch"
+          },
+          "description": "SCHD lifecycle batches must use configured lifecycle operations.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_schd_lifecycle_operation",
+            "required_action": "choose_supported_schd_lifecycle_operation"
+          },
+          "name": "schd_lifecycle_operation_supported"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "validate_schd_lifecycle_batch"
+          },
+          "description": "SCHD lifecycle batches must be routed through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_lifecycle_stream_required",
+            "required_action": "route_schd_lifecycle_batch_to_bytewax"
+          },
+          "name": "bytewax_schd_lifecycle_stream_required"
         },
         {
           "condition": {
@@ -1081,8 +1446,19 @@
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
+        "helpers": "scheduling_runtime.py",
+        "service": "service.SchdService",
         "views": "views.py"
+      },
+      "scheduler_lifecycle": {
+        "audit": "SchdAuditEvent",
+        "calendar": "CalendarPolicy",
+        "job": "JobDefinition",
+        "lifecycle_batch": "SchdLifecycleBatch",
+        "run": "JobRun",
+        "schedule": "ScheduleDefinition",
+        "scheduler_agent": "SchedulerAgent",
+        "worker_pool": "WorkerPool"
       },
       "screens": {
         "agents": {
@@ -1115,6 +1491,11 @@
           "permission": "schd:run_jobs",
           "route": "/schd/jobs"
         },
+        "lifecycle": {
+          "component": "SCHDLifecycleBatchMonitor",
+          "permission": "schd:admin",
+          "route": "/schd/lifecycle"
+        },
         "runs": {
           "component": "RunMonitor",
           "permission": "schd:view",
@@ -1138,6 +1519,8 @@
       },
       "streaming": {
         "batch_mutation_guardrail": "batch_scheduler_mutation_requires_bytewax",
+        "broker_core_dependency_allowed": false,
+        "engine": "bytewax",
         "events": [
           "calendar_policy_created",
           "worker_pool_registered",
@@ -1154,7 +1537,20 @@
           "job_run_dead_lettered",
           "scheduler_agent_registered"
         ],
+        "lifecycle_stream": "schd.lifecycle",
         "processor": "bytewax",
+        "required_operations": [
+          "calendar_batch",
+          "worker_pool_batch",
+          "job_batch",
+          "schedule_batch",
+          "run_batch",
+          "retry_batch",
+          "dead_letter_batch",
+          "scheduler_agent_batch",
+          "audit_batch"
+        ],
+        "required_processor": "bytewax",
         "state": [
           "calendar_policies",
           "worker_pools",
@@ -1163,7 +1559,19 @@
           "runs",
           "scheduler_agents"
         ],
-        "topic": "apg.schd.lifecycle"
+        "topic": "apg.schd.lifecycle",
+        "topics": [
+          "schd.calendars",
+          "schd.worker_pools",
+          "schd.jobs",
+          "schd.schedules",
+          "schd.runs",
+          "schd.retries",
+          "schd.dead_letters",
+          "schd.agents",
+          "schd.audit"
+        ],
+        "watermark": "event_time"
       },
       "theme": {
         "components": {
@@ -1174,6 +1582,10 @@
           "audit_timeline": {
             "status_style": "scheduler-chip",
             "visual": "event-timeline"
+          },
+          "bytewax_lifecycle_panel": {
+            "status_style": "processor-chip",
+            "visual": "stream-batch-monitor"
           },
           "job_run_table": {
             "highlight": "runtime-chip",
@@ -1187,6 +1599,10 @@
             "icon": "calendar-clock",
             "risk_style": "calendar-band",
             "status_indicator": "schedule-pill"
+          },
+          "scheduler_agent_roster": {
+            "status_style": "approval-chip",
+            "visual": "agent-roster"
           },
           "worker_pool": {
             "status_style": "health-chip",
@@ -1262,6 +1678,13 @@
             "permission": "schd:run_jobs"
           },
           {
+            "component": "SCHDLifecycleBatchMonitor",
+            "name": "lifecycle",
+            "nav_group": "Operations",
+            "path": "/schd/lifecycle",
+            "permission": "schd:admin"
+          },
+          {
             "component": "SchedulerAuditTrail",
             "name": "audit",
             "nav_group": "Governance",
@@ -1293,21 +1716,76 @@
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "scheduler_governance": {
+        "adapter_contract": "aicr_provider_neutral_schd_agent_adapter",
+        "roles": [
+          "schedule_designer",
+          "run_observer",
+          "retry_advisor",
+          "capacity_planner",
+          "calendar_auditor",
+          "worker_coordinator",
+          "lifecycle_batch_reviewer",
+          "scheduler_steward"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
       "schd": [
         "wflo",
         "mqeb",
         "moni",
-        "audl"
+        "audl",
+        "aicr"
       ]
     }
   },
   "contracts": {
     "schd": {
+      "agents": {
+        "adapter_contract": "aicr_provider_neutral_schd_agent_adapter",
+        "first_class": true,
+        "privileged_roles": [
+          "retry_advisor",
+          "capacity_planner",
+          "worker_coordinator",
+          "lifecycle_batch_reviewer",
+          "scheduler_steward"
+        ],
+        "require_contribution_disclosure": true,
+        "require_human_approval_for_privileged_roles": true,
+        "require_owner": true,
+        "require_purpose": true,
+        "require_scope": true,
+        "supported_roles": [
+          "schedule_designer",
+          "run_observer",
+          "retry_advisor",
+          "capacity_planner",
+          "calendar_auditor",
+          "worker_coordinator",
+          "lifecycle_batch_reviewer",
+          "scheduler_steward"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "configuration": {
         "adapters": {
+          "agent_adapter": "aicr_provider_neutral_schd_agent_adapter",
+          "ai_orchestration": "aicr",
           "api_helpers": "api.py",
           "audit_sink": "audl",
           "cache": "cach",
@@ -1321,6 +1799,38 @@
           "theme": "them",
           "view_models": "views.py",
           "workflow": "wflo"
+        },
+        "agents": {
+          "adapter_contract": "aicr_provider_neutral_schd_agent_adapter",
+          "first_class": true,
+          "privileged_roles": [
+            "retry_advisor",
+            "capacity_planner",
+            "worker_coordinator",
+            "lifecycle_batch_reviewer",
+            "scheduler_steward"
+          ],
+          "require_contribution_disclosure": true,
+          "require_human_approval_for_privileged_roles": true,
+          "require_owner": true,
+          "require_purpose": true,
+          "require_scope": true,
+          "supported_roles": [
+            "schedule_designer",
+            "run_observer",
+            "retry_advisor",
+            "capacity_planner",
+            "calendar_auditor",
+            "worker_coordinator",
+            "lifecycle_batch_reviewer",
+            "scheduler_steward"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "governance": {
           "audit_job_runs": true,
@@ -1364,7 +1874,10 @@
             "run_observer",
             "retry_advisor",
             "capacity_planner",
-            "calendar_auditor"
+            "calendar_auditor",
+            "worker_coordinator",
+            "lifecycle_batch_reviewer",
+            "scheduler_steward"
           ],
           "supported_runtimes": [
             "codex",
@@ -1382,6 +1895,35 @@
           "schedule_owner_required": true,
           "timezone_required": true
         },
+        "streaming": {
+          "broker_core_dependency_allowed": false,
+          "engine": "bytewax",
+          "lifecycle_stream": "schd.lifecycle",
+          "required_operations": [
+            "calendar_batch",
+            "worker_pool_batch",
+            "job_batch",
+            "schedule_batch",
+            "run_batch",
+            "retry_batch",
+            "dead_letter_batch",
+            "scheduler_agent_batch",
+            "audit_batch"
+          ],
+          "required_processor": "bytewax",
+          "topics": [
+            "schd.calendars",
+            "schd.worker_pools",
+            "schd.jobs",
+            "schd.schedules",
+            "schd.runs",
+            "schd.retries",
+            "schd.dead_letters",
+            "schd.agents",
+            "schd.audit"
+          ],
+          "watermark": "event_time"
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
@@ -1393,6 +1935,7 @@
           "enable_audit": true,
           "enable_calendar_manager": true,
           "enable_job_monitor": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_schedule_console": true,
           "enable_worker_dashboard": true
         },
@@ -1412,15 +1955,73 @@
         "worker_orchestration",
         "retry_policies",
         "job_monitoring",
-        "scheduler_agents",
-        "run_recovery"
+        "scheduler_agent_composition",
+        "run_recovery",
+        "bytewax_scheduler_lifecycle"
       ],
       "requires": [
         "wflo",
         "mqeb",
         "moni",
-        "audl"
-      ]
+        "audl",
+        "aicr"
+      ],
+      "streaming": {
+        "batch_mutation_guardrail": "batch_scheduler_mutation_requires_bytewax",
+        "broker_core_dependency_allowed": false,
+        "engine": "bytewax",
+        "events": [
+          "calendar_policy_created",
+          "worker_pool_registered",
+          "worker_pool_state_changed",
+          "job_defined",
+          "schedule_created",
+          "schedule_paused",
+          "schedule_resumed",
+          "schedule_disabled",
+          "job_run_started",
+          "job_run_completed",
+          "job_run_cancelled",
+          "job_run_retried",
+          "job_run_dead_lettered",
+          "scheduler_agent_registered"
+        ],
+        "lifecycle_stream": "schd.lifecycle",
+        "processor": "bytewax",
+        "required_operations": [
+          "calendar_batch",
+          "worker_pool_batch",
+          "job_batch",
+          "schedule_batch",
+          "run_batch",
+          "retry_batch",
+          "dead_letter_batch",
+          "scheduler_agent_batch",
+          "audit_batch"
+        ],
+        "required_processor": "bytewax",
+        "state": [
+          "calendar_policies",
+          "worker_pools",
+          "jobs",
+          "schedules",
+          "runs",
+          "scheduler_agents"
+        ],
+        "topic": "apg.schd.lifecycle",
+        "topics": [
+          "schd.calendars",
+          "schd.worker_pools",
+          "schd.jobs",
+          "schd.schedules",
+          "schd.runs",
+          "schd.retries",
+          "schd.dead_letters",
+          "schd.agents",
+          "schd.audit"
+        ],
+        "watermark": "event_time"
+      }
     }
   },
   "deployment": {
@@ -1432,7 +2033,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 4,
+      "edges": 5,
       "kind": "capability",
       "nodes": 1
     },
@@ -1465,6 +2066,19 @@
         "required_action": "use_bytewax_event_stream"
       },
       "name": "batch_scheduler_mutation_requires_bytewax"
+    },
+    "bytewax_schd_lifecycle_stream_required": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "validate_schd_lifecycle_batch"
+      },
+      "description": "SCHD lifecycle batches must be routed through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_lifecycle_stream_required",
+        "required_action": "route_schd_lifecycle_batch_to_bytewax"
+      },
+      "name": "bytewax_schd_lifecycle_stream_required"
     },
     "calendar_policy_required": {
       "condition": {
@@ -1728,6 +2342,32 @@
       },
       "name": "run_requires_ready_worker_pool"
     },
+    "schd_lifecycle_batch_requires_mutations": {
+      "condition": {
+        "mutation_count_lte": 0,
+        "operation": "validate_schd_lifecycle_batch"
+      },
+      "description": "SCHD lifecycle batches must include at least one mutation.",
+      "effect": {
+        "decision": "deny",
+        "reason": "schd_lifecycle_batch_empty",
+        "required_action": "include_schd_lifecycle_mutations"
+      },
+      "name": "schd_lifecycle_batch_requires_mutations"
+    },
+    "schd_lifecycle_operation_supported": {
+      "condition": {
+        "lifecycle_operation_supported": false,
+        "operation": "validate_schd_lifecycle_batch"
+      },
+      "description": "SCHD lifecycle batches must use configured lifecycle operations.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_schd_lifecycle_operation",
+        "required_action": "choose_supported_schd_lifecycle_operation"
+      },
+      "name": "schd_lifecycle_operation_supported"
+    },
     "schedule_disable_requires_reason": {
       "condition": {
         "disable_reason_present": false,
@@ -1780,12 +2420,26 @@
       },
       "name": "schedule_state_change_requires_audit"
     },
+    "scheduler_agent_privileged_role_requires_human_approval": {
+      "condition": {
+        "human_approval_required": false,
+        "operation": "register_scheduler_agent",
+        "privileged_role": true
+      },
+      "description": "Privileged scheduler-agent roles require human approval evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "scheduler_agent_human_approval_required",
+        "required_action": "record_scheduler_agent_human_approval"
+      },
+      "name": "scheduler_agent_privileged_role_requires_human_approval"
+    },
     "scheduler_agent_requires_disclosure": {
       "condition": {
         "agent_contribution_disclosed": false,
-        "scheduler_agent_present": true
+        "operation": "register_scheduler_agent"
       },
-      "description": "AI scheduler agent contributions require disclosure.",
+      "description": "First-class scheduler agent contributions require visible machine-contribution disclosure.",
       "effect": {
         "decision": "deny",
         "reason": "scheduler_agent_disclosure_required",
@@ -1793,25 +2447,64 @@
       },
       "name": "scheduler_agent_requires_disclosure"
     },
-    "scheduler_agent_requires_registration": {
+    "scheduler_agent_requires_id": {
       "condition": {
-        "agent_registered": false,
-        "scheduler_agent_present": true
+        "agent_id_present": false,
+        "operation": "register_scheduler_agent"
       },
-      "description": "AI scheduler agents must be registered.",
+      "description": "First-class scheduler agents require stable identifiers.",
       "effect": {
         "decision": "deny",
-        "reason": "scheduler_agent_registration_required",
-        "required_action": "register_scheduler_agent"
+        "reason": "scheduler_agent_id_required",
+        "required_action": "assign_scheduler_agent_id"
       },
-      "name": "scheduler_agent_requires_registration"
+      "name": "scheduler_agent_requires_id"
+    },
+    "scheduler_agent_requires_name": {
+      "condition": {
+        "agent_name_present": false,
+        "operation": "register_scheduler_agent"
+      },
+      "description": "First-class scheduler agents require readable names.",
+      "effect": {
+        "decision": "deny",
+        "reason": "scheduler_agent_name_required",
+        "required_action": "name_scheduler_agent"
+      },
+      "name": "scheduler_agent_requires_name"
+    },
+    "scheduler_agent_requires_owner": {
+      "condition": {
+        "agent_owner_present": false,
+        "operation": "register_scheduler_agent"
+      },
+      "description": "First-class scheduler agents require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "scheduler_agent_owner_required",
+        "required_action": "assign_scheduler_agent_owner"
+      },
+      "name": "scheduler_agent_requires_owner"
+    },
+    "scheduler_agent_requires_purpose": {
+      "condition": {
+        "agent_purpose_present": false,
+        "operation": "register_scheduler_agent"
+      },
+      "description": "First-class scheduler agents require a documented scheduler-governance purpose.",
+      "effect": {
+        "decision": "deny",
+        "reason": "scheduler_agent_purpose_required",
+        "required_action": "document_scheduler_agent_purpose"
+      },
+      "name": "scheduler_agent_requires_purpose"
     },
     "scheduler_agent_requires_scope": {
       "condition": {
         "agent_scope_present": false,
-        "scheduler_agent_present": true
+        "operation": "register_scheduler_agent"
       },
-      "description": "AI scheduler agents require schedule, job, run, or worker scope.",
+      "description": "First-class scheduler agents require calendar, worker, job, schedule, run, retry, dead-letter, or lifecycle scope.",
       "effect": {
         "decision": "deny",
         "reason": "scheduler_agent_scope_required",
@@ -1819,12 +2512,25 @@
       },
       "name": "scheduler_agent_requires_scope"
     },
+    "scheduler_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_scheduler_agent"
+      },
+      "description": "First-class scheduler agents must use supported scheduler-governance roles.",
+      "effect": {
+        "decision": "deny",
+        "reason": "scheduler_agent_role_not_supported",
+        "required_action": "choose_supported_scheduler_agent_role"
+      },
+      "name": "scheduler_agent_role_supported"
+    },
     "scheduler_agent_runtime_supported": {
       "condition": {
         "agent_runtime_supported": false,
-        "scheduler_agent_present": true
+        "operation": "register_scheduler_agent"
       },
-      "description": "AI scheduler agents must use a configured runtime.",
+      "description": "First-class scheduler agents must use a configured provider-neutral runtime.",
       "effect": {
         "decision": "deny",
         "reason": "scheduler_agent_runtime_not_supported",
@@ -1926,7 +2632,13 @@
   },
   "security": {},
   "source_files": [
-    "capability_contract.py"
+    "capability_contract.py",
+    "models.py",
+    "scheduling_runtime.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
   ],
   "symbols": {
     "capability.schd": {

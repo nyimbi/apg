@@ -7,6 +7,28 @@ from numbers import Number
 from typing import Any
 
 
+SUPPORTED_SCHD_AGENT_RUNTIMES: list[str] = ["codex", "claude_code", "opencode", "pi"]
+
+SUPPORTED_SCHD_AGENT_ROLES: list[str] = [
+	"schedule_designer",
+	"run_observer",
+	"retry_advisor",
+	"capacity_planner",
+	"calendar_auditor",
+	"worker_coordinator",
+	"lifecycle_batch_reviewer",
+	"scheduler_steward",
+]
+
+PRIVILEGED_SCHD_AGENT_ROLES: list[str] = [
+	"retry_advisor",
+	"capacity_planner",
+	"worker_coordinator",
+	"lifecycle_batch_reviewer",
+	"scheduler_steward",
+]
+
+
 DEFAULT_CONFIGURATION: dict[str, Any] = {
 	"tenant_id": "default",
 	"schedules": {
@@ -48,8 +70,20 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"agent_registration_required": True,
 		"agent_scope_required": True,
 		"agent_contribution_disclosure_required": True,
-		"supported_runtimes": ["codex", "claude_code", "opencode", "pi"],
-		"allowed_roles": ["schedule_designer", "run_observer", "retry_advisor", "capacity_planner", "calendar_auditor"],
+		"supported_runtimes": SUPPORTED_SCHD_AGENT_RUNTIMES,
+		"allowed_roles": SUPPORTED_SCHD_AGENT_ROLES,
+	},
+	"agents": {
+		"first_class": True,
+		"supported_runtimes": SUPPORTED_SCHD_AGENT_RUNTIMES,
+		"supported_roles": SUPPORTED_SCHD_AGENT_ROLES,
+		"privileged_roles": PRIVILEGED_SCHD_AGENT_ROLES,
+		"require_scope": True,
+		"require_owner": True,
+		"require_purpose": True,
+		"require_contribution_disclosure": True,
+		"require_human_approval_for_privileged_roles": True,
+		"adapter_contract": "aicr_provider_neutral_schd_agent_adapter",
 	},
 	"governance": {
 		"require_tenant_context": True,
@@ -66,6 +100,35 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"schedule_metrics_required": True,
 		"event_stream": "bytewax",
 	},
+	"streaming": {
+		"engine": "bytewax",
+		"lifecycle_stream": "schd.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"calendar_batch",
+			"worker_pool_batch",
+			"job_batch",
+			"schedule_batch",
+			"run_batch",
+			"retry_batch",
+			"dead_letter_batch",
+			"scheduler_agent_batch",
+			"audit_batch",
+		],
+		"topics": [
+			"schd.calendars",
+			"schd.worker_pools",
+			"schd.jobs",
+			"schd.schedules",
+			"schd.runs",
+			"schd.retries",
+			"schd.dead_letters",
+			"schd.agents",
+			"schd.audit",
+		],
+		"broker_core_dependency_allowed": False,
+	},
 	"adapters": {
 		"generated_app_runtime": "service.SchdService",
 		"runtime_helpers": "scheduling_runtime.py",
@@ -76,6 +139,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"message_bus": "mqeb",
 		"monitoring": "moni",
 		"audit_sink": "audl",
+		"ai_orchestration": "aicr",
+		"agent_adapter": "aicr_provider_neutral_schd_agent_adapter",
 		"notifications": "ntfy",
 		"cache": "cach",
 		"compensation": "comp",
@@ -87,6 +152,7 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"enable_worker_dashboard": True,
 		"enable_calendar_manager": True,
 		"enable_agent_panel": True,
+		"enable_lifecycle_batch_monitor": True,
 		"enable_audit": True,
 		"enable_analytics": True,
 	},
@@ -105,8 +171,10 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"job_runs",
 		"workers",
 		"scheduler_agents",
+		"agents",
 		"governance",
 		"observability",
+		"streaming",
 		"adapters",
 		"ui",
 		"theme",
@@ -117,8 +185,10 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"job_runs",
 		"workers",
 		"scheduler_agents",
+		"agents",
 		"governance",
 		"observability",
+		"streaming",
 		"adapters",
 		"ui",
 		"theme",
@@ -157,10 +227,18 @@ RULES: list[dict[str, Any]] = [
 	{"name": "run_cancel_requires_reason", "description": "Run cancellation requires a reason.", "condition": {"operation": "cancel_run", "cancel_reason_present": False}, "effect": {"decision": "deny", "reason": "run_cancel_reason_required", "required_action": "record_cancel_reason"}},
 	{"name": "schedule_pause_requires_reason", "description": "Schedule pauses require a reason.", "condition": {"operation": "pause_schedule", "pause_reason_present": False}, "effect": {"decision": "deny", "reason": "schedule_pause_reason_required", "required_action": "record_pause_reason"}},
 	{"name": "schedule_disable_requires_reason", "description": "Schedule disablement requires a reason.", "condition": {"operation": "disable_schedule", "disable_reason_present": False}, "effect": {"decision": "deny", "reason": "schedule_disable_reason_required", "required_action": "record_disable_reason"}},
-	{"name": "scheduler_agent_requires_registration", "description": "AI scheduler agents must be registered.", "condition": {"scheduler_agent_present": True, "agent_registered": False}, "effect": {"decision": "deny", "reason": "scheduler_agent_registration_required", "required_action": "register_scheduler_agent"}},
-	{"name": "scheduler_agent_runtime_supported", "description": "AI scheduler agents must use a configured runtime.", "condition": {"scheduler_agent_present": True, "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "scheduler_agent_runtime_not_supported", "required_action": "choose_supported_scheduler_agent_runtime"}},
-	{"name": "scheduler_agent_requires_scope", "description": "AI scheduler agents require schedule, job, run, or worker scope.", "condition": {"scheduler_agent_present": True, "agent_scope_present": False}, "effect": {"decision": "deny", "reason": "scheduler_agent_scope_required", "required_action": "set_scheduler_agent_scope"}},
-	{"name": "scheduler_agent_requires_disclosure", "description": "AI scheduler agent contributions require disclosure.", "condition": {"scheduler_agent_present": True, "agent_contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "scheduler_agent_disclosure_required", "required_action": "disclose_scheduler_agent"}},
+	{"name": "scheduler_agent_requires_id", "description": "First-class scheduler agents require stable identifiers.", "condition": {"operation": "register_scheduler_agent", "agent_id_present": False}, "effect": {"decision": "deny", "reason": "scheduler_agent_id_required", "required_action": "assign_scheduler_agent_id"}},
+	{"name": "scheduler_agent_requires_name", "description": "First-class scheduler agents require readable names.", "condition": {"operation": "register_scheduler_agent", "agent_name_present": False}, "effect": {"decision": "deny", "reason": "scheduler_agent_name_required", "required_action": "name_scheduler_agent"}},
+	{"name": "scheduler_agent_runtime_supported", "description": "First-class scheduler agents must use a configured provider-neutral runtime.", "condition": {"operation": "register_scheduler_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "scheduler_agent_runtime_not_supported", "required_action": "choose_supported_scheduler_agent_runtime"}},
+	{"name": "scheduler_agent_role_supported", "description": "First-class scheduler agents must use supported scheduler-governance roles.", "condition": {"operation": "register_scheduler_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "scheduler_agent_role_not_supported", "required_action": "choose_supported_scheduler_agent_role"}},
+	{"name": "scheduler_agent_requires_scope", "description": "First-class scheduler agents require calendar, worker, job, schedule, run, retry, dead-letter, or lifecycle scope.", "condition": {"operation": "register_scheduler_agent", "agent_scope_present": False}, "effect": {"decision": "deny", "reason": "scheduler_agent_scope_required", "required_action": "set_scheduler_agent_scope"}},
+	{"name": "scheduler_agent_requires_owner", "description": "First-class scheduler agents require an accountable owner.", "condition": {"operation": "register_scheduler_agent", "agent_owner_present": False}, "effect": {"decision": "deny", "reason": "scheduler_agent_owner_required", "required_action": "assign_scheduler_agent_owner"}},
+	{"name": "scheduler_agent_requires_purpose", "description": "First-class scheduler agents require a documented scheduler-governance purpose.", "condition": {"operation": "register_scheduler_agent", "agent_purpose_present": False}, "effect": {"decision": "deny", "reason": "scheduler_agent_purpose_required", "required_action": "document_scheduler_agent_purpose"}},
+	{"name": "scheduler_agent_requires_disclosure", "description": "First-class scheduler agent contributions require visible machine-contribution disclosure.", "condition": {"operation": "register_scheduler_agent", "agent_contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "scheduler_agent_disclosure_required", "required_action": "disclose_scheduler_agent"}},
+	{"name": "scheduler_agent_privileged_role_requires_human_approval", "description": "Privileged scheduler-agent roles require human approval evidence.", "condition": {"operation": "register_scheduler_agent", "privileged_role": True, "human_approval_required": False}, "effect": {"decision": "require_review", "reason": "scheduler_agent_human_approval_required", "required_action": "record_scheduler_agent_human_approval"}},
+	{"name": "schd_lifecycle_batch_requires_mutations", "description": "SCHD lifecycle batches must include at least one mutation.", "condition": {"operation": "validate_schd_lifecycle_batch", "mutation_count_lte": 0}, "effect": {"decision": "deny", "reason": "schd_lifecycle_batch_empty", "required_action": "include_schd_lifecycle_mutations"}},
+	{"name": "schd_lifecycle_operation_supported", "description": "SCHD lifecycle batches must use configured lifecycle operations.", "condition": {"operation": "validate_schd_lifecycle_batch", "lifecycle_operation_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_schd_lifecycle_operation", "required_action": "choose_supported_schd_lifecycle_operation"}},
+	{"name": "bytewax_schd_lifecycle_stream_required", "description": "SCHD lifecycle batches must be routed through Bytewax.", "condition": {"operation": "validate_schd_lifecycle_batch", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_schd_lifecycle_batch_to_bytewax"}},
 	{"name": "schedule_state_change_requires_audit", "description": "Schedule and run state changes require audit evidence.", "condition": {"state_change_requested": True, "audit_event_recorded": False}, "effect": {"decision": "deny", "reason": "scheduler_audit_event_required", "required_action": "record_scheduler_audit_event"}},
 	{"name": "cross_tenant_scheduler_access_denied", "description": "Scheduler records may not cross tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_scheduler_access_denied", "required_action": "use_tenant_local_context"}},
 	{"name": "batch_scheduler_mutation_requires_bytewax", "description": "Batch scheduler mutations must use Bytewax event streams.", "condition": {"operation": "batch_scheduler_mutation", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}},
@@ -174,6 +252,7 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "workers", "path": "/schd/workers", "component": "WorkerDashboard", "permission": "schd:manage_workers", "nav_group": "Workers"},
 	{"name": "calendars", "path": "/schd/calendars", "component": "CalendarManager", "permission": "schd:schedule", "nav_group": "Schedules"},
 	{"name": "agents", "path": "/schd/agents", "component": "SchedulerAgentPanel", "permission": "schd:run_jobs", "nav_group": "Runtime"},
+	{"name": "lifecycle", "path": "/schd/lifecycle", "component": "SCHDLifecycleBatchMonitor", "permission": "schd:admin", "nav_group": "Operations"},
 	{"name": "audit", "path": "/schd/audit", "component": "SchedulerAuditTrail", "permission": "schd:audit", "nav_group": "Governance"},
 	{"name": "analytics", "path": "/schd/analytics", "component": "SchedulerAnalytics", "permission": "schd:view", "nav_group": "Operations"},
 	{"name": "settings", "path": "/schd/settings", "component": "SCHDSettings", "permission": "schd:admin", "nav_group": "Administration"},
@@ -200,6 +279,8 @@ THEME: dict[str, Any] = {
 		"worker_pool": {"visual": "capacity-grid", "status_style": "health-chip"},
 		"retry_panel": {"visual": "retry-ladder", "status_style": "backoff-chip"},
 		"agent_panel": {"visual": "agent-roster", "status_style": "scope-chip"},
+		"scheduler_agent_roster": {"visual": "agent-roster", "status_style": "approval-chip"},
+		"bytewax_lifecycle_panel": {"visual": "stream-batch-monitor", "status_style": "processor-chip"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "scheduler-chip"},
 	},
 }
@@ -225,6 +306,13 @@ STREAMING: dict[str, Any] = {
 		"scheduler_agent_registered",
 	],
 	"batch_mutation_guardrail": "batch_scheduler_mutation_requires_bytewax",
+	"engine": "bytewax",
+	"lifecycle_stream": "schd.lifecycle",
+	"watermark": "event_time",
+	"required_processor": "bytewax",
+	"required_operations": DEFAULT_CONFIGURATION["streaming"]["required_operations"],
+	"topics": DEFAULT_CONFIGURATION["streaming"]["topics"],
+	"broker_core_dependency_allowed": False,
 }
 
 
@@ -237,8 +325,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "schd",
 		"display_name": "Scheduling and Job Orchestration",
-		"provides": ["job_scheduling", "calendar_triggers", "worker_orchestration", "retry_policies", "job_monitoring", "scheduler_agents", "run_recovery"],
-		"requires": ["wflo", "mqeb", "moni", "audl"],
+		"provides": ["job_scheduling", "calendar_triggers", "worker_orchestration", "retry_policies", "job_monitoring", "scheduler_agent_composition", "run_recovery", "bytewax_scheduler_lifecycle"],
+		"requires": ["wflo", "mqeb", "moni", "audl", "aicr"],
 		"configuration": config,
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},
@@ -251,8 +339,23 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"requires_theme": True,
 		},
 		"theme": deepcopy(THEME),
-		"streaming": deepcopy(STREAMING),
+		"agents": agent_manifest(config),
+		"streaming": streaming_manifest(config),
 	}
+
+
+def agent_manifest(config: dict[str, Any] | None = None) -> dict[str, Any]:
+	"""Return first-class provider-neutral scheduler-agent composition metadata."""
+	config = config or DEFAULT_CONFIGURATION
+	return deepcopy(config["agents"])
+
+
+def streaming_manifest(config: dict[str, Any] | None = None) -> dict[str, Any]:
+	"""Return Bytewax lifecycle metadata for scheduler composition state."""
+	config = config or DEFAULT_CONFIGURATION
+	streaming = deepcopy(STREAMING)
+	streaming.update(deepcopy(config["streaming"]))
+	return streaming
 
 
 def evaluate_capability_rules(context: dict[str, Any]) -> dict[str, Any]:

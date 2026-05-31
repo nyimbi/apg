@@ -33,8 +33,10 @@ def test_schd_contract_shape_is_valid():
 	assert contract["capability"] == "schd"
 	assert contract["configuration"]["jobs"]["retry_policy_required"] is True
 	assert contract["configuration"]["workers"]["capacity_limits_required"] is True
-	assert contract["configuration"]["scheduler_agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert contract["agents"]["first_class"] is True
 	assert contract["streaming"]["processor"] == "bytewax"
+	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert contract["ui"]["routes"]
 	assert contract["theme"]["name"] == "schd_scheduler_ops"
 
@@ -83,7 +85,19 @@ def test_schd_lifecycle_executes_with_guardrails():
 	)
 	run = service.trigger_run(tenant_id, schedule["id"], "scheduler")
 	completed = service.complete_run(tenant_id, run["id"], records_processed=25, logs=["close complete"])
-	agent = service.register_scheduler_agent("agent-schd", tenant_id, "Codex Scheduler", "codex", "run_observer", schedule["id"], "ops-owner", True)
+	agent = service.register_scheduler_agent(
+		"agent-schd",
+		tenant_id,
+		"Codex Scheduler",
+		"codex",
+		"run_observer",
+		schedule["id"],
+		"ops-owner",
+		True,
+		owner_ref="ops-owner",
+		purpose="Observe scheduled run state and identify blocked ledger-close jobs.",
+	)
+	batch = service.validate_lifecycle_batch(tenant_id, "bytewax", 1, "scheduler_agent_batch")
 	summary = service.dashboard_summary(tenant_id)
 
 	assert schedule["state"] == "active"
@@ -91,10 +105,14 @@ def test_schd_lifecycle_executes_with_guardrails():
 	assert completed["status"] == "succeeded"
 	assert completed["event_stream"] == "bytewax"
 	assert agent["runtime"] == "codex"
+	assert agent["purpose"]
+	assert batch["processor"] == "bytewax"
+	assert batch["status"] == "accepted"
 	assert service.list_schedules(tenant_id)[0]["owner"] == "finance-owner"
 	assert summary["schedule_count"] == 1
 	assert summary["succeeded_run_count"] == 1
 	assert summary["agent_count"] == 1
+	assert summary["lifecycle_batch_count"] == 1
 	assert service.audit_events(tenant_id)
 
 
@@ -131,10 +149,87 @@ def test_schd_policy_failures_are_enforced():
 		service.trigger_run(tenant_id, schedule["id"], "owner", event_stream="legacy_bus")
 
 	with pytest.raises(PermissionError, match="scheduler_agent_runtime_not_supported"):
-		service.register_scheduler_agent("agent-bad", tenant_id, "Bad Agent", "unknown", "run_observer", job["id"], "owner", True)
+		service.register_scheduler_agent(
+			"agent-bad",
+			tenant_id,
+			"Bad Agent",
+			"unknown",
+			"run_observer",
+			job["id"],
+			"owner",
+			True,
+			owner_ref="owner",
+			purpose="Observe scheduler state.",
+		)
+
+	with pytest.raises(PermissionError, match="scheduler_agent_owner_required"):
+		service.register_scheduler_agent(
+			"agent-no-owner",
+			tenant_id,
+			"No Owner",
+			"codex",
+			"run_observer",
+			job["id"],
+			"owner",
+			True,
+			owner_ref="",
+			purpose="Observe scheduler state.",
+		)
+
+	with pytest.raises(PermissionError, match="scheduler_agent_purpose_required"):
+		service.register_scheduler_agent(
+			"agent-no-purpose",
+			tenant_id,
+			"No Purpose",
+			"codex",
+			"run_observer",
+			job["id"],
+			"owner",
+			True,
+			owner_ref="owner",
+			purpose="",
+		)
+
+	review_agent = service.register_scheduler_agent(
+		"agent-review",
+		tenant_id,
+		"Scheduler Steward",
+		"codex",
+		"scheduler_steward",
+		job["id"],
+		"owner",
+		True,
+		owner_ref="owner",
+		purpose="Steward scheduler lifecycle changes with operator review.",
+		human_approval_required=False,
+	)
+	assert review_agent["status"] == "pending_review"
 
 	with pytest.raises(PermissionError, match="bytewax_event_stream_required"):
 		service.validate_batch_mutation("legacy_bus")
+
+	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
+		service.validate_lifecycle_batch(tenant_id, "kafka_replay", 1, "scheduler_agent_batch")
+
+	with pytest.raises(PermissionError, match="schd_lifecycle_batch_empty"):
+		service.validate_lifecycle_batch(tenant_id, "bytewax", 0, "scheduler_agent_batch")
+
+	accepted_batch = service.validate_lifecycle_batch(tenant_id, "bytewax", 2, "run_batch")
+	lifecycle_agent = service.register_scheduler_agent(
+		"agent-lifecycle",
+		tenant_id,
+		"Lifecycle Reviewer",
+		"codex",
+		"lifecycle_batch_reviewer",
+		accepted_batch["id"],
+		"owner",
+		True,
+		owner_ref="owner",
+		purpose="Review accepted SCHD lifecycle batches before promotion.",
+		human_approval_required=True,
+	)
+	assert accepted_batch["status"] == "accepted"
+	assert lifecycle_agent["status"] == "active"
 
 
 def test_schd_recovery_and_state_guardrails():
@@ -183,6 +278,7 @@ def test_schd_view_models_expose_composable_surfaces():
 		run_monitor_model,
 		schedule_console_model,
 		scheduler_agent_panel_model,
+		lifecycle_batch_model,
 		settings_model,
 		worker_dashboard_model,
 	)
@@ -195,7 +291,20 @@ def test_schd_view_models_expose_composable_surfaces():
 	schedule = service.create_schedule(tenant_id, "hourly", job["id"], calendar["id"], worker["id"], "interval", "UTC", "owner", interval_minutes=30)
 	run = service.trigger_run(tenant_id, schedule["id"], "owner")
 	service.complete_run(tenant_id, run["id"])
-	service.register_scheduler_agent("agent-view", tenant_id, "Codex Scheduler", "codex", "calendar_auditor", schedule["id"], "owner", True)
+	agent = service.register_scheduler_agent(
+		"agent-view",
+		tenant_id,
+		"Codex Scheduler",
+		"codex",
+		"calendar_auditor",
+		schedule["id"],
+		"owner",
+		"true",
+		owner_ref="owner",
+		purpose="Audit calendar and blackout schedule effects.",
+		human_approval_required="false",
+	)
+	batch = service.validate_lifecycle_batch(tenant_id, "bytewax", 1, "scheduler_agent_batch")
 
 	assert dashboard_model(service, tenant_id)["summary"]["schedule_count"] == 1
 	assert schedule_console_model(service, tenant_id)["actions"] == ["create_schedule", "pause_schedule", "resume_schedule", "disable_schedule", "trigger_run"]
@@ -204,6 +313,10 @@ def test_schd_view_models_expose_composable_surfaces():
 	assert worker_dashboard_model(service, tenant_id)["worker_pools"][0]["state"] == "ready"
 	assert calendar_manager_model(service, tenant_id)["calendars"][0]["timezone"] == "UTC"
 	assert scheduler_agent_panel_model(service, tenant_id)["agents"][0]["runtime"] == "codex"
+	assert scheduler_agent_panel_model(service, tenant_id)["privileged_roles"]
+	assert lifecycle_batch_model(service, tenant_id)["batches"][0]["status"] == "accepted"
 	assert audit_trail_model(service, tenant_id)["streaming_topic"] == "apg.schd.lifecycle"
 	assert analytics_model(service, tenant_id)["run_health"]["succeeded"] == 1
 	assert settings_model(service, tenant_id)["theme"]["name"] == "schd_scheduler_ops"
+	assert agent["contribution_disclosed"] is True
+	assert batch["processor"] == "bytewax"
