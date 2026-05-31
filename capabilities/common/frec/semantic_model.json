@@ -1,5 +1,57 @@
 {
-  "agents": {},
+  "agents": {
+    "facial_recognition_governance": {
+      "adapter_contract": "aicr_provider_neutral_facial_recognition_agent_adapter",
+      "first_class": true,
+      "guardrails": [
+        "supported_runtime",
+        "supported_role",
+        "explicit_scope",
+        "accountable_owner",
+        "declared_purpose",
+        "machine_contribution_disclosure",
+        "human_approval_for_privileged_roles"
+      ],
+      "privileged_roles": [
+        "liveness_reviewer",
+        "verification_reviewer",
+        "watchlist_reviewer",
+        "identification_reviewer",
+        "emotion_governance_reviewer",
+        "privacy_reviewer",
+        "lifecycle_batch_reviewer",
+        "facial_recognition_steward"
+      ],
+      "required_fields": [
+        "tenant_id",
+        "agent_id",
+        "name",
+        "runtime",
+        "role",
+        "scope",
+        "owner",
+        "purpose"
+      ],
+      "supported_roles": [
+        "consent_reviewer",
+        "enrollment_reviewer",
+        "liveness_reviewer",
+        "verification_reviewer",
+        "watchlist_reviewer",
+        "identification_reviewer",
+        "emotion_governance_reviewer",
+        "privacy_reviewer",
+        "lifecycle_batch_reviewer",
+        "facial_recognition_steward"
+      ],
+      "supported_runtimes": [
+        "codex",
+        "claude_code",
+        "opencode",
+        "pi"
+      ]
+    }
+  },
   "app": {
     "description": "Facial Recognition package-backed APG capability",
     "entity_count": 0,
@@ -9,6 +61,7 @@
   "capabilities": {
     "frec": {
       "adapters": {
+        "agent_adapter": "aicr_provider_neutral_facial_recognition_agent_adapter",
         "ai_core": "aicr",
         "api_helpers": "api_helpers.py",
         "audit_sink": "audl",
@@ -26,8 +79,60 @@
         "production_views": "views.py",
         "view_models": "view_models.py"
       },
+      "agents": {
+        "adapter_contract": "aicr_provider_neutral_facial_recognition_agent_adapter",
+        "first_class": true,
+        "guardrails": [
+          "supported_runtime",
+          "supported_role",
+          "explicit_scope",
+          "accountable_owner",
+          "declared_purpose",
+          "machine_contribution_disclosure",
+          "human_approval_for_privileged_roles"
+        ],
+        "privileged_roles": [
+          "liveness_reviewer",
+          "verification_reviewer",
+          "watchlist_reviewer",
+          "identification_reviewer",
+          "emotion_governance_reviewer",
+          "privacy_reviewer",
+          "lifecycle_batch_reviewer",
+          "facial_recognition_steward"
+        ],
+        "required_fields": [
+          "tenant_id",
+          "agent_id",
+          "name",
+          "runtime",
+          "role",
+          "scope",
+          "owner",
+          "purpose"
+        ],
+        "supported_roles": [
+          "consent_reviewer",
+          "enrollment_reviewer",
+          "liveness_reviewer",
+          "verification_reviewer",
+          "watchlist_reviewer",
+          "identification_reviewer",
+          "emotion_governance_reviewer",
+          "privacy_reviewer",
+          "lifecycle_batch_reviewer",
+          "facial_recognition_steward"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "approvals": {
         "emotion_analysis": "PurposeApproval",
+        "facial_recognition_agent": "FacialRecognitionAgentRecord",
         "low_confidence_match": "FaceReview",
         "low_quality_capture": "FaceReview",
         "watchlist_hit": "FaceReview"
@@ -36,6 +141,7 @@
       "components": {},
       "configuration": {
         "adapters": {
+          "agent_adapter": "aicr_provider_neutral_facial_recognition_agent_adapter",
           "ai_core": "aicr",
           "api_helpers": "api_helpers.py",
           "audit_sink": "audl",
@@ -52,6 +158,43 @@
           "production_runtime": "service.py",
           "production_views": "views.py",
           "view_models": "view_models.py"
+        },
+        "agents": {
+          "adapter_contract": "aicr_provider_neutral_facial_recognition_agent_adapter",
+          "first_class": true,
+          "privileged_roles": [
+            "liveness_reviewer",
+            "verification_reviewer",
+            "watchlist_reviewer",
+            "identification_reviewer",
+            "emotion_governance_reviewer",
+            "privacy_reviewer",
+            "lifecycle_batch_reviewer",
+            "facial_recognition_steward"
+          ],
+          "require_contribution_disclosure": true,
+          "require_human_approval_for_privileged_roles": true,
+          "require_owner": true,
+          "require_purpose": true,
+          "require_scope": true,
+          "supported_roles": [
+            "consent_reviewer",
+            "enrollment_reviewer",
+            "liveness_reviewer",
+            "verification_reviewer",
+            "watchlist_reviewer",
+            "identification_reviewer",
+            "emotion_governance_reviewer",
+            "privacy_reviewer",
+            "lifecycle_batch_reviewer",
+            "facial_recognition_steward"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "consent": {
           "explicit_consent_required": true,
@@ -122,6 +265,35 @@
           "raw_face_image_retention_allowed": false,
           "tenant_isolation_required": true
         },
+        "streaming": {
+          "broker_core_dependency_allowed": false,
+          "engine": "bytewax",
+          "lifecycle_stream": "frec.lifecycle",
+          "required_operations": [
+            "face_consent_batch",
+            "face_template_batch",
+            "liveness_batch",
+            "verification_batch",
+            "watchlist_batch",
+            "identification_batch",
+            "emotion_batch",
+            "face_review_batch",
+            "facial_recognition_agent_batch"
+          ],
+          "required_processor": "bytewax",
+          "topics": [
+            "frec.consents",
+            "frec.templates",
+            "frec.liveness",
+            "frec.verifications",
+            "frec.watchlists",
+            "frec.identifications",
+            "frec.emotion",
+            "frec.reviews",
+            "frec.agents"
+          ],
+          "watermark": "event_time"
+        },
         "templates": {
           "encrypted_storage_required": true,
           "raw_image_retention": "disabled",
@@ -138,8 +310,10 @@
           "enable_consent_center": true,
           "enable_emotion_governance": true,
           "enable_enrollment_console": true,
+          "enable_facial_recognition_agent_roster": true,
           "enable_identification_workbench": true,
           "enable_identity_dashboard": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_liveness_console": true,
           "enable_review_queue": true,
           "enable_settings": true,
@@ -168,7 +342,9 @@
         "audit": "FaceAuditEvent",
         "consent": "FaceConsent",
         "emotion": "EmotionGovernance",
+        "facial_recognition_agent": "FacialRecognitionAgentRecord",
         "identification": "FaceIdentification",
+        "lifecycle_batch": "FrecLifecycleBatchRecord",
         "liveness": "FaceLiveness",
         "review": "FaceReview",
         "template": "FaceTemplate",
@@ -179,12 +355,18 @@
       "master_data": {},
       "name": "Facial Recognition",
       "provides": [
-        "frec_operations"
+        "facial_recognition",
+        "face_identification",
+        "facial_recognition_agent_composition"
       ],
       "requires": [
         "biop",
         "cvsn",
-        "aicr"
+        "aicr",
+        "encr",
+        "audl",
+        "conf",
+        "mfau"
       ],
       "rule_engine": {
         "rules": [
@@ -643,6 +825,124 @@
               "required_action": "record_face_audit_event"
             },
             "name": "face_state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_facial_recognition_agent"
+            },
+            "description": "Facial-recognition agents must use supported provider-neutral runtimes.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_facial_recognition_agent_runtime",
+              "required_action": "choose_supported_frec_agent_runtime"
+            },
+            "name": "facial_recognition_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_facial_recognition_agent"
+            },
+            "description": "Facial-recognition agents must use supported identity-governance roles.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_facial_recognition_agent_role",
+              "required_action": "choose_supported_frec_agent_role"
+            },
+            "name": "facial_recognition_agent_role_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_facial_recognition_agent",
+              "scope_present": false
+            },
+            "description": "Facial-recognition agents require an explicit consent, enrollment, liveness, verification, watchlist, identification, emotion, privacy, or lifecycle scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "facial_recognition_agent_scope_required",
+              "required_action": "declare_frec_agent_scope"
+            },
+            "name": "facial_recognition_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "operation": "register_facial_recognition_agent",
+              "owner_present": false
+            },
+            "description": "Facial-recognition agents require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "facial_recognition_agent_owner_required",
+              "required_action": "assign_frec_agent_owner"
+            },
+            "name": "facial_recognition_agent_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "register_facial_recognition_agent",
+              "purpose_present": false
+            },
+            "description": "Facial-recognition agents require a documented purpose.",
+            "effect": {
+              "decision": "deny",
+              "reason": "facial_recognition_agent_purpose_required",
+              "required_action": "document_frec_agent_purpose"
+            },
+            "name": "facial_recognition_agent_requires_purpose"
+          },
+          {
+            "condition": {
+              "contribution_disclosed": false,
+              "operation": "register_facial_recognition_agent"
+            },
+            "description": "Facial-recognition agents must disclose machine-authored enrollment, liveness, match, watchlist, emotion, privacy, and lifecycle-review contributions.",
+            "effect": {
+              "decision": "deny",
+              "reason": "facial_recognition_agent_contribution_disclosure_required",
+              "required_action": "disclose_machine_contribution"
+            },
+            "name": "facial_recognition_agent_requires_contribution_disclosure"
+          },
+          {
+            "condition": {
+              "human_approval_required": false,
+              "operation": "register_facial_recognition_agent",
+              "privileged_role": true
+            },
+            "description": "Privileged facial-recognition agent roles require human approval evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "facial_recognition_agent_human_approval_required",
+              "required_action": "record_human_frec_agent_approval"
+            },
+            "name": "facial_recognition_agent_privileged_role_requires_human_approval"
+          },
+          {
+            "condition": {
+              "mutation_count_lte": 0,
+              "operation": "validate_frec_lifecycle_batch"
+            },
+            "description": "FREC lifecycle batches must include at least one mutation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "frec_lifecycle_batch_empty",
+              "required_action": "include_frec_lifecycle_mutations"
+            },
+            "name": "frec_lifecycle_batch_requires_mutations"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "validate_frec_lifecycle_batch"
+            },
+            "description": "FREC lifecycle batches must be routed through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_lifecycle_stream_required",
+              "required_action": "route_frec_lifecycle_batch_to_bytewax"
+            },
+            "name": "bytewax_frec_stream_required"
           }
         ],
         "type": "deterministic"
@@ -1103,6 +1403,124 @@
             "required_action": "record_face_audit_event"
           },
           "name": "face_state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_facial_recognition_agent"
+          },
+          "description": "Facial-recognition agents must use supported provider-neutral runtimes.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_facial_recognition_agent_runtime",
+            "required_action": "choose_supported_frec_agent_runtime"
+          },
+          "name": "facial_recognition_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_facial_recognition_agent"
+          },
+          "description": "Facial-recognition agents must use supported identity-governance roles.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_facial_recognition_agent_role",
+            "required_action": "choose_supported_frec_agent_role"
+          },
+          "name": "facial_recognition_agent_role_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_facial_recognition_agent",
+            "scope_present": false
+          },
+          "description": "Facial-recognition agents require an explicit consent, enrollment, liveness, verification, watchlist, identification, emotion, privacy, or lifecycle scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "facial_recognition_agent_scope_required",
+            "required_action": "declare_frec_agent_scope"
+          },
+          "name": "facial_recognition_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "operation": "register_facial_recognition_agent",
+            "owner_present": false
+          },
+          "description": "Facial-recognition agents require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "facial_recognition_agent_owner_required",
+            "required_action": "assign_frec_agent_owner"
+          },
+          "name": "facial_recognition_agent_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "register_facial_recognition_agent",
+            "purpose_present": false
+          },
+          "description": "Facial-recognition agents require a documented purpose.",
+          "effect": {
+            "decision": "deny",
+            "reason": "facial_recognition_agent_purpose_required",
+            "required_action": "document_frec_agent_purpose"
+          },
+          "name": "facial_recognition_agent_requires_purpose"
+        },
+        {
+          "condition": {
+            "contribution_disclosed": false,
+            "operation": "register_facial_recognition_agent"
+          },
+          "description": "Facial-recognition agents must disclose machine-authored enrollment, liveness, match, watchlist, emotion, privacy, and lifecycle-review contributions.",
+          "effect": {
+            "decision": "deny",
+            "reason": "facial_recognition_agent_contribution_disclosure_required",
+            "required_action": "disclose_machine_contribution"
+          },
+          "name": "facial_recognition_agent_requires_contribution_disclosure"
+        },
+        {
+          "condition": {
+            "human_approval_required": false,
+            "operation": "register_facial_recognition_agent",
+            "privileged_role": true
+          },
+          "description": "Privileged facial-recognition agent roles require human approval evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "facial_recognition_agent_human_approval_required",
+            "required_action": "record_human_frec_agent_approval"
+          },
+          "name": "facial_recognition_agent_privileged_role_requires_human_approval"
+        },
+        {
+          "condition": {
+            "mutation_count_lte": 0,
+            "operation": "validate_frec_lifecycle_batch"
+          },
+          "description": "FREC lifecycle batches must include at least one mutation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "frec_lifecycle_batch_empty",
+            "required_action": "include_frec_lifecycle_mutations"
+          },
+          "name": "frec_lifecycle_batch_requires_mutations"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "validate_frec_lifecycle_batch"
+          },
+          "description": "FREC lifecycle batches must be routed through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_lifecycle_stream_required",
+            "required_action": "route_frec_lifecycle_batch_to_bytewax"
+          },
+          "name": "bytewax_frec_stream_required"
         }
       ],
       "runtime": {
@@ -1114,6 +1532,11 @@
         "views": "view_models.py"
       },
       "screens": {
+        "agents": {
+          "component": "FacialRecognitionAgentRoster",
+          "permission": "frec:admin",
+          "route": "/frec/agents"
+        },
         "audit": {
           "component": "FRECAuditTrail",
           "permission": "frec:audit",
@@ -1143,6 +1566,11 @@
           "component": "FaceIdentification",
           "permission": "frec:identify",
           "route": "/frec/identification"
+        },
+        "lifecycle": {
+          "component": "FRECLifecycleBatchMonitor",
+          "permission": "frec:admin",
+          "route": "/frec/lifecycle"
         },
         "liveness": {
           "component": "FaceLiveness",
@@ -1181,13 +1609,44 @@
         }
       },
       "streaming": {
-        "engine": "bytewax"
+        "broker_core_dependency_allowed": false,
+        "engine": "bytewax",
+        "lifecycle_stream": "frec.lifecycle",
+        "required_operations": [
+          "face_consent_batch",
+          "face_template_batch",
+          "liveness_batch",
+          "verification_batch",
+          "watchlist_batch",
+          "identification_batch",
+          "emotion_batch",
+          "face_review_batch",
+          "facial_recognition_agent_batch"
+        ],
+        "required_processor": "bytewax",
+        "topics": [
+          "frec.consents",
+          "frec.templates",
+          "frec.liveness",
+          "frec.verifications",
+          "frec.watchlists",
+          "frec.identifications",
+          "frec.emotion",
+          "frec.reviews",
+          "frec.agents"
+        ],
+        "watermark": "event_time"
       },
       "theme": {
         "components": {
           "audit_timeline": {
             "status_style": "identity-chip",
             "visual": "event-timeline"
+          },
+          "bytewax_lifecycle_panel": {
+            "icon": "git-branch",
+            "risk_style": "processor-band",
+            "status_indicator": "stream-chip"
           },
           "consent_scope": {
             "status_style": "consent-chip",
@@ -1201,6 +1660,11 @@
             "icon": "scan-face",
             "risk_style": "capture-band",
             "status_indicator": "quality-pill"
+          },
+          "facial_recognition_agent_roster": {
+            "icon": "bot",
+            "risk_style": "face-scope-band",
+            "status_indicator": "agent-approval-chip"
           },
           "liveness_trace": {
             "status_style": "spoof-chip",
@@ -1320,6 +1784,20 @@
             "permission": "frec:admin"
           },
           {
+            "component": "FacialRecognitionAgentRoster",
+            "name": "agents",
+            "nav_group": "Governance",
+            "path": "/frec/agents",
+            "permission": "frec:admin"
+          },
+          {
+            "component": "FRECLifecycleBatchMonitor",
+            "name": "lifecycle",
+            "nav_group": "Operations",
+            "path": "/frec/lifecycle",
+            "permission": "frec:admin"
+          },
+          {
             "component": "FRECAuditTrail",
             "name": "audit",
             "nav_group": "Governance",
@@ -1344,20 +1822,98 @@
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "facial_recognition_governance": {
+        "roles": [
+          "consent_reviewer",
+          "enrollment_reviewer",
+          "liveness_reviewer",
+          "verification_reviewer",
+          "watchlist_reviewer",
+          "identification_reviewer",
+          "emotion_governance_reviewer",
+          "privacy_reviewer",
+          "lifecycle_batch_reviewer",
+          "facial_recognition_steward"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ],
+        "stream": "frec.lifecycle"
+      }
+    },
     "applications": {},
     "capability_dependencies": {
       "frec": [
         "biop",
         "cvsn",
-        "aicr"
+        "aicr",
+        "encr",
+        "audl",
+        "conf",
+        "mfau"
       ]
     }
   },
   "contracts": {
     "frec": {
+      "agents": {
+        "adapter_contract": "aicr_provider_neutral_facial_recognition_agent_adapter",
+        "first_class": true,
+        "guardrails": [
+          "supported_runtime",
+          "supported_role",
+          "explicit_scope",
+          "accountable_owner",
+          "declared_purpose",
+          "machine_contribution_disclosure",
+          "human_approval_for_privileged_roles"
+        ],
+        "privileged_roles": [
+          "liveness_reviewer",
+          "verification_reviewer",
+          "watchlist_reviewer",
+          "identification_reviewer",
+          "emotion_governance_reviewer",
+          "privacy_reviewer",
+          "lifecycle_batch_reviewer",
+          "facial_recognition_steward"
+        ],
+        "required_fields": [
+          "tenant_id",
+          "agent_id",
+          "name",
+          "runtime",
+          "role",
+          "scope",
+          "owner",
+          "purpose"
+        ],
+        "supported_roles": [
+          "consent_reviewer",
+          "enrollment_reviewer",
+          "liveness_reviewer",
+          "verification_reviewer",
+          "watchlist_reviewer",
+          "identification_reviewer",
+          "emotion_governance_reviewer",
+          "privacy_reviewer",
+          "lifecycle_batch_reviewer",
+          "facial_recognition_steward"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "configuration": {
         "adapters": {
+          "agent_adapter": "aicr_provider_neutral_facial_recognition_agent_adapter",
           "ai_core": "aicr",
           "api_helpers": "api_helpers.py",
           "audit_sink": "audl",
@@ -1374,6 +1930,43 @@
           "production_runtime": "service.py",
           "production_views": "views.py",
           "view_models": "view_models.py"
+        },
+        "agents": {
+          "adapter_contract": "aicr_provider_neutral_facial_recognition_agent_adapter",
+          "first_class": true,
+          "privileged_roles": [
+            "liveness_reviewer",
+            "verification_reviewer",
+            "watchlist_reviewer",
+            "identification_reviewer",
+            "emotion_governance_reviewer",
+            "privacy_reviewer",
+            "lifecycle_batch_reviewer",
+            "facial_recognition_steward"
+          ],
+          "require_contribution_disclosure": true,
+          "require_human_approval_for_privileged_roles": true,
+          "require_owner": true,
+          "require_purpose": true,
+          "require_scope": true,
+          "supported_roles": [
+            "consent_reviewer",
+            "enrollment_reviewer",
+            "liveness_reviewer",
+            "verification_reviewer",
+            "watchlist_reviewer",
+            "identification_reviewer",
+            "emotion_governance_reviewer",
+            "privacy_reviewer",
+            "lifecycle_batch_reviewer",
+            "facial_recognition_steward"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "consent": {
           "explicit_consent_required": true,
@@ -1444,6 +2037,35 @@
           "raw_face_image_retention_allowed": false,
           "tenant_isolation_required": true
         },
+        "streaming": {
+          "broker_core_dependency_allowed": false,
+          "engine": "bytewax",
+          "lifecycle_stream": "frec.lifecycle",
+          "required_operations": [
+            "face_consent_batch",
+            "face_template_batch",
+            "liveness_batch",
+            "verification_batch",
+            "watchlist_batch",
+            "identification_batch",
+            "emotion_batch",
+            "face_review_batch",
+            "facial_recognition_agent_batch"
+          ],
+          "required_processor": "bytewax",
+          "topics": [
+            "frec.consents",
+            "frec.templates",
+            "frec.liveness",
+            "frec.verifications",
+            "frec.watchlists",
+            "frec.identifications",
+            "frec.emotion",
+            "frec.reviews",
+            "frec.agents"
+          ],
+          "watermark": "event_time"
+        },
         "templates": {
           "encrypted_storage_required": true,
           "raw_image_retention": "disabled",
@@ -1460,8 +2082,10 @@
           "enable_consent_center": true,
           "enable_emotion_governance": true,
           "enable_enrollment_console": true,
+          "enable_facial_recognition_agent_roster": true,
           "enable_identification_workbench": true,
           "enable_identity_dashboard": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_liveness_console": true,
           "enable_review_queue": true,
           "enable_settings": true,
@@ -1485,13 +2109,48 @@
       },
       "id": "frec",
       "provides": [
-        "frec_operations"
+        "facial_recognition",
+        "face_identification",
+        "facial_recognition_agent_composition"
       ],
       "requires": [
         "biop",
         "cvsn",
-        "aicr"
-      ]
+        "aicr",
+        "encr",
+        "audl",
+        "conf",
+        "mfau"
+      ],
+      "streaming": {
+        "broker_core_dependency_allowed": false,
+        "engine": "bytewax",
+        "lifecycle_stream": "frec.lifecycle",
+        "required_operations": [
+          "face_consent_batch",
+          "face_template_batch",
+          "liveness_batch",
+          "verification_batch",
+          "watchlist_batch",
+          "identification_batch",
+          "emotion_batch",
+          "face_review_batch",
+          "facial_recognition_agent_batch"
+        ],
+        "required_processor": "bytewax",
+        "topics": [
+          "frec.consents",
+          "frec.templates",
+          "frec.liveness",
+          "frec.verifications",
+          "frec.watchlists",
+          "frec.identifications",
+          "frec.emotion",
+          "frec.reviews",
+          "frec.agents"
+        ],
+        "watermark": "event_time"
+      }
     }
   },
   "deployment": {
@@ -1549,6 +2208,19 @@
         "required_action": "use_bytewax_event_stream"
       },
       "name": "batch_face_mutation_requires_bytewax"
+    },
+    "bytewax_frec_stream_required": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "validate_frec_lifecycle_batch"
+      },
+      "description": "FREC lifecycle batches must be routed through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_lifecycle_stream_required",
+        "required_action": "route_frec_lifecycle_batch_to_bytewax"
+      },
+      "name": "bytewax_frec_stream_required"
     },
     "consent_revocation_retires_templates": {
       "condition": {
@@ -1744,6 +2416,111 @@
         "required_action": "attach_face_template_hash"
       },
       "name": "face_template_requires_hash"
+    },
+    "facial_recognition_agent_privileged_role_requires_human_approval": {
+      "condition": {
+        "human_approval_required": false,
+        "operation": "register_facial_recognition_agent",
+        "privileged_role": true
+      },
+      "description": "Privileged facial-recognition agent roles require human approval evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "facial_recognition_agent_human_approval_required",
+        "required_action": "record_human_frec_agent_approval"
+      },
+      "name": "facial_recognition_agent_privileged_role_requires_human_approval"
+    },
+    "facial_recognition_agent_requires_contribution_disclosure": {
+      "condition": {
+        "contribution_disclosed": false,
+        "operation": "register_facial_recognition_agent"
+      },
+      "description": "Facial-recognition agents must disclose machine-authored enrollment, liveness, match, watchlist, emotion, privacy, and lifecycle-review contributions.",
+      "effect": {
+        "decision": "deny",
+        "reason": "facial_recognition_agent_contribution_disclosure_required",
+        "required_action": "disclose_machine_contribution"
+      },
+      "name": "facial_recognition_agent_requires_contribution_disclosure"
+    },
+    "facial_recognition_agent_requires_owner": {
+      "condition": {
+        "operation": "register_facial_recognition_agent",
+        "owner_present": false
+      },
+      "description": "Facial-recognition agents require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "facial_recognition_agent_owner_required",
+        "required_action": "assign_frec_agent_owner"
+      },
+      "name": "facial_recognition_agent_requires_owner"
+    },
+    "facial_recognition_agent_requires_purpose": {
+      "condition": {
+        "operation": "register_facial_recognition_agent",
+        "purpose_present": false
+      },
+      "description": "Facial-recognition agents require a documented purpose.",
+      "effect": {
+        "decision": "deny",
+        "reason": "facial_recognition_agent_purpose_required",
+        "required_action": "document_frec_agent_purpose"
+      },
+      "name": "facial_recognition_agent_requires_purpose"
+    },
+    "facial_recognition_agent_requires_scope": {
+      "condition": {
+        "operation": "register_facial_recognition_agent",
+        "scope_present": false
+      },
+      "description": "Facial-recognition agents require an explicit consent, enrollment, liveness, verification, watchlist, identification, emotion, privacy, or lifecycle scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "facial_recognition_agent_scope_required",
+        "required_action": "declare_frec_agent_scope"
+      },
+      "name": "facial_recognition_agent_requires_scope"
+    },
+    "facial_recognition_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_facial_recognition_agent"
+      },
+      "description": "Facial-recognition agents must use supported identity-governance roles.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_facial_recognition_agent_role",
+        "required_action": "choose_supported_frec_agent_role"
+      },
+      "name": "facial_recognition_agent_role_supported"
+    },
+    "facial_recognition_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_facial_recognition_agent"
+      },
+      "description": "Facial-recognition agents must use supported provider-neutral runtimes.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_facial_recognition_agent_runtime",
+        "required_action": "choose_supported_frec_agent_runtime"
+      },
+      "name": "facial_recognition_agent_runtime_supported"
+    },
+    "frec_lifecycle_batch_requires_mutations": {
+      "condition": {
+        "mutation_count_lte": 0,
+        "operation": "validate_frec_lifecycle_batch"
+      },
+      "description": "FREC lifecycle batches must include at least one mutation.",
+      "effect": {
+        "decision": "deny",
+        "reason": "frec_lifecycle_batch_empty",
+        "required_action": "include_frec_lifecycle_mutations"
+      },
+      "name": "frec_lifecycle_batch_requires_mutations"
     },
     "identification_confidence_requires_threshold": {
       "condition": {

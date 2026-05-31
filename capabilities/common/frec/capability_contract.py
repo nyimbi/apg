@@ -7,6 +7,31 @@ from numbers import Number
 from typing import Any
 
 
+SUPPORTED_FREC_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_FREC_AGENT_ROLES = [
+	"consent_reviewer",
+	"enrollment_reviewer",
+	"liveness_reviewer",
+	"verification_reviewer",
+	"watchlist_reviewer",
+	"identification_reviewer",
+	"emotion_governance_reviewer",
+	"privacy_reviewer",
+	"lifecycle_batch_reviewer",
+	"facial_recognition_steward",
+]
+PRIVILEGED_FREC_AGENT_ROLES = [
+	"liveness_reviewer",
+	"verification_reviewer",
+	"watchlist_reviewer",
+	"identification_reviewer",
+	"emotion_governance_reviewer",
+	"privacy_reviewer",
+	"lifecycle_batch_reviewer",
+	"facial_recognition_steward",
+]
+
+
 DEFAULT_CONFIGURATION: dict[str, Any] = {
 	"tenant_id": "default",
 	"consent": {
@@ -74,6 +99,47 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"review_notes_required": True,
 		"duplicate_pending_review_blocked": True,
 	},
+	"agents": {
+		"first_class": True,
+		"supported_runtimes": SUPPORTED_FREC_AGENT_RUNTIMES,
+		"supported_roles": SUPPORTED_FREC_AGENT_ROLES,
+		"privileged_roles": PRIVILEGED_FREC_AGENT_ROLES,
+		"require_owner": True,
+		"require_purpose": True,
+		"require_scope": True,
+		"require_contribution_disclosure": True,
+		"require_human_approval_for_privileged_roles": True,
+		"adapter_contract": "aicr_provider_neutral_facial_recognition_agent_adapter",
+	},
+	"streaming": {
+		"engine": "bytewax",
+		"lifecycle_stream": "frec.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"face_consent_batch",
+			"face_template_batch",
+			"liveness_batch",
+			"verification_batch",
+			"watchlist_batch",
+			"identification_batch",
+			"emotion_batch",
+			"face_review_batch",
+			"facial_recognition_agent_batch",
+		],
+		"topics": [
+			"frec.consents",
+			"frec.templates",
+			"frec.liveness",
+			"frec.verifications",
+			"frec.watchlists",
+			"frec.identifications",
+			"frec.emotion",
+			"frec.reviews",
+			"frec.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	},
 	"security": {
 		"tenant_isolation_required": True,
 		"raw_face_image_retention_allowed": False,
@@ -109,6 +175,7 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"mfa_provider": "mfau",
 		"cache": "cach",
 		"metrics_sink": "moni",
+		"agent_adapter": "aicr_provider_neutral_facial_recognition_agent_adapter",
 	},
 	"ui": {
 		"enable_identity_dashboard": True,
@@ -122,6 +189,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"enable_watchlist_manager": True,
 		"enable_review_queue": True,
 		"enable_emotion_governance": True,
+		"enable_facial_recognition_agent_roster": True,
+		"enable_lifecycle_batch_monitor": True,
 		"enable_audit": True,
 		"enable_settings": True,
 	},
@@ -144,6 +213,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"emotion",
 		"privacy",
 		"reviews",
+		"agents",
+		"streaming",
 		"security",
 		"governance",
 		"observability",
@@ -163,6 +234,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"emotion",
 		"privacy",
 		"reviews",
+		"agents",
+		"streaming",
 		"security",
 		"governance",
 		"observability",
@@ -209,6 +282,15 @@ RULES: list[dict[str, Any]] = [
 	{"name": "batch_face_mutation_requires_bytewax", "description": "Batch facial recognition mutations must use Bytewax event streams.", "condition": {"operation": "batch_face_mutation", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}},
 	{"name": "cross_tenant_face_access_denied", "description": "Facial recognition records may not cross tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_face_access_denied", "required_action": "use_tenant_local_context"}},
 	{"name": "face_state_change_requires_audit", "description": "Facial recognition state changes require audit evidence.", "condition": {"state_change_requested": True, "audit_event_recorded": False}, "effect": {"decision": "deny", "reason": "face_audit_event_required", "required_action": "record_face_audit_event"}},
+	{"name": "facial_recognition_agent_runtime_supported", "description": "Facial-recognition agents must use supported provider-neutral runtimes.", "condition": {"operation": "register_facial_recognition_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_facial_recognition_agent_runtime", "required_action": "choose_supported_frec_agent_runtime"}},
+	{"name": "facial_recognition_agent_role_supported", "description": "Facial-recognition agents must use supported identity-governance roles.", "condition": {"operation": "register_facial_recognition_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_facial_recognition_agent_role", "required_action": "choose_supported_frec_agent_role"}},
+	{"name": "facial_recognition_agent_requires_scope", "description": "Facial-recognition agents require an explicit consent, enrollment, liveness, verification, watchlist, identification, emotion, privacy, or lifecycle scope.", "condition": {"operation": "register_facial_recognition_agent", "scope_present": False}, "effect": {"decision": "deny", "reason": "facial_recognition_agent_scope_required", "required_action": "declare_frec_agent_scope"}},
+	{"name": "facial_recognition_agent_requires_owner", "description": "Facial-recognition agents require an accountable owner.", "condition": {"operation": "register_facial_recognition_agent", "owner_present": False}, "effect": {"decision": "deny", "reason": "facial_recognition_agent_owner_required", "required_action": "assign_frec_agent_owner"}},
+	{"name": "facial_recognition_agent_requires_purpose", "description": "Facial-recognition agents require a documented purpose.", "condition": {"operation": "register_facial_recognition_agent", "purpose_present": False}, "effect": {"decision": "deny", "reason": "facial_recognition_agent_purpose_required", "required_action": "document_frec_agent_purpose"}},
+	{"name": "facial_recognition_agent_requires_contribution_disclosure", "description": "Facial-recognition agents must disclose machine-authored enrollment, liveness, match, watchlist, emotion, privacy, and lifecycle-review contributions.", "condition": {"operation": "register_facial_recognition_agent", "contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "facial_recognition_agent_contribution_disclosure_required", "required_action": "disclose_machine_contribution"}},
+	{"name": "facial_recognition_agent_privileged_role_requires_human_approval", "description": "Privileged facial-recognition agent roles require human approval evidence.", "condition": {"operation": "register_facial_recognition_agent", "privileged_role": True, "human_approval_required": False}, "effect": {"decision": "require_review", "reason": "facial_recognition_agent_human_approval_required", "required_action": "record_human_frec_agent_approval"}},
+	{"name": "frec_lifecycle_batch_requires_mutations", "description": "FREC lifecycle batches must include at least one mutation.", "condition": {"operation": "validate_frec_lifecycle_batch", "mutation_count_lte": 0}, "effect": {"decision": "deny", "reason": "frec_lifecycle_batch_empty", "required_action": "include_frec_lifecycle_mutations"}},
+	{"name": "bytewax_frec_stream_required", "description": "FREC lifecycle batches must be routed through Bytewax.", "condition": {"operation": "validate_frec_lifecycle_batch", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_frec_lifecycle_batch_to_bytewax"}},
 ]
 
 
@@ -224,6 +306,8 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "watchlists", "path": "/frec/watchlists", "component": "WatchlistManager", "permission": "frec:manage_watchlists", "nav_group": "Governance"},
 	{"name": "reviews", "path": "/frec/reviews", "component": "FaceReviewQueue", "permission": "frec:review", "nav_group": "Governance"},
 	{"name": "emotion", "path": "/frec/emotion", "component": "EmotionGovernance", "permission": "frec:admin", "nav_group": "Governance"},
+	{"name": "agents", "path": "/frec/agents", "component": "FacialRecognitionAgentRoster", "permission": "frec:admin", "nav_group": "Governance"},
+	{"name": "lifecycle", "path": "/frec/lifecycle", "component": "FRECLifecycleBatchMonitor", "permission": "frec:admin", "nav_group": "Operations"},
 	{"name": "audit", "path": "/frec/audit", "component": "FRECAuditTrail", "permission": "frec:audit", "nav_group": "Governance"},
 	{"name": "settings", "path": "/frec/settings", "component": "FRECSettings", "permission": "frec:admin", "nav_group": "Administration"},
 ]
@@ -253,9 +337,65 @@ THEME: dict[str, Any] = {
 		"watchlist_table": {"visual": "identity-list", "status_style": "policy-chip"},
 		"review_queue": {"visual": "decision-lane", "status_style": "review-chip"},
 		"emotion_governance": {"visual": "purpose-ledger", "status_style": "aggregate-chip"},
+		"facial_recognition_agent_roster": {"icon": "bot", "status_indicator": "agent-approval-chip", "risk_style": "face-scope-band"},
+		"bytewax_lifecycle_panel": {"icon": "git-branch", "status_indicator": "stream-chip", "risk_style": "processor-band"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "identity-chip"},
 	},
 }
+
+
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class FREC agent composition manifest."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_FREC_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_FREC_AGENT_ROLES),
+		"privileged_roles": list(PRIVILEGED_FREC_AGENT_ROLES),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles",
+		],
+		"adapter_contract": "aicr_provider_neutral_facial_recognition_agent_adapter",
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return the FREC Bytewax lifecycle stream contract."""
+	return {
+		"engine": "bytewax",
+		"lifecycle_stream": "frec.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"face_consent_batch",
+			"face_template_batch",
+			"liveness_batch",
+			"verification_batch",
+			"watchlist_batch",
+			"identification_batch",
+			"emotion_batch",
+			"face_review_batch",
+			"facial_recognition_agent_batch",
+		],
+		"topics": [
+			"frec.consents",
+			"frec.templates",
+			"frec.liveness",
+			"frec.verifications",
+			"frec.watchlists",
+			"frec.identifications",
+			"frec.emotion",
+			"frec.reviews",
+			"frec.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	}
 
 
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -267,6 +407,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "frec",
 		"display_name": "Facial Recognition",
+		"provides": ["facial_recognition", "face_identification", "facial_recognition_agent_composition"],
+		"requires": ["biop", "cvsn", "aicr", "encr", "audl", "conf", "mfau"],
 		"configuration": config,
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},
@@ -278,6 +420,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"template_roots": ["templates/", "static/"],
 			"requires_theme": True,
 		},
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
 		"theme": deepcopy(THEME),
 	}
 

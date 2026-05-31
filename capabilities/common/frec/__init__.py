@@ -10,7 +10,7 @@ from .capability_contract import evaluate_capability_rules, get_capability_contr
 __version__ = "1.0.0"
 __capability_id__ = "frec"
 __capability_name__ = "Facial Recognition"
-__apg_dependencies__ = ["biop", "cvsn", "aicr"]
+__apg_dependencies__ = ["biop", "cvsn", "aicr", "encr", "audl", "conf", "mfau"]
 
 capability_metadata: dict[str, Any] = {
 	"name": "frec",
@@ -33,6 +33,8 @@ capability_metadata: dict[str, Any] = {
 		"watchlist_matching",
 		"emotion_governance",
 		"face_reviews",
+		"facial_recognition_agent_composition",
+		"bytewax_lifecycle_batches",
 		"face_audit",
 	],
 	"permissions": ["frec:view", "frec:enroll", "frec:verify", "frec:identify", "frec:manage_watchlists", "frec:review", "frec:audit", "frec:admin"]
@@ -49,7 +51,7 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["auth", "audl", "encr", "mfau", "moni", "cach"],
+		"optional_dependencies": ["auth", "moni", "cach"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
@@ -61,6 +63,8 @@ def register_capability() -> dict[str, Any]:
 			"face_liveness": "Validate liveness, anti-spoofing, and deepfake evidence for authentication",
 			"emotion_governance": "Gate emotion analysis behind explicit approved purpose",
 			"face_reviews": "Route low-confidence matches and watchlist hits to review",
+			"facial_recognition_agent_composition": "Compose Codex, Claude Code, opencode, and Pi style facial-recognition governance agents behind provider-neutral guardrails",
+			"bytewax_lifecycle_batches": "Validate FREC lifecycle batches through Bytewax-first processor contracts",
 			"capability_rules": "Evaluate deterministic facial-recognition rules",
 			"visual_theming": "Apply identity-vision theme tokens and components"
 		},
@@ -75,9 +79,13 @@ def register_capability() -> dict[str, Any]:
 			"watchlists": "/frec/api/v1/watchlists",
 			"reviews": "/frec/api/v1/reviews",
 			"emotion": "/frec/api/v1/emotion",
+			"agents": "/frec/api/v1/agents",
+			"lifecycle": "/frec/api/v1/lifecycle",
 			"audit": "/frec/api/v1/audit"
 		},
 		"adapters": contract["configuration"]["adapters"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],

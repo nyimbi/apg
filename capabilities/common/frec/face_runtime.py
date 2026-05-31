@@ -27,6 +27,46 @@ class FaceRecord:
 		return asdict(self)
 
 
+@dataclass
+class FacialRecognitionAgentRecord:
+	"""Provider-neutral AI-agent composition record for facial-recognition governance."""
+
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	owner: str
+	purpose: str
+	contribution_disclosed: bool
+	human_approval_required: bool
+	status: str
+	created_at: str
+
+	def as_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass
+class FrecLifecycleBatchRecord:
+	"""Bytewax lifecycle batch validation evidence for facial-recognition changes."""
+
+	id: str
+	tenant_id: str
+	event_stream: str
+	mutation_count: int
+	operation: str
+	accepted: bool
+	decision: str
+	matched_rules: tuple[str, ...]
+	status: str
+	created_at: str
+
+	def as_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
 class FrecGuardrailError(ValueError):
 	"""Raised when a FREC guardrail denies or requires review for an operation."""
 
@@ -49,7 +89,13 @@ class FrecService:
 		self._identifications: dict[StoreKey, dict[str, Any]] = {}
 		self._reviews: dict[StoreKey, dict[str, Any]] = {}
 		self._emotion_events: dict[StoreKey, dict[str, Any]] = {}
+		self._facial_recognition_agents: dict[StoreKey, dict[str, Any]] = {}
+		self._lifecycle_batches: dict[StoreKey, dict[str, Any]] = {}
 		self._audit_events: list[dict[str, Any]] = []
+		self._agent_runtimes = set(self.contract["agents"]["supported_runtimes"])
+		self._agent_roles = set(self.contract["agents"]["supported_roles"])
+		self._privileged_agent_roles = set(self.contract["agents"]["privileged_roles"])
+		self._lifecycle_operations = set(self.contract["streaming"]["required_operations"])
 
 	def describe(self) -> dict[str, Any]:
 		return self.contract
@@ -294,6 +340,97 @@ class FrecService:
 		self._audit(tenant_id, "emotion_analysis_completed", event_id, subject_id=subject_id, actor="system", audit_event_recorded=True)
 		return record
 
+	def register_facial_recognition_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> dict[str, Any]:
+		self._ensure_new(self._facial_recognition_agents, tenant_id, agent_id)
+		runtime_value = _normalize_token(runtime)
+		role_value = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(str(tenant_id or "").strip()),
+			"operation": "register_facial_recognition_agent",
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"scope_present": bool(str(scope or "").strip()),
+			"owner_present": bool(str(owner or "").strip()),
+			"purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+		})
+		if result["decision"] == "deny":
+			raise FrecGuardrailError(result)
+		if not str(name or "").strip():
+			raise ValueError("facial_recognition_agent_name_required")
+		record = FacialRecognitionAgentRecord(
+			id=str(agent_id).strip(),
+			tenant_id=tenant_id,
+			name=str(name).strip(),
+			runtime=runtime_value,
+			role=role_value,
+			scope=str(scope).strip(),
+			owner=str(owner).strip(),
+			purpose=str(purpose).strip(),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+			status="pending_review" if result["decision"] == "require_review" else "active",
+			created_at=datetime.now(timezone.utc).isoformat(),
+		).as_dict()
+		self._facial_recognition_agents[self._key(tenant_id, record["id"])] = record
+		self._audit(tenant_id, "facial_recognition_agent_registered", record["id"], actor=owner, audit_event_recorded=True, decision=result["decision"], matched_rules=result["matched_rules"])
+		return record
+
+	def validate_frec_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "facial_recognition_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		if not str(tenant_id or "").strip():
+			self._raise_if_denied({"tenant_context_present": False})
+		mutation_count = int(mutation_count)
+		if mutation_count <= 0:
+			raise ValueError("frec_lifecycle_batch_empty")
+		stream_value = _normalize_token(event_stream)
+		operation_value = _normalize_token(operation)
+		if operation_value not in self._lifecycle_operations:
+			raise ValueError(f"unsupported_frec_lifecycle_operation:{operation_value}")
+		result = self.evaluate({
+			"operation": "validate_frec_lifecycle_batch",
+			"event_stream": stream_value,
+			"mutation_count": mutation_count,
+		})
+		accepted = result["decision"] == "allow"
+		record = FrecLifecycleBatchRecord(
+			id=batch_id or f"frecbatch:{len(self._lifecycle_batches) + 1:06d}",
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			operation=operation_value,
+			accepted=accepted,
+			decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			status="accepted" if accepted else "denied",
+			created_at=datetime.now(timezone.utc).isoformat(),
+		).as_dict()
+		self._lifecycle_batches[self._key(tenant_id, record["id"])] = record
+		self._audit(tenant_id, f"frec_lifecycle_batch_{record['status']}", record["id"], actor="bytewax" if accepted else stream_value, audit_event_recorded=True, decision=result["decision"], matched_rules=result["matched_rules"])
+		if result["decision"] == "deny":
+			raise FrecGuardrailError(result)
+		return record
+
 	def list_consents(self, tenant_id: str) -> list[dict[str, Any]]:
 		return self._tenant_records(self._consents, tenant_id)
 
@@ -318,6 +455,12 @@ class FrecService:
 	def list_emotion_events(self, tenant_id: str) -> list[dict[str, Any]]:
 		return self._tenant_records(self._emotion_events, tenant_id)
 
+	def list_facial_recognition_agents(self, tenant_id: str) -> list[dict[str, Any]]:
+		return self._tenant_records(self._facial_recognition_agents, tenant_id)
+
+	def list_lifecycle_batches(self, tenant_id: str) -> list[dict[str, Any]]:
+		return self._tenant_records(self._lifecycle_batches, tenant_id)
+
 	def list_audit_events(self, tenant_id: str) -> list[dict[str, Any]]:
 		return [event for event in self._audit_events if event["tenant_id"] == tenant_id]
 
@@ -331,6 +474,10 @@ class FrecService:
 			"identification_count": len(self.list_identifications(tenant_id)),
 			"review_count": len(self.list_reviews(tenant_id)),
 			"emotion_event_count": len(self.list_emotion_events(tenant_id)),
+			"facial_recognition_agent_count": len(self.list_facial_recognition_agents(tenant_id)),
+			"pending_agent_review_count": len([item for item in self.list_facial_recognition_agents(tenant_id) if item["status"] == "pending_review"]),
+			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
+			"denied_lifecycle_batch_count": len([item for item in self.list_lifecycle_batches(tenant_id) if item["status"] == "denied"]),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 		}
 
@@ -346,6 +493,8 @@ class FrecService:
 			"identifications": self.list_identifications(tenant_id),
 			"reviews": self.list_reviews(tenant_id),
 			"emotion_events": self.list_emotion_events(tenant_id),
+			"facial_recognition_agents": self.list_facial_recognition_agents(tenant_id),
+			"lifecycle_batches": self.list_lifecycle_batches(tenant_id),
 			"audit_events": self.list_audit_events(tenant_id),
 		}
 
@@ -395,3 +544,7 @@ class FrecService:
 			"metadata": metadata,
 			"created_at": datetime.now(timezone.utc).isoformat(),
 		})
+
+
+def _normalize_token(value: str) -> str:
+	return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")

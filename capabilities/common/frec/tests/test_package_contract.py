@@ -30,8 +30,10 @@ def test_package_contract_shape_is_valid():
 	assert contract["capability"] == "frec"
 	assert contract["ui"]["routes"]
 	assert contract["theme"]["tokens"]["border.radius"]
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert len(contract["rule_engine"]["rules"]) >= 44
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["required_processor"] == "bytewax"
 
 
 def test_package_app_entrypoint_is_publishable():
@@ -48,3 +50,5 @@ def test_package_app_entrypoint_is_publishable():
 	assert "frec" in model["capabilities"]
 	assert model["capabilities"]["frec"]["runtime"]["service"] == "face_runtime.FrecService"
 	assert model["capabilities"]["frec"]["streaming"]["engine"] == "bytewax"
+	assert model["capabilities"]["frec"]["agents"]["first_class"] is True
+	assert model["capabilities"]["frec"]["face_lifecycle"]["lifecycle_batch"] == "FrecLifecycleBatchRecord"

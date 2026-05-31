@@ -1,5 +1,8 @@
 {
   "base_target": "python",
+  "capabilities": [
+    "frec"
+  ],
   "display_name": "Facial Recognition",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
@@ -19,10 +22,17 @@
     "semantic_model.json",
     "release_report.json"
   ],
+  "interfaces": {
+    "health": "/health",
+    "self_test": "/self-test",
+    "semantic_model": "/semantic-model.json"
+  },
+  "kind": "apg.generated_application",
   "name": "frec",
   "profile": "capability",
   "profile_artifacts": [
     "package_manifest.json"
   ],
+  "target": "python",
   "version": "1.0.0"
 }

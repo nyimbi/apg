@@ -9,11 +9,16 @@ from .face_runtime import FrecService
 
 def dashboard_model(service: FrecService | None = None, tenant_id: str = "default") -> dict[str, Any]:
 	service = _service_or_default(service)
+	contract = service.describe()
 	return {
 		"component": "FRECDashboard",
 		"summary": service.dashboard_summary(tenant_id),
-		"routes": service.describe()["ui"]["routes"],
-		"theme": service.describe()["theme"],
+		"facial_recognition_agents": service.list_facial_recognition_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
+		"routes": contract["ui"]["routes"],
+		"theme": contract["theme"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 	}
 
 
@@ -53,14 +58,60 @@ def emotion_model(service: FrecService | None = None, tenant_id: str = "default"
 	return {"component": "EmotionGovernance", "emotion_events": service.list_emotion_events(tenant_id), "theme_component": "emotion_governance"}
 
 
+def facial_recognition_agent_roster_model(service: FrecService | None = None, tenant_id: str = "default") -> dict[str, Any]:
+	service = _service_or_default(service)
+	contract = service.describe()
+	agents = service.list_facial_recognition_agents(tenant_id)
+	return {
+		"component": "FacialRecognitionAgentRoster",
+		"tenant_id": tenant_id,
+		"agents": agents,
+		"pending_review": [item for item in agents if item["status"] == "pending_review"],
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+		"theme_component": "facial_recognition_agent_roster",
+	}
+
+
+def lifecycle_batch_model(service: FrecService | None = None, tenant_id: str = "default") -> dict[str, Any]:
+	service = _service_or_default(service)
+	contract = service.describe()
+	batches = service.list_lifecycle_batches(tenant_id)
+	return {
+		"component": "FRECLifecycleBatchMonitor",
+		"tenant_id": tenant_id,
+		"batches": batches,
+		"denied": [item for item in batches if item["status"] == "denied"],
+		"required_processor": contract["streaming"]["required_processor"],
+		"required_operations": contract["streaming"]["required_operations"],
+		"topics": contract["streaming"]["topics"],
+		"theme_component": "bytewax_lifecycle_panel",
+	}
+
+
 def audit_model(service: FrecService | None = None, tenant_id: str = "default") -> dict[str, Any]:
 	service = _service_or_default(service)
-	return {"component": "FRECAuditTrail", "audit_events": service.list_audit_events(tenant_id), "theme_component": "audit_timeline"}
+	contract = service.describe()
+	return {
+		"component": "FRECAuditTrail",
+		"audit_events": service.list_audit_events(tenant_id),
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
+		"theme_component": "audit_timeline",
+	}
 
 
 def settings_model(service: FrecService | None = None, tenant_id: str = "default") -> dict[str, Any]:
 	service = _service_or_default(service)
-	return {"component": "FRECSettings", "tenant_id": tenant_id, "configuration": service.describe()["configuration"]}
+	contract = service.describe()
+	return {
+		"component": "FRECSettings",
+		"tenant_id": tenant_id,
+		"configuration": contract["configuration"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
+	}
 
 
 def _service_or_default(service: FrecService | None) -> FrecService:

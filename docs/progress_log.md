@@ -22315,3 +22315,72 @@ Not run to preserve battery:
   adapters, rendered browser UI, external AI-agent runtime clients,
   presentation-attack benchmarks, biometric interoperability checks, privacy
   workflow approvals, and load/performance benchmarks.
+
+### 2026-05-31 09:08 EAT
+
+FREC facial-recognition agent composition and Bytewax lifecycle guardrail packet:
+
+- Selected `capabilities/common/frec` as the next coherent lifecycle packet
+  and preserved its existing face consent, template enrollment, liveness,
+  verification, watchlist, identification, emotion-governance, review, and
+  audit lifecycle.
+- Extended the FREC executable contract with first-class facial-recognition
+  governance-agent metadata, supported runtimes `codex`, `claude_code`,
+  `opencode`, and `pi`, supported governance roles, privileged-role metadata,
+  Bytewax lifecycle stream metadata, route metadata, theme components, and
+  contract `provides`/`requires`.
+- Added deterministic guardrails for unsupported facial-recognition agent
+  runtime, unsupported role, missing scope, owner, purpose, missing machine
+  contribution disclosure, privileged agent registration without human
+  approval, empty lifecycle batches, unsupported lifecycle operations, and
+  non-Bytewax FREC lifecycle batch routing.
+- Added `FacialRecognitionAgentRecord`, `FrecLifecycleBatchRecord`,
+  tenant-qualified agent storage, lifecycle-batch storage, registration,
+  listing, audit events, dashboard counts, facial-recognition agent roster
+  view models, lifecycle-batch monitor view models, and serializable API
+  helpers.
+- Added `/frec/agents`, `/frec/lifecycle`, facial-recognition agent roster
+  theme metadata, and Bytewax lifecycle panel theme metadata.
+- Regenerated `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract and refreshed
+  `README.md`, `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md`.
+- Review fix: API lifecycle validation now preserves `mutation_count=0` and
+  returns a serializable validation error instead of silently defaulting to a
+  non-empty batch.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/frec/capability_contract.py capabilities/common/frec/face_runtime.py capabilities/common/frec/api_helpers.py capabilities/common/frec/view_models.py capabilities/common/frec/app.py capabilities/common/frec/__init__.py capabilities/common/frec/test_capability_contract.py capabilities/common/frec/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/python capabilities/common/frec/app.py` passed the package
+  self-test.
+- `./.venv/bin/pytest -q capabilities/common/frec/test_capability_contract.py capabilities/common/frec/tests/test_package_contract.py`
+  passed with 9 tests and only existing shared-module deprecation warnings.
+- `./.venv/bin/apg capabilities inspect frec --json` passed with `ok: true`,
+  15 APG Python routes, 44 deterministic rules, first-class agents, and
+  Bytewax streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/frec --json`
+  passed with `ok: true`; FREC remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/frec --json`
+  passed with `side_effect_free: true` and no warnings.
+- `./.venv/bin/python -m json.tool capabilities/common/frec/semantic_model.json`,
+  `./.venv/bin/python -m json.tool capabilities/common/frec/release_report.json`,
+  and `./.venv/bin/python -m json.tool capabilities/common/frec/package_manifest.json`
+  passed.
+- Runtime smoke returned one verified face request, one active `codex`
+  facial-recognition governance agent, and one accepted `bytewax`
+  lifecycle-batch evidence record.
+- Focused stale-marker scan over touched FREC packet source, docs, tests, and
+  evidence returned only intentional non-Bytewax denial checks and
+  no-broker-core/Kafka dependency documentation.
+- `git diff --check -- capabilities/common/frec docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live camera capture, raw image processing, face matchers/model servers,
+  liveness/deepfake engines, production databases, durable Bytewax topology,
+  live BIOP/CVSN/AICR/ENCR/AUDL/CONF/MFAU adapters, rendered browser UI,
+  external AI-agent runtime clients, watchlist operational approvals,
+  biometric performance benchmarks, and load/performance checks.
