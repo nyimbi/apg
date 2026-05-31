@@ -21733,3 +21733,64 @@ Not run to preserve battery:
 - Live forecasting/scoring model providers, live Bytewax topology, live AICR/
   MLCM/ETLP/CONF/AUTH/AUDL/MONI/CACH adapters, rendered browser UI, external
   AI-agent runtime clients, and performance/load/accuracy/drift benchmarks.
+
+### 2026-05-31 07:26 EAT
+
+ANOM anomaly-agent composition and Bytewax lifecycle guardrail packet:
+
+- Selected `capabilities/common/anom` as the next ordered capability after
+  PRED.
+- Extended the ANOM executable contract with first-class anomaly-agent
+  metadata, supported runtimes `codex`, `claude_code`, `opencode`, and `pi`,
+  supported anomaly-governance roles, privileged-role metadata, Bytewax
+  lifecycle stream metadata, route metadata, theme components, and contract
+  `provides`/`requires`.
+- Added deterministic guardrails for unsupported anomaly-agent runtime,
+  unsupported anomaly-agent role, missing agent scope, owner, purpose, missing
+  machine contribution disclosure, privileged anomaly-agent registration
+  without human approval, and non-Bytewax ANOM lifecycle batch routing.
+- Added `AnomalyAgentRecord`, `AnomLifecycleBatchRecord`, tenant-qualified
+  anomaly-agent storage, lifecycle-batch storage, registration, listing, audit
+  events, dashboard counts, anomaly-agent roster view models, and
+  lifecycle-batch monitor view models.
+- Added `/anom/agents`, `/anom/lifecycle`, anomaly-agent roster theme metadata,
+  and Bytewax lifecycle panel theme metadata.
+- Regenerated `semantic_model.json` and `release_report.json` from the live
+  `app.py` contract.
+- Refreshed `README.md`, `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md` so
+  the documented packet matches the executable contract and keeps external
+  AI-agent runtimes plus Bytewax workers behind adapter boundaries.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/anom/__init__.py capabilities/common/anom/capability_contract.py capabilities/common/anom/models.py capabilities/common/anom/anomaly_engine.py capabilities/common/anom/service.py capabilities/common/anom/api.py capabilities/common/anom/views.py capabilities/common/anom/app.py capabilities/common/anom/test_capability_contract.py capabilities/common/anom/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/python capabilities/common/anom/app.py` passed with `passed:
+  true`.
+- `./.venv/bin/python -m json.tool capabilities/common/anom/semantic_model.json`
+  passed.
+- `./.venv/bin/python -m json.tool capabilities/common/anom/release_report.json`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/anom/test_capability_contract.py capabilities/common/anom/tests/test_package_contract.py`
+  passed with 11 tests and only existing shared-module deprecation warnings.
+- `./.venv/bin/apg capabilities inspect anom --json` passed with `ok: true`,
+  14 APG Python routes, 39 deterministic rules, first-class agents, and
+  Bytewax streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/anom --json`
+  passed with `ok: true`; ANOM remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/anom --json`
+  passed with side-effect-free package evidence and no warnings.
+- `./.venv/bin/python -c "... AnomService ... register_anomaly_agent ... validate_anom_lifecycle_batch ..."`
+  returned one `codex` active anomaly steward and one `bytewax`
+  lifecycle-batch evidence record.
+- Focused stale-marker scan over touched ANOM packet source, docs, tests, and
+  evidence returned only intentional Kafka-denial tests.
+- `git diff --check -- capabilities/common/anom docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live monitoring ingest, live Bytewax topology, live PRED/AICR/MONI/CONF/
+  AUTH/AUDL/WFLO/NTFY/HLTH/CACH adapters, rendered browser UI, external
+  AI-agent runtime clients, and performance/load/precision/recall benchmarks.

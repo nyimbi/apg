@@ -5,6 +5,7 @@
 ANOM provides APG with first-class anomaly detection for generated
 applications. It supports monitored source registration, baseline management,
 observation scoring, signal triage, investigation workflows, feedback tuning,
+first-class AI anomaly-agent composition, Bytewax lifecycle batch validation,
 UI composition, and auditable policy enforcement.
 
 ## Scope
@@ -15,6 +16,9 @@ This packet establishes the executable baseline for ANOM:
   routes, and visual theme tokens.
 - A dependency-light runtime service for generated applications.
 - UI view models that can be composed into APG screens.
+- Provider-neutral AI anomaly agents as executable state with runtime, role,
+  scope, owner, purpose, disclosure, human-review status, and audit evidence.
+- Bytewax-only lifecycle batch validation for anomaly mutations.
 - Package evidence that can be published and self-tested from the current
   executable contract.
 - Focused tests for the contract, lifecycle, guardrails, view models, and
@@ -25,6 +29,9 @@ This packet establishes the executable baseline for ANOM:
 - Operator: registers sources, creates baselines, and monitors signal boards.
 - SRE or risk owner: investigates critical and high anomaly signals.
 - Detection steward: records feedback and tunes false-positive behavior.
+- AI anomaly agent: assists with source, baseline, detector, signal,
+  investigation, feedback, alert, and baseline-reset review while remaining
+  provider-neutral.
 - Platform operator: configures Bytewax streams, monitoring, notifications,
   audit, auth, metrics, cache, and generated app deployment.
 
@@ -69,10 +76,36 @@ This packet establishes the executable baseline for ANOM:
 - Require tuning review when false-positive rate exceeds the configured
   threshold.
 
+### AI Agent Lifecycle
+
+- Register anomaly agents with tenant, name, runtime, role, scope, owner,
+  purpose, machine-contribution disclosure, and human-approval metadata.
+- Support provider-neutral runtimes `codex`, `claude_code`, `opencode`, and
+  `pi`.
+- Support roles for source review, baseline review, detector review,
+  signal-triage review, investigation review, feedback-tuning review,
+  alert-dispatch review, baseline-reset review, and anomaly stewardship.
+- Deny unsupported runtimes, unsupported roles, missing scope, missing owner,
+  missing purpose, and missing machine-contribution disclosure.
+- Put privileged anomaly-agent roles into pending review when human approval
+  evidence is absent.
+- Keep live agent invocation, credentials, and provider-specific routing behind
+  the AICR adapter boundary.
+
+### Bytewax Lifecycle Batches
+
+- Validate ANOM lifecycle mutation batches through the declared Bytewax stream
+  contract.
+- Accept only configured lifecycle operations: source, baseline, detection,
+  signal, investigation, feedback, alert, and anomaly-agent batches.
+- Deny non-Bytewax lifecycle streams while preserving denied-batch evidence for
+  audit and UI review.
+
 ### UI and Theming
 
 - Expose routes for dashboard, sources, baselines, detector, signals,
-  investigations, alerts, rules, feedback, quality, audit, and settings.
+  investigations, alerts, rules, feedback, quality, agents, lifecycle batches,
+  audit, and settings.
 - Provide route-specific view models.
 - Publish signal-console theme tokens and component hints.
 
@@ -86,6 +119,7 @@ This packet establishes the executable baseline for ANOM:
 
 - Live monitoring backend ingestion.
 - Live Bytewax stream execution.
+- Live AI-agent CLI/API invocation.
 - Live notification or incident-management dispatch.
 - Persistent database migrations.
 - Browser-rendered UI validation.
@@ -96,11 +130,12 @@ stable.
 
 ## Acceptance Criteria
 
-- `get_capability_contract()` exposes at least 30 deterministic rules, at least
-  12 UI routes, Bytewax adapter evidence, runtime adapter evidence, and theme
-  component metadata.
+- `get_capability_contract()` exposes at least 39 deterministic rules, at least
+  14 UI routes, first-class agent metadata, Bytewax lifecycle metadata, runtime
+  adapter evidence, and theme component metadata.
 - `AnomService` executes source, baseline, detection, investigation, feedback,
-  reset, list, summary, audit, and APG record compatibility flows.
+  reset, anomaly-agent, lifecycle-batch, list, summary, audit, and APG record
+  compatibility flows.
 - Guardrail tests prove denied or review-required cases fail before invalid
   state is accepted.
 - `app.self_test()` passes and fails if route, rule, Bytewax, or runtime

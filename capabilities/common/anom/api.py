@@ -99,6 +99,31 @@ def record_feedback(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_anomaly_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_anomaly_agent(
+		agent_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or ""),
+		runtime=str(payload.get("runtime") or ""),
+		role=str(payload.get("role") or ""),
+		scope=str(payload.get("scope") or ""),
+		owner=str(payload.get("owner") or ""),
+		purpose=str(payload.get("purpose") or ""),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", True)),
+		human_approval_required=bool(payload.get("human_approval_required", False)),
+	)
+
+
+def validate_anom_lifecycle_batch(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_anom_lifecycle_batch(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		event_stream=str(payload.get("event_stream") or ""),
+		mutation_count=int(payload.get("mutation_count") or 0),
+		operation=str(payload.get("operation") or "anomaly_agent_batch"),
+		batch_id=payload.get("id"),
+	)
+
+
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.create_record(
 		record_id=str(payload["id"]),
@@ -126,6 +151,14 @@ def list_signals(tenant_id: str | None = None) -> list[dict[str, Any]]:
 
 def list_investigations(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_investigations(tenant_id)
+
+
+def list_anomaly_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_anomaly_agents(tenant_id)
+
+
+def list_lifecycle_batches(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_lifecycle_batches(tenant_id)
 
 
 def list_audit_events(tenant_id: str | None = None) -> list[dict[str, Any]]:

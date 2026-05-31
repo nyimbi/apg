@@ -47,8 +47,8 @@ def semantic_model() -> dict[str, Any]:
 			"anom": {
 				"name": contract["display_name"],
 				"configuration": contract["configuration"],
-				"provides": ["anom_operations"],
-				"requires": [],
+				"provides": contract["provides"],
+				"requires": contract["requires"],
 				"erp_modules": ["common"],
 				"rule_engine": contract["rule_engine"],
 				"rules": contract["rule_engine"]["rules"],
@@ -68,6 +68,7 @@ def semantic_model() -> dict[str, Any]:
 					"baseline_reset": "BaselineProfile",
 					"investigation": "Investigation",
 					"feedback_tuning": "DetectionFeedback",
+					"anomaly_agent": "AnomalyAgentRecord",
 				},
 				"anomaly_lifecycle": {
 					"source": "MonitoringSource",
@@ -76,30 +77,45 @@ def semantic_model() -> dict[str, Any]:
 					"signal": "AnomalySignal",
 					"investigation": "Investigation",
 					"feedback": "DetectionFeedback",
+					"anomaly_agent": "AnomalyAgentRecord",
+					"lifecycle_batch": "AnomLifecycleBatchRecord",
 					"audit": "AnomalyAuditEvent",
 				},
 				"adapters": contract["configuration"]["adapters"],
+				"agents": contract["agents"],
 				"i18n": {},
 				"master_data": {},
-				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
+				"streaming": contract["streaming"],
 			}
 		},
 		"contracts": {
 			"anom": {
 				"id": "anom",
 				"configuration": contract["configuration"],
-				"provides": ["anom_operations"],
-				"requires": [],
+				"provides": contract["provides"],
+				"requires": contract["requires"],
+				"agents": contract["agents"],
+				"streaming": contract["streaming"],
 			}
 		},
 		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
-		"composition": {"capability_dependencies": {"anom": []}, "applications": {}, "agent_teams": {}},
+		"composition": {
+			"capability_dependencies": {"anom": contract["requires"]},
+			"applications": {},
+			"agent_teams": {
+				"anom_signal_governance": {
+					"roles": contract["agents"]["supported_roles"],
+					"runtimes": contract["agents"]["supported_runtimes"],
+					"stream": contract["streaming"]["lifecycle_stream"],
+				}
+			},
+		},
 		"deployment": {"source": "capability_contract.py", "target": "python"},
 		"graphs": {
 			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
 			"package": {"kind": "package", "nodes": 2, "edges": 1},
 		},
-		"source_files": ["capability_contract.py", "service.py", "anomaly_engine.py", "views.py"],
+		"source_files": ["capability_contract.py", "models.py", "service.py", "anomaly_engine.py", "views.py"],
 		"symbols": {
 			"capability.anom": {
 				"id": "capability.anom",
@@ -110,7 +126,7 @@ def semantic_model() -> dict[str, Any]:
 				"references": [],
 			}
 		},
-		"agents": {},
+		"agents": {"anom_signal_governance": contract["agents"]},
 		"flows": {},
 		"llms": {},
 		"operations": {},
@@ -148,18 +164,24 @@ def self_test() -> dict[str, Any]:
 	routes = capability.get("ui", {}).get("routes", [])
 	rules = capability.get("rule_engine", {}).get("rules", [])
 	adapters = capability.get("adapters", {})
+	agents = capability.get("agents", {})
+	streaming = capability.get("streaming", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "anom" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
-	if len(routes) < 12:
+	if len(routes) < 14:
 		errors.append("ANOM semantic model route manifest is stale")
-	if len(rules) < 30:
+	if len(rules) < 39:
 		errors.append("ANOM semantic model rule manifest is stale")
 	if adapters.get("event_stream") != "bytewax":
 		errors.append("ANOM adapter manifest must use Bytewax for event streaming")
+	if agents.get("first_class") is not True:
+		errors.append("ANOM agents must be first-class semantic citizens")
+	if streaming.get("required_processor") != "bytewax":
+		errors.append("ANOM lifecycle stream must require Bytewax")
 	if capability.get("runtime", {}).get("service") != "service.AnomService":
 		errors.append("ANOM generated-app runtime is missing")
 	return {

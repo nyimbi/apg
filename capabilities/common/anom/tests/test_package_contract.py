@@ -30,10 +30,12 @@ def test_package_contract_shape_is_valid():
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "anom"
-	assert len(contract["ui"]["routes"]) >= 12
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert len(contract["ui"]["routes"]) >= 14
+	assert len(contract["rule_engine"]["rules"]) >= 39
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "service.AnomService"
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert contract["theme"]["tokens"]["border.radius"]
 
 
@@ -54,6 +56,11 @@ def test_package_app_entrypoint_is_publishable():
 	assert "anom" in model["capabilities"]
 	assert model["capabilities"]["anom"]["runtime"]["service"] == "service.AnomService"
 	assert model["capabilities"]["anom"]["streaming"]["engine"] == "bytewax"
+	assert model["capabilities"]["anom"]["streaming"]["required_processor"] == "bytewax"
+	assert model["capabilities"]["anom"]["agents"]["first_class"] is True
+	assert model["composition"]["capability_dependencies"]["anom"] == ["pred", "aicr", "moni", "conf"]
+	assert model["composition"]["agent_teams"]["anom_signal_governance"]["stream"] == "anom.lifecycle"
+	assert model["capabilities"]["anom"]["anomaly_lifecycle"]["lifecycle_batch"] == "AnomLifecycleBatchRecord"
 	assert "audit" in model["capabilities"]["anom"]["screens"]
 	assert committed_model == model
 	assert set(committed_manifest["generated_artifacts"]) >= {
@@ -61,16 +68,19 @@ def test_package_app_entrypoint_is_publishable():
 		"SPECIFICATION.md",
 		"PLAN.md",
 		"capability_contract.py",
+		"models.py",
 		"anomaly_engine.py",
 		"service.py",
 		"views.py",
 		"app.py",
 	}
 	assert committed_report["ok"] is True
-	assert committed_report["evidence"]["contracts"]["capability_contract"]["route_count"] >= 12
-	assert committed_report["evidence"]["contracts"]["capability_contract"]["rule_count"] >= 30
+	assert committed_report["evidence"]["contracts"]["capability_contract"]["route_count"] >= 14
+	assert committed_report["evidence"]["contracts"]["capability_contract"]["rule_count"] >= 39
 	assert committed_report["evidence"]["runtime"]["event_stream"] == "bytewax"
 	assert committed_report["evidence"]["runtime"]["generated_app_runtime"] == "service.AnomService"
+	assert committed_report["evidence"]["agents"]["first_class"] is True
+	assert committed_report["evidence"]["streaming"]["required_processor"] == "bytewax"
 
 
 def test_package_runtime_compatibility_surface_creates_signal():

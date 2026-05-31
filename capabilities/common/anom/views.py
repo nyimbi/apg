@@ -26,6 +26,8 @@ def dashboard_model(
 		"baselines": service.list_baselines(tenant_id),
 		"signals": service.list_signals(tenant_id),
 		"investigations": service.list_investigations(tenant_id),
+		"anomaly_agents": service.list_anomaly_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
@@ -119,9 +121,12 @@ def rule_manager_model(
 	tenant_id: str = "default",
 ) -> dict[str, object]:
 	service = service or AnomService()
+	contract = service.describe(tenant_id)
 	return {
 		"tenant_id": tenant_id,
-		"rules": service.describe(tenant_id)["rule_engine"]["rules"],
+		"rules": contract["rule_engine"]["rules"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"route": "/anom/rules",
 	}
 
@@ -167,11 +172,49 @@ def audit_timeline_model(
 	}
 
 
+def anomaly_agent_roster_model(
+	service: AnomService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or AnomService()
+	contract = service.describe(tenant_id)
+	agents = service.list_anomaly_agents(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"route": "/anom/agents",
+		"agents": agents,
+		"pending_review": [item for item in agents if item["status"] == "pending_review"],
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+	}
+
+
+def lifecycle_batch_model(
+	service: AnomService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or AnomService()
+	contract = service.describe(tenant_id)
+	batches = service.list_lifecycle_batches(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"route": "/anom/lifecycle",
+		"batches": batches,
+		"denied": [item for item in batches if item["status"] == "denied"],
+		"required_processor": contract["streaming"]["required_processor"],
+		"required_operations": contract["streaming"]["required_operations"],
+		"topics": contract["streaming"]["topics"],
+	}
+
+
 def settings_model(tenant_id: str = "default") -> dict[str, object]:
 	contract = get_capability_contract(tenant_id)
 	return {
 		"tenant_id": tenant_id,
 		"configuration": contract["configuration"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 		"route": "/anom/settings",
 	}

@@ -7,8 +7,10 @@ from typing import Any
 from .anomaly_engine import AnomalyDetectionEngine
 from .capability_contract import evaluate_capability_rules, get_capability_contract
 from .models import (
-	AnomalySignal,
+	AnomLifecycleBatchRecord,
+	AnomalyAgentRecord,
 	AnomalyAuditEvent,
+	AnomalySignal,
 	BaselineProfile,
 	DetectionFeedback,
 	Investigation,
@@ -27,8 +29,15 @@ class AnomService:
 		self._signals: dict[tuple[str, str], AnomalySignal] = {}
 		self._investigations: dict[tuple[str, str], Investigation] = {}
 		self._feedback: dict[tuple[str, str], DetectionFeedback] = {}
+		self._agents: dict[tuple[str, str], AnomalyAgentRecord] = {}
+		self._lifecycle_batches: dict[tuple[str, str], AnomLifecycleBatchRecord] = {}
 		self._events: list[AnomalyAuditEvent] = []
 		self._engine = AnomalyDetectionEngine()
+		contract = get_capability_contract()
+		self._agent_runtimes = set(contract["agents"]["supported_runtimes"])
+		self._agent_roles = set(contract["agents"]["supported_roles"])
+		self._privileged_agent_roles = set(contract["agents"]["privileged_roles"])
+		self._lifecycle_operations = set(contract["streaming"]["required_operations"])
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -396,6 +405,126 @@ class AnomService:
 			feedback = [item for item in feedback if item.tenant_id == tenant_id]
 		return [item.to_dict() for item in sorted(feedback, key=lambda item: item.id)]
 
+	def register_anomaly_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> dict[str, Any]:
+		runtime_value = _normalize_token(runtime)
+		role_value = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_anomaly_agent",
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"scope_present": bool(str(scope or "").strip()),
+			"owner_present": bool(str(owner or "").strip()),
+			"purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+		})
+		_raise_if_denied(result)
+		if not name:
+			raise ValueError("anomaly_agent_name_required")
+		status = "pending_review" if result["decision"] == "require_review" else "active"
+		agent = AnomalyAgentRecord(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=name,
+			runtime=runtime_value,
+			role=role_value,
+			scope=str(scope).strip(),
+			owner=str(owner).strip(),
+			purpose=str(purpose).strip(),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+			status=status,
+		)
+		self._agents[self._tenant_key(tenant_id, agent.id)] = agent
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="anomaly_agent_registered",
+			subject_id=agent.id,
+			message=f"Registered anomaly agent {name}.",
+			evidence={
+				"runtime": runtime_value,
+				"role": role_value,
+				"decision": result["decision"],
+				"reasons": list(_reasons(result)),
+			},
+		)
+		return agent.to_dict()
+
+	def validate_anom_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "anomaly_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		mutation_count = int(mutation_count)
+		if mutation_count <= 0:
+			raise ValueError("anom_lifecycle_batch_empty")
+		stream_value = _normalize_token(event_stream)
+		operation_value = _normalize_token(operation)
+		if operation_value not in self._lifecycle_operations:
+			raise ValueError(f"unsupported_anom_lifecycle_operation:{operation_value}")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "validate_anom_lifecycle_batch",
+			"event_stream": stream_value,
+		})
+		accepted = result["decision"] == "allow"
+		batch = AnomLifecycleBatchRecord(
+			id=batch_id or f"anombatch:{len(self._lifecycle_batches) + 1:06d}",
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			operation=operation_value,
+			accepted=accepted,
+			decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			status="accepted" if accepted else "denied",
+		)
+		self._lifecycle_batches[self._tenant_key(tenant_id, batch.id)] = batch
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type=f"anom_lifecycle_batch_{batch.status}",
+			subject_id=batch.id,
+			message=f"Validated ANOM lifecycle batch {batch.id}.",
+			evidence={
+				"event_stream": stream_value,
+				"operation": operation_value,
+				"decision": result["decision"],
+				"reasons": list(_reasons(result)),
+			},
+		)
+		if not accepted:
+			_raise_if_denied(result)
+		return batch.to_dict()
+
+	def list_anomaly_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		agents = list(self._agents.values())
+		if tenant_id is not None:
+			agents = [item for item in agents if item.tenant_id == tenant_id]
+		return [item.to_dict() for item in sorted(agents, key=lambda item: item.id)]
+
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		batches = list(self._lifecycle_batches.values())
+		if tenant_id is not None:
+			batches = [item for item in batches if item.tenant_id == tenant_id]
+		return [item.to_dict() for item in sorted(batches, key=lambda item: item.id)]
+
 	def signal_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		signals = self.list_signals(tenant_id)
 		feedback = self.list_feedback(tenant_id)
@@ -406,6 +535,10 @@ class AnomService:
 			"signal_count": len(signals),
 			"investigation_count": len(self.list_investigations(tenant_id)),
 			"feedback_count": len(feedback),
+			"anomaly_agent_count": len(self.list_anomaly_agents(tenant_id)),
+			"pending_agent_review_count": len([item for item in self.list_anomaly_agents(tenant_id) if item["status"] == "pending_review"]),
+			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
+			"denied_lifecycle_batch_count": len([item for item in self.list_lifecycle_batches(tenant_id) if item["status"] == "denied"]),
 			"false_positive_rate": self._engine.false_positive_rate(feedback),
 			**self._engine.summarize_signals(signals),
 		}
@@ -573,7 +706,20 @@ class AnomService:
 def _raise_if_blocked(result: dict[str, Any]) -> None:
 	if result["decision"] == "allow":
 		return
-	reasons = ", ".join(action.get("reason", "anomaly_policy_blocked") for action in result["actions"])
+	reasons = ", ".join(_reasons(result))
 	if result["decision"] == "require_review":
 		raise PermissionError(reasons or "anomaly_review_required")
 	raise PermissionError(reasons or "anomaly_policy_blocked")
+
+
+def _raise_if_denied(result: dict[str, Any]) -> None:
+	if result["decision"] == "deny":
+		raise PermissionError(", ".join(_reasons(result)) or "anomaly_policy_blocked")
+
+
+def _reasons(result: dict[str, Any]) -> tuple[str, ...]:
+	return tuple(action.get("reason", "anomaly_policy_blocked") for action in result["actions"])
+
+
+def _normalize_token(value: str) -> str:
+	return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")

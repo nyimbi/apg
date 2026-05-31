@@ -20,8 +20,14 @@ evidence through deterministic guardrails.
 - Investigation workflows with owner assignment and closure evidence.
 - Feedback capture with reviewer, label, false-positive-rate checks, and tuning
   review enforcement.
+- First-class AI anomaly-agent composition for `codex`, `claude_code`,
+  `opencode`, and `pi`, with role, scope, owner, purpose, contribution
+  disclosure, and privileged-role review guardrails.
+- Bytewax lifecycle batch validation for source, baseline, detection, signal,
+  investigation, feedback, alert, and anomaly-agent mutations.
 - UI view models for dashboard, sources, baselines, detector, signals,
-  investigations, alerts, rules, feedback, quality, audit, and settings.
+  investigations, alerts, rules, feedback, quality, agents, lifecycle batches,
+  audit, and settings.
 - Adapter configuration for PRED, AICR, MONI, WFLO, NTFY, HLTH, CONF, AUTH,
   AUDL, CACH, and Bytewax event streaming.
 
@@ -69,6 +75,23 @@ signal = service.detect(
 	context={"deployment": "checkout-v2", "region": "ke"},
 	owner="sre-lead",
 )
+agent = service.register_anomaly_agent(
+	"agent-001",
+	"tenant-a",
+	"Anomaly Steward",
+	"codex",
+	"anomaly_steward",
+	"source baseline signal review",
+	"sre-lead",
+	"govern anomaly lifecycle changes",
+)
+batch = service.validate_anom_lifecycle_batch(
+	"tenant-a",
+	"bytewax",
+	1,
+	"anomaly_agent_batch",
+	"batch-001",
+)
 closed = service.close_investigation(
 	f"investigate:{signal['id']}",
 	"rollback checkout-v2",
@@ -89,6 +112,25 @@ approval, non-Bytewax batch detection streams, alert dispatch without
 notification adapter, and state changes without audit evidence. ANOM requires
 review for unknown source kinds, unknown sensitivity values, high-severity
 triage, unknown feedback labels, and high false-positive rates.
+AI anomaly-agent guardrails also block unsupported runtimes, unsupported roles,
+missing scope, missing owner, missing purpose, missing machine-contribution
+disclosure, and route privileged roles through pending human review when
+approval evidence is absent. Lifecycle mutation batches are accepted only
+through the declared Bytewax processor contract.
+
+## AI Agent Composition
+
+ANOM treats anomaly-governance agents as first-class APG citizens. Generated
+applications can compose agents from rapidly changing tool runtimes without
+binding detection or investigation logic to a single provider. The executable
+contract supports `codex`, `claude_code`, `opencode`, and `pi`; roles include
+source review, baseline review, detector review, signal-triage review,
+investigation review, feedback-tuning review, alert-dispatch review,
+baseline-reset review, and anomaly stewardship.
+
+The runtime stores provider-neutral agent metadata only. Live CLI/API
+invocation, credentials, tool routing, and remote agent orchestration belong
+behind the AICR adapter boundary.
 
 ## Focused Verification
 

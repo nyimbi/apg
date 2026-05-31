@@ -26,13 +26,15 @@ def test_contract_exposes_full_lifecycle_configuration_rules_ui_and_theme():
 		"signals",
 		"investigation",
 		"feedback",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
 		"ui",
 		"theme",
 	]
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert len(contract["rule_engine"]["rules"]) >= 39
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
 		"sources",
@@ -44,15 +46,29 @@ def test_contract_exposes_full_lifecycle_configuration_rules_ui_and_theme():
 		"rules",
 		"feedback",
 		"quality",
+		"agents",
+		"lifecycle",
 		"audit",
 		"settings",
 	}
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "service.AnomService"
+	assert contract["agents"]["first_class"] is True
+	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert contract["streaming"]["lifecycle_stream"] == "anom.lifecycle"
 	assert next(route for route in contract["ui"]["routes"] if route["name"] == "audit")["permission"] == "anom:audit"
 	assert contract["ui"]["api_prefix"] == "/anom/api/v1"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
-	assert {"signal_card", "baseline_chart", "alert_queue", "quality_dashboard", "audit_timeline"} <= set(contract["theme"]["components"])
+	assert {
+		"signal_card",
+		"baseline_chart",
+		"alert_queue",
+		"quality_dashboard",
+		"anomaly_agent_roster",
+		"bytewax_lifecycle_panel",
+		"audit_timeline",
+	} <= set(contract["theme"]["components"])
 
 
 def test_rule_engine_enforces_anomaly_guardrails():
@@ -86,6 +102,23 @@ def test_rule_engine_enforces_anomaly_guardrails():
 		"state_change_requested": True,
 		"audit_event_recorded": False,
 	})
+	agent_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_anomaly_agent",
+		"agent_runtime_supported": False,
+		"agent_role_supported": True,
+		"scope_present": True,
+		"owner_present": True,
+		"purpose_present": True,
+		"contribution_disclosed": True,
+		"privileged_role": False,
+		"human_approval_required": False,
+	})
+	lifecycle_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "validate_anom_lifecycle_batch",
+		"event_stream": "kafka",
+	})
 
 	assert detection_result["decision"] == "deny"
 	assert set(detection_result["matched_rules"]) == {
@@ -101,6 +134,10 @@ def test_rule_engine_enforces_anomaly_guardrails():
 	assert batch_result["matched_rules"] == ["batch_detection_requires_bytewax"]
 	assert batch_result["actions"][0]["reason"] == "bytewax_event_stream_required"
 	assert state_change_result["matched_rules"] == ["anomaly_state_change_requires_audit"]
+	assert agent_result["matched_rules"] == ["anomaly_agent_runtime_supported"]
+	assert agent_result["actions"][0]["reason"] == "unsupported_anomaly_agent_runtime"
+	assert lifecycle_result["matched_rules"] == ["bytewax_anom_stream_required"]
+	assert lifecycle_result["actions"][0]["reason"] == "bytewax_lifecycle_stream_required"
 
 
 def test_registration_includes_full_capability_contract():
@@ -110,13 +147,20 @@ def test_registration_includes_full_capability_contract():
 	assert registration["configuration"]["tenant_id"] == "default"
 	assert registration["rule_engine"]["type"] == "deterministic"
 	assert registration["adapters"]["event_stream"] == "bytewax"
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["required_processor"] == "bytewax"
 	assert registration["ui_manifest"]["requires_theme"] is True
 	assert registration["theme"]["name"] == "anom_signal_console"
 	assert registration["ui_components"]["investigations"] == "/anom/investigations"
 	assert registration["ui_components"]["audit"] == "/anom/audit"
+	assert registration["ui_components"]["agents"] == "/anom/agents"
+	assert registration["ui_components"]["lifecycle"] == "/anom/lifecycle"
 	assert "investigation_closure_governance" in registration["capabilities"]
 	assert "feedback_tuning" in registration["capabilities"]
+	assert "anomaly_agent_composition" in registration["capabilities"]
+	assert "lifecycle_batch_governance" in registration["capabilities"]
 	assert "pred" in registration["dependencies"]
+	assert "conf" in registration["dependencies"]
 	assert "anom:audit" in registration["permissions"]
 
 
@@ -161,6 +205,23 @@ def test_service_builds_baselines_detects_signals_and_tracks_investigations():
 		label="true_positive",
 		reviewer="sre-lead",
 	)
+	agent = service.register_anomaly_agent(
+		agent_id="anomaly-agent-1",
+		tenant_id="tenant-signals",
+		name="Anomaly Steward",
+		runtime="codex",
+		role="anomaly_steward",
+		scope="source baseline signal review",
+		owner="sre-lead",
+		purpose="review anomaly lifecycle changes",
+	)
+	batch = service.validate_anom_lifecycle_batch(
+		tenant_id="tenant-signals",
+		event_stream="bytewax",
+		mutation_count=2,
+		operation="anomaly_agent_batch",
+		batch_id="anom-batch-001",
+	)
 	summary = service.signal_summary("tenant-signals")
 	dashboard = views.dashboard_model(service, "tenant-signals")
 	source_registry = views.source_registry_model(service, "tenant-signals")
@@ -168,6 +229,8 @@ def test_service_builds_baselines_detects_signals_and_tracks_investigations():
 	alerts = views.alert_queue_model(service, "tenant-signals")
 	rules = views.rule_manager_model(service, "tenant-signals")
 	quality = views.quality_model(service, "tenant-signals")
+	agent_roster = views.anomaly_agent_roster_model(service, "tenant-signals")
+	lifecycle = views.lifecycle_batch_model(service, "tenant-signals")
 	audit = views.audit_timeline_model(service, "tenant-signals")
 
 	assert baseline["history_points"] == 60
@@ -177,14 +240,25 @@ def test_service_builds_baselines_detects_signals_and_tracks_investigations():
 	assert investigation["closed_by"] == "sre-lead"
 	assert investigation["resolution_evidence"] == ["incident:123", "deployment rollback completed"]
 	assert feedback["label"] == "true_positive"
+	assert agent["runtime"] == "codex"
+	assert agent["status"] == "active"
+	assert batch["required_processor"] == "bytewax"
+	assert batch["status"] == "accepted"
 	assert summary["critical_or_high_count"] == 1
 	assert summary["investigation_count"] == 1
+	assert summary["anomaly_agent_count"] == 1
+	assert summary["lifecycle_batch_count"] == 1
 	assert dashboard["summary"]["signal_count"] == 1
+	assert dashboard["anomaly_agents"][0]["id"] == "anomaly-agent-1"
+	assert dashboard["lifecycle_batches"][0]["id"] == "anom-batch-001"
 	assert source_registry["sources"][0]["id"] == "api_latency"
 	assert detector["required_fields"] == ["source_id", "baseline_id", "metric", "value"]
 	assert alerts["notification_adapter"] == "ntfy"
-	assert len(rules["rules"]) >= 30
+	assert len(rules["rules"]) >= 39
+	assert rules["agents"]["first_class"] is True
 	assert quality["tuning_required"] is False
+	assert agent_roster["agents"][0]["role"] == "anomaly_steward"
+	assert lifecycle["batches"][0]["operation"] == "anomaly_agent_batch"
 	assert audit["audit_events"]
 	assert {event["event_type"] for event in service.list_audit_events("tenant-signals")} >= {
 		"monitoring_source_registered",
@@ -193,6 +267,8 @@ def test_service_builds_baselines_detects_signals_and_tracks_investigations():
 		"investigation_opened",
 		"investigation_closed",
 		"feedback_recorded",
+		"anomaly_agent_registered",
+		"anom_lifecycle_batch_accepted",
 	}
 
 
@@ -371,6 +447,74 @@ def test_service_blocks_invalid_detection_and_tuning_flows():
 		)
 
 
+def test_service_enforces_anomaly_agent_and_lifecycle_guardrails():
+	service = AnomService()
+	tenant_id = "tenant-agent"
+
+	with pytest.raises(PermissionError, match="unsupported_anomaly_agent_runtime"):
+		service.register_anomaly_agent(
+			"agent-bad-runtime",
+			tenant_id,
+			"Bad Runtime",
+			"unknown",
+			"anomaly_steward",
+			"signal review",
+			"owner",
+			"purpose",
+		)
+
+	with pytest.raises(PermissionError, match="anomaly_agent_scope_required"):
+		service.register_anomaly_agent(
+			"agent-no-scope",
+			tenant_id,
+			"No Scope",
+			"codex",
+			"anomaly_steward",
+			"",
+			"owner",
+			"purpose",
+		)
+
+	with pytest.raises(PermissionError, match="anomaly_agent_contribution_disclosure_required"):
+		service.register_anomaly_agent(
+			"agent-no-disclosure",
+			tenant_id,
+			"No Disclosure",
+			"codex",
+			"anomaly_steward",
+			"signal review",
+			"owner",
+			"purpose",
+			contribution_disclosed=False,
+		)
+
+	agent = service.register_anomaly_agent(
+		"agent-review",
+		tenant_id,
+		"Review Agent",
+		"claude-code",
+		"signal triage reviewer",
+		"critical signal triage",
+		"owner",
+		"purpose",
+	)
+
+	assert agent["runtime"] == "claude_code"
+	assert agent["role"] == "signal_triage_reviewer"
+	assert agent["status"] == "pending_review"
+	assert service.signal_summary(tenant_id)["pending_agent_review_count"] == 1
+
+	with pytest.raises(ValueError, match="anom_lifecycle_batch_empty"):
+		service.validate_anom_lifecycle_batch(tenant_id, "bytewax", 0)
+	with pytest.raises(ValueError, match="unsupported_anom_lifecycle_operation"):
+		service.validate_anom_lifecycle_batch(tenant_id, "bytewax", 1, "unknown_batch")
+	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
+		service.validate_anom_lifecycle_batch(tenant_id, "kafka", 1)
+
+	assert service.list_lifecycle_batches(tenant_id)[0]["status"] == "denied"
+	assert service.signal_summary(tenant_id)["denied_lifecycle_batch_count"] == 1
+
+
 def test_service_keeps_duplicate_ids_isolated_by_tenant():
 	service = AnomService()
 	for tenant_id, owner in [("tenant-a", "owner-a"), ("tenant-b", "owner-b")]:
@@ -467,6 +611,31 @@ def test_api_helpers_expose_closure_and_audit_lifecycle():
 		"closed_by": "api-owner",
 		"resolution_evidence": ["runbook:latency"],
 	})
+	agent = api.register_anomaly_agent({
+		"id": "api-agent",
+		"tenant_id": source["tenant_id"],
+		"name": "API Anomaly Agent",
+		"runtime": "opencode",
+		"role": "anomaly_steward",
+		"scope": "api anomaly review",
+		"owner": "api-owner",
+		"purpose": "govern API anomaly changes",
+	})
+	batch = api.validate_anom_lifecycle_batch({
+		"id": "api-batch",
+		"tenant_id": source["tenant_id"],
+		"event_stream": "bytewax",
+		"mutation_count": 1,
+		"operation": "anomaly_agent_batch",
+	})
 
 	assert closed["status"] == "closed"
-	assert api.list_audit_events(source["tenant_id"])[-1]["event_type"] == "investigation_closed"
+	assert agent["runtime"] == "opencode"
+	assert batch["status"] == "accepted"
+	assert api.list_anomaly_agents(source["tenant_id"])[0]["id"] == "api-agent"
+	assert api.list_lifecycle_batches(source["tenant_id"])[0]["id"] == "api-batch"
+	assert {event["event_type"] for event in api.list_audit_events(source["tenant_id"])} >= {
+		"investigation_closed",
+		"anomaly_agent_registered",
+		"anom_lifecycle_batch_accepted",
+	}

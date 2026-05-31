@@ -6,6 +6,27 @@ from copy import deepcopy
 from typing import Any
 
 
+SUPPORTED_ANOM_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_ANOM_AGENT_ROLES = [
+	"source_reviewer",
+	"baseline_reviewer",
+	"detector_reviewer",
+	"signal_triage_reviewer",
+	"investigation_reviewer",
+	"feedback_tuning_reviewer",
+	"alert_dispatch_reviewer",
+	"baseline_reset_reviewer",
+	"anomaly_steward",
+]
+PRIVILEGED_ANOM_AGENT_ROLES = [
+	"signal_triage_reviewer",
+	"investigation_reviewer",
+	"feedback_tuning_reviewer",
+	"alert_dispatch_reviewer",
+	"baseline_reset_reviewer",
+]
+
+
 DEFAULT_CONFIGURATION: dict[str, Any] = {
 	"tenant_id": "default",
 	"sources": {
@@ -44,6 +65,45 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"reviewer_required": True,
 		"allowed_labels": ["true_positive", "false_positive", "expected_change"],
 		"false_positive_review_threshold": 0.2,
+	},
+	"agents": {
+		"first_class": True,
+		"supported_runtimes": SUPPORTED_ANOM_AGENT_RUNTIMES,
+		"supported_roles": SUPPORTED_ANOM_AGENT_ROLES,
+		"privileged_roles": PRIVILEGED_ANOM_AGENT_ROLES,
+		"require_owner": True,
+		"require_purpose": True,
+		"require_scope": True,
+		"require_contribution_disclosure": True,
+		"require_human_approval_for_privileged_roles": True,
+		"adapter_contract": "aicr_provider_neutral_anomaly_agent_adapter",
+	},
+	"streaming": {
+		"engine": "bytewax",
+		"lifecycle_stream": "anom.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"source_batch",
+			"baseline_batch",
+			"detection_batch",
+			"signal_batch",
+			"investigation_batch",
+			"feedback_batch",
+			"alert_batch",
+			"anomaly_agent_batch",
+		],
+		"topics": [
+			"anom.sources",
+			"anom.baselines",
+			"anom.detections",
+			"anom.signals",
+			"anom.investigations",
+			"anom.feedback",
+			"anom.alerts",
+			"anom.agents",
+		],
+		"broker_core_dependency_allowed": False,
 	},
 	"governance": {
 		"require_tenant_context": True,
@@ -87,6 +147,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"enable_rules": True,
 		"enable_feedback_review": True,
 		"enable_quality": True,
+		"enable_anomaly_agent_roster": True,
+		"enable_lifecycle_batch_monitor": True,
 		"enable_audit": True,
 		"enable_settings": True,
 	},
@@ -104,6 +166,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"signals",
 		"investigation",
 		"feedback",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
@@ -117,6 +181,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"signals",
 		"investigation",
 		"feedback",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
@@ -158,6 +224,14 @@ RULES: list[dict[str, Any]] = [
 	{"name": "batch_detection_requires_bytewax", "description": "Batch anomaly detection streams must use Bytewax.", "condition": {"operation": "configure_batch_detection", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}},
 	{"name": "alert_dispatch_requires_notification_adapter", "description": "Alert dispatch requires a notification adapter.", "condition": {"operation": "dispatch_alert", "notification_adapter_present": False}, "effect": {"decision": "deny", "reason": "notification_adapter_required", "required_action": "configure_notification_adapter"}},
 	{"name": "anomaly_state_change_requires_audit", "description": "Anomaly state changes require audit events.", "condition": {"state_change_requested": True, "audit_event_recorded": False}, "effect": {"decision": "deny", "reason": "audit_event_required", "required_action": "record_audit_event"}},
+	{"name": "anomaly_agent_runtime_supported", "description": "Anomaly agents must use supported runtimes.", "condition": {"operation": "register_anomaly_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_anomaly_agent_runtime", "required_action": "choose_supported_anomaly_agent_runtime"}},
+	{"name": "anomaly_agent_role_supported", "description": "Anomaly agents must use supported detection-governance roles.", "condition": {"operation": "register_anomaly_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_anomaly_agent_role", "required_action": "choose_supported_anomaly_agent_role"}},
+	{"name": "anomaly_agent_requires_scope", "description": "Anomaly agents require an explicit bounded scope.", "condition": {"operation": "register_anomaly_agent", "scope_present": False}, "effect": {"decision": "deny", "reason": "anomaly_agent_scope_required", "required_action": "declare_anomaly_agent_scope"}},
+	{"name": "anomaly_agent_requires_owner", "description": "Anomaly agents require an accountable owner.", "condition": {"operation": "register_anomaly_agent", "owner_present": False}, "effect": {"decision": "deny", "reason": "anomaly_agent_owner_required", "required_action": "assign_anomaly_agent_owner"}},
+	{"name": "anomaly_agent_requires_purpose", "description": "Anomaly agents require a documented purpose.", "condition": {"operation": "register_anomaly_agent", "purpose_present": False}, "effect": {"decision": "deny", "reason": "anomaly_agent_purpose_required", "required_action": "document_anomaly_agent_purpose"}},
+	{"name": "anomaly_agent_requires_contribution_disclosure", "description": "Anomaly agents must disclose machine-authored detection-governance contributions.", "condition": {"operation": "register_anomaly_agent", "contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "anomaly_agent_contribution_disclosure_required", "required_action": "disclose_machine_contribution"}},
+	{"name": "anomaly_agent_privileged_role_requires_human_approval", "description": "Privileged anomaly-agent roles require human approval evidence.", "condition": {"operation": "register_anomaly_agent", "privileged_role": True, "human_approval_required": False}, "effect": {"decision": "require_review", "reason": "anomaly_agent_human_approval_required", "required_action": "record_human_anomaly_agent_approval"}},
+	{"name": "bytewax_anom_stream_required", "description": "ANOM lifecycle batches must be routed through Bytewax.", "condition": {"operation": "validate_anom_lifecycle_batch", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_anom_lifecycle_batch_to_bytewax"}},
 ]
 
 
@@ -172,6 +246,8 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "rules", "path": "/anom/rules", "component": "AnomalyRuleManager", "permission": "anom:manage_rules", "nav_group": "Governance"},
 	{"name": "feedback", "path": "/anom/feedback", "component": "FeedbackReview", "permission": "anom:tune", "nav_group": "Quality"},
 	{"name": "quality", "path": "/anom/quality", "component": "DetectionQuality", "permission": "anom:tune", "nav_group": "Quality"},
+	{"name": "agents", "path": "/anom/agents", "component": "AnomalyAgentRoster", "permission": "anom:investigate", "nav_group": "Governance"},
+	{"name": "lifecycle", "path": "/anom/lifecycle", "component": "ANOMLifecycleBatchMonitor", "permission": "anom:admin", "nav_group": "Operations"},
 	{"name": "audit", "path": "/anom/audit", "component": "AnomalyAuditTimeline", "permission": "anom:audit", "nav_group": "Governance"},
 	{"name": "settings", "path": "/anom/settings", "component": "ANOMSettings", "permission": "anom:admin", "nav_group": "Administration"},
 ]
@@ -201,9 +277,63 @@ THEME: dict[str, Any] = {
 		"alert_queue": {"visual": "queue-table", "status_style": "notification-chip"},
 		"feedback_panel": {"visual": "review-stack", "threshold_style": "false-positive-meter"},
 		"quality_dashboard": {"visual": "quality-grid", "status_style": "tuning-chip"},
+		"anomaly_agent_roster": {"icon": "bot", "status_indicator": "agent-approval-chip", "risk_style": "signal-scope-band"},
+		"bytewax_lifecycle_panel": {"icon": "git-branch", "status_indicator": "stream-chip", "risk_style": "processor-band"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "evidence-chip"},
 	},
 }
+
+
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class ANOM agent composition manifest."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_ANOM_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_ANOM_AGENT_ROLES),
+		"privileged_roles": list(PRIVILEGED_ANOM_AGENT_ROLES),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles",
+		],
+		"adapter_contract": "aicr_provider_neutral_anomaly_agent_adapter",
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return the ANOM Bytewax lifecycle stream contract."""
+	return {
+		"engine": "bytewax",
+		"lifecycle_stream": "anom.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"source_batch",
+			"baseline_batch",
+			"detection_batch",
+			"signal_batch",
+			"investigation_batch",
+			"feedback_batch",
+			"alert_batch",
+			"anomaly_agent_batch",
+		],
+		"topics": [
+			"anom.sources",
+			"anom.baselines",
+			"anom.detections",
+			"anom.signals",
+			"anom.investigations",
+			"anom.feedback",
+			"anom.alerts",
+			"anom.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	}
 
 
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -215,6 +345,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "anom",
 		"display_name": "Anomaly Detection",
+		"provides": ["anomaly_detection", "signal_intelligence", "anomaly_agent_composition"],
+		"requires": ["pred", "aicr", "moni", "conf"],
 		"configuration": config,
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},
@@ -226,6 +358,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"template_roots": ["templates/", "static/"],
 			"requires_theme": True,
 		},
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
 		"theme": deepcopy(THEME),
 	}
 
