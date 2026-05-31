@@ -20,6 +20,9 @@ capability directory.
   changes.
 - Platform operators who connect persistence, matching, quality, lineage, audit,
   cache, and Bytewax stream adapters.
+- AI/data-agent operators who register Codex, Claude Code, opencode, Pi, or
+  other APG-compatible agents as governed contributors to stewardship and
+  publishing workflows.
 
 ## Runtime Surfaces
 
@@ -35,6 +38,19 @@ events. It is the composition baseline for APG package publication.
 persistence, database sessions, AI matching engines, quality services, audit
 logging, and integration adapters. It must follow decisions made by the
 capability contract.
+
+### First-Class Data Agents
+
+AI/data agents are first-class MDM citizens. They can participate in review,
+quality, duplicate matching, golden-record, survivorship, lineage, and publish
+gate workflows when they are explicitly registered with runtime, role, scope,
+owner, purpose, and contribution disclosure metadata. Privileged agent roles
+must be approved for human-supervised operation before they can affect
+publication-sensitive lifecycle steps.
+
+The contract starts with supported runtimes `codex`, `claude_code`,
+`opencode`, and `pi`. New runtimes must be added through the contract rather
+than hidden inside service code.
 
 ## Functional Requirements
 
@@ -91,11 +107,33 @@ capability contract.
 - Entity retirement must require lineage evidence.
 - Retirement decisions must be audited.
 
+### Data-Agent Composition
+
+- Register agent contributors per tenant.
+- Require supported runtime, supported role, declared scope, owner, purpose,
+  and machine-contribution disclosure.
+- Require human approval for privileged roles that can influence duplicate
+  matching, golden-record, survivorship, and publish-gate outcomes.
+- Persist data-agent records in the generated-app control plane for UI display
+  and audit evidence.
+- Surface agent registration failures as matched guardrails, not generic
+  runtime errors.
+
+### Bytewax Lifecycle Batches
+
+- Validate MDM lifecycle batch processing through Bytewax.
+- Require lifecycle processors to declare the `bytewax` event stream.
+- Track batch status, mutation count, and matched guardrails for UI/runtime
+  evidence.
+- Keep broker transports out of the core lifecycle contract; event brokers may
+  exist behind adapters, but Bytewax is the required lifecycle processing
+  engine for this packet.
+
 ### UI and Theming
 
 - Expose generated-application routes for dashboard, entities, golden records,
   quality, duplicates, stewardship, lineage, cross references, publish,
-  analytics, audit, adapters, and settings.
+  analytics, audit, adapters, data agents, lifecycle batches, and settings.
 - Expose theme tokens and component metadata through the capability contract.
 - Provide view models that turn service state into composable UI state without
   requiring a web framework.
@@ -127,6 +165,14 @@ The deterministic rule engine must include at least these decisions:
 - `cross_reference_requires_source_evidence`
 - `retire_requires_lineage_evidence`
 - `review_decisions_require_notes`
+- `data_agent_runtime_supported`
+- `data_agent_role_supported`
+- `data_agent_requires_scope`
+- `data_agent_requires_owner`
+- `data_agent_requires_purpose`
+- `data_agent_requires_contribution_disclosure`
+- `data_agent_privileged_role_requires_human_approval`
+- `bytewax_mdm_stream_required`
 
 ## Adapter Requirements
 
@@ -136,7 +182,7 @@ Adapters can provide richer implementation behind the control plane:
 - AI or rules-based quality scoring.
 - AI or deterministic duplicate matching.
 - Metadata catalog synchronization.
-- Bytewax event streams for mastered entity changes.
+- Bytewax lifecycle streams for mastered entity changes.
 - Cache invalidation and lookup acceleration.
 - Graph lineage persistence.
 - External audit and security integration.
@@ -147,8 +193,11 @@ merge, retire, or mutate restricted data by bypassing `capability_contract.py`.
 ## Non-Goals For This Packet
 
 - Rendering a production browser UI.
+- Embedding Codex, Claude Code, opencode, Pi, or any other agent runtime
+  client directly in MDM.
 - Training matching or quality ML models.
-- Running external databases, queues, caches, or metadata catalogs.
+- Running external databases, event brokers, caches, or metadata catalogs.
+- Treating any broker as the core lifecycle processor.
 - Replacing the existing database-backed `MDMService`.
 - Running the full repository test suite during battery-constrained capability
   delivery.
@@ -159,6 +208,8 @@ merge, retire, or mutate restricted data by bypassing `capability_contract.py`.
 - `capability_contract.py` exposes configuration, schema, rules, UI routes, and
   theme data.
 - `service.py` exposes `MdmService` lifecycle behavior and audit records.
+- `service.py` registers data agents and validates Bytewax lifecycle batches
+  using deterministic guardrails.
 - `view_models.py` exposes generated-application view models.
 - `app.py` builds semantic model data from the live contract.
 - Focused package tests prove guardrails, lifecycle, view models, registration,

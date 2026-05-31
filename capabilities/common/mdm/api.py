@@ -29,9 +29,11 @@ from .service import (
     MDMOperationType,
     MDMOperationContext,
     MdmCrossReferenceRecord,
+    MdmDataAgentRecord,
     MdmDuplicateCandidateRecord,
     MdmEntityRecord,
     MdmGoldenRecord,
+    MdmLifecycleBatchRecord,
     MdmMergeRequestRecord,
     MdmPublishRecord,
     MdmQualityRecord,
@@ -90,6 +92,14 @@ def publish_entity_record(**kwargs: Any) -> MdmPublishRecord:
     return SERVICE.publish_entity(**kwargs)
 
 
+def register_data_agent(**kwargs: Any) -> MdmDataAgentRecord:
+    return SERVICE.register_data_agent(**kwargs)
+
+
+def validate_mdm_lifecycle_batch(**kwargs: Any) -> MdmLifecycleBatchRecord:
+    return SERVICE.validate_mdm_lifecycle_batch(**kwargs)
+
+
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:
     return SERVICE.create_record(
         record_id=str(payload["id"]),
@@ -113,6 +123,8 @@ def list_mdm(tenant_id: str | None = None) -> dict[str, Any]:
         "merge_requests": SERVICE.list_records(tenant_id, "merge_requests"),
         "cross_references": SERVICE.list_records(tenant_id, "cross_references"),
         "publish_records": SERVICE.list_records(tenant_id, "publish_records"),
+        "data_agents": SERVICE.list_records(tenant_id, "data_agents"),
+        "lifecycle_batches": SERVICE.list_records(tenant_id, "lifecycle_batches"),
         "audit_events": SERVICE.list_records(tenant_id, "audit_events"),
     }
 

@@ -29,7 +29,11 @@ def test_package_contract_shape_is_valid():
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "mdm"
 	assert contract["display_name"] == "Master Data Management"
-	assert len(contract["rule_engine"]["rules"]) >= 15
+	assert contract["provides"] == ["master_data_governance", "golden_record_lifecycle", "data_agent_composition"]
+	assert contract["requires"] == ["auth", "audl", "conf", "mten"]
+	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert len(contract["rule_engine"]["rules"]) >= 23
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"entities",
 		"golden_records",
@@ -41,6 +45,8 @@ def test_package_contract_shape_is_valid():
 		"publish",
 		"audit",
 		"adapters",
+		"agents",
+		"lifecycle",
 	}
 	assert contract["theme"]["tokens"]["border.radius"]
 
@@ -60,4 +66,7 @@ def test_package_app_entrypoint_is_publishable():
 	assert model["capabilities"]["mdm"]["runtime"]["views"] == "view_models.py"
 	assert model["capabilities"]["mdm"]["approvals"]["duplicate_review"] == "MdmDuplicateCandidateRecord"
 	assert model["capabilities"]["mdm"]["approvals"]["golden_record_merge"] == "MdmMergeRequestRecord"
+	assert model["capabilities"]["mdm"]["approvals"]["data_agent"] == "MdmDataAgentRecord"
+	assert model["capabilities"]["mdm"]["streaming"]["required_processor"] == "bytewax"
+	assert "codex" in model["capabilities"]["mdm"]["agents"]["data_agent_contract"]["supported_runtimes"]
 	assert model["capabilities"]["mdm"]["adapters"]["event_stream"] == "bytewax"

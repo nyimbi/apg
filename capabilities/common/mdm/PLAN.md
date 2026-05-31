@@ -3,15 +3,17 @@
 ## Objective
 
 Build one coherent lifecycle and guardrail packet for `common/mdm` so APG can
-compose executable applications with master-data governance before production
-adapters are attached.
+compose executable applications with master-data governance, first-class
+AI/data-agent participation, and Bytewax lifecycle processing before
+production adapters are attached.
 
 ## Sequence
 
 ### 1. Specification
 
 - Define the entity, quality, duplicate, golden-record, cross-reference,
-  publish, audit, UI, theme, and adapter boundaries.
+  publish, data-agent, Bytewax lifecycle, audit, UI, theme, and adapter
+  boundaries.
 - Separate dependency-light generated-app behavior from database-backed runtime
   behavior.
 - Record non-goals so the packet is useful without overclaiming infrastructure
@@ -20,13 +22,17 @@ adapters are attached.
 ### 2. Contract
 
 - Expand tenant configuration for entity types, quality thresholds, matching,
-  survivorship, governance, integration, adapters, UI, and theme.
+  survivorship, governance, data agents, Bytewax lifecycle streams,
+  integration, adapters, UI, and theme.
 - Add deterministic guardrails for tenant context, supported entity types,
   business keys, restricted data, quality, duplicate review, survivorship,
-  conflict review, cross references, retirement, and review notes.
+  conflict review, cross references, retirement, review notes, supported data
+  agent runtimes, supported data-agent roles, agent scope, owner, purpose,
+  machine contribution disclosure, privileged-role human approval, and Bytewax
+  lifecycle batches.
 - Add UI routes for dashboard, entities, golden records, quality, duplicates,
   stewardship, lineage, cross references, publish, analytics, audit, adapters,
-  and settings.
+  data agents, lifecycle batches, and settings.
 
 ### 3. Control Plane
 
@@ -34,7 +40,7 @@ adapters are attached.
 - Add `MdmService` for generated applications and focused package tests.
 - Implement in-memory lifecycle records for entities, quality assessments,
   duplicate candidates, golden records, merge requests, cross references,
-  publish decisions, and audit events.
+  publish decisions, data agents, lifecycle batches, and audit events.
 - Ensure all lifecycle methods evaluate rules and preserve matched-rule
   evidence.
 
@@ -68,7 +74,10 @@ adapters are attached.
 ## Follow-On Work
 
 - Connect `MdmService` decisions to durable persistence in `MDMService`.
-- Add production Bytewax flow definitions for mastered entity events.
+- Add production Bytewax flow definitions for mastered entity and data-agent
+  lifecycle events.
+- Add real runtime adapter shims for Codex, Claude Code, opencode, Pi, and
+  later AI-agent providers without making any one runtime mandatory.
 - Add live adapter tests for matching, quality, metadata catalog, lineage graph,
   cache, audit, and security integration.
 - Add rendered UI shells after APG generated-application targets stabilize.

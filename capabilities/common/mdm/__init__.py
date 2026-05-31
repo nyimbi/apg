@@ -44,10 +44,12 @@ from .service import (
     AuditService,
     MDMOperationType,
     MDMOperationContext,
+    MdmDataAgentRecord,
     MdmEntityRecord,
     MdmQualityRecord,
     MdmDuplicateCandidateRecord,
     MdmGoldenRecord,
+    MdmLifecycleBatchRecord,
     MdmMergeRequestRecord,
     MdmCrossReferenceRecord,
     MdmPublishRecord,
@@ -203,6 +205,8 @@ __all__ = [
     "MdmMergeRequestRecord",
     "MdmCrossReferenceRecord",
     "MdmPublishRecord",
+    "MdmDataAgentRecord",
+    "MdmLifecycleBatchRecord",
     "MdmAuditEventRecord",
     
     # Models
@@ -281,6 +285,7 @@ def register_capability() -> dict:
         "version": __version__,
         "dependencies": ["auth", "audl", "conf", "mten"],
         "optional_dependencies": ["meta", "mqeb", "moni", "cach", "aicr"],
+        "api_prefix": contract["ui"]["api_prefix"],
         "configuration": contract["configuration"],
         "configuration_schema": contract["configuration_schema"],
         "rule_engine": contract["rule_engine"],
@@ -291,7 +296,9 @@ def register_capability() -> dict:
             "duplicate_review": "Detect and review duplicate entity candidates",
             "stewardship": "Route governance work to data stewards and owners",
             "capability_rules": "Evaluate deterministic master-data governance rules",
-            "visual_theming": "Apply golden-record console theme tokens and components"
+            "visual_theming": "Apply golden-record console theme tokens and components",
+            "data_agent_composition": "Register first-class data agents across Codex, Claude Code, opencode, Pi, and future runtime adapters",
+            "lifecycle_batch_validation": "Validate master-data lifecycle mutation batches against Bytewax-first stream rules"
         },
         "endpoints": {
             "entities": "/mdm/api/v1/entities",
@@ -299,13 +306,17 @@ def register_capability() -> dict:
             "quality": "/mdm/api/v1/quality",
             "duplicates": "/mdm/api/v1/duplicates",
             "stewardship": "/mdm/api/v1/stewardship",
-            "analytics": "/mdm/api/v1/analytics"
+            "analytics": "/mdm/api/v1/analytics",
+            "agents": "/mdm/api/v1/agents",
+            "lifecycle": "/mdm/api/v1/lifecycle"
         },
         "ui_components": {
             route["name"]: route["path"]
             for route in contract["ui"]["routes"]
         },
         "ui_manifest": contract["ui"],
+        "agents": contract["agents"],
+        "streaming": contract["streaming"],
         "theme": contract["theme"],
         "permissions": [
             "mdm:view",
@@ -315,6 +326,8 @@ def register_capability() -> dict:
             "mdm:review_duplicates",
             "mdm:steward",
             "mdm:view_analytics",
+            "mdm:publish",
+            "mdm:view_audit",
             "mdm:admin"
         ]
     }
@@ -337,6 +350,8 @@ def get_capability_info() -> dict:
             "AI-powered quality assessment",
             "Semantic duplicate detection",
             "Golden record management",
+            "First-class data-agent composition",
+            "Bytewax-first master-data lifecycle batch validation",
             "Multi-tenant security",
             "Comprehensive audit trails"
         ]

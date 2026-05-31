@@ -26,6 +26,7 @@ def dashboard_model(service: MdmService, tenant_id: str = "default") -> dict[str
 			{"id": "assess_quality", "label": "Assess quality", "permission": "mdm:view_quality"},
 			{"id": "review_duplicate", "label": "Review duplicate", "permission": "mdm:review_duplicates"},
 			{"id": "publish_entity", "label": "Publish entity", "permission": "mdm:publish"},
+			{"id": "register_agent", "label": "Register agent", "permission": "mdm:admin"},
 		],
 	}
 
@@ -112,7 +113,7 @@ def analytics_model(service: MdmService, tenant_id: str = "default") -> dict[str
 		"tenant_id": tenant_id,
 		"summary": summary,
 		"quality_dimensions": get_capability_contract(tenant_id)["configuration"]["quality"]["dimensions"],
-		"sections": ["entities", "quality_assessments", "duplicate_candidates", "golden_records", "publish_records"],
+		"sections": ["entities", "quality_assessments", "duplicate_candidates", "golden_records", "publish_records", "data_agents", "lifecycle_batches"],
 	}
 
 
@@ -137,12 +138,39 @@ def adapter_health_model(tenant_id: str = "default") -> dict[str, Any]:
 	}
 
 
+def data_agent_roster_model(service: MdmService, tenant_id: str = "default") -> dict[str, Any]:
+	"""Return first-class MDM data-agent roster state."""
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"rows": service.list_records(tenant_id, "data_agents"),
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+		"guardrails": contract["agents"]["guardrails"],
+		"columns": ["name", "runtime", "role", "owner", "purpose", "status", "human_approval_required"],
+	}
+
+
+def lifecycle_batch_model(service: MdmService, tenant_id: str = "default") -> dict[str, Any]:
+	"""Return Bytewax lifecycle-batch monitor state."""
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"streaming": contract["streaming"],
+		"rows": service.list_records(tenant_id, "lifecycle_batches"),
+		"columns": ["event_stream", "mutation_count", "accepted", "decision", "required_processor", "status"],
+	}
+
+
 def settings_model(tenant_id: str = "default") -> dict[str, Any]:
 	contract = get_capability_contract(tenant_id)
 	return {
 		"tenant_id": tenant_id,
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 		"routes": contract["ui"]["routes"],
 	}

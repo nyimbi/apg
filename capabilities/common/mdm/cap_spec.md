@@ -17,6 +17,11 @@ The current packet focuses on executable composition: contract data, lifecycle
 service methods, guardrails, UI route metadata, theme tokens, view models,
 semantic model generation, package tests, and adapter boundaries.
 
+It also makes AI/data agents first-class MDM participants. Agents can be
+registered per tenant with supported runtime, role, scope, owner, purpose,
+machine-contribution disclosure, and human-approval metadata. Bytewax is the
+required lifecycle processing engine for this packet.
+
 ## Lifecycle
 
 1. Register entity.
@@ -28,7 +33,10 @@ semantic model generation, package tests, and adapter boundaries.
 7. Map source-system cross references.
 8. Publish mastered records after readiness checks.
 9. Retire records with lineage evidence.
-10. Audit every lifecycle decision.
+10. Register governed data agents for quality, duplicate, golden-record,
+    survivorship, lineage, and publish-gate workflows.
+11. Validate lifecycle batches through Bytewax.
+12. Audit every lifecycle decision.
 
 ## Guardrails
 
@@ -47,6 +55,10 @@ The capability denies or routes decisions when:
 - Cross-reference changes lack source-system evidence.
 - Retirement lacks lineage evidence.
 - Review decisions lack notes.
+- Data-agent runtime or role is unsupported.
+- Data-agent scope, owner, purpose, or contribution disclosure is missing.
+- Privileged data-agent roles are registered without human approval.
+- Lifecycle batches are submitted through anything other than Bytewax.
 
 ## UI And Theme
 
@@ -64,6 +76,8 @@ Generated applications can compose these surfaces:
 - Analytics
 - Audit timeline
 - Adapter health
+- Data-agent roster
+- Bytewax lifecycle monitor
 - Settings
 
 The theme contract exposes compact golden-record console tokens and component
@@ -81,8 +95,12 @@ contract:
 - matching and quality engines
 - metadata catalog synchronization
 - graph lineage persistence
-- Bytewax event streams
+- Bytewax lifecycle streams
 - cache and audit services
 
 Adapters must preserve the guardrail decisions produced by
 `capability_contract.py`.
+
+Agent runtime adapters may integrate Codex, Claude Code, opencode, Pi, or later
+providers. They must remain adapter-level integrations and must not replace the
+MDM contract as the authority for allowed actions.

@@ -13,6 +13,24 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+SUPPORTED_MDM_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_MDM_AGENT_ROLES = [
+	"data_steward_reviewer",
+	"quality_reviewer",
+	"duplicate_match_reviewer",
+	"golden_record_reviewer",
+	"survivorship_reviewer",
+	"lineage_reviewer",
+	"publish_gate_reviewer",
+]
+PRIVILEGED_MDM_AGENT_ROLES = [
+	"duplicate_match_reviewer",
+	"golden_record_reviewer",
+	"survivorship_reviewer",
+	"publish_gate_reviewer",
+]
+
+
 @dataclass(frozen=True)
 class CapabilityConfiguration:
 	"""Tenant-scoped MDM configuration defaults and schema."""
@@ -91,6 +109,38 @@ class CapabilityConfiguration:
 			"event_stream": "bytewax",
 			"metadata_catalog": "adapter"
 		},
+		"agents": {
+			"first_class": True,
+			"supported_runtimes": SUPPORTED_MDM_AGENT_RUNTIMES,
+			"supported_roles": SUPPORTED_MDM_AGENT_ROLES,
+			"privileged_roles": PRIVILEGED_MDM_AGENT_ROLES,
+			"require_owner": True,
+			"require_purpose": True,
+			"require_scope": True,
+			"require_contribution_disclosure": True,
+			"require_human_approval_for_privileged_roles": True
+		},
+		"streaming": {
+			"engine": "bytewax",
+			"lifecycle_stream": "mdm.lifecycle",
+			"watermark": "event_time",
+			"required_operations": [
+				"entity_batch",
+				"quality_batch",
+				"duplicate_batch",
+				"golden_record_batch",
+				"publish_batch",
+				"data_agent_batch"
+			],
+			"topics": [
+				"mdm.entities",
+				"mdm.quality",
+				"mdm.duplicates",
+				"mdm.golden_records",
+				"mdm.publish",
+				"mdm.agents"
+			]
+		},
 		"ui": {
 			"enable_dashboard": True,
 			"enable_entity_workbench": True,
@@ -101,7 +151,9 @@ class CapabilityConfiguration:
 			"enable_cross_reference_console": True,
 			"enable_publish_console": True,
 			"enable_audit_timeline": True,
-			"enable_adapter_health": True
+			"enable_adapter_health": True,
+			"enable_data_agent_roster": True,
+			"enable_lifecycle_batch_monitor": True
 		},
 		"theme": {
 			"default_theme": "mdm_golden_record_console",
@@ -119,6 +171,8 @@ class CapabilityConfiguration:
 			"governance",
 			"integration",
 			"adapters",
+			"agents",
+			"streaming",
 			"ui",
 			"theme"
 		],
@@ -131,6 +185,8 @@ class CapabilityConfiguration:
 			"governance": {"type": "object"},
 			"integration": {"type": "object"},
 			"adapters": {"type": "object"},
+			"agents": {"type": "object"},
+			"streaming": {"type": "object"},
 			"ui": {"type": "object"},
 			"theme": {"type": "object"}
 		}
@@ -252,6 +308,16 @@ class CapabilityTheme:
 		"adapter_status_panel": {
 			"visual": "backend-grid",
 			"status_indicator": "adapter-state"
+		},
+		"data_agent_roster": {
+			"icon": "bot",
+			"status_indicator": "approval-state",
+			"variant": "agent-governance"
+		},
+		"bytewax_lifecycle_panel": {
+			"icon": "activity",
+			"status_indicator": "processor-state",
+			"variant": "stream-lifecycle"
 		}
 	})
 
@@ -428,6 +494,86 @@ def default_rules() -> list[CapabilityRule]:
 				"reason": "review_notes_required",
 				"required_action": "attach_review_notes"
 			}
+		),
+		CapabilityRule(
+			name="data_agent_runtime_supported",
+			description="Data governance agents must use a supported runtime adapter.",
+			condition={"operation": "register_data_agent", "agent_runtime_supported": False},
+			effect={
+				"decision": "deny",
+				"reason": "unsupported_data_agent_runtime",
+				"required_action": "select_supported_agent_runtime"
+			}
+		),
+		CapabilityRule(
+			name="data_agent_role_supported",
+			description="Data governance agents must use a supported stewardship role.",
+			condition={"operation": "register_data_agent", "agent_role_supported": False},
+			effect={
+				"decision": "deny",
+				"reason": "unsupported_data_agent_role",
+				"required_action": "select_supported_agent_role"
+			}
+		),
+		CapabilityRule(
+			name="data_agent_requires_scope",
+			description="Data governance agents require an explicit operating scope.",
+			condition={"operation": "register_data_agent", "agent_scope_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "data_agent_scope_required",
+				"required_action": "attach_agent_scope"
+			}
+		),
+		CapabilityRule(
+			name="data_agent_requires_owner",
+			description="Data governance agents require an accountable owner.",
+			condition={"operation": "register_data_agent", "agent_owner_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "data_agent_owner_required",
+				"required_action": "attach_agent_owner"
+			}
+		),
+		CapabilityRule(
+			name="data_agent_requires_purpose",
+			description="Data governance agents require a declared purpose.",
+			condition={"operation": "register_data_agent", "agent_purpose_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "data_agent_purpose_required",
+				"required_action": "attach_agent_purpose"
+			}
+		),
+		CapabilityRule(
+			name="data_agent_requires_contribution_disclosure",
+			description="Data governance agents must disclose machine contribution in stewardship decisions.",
+			condition={"operation": "register_data_agent", "contribution_disclosed": False},
+			effect={
+				"decision": "deny",
+				"reason": "data_agent_contribution_disclosure_required",
+				"required_action": "enable_agent_contribution_disclosure"
+			}
+		),
+		CapabilityRule(
+			name="data_agent_privileged_role_requires_human_approval",
+			description="Privileged data-agent roles require human approval.",
+			condition={"operation": "register_data_agent", "privileged_agent_role": True, "human_approval_required": False},
+			effect={
+				"decision": "deny",
+				"reason": "data_agent_human_approval_required",
+				"required_action": "require_human_approval_for_agent"
+			}
+		),
+		CapabilityRule(
+			name="bytewax_mdm_stream_required",
+			description="MDM lifecycle batches must declare Bytewax as the master-data lifecycle processor.",
+			condition={"operation": "validate_mdm_lifecycle_batch", "event_stream_ne": "bytewax"},
+			effect={
+				"decision": "deny",
+				"reason": "bytewax_mdm_stream_required",
+				"required_action": "route_batch_through_bytewax"
+			}
 		)
 	]
 
@@ -447,6 +593,8 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("analytics", "/mdm/analytics", "MDMAnalytics", "mdm:view_analytics", "Intelligence"),
 		CapabilityUIRoute("audit", "/mdm/audit", "MDMAuditTimeline", "mdm:view_audit", "Governance"),
 		CapabilityUIRoute("adapters", "/mdm/adapters", "MDMAdapterHealth", "mdm:admin", "Administration"),
+		CapabilityUIRoute("agents", "/mdm/agents", "DataAgentRoster", "mdm:admin", "Administration"),
+		CapabilityUIRoute("lifecycle", "/mdm/lifecycle", "MDMLifecycleBatchMonitor", "mdm:admin", "Runtime"),
 		CapabilityUIRoute("settings", "/mdm/settings", "MDMSettings", "mdm:admin", "Administration")
 	]
 	return {
@@ -459,6 +607,53 @@ def ui_manifest() -> dict[str, Any]:
 	}
 
 
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class MDM data-agent composition manifest."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_MDM_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_MDM_AGENT_ROLES),
+		"privileged_roles": list(PRIVILEGED_MDM_AGENT_ROLES),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles"
+		]
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return MDM lifecycle stream-processing contract."""
+	return {
+		"engine": "bytewax",
+		"lifecycle_stream": "mdm.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"entity_batch",
+			"quality_batch",
+			"duplicate_batch",
+			"golden_record_batch",
+			"publish_batch",
+			"data_agent_batch"
+		],
+		"topics": [
+			"mdm.entities",
+			"mdm.quality",
+			"mdm.duplicates",
+			"mdm.golden_records",
+			"mdm.publish",
+			"mdm.agents"
+		],
+		"broker_core_dependency_allowed": False
+	}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable MDM capability contract."""
 	config = CapabilityConfiguration()
@@ -466,6 +661,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "mdm",
 		"display_name": "Master Data Management",
+		"provides": ["master_data_governance", "golden_record_lifecycle", "data_agent_composition"],
+		"requires": ["auth", "audl", "conf", "mten"],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
 		"rule_engine": {
@@ -473,6 +670,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"rules": [rule.__dict__ for rule in default_rules()]
 		},
 		"ui": ui_manifest(),
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
 		"theme": {
 			"name": theme.name,
 			"tokens": theme.tokens,
@@ -495,6 +694,10 @@ def _matches(condition: dict[str, Any], context: dict[str, Any]) -> bool:
 		elif key.endswith("_lt"):
 			field_name = key[:-3]
 			if not context.get(field_name, 0) < expected:
+				return False
+		elif key.endswith("_ne"):
+			field_name = key[:-3]
+			if context.get(field_name) == expected:
 				return False
 		elif context.get(key) != expected:
 			return False

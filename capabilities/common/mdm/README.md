@@ -31,8 +31,14 @@ they must honor the same capability contract and guardrails.
 - Publish-readiness gates that require owner and current quality evidence.
 - Restricted-data checks for data owner, audit evidence, and classification
   evidence.
+- First-class data-agent registration for Codex, Claude Code, opencode, Pi,
+  and future APG-compatible runtimes.
+- Data-agent guardrails for supported roles, declared scope, owner, purpose,
+  machine-contribution disclosure, and human approval for privileged roles.
+- Bytewax lifecycle batch validation for mastered entity, quality, duplicate,
+  golden-record, publish, and data-agent streams.
 - Generated-application route, theme, adapter, and view-model contracts.
-- Bytewax-ready event-stream adapter boundary for publishing mastered changes.
+- Bytewax lifecycle adapter boundary for publishing mastered changes.
 
 ## Core Lifecycle
 
@@ -45,8 +51,12 @@ they must honor the same capability contract and guardrails.
 6. Evaluate merge requests, requiring independent stewardship when conflicts
    exist.
 7. Attach source-system cross references with evidence.
-8. Publish the entity only when ownership and quality gates pass.
-9. Preserve audit events for every lifecycle decision.
+8. Register data agents that can contribute to stewardship and publish-gate
+   workflows.
+9. Validate lifecycle batches through Bytewax before publishing operational
+   evidence.
+10. Publish the entity only when ownership and quality gates pass.
+11. Preserve audit events for every lifecycle decision.
 
 ## Quick Use
 
@@ -89,6 +99,31 @@ publish = service.publish_entity(
 assert publish.status == "published"
 ```
 
+Register a governed agent contributor:
+
+```python
+agent = service.register_data_agent(
+    tenant_id="tenant-a",
+    agent_id="publish-reviewer",
+    name="Publish Reviewer",
+    runtime="codex",
+    role="publish_gate_reviewer",
+    scope="customer publish readiness",
+    owner="data-office",
+    purpose="review mastered records before publication",
+    human_approval_required=True,
+)
+
+batch = service.validate_mdm_lifecycle_batch(
+    tenant_id="tenant-a",
+    event_stream="bytewax",
+    mutation_count=12,
+)
+
+assert agent.runtime == "codex"
+assert batch.status == "accepted"
+```
+
 ## Generated UI Surfaces
 
 The capability contract exposes routes and view models for:
@@ -105,6 +140,8 @@ The capability contract exposes routes and view models for:
 - Analytics
 - Audit timeline
 - Adapter health
+- Data-agent roster
+- Lifecycle batch monitor
 - Settings
 
 `view_models.py` turns service state into generated-application models for these
@@ -129,6 +166,11 @@ MDM evaluates deterministic rules before lifecycle decisions. Key guardrails:
 - Cross-reference updates require source-system evidence.
 - Entity retirement requires lineage evidence.
 - Review decisions require notes.
+- Data-agent runtime and role must be supported.
+- Data-agent scope, owner, purpose, and machine-contribution disclosure are
+  required.
+- Privileged data-agent roles require human approval.
+- Lifecycle batch processing must use Bytewax.
 
 ## Adapter Boundaries
 
@@ -138,10 +180,15 @@ This packet defines the executable control plane. Production adapters may supply
 - AI-assisted entity matching and quality scoring.
 - Metadata catalog synchronization.
 - Lineage graph persistence.
-- Bytewax stream processing for mastered entity events.
+- Bytewax stream processing for mastered entity and data-agent lifecycle events.
 - Cache, audit, search, and security integrations.
 
 Adapters must not bypass the contract in `capability_contract.py`.
+
+The MDM packet intentionally does not embed SDK clients for Codex, Claude Code,
+opencode, Pi, or future agent providers. Those runtimes connect through
+adapters that preserve the APG contract, guardrail decisions, audit events, and
+human-approval requirements.
 
 ## Local Proof
 
