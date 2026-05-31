@@ -10,8 +10,10 @@ from capabilities.common.onto.views import (
 	dashboard_model,
 	exchange_model,
 	governance_model,
+	lifecycle_batch_model,
 	mapping_workbench_model,
 	namespace_model,
+	ontology_agent_roster_model,
 	ontology_registry_model,
 	publication_queue_model,
 	settings_model,
@@ -27,13 +29,23 @@ def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
 	assert contract["capability"] == "onto"
 	assert contract["configuration"]["tenant_id"] == "tenant-onto"
 	assert contract["configuration"]["mappings"]["confidence_threshold"] == 0.9
-	assert set(contract["configuration_schema"]["required"]) >= {"tenant_id", "ontologies", "namespaces", "terms", "taxonomy", "mappings", "validation", "publication", "adapters", "ui", "theme"}
-	assert len(contract["rule_engine"]["rules"]) >= 30
-	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "ontologies", "namespaces", "terms", "taxonomy", "mappings", "validation", "imports", "exports", "publication", "governance", "audit", "settings"}
+	assert set(contract["configuration_schema"]["required"]) >= {"tenant_id", "ontologies", "namespaces", "terms", "taxonomy", "mappings", "validation", "publication", "agents", "streaming", "adapters", "ui", "theme"}
+	assert len(contract["rule_engine"]["rules"]) >= 55
+	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "ontologies", "namespaces", "terms", "taxonomy", "mappings", "validation", "imports", "exports", "publication", "governance", "agents", "lifecycle", "audit", "settings"}
 	assert contract["ui"]["api_prefix"] == "/onto/api/v1"
+	assert contract["provides"] == ["ontology_management", "semantic_vocabulary_governance", "ontology_agent_composition"]
+	assert set(contract["requires"]) >= {"kngr", "meta", "nlpc", "grph", "srch", "aicr", "conf", "auth", "audl"}
+	assert contract["agents"]["first_class"] is True
+	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert "publication_reviewer" in contract["agents"]["privileged_roles"]
+	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert contract["streaming"]["lifecycle_stream"] == "onto.lifecycle"
+	assert "ontology_agent_batch" in contract["streaming"]["required_operations"]
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "taxonomy_tree" in contract["theme"]["components"]
+	assert "ontology_agent_roster" in contract["theme"]["components"]
+	assert "bytewax_lifecycle_panel" in contract["theme"]["components"]
 
 
 def test_rule_engine_enforces_ontology_guardrails():
@@ -60,6 +72,23 @@ def test_rule_engine_enforces_ontology_guardrails():
 		"operation": "batch_ontology_mutation",
 		"event_stream": "kafka",
 	})
+	agent_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_ontology_agent",
+		"agent_runtime_supported": False,
+		"agent_role_supported": False,
+		"scope_present": False,
+		"owner_present": False,
+		"purpose_present": False,
+		"contribution_disclosed": False,
+		"privileged_role": True,
+		"human_approval_required": False,
+	})
+	lifecycle_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "validate_onto_lifecycle_batch",
+		"event_stream": "kafka",
+	})
 	mapping_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "create_mapping",
@@ -81,6 +110,18 @@ def test_rule_engine_enforces_ontology_guardrails():
 	assert term_result["matched_rules"] == ["term_requires_owner"]
 	assert batch_result["decision"] == "deny"
 	assert batch_result["matched_rules"] == ["batch_ontology_mutation_requires_bytewax"]
+	assert agent_result["decision"] == "deny"
+	assert {
+		"ontology_agent_runtime_supported",
+		"ontology_agent_role_supported",
+		"ontology_agent_requires_scope",
+		"ontology_agent_requires_owner",
+		"ontology_agent_requires_purpose",
+		"ontology_agent_requires_contribution_disclosure",
+		"ontology_agent_privileged_role_requires_human_approval",
+	} <= set(agent_result["matched_rules"])
+	assert lifecycle_result["decision"] == "deny"
+	assert lifecycle_result["matched_rules"] == ["bytewax_ontology_stream_required"]
 	assert mapping_result["decision"] == "require_review"
 	assert mapping_result["matched_rules"] == ["low_confidence_mapping_requires_review"]
 
@@ -96,6 +137,10 @@ def test_registration_includes_full_capability_contract():
 	assert registration["ui_components"]["mappings"] == "/onto/mappings"
 	assert "kngr" in registration["dependencies"]
 	assert registration["adapters"]["event_stream"] == "bytewax"
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["required_processor"] == "bytewax"
+	assert registration["capabilities"]["ontology_agent_composition"]
+	assert registration["endpoints"]["agents"] == "/onto/api/v1/agents"
 	assert registration["endpoints"]["audit"] == "/onto/api/v1/audit"
 	assert "onto:publish" in registration["permissions"]
 	assert "onto:audit" in registration["permissions"]
@@ -196,6 +241,25 @@ def test_onto_lifecycle_is_executable():
 		ontology_id=ontology["id"],
 		export_format="jsonld",
 	)
+	agent = service.register_ontology_agent(
+		agent_id="agent-taxonomy",
+		tenant_id=tenant_id,
+		name="Taxonomy reviewer",
+		runtime="codex",
+		role="taxonomy_reviewer",
+		scope="customer ontology taxonomy",
+		owner="data-stewards",
+		purpose="Review taxonomy changes before publication",
+		contribution_disclosed=True,
+		human_approval_required=False,
+	)
+	batch = service.validate_onto_lifecycle_batch(
+		tenant_id=tenant_id,
+		event_stream="bytewax",
+		mutation_count=4,
+		operation="ontology_agent_batch",
+		batch_id="ontobatch-customer",
+	)
 
 	assert namespace["prefix"] == "cust"
 	assert edge["relationship_type"] == "broader_than"
@@ -205,6 +269,11 @@ def test_onto_lifecycle_is_executable():
 	assert publication["status"] == "published"
 	assert publication["term_count"] == 2
 	assert export["format"] == "jsonld"
+	assert agent["runtime"] == "codex"
+	assert agent["role"] == "taxonomy_reviewer"
+	assert agent["status"] == "active"
+	assert batch["required_processor"] == "bytewax"
+	assert batch["accepted"] is True
 	assert service.list_terms(tenant_id)[0]["status"] == "published"
 
 	summary = service.dashboard_summary(tenant_id)
@@ -214,8 +283,11 @@ def test_onto_lifecycle_is_executable():
 	assert summary["mapping_count"] == 2
 	assert summary["publication_count"] == 1
 	assert summary["export_count"] == 1
+	assert summary["ontology_agent_count"] == 1
+	assert summary["lifecycle_batch_count"] == 1
 
 	assert dashboard_model(service, tenant_id)["summary"]["term_count"] == 2
+	assert dashboard_model(service, tenant_id)["streaming"]["required_processor"] == "bytewax"
 	assert ontology_registry_model(service, tenant_id)["ontologies"][0]["id"] == "customer-ontology"
 	assert namespace_model(service, tenant_id)["namespaces"][0]["prefix"] == "cust"
 	assert term_editor_model(service, tenant_id)["reviews"]
@@ -224,9 +296,13 @@ def test_onto_lifecycle_is_executable():
 	assert validation_model(service, tenant_id)["validation_reports"][0]["status"] == "passed"
 	assert publication_queue_model(service, tenant_id)["publications"][0]["approval_recorded"] is True
 	assert exchange_model(service, tenant_id)["exports"][0]["format"] == "jsonld"
+	assert ontology_agent_roster_model(service, tenant_id)["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert lifecycle_batch_model(service, tenant_id)["required_processor"] == "bytewax"
 	assert governance_model(service, tenant_id)["audit_events"]
+	assert governance_model(service, tenant_id)["ontology_agents"][0]["id"] == "agent-taxonomy"
 	assert audit_timeline_model(service, tenant_id)["audit_events"]
 	assert settings_model(service, tenant_id)["adapters"]["event_stream"] == "bytewax"
+	assert settings_model(service, tenant_id)["streaming"]["required_processor"] == "bytewax"
 
 
 def test_onto_service_enforces_policy_guardrails():
@@ -405,3 +481,38 @@ def test_onto_service_enforces_policy_guardrails():
 			target_ref="meta:cross",
 			confidence=1.0,
 		)
+
+	with pytest.raises(PermissionError, match="unsupported_ontology_agent_runtime"):
+		service.register_ontology_agent(
+			agent_id="agent-unsupported",
+			tenant_id=tenant_id,
+			name="Unsupported runtime",
+			runtime="bespoke-cli",
+			role="taxonomy_reviewer",
+			scope="guardrail ontology",
+			owner="steward",
+			purpose="Review ontology taxonomy",
+		)
+
+	pending_agent = service.register_ontology_agent(
+		agent_id="agent-publication",
+		tenant_id=tenant_id,
+		name="Publication reviewer",
+		runtime="codex",
+		role="publication_reviewer",
+		scope="ontology publication queue",
+		owner="steward",
+		purpose="Review publication readiness",
+		contribution_disclosed=True,
+		human_approval_required=False,
+	)
+	assert pending_agent["status"] == "pending_review"
+
+	with pytest.raises(ValueError, match="onto_lifecycle_batch_empty"):
+		service.validate_onto_lifecycle_batch(tenant_id, "bytewax", 0)
+
+	with pytest.raises(ValueError, match="unsupported_onto_lifecycle_operation"):
+		service.validate_onto_lifecycle_batch(tenant_id, "bytewax", 1, "unknown_batch")
+
+	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
+		service.validate_onto_lifecycle_batch(tenant_id, "kafka", 1, "ontology_agent_batch")

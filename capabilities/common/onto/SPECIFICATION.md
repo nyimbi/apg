@@ -16,9 +16,12 @@ ONTO owns the generated-app lifecycle for:
 6. Validation reports.
 7. Publication approval and versioning.
 8. Export artifact records.
-9. UI route metadata, view models, theme metadata, audit events, and package evidence.
+9. First-class ontology-agent composition for curation, mapping, validation, and publication review.
+10. Bytewax lifecycle batch validation for ontology, namespace, term, taxonomy, mapping, validation, publication, exchange, and agent changes.
+11. UI route metadata, view models, theme metadata, audit events, and package evidence.
 
 Production RDF/OWL/SKOS parsers, graph stores, search indexes, NLP term extraction, approval workflows, and external audit stores are adapter concerns.
+External AI-agent runtimes such as Codex, Claude Code, opencode, and Pi are adapter concerns. ONTO owns their provider-neutral registration contract, accountable scope, contribution disclosure, and privileged-role review gates.
 
 ## Configuration
 
@@ -33,6 +36,8 @@ The contract includes explicit sections for:
 - `publication`
 - `import_export`
 - `curation`
+- `agents`
+- `streaming`
 - `security`
 - `governance`
 - `observability`
@@ -41,6 +46,7 @@ The contract includes explicit sections for:
 - `theme`
 
 `observability.event_stream` and `adapters.event_stream` are `bytewax`.
+`streaming.required_processor` is also `bytewax`; Kafka or broker-core coupling is outside the ONTO generated-app contract.
 
 ## Runtime Records
 
@@ -55,6 +61,8 @@ The generated-app runtime uses these record types:
 - `ValidationReport`
 - `OntologyPublication`
 - `OntologyExport`
+- `OntologyAgentRecord`
+- `OntoLifecycleBatchRecord`
 - `OntoAuditEvent`
 
 Records are tenant-scoped and exposed as dictionaries for generated applications.
@@ -76,6 +84,8 @@ Rules cover:
 - Validation report review for issue-bearing ontologies.
 - Publication approval, validation, duplicate, cycle, draft-term, and low-confidence mapping gates.
 - Import/export format and review gates.
+- Ontology-agent runtime, role, scope, owner, purpose, contribution-disclosure, and human-review gates.
+- Bytewax lifecycle batch processor and operation gates.
 - Bytewax event-stream, audit, and tenant isolation requirements.
 
 ## UI Requirements
@@ -93,16 +103,19 @@ The generated UI exposes these route surfaces:
 - Exports
 - Publication
 - Governance
+- Agents
+- Lifecycle
 - Audit
 - Settings
 
-Theme components cover ontology cards, namespace panels, term cards, taxonomy trees, mapping panels, validation reports, publication queues, exchange panels, and audit timelines.
+Theme components cover ontology cards, namespace panels, term cards, taxonomy trees, mapping panels, validation reports, publication queues, exchange panels, ontology-agent rosters, Bytewax lifecycle panels, and audit timelines.
 
 ## Acceptance Criteria
 
 - Root README, specification, and plan exist.
-- Contract exposes at least 30 deterministic rules, at least 12 routes, Bytewax adapters, and theme metadata.
+- Contract exposes at least 55 deterministic rules, at least 15 routes, first-class ontology agents, Bytewax streaming metadata, Bytewax adapters, and theme metadata.
 - Runtime executes ontology registration, namespace registration, term lifecycle, taxonomy edges, mappings, validation, publication, export, and audit.
-- Guardrails block missing tenant context, ownerless terms, duplicate prefixes, taxonomy cycles, low-confidence unreviewed mappings, publication without validation or approval, invalid export formats, and cross-tenant access.
+- Runtime executes provider-neutral ontology-agent registration and Bytewax lifecycle-batch validation.
+- Guardrails block missing tenant context, ownerless terms, duplicate prefixes, taxonomy cycles, low-confidence unreviewed mappings, publication without validation or approval, invalid export formats, unsupported ontology-agent runtimes or roles, missing agent scope/owner/purpose, undisclosed machine contribution, non-Bytewax lifecycle batches, unsupported lifecycle operations, and cross-tenant access.
 - Package semantic evidence is generated from the current contract.
-- Focused tests cover the lifecycle, guardrails, views, package evidence, and import-light API.
+- Focused tests cover the lifecycle, agent guardrails, Bytewax lifecycle batches, views, package evidence, and import-light API.

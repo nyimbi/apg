@@ -47,8 +47,8 @@ def semantic_model() -> dict[str, Any]:
 			"onto": {
 				"name": contract["display_name"],
 				"configuration": contract["configuration"],
-				"provides": ["onto_operations"],
-				"requires": [],
+				"provides": contract["provides"],
+				"requires": contract["requires"],
 				"erp_modules": ["common"],
 				"rule_engine": contract["rule_engine"],
 				"rules": contract["rule_engine"]["rules"],
@@ -72,6 +72,7 @@ def semantic_model() -> dict[str, Any]:
 					"external_mapping": "CurationReview",
 					"validation_issues": "ValidationReport",
 					"publication": "OntologyPublication",
+					"ontology_agent": "OntologyAgentRecord",
 				},
 				"ontology_lifecycle": {
 					"ontology": "Ontology",
@@ -83,24 +84,39 @@ def semantic_model() -> dict[str, Any]:
 					"validation": "ValidationReport",
 					"publication": "OntologyPublication",
 					"export": "OntologyExport",
+					"ontology_agent": "OntologyAgentRecord",
+					"lifecycle_batch": "OntoLifecycleBatchRecord",
 					"audit": "OntoAuditEvent",
 				},
 				"adapters": contract["configuration"]["adapters"],
+				"agents": contract["agents"],
 				"i18n": {},
 				"master_data": {},
-				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
+				"streaming": contract["streaming"],
 			}
 		},
 		"contracts": {
 			"onto": {
 				"id": "onto",
 				"configuration": contract["configuration"],
-				"provides": ["onto_operations"],
-				"requires": [],
+				"provides": contract["provides"],
+				"requires": contract["requires"],
+				"agents": contract["agents"],
+				"streaming": contract["streaming"],
 			}
 		},
 		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
-		"composition": {"capability_dependencies": {"onto": []}, "applications": {}, "agent_teams": {}},
+		"composition": {
+			"capability_dependencies": {"onto": contract["requires"]},
+			"applications": {},
+			"agent_teams": {
+				"ontology_governance": {
+					"roles": contract["agents"]["supported_roles"],
+					"runtimes": contract["agents"]["supported_runtimes"],
+					"stream": contract["streaming"]["lifecycle_stream"],
+				}
+			},
+		},
 		"deployment": {"source": "capability_contract.py", "target": "python"},
 		"graphs": {
 			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
@@ -117,7 +133,7 @@ def semantic_model() -> dict[str, Any]:
 				"references": [],
 			}
 		},
-		"agents": {},
+		"agents": {"ontology_governance": contract["agents"]},
 		"flows": {},
 		"llms": {},
 		"operations": {},
@@ -155,18 +171,24 @@ def self_test() -> dict[str, Any]:
 	routes = capability.get("ui", {}).get("routes", [])
 	rules = capability.get("rule_engine", {}).get("rules", [])
 	adapters = capability.get("adapters", {})
+	agents = capability.get("agents", {})
+	streaming = capability.get("streaming", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "onto" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
-	if len(routes) < 12:
+	if len(routes) < 15:
 		errors.append("ONTO semantic model route manifest is stale")
-	if len(rules) < 30:
+	if len(rules) < 55:
 		errors.append("ONTO semantic model rule manifest is stale")
 	if adapters.get("event_stream") != "bytewax":
 		errors.append("ONTO adapter manifest must use Bytewax for event streaming")
+	if agents.get("first_class") is not True:
+		errors.append("ONTO agents must be first-class ontology citizens")
+	if streaming.get("required_processor") != "bytewax":
+		errors.append("ONTO lifecycle stream must require Bytewax")
 	if capability.get("runtime", {}).get("service") != "service.OntoService":
 		errors.append("ONTO generated-app runtime is missing")
 	return {

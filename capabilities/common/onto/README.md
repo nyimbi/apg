@@ -1,8 +1,8 @@
 # ONTO - Ontology Management
 
-ONTO is the APG capability for governed ontologies, taxonomies, controlled vocabularies, semantic mappings, validation, publication, and ontology exchange. It gives generated applications an executable vocabulary workbench that can be composed with Knowledge Graph, Metadata, NLP, Search, Auth, Audit, Cache, Metrics, and Bytewax-backed event processing.
+ONTO is the APG capability for governed ontologies, taxonomies, controlled vocabularies, semantic mappings, validation, publication, ontology exchange, first-class ontology agents, and Bytewax lifecycle batches. It gives generated applications an executable vocabulary workbench that can be composed with Knowledge Graph, Metadata, NLP, Search, Auth, Audit, AICR, Cache, Metrics, and Bytewax-backed event processing.
 
-The generated-app surface is dependency-light. It uses in-process domain records for ontologies, namespaces, terms, taxonomy edges, mappings, reviews, validation reports, publications, exports, and audit events. Production systems can attach persistent stores, RDF/OWL/SKOS processors, graph stores, approval workflows, and NLP assistants through the configured adapters.
+The generated-app surface is dependency-light. It uses in-process domain records for ontologies, namespaces, terms, taxonomy edges, mappings, reviews, validation reports, publications, exports, ontology agents, lifecycle batches, and audit events. Production systems can attach persistent stores, RDF/OWL/SKOS processors, graph stores, approval workflows, NLP assistants, external AI-agent runtimes, and durable Bytewax topologies through the configured adapters.
 
 ## What ONTO Provides
 
@@ -15,6 +15,8 @@ The generated-app surface is dependency-light. It uses in-process domain records
 - Validation reports for publication readiness.
 - Publication lifecycle with approval, duplicate checks, draft-term checks, mapping-review checks, and version bumps.
 - Export records for RDF, OWL, JSON-LD, SKOS, and CSV style interchange.
+- First-class ontology-agent registration for Codex, Claude Code, opencode, and Pi style assistants behind provider-neutral AICR adapter contracts.
+- Bytewax lifecycle batch validation for ontology, namespace, term, taxonomy, mapping, validation, publication, exchange, and agent changes.
 - UI route metadata, view models, theme tokens, and audit evidence for generated APG applications.
 
 ## How To Use It
@@ -82,13 +84,32 @@ publication = service.publish_ontology(
 	approval_ref="approval:onto-42",
 )
 export = service.export_ontology("export-customer", "tenant-a", ontology["id"], "jsonld")
+
+agent = service.register_ontology_agent(
+	"agent-taxonomy-review",
+	"tenant-a",
+	"Taxonomy Reviewer",
+	"codex",
+	"taxonomy_reviewer",
+	"customer ontology taxonomy",
+	"data-stewards",
+	"Review ontology hierarchy changes before publication",
+	contribution_disclosed=True,
+)
+batch = service.validate_onto_lifecycle_batch(
+	"tenant-a",
+	"bytewax",
+	4,
+	"ontology_agent_batch",
+	"ontobatch-customer-review",
+)
 ```
 
-Use `capability_contract.py` for compiler and composition metadata. Use `api.py` for generated endpoint-style helpers. Use `views.py` for dashboard, registry, namespace, term, taxonomy, mapping, validation, exchange, publication, governance, audit, and settings view models.
+Use `capability_contract.py` for compiler and composition metadata. Use `api.py` for generated endpoint-style helpers. Use `views.py` for dashboard, registry, namespace, term, taxonomy, mapping, validation, exchange, publication, governance, ontology-agent roster, lifecycle-batch monitor, audit, and settings view models.
 
 ## Guardrails
 
-ONTO exposes deterministic rules for tenant context, ontology identity, namespace uniqueness, term ownership, term status, duplicate review, deprecation replacement, synonym values, taxonomy integrity, mapping confidence, external mapping review, breaking change review, curation evidence, validation, publication readiness, import/export controls, Bytewax event streaming, tenant isolation, and audit evidence.
+ONTO exposes deterministic rules for tenant context, ontology identity, namespace uniqueness, term ownership, term status, duplicate review, deprecation replacement, synonym values, taxonomy integrity, mapping confidence, external mapping review, breaking change review, curation evidence, validation, publication readiness, import/export controls, first-class ontology-agent governance, Bytewax lifecycle batches, tenant isolation, and audit evidence.
 
 ## Files
 

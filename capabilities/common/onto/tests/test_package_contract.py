@@ -30,9 +30,11 @@ def test_onto_contract_shape_is_valid():
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "onto"
-	assert len(contract["ui"]["routes"]) >= 12
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert len(contract["ui"]["routes"]) >= 15
+	assert len(contract["rule_engine"]["rules"]) >= 55
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert contract["theme"]["tokens"]["border.radius"]
 
 
@@ -48,8 +50,10 @@ def test_onto_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "onto" in model["capabilities"]
-	assert model["capabilities"]["onto"]["streaming"]["engine"] == "bytewax"
-	assert len(model["capabilities"]["onto"]["ui"]["routes"]) >= 12
+	assert model["capabilities"]["onto"]["agents"]["first_class"] is True
+	assert model["capabilities"]["onto"]["streaming"]["required_processor"] == "bytewax"
+	assert model["capabilities"]["onto"]["ontology_lifecycle"]["lifecycle_batch"] == "OntoLifecycleBatchRecord"
+	assert len(model["capabilities"]["onto"]["ui"]["routes"]) >= 15
 
 
 def test_onto_package_evidence_matches_entrypoint():
@@ -68,7 +72,7 @@ def test_onto_api_imports_without_production_dependencies():
 	status = module.capability_status("tenant-test")
 
 	assert status["capability"] == "onto"
-	assert status["rule_count"] >= 30
+	assert status["rule_count"] >= 55
 
 
 def test_onto_compatibility_record_uses_ontology_registry():

@@ -22107,3 +22107,71 @@ Not run to preserve battery:
   durable Bytewax topology, live RAGN/KNGR/GRPH/SRCH/NLPC/AICR/CONF/AUDL
   adapters, rendered browser UI, external AI-agent runtime clients, and
   performance/load/retrieval/reasoning/generation quality benchmarks.
+
+### 2026-05-31 08:32 EAT
+
+ONTO ontology-agent composition and Bytewax lifecycle guardrail packet:
+
+- Selected `capabilities/common/onto` as the next ordered capability packet
+  after GRAG and kept the existing ontology, namespace, term, taxonomy,
+  mapping, validation, publication, export, and audit lifecycle intact.
+- Extended the ONTO executable contract with first-class ontology-agent
+  metadata, supported runtimes `codex`, `claude_code`, `opencode`, and `pi`,
+  supported ontology-governance roles, privileged-role metadata, Bytewax
+  lifecycle stream metadata, route metadata, theme components, and contract
+  `provides`/`requires`.
+- Added deterministic guardrails for unsupported ontology-agent runtime,
+  unsupported ontology-agent role, missing scope, owner, purpose, missing
+  machine contribution disclosure, privileged ontology-agent registration
+  without human approval, empty lifecycle batches, unsupported lifecycle
+  operations, and non-Bytewax ONTO lifecycle batch routing.
+- Added `OntologyAgentRecord`, `OntoLifecycleBatchRecord`,
+  tenant-qualified agent storage, lifecycle-batch storage, registration,
+  listing, audit events, dashboard counts, ontology-agent roster view models,
+  and lifecycle-batch monitor view models.
+- Added `/onto/agents`, `/onto/lifecycle`, ontology-agent roster theme
+  metadata, and Bytewax lifecycle panel theme metadata.
+- Regenerated `semantic_model.json` and `release_report.json` from the live
+  `app.py` contract and restored `package_manifest.json` to the APG
+  package-manifest shape required by publish-plan.
+- Refreshed `README.md`, `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md` so
+  the documented packet matches the executable contract and keeps external
+  AI-agent runtimes, RDF/OWL/SKOS processors, graph/search/NLP stores, and
+  durable Bytewax topologies behind adapter boundaries.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/onto/capability_contract.py capabilities/common/onto/models.py capabilities/common/onto/service.py capabilities/common/onto/api.py capabilities/common/onto/views.py capabilities/common/onto/app.py capabilities/common/onto/__init__.py capabilities/common/onto/test_capability_contract.py capabilities/common/onto/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/python capabilities/common/onto/app.py` passed the package
+  self-test.
+- `./.venv/bin/pytest -q capabilities/common/onto/test_capability_contract.py capabilities/common/onto/tests/test_package_contract.py`
+  passed with 10 tests and only existing shared-module deprecation warnings.
+- `./.venv/bin/apg capabilities inspect onto --json` passed with `ok: true`,
+  15 APG Python routes, 55 deterministic rules, first-class agents, and
+  Bytewax streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/onto --json`
+  passed with `ok: true`; ONTO remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/onto --json`
+  passed after the package manifest was restored to
+  `apg.package-manifest.v1`.
+- `./.venv/bin/python -m json.tool capabilities/common/onto/semantic_model.json`,
+  `./.venv/bin/python -m json.tool capabilities/common/onto/release_report.json`,
+  and `./.venv/bin/python -m json.tool capabilities/common/onto/package_manifest.json`
+  passed.
+- `./.venv/bin/python -c "... OntoService ... register_ontology_agent ... validate_onto_lifecycle_batch ..."`
+  returned one `codex` active vocabulary steward and one `bytewax`
+  lifecycle-batch evidence record.
+- Focused stale-marker scan over touched ONTO packet source, docs, tests, and
+  evidence returned only intentional Bytewax-not-Kafka documentation and
+  Kafka-denial tests.
+- `git diff --check -- capabilities/common/onto docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live RDF/OWL/SKOS parsers, graph stores, search indexes, NLP extractors,
+  approval workflows, durable Bytewax topology, live KNGR/META/NLPC/GRPH/SRCH/
+  AICR/CONF/AUTH/AUDL adapters, rendered browser UI, external AI-agent runtime
+  clients, and performance/load/semantic-quality benchmarks.

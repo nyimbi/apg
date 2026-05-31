@@ -8,7 +8,9 @@ from .capability_contract import evaluate_capability_rules, get_capability_contr
 from .models import (
 	CurationReview,
 	OntoAuditEvent,
+	OntoLifecycleBatchRecord,
 	Ontology,
+	OntologyAgentRecord,
 	OntologyExport,
 	OntologyNamespace,
 	OntologyPublication,
@@ -51,7 +53,13 @@ class OntoService:
 		self._validation_reports: dict[str, ValidationReport] = {}
 		self._publications: dict[str, OntologyPublication] = {}
 		self._exports: dict[str, OntologyExport] = {}
+		self._ontology_agents: dict[str, OntologyAgentRecord] = {}
+		self._lifecycle_batches: dict[str, OntoLifecycleBatchRecord] = {}
 		self._audit_events: dict[str, OntoAuditEvent] = {}
+		self._agent_runtimes = set(contract["agents"]["supported_runtimes"])
+		self._agent_roles = set(contract["agents"]["supported_roles"])
+		self._privileged_agent_roles = set(contract["agents"]["privileged_roles"])
+		self._lifecycle_operations = set(contract["streaming"]["required_operations"])
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -509,6 +517,94 @@ class OntoService:
 		self._audit(tenant_id, "ontology_exported", export.id, f"Exported ontology {ontology.name}")
 		return export.to_dict()
 
+	def register_ontology_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> dict[str, Any]:
+		runtime_value = _normalize_token(runtime)
+		role_value = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(str(tenant_id or "").strip()),
+			"operation": "register_ontology_agent",
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"scope_present": bool(str(scope or "").strip()),
+			"owner_present": bool(str(owner or "").strip()),
+			"purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+		})
+		self._raise_if_denied(result)
+		if not str(agent_id or "").strip():
+			raise ValueError("ontology_agent_id_required")
+		if not str(name or "").strip():
+			raise ValueError("ontology_agent_name_required")
+		status = "pending_review" if result["decision"] == "require_review" else "active"
+		record = OntologyAgentRecord(
+			id=str(agent_id).strip(),
+			tenant_id=tenant_id,
+			name=str(name).strip(),
+			runtime=runtime_value,
+			role=role_value,
+			scope=str(scope).strip(),
+			owner=str(owner).strip(),
+			purpose=str(purpose).strip(),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+			status=status,
+		)
+		self._ontology_agents[self._tenant_record_key(tenant_id, record.id)] = record
+		self._audit(tenant_id, "ontology_agent_registered", record.id, f"Registered ontology agent {record.name}", metadata={"decision": result["decision"], "matched_rules": result["matched_rules"]})
+		return record.to_dict()
+
+	def validate_onto_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "ontology_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		mutation_count = int(mutation_count)
+		if mutation_count <= 0:
+			raise ValueError("onto_lifecycle_batch_empty")
+		stream_value = _normalize_token(event_stream)
+		operation_value = _normalize_token(operation)
+		if operation_value not in self._lifecycle_operations:
+			raise ValueError(f"unsupported_onto_lifecycle_operation:{operation_value}")
+		result = self.evaluate({
+			"tenant_context_present": bool(str(tenant_id or "").strip()),
+			"operation": "validate_onto_lifecycle_batch",
+			"event_stream": stream_value,
+		})
+		accepted = result["decision"] == "allow"
+		record = OntoLifecycleBatchRecord(
+			id=batch_id or f"ontobatch:{len(self._lifecycle_batches) + 1:06d}",
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			operation=operation_value,
+			accepted=accepted,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			status="accepted" if accepted else "denied",
+		)
+		self._lifecycle_batches[self._tenant_record_key(tenant_id, record.id)] = record
+		self._audit(tenant_id, f"onto_lifecycle_batch_{record.status}", record.id, f"Validated ontology lifecycle batch {record.id}", metadata={"decision": result["decision"], "matched_rules": result["matched_rules"]})
+		if not accepted:
+			self._raise_if_denied(result)
+		return record.to_dict()
+
 	def create_record(
 		self,
 		record_id: str,
@@ -557,6 +653,12 @@ class OntoService:
 	def list_exports(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._exports, tenant_id)
 
+	def list_ontology_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._ontology_agents, tenant_id)
+
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._lifecycle_batches, tenant_id)
+
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events, tenant_id)
 
@@ -576,6 +678,10 @@ class OntoService:
 			"validation_report_count": len(self.list_validation_reports(tenant_id)),
 			"publication_count": len(self.list_publications(tenant_id)),
 			"export_count": len(self.list_exports(tenant_id)),
+			"ontology_agent_count": len(self.list_ontology_agents(tenant_id)),
+			"pending_agent_review_count": len([item for item in self.list_ontology_agents(tenant_id) if item["status"] == "pending_review"]),
+			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
+			"denied_lifecycle_batch_count": len([item for item in self.list_lifecycle_batches(tenant_id) if item["status"] == "denied"]),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 		}
 
@@ -650,8 +756,15 @@ class OntoService:
 			values = [record for record in values if record.tenant_id == tenant_id]
 		return [record.to_dict() for record in sorted(values, key=lambda item: item.id)]
 
+	def _tenant_record_key(self, tenant_id: str, record_id: str) -> str:
+		return f"{tenant_id}:{record_id}"
+
 	def _reasons(self, result: dict[str, Any]) -> str:
 		return ", ".join(
 			action.get("reason", "capability_policy_blocked")
 			for action in result.get("actions", [])
 		) or "capability_policy_blocked"
+
+
+def _normalize_token(value: str) -> str:
+	return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")

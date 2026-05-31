@@ -4,24 +4,29 @@
 
 - Define the executable generated-app lifecycle for ontologies, namespaces, terms, taxonomy, mappings, validation, publication, export, and audit.
 - Keep production RDF/OWL/SKOS, graph, metadata, NLP, approval, and audit systems behind adapters.
+- Add first-class ontology-agent composition for Codex, Claude Code, opencode, and Pi style assistants behind provider-neutral AICR contracts.
+- Add Bytewax lifecycle batch validation for ontology, namespace, term, taxonomy, mapping, validation, publication, exchange, and agent changes.
 
 ## 2. Contract
 
 - Expand configuration to ontology, namespace, term, taxonomy, mapping, validation, publication, import/export, curation, security, governance, observability, adapter, UI, and theme sections.
-- Expand deterministic rules beyond 30 lifecycle and guardrail checks.
-- Expose at least 12 UI routes and component theme hooks.
+- Expand configuration to ontology, namespace, term, taxonomy, mapping, validation, publication, import/export, curation, agents, streaming, security, governance, observability, adapter, UI, and theme sections.
+- Expand deterministic rules beyond 55 lifecycle, agent, stream, and guardrail checks.
+- Expose at least 15 UI routes and component theme hooks.
 - Support numeric and inequality operators in rule matching.
 
 ## 3. Runtime
 
 - Extend domain models with namespaces, validation reports, and exports.
 - Extend `OntoService` to enforce namespace uniqueness, duplicate-term review, taxonomy integrity, validation reports, publication validation, and export formats.
+- Add ontology-agent records and lifecycle-batch records with tenant-qualified storage, audit evidence, and dashboard counts.
 - Preserve existing ontology, term, taxonomy, mapping, review, publication, audit, and compatibility behavior.
 
 ## 4. API And UI
 
 - Add payload helpers for namespaces, term deprecation, validation, and exports.
-- Add view models for namespaces, validation, exchange, audit, and settings.
+- Add payload helpers for ontology-agent registration and lifecycle-batch validation.
+- Add view models for namespaces, validation, exchange, ontology agents, lifecycle batches, audit, and settings.
 
 ## 5. Package Evidence
 

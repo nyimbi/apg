@@ -2,10 +2,12 @@
   "evidence": {
     "contracts": {
       "capability_contract": {
+        "agents_first_class": true,
         "display_name": "Ontology Management",
         "errors": [],
-        "route_count": 13,
-        "rule_count": 47
+        "required_processor": "bytewax",
+        "route_count": 15,
+        "rule_count": 55
       }
     },
     "runtime": {

@@ -10,7 +10,7 @@ from .capability_contract import evaluate_capability_rules, get_capability_contr
 __version__ = "1.0.0"
 __capability_id__ = "onto"
 __capability_name__ = "Ontology Management"
-__apg_dependencies__ = ["kngr", "meta", "nlpc"]
+__apg_dependencies__ = ["kngr", "meta", "nlpc", "grph", "srch", "aicr", "conf", "auth", "audl"]
 
 capability_metadata: dict[str, Any] = {
 	"name": "onto",
@@ -24,7 +24,7 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["ontology_registry", "namespace_management", "taxonomy_management", "vocabulary_governance", "semantic_mapping", "ontology_validation", "term_curation", "ontology_exchange"],
+	"provides": ["ontology_registry", "namespace_management", "taxonomy_management", "vocabulary_governance", "semantic_mapping", "ontology_validation", "term_curation", "ontology_exchange", "ontology_agent_composition", "bytewax_lifecycle_batches"],
 	"permissions": ["onto:view", "onto:edit", "onto:map", "onto:publish", "onto:govern", "onto:audit", "onto:admin"]
 }
 
@@ -39,7 +39,7 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["audl", "auth", "srch", "grph", "cach", "moni"],
+		"optional_dependencies": ["cach", "moni"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
@@ -50,6 +50,8 @@ def register_capability() -> dict[str, Any]:
 			"semantic_mapping": "Map terms, entities, and metadata concepts across domains",
 			"ontology_validation": "Validate duplicates, draft terms, taxonomy integrity, and mapping reviews",
 			"ontology_exchange": "Prepare ontology export artifacts in configured interchange formats",
+			"ontology_agent_composition": "Compose Codex, Claude Code, opencode, and Pi style ontology agents behind provider-neutral guardrails",
+			"bytewax_lifecycle_batches": "Validate ontology lifecycle batches through Bytewax-first processor contracts",
 			"term_curation": "Govern term ownership, status, synonyms, and publication",
 			"capability_rules": "Evaluate deterministic ontology-governance rules",
 			"visual_theming": "Apply ontology-workbench theme tokens and components"
@@ -64,9 +66,13 @@ def register_capability() -> dict[str, Any]:
 			"validation": "/onto/api/v1/validation",
 			"exports": "/onto/api/v1/exports",
 			"publication": "/onto/api/v1/publication",
+			"agents": "/onto/api/v1/agents",
+			"lifecycle": "/onto/api/v1/lifecycle",
 			"audit": "/onto/api/v1/audit"
 		},
 		"adapters": contract["configuration"]["adapters"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
