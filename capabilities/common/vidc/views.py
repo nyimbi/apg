@@ -22,6 +22,8 @@ def dashboard_model(
 		"tenant_id": tenant_id,
 		"routes": capability_routes(tenant_id),
 		"summary": service.dashboard_summary(tenant_id),
+		"video_agents": service.list_video_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
 	}
@@ -107,6 +109,48 @@ def meeting_agent_model(
 		"supported_runtimes": contract["configuration"]["meeting_agents"]["supported_runtimes"],
 		"allowed_roles": contract["configuration"]["meeting_agents"]["allowed_roles"],
 		"theme": contract["theme"]["components"]["agent_panel"],
+	}
+
+
+def video_agent_roster_model(
+	service: VidcService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or VidcService()
+	contract = service.describe(tenant_id)
+	agents = service.list_video_agents(tenant_id)
+	return {
+		"route": "/vidc/agents",
+		"tenant_id": tenant_id,
+		"agents": agents,
+		"active": [agent for agent in agents if agent["status"] == "active"],
+		"pending_review": [agent for agent in agents if agent["status"] == "pending_review"],
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+		"actions": ["register_video_agent", "record_human_video_agent_approval"],
+		"theme_component": "video_agent_roster",
+	}
+
+
+def lifecycle_batch_model(
+	service: VidcService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or VidcService()
+	contract = service.describe(tenant_id)
+	batches = service.list_lifecycle_batches(tenant_id)
+	return {
+		"route": "/vidc/lifecycle",
+		"tenant_id": tenant_id,
+		"lifecycle_stream": contract["streaming"]["lifecycle_stream"],
+		"required_processor": contract["streaming"]["required_processor"],
+		"required_operations": contract["streaming"]["required_operations"],
+		"batches": batches,
+		"accepted": [batch for batch in batches if batch["status"] == "accepted"],
+		"denied": [batch for batch in batches if batch["status"] == "denied"],
+		"actions": ["validate_lifecycle_batch", "inspect_bytewax_lifecycle"],
+		"theme_component": "bytewax_lifecycle_panel",
 	}
 
 

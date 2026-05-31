@@ -156,6 +156,42 @@ class MeetingAgentRecord:
 
 
 @dataclass(slots=True)
+class VideoAgentRecord:
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	owner: str
+	purpose: str
+	contribution_disclosed: bool = True
+	human_approval_required: bool = False
+	status: str = "active"
+	created_at: str = field(default_factory=utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return serialize(self)
+
+
+@dataclass(slots=True)
+class VidcLifecycleBatchRecord:
+	id: str
+	tenant_id: str
+	event_stream: str
+	mutation_count: int
+	operation: str
+	accepted: bool
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	status: str = "accepted"
+	created_at: str = field(default_factory=utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return serialize(self)
+
+
+@dataclass(slots=True)
 class MeetingAuditEventRecord:
 	id: str
 	tenant_id: str
@@ -183,6 +219,8 @@ __all__ = [
 	"MeetingRoomRecord",
 	"ParticipantRecord",
 	"RecordingRecord",
+	"VideoAgentRecord",
+	"VidcLifecycleBatchRecord",
 	"meeting_required_actions",
 	"normalize_meeting_agent_role",
 	"normalize_participant_role",

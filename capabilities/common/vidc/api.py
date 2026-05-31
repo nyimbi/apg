@@ -19,12 +19,16 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"tenant_id": tenant_id,
 		"route_count": len(contract["ui"]["routes"]),
 		"rule_count": len(contract["rule_engine"]["rules"]),
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"room_count": summary["room_count"],
 		"meeting_count": summary["meeting_count"],
 		"active_meeting_count": summary["active_meeting_count"],
 		"recording_count": summary["recording_count"],
 		"caption_count": summary["caption_count"],
 		"meeting_agent_count": summary["meeting_agent_count"],
+		"video_agent_count": summary["video_agent_count"],
+		"lifecycle_batch_count": summary["lifecycle_batch_count"],
 	}
 
 
@@ -110,6 +114,31 @@ def register_meeting_agent(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_video_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_video_agent(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		agent_id=str(payload["id"]),
+		name=str(payload["name"]),
+		runtime=str(payload["runtime"]),
+		role=str(payload["role"]),
+		scope=str(payload["scope"]),
+		owner=str(payload["owner"]),
+		purpose=str(payload["purpose"]),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", True)),
+		human_approval_required=bool(payload.get("human_approval_required", False)),
+	)
+
+
+def validate_lifecycle_batch(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_vidc_lifecycle_batch(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
+		mutation_count=int(payload.get("mutation_count") or 0),
+		operation=str(payload.get("operation") or "video_agent_batch"),
+		batch_id=payload.get("batch_id"),
+	)
+
+
 def end_meeting(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.end_meeting(
 		tenant_id=str(payload.get("tenant_id") or "default"),
@@ -139,6 +168,8 @@ def list_video_conferencing(tenant_id: str = "default") -> dict[str, Any]:
 		"recordings": SERVICE.list_recordings(tenant_id),
 		"captions": SERVICE.list_captions(tenant_id),
 		"meeting_agents": SERVICE.list_meeting_agents(tenant_id),
+		"video_agents": SERVICE.list_video_agents(tenant_id),
+		"lifecycle_batches": SERVICE.list_lifecycle_batches(tenant_id),
 		"audit_events": SERVICE.list_audit_events(tenant_id),
 		"summary": SERVICE.dashboard_summary(tenant_id),
 	}

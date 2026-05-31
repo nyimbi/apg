@@ -1,6 +1,6 @@
 # Video Conferencing Capability
 
-`vidc` provides APG's common capability for tenant-scoped video meetings. It composes meeting rooms, accountable hosts, waiting-room controls, participants, encrypted recordings, caption artifacts, AI meeting agents, audit events, UI routes, visual theming, and Bytewax event-stream guardrails into a generated-application packet that runs without live media infrastructure.
+`vidc` provides APG's common capability for tenant-scoped video meetings. It composes meeting rooms, accountable hosts, waiting-room controls, participants, encrypted recordings, caption artifacts, AI meeting agents, first-class provider-neutral video agents, audit events, UI routes, visual theming, and Bytewax lifecycle guardrails into a generated-application packet that runs without live media infrastructure.
 
 ## What It Provides
 
@@ -8,7 +8,8 @@
 - Video meeting lifecycle from room selection through active meeting, review-required state, recording/caption artifacts, AI meeting assistants, and meeting closure.
 - Guardrails for tenant context, host accountability, secure media transport, screen-share policy, external guests, recording consent, encryption, retention, access audit, large-meeting review, caption language support, computer-vision assist policy, and cross-tenant denial.
 - AI meeting agents for captioning, summaries, moderation, and action tracking across runtimes such as Codex, Claude Code, OpenCode, and Pi.
-- Bytewax enforcement for batch video-meeting mutations.
+- First-class video agents with runtime, role, scope, owner, purpose, contribution-disclosure, and privileged-role approval guardrails.
+- Bytewax lifecycle stream metadata for room, meeting, participant, recording, caption, meeting-agent, video-agent, and audit batches.
 - Dependency-light API helpers, UI view models, package manifest, semantic model, and release evidence.
 
 ## Runtime Shape
@@ -23,6 +24,8 @@ Primary methods:
 - `create_recording(...)`
 - `generate_captions(...)`
 - `register_meeting_agent(...)`
+- `register_video_agent(...)`
+- `validate_vidc_lifecycle_batch(...)`
 - `end_meeting(...)`
 - `dashboard_summary(...)`
 
@@ -86,6 +89,18 @@ service.register_meeting_agent(
     "disclosure://meeting",
     "host-1",
 )
+service.register_video_agent(
+    "tenant-1",
+    "video-agent-1",
+    "Meeting Steward",
+    "codex",
+    "video_meeting_steward",
+    meeting["id"],
+    "host-1",
+    "Govern recording, caption, moderation, and action-item lifecycle evidence.",
+    human_approval_required=True,
+)
+service.validate_vidc_lifecycle_batch("tenant-1", "bytewax", 2, "video_agent_batch")
 ```
 
 Use `register_capability()` to expose the full APG registration payload to the composition engine.

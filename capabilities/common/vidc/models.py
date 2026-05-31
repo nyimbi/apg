@@ -9,6 +9,8 @@ from .video_runtime import (
 	MeetingRoomRecord,
 	ParticipantRecord,
 	RecordingRecord,
+	VideoAgentRecord,
+	VidcLifecycleBatchRecord,
 )
 
 
@@ -22,5 +24,7 @@ __all__ = [
 	"MeetingRoomRecord",
 	"ParticipantRecord",
 	"RecordingRecord",
+	"VideoAgentRecord",
+	"VidcLifecycleBatchRecord",
 	"VidcRecord",
 ]

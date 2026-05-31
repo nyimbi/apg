@@ -1,4 +1,53 @@
 {
+  "agents": {
+    "adapter_contract": "aicr_provider_neutral_video_agent_adapter",
+    "first_class": true,
+    "guardrails": [
+      "supported_runtime",
+      "supported_role",
+      "explicit_scope",
+      "accountable_owner",
+      "declared_purpose",
+      "machine_contribution_disclosure",
+      "human_approval_for_privileged_roles"
+    ],
+    "privileged_roles": [
+      "moderation_reviewer",
+      "recording_reviewer",
+      "guest_access_reviewer",
+      "computer_vision_reviewer",
+      "lifecycle_batch_reviewer",
+      "video_meeting_steward"
+    ],
+    "required_fields": [
+      "tenant_id",
+      "agent_id",
+      "name",
+      "runtime",
+      "role",
+      "scope",
+      "owner",
+      "purpose"
+    ],
+    "supported_roles": [
+      "meeting_scheduler",
+      "caption_reviewer",
+      "summary_reviewer",
+      "moderation_reviewer",
+      "action_item_reviewer",
+      "recording_reviewer",
+      "guest_access_reviewer",
+      "computer_vision_reviewer",
+      "lifecycle_batch_reviewer",
+      "video_meeting_steward"
+    ],
+    "supported_runtimes": [
+      "codex",
+      "claude_code",
+      "opencode",
+      "pi"
+    ]
+  },
   "base_target": "python",
   "display_name": "Video Conferencing",
   "format": "apg.package-manifest.v1",
@@ -17,5 +66,32 @@
   "profile_artifacts": [
     "package_manifest.json"
   ],
+  "streaming": {
+    "broker_core_dependency_allowed": false,
+    "engine": "bytewax",
+    "lifecycle_stream": "vidc.lifecycle",
+    "required_operations": [
+      "room_batch",
+      "meeting_batch",
+      "participant_batch",
+      "recording_batch",
+      "caption_batch",
+      "meeting_agent_batch",
+      "video_agent_batch",
+      "audit_batch"
+    ],
+    "required_processor": "bytewax",
+    "topics": [
+      "vidc.rooms",
+      "vidc.meetings",
+      "vidc.participants",
+      "vidc.recordings",
+      "vidc.captions",
+      "vidc.meeting_agents",
+      "vidc.video_agents",
+      "vidc.audit"
+    ],
+    "watermark": "event_time"
+  },
   "version": "1.0.0"
 }

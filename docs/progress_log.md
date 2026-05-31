@@ -22769,3 +22769,67 @@ Not run to preserve battery:
   topology, live MQEB/AUTH/MTEN/AUDL/AICR/SECU/CACH adapters, rendered browser
   UI, external AI-agent runtime clients, provider deliverability
   certification, and load/performance checks.
+
+### 2026-05-31 22:46 EAT
+
+VIDC video-agent composition and Bytewax lifecycle guardrail packet:
+
+- Selected `capabilities/common/vidc` as the next ordered capability packet
+  after COLB from `capabilities/common/dev_order.md`.
+- Preserved its existing room, meeting, participant, recording, caption,
+  meeting-agent, audit, tenant-isolation, and Bytewax batch guardrails.
+- Extended the executable VIDC contract with first-class video-agent metadata,
+  supported runtimes `codex`, `claude_code`, `opencode`, and `pi`, supported
+  video-governance roles, privileged-role metadata, Bytewax lifecycle stream
+  metadata, route metadata, theme components, and expanded dependency evidence.
+- Added deterministic guardrails for unsupported video-agent runtime,
+  unsupported role, missing scope, owner, purpose, missing machine contribution
+  disclosure, privileged video-agent registration without human approval, empty
+  lifecycle batches, unsupported lifecycle operations, and non-Bytewax VIDC
+  lifecycle batch routing.
+- Added `VideoAgentRecord`, `VidcLifecycleBatchRecord`, tenant-qualified
+  video-agent storage, lifecycle-batch storage, registration, listing, audit
+  events, dashboard counts, video-agent roster view models, lifecycle-batch
+  monitor view models, and API helpers.
+- Added `/vidc/lifecycle`, video-agent roster theme metadata, and Bytewax
+  lifecycle panel theme metadata.
+- Regenerated `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract and refreshed `README.md`,
+  `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md`.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/vidc/__init__.py capabilities/common/vidc/capability_contract.py capabilities/common/vidc/video_runtime.py capabilities/common/vidc/models.py capabilities/common/vidc/service.py capabilities/common/vidc/api.py capabilities/common/vidc/views.py capabilities/common/vidc/app.py capabilities/common/vidc/test_capability_contract.py capabilities/common/vidc/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/python capabilities/common/vidc/app.py` passed the package
+  self-test.
+- `./.venv/bin/pytest -q capabilities/common/vidc/test_capability_contract.py capabilities/common/vidc/tests/test_package_contract.py`
+  passed with 8 tests and only existing shared-module deprecation warnings.
+- `./.venv/bin/apg capabilities inspect vidc --json` passed with `ok: true`,
+  11 APG Python routes, 37 deterministic rules, first-class agents, and
+  Bytewax lifecycle streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/vidc --json`
+  passed with `ok: true`; VIDC remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/vidc --json`
+  passed with `side_effect_free: true` and no warnings.
+- `./.venv/bin/python -m json.tool capabilities/common/vidc/semantic_model.json`,
+  `./.venv/bin/python -m json.tool capabilities/common/vidc/release_report.json`,
+  and `./.venv/bin/python -m json.tool capabilities/common/vidc/package_manifest.json`
+  passed.
+- Runtime smoke returned one active meeting, one active `codex`
+  video-meeting steward agent, and one accepted `bytewax` lifecycle-batch
+  evidence record.
+- Focused stale-marker scan over touched VIDC packet source, docs, tests, and
+  evidence returned only intentional no-broker-core metadata and a negative
+  unsupported-operation example named `kafka_replay`.
+- `git diff --check -- capabilities/common/vidc docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live WebRTC/SFU servers, TURN/STUN allocation, media storage, live
+  transcription, live computer-vision inference, production databases, durable
+  Bytewax topology, live COLB/MQEB/CVSN/AUTH/MTEN/AUDL/AICR/NTFY/NLPC/THEM
+  adapters, rendered browser UI, external AI-agent runtime clients, media
+  interoperability certification, and load/performance checks.

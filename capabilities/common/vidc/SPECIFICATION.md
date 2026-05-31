@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`vidc` is the APG common capability for governed video meetings. It lets generated applications compose tenant-scoped rooms, realtime meeting sessions, participants, external guest controls, recordings, captions, AI meeting agents, audit trails, analytics, UI screens, visual theming, and event-stream policy.
+`vidc` is the APG common capability for governed video meetings. It lets generated applications compose tenant-scoped rooms, realtime meeting sessions, participants, external guest controls, recordings, captions, AI meeting agents, first-class provider-neutral video agents, audit trails, analytics, UI screens, visual theming, and Bytewax lifecycle policy.
 
 ## Scope
 
@@ -14,8 +14,11 @@ The capability must support:
 - Recording artifacts with consent, encryption, retention policy, and access-audit controls.
 - Caption artifacts with transcript references and configured language support.
 - AI meeting agents with registration, runtime, role, explicit meeting scope, and visible contribution disclosure.
+- First-class video agents for meeting scheduling, caption review, summary review, moderation review, action-item review, recording review, guest-access review, computer-vision review, lifecycle-batch review, and video-meeting stewardship.
+- Provider-neutral agent runtimes `codex`, `claude_code`, `opencode`, and `pi` through an AICR adapter contract, without invoking external agent clients from the package runtime.
+- Privileged video-agent roles that require human approval evidence and remain in `pending_review` without it.
 - Computer-vision assistance as an adapter-governed capability that requires policy evidence before use.
-- Bytewax-backed event-stream configuration for batch video-meeting mutations.
+- Bytewax-backed lifecycle stream configuration for room, meeting, participant, recording, caption, meeting-agent, video-agent, and audit batches.
 - UI route contracts and dependency-light view models for generated applications.
 
 ## Dependencies
@@ -38,6 +41,8 @@ The authoritative configuration lives in `capability_contract.py` and includes:
 - `media`
 - `recordings`
 - `meeting_agents`
+- `agents`
+- `streaming`
 - `governance`
 - `observability`
 - `adapters`
@@ -58,9 +63,10 @@ The deterministic rule engine covers:
 - caption transcript and supported-language checks
 - computer-vision assist policy
 - AI meeting agent registration, scope, and disclosure
+- first-class video-agent runtime, role, scope, owner, purpose, disclosure, and privileged-role approval
 - meeting state-change audit evidence
 - cross-tenant access denial
-- Bytewax batch mutation enforcement
+- Bytewax lifecycle-batch mutation, operation, and stream enforcement
 
 ## Runtime
 
@@ -72,6 +78,8 @@ The deterministic rule engine covers:
 - recordings
 - captions
 - meeting agents
+- first-class video agents
+- lifecycle batches
 - audit events
 
 The runtime enforces the same guardrails exposed by the contract rule engine and keeps live media infrastructure behind adapter boundaries.
@@ -87,6 +95,7 @@ The UI contract exposes:
 - recordings
 - captions
 - agents
+- lifecycle
 - analytics
 - audit
 - settings

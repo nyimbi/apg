@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	PRIVILEGED_VIDC_AGENT_ROLES,
+	SUPPORTED_VIDC_AGENT_ROLES,
+	SUPPORTED_VIDC_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
 from .video_runtime import (
 	CaptionRecord,
 	MeetingAgentRecord,
@@ -13,6 +19,8 @@ from .video_runtime import (
 	MeetingRoomRecord,
 	ParticipantRecord,
 	RecordingRecord,
+	VideoAgentRecord,
+	VidcLifecycleBatchRecord,
 	meeting_required_actions,
 	normalize_meeting_agent_role,
 	normalize_participant_role,
@@ -31,7 +39,16 @@ class VidcService:
 		self.recordings: dict[str, RecordingRecord] = {}
 		self.captions: dict[str, CaptionRecord] = {}
 		self.meeting_agents: dict[str, MeetingAgentRecord] = {}
+		self.video_agents: dict[str, VideoAgentRecord] = {}
+		self.lifecycle_batches: dict[str, VidcLifecycleBatchRecord] = {}
 		self.audit_events: dict[str, MeetingAuditEventRecord] = {}
+		self._agent_runtimes = {_normalize_token(item) for item in SUPPORTED_VIDC_AGENT_RUNTIMES}
+		self._agent_roles = {_normalize_token(item) for item in SUPPORTED_VIDC_AGENT_ROLES}
+		self._privileged_agent_roles = {_normalize_token(item) for item in PRIVILEGED_VIDC_AGENT_ROLES}
+		self._lifecycle_operations = {
+			_normalize_token(item)
+			for item in get_capability_contract()["streaming"]["required_operations"]
+		}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -300,6 +317,101 @@ class VidcService:
 		self._record_event(tenant_id, "meeting_agent_registered", record.id, f"Meeting agent registered: {agent_ref}", registered_by)
 		return record.to_dict()
 
+	def register_video_agent(
+		self,
+		tenant_id: str,
+		agent_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		record_key = self._tenant_key(tenant_id, agent_id)
+		if record_key in self.video_agents:
+			raise ValueError(f"video_agent_already_exists:{agent_id}")
+		runtime_value = _normalize_token(runtime)
+		role_value = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "register_video_agent",
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"scope_present": bool(str(scope or "").strip()),
+			"owner_present": bool(str(owner or "").strip()),
+			"purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy(result)
+		if not str(name or "").strip():
+			raise ValueError("video_agent_name_required")
+		record = VideoAgentRecord(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=str(name).strip(),
+			runtime=runtime_value,
+			role=role_value,
+			scope=str(scope).strip(),
+			owner=str(owner).strip(),
+			purpose=str(purpose).strip(),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+			status="pending_review" if result["decision"] == "require_review" else "active",
+		)
+		self.video_agents[record_key] = record
+		self._record_event(tenant_id, "video_agent_registered", agent_id, f"Video agent registered: {record.name}", record.owner)
+		return record.to_dict()
+
+	def validate_vidc_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "video_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		mutation_count = int(mutation_count)
+		stream_value = _normalize_token(event_stream)
+		operation_value = _normalize_token(operation)
+		operation_supported = operation_value in self._lifecycle_operations
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "validate_vidc_lifecycle_batch",
+			"event_stream": stream_value,
+			"mutation_count": mutation_count,
+			"lifecycle_operation_supported": operation_supported,
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		accepted = result["decision"] == "allow"
+		record_id = batch_id or f"vidc-batch-{len(self.lifecycle_batches) + 1:06d}"
+		record = VidcLifecycleBatchRecord(
+			id=record_id,
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			operation=operation_value,
+			accepted=accepted,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			status="accepted" if accepted else "denied",
+		)
+		self.lifecycle_batches[self._tenant_key(tenant_id, record_id)] = record
+		self._record_event(tenant_id, f"vidc_lifecycle_batch_{record.status}", record_id, f"VIDC lifecycle batch {record.status}: {operation_value}", "bytewax")
+		if result["decision"] == "deny":
+			self._raise_policy(result)
+		return record.to_dict()
+
 	def end_meeting(self, tenant_id: str, meeting_id: str, actor: str) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		meeting = self._get_meeting(tenant_id, meeting_id)
@@ -352,6 +464,12 @@ class VidcService:
 	def list_meeting_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.meeting_agents, tenant_id)
 
+	def list_video_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.video_agents, tenant_id)
+
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.lifecycle_batches, tenant_id)
+
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.audit_events, tenant_id)
 
@@ -368,6 +486,10 @@ class VidcService:
 			"recording_count": len(self.list_recordings(tenant_id)),
 			"caption_count": len(self.list_captions(tenant_id)),
 			"meeting_agent_count": len(self.list_meeting_agents(tenant_id)),
+			"video_agent_count": len(self.list_video_agents(tenant_id)),
+			"pending_video_agent_review_count": sum(1 for item in self.list_video_agents(tenant_id) if item["status"] == "pending_review"),
+			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
+			"denied_lifecycle_batch_count": sum(1 for item in self.list_lifecycle_batches(tenant_id) if item["status"] == "denied"),
 			"recent_events": self.list_audit_events(tenant_id)[-5:],
 		}
 
@@ -423,8 +545,15 @@ class VidcService:
 		self.audit_events[record.id] = record
 		return record.to_dict()
 
+	def _tenant_key(self, tenant_id: str, record_id: str) -> str:
+		return f"{tenant_id}:{record_id}"
+
 	def _list(self, records: dict[str, Any], tenant_id: str | None = None) -> list[dict[str, Any]]:
 		items = [record.to_dict() for record in records.values()]
 		if tenant_id is not None:
 			items = [item for item in items if item["tenant_id"] == tenant_id]
 		return sorted(items, key=lambda item: item["id"])
+
+
+def _normalize_token(value: str) -> str:
+	return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")

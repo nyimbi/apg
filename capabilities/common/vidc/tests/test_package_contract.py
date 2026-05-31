@@ -31,6 +31,8 @@ def test_contract_shape_is_valid():
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "vidc"
 	assert contract["ui"]["routes"]
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert contract["theme"]["tokens"]["border.radius"]
 
 
@@ -46,6 +48,8 @@ def test_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "vidc" in model["capabilities"]
+	assert model["capabilities"]["vidc"]["agents"]["first_class"] is True
+	assert model["capabilities"]["vidc"]["streaming"]["lifecycle_stream"] == "vidc.lifecycle"
 
 
 def test_room_meeting_participant_recording_caption_and_end_lifecycle_executes():
@@ -103,6 +107,23 @@ def test_room_meeting_participant_recording_caption_and_end_lifecycle_executes()
 		disclosure_ref="disclosure://meeting/1",
 		registered_by="host-1",
 	)
+	video_agent = service.register_video_agent(
+		tenant_id="tenant-a",
+		agent_id="video-agent-1",
+		name="Meeting Steward",
+		runtime="codex",
+		role="video_meeting_steward",
+		scope="meeting://operations",
+		owner="host-1",
+		purpose="Govern recording, caption, moderation, and action-item lifecycle evidence.",
+		human_approval_required=True,
+	)
+	batch = service.validate_vidc_lifecycle_batch(
+		tenant_id="tenant-a",
+		event_stream="bytewax",
+		mutation_count=3,
+		operation="video_agent_batch",
+	)
 	ended = service.end_meeting("tenant-a", meeting["id"], "host-1")
 	summary = service.dashboard_summary("tenant-a")
 
@@ -112,12 +133,16 @@ def test_room_meeting_participant_recording_caption_and_end_lifecycle_executes()
 	assert recording["encrypted"] is True
 	assert captions["caption_count"] == 42
 	assert agent["role"] == "summarizer"
+	assert video_agent["status"] == "active"
+	assert batch["status"] == "accepted"
 	assert ended["status"] == "ended"
 	assert summary["room_count"] == 1
 	assert summary["meeting_count"] == 1
 	assert summary["recording_count"] == 1
 	assert summary["caption_count"] == 1
 	assert summary["meeting_agent_count"] == 1
+	assert summary["video_agent_count"] == 1
+	assert summary["lifecycle_batch_count"] == 1
 
 
 def test_video_guardrails_require_tenant_host_guest_policy_consent_encryption_and_capacity_review():
@@ -227,6 +252,73 @@ def test_video_guardrails_require_tenant_host_guest_policy_consent_encryption_an
 	assert rule_result["decision"] == "deny"
 	assert rule_result["matched_rules"] == ["batch_video_mutation_requires_bytewax"]
 
+	agent_guard = service.start_meeting("tenant-a", room["id"], "Video Agent Guard", "host-1", 2)
+	try:
+		service.register_video_agent(
+			"tenant-a",
+			"bad-runtime",
+			"Bad Runtime",
+			"unknown",
+			"summary_reviewer",
+			"meeting://guard",
+			"owner",
+			"Review meeting summary evidence.",
+		)
+	except PermissionError as exc:
+		assert str(exc) == "unsupported_video_agent_runtime"
+	else:
+		raise AssertionError("unsupported first-class video agent runtime was accepted")
+
+	try:
+		service.register_video_agent(
+			"tenant-a",
+			"missing-disclosure",
+			"Missing Disclosure",
+			"codex",
+			"summary_reviewer",
+			"meeting://guard",
+			"owner",
+			"Review meeting summary evidence.",
+			contribution_disclosed=False,
+		)
+	except PermissionError as exc:
+		assert str(exc) == "video_agent_contribution_disclosure_required"
+	else:
+		raise AssertionError("undisclosed first-class video agent was accepted")
+
+	pending = service.register_video_agent(
+		"tenant-a",
+		"pending-agent",
+		"Pending Agent",
+		"codex",
+		"video_meeting_steward",
+		agent_guard["id"],
+		"owner",
+		"Govern privileged meeting lifecycle evidence.",
+	)
+	assert pending["status"] == "pending_review"
+
+	try:
+		service.validate_vidc_lifecycle_batch("tenant-a", "legacy_bus", 2, "video_agent_batch")
+	except PermissionError as exc:
+		assert str(exc) == "bytewax_lifecycle_stream_required"
+	else:
+		raise AssertionError("non-Bytewax VIDC lifecycle batch was accepted")
+
+	try:
+		service.validate_vidc_lifecycle_batch("tenant-a", "bytewax", 0, "video_agent_batch")
+	except PermissionError as exc:
+		assert str(exc) == "vidc_lifecycle_batch_empty"
+	else:
+		raise AssertionError("empty VIDC lifecycle batch was accepted")
+
+	try:
+		service.validate_vidc_lifecycle_batch("tenant-a", "bytewax", 1, "kafka_replay")
+	except PermissionError as exc:
+		assert str(exc) == "unsupported_vidc_lifecycle_operation"
+	else:
+		raise AssertionError("unsupported VIDC lifecycle operation was accepted")
+
 
 def test_api_and_view_models_expose_video_conferencing_surfaces():
 	local_service = VidcService()
@@ -282,6 +374,22 @@ def test_api_and_view_models_expose_video_conferencing_surfaces():
 		"disclosure_ref": "disclosure://customer",
 		"registered_by": "host-1",
 	})
+	api.register_video_agent({
+		"tenant_id": "tenant-b",
+		"id": "video-agent-1",
+		"name": "Caption Reviewer",
+		"runtime": "codex",
+		"role": "caption_reviewer",
+		"scope": "meeting://customer",
+		"owner": "host-1",
+		"purpose": "Review live caption quality and disclosure evidence.",
+	})
+	api.validate_lifecycle_batch({
+		"tenant_id": "tenant-b",
+		"event_stream": "bytewax",
+		"mutation_count": 2,
+		"operation": "caption_batch",
+	})
 
 	status = api.capability_status("tenant-b")
 	system = api.list_video_conferencing("tenant-b")
@@ -292,14 +400,22 @@ def test_api_and_view_models_expose_video_conferencing_surfaces():
 	recordings = views.recording_library_model(local_service, "tenant-b")
 	captions = views.caption_workbench_model(local_service, "tenant-b")
 	agents = views.meeting_agent_model(local_service, "tenant-b")
+	video_agents = views.video_agent_roster_model(local_service, "tenant-b")
+	lifecycle = views.lifecycle_batch_model(local_service, "tenant-b")
 	analytics = views.analytics_model(local_service, "tenant-b")
 	audit = views.audit_model(local_service, "tenant-b")
 	settings = views.settings_model("tenant-b")
 
 	assert status["meeting_count"] == 1
 	assert status["meeting_agent_count"] == 1
+	assert status["video_agent_count"] == 1
+	assert status["lifecycle_batch_count"] == 1
+	assert status["agents"]["first_class"] is True
+	assert status["streaming"]["required_processor"] == "bytewax"
 	assert system["summary"]["participant_count"] == 1
 	assert system["meeting_agents"][0]["role"] == "action_tracker"
+	assert system["video_agents"][0]["role"] == "caption_reviewer"
+	assert system["lifecycle_batches"][0]["status"] == "accepted"
 	assert dashboard["summary"]["recording_count"] == 1
 	assert meetings["route"] == "/vidc/meetings"
 	assert rooms["waiting_room_supported"] is True
@@ -307,6 +423,10 @@ def test_api_and_view_models_expose_video_conferencing_surfaces():
 	assert recordings["encryption_required"] is True
 	assert captions["languages_supported"] == ["en", "fr", "sw", "ar"]
 	assert agents["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert video_agents["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert video_agents["active"][0]["name"] == "Caption Reviewer"
+	assert lifecycle["required_processor"] == "bytewax"
+	assert lifecycle["accepted"][0]["operation"] == "caption_batch"
 	assert analytics["review_required_meetings"] == []
 	assert audit["event_stream"] == "bytewax"
 	assert settings["theme"]["name"] == "vidc_meeting_room"
