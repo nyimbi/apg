@@ -22902,3 +22902,74 @@ Not run to preserve battery:
   live RAGN/SRCH/NLPC/AUTH/AUDL/AICR/NTFY/CHAT/THEM adapters, rendered browser
   UI, external AI-agent runtime clients, provider interoperability checks, and
   load/performance checks.
+
+### 2026-06-01 01:09 EAT
+
+ESGN signing-agent composition and Bytewax lifecycle guardrail packet:
+
+- Selected `capabilities/common/esgn` as the next ordered common capability
+  packet after HELP.
+- Preserved the existing form-template, submission, envelope, ordered-signing,
+  cancellation/rejection, tamper-seal, evidence-package, audit, tenant-isolation,
+  and legacy Bytewax batch-mutation behavior.
+- Extended the executable ESGN contract with first-class signing-agent metadata,
+  supported runtimes `codex`, `claude_code`, `opencode`, and `pi`, expanded
+  signing-governance roles, privileged-role metadata, AICR adapter metadata,
+  Bytewax lifecycle stream metadata, route metadata, theme components, and
+  expanded dependency evidence.
+- Added deterministic guardrails for missing signing-agent ID, missing readable
+  name, unsupported runtime, unsupported role, missing scope, owner, purpose,
+  missing machine contribution disclosure, privileged signing-agent registration
+  without human approval, empty lifecycle batches, unsupported lifecycle
+  operations, and non-Bytewax ESGN lifecycle batch routing.
+- Added `EsgnLifecycleBatch`, lifecycle-batch storage, batch validation,
+  dashboard counts, lifecycle-batch monitor view models, API helpers, and
+  tenant-qualified signing-agent storage.
+- Hardened top-level API boolean parsing and nested recipient boolean parsing
+  so readable string values such as `"false"` cannot bypass consent,
+  disclosure, approval, identity, signature-intent, encryption, or review
+  guardrails.
+- Replaced the static embedded app semantic model with a dynamic contract-derived
+  package entrypoint and regenerated `semantic_model.json`, `release_report.json`,
+  and `package_manifest.json` from the live contract.
+- Refreshed `README.md`, `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md`.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/esgn/__init__.py capabilities/common/esgn/capability_contract.py capabilities/common/esgn/models.py capabilities/common/esgn/signing_engine.py capabilities/common/esgn/service.py capabilities/common/esgn/api.py capabilities/common/esgn/views.py capabilities/common/esgn/app.py capabilities/common/esgn/test_capability_contract.py capabilities/common/esgn/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/python capabilities/common/esgn/app.py` passed the package
+  self-test.
+- `./.venv/bin/pytest -q capabilities/common/esgn/test_capability_contract.py capabilities/common/esgn/tests/test_package_contract.py`
+  passed with 10 tests and only existing shared-module deprecation warnings.
+- `./.venv/bin/apg capabilities inspect esgn --json` passed with `ok: true`,
+  12 APG Python routes, 45 deterministic rules, first-class agents, and
+  Bytewax lifecycle streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/esgn --json`
+  passed with `ok: true`; ESGN remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/esgn --json`
+  passed with `side_effect_free: true` and no warnings.
+- `./.venv/bin/python -m json.tool capabilities/common/esgn/semantic_model.json`,
+  `./.venv/bin/python -m json.tool capabilities/common/esgn/package_manifest.json`,
+  and `./.venv/bin/python -m json.tool capabilities/common/esgn/release_report.json`
+  passed.
+- Runtime smoke executed template -> publication -> submission -> envelope ->
+  signature -> evidence -> `codex` signing steward -> Bytewax lifecycle batch
+  and returned `valid signed sealed codex active bytewax accepted 1`.
+- Focused stale-marker scan over touched ESGN packet source, docs, tests, and
+  evidence returned only intentional no-broker-core metadata, a review-checklist
+  generated-baseline reference, `_coerce_bool` hardening calls, and a negative
+  unsupported-operation example named `kafka_replay`.
+- In-process code review found and resolved weak implicit signing-agent purpose
+  generation plus unsafe nested recipient string-boolean parsing.
+- `git diff --check -- capabilities/common/esgn docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live identity proofing, durable document/evidence storage, HSM/key custody,
+  notarization, notification delivery, browser-rendered signing UI, durable
+  Bytewax topology, live AUTH/ENCR/AUDL/COMP/AICR/WFLO/NTFY/IDFD/DLPD/NLPC/THEM
+  adapters, external AI-agent runtime clients, legal-provider certification,
+  and load/performance checks.

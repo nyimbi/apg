@@ -1,5 +1,55 @@
 {
-  "agents": {},
+  "agents": {
+    "esgn": {
+      "adapter_contract": "aicr_provider_neutral_esgn_agent_adapter",
+      "first_class": true,
+      "guardrails": [
+        "stable_identifier",
+        "readable_name",
+        "supported_runtime",
+        "supported_role",
+        "explicit_scope",
+        "accountable_owner",
+        "declared_purpose",
+        "machine_contribution_disclosure",
+        "human_approval_for_privileged_roles"
+      ],
+      "privileged_roles": [
+        "clause_reviewer",
+        "routing_coordinator",
+        "evidence_auditor",
+        "compliance_reviewer",
+        "lifecycle_batch_reviewer",
+        "signing_steward"
+      ],
+      "required_fields": [
+        "tenant_id",
+        "agent_id",
+        "name",
+        "runtime",
+        "role",
+        "scope_ref",
+        "registered_by",
+        "purpose"
+      ],
+      "supported_roles": [
+        "form_assistant",
+        "clause_reviewer",
+        "routing_coordinator",
+        "evidence_auditor",
+        "compliance_reviewer",
+        "signer_experience_reviewer",
+        "lifecycle_batch_reviewer",
+        "signing_steward"
+      ],
+      "supported_runtimes": [
+        "codex",
+        "claude_code",
+        "opencode",
+        "pi"
+      ]
+    }
+  },
   "app": {
     "description": "Digital Forms and eSign package-backed APG capability",
     "entity_count": 0,
@@ -8,11 +58,83 @@
   },
   "capabilities": {
     "esgn": {
-      "approvals": {},
+      "adapters": {
+        "agent_adapter": "aicr_provider_neutral_esgn_agent_adapter",
+        "ai_orchestration": "aicr",
+        "api_helpers": "api.py",
+        "audit_sink": "audl",
+        "compliance": "comp",
+        "document_intelligence": "nlpc",
+        "encryption": "encr",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "service.EsgnService",
+        "identity": "auth",
+        "notifications": "ntfy",
+        "sealing_engine": "signing_engine.py",
+        "theme": "them",
+        "view_models": "views.py",
+        "workflow": "wflo"
+      },
+      "agents": {
+        "adapter_contract": "aicr_provider_neutral_esgn_agent_adapter",
+        "first_class": true,
+        "guardrails": [
+          "stable_identifier",
+          "readable_name",
+          "supported_runtime",
+          "supported_role",
+          "explicit_scope",
+          "accountable_owner",
+          "declared_purpose",
+          "machine_contribution_disclosure",
+          "human_approval_for_privileged_roles"
+        ],
+        "privileged_roles": [
+          "clause_reviewer",
+          "routing_coordinator",
+          "evidence_auditor",
+          "compliance_reviewer",
+          "lifecycle_batch_reviewer",
+          "signing_steward"
+        ],
+        "required_fields": [
+          "tenant_id",
+          "agent_id",
+          "name",
+          "runtime",
+          "role",
+          "scope_ref",
+          "registered_by",
+          "purpose"
+        ],
+        "supported_roles": [
+          "form_assistant",
+          "clause_reviewer",
+          "routing_coordinator",
+          "evidence_auditor",
+          "compliance_reviewer",
+          "signer_experience_reviewer",
+          "lifecycle_batch_reviewer",
+          "signing_steward"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
+      "approvals": {
+        "form_publication": "FormPublicationApproval",
+        "privileged_signing_agent_review": "SigningAgentHumanApprovalReview",
+        "regulated_form_review": "RegulatedFormComplianceReview"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
         "adapters": {
+          "agent_adapter": "aicr_provider_neutral_esgn_agent_adapter",
+          "ai_orchestration": "aicr",
           "api_helpers": "api.py",
           "audit_sink": "audl",
           "compliance": "comp",
@@ -26,6 +148,39 @@
           "theme": "them",
           "view_models": "views.py",
           "workflow": "wflo"
+        },
+        "agents": {
+          "adapter_contract": "aicr_provider_neutral_esgn_agent_adapter",
+          "first_class": true,
+          "privileged_roles": [
+            "clause_reviewer",
+            "routing_coordinator",
+            "evidence_auditor",
+            "compliance_reviewer",
+            "lifecycle_batch_reviewer",
+            "signing_steward"
+          ],
+          "require_contribution_disclosure": true,
+          "require_human_approval_for_privileged_roles": true,
+          "require_owner": true,
+          "require_purpose": true,
+          "require_scope": true,
+          "supported_roles": [
+            "form_assistant",
+            "clause_reviewer",
+            "routing_coordinator",
+            "evidence_auditor",
+            "compliance_reviewer",
+            "signer_experience_reviewer",
+            "lifecycle_batch_reviewer",
+            "signing_steward"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "envelopes": {
           "document_hash_required": true,
@@ -83,7 +238,11 @@
             "form_assistant",
             "clause_reviewer",
             "routing_coordinator",
-            "evidence_auditor"
+            "evidence_auditor",
+            "compliance_reviewer",
+            "signer_experience_reviewer",
+            "lifecycle_batch_reviewer",
+            "signing_steward"
           ],
           "supported_runtimes": [
             "codex",
@@ -91,6 +250,31 @@
             "opencode",
             "pi"
           ]
+        },
+        "streaming": {
+          "broker_core_dependency_allowed": false,
+          "engine": "bytewax",
+          "lifecycle_stream": "esgn.lifecycle",
+          "required_operations": [
+            "template_batch",
+            "submission_batch",
+            "envelope_batch",
+            "signing_batch",
+            "evidence_batch",
+            "signing_agent_batch",
+            "audit_batch"
+          ],
+          "required_processor": "bytewax",
+          "topics": [
+            "esgn.templates",
+            "esgn.submissions",
+            "esgn.envelopes",
+            "esgn.signatures",
+            "esgn.evidence",
+            "esgn.agents",
+            "esgn.audit"
+          ],
+          "watermark": "event_time"
         },
         "submissions": {
           "audit_trail_required": true,
@@ -109,12 +293,23 @@
           "enable_envelope_console": true,
           "enable_evidence_vault": true,
           "enable_form_builder": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_signing_room": true
         }
       },
       "erp_modules": [
         "common"
       ],
+      "esign_lifecycle": {
+        "audit": "EsgnAuditEvent",
+        "ceremony": "SigningCeremony",
+        "envelope": "SignatureEnvelope",
+        "evidence": "EvidencePackage",
+        "lifecycle_batch": "EsgnLifecycleBatch",
+        "signing_agent": "SigningAgent",
+        "submission": "FormSubmission",
+        "template": "FormTemplate"
+      },
       "i18n": {},
       "master_data": {},
       "name": "Digital Forms and eSign",
@@ -123,14 +318,15 @@
         "signature_envelopes",
         "signing_ceremonies",
         "evidence_packages",
-        "signing_agent_assist",
+        "signing_agent_composition",
         "form_workflows"
       ],
       "requires": [
         "auth",
         "encr",
         "audl",
-        "comp"
+        "comp",
+        "aicr"
       ],
       "rule_engine": {
         "rules": [
@@ -538,6 +734,32 @@
           },
           {
             "condition": {
+              "agent_id_present": false,
+              "operation": "register_signing_agent"
+            },
+            "description": "First-class signing agents require stable identifiers.",
+            "effect": {
+              "decision": "deny",
+              "reason": "signing_agent_id_required",
+              "required_action": "assign_signing_agent_id"
+            },
+            "name": "signing_agent_requires_id"
+          },
+          {
+            "condition": {
+              "agent_name_present": false,
+              "operation": "register_signing_agent"
+            },
+            "description": "First-class signing agents require readable names.",
+            "effect": {
+              "decision": "deny",
+              "reason": "signing_agent_name_required",
+              "required_action": "name_signing_agent"
+            },
+            "name": "signing_agent_requires_name"
+          },
+          {
+            "condition": {
               "agent_runtime_supported": false,
               "signing_agent_present": true
             },
@@ -548,6 +770,19 @@
               "required_action": "choose_supported_signing_agent_runtime"
             },
             "name": "signing_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_signing_agent"
+            },
+            "description": "First-class signing agents must use configured governance roles.",
+            "effect": {
+              "decision": "deny",
+              "reason": "signing_agent_role_not_supported",
+              "required_action": "choose_supported_signing_agent_role"
+            },
+            "name": "signing_agent_role_supported"
           },
           {
             "condition": {
@@ -564,6 +799,32 @@
           },
           {
             "condition": {
+              "agent_owner_present": false,
+              "operation": "register_signing_agent"
+            },
+            "description": "First-class signing agents require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "signing_agent_owner_required",
+              "required_action": "assign_signing_agent_owner"
+            },
+            "name": "signing_agent_requires_owner"
+          },
+          {
+            "condition": {
+              "agent_purpose_present": false,
+              "operation": "register_signing_agent"
+            },
+            "description": "First-class signing agents require a declared form, routing, clause, evidence, or lifecycle purpose.",
+            "effect": {
+              "decision": "deny",
+              "reason": "signing_agent_purpose_required",
+              "required_action": "document_signing_agent_purpose"
+            },
+            "name": "signing_agent_requires_purpose"
+          },
+          {
+            "condition": {
               "agent_contribution_disclosed": false,
               "signing_agent_present": true
             },
@@ -574,6 +835,59 @@
               "required_action": "disclose_signing_agent"
             },
             "name": "signing_agent_requires_disclosure"
+          },
+          {
+            "condition": {
+              "human_approval_required": false,
+              "operation": "register_signing_agent",
+              "privileged_role": true
+            },
+            "description": "Privileged signing-agent roles require human approval evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "signing_agent_human_approval_required",
+              "required_action": "record_signing_agent_human_approval"
+            },
+            "name": "signing_agent_privileged_role_requires_human_approval"
+          },
+          {
+            "condition": {
+              "mutation_count_lte": 0,
+              "operation": "validate_esgn_lifecycle_batch"
+            },
+            "description": "ESGN lifecycle batches must include at least one mutation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esgn_lifecycle_batch_empty",
+              "required_action": "include_esgn_lifecycle_mutations"
+            },
+            "name": "esgn_lifecycle_batch_requires_mutations"
+          },
+          {
+            "condition": {
+              "lifecycle_operation_supported": false,
+              "operation": "validate_esgn_lifecycle_batch"
+            },
+            "description": "ESGN lifecycle batches must use configured lifecycle operations.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_esgn_lifecycle_operation",
+              "required_action": "choose_supported_esgn_lifecycle_operation"
+            },
+            "name": "esgn_lifecycle_operation_supported"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "validate_esgn_lifecycle_batch"
+            },
+            "description": "ESGN lifecycle batches must be routed through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_lifecycle_stream_required",
+              "required_action": "route_esgn_lifecycle_batch_to_bytewax"
+            },
+            "name": "bytewax_esgn_lifecycle_stream_required"
           },
           {
             "condition": {
@@ -1008,6 +1322,32 @@
         },
         {
           "condition": {
+            "agent_id_present": false,
+            "operation": "register_signing_agent"
+          },
+          "description": "First-class signing agents require stable identifiers.",
+          "effect": {
+            "decision": "deny",
+            "reason": "signing_agent_id_required",
+            "required_action": "assign_signing_agent_id"
+          },
+          "name": "signing_agent_requires_id"
+        },
+        {
+          "condition": {
+            "agent_name_present": false,
+            "operation": "register_signing_agent"
+          },
+          "description": "First-class signing agents require readable names.",
+          "effect": {
+            "decision": "deny",
+            "reason": "signing_agent_name_required",
+            "required_action": "name_signing_agent"
+          },
+          "name": "signing_agent_requires_name"
+        },
+        {
+          "condition": {
             "agent_runtime_supported": false,
             "signing_agent_present": true
           },
@@ -1018,6 +1358,19 @@
             "required_action": "choose_supported_signing_agent_runtime"
           },
           "name": "signing_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_signing_agent"
+          },
+          "description": "First-class signing agents must use configured governance roles.",
+          "effect": {
+            "decision": "deny",
+            "reason": "signing_agent_role_not_supported",
+            "required_action": "choose_supported_signing_agent_role"
+          },
+          "name": "signing_agent_role_supported"
         },
         {
           "condition": {
@@ -1034,6 +1387,32 @@
         },
         {
           "condition": {
+            "agent_owner_present": false,
+            "operation": "register_signing_agent"
+          },
+          "description": "First-class signing agents require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "signing_agent_owner_required",
+            "required_action": "assign_signing_agent_owner"
+          },
+          "name": "signing_agent_requires_owner"
+        },
+        {
+          "condition": {
+            "agent_purpose_present": false,
+            "operation": "register_signing_agent"
+          },
+          "description": "First-class signing agents require a declared form, routing, clause, evidence, or lifecycle purpose.",
+          "effect": {
+            "decision": "deny",
+            "reason": "signing_agent_purpose_required",
+            "required_action": "document_signing_agent_purpose"
+          },
+          "name": "signing_agent_requires_purpose"
+        },
+        {
+          "condition": {
             "agent_contribution_disclosed": false,
             "signing_agent_present": true
           },
@@ -1044,6 +1423,59 @@
             "required_action": "disclose_signing_agent"
           },
           "name": "signing_agent_requires_disclosure"
+        },
+        {
+          "condition": {
+            "human_approval_required": false,
+            "operation": "register_signing_agent",
+            "privileged_role": true
+          },
+          "description": "Privileged signing-agent roles require human approval evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "signing_agent_human_approval_required",
+            "required_action": "record_signing_agent_human_approval"
+          },
+          "name": "signing_agent_privileged_role_requires_human_approval"
+        },
+        {
+          "condition": {
+            "mutation_count_lte": 0,
+            "operation": "validate_esgn_lifecycle_batch"
+          },
+          "description": "ESGN lifecycle batches must include at least one mutation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esgn_lifecycle_batch_empty",
+            "required_action": "include_esgn_lifecycle_mutations"
+          },
+          "name": "esgn_lifecycle_batch_requires_mutations"
+        },
+        {
+          "condition": {
+            "lifecycle_operation_supported": false,
+            "operation": "validate_esgn_lifecycle_batch"
+          },
+          "description": "ESGN lifecycle batches must use configured lifecycle operations.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_esgn_lifecycle_operation",
+            "required_action": "choose_supported_esgn_lifecycle_operation"
+          },
+          "name": "esgn_lifecycle_operation_supported"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "validate_esgn_lifecycle_batch"
+          },
+          "description": "ESGN lifecycle batches must be routed through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_lifecycle_stream_required",
+            "required_action": "route_esgn_lifecycle_batch_to_bytewax"
+          },
+          "name": "bytewax_esgn_lifecycle_stream_required"
         },
         {
           "condition": {
@@ -1074,7 +1506,8 @@
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
+        "helpers": "signing_engine.py",
+        "service": "service.EsgnService",
         "views": "views.py"
       },
       "screens": {
@@ -1118,6 +1551,11 @@
           "permission": "esgn:create_forms",
           "route": "/esgn/forms"
         },
+        "lifecycle": {
+          "component": "ESGNLifecycleBatchMonitor",
+          "permission": "esgn:admin",
+          "route": "/esgn/lifecycle"
+        },
         "settings": {
           "component": "ESGNSettings",
           "permission": "esgn:admin",
@@ -1136,6 +1574,8 @@
       },
       "streaming": {
         "batch_mutation_guardrail": "batch_esgn_mutation_requires_bytewax",
+        "broker_core_dependency_allowed": false,
+        "engine": "bytewax",
         "events": [
           "template_created",
           "template_published",
@@ -1147,7 +1587,18 @@
           "evidence_package_created",
           "signing_agent_registered"
         ],
+        "lifecycle_stream": "esgn.lifecycle",
         "processor": "bytewax",
+        "required_operations": [
+          "template_batch",
+          "submission_batch",
+          "envelope_batch",
+          "signing_batch",
+          "evidence_batch",
+          "signing_agent_batch",
+          "audit_batch"
+        ],
+        "required_processor": "bytewax",
         "state": [
           "form_templates",
           "form_submissions",
@@ -1155,7 +1606,17 @@
           "signing_ceremonies",
           "evidence_packages"
         ],
-        "topic": "apg.esgn.lifecycle"
+        "topic": "apg.esgn.lifecycle",
+        "topics": [
+          "esgn.templates",
+          "esgn.submissions",
+          "esgn.envelopes",
+          "esgn.signatures",
+          "esgn.evidence",
+          "esgn.agents",
+          "esgn.audit"
+        ],
+        "watermark": "event_time"
       },
       "theme": {
         "components": {
@@ -1166,6 +1627,11 @@
           "audit_timeline": {
             "status_style": "seal-chip",
             "visual": "event-timeline"
+          },
+          "bytewax_lifecycle_panel": {
+            "icon": "activity",
+            "status_style": "stream-chip",
+            "visual": "lifecycle-batch-list"
           },
           "envelope_console": {
             "highlight": "signature-chip",
@@ -1179,6 +1645,11 @@
             "icon": "file-pen",
             "risk_style": "schema-band",
             "status_indicator": "template-pill"
+          },
+          "signing_agent_roster": {
+            "icon": "bot",
+            "status_style": "approval-chip",
+            "visual": "agent-roster"
           },
           "signing_room": {
             "status_style": "identity-chip",
@@ -1258,6 +1729,13 @@
             "permission": "esgn:send_envelopes"
           },
           {
+            "component": "ESGNLifecycleBatchMonitor",
+            "name": "lifecycle",
+            "nav_group": "Operations",
+            "path": "/esgn/lifecycle",
+            "permission": "esgn:admin"
+          },
+          {
             "component": "EvidenceVault",
             "name": "evidence",
             "nav_group": "Governance",
@@ -1296,21 +1774,93 @@
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "signing_governance": {
+        "adapter_contract": "aicr_provider_neutral_esgn_agent_adapter",
+        "roles": [
+          "form_assistant",
+          "clause_reviewer",
+          "routing_coordinator",
+          "evidence_auditor",
+          "compliance_reviewer",
+          "signer_experience_reviewer",
+          "lifecycle_batch_reviewer",
+          "signing_steward"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
       "esgn": [
         "auth",
         "encr",
         "audl",
-        "comp"
+        "comp",
+        "aicr"
       ]
     }
   },
   "contracts": {
     "esgn": {
+      "agents": {
+        "adapter_contract": "aicr_provider_neutral_esgn_agent_adapter",
+        "first_class": true,
+        "guardrails": [
+          "stable_identifier",
+          "readable_name",
+          "supported_runtime",
+          "supported_role",
+          "explicit_scope",
+          "accountable_owner",
+          "declared_purpose",
+          "machine_contribution_disclosure",
+          "human_approval_for_privileged_roles"
+        ],
+        "privileged_roles": [
+          "clause_reviewer",
+          "routing_coordinator",
+          "evidence_auditor",
+          "compliance_reviewer",
+          "lifecycle_batch_reviewer",
+          "signing_steward"
+        ],
+        "required_fields": [
+          "tenant_id",
+          "agent_id",
+          "name",
+          "runtime",
+          "role",
+          "scope_ref",
+          "registered_by",
+          "purpose"
+        ],
+        "supported_roles": [
+          "form_assistant",
+          "clause_reviewer",
+          "routing_coordinator",
+          "evidence_auditor",
+          "compliance_reviewer",
+          "signer_experience_reviewer",
+          "lifecycle_batch_reviewer",
+          "signing_steward"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "configuration": {
         "adapters": {
+          "agent_adapter": "aicr_provider_neutral_esgn_agent_adapter",
+          "ai_orchestration": "aicr",
           "api_helpers": "api.py",
           "audit_sink": "audl",
           "compliance": "comp",
@@ -1324,6 +1874,39 @@
           "theme": "them",
           "view_models": "views.py",
           "workflow": "wflo"
+        },
+        "agents": {
+          "adapter_contract": "aicr_provider_neutral_esgn_agent_adapter",
+          "first_class": true,
+          "privileged_roles": [
+            "clause_reviewer",
+            "routing_coordinator",
+            "evidence_auditor",
+            "compliance_reviewer",
+            "lifecycle_batch_reviewer",
+            "signing_steward"
+          ],
+          "require_contribution_disclosure": true,
+          "require_human_approval_for_privileged_roles": true,
+          "require_owner": true,
+          "require_purpose": true,
+          "require_scope": true,
+          "supported_roles": [
+            "form_assistant",
+            "clause_reviewer",
+            "routing_coordinator",
+            "evidence_auditor",
+            "compliance_reviewer",
+            "signer_experience_reviewer",
+            "lifecycle_batch_reviewer",
+            "signing_steward"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "envelopes": {
           "document_hash_required": true,
@@ -1381,7 +1964,11 @@
             "form_assistant",
             "clause_reviewer",
             "routing_coordinator",
-            "evidence_auditor"
+            "evidence_auditor",
+            "compliance_reviewer",
+            "signer_experience_reviewer",
+            "lifecycle_batch_reviewer",
+            "signing_steward"
           ],
           "supported_runtimes": [
             "codex",
@@ -1389,6 +1976,31 @@
             "opencode",
             "pi"
           ]
+        },
+        "streaming": {
+          "broker_core_dependency_allowed": false,
+          "engine": "bytewax",
+          "lifecycle_stream": "esgn.lifecycle",
+          "required_operations": [
+            "template_batch",
+            "submission_batch",
+            "envelope_batch",
+            "signing_batch",
+            "evidence_batch",
+            "signing_agent_batch",
+            "audit_batch"
+          ],
+          "required_processor": "bytewax",
+          "topics": [
+            "esgn.templates",
+            "esgn.submissions",
+            "esgn.envelopes",
+            "esgn.signatures",
+            "esgn.evidence",
+            "esgn.agents",
+            "esgn.audit"
+          ],
+          "watermark": "event_time"
         },
         "submissions": {
           "audit_trail_required": true,
@@ -1407,6 +2019,7 @@
           "enable_envelope_console": true,
           "enable_evidence_vault": true,
           "enable_form_builder": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_signing_room": true
         }
       },
@@ -1416,15 +2029,62 @@
         "signature_envelopes",
         "signing_ceremonies",
         "evidence_packages",
-        "signing_agent_assist",
+        "signing_agent_composition",
         "form_workflows"
       ],
       "requires": [
         "auth",
         "encr",
         "audl",
-        "comp"
-      ]
+        "comp",
+        "aicr"
+      ],
+      "streaming": {
+        "batch_mutation_guardrail": "batch_esgn_mutation_requires_bytewax",
+        "broker_core_dependency_allowed": false,
+        "engine": "bytewax",
+        "events": [
+          "template_created",
+          "template_published",
+          "form_submitted",
+          "envelope_sent",
+          "envelope_signed",
+          "envelope_cancelled",
+          "envelope_rejected",
+          "evidence_package_created",
+          "signing_agent_registered"
+        ],
+        "lifecycle_stream": "esgn.lifecycle",
+        "processor": "bytewax",
+        "required_operations": [
+          "template_batch",
+          "submission_batch",
+          "envelope_batch",
+          "signing_batch",
+          "evidence_batch",
+          "signing_agent_batch",
+          "audit_batch"
+        ],
+        "required_processor": "bytewax",
+        "state": [
+          "form_templates",
+          "form_submissions",
+          "signature_envelopes",
+          "signing_ceremonies",
+          "evidence_packages"
+        ],
+        "topic": "apg.esgn.lifecycle",
+        "topics": [
+          "esgn.templates",
+          "esgn.submissions",
+          "esgn.envelopes",
+          "esgn.signatures",
+          "esgn.evidence",
+          "esgn.agents",
+          "esgn.audit"
+        ],
+        "watermark": "event_time"
+      }
     }
   },
   "deployment": {
@@ -1436,7 +2096,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 4,
+      "edges": 5,
       "kind": "capability",
       "nodes": 1
     },
@@ -1469,6 +2129,19 @@
         "required_action": "use_bytewax_event_stream"
       },
       "name": "batch_esgn_mutation_requires_bytewax"
+    },
+    "bytewax_esgn_lifecycle_stream_required": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "validate_esgn_lifecycle_batch"
+      },
+      "description": "ESGN lifecycle batches must be routed through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_lifecycle_stream_required",
+        "required_action": "route_esgn_lifecycle_batch_to_bytewax"
+      },
+      "name": "bytewax_esgn_lifecycle_stream_required"
     },
     "cross_tenant_esgn_access_denied": {
       "condition": {
@@ -1572,6 +2245,32 @@
         "required_action": "record_state_change_reason"
       },
       "name": "envelope_state_change_requires_reason"
+    },
+    "esgn_lifecycle_batch_requires_mutations": {
+      "condition": {
+        "mutation_count_lte": 0,
+        "operation": "validate_esgn_lifecycle_batch"
+      },
+      "description": "ESGN lifecycle batches must include at least one mutation.",
+      "effect": {
+        "decision": "deny",
+        "reason": "esgn_lifecycle_batch_empty",
+        "required_action": "include_esgn_lifecycle_mutations"
+      },
+      "name": "esgn_lifecycle_batch_requires_mutations"
+    },
+    "esgn_lifecycle_operation_supported": {
+      "condition": {
+        "lifecycle_operation_supported": false,
+        "operation": "validate_esgn_lifecycle_batch"
+      },
+      "description": "ESGN lifecycle batches must use configured lifecycle operations.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_esgn_lifecycle_operation",
+        "required_action": "choose_supported_esgn_lifecycle_operation"
+      },
+      "name": "esgn_lifecycle_operation_supported"
     },
     "esgn_state_change_requires_audit": {
       "condition": {
@@ -1742,6 +2441,20 @@
       },
       "name": "regulated_form_requires_dlp"
     },
+    "signing_agent_privileged_role_requires_human_approval": {
+      "condition": {
+        "human_approval_required": false,
+        "operation": "register_signing_agent",
+        "privileged_role": true
+      },
+      "description": "Privileged signing-agent roles require human approval evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "signing_agent_human_approval_required",
+        "required_action": "record_signing_agent_human_approval"
+      },
+      "name": "signing_agent_privileged_role_requires_human_approval"
+    },
     "signing_agent_requires_disclosure": {
       "condition": {
         "agent_contribution_disclosed": false,
@@ -1754,6 +2467,58 @@
         "required_action": "disclose_signing_agent"
       },
       "name": "signing_agent_requires_disclosure"
+    },
+    "signing_agent_requires_id": {
+      "condition": {
+        "agent_id_present": false,
+        "operation": "register_signing_agent"
+      },
+      "description": "First-class signing agents require stable identifiers.",
+      "effect": {
+        "decision": "deny",
+        "reason": "signing_agent_id_required",
+        "required_action": "assign_signing_agent_id"
+      },
+      "name": "signing_agent_requires_id"
+    },
+    "signing_agent_requires_name": {
+      "condition": {
+        "agent_name_present": false,
+        "operation": "register_signing_agent"
+      },
+      "description": "First-class signing agents require readable names.",
+      "effect": {
+        "decision": "deny",
+        "reason": "signing_agent_name_required",
+        "required_action": "name_signing_agent"
+      },
+      "name": "signing_agent_requires_name"
+    },
+    "signing_agent_requires_owner": {
+      "condition": {
+        "agent_owner_present": false,
+        "operation": "register_signing_agent"
+      },
+      "description": "First-class signing agents require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "signing_agent_owner_required",
+        "required_action": "assign_signing_agent_owner"
+      },
+      "name": "signing_agent_requires_owner"
+    },
+    "signing_agent_requires_purpose": {
+      "condition": {
+        "agent_purpose_present": false,
+        "operation": "register_signing_agent"
+      },
+      "description": "First-class signing agents require a declared form, routing, clause, evidence, or lifecycle purpose.",
+      "effect": {
+        "decision": "deny",
+        "reason": "signing_agent_purpose_required",
+        "required_action": "document_signing_agent_purpose"
+      },
+      "name": "signing_agent_requires_purpose"
     },
     "signing_agent_requires_registration": {
       "condition": {
@@ -1780,6 +2545,19 @@
         "required_action": "set_signing_agent_scope"
       },
       "name": "signing_agent_requires_scope"
+    },
+    "signing_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_signing_agent"
+      },
+      "description": "First-class signing agents must use configured governance roles.",
+      "effect": {
+        "decision": "deny",
+        "reason": "signing_agent_role_not_supported",
+        "required_action": "choose_supported_signing_agent_role"
+      },
+      "name": "signing_agent_role_supported"
     },
     "signing_agent_runtime_supported": {
       "condition": {
@@ -1926,7 +2704,13 @@
   },
   "security": {},
   "source_files": [
-    "capability_contract.py"
+    "capability_contract.py",
+    "models.py",
+    "signing_engine.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
   ],
   "symbols": {
     "capability.esgn": {

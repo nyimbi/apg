@@ -10,13 +10,13 @@ from .capability_contract import evaluate_capability_rules, get_capability_contr
 __version__ = "1.0.0"
 __capability_id__ = "esgn"
 __capability_name__ = "Digital Forms and eSign"
-__apg_dependencies__ = ["auth", "encr", "audl", "comp"]
+__apg_dependencies__ = ["auth", "encr", "audl", "comp", "aicr"]
 
 capability_metadata: dict[str, Any] = {
 	"name": "esgn",
 	"version": __version__,
 	"display_name": __capability_name__,
-	"description": "Digital form templates, submissions, e-signature envelopes, signing ceremonies, evidence, AI signing assistants, and compliance controls",
+	"description": "Digital form templates, submissions, e-signature envelopes, signing ceremonies, evidence, first-class signing agents, Bytewax lifecycle governance, and compliance controls",
 	"category": "collaboration_communication",
 	"subcategory": "digital_forms_esign",
 	"vendor": "Datacraft",
@@ -24,7 +24,7 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["digital_forms", "signature_envelopes", "signing_ceremonies", "evidence_packages", "signing_agent_assist", "form_workflows"],
+	"provides": ["digital_forms", "signature_envelopes", "signing_ceremonies", "evidence_packages", "signing_agent_composition", "bytewax_lifecycle_governance", "form_workflows"],
 	"permissions": ["esgn:view", "esgn:create_forms", "esgn:send_envelopes", "esgn:sign", "esgn:manage_templates", "esgn:audit", "esgn:admin"]
 }
 
@@ -48,7 +48,8 @@ def register_capability() -> dict[str, Any]:
 			"signature_envelopes": "Prepare signature envelopes, recipients, routing, and reminders",
 			"signing_ceremonies": "Run identity-verified electronic signature ceremonies",
 			"evidence_packages": "Assemble encrypted audit evidence for completed signatures",
-			"signing_agent_assist": "Register scoped AI assistants for form, routing, clause-review, and evidence tasks",
+			"signing_agent_composition": "Register provider-neutral first-class signing agents with scope, owner, purpose, disclosure, and approval guardrails",
+			"bytewax_lifecycle_governance": "Validate template, submission, envelope, signature, evidence, signing-agent, and audit lifecycle batches through Bytewax stream metadata",
 			"capability_rules": "Evaluate deterministic digital-form and e-signature rules",
 			"visual_theming": "Apply forms and signing theme tokens and components"
 		},
@@ -58,12 +59,15 @@ def register_capability() -> dict[str, Any]:
 			"envelopes": "/esgn/api/v1/envelopes",
 			"signing": "/esgn/api/v1/signing",
 			"agents": "/esgn/api/v1/agents",
+			"lifecycle": "/esgn/api/v1/lifecycle",
 			"evidence": "/esgn/api/v1/evidence",
 			"streaming": "/esgn/api/v1/streaming"
 		},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"permissions": capability_metadata["permissions"]
 	}
 

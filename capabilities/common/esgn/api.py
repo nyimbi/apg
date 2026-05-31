@@ -18,6 +18,8 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"tenant_id": tenant_id,
 		"route_count": len(contract["ui"]["routes"]),
 		"rule_count": len(contract["rule_engine"]["rules"]),
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"summary": SERVICE.dashboard_summary(tenant_id),
 	}
 
@@ -32,8 +34,8 @@ def create_form_template(payload: dict[str, Any]) -> dict[str, Any]:
 		compliance_framework=str(payload.get("compliance_framework") or ""),
 		dlp_policy=str(payload.get("dlp_policy") or ""),
 		retention_policy=str(payload.get("retention_policy") or ""),
-		regulated_form=bool(payload.get("regulated_form", False)),
-		compliance_review_recorded=bool(payload.get("compliance_review_recorded", True)),
+		regulated_form=_payload_bool(payload, "regulated_form", False),
+		compliance_review_recorded=_payload_bool(payload, "compliance_review_recorded", True),
 	)
 
 
@@ -42,7 +44,7 @@ def publish_form(payload: dict[str, Any]) -> dict[str, Any]:
 		template_id=str(payload["id"]),
 		tenant_id=str(payload.get("tenant_id") or "default"),
 		approved_by=str(payload.get("approved_by") or "forms-admin"),
-		publication_approved=bool(payload.get("publication_approved", False)),
+		publication_approved=_payload_bool(payload, "publication_approved", False),
 	)
 
 
@@ -66,7 +68,7 @@ def create_envelope(payload: dict[str, Any]) -> dict[str, Any]:
 		recipients=list(payload.get("recipients") or []),
 		sender=str(payload.get("sender") or "system"),
 		signature_intent=str(payload.get("signature_intent") or "approval"),
-		compliance_review_recorded=bool(payload.get("compliance_review_recorded", True)),
+		compliance_review_recorded=_payload_bool(payload, "compliance_review_recorded", True),
 		document_hash=str(payload.get("document_hash") or ""),
 		expires_at=str(payload.get("expires_at") or ""),
 	)
@@ -79,8 +81,8 @@ def sign_envelope(payload: dict[str, Any]) -> dict[str, Any]:
 		envelope_id=str(payload["envelope_id"]),
 		recipient_id=str(payload["recipient_id"]),
 		signature_intent=str(payload.get("signature_intent") or ""),
-		identity_verified=bool(payload.get("identity_verified", False)),
-		signature_intent_recorded=bool(payload.get("signature_intent_recorded", True)),
+		identity_verified=_payload_bool(payload, "identity_verified", False),
+		signature_intent_recorded=_payload_bool(payload, "signature_intent_recorded", True),
 		signed_at=payload.get("signed_at"),
 	)
 
@@ -90,7 +92,7 @@ def create_evidence_package(payload: dict[str, Any]) -> dict[str, Any]:
 		evidence_id=str(payload["id"]),
 		tenant_id=str(payload.get("tenant_id") or "default"),
 		envelope_id=str(payload["envelope_id"]),
-		encrypted=bool(payload.get("encrypted", False)),
+		encrypted=_payload_bool(payload, "encrypted", False),
 		retention_policy=str(payload.get("retention_policy") or ""),
 		audit_trail_ref=str(payload.get("audit_trail_ref") or ""),
 	)
@@ -123,7 +125,9 @@ def register_signing_agent(payload: dict[str, Any]) -> dict[str, Any]:
 		role=str(payload.get("role") or ""),
 		scope_ref=str(payload.get("scope_ref") or ""),
 		registered_by=str(payload.get("registered_by") or ""),
-		contribution_disclosed=bool(payload.get("contribution_disclosed", False)),
+		contribution_disclosed=_payload_bool(payload, "contribution_disclosed", False),
+		purpose=str(payload.get("purpose") or ""),
+		human_approval_required=_payload_bool(payload, "human_approval_required", False),
 	)
 
 
@@ -135,6 +139,16 @@ def verify_tamper_seal(payload: dict[str, Any]) -> dict[str, Any]:
 
 def validate_batch_mutation(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.validate_batch_mutation(str(payload.get("event_stream") or ""))
+
+
+def validate_lifecycle_batch(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_lifecycle_batch(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
+		mutation_count=int(payload.get("mutation_count") or 0),
+		operation=str(payload.get("operation") or "signing_agent_batch"),
+		batch_id=payload.get("batch_id"),
+	)
 
 
 def list_form_templates(tenant_id: str | None = None) -> list[dict[str, Any]]:
@@ -161,6 +175,10 @@ def list_signing_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_signing_agents(tenant_id)
 
 
+def list_lifecycle_batches(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_lifecycle_batches(tenant_id)
+
+
 def list_audit_events(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_audit_events(tenant_id)
 
@@ -176,3 +194,16 @@ def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 
 def list_records(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_records(tenant_id)
+
+
+def _payload_bool(payload: dict[str, Any], key: str, default: bool) -> bool:
+	value = payload.get(key, default)
+	if isinstance(value, bool):
+		return value
+	if isinstance(value, str):
+		normalized = value.strip().lower()
+		if normalized in {"1", "true", "yes", "y", "on"}:
+			return True
+		if normalized in {"0", "false", "no", "n", "off"}:
+			return False
+	return bool(value)

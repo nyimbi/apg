@@ -202,6 +202,8 @@ class SigningAgent:
 	scope_ref: str
 	registered_by: str
 	contribution_disclosed: bool
+	purpose: str = ""
+	human_approval_required: bool = False
 	status: str = "active"
 
 	def to_dict(self) -> dict[str, Any]:
@@ -214,6 +216,36 @@ class SigningAgent:
 			"scope_ref": self.scope_ref,
 			"registered_by": self.registered_by,
 			"contribution_disclosed": self.contribution_disclosed,
+			"purpose": self.purpose,
+			"human_approval_required": self.human_approval_required,
+			"status": self.status,
+		}
+
+
+@dataclass(frozen=True)
+class EsgnLifecycleBatch:
+	"""Bytewax lifecycle-batch validation evidence for ESGN mutations."""
+
+	id: str
+	tenant_id: str
+	event_stream: str
+	mutation_count: int
+	operation: str
+	accepted: bool
+	decision: str
+	matched_rules: tuple[str, ...] = ()
+	status: str = "accepted"
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"event_stream": self.event_stream,
+			"mutation_count": self.mutation_count,
+			"operation": self.operation,
+			"accepted": self.accepted,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
 			"status": self.status,
 		}
 

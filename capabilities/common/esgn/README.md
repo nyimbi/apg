@@ -1,6 +1,6 @@
 # Digital Forms and eSign Capability
 
-`esgn` provides APG's common capability for governed digital forms and electronic signatures. It composes form-template authoring, schema validation, publication approval, submissions, signature envelopes, ordered signing ceremonies, cancellation/rejection, tamper sealing, encrypted evidence packages, scoped AI signing assistants, UI route metadata, visual theming, and Bytewax event-stream guardrails.
+`esgn` provides APG's common capability for governed digital forms and electronic signatures. It composes form-template authoring, schema validation, publication approval, submissions, signature envelopes, ordered signing ceremonies, cancellation/rejection, tamper sealing, encrypted evidence packages, first-class provider-neutral signing agents, UI route metadata, visual theming, and Bytewax lifecycle guardrails.
 
 ## What It Provides
 
@@ -10,8 +10,8 @@
 - Signing ceremonies that require identity verification, explicit signature intent, active envelope state, valid seal, non-expired envelope, correct signer order, and one signature per recipient.
 - Envelope cancellation and rejection with mandatory reason and audit event.
 - Evidence packages with encrypted seal digest, certificate ID, retention policy, and audit trail reference.
-- Scoped AI signing assistants for form guidance, clause review, routing coordination, and evidence audit, with runtime, registration, scope, and disclosure controls.
-- Bytewax enforcement for batch form and signature mutations.
+- First-class signing agents for form guidance, clause review, routing coordination, evidence audit, compliance review, signer-experience review, lifecycle review, and signing stewardship, with runtime, role, scope, owner, purpose, disclosure, and privileged-role approval controls.
+- Bytewax lifecycle stream metadata for template, submission, envelope, signature, evidence, signing-agent, and audit batches.
 - Dependency-light API helpers, UI view models, package manifest, semantic model, and release evidence.
 
 ## Runtime Shape
@@ -29,6 +29,7 @@ Primary methods:
 - `reject_envelope(...)`
 - `create_evidence_package(...)`
 - `register_signing_agent(...)`
+- `validate_lifecycle_batch(...)`
 - `verify_tamper_seal(...)`
 - `validate_batch_mutation(...)`
 - `dashboard_summary(...)`
@@ -44,6 +45,8 @@ Primary methods:
 - theme tokens
 - APG adapter map
 - Bytewax streaming contract
+- first-class signing-agent manifest
+- Bytewax lifecycle-batch manifest
 
 The rule engine returns `allow`, `require_review`, or `deny` decisions with matched rules and required actions. Runtime methods enforce the same guardrails used by the contract.
 
@@ -58,6 +61,7 @@ The package exposes route contracts for:
 - envelopes
 - signing
 - agents
+- lifecycle
 - evidence
 - audit
 - analytics
@@ -104,6 +108,19 @@ service.create_envelope(
 )
 service.sign_envelope("cer-1", "tenant-1", "env-1", "rcp-1", "approve_nda", True)
 evidence = service.create_evidence_package("evd-1", "tenant-1", "env-1", True, "legal-7y", "audit:env-1")
+service.register_signing_agent(
+    "agent-1",
+    "tenant-1",
+    "Signing Steward",
+    "codex",
+    "signing_steward",
+    "env-1",
+    "legal-ops",
+    True,
+    purpose="Govern signing evidence and lifecycle controls.",
+    human_approval_required=True,
+)
+service.validate_lifecycle_batch("tenant-1", "bytewax", 1, "signing_agent_batch")
 ```
 
 Use `register_capability()` to expose the full APG registration payload to the composition engine.

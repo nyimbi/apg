@@ -5,9 +5,17 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from .capability_contract import DEFAULT_CONFIGURATION, evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	DEFAULT_CONFIGURATION,
+	PRIVILEGED_ESGN_AGENT_ROLES,
+	SUPPORTED_ESGN_AGENT_ROLES,
+	SUPPORTED_ESGN_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
 from .models import (
 	EsgnAuditEvent,
+	EsgnLifecycleBatch,
 	EvidencePackage,
 	FormSubmission,
 	FormTemplate,
@@ -29,8 +37,16 @@ class EsgnService:
 		self._ceremonies: dict[str, SigningCeremony] = {}
 		self._evidence_packages: dict[str, EvidencePackage] = {}
 		self._signing_agents: dict[str, SigningAgent] = {}
+		self._lifecycle_batches: dict[str, EsgnLifecycleBatch] = {}
 		self._audit_events: dict[str, EsgnAuditEvent] = {}
 		self._engine = SigningEngine()
+		self._agent_runtimes = {_normalize_token(item) for item in SUPPORTED_ESGN_AGENT_RUNTIMES}
+		self._agent_roles = {_normalize_token(item) for item in SUPPORTED_ESGN_AGENT_ROLES}
+		self._privileged_agent_roles = {_normalize_token(item) for item in PRIVILEGED_ESGN_AGENT_ROLES}
+		self._lifecycle_operations = {
+			_normalize_token(item)
+			for item in get_capability_contract()["streaming"]["required_operations"]
+		}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -327,31 +343,53 @@ class EsgnService:
 		scope_ref: str,
 		registered_by: str,
 		contribution_disclosed: bool,
+		purpose: str = "",
+		human_approval_required: bool = False,
 	) -> dict[str, Any]:
-		config = DEFAULT_CONFIGURATION["signing_agents"]
+		self._require_tenant_context(tenant_id)
+		agent_id_value = str(agent_id or "").strip()
+		name_value = str(name or "").strip()
+		agent_key = self._tenant_key(tenant_id, agent_id_value)
+		if agent_key in self._signing_agents:
+			raise ValueError(f"signing_agent_already_exists:{agent_id_value}")
+		runtime_value = _normalize_token(runtime)
+		role_value = _normalize_token(role)
+		owner_value = str(registered_by or "").strip()
+		purpose_value = str(purpose or "").strip()
 		result = self.evaluate({
-			"tenant_context_present": bool(tenant_id),
+			"tenant_context_present": True,
+			"operation": "register_signing_agent",
 			"signing_agent_present": True,
-			"agent_registered": bool(name and registered_by),
-			"agent_runtime_supported": runtime in config["supported_runtimes"],
-			"agent_scope_present": bool(scope_ref),
+			"agent_registered": bool(agent_id_value and name_value and owner_value),
+			"agent_id_present": bool(agent_id_value),
+			"agent_name_present": bool(name_value),
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"agent_scope_present": bool(str(scope_ref or "").strip()),
+			"agent_owner_present": bool(owner_value),
+			"agent_purpose_present": bool(purpose_value),
 			"agent_contribution_disclosed": bool(contribution_disclosed),
+			"privileged_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
 		})
 		self._raise_if_denied(result)
-		if role not in config["allowed_roles"]:
-			raise PermissionError("signing_agent_role_not_supported")
 		agent = SigningAgent(
-			id=agent_id,
+			id=agent_id_value,
 			tenant_id=tenant_id,
-			name=name,
-			runtime=runtime,
-			role=role,
-			scope_ref=scope_ref,
-			registered_by=registered_by,
+			name=name_value,
+			runtime=runtime_value,
+			role=role_value,
+			scope_ref=str(scope_ref).strip(),
+			registered_by=owner_value,
 			contribution_disclosed=bool(contribution_disclosed),
+			purpose=purpose_value,
+			human_approval_required=bool(human_approval_required),
+			status="pending_review" if result["decision"] == "require_review" else "active",
 		)
-		self._signing_agents[agent_id] = agent
-		self._record_audit(tenant_id, agent_id, "signing_agent_registered", registered_by, result["decision"], metadata={"runtime": runtime, "role": role, "scope_ref": scope_ref})
+		self._signing_agents[self._tenant_key(tenant_id, agent_id_value)] = agent
+		self._record_audit(tenant_id, agent_id_value, "signing_agent_registered", owner_value, result["decision"], metadata={"runtime": runtime_value, "role": role_value, "scope_ref": scope_ref})
 		return agent.to_dict()
 
 	def verify_tamper_seal(self, envelope_id: str, tenant_id: str) -> bool:
@@ -360,8 +398,47 @@ class EsgnService:
 		expected = self._tamper_seal(submission, envelope.recipients, envelope.document_hash, envelope.expires_at)
 		return envelope.tamper_seal == expected
 
+	def validate_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "signing_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		self._require_tenant_context(tenant_id)
+		stream_value = _normalize_token(event_stream)
+		operation_value = _normalize_token(operation)
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "validate_esgn_lifecycle_batch",
+			"event_stream": stream_value,
+			"mutation_count": int(mutation_count),
+			"lifecycle_operation_supported": operation_value in self._lifecycle_operations,
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		accepted = result["decision"] == "allow"
+		record_id = batch_id or f"esgn-batch-{len(self._lifecycle_batches) + 1:06d}"
+		record = EsgnLifecycleBatch(
+			id=record_id,
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=int(mutation_count),
+			operation=operation_value,
+			accepted=accepted,
+			decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			status="accepted" if accepted else "denied",
+		)
+		self._lifecycle_batches[self._tenant_key(tenant_id, record_id)] = record
+		self._record_audit(tenant_id, record_id, f"esgn_lifecycle_batch_{record.status}", "bytewax", result["decision"], metadata={"operation": operation_value, "event_stream": stream_value})
+		if result["decision"] == "deny":
+			self._raise_if_denied(result)
+		return record.to_dict()
+
 	def validate_batch_mutation(self, event_stream: str) -> dict[str, Any]:
-		result = self.evaluate({"tenant_context_present": True, "operation": "batch_esgn_mutation", "event_stream": event_stream})
+		result = self.evaluate({"tenant_context_present": True, "operation": "batch_esgn_mutation", "event_stream": _normalize_token(event_stream)})
 		self._raise_if_denied(result)
 		return result
 
@@ -382,6 +459,9 @@ class EsgnService:
 
 	def list_signing_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._signing_agents, tenant_id)
+
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._lifecycle_batches, tenant_id)
 
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events, tenant_id)
@@ -434,6 +514,9 @@ class EsgnService:
 			"ceremony_count": len(self.list_ceremonies(tenant_id)),
 			"evidence_package_count": len(self.list_evidence_packages(tenant_id)),
 			"signing_agent_count": len(self.list_signing_agents(tenant_id)),
+			"pending_signing_agent_review_count": len([item for item in self.list_signing_agents(tenant_id) if item["status"] == "pending_review"]),
+			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
+			"denied_lifecycle_batch_count": len([item for item in self.list_lifecycle_batches(tenant_id) if item["status"] == "denied"]),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 		}
 
@@ -477,10 +560,10 @@ class EsgnService:
 			email=str(payload["email"]),
 			role=str(payload.get("role") or "signer"),
 			routing_order=int(payload.get("routing_order") or 1),
-			consent_recorded=bool(payload.get("consent_recorded", False)),
+			consent_recorded=_coerce_bool(payload.get("consent_recorded", False)),
 			delegated_policy_ref=str(payload.get("delegated_policy_ref") or ""),
-			identity_verified=bool(payload.get("identity_verified", False)),
-			signed=bool(payload.get("signed", False)),
+			identity_verified=_coerce_bool(payload.get("identity_verified", False)),
+			signed=_coerce_bool(payload.get("signed", False)),
 		)
 
 	def _refresh_envelope_signing_state(self, envelope_id: str, tenant_id: str, recipient_id: str) -> None:
@@ -574,6 +657,9 @@ class EsgnService:
 			items = [item for item in items if item.tenant_id == tenant_id]
 		return [item.to_dict() for item in sorted(items, key=lambda item: item.id)]
 
+	def _tenant_key(self, tenant_id: str, record_id: str) -> str:
+		return f"{tenant_id}:{record_id}"
+
 	def _require_template(self, template_id: str, tenant_id: str) -> FormTemplate:
 		self._require_tenant_context(tenant_id)
 		template = self._templates.get(template_id)
@@ -633,3 +719,19 @@ class EsgnService:
 		if result["decision"] == "deny":
 			reasons = ", ".join(action.get("reason", "esgn_policy_blocked") for action in result["actions"])
 			raise PermissionError(reasons or "esgn_policy_blocked")
+
+
+def _normalize_token(value: str) -> str:
+	return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def _coerce_bool(value: Any) -> bool:
+	if isinstance(value, bool):
+		return value
+	if isinstance(value, str):
+		normalized = value.strip().lower()
+		if normalized in {"1", "true", "yes", "y", "on"}:
+			return True
+		if normalized in {"0", "false", "no", "n", "off"}:
+			return False
+	return bool(value)

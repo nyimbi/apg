@@ -7,6 +7,29 @@ from numbers import Number
 from typing import Any
 
 
+SUPPORTED_ESGN_AGENT_RUNTIMES: list[str] = ["codex", "claude_code", "opencode", "pi"]
+
+SUPPORTED_ESGN_AGENT_ROLES: list[str] = [
+	"form_assistant",
+	"clause_reviewer",
+	"routing_coordinator",
+	"evidence_auditor",
+	"compliance_reviewer",
+	"signer_experience_reviewer",
+	"lifecycle_batch_reviewer",
+	"signing_steward",
+]
+
+PRIVILEGED_ESGN_AGENT_ROLES: list[str] = [
+	"clause_reviewer",
+	"routing_coordinator",
+	"evidence_auditor",
+	"compliance_reviewer",
+	"lifecycle_batch_reviewer",
+	"signing_steward",
+]
+
+
 DEFAULT_CONFIGURATION: dict[str, Any] = {
 	"tenant_id": "default",
 	"forms": {
@@ -52,8 +75,45 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"agent_registration_required": True,
 		"agent_scope_required": True,
 		"agent_contribution_disclosure_required": True,
-		"supported_runtimes": ["codex", "claude_code", "opencode", "pi"],
-		"allowed_roles": ["form_assistant", "clause_reviewer", "routing_coordinator", "evidence_auditor"],
+		"supported_runtimes": SUPPORTED_ESGN_AGENT_RUNTIMES,
+		"allowed_roles": SUPPORTED_ESGN_AGENT_ROLES,
+	},
+	"agents": {
+		"first_class": True,
+		"supported_runtimes": SUPPORTED_ESGN_AGENT_RUNTIMES,
+		"supported_roles": SUPPORTED_ESGN_AGENT_ROLES,
+		"privileged_roles": PRIVILEGED_ESGN_AGENT_ROLES,
+		"require_scope": True,
+		"require_owner": True,
+		"require_purpose": True,
+		"require_contribution_disclosure": True,
+		"require_human_approval_for_privileged_roles": True,
+		"adapter_contract": "aicr_provider_neutral_esgn_agent_adapter",
+	},
+	"streaming": {
+		"engine": "bytewax",
+		"lifecycle_stream": "esgn.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"template_batch",
+			"submission_batch",
+			"envelope_batch",
+			"signing_batch",
+			"evidence_batch",
+			"signing_agent_batch",
+			"audit_batch",
+		],
+		"topics": [
+			"esgn.templates",
+			"esgn.submissions",
+			"esgn.envelopes",
+			"esgn.signatures",
+			"esgn.evidence",
+			"esgn.agents",
+			"esgn.audit",
+		],
+		"broker_core_dependency_allowed": False,
 	},
 	"governance": {
 		"require_tenant_context": True,
@@ -83,6 +143,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"notifications": "ntfy",
 		"document_intelligence": "nlpc",
 		"theme": "them",
+		"ai_orchestration": "aicr",
+		"agent_adapter": "aicr_provider_neutral_esgn_agent_adapter",
 	},
 	"ui": {
 		"enable_form_builder": True,
@@ -90,6 +152,7 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"enable_signing_room": True,
 		"enable_evidence_vault": True,
 		"enable_agent_panel": True,
+		"enable_lifecycle_batch_monitor": True,
 		"enable_audit": True,
 		"enable_analytics": True,
 	},
@@ -109,6 +172,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"signatures",
 		"evidence",
 		"signing_agents",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
@@ -122,6 +187,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"signatures",
 		"evidence",
 		"signing_agents",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
@@ -164,9 +231,18 @@ RULES: list[dict[str, Any]] = [
 	{"name": "envelope_state_change_requires_reason", "description": "Envelope cancellation and rejection require a reason.", "condition": {"operation": "change_envelope_state", "state_change_reason_present": False}, "effect": {"decision": "deny", "reason": "state_change_reason_required", "required_action": "record_state_change_reason"}},
 	{"name": "esgn_state_change_requires_audit", "description": "ESGN state changes require audit evidence.", "condition": {"state_change_requested": True, "audit_event_recorded": False}, "effect": {"decision": "deny", "reason": "esgn_audit_event_required", "required_action": "record_esgn_audit_event"}},
 	{"name": "signing_agent_requires_registration", "description": "AI signing assistants must be registered.", "condition": {"signing_agent_present": True, "agent_registered": False}, "effect": {"decision": "deny", "reason": "signing_agent_registration_required", "required_action": "register_signing_agent"}},
+	{"name": "signing_agent_requires_id", "description": "First-class signing agents require stable identifiers.", "condition": {"operation": "register_signing_agent", "agent_id_present": False}, "effect": {"decision": "deny", "reason": "signing_agent_id_required", "required_action": "assign_signing_agent_id"}},
+	{"name": "signing_agent_requires_name", "description": "First-class signing agents require readable names.", "condition": {"operation": "register_signing_agent", "agent_name_present": False}, "effect": {"decision": "deny", "reason": "signing_agent_name_required", "required_action": "name_signing_agent"}},
 	{"name": "signing_agent_runtime_supported", "description": "AI signing assistants must use a configured runtime.", "condition": {"signing_agent_present": True, "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "signing_agent_runtime_not_supported", "required_action": "choose_supported_signing_agent_runtime"}},
+	{"name": "signing_agent_role_supported", "description": "First-class signing agents must use configured governance roles.", "condition": {"operation": "register_signing_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "signing_agent_role_not_supported", "required_action": "choose_supported_signing_agent_role"}},
 	{"name": "signing_agent_requires_scope", "description": "AI signing assistants require envelope or form scope.", "condition": {"signing_agent_present": True, "agent_scope_present": False}, "effect": {"decision": "deny", "reason": "signing_agent_scope_required", "required_action": "set_signing_agent_scope"}},
+	{"name": "signing_agent_requires_owner", "description": "First-class signing agents require an accountable owner.", "condition": {"operation": "register_signing_agent", "agent_owner_present": False}, "effect": {"decision": "deny", "reason": "signing_agent_owner_required", "required_action": "assign_signing_agent_owner"}},
+	{"name": "signing_agent_requires_purpose", "description": "First-class signing agents require a declared form, routing, clause, evidence, or lifecycle purpose.", "condition": {"operation": "register_signing_agent", "agent_purpose_present": False}, "effect": {"decision": "deny", "reason": "signing_agent_purpose_required", "required_action": "document_signing_agent_purpose"}},
 	{"name": "signing_agent_requires_disclosure", "description": "AI-assisted signature activity requires visible disclosure.", "condition": {"signing_agent_present": True, "agent_contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "signing_agent_disclosure_required", "required_action": "disclose_signing_agent"}},
+	{"name": "signing_agent_privileged_role_requires_human_approval", "description": "Privileged signing-agent roles require human approval evidence.", "condition": {"operation": "register_signing_agent", "privileged_role": True, "human_approval_required": False}, "effect": {"decision": "require_review", "reason": "signing_agent_human_approval_required", "required_action": "record_signing_agent_human_approval"}},
+	{"name": "esgn_lifecycle_batch_requires_mutations", "description": "ESGN lifecycle batches must include at least one mutation.", "condition": {"operation": "validate_esgn_lifecycle_batch", "mutation_count_lte": 0}, "effect": {"decision": "deny", "reason": "esgn_lifecycle_batch_empty", "required_action": "include_esgn_lifecycle_mutations"}},
+	{"name": "esgn_lifecycle_operation_supported", "description": "ESGN lifecycle batches must use configured lifecycle operations.", "condition": {"operation": "validate_esgn_lifecycle_batch", "lifecycle_operation_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_esgn_lifecycle_operation", "required_action": "choose_supported_esgn_lifecycle_operation"}},
+	{"name": "bytewax_esgn_lifecycle_stream_required", "description": "ESGN lifecycle batches must be routed through Bytewax.", "condition": {"operation": "validate_esgn_lifecycle_batch", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_esgn_lifecycle_batch_to_bytewax"}},
 	{"name": "cross_tenant_esgn_access_denied", "description": "Digital form and e-sign records may not cross tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_esgn_access_denied", "required_action": "use_tenant_local_context"}},
 	{"name": "batch_esgn_mutation_requires_bytewax", "description": "Batch form and signature mutations must use Bytewax event streams.", "condition": {"operation": "batch_esgn_mutation", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}},
 ]
@@ -179,6 +255,7 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "envelopes", "path": "/esgn/envelopes", "component": "EnvelopeConsole", "permission": "esgn:send_envelopes", "nav_group": "Signatures"},
 	{"name": "signing", "path": "/esgn/signing", "component": "SigningRoom", "permission": "esgn:sign", "nav_group": "Signatures"},
 	{"name": "agents", "path": "/esgn/agents", "component": "SigningAgentPanel", "permission": "esgn:send_envelopes", "nav_group": "Signatures"},
+	{"name": "lifecycle", "path": "/esgn/lifecycle", "component": "ESGNLifecycleBatchMonitor", "permission": "esgn:admin", "nav_group": "Operations"},
 	{"name": "evidence", "path": "/esgn/evidence", "component": "EvidenceVault", "permission": "esgn:view", "nav_group": "Governance"},
 	{"name": "audit", "path": "/esgn/audit", "component": "ESGNAuditTrail", "permission": "esgn:audit", "nav_group": "Governance"},
 	{"name": "analytics", "path": "/esgn/analytics", "component": "ESGNAnalytics", "permission": "esgn:view", "nav_group": "Operations"},
@@ -206,6 +283,8 @@ THEME: dict[str, Any] = {
 		"envelope_console": {"visual": "recipient-routing", "highlight": "signature-chip"},
 		"signing_room": {"visual": "signature-ceremony", "status_style": "identity-chip"},
 		"agent_panel": {"visual": "assistant-roster", "status_style": "scope-chip"},
+		"signing_agent_roster": {"icon": "bot", "visual": "agent-roster", "status_style": "approval-chip"},
+		"bytewax_lifecycle_panel": {"icon": "activity", "visual": "lifecycle-batch-list", "status_style": "stream-chip"},
 		"evidence_vault": {"visual": "sealed-record-list", "status_style": "audit-chip"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "seal-chip"},
 	},
@@ -227,6 +306,9 @@ STREAMING: dict[str, Any] = {
 		"signing_agent_registered",
 	],
 	"batch_mutation_guardrail": "batch_esgn_mutation_requires_bytewax",
+	"lifecycle_stream": "esgn.lifecycle",
+	"required_operations": DEFAULT_CONFIGURATION["streaming"]["required_operations"],
+	"topics": DEFAULT_CONFIGURATION["streaming"]["topics"],
 }
 
 
@@ -239,8 +321,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "esgn",
 		"display_name": "Digital Forms and eSign",
-		"provides": ["digital_forms", "signature_envelopes", "signing_ceremonies", "evidence_packages", "signing_agent_assist", "form_workflows"],
-		"requires": ["auth", "encr", "audl", "comp"],
+		"provides": ["digital_forms", "signature_envelopes", "signing_ceremonies", "evidence_packages", "signing_agent_composition", "form_workflows"],
+		"requires": ["auth", "encr", "audl", "comp", "aicr"],
 		"configuration": config,
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},
@@ -253,7 +335,51 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"requires_theme": True,
 		},
 		"theme": deepcopy(THEME),
-		"streaming": deepcopy(STREAMING),
+		"agents": agent_manifest(config),
+		"streaming": streaming_manifest(config),
+	}
+
+
+def agent_manifest(config: dict[str, Any] | None = None) -> dict[str, Any]:
+	"""Return provider-neutral signing-agent composition metadata."""
+	agents = (config or DEFAULT_CONFIGURATION)["agents"]
+	return {
+		"first_class": bool(agents["first_class"]),
+		"supported_runtimes": list(agents["supported_runtimes"]),
+		"supported_roles": list(agents["supported_roles"]),
+		"privileged_roles": list(agents["privileged_roles"]),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope_ref", "registered_by", "purpose"],
+		"guardrails": [
+			"stable_identifier",
+			"readable_name",
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles",
+		],
+		"adapter_contract": agents["adapter_contract"],
+	}
+
+
+def streaming_manifest(config: dict[str, Any] | None = None) -> dict[str, Any]:
+	"""Return Bytewax lifecycle stream metadata for ESGN composition."""
+	streaming = (config or DEFAULT_CONFIGURATION)["streaming"]
+	return {
+		"engine": streaming["engine"],
+		"processor": streaming["required_processor"],
+		"required_processor": streaming["required_processor"],
+		"lifecycle_stream": streaming["lifecycle_stream"],
+		"topic": f"apg.{streaming['lifecycle_stream']}",
+		"watermark": streaming["watermark"],
+		"required_operations": list(streaming["required_operations"]),
+		"topics": list(streaming["topics"]),
+		"state": list(STREAMING["state"]),
+		"events": list(STREAMING["events"]),
+		"batch_mutation_guardrail": STREAMING["batch_mutation_guardrail"],
+		"broker_core_dependency_allowed": bool(streaming["broker_core_dependency_allowed"]),
 	}
 
 

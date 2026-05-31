@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`esgn` is the APG common capability for governed digital forms and electronic signatures. It lets generated applications compose tenant-scoped form templates, submissions, signing envelopes, ordered signing ceremonies, AI signing assistants, evidence packages, audit events, UI screens, visual theming, and event-stream policy.
+`esgn` is the APG common capability for governed digital forms and electronic signatures. It lets generated applications compose tenant-scoped form templates, submissions, signing envelopes, ordered signing ceremonies, first-class provider-neutral signing agents, evidence packages, audit events, UI screens, visual theming, and Bytewax lifecycle policy.
 
 ## Scope
 
@@ -14,8 +14,10 @@ The capability must support:
 - Signing ceremonies that require verified identity, explicit signature intent, active/non-expired envelope state, valid tamper seal, and routing-order readiness.
 - Envelope cancellation and rejection with mandatory reason and audit event.
 - Evidence-package creation only after all required signatures complete, with encryption, retention, audit trail, seal digest, and completion certificate ID.
-- AI signing assistants as first-class records, with supported runtime, role, registered owner, scope, and visible disclosure.
-- Bytewax-backed event-stream configuration for batch digital-form and e-signature mutations.
+- First-class signing agents for form assistance, clause review, routing coordination, evidence audit, compliance review, signer-experience review, lifecycle-batch review, and signing stewardship.
+- Provider-neutral signing-agent runtimes `codex`, `claude_code`, `opencode`, and `pi` through an AICR adapter contract, without invoking external agent clients from the package runtime.
+- Privileged signing-agent roles that require human approval evidence and remain in `pending_review` without it.
+- Bytewax-backed lifecycle stream configuration for template, submission, envelope, signing, evidence, signing-agent, and audit batches.
 - UI route contracts and dependency-light view models for generated applications.
 
 ## Dependencies
@@ -41,6 +43,8 @@ The authoritative configuration lives in `capability_contract.py` and includes:
 - `signatures`
 - `evidence`
 - `signing_agents`
+- `agents`
+- `streaming`
 - `governance`
 - `observability`
 - `adapters`
@@ -58,9 +62,10 @@ The deterministic rule engine covers:
 - signer identity, signature intent, active envelope state, routing order, duplicate-recipient signatures, tamper seal, and expiry
 - evidence encryption, completed envelope state, valid seal, audit trail, and retention policy
 - cancellation/rejection reason capture
-- AI signing assistant registration, runtime support, scope, and disclosure
+- first-class signing-agent ID, name, runtime support, role support, scope, owner, purpose, disclosure, and privileged-role approval
+- ESGN lifecycle-batch mutation, operation, and Bytewax stream enforcement
 - cross-tenant access denial
-- Bytewax batch mutation enforcement
+- legacy Bytewax batch mutation enforcement
 
 ## Runtime
 
@@ -72,6 +77,7 @@ The deterministic rule engine covers:
 - signing ceremonies
 - evidence packages
 - signing agents
+- lifecycle batches
 - audit events
 
 The runtime enforces the same guardrails exposed by the contract rule engine and keeps live providers behind adapter boundaries.
@@ -87,6 +93,7 @@ The UI contract exposes:
 - envelopes
 - signing
 - agents
+- lifecycle
 - evidence
 - audit
 - analytics

@@ -1,10 +1,60 @@
 {
+  "agents": {
+    "adapter_contract": "aicr_provider_neutral_esgn_agent_adapter",
+    "first_class": true,
+    "guardrails": [
+      "stable_identifier",
+      "readable_name",
+      "supported_runtime",
+      "supported_role",
+      "explicit_scope",
+      "accountable_owner",
+      "declared_purpose",
+      "machine_contribution_disclosure",
+      "human_approval_for_privileged_roles"
+    ],
+    "privileged_roles": [
+      "clause_reviewer",
+      "routing_coordinator",
+      "evidence_auditor",
+      "compliance_reviewer",
+      "lifecycle_batch_reviewer",
+      "signing_steward"
+    ],
+    "required_fields": [
+      "tenant_id",
+      "agent_id",
+      "name",
+      "runtime",
+      "role",
+      "scope_ref",
+      "registered_by",
+      "purpose"
+    ],
+    "supported_roles": [
+      "form_assistant",
+      "clause_reviewer",
+      "routing_coordinator",
+      "evidence_auditor",
+      "compliance_reviewer",
+      "signer_experience_reviewer",
+      "lifecycle_batch_reviewer",
+      "signing_steward"
+    ],
+    "supported_runtimes": [
+      "codex",
+      "claude_code",
+      "opencode",
+      "pi"
+    ]
+  },
   "base_target": "python",
   "display_name": "Digital Forms and eSign",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
     "cap_spec.md",
     "models.py",
+    "signing_engine.py",
     "service.py",
     "api.py",
     "views.py",
@@ -17,5 +67,51 @@
   "profile_artifacts": [
     "package_manifest.json"
   ],
+  "streaming": {
+    "batch_mutation_guardrail": "batch_esgn_mutation_requires_bytewax",
+    "broker_core_dependency_allowed": false,
+    "engine": "bytewax",
+    "events": [
+      "template_created",
+      "template_published",
+      "form_submitted",
+      "envelope_sent",
+      "envelope_signed",
+      "envelope_cancelled",
+      "envelope_rejected",
+      "evidence_package_created",
+      "signing_agent_registered"
+    ],
+    "lifecycle_stream": "esgn.lifecycle",
+    "processor": "bytewax",
+    "required_operations": [
+      "template_batch",
+      "submission_batch",
+      "envelope_batch",
+      "signing_batch",
+      "evidence_batch",
+      "signing_agent_batch",
+      "audit_batch"
+    ],
+    "required_processor": "bytewax",
+    "state": [
+      "form_templates",
+      "form_submissions",
+      "signature_envelopes",
+      "signing_ceremonies",
+      "evidence_packages"
+    ],
+    "topic": "apg.esgn.lifecycle",
+    "topics": [
+      "esgn.templates",
+      "esgn.submissions",
+      "esgn.envelopes",
+      "esgn.signatures",
+      "esgn.evidence",
+      "esgn.agents",
+      "esgn.audit"
+    ],
+    "watermark": "event_time"
+  },
   "version": "1.0.0"
 }
