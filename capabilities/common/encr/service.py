@@ -1,24 +1,8 @@
-"""
-APG Encryption Services - Core Service Implementation
+"""APG Encryption Services core runtime.
 
-Revolutionary quantum-safe encryption service providing:
-- Post-quantum cryptographic operations (CRYSTALS-Kyber, CRYSTALS-Dilithium)
-- Zero-knowledge encryption architecture with privacy preservation
-- Autonomous AI-driven key lifecycle management
-- Homomorphic computation on encrypted data
-- Multi-tenant isolation with shared threat intelligence
-- APG capability integration patterns
-
-This service surpasses industry leaders (AWS KMS, HashiCorp Vault, Azure Key Vault)
-by 10x through quantum-safe algorithms, autonomous management, and zero-knowledge architecture.
-
-APG Standards Compliance:
-- Async Python with modern typing (str | None, list[str], dict[str, Any])
-- Tabs for indentation (NEVER spaces)
-- _log_ prefixed methods for logging
-- Runtime assertions at function start/end
-- APG capability integration (auth, secu, audl)
-- Dependency injection patterns
+The dependency-light ``EncrService`` provides package-safe crypto governance for
+generated APG applications. The larger async engines in this package remain
+adapter surfaces for production cryptography providers.
 """
 
 import asyncio
@@ -233,19 +217,49 @@ class CryptoAuditEventRecord:
 		return asdict(self)
 
 
+@dataclass(slots=True)
+class CryptoAgentRecord:
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	owner: str
+	purpose: str
+	contribution_disclosed: bool
+	human_approval_required: bool
+	policy_ref: str | None = None
+	status: str = "active"
+	registered_at: str = field(default_factory=_utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
 class EncrService:
 	"""Dependency-light ENCR service for generated APG applications."""
 
 	def __init__(self) -> None:
-		from .capability_contract import evaluate_capability_rules, get_capability_contract
+		from .capability_contract import (
+			PRIVILEGED_ENCR_AGENT_ROLES,
+			SUPPORTED_ENCR_AGENT_ROLES,
+			SUPPORTED_ENCR_AGENT_RUNTIMES,
+			evaluate_capability_rules,
+			get_capability_contract,
+		)
 
 		self._evaluate_rules = evaluate_capability_rules
 		self._get_contract = get_capability_contract
+		self._agent_runtimes = set(SUPPORTED_ENCR_AGENT_RUNTIMES)
+		self._agent_roles = set(SUPPORTED_ENCR_AGENT_ROLES)
+		self._privileged_agent_roles = set(PRIVILEGED_ENCR_AGENT_ROLES)
 		self.key_domains: dict[str, CryptoKeyDomainRecord] = {}
 		self.operations: dict[str, CryptoOperationRecord] = {}
 		self.exception_reviews: dict[str, CryptoExceptionReviewRecord] = {}
 		self.rotations: dict[str, KeyRotationRecord] = {}
 		self.audit_events: dict[str, CryptoAuditEventRecord] = {}
+		self.crypto_agents: dict[str, CryptoAgentRecord] = {}
 
 	def describe(self, tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 		return self._get_contract(tenant_id, overrides)
@@ -488,6 +502,87 @@ class EncrService:
 		self._record_event(tenant_id, "key_rotation_completed", record.id, f"Key rotation completed: {domain.name}", actor, "medium")
 		return record.to_dict()
 
+	def register_crypto_agent(
+		self,
+		tenant_id: str,
+		agent_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+		policy_ref: str | None = None,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		if not str(agent_id or "").strip():
+			raise ValueError("crypto_agent_id_required")
+		if not str(name or "").strip():
+			raise ValueError("crypto_agent_name_required")
+		if not str(owner or "").strip():
+			raise ValueError("crypto_agent_owner_required")
+		if not str(purpose or "").strip():
+			raise ValueError("crypto_agent_purpose_required")
+		normalized_runtime = self._normalize_agent_token(runtime)
+		normalized_role = self._normalize_agent_token(role)
+		result = self.evaluate({
+			"operation": "register_crypto_agent",
+			"crypto_agent_runtime_supported": normalized_runtime in self._agent_runtimes,
+			"crypto_agent_role_supported": normalized_role in self._agent_roles,
+			"crypto_agent_scope_attached": bool(str(scope or "").strip()),
+			"crypto_agent_privileged_role": normalized_role in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+		})
+		if result["decision"] == "deny":
+			raise PermissionError(self._first_reason(result))
+		if not contribution_disclosed:
+			raise PermissionError("crypto_agent_contribution_disclosure_required")
+		record_id = _stable_id("encr_crypto_agent", tenant_id, agent_id)
+		if record_id in self.crypto_agents:
+			raise ValueError(f"crypto_agent_already_exists:{agent_id}")
+		record = CryptoAgentRecord(
+			id=record_id,
+			tenant_id=tenant_id,
+			name=str(name).strip(),
+			runtime=normalized_runtime,
+			role=normalized_role,
+			scope=str(scope).strip(),
+			owner=str(owner).strip(),
+			purpose=str(purpose).strip(),
+			contribution_disclosed=True,
+			human_approval_required=bool(human_approval_required),
+			policy_ref=str(policy_ref).strip() if policy_ref else None,
+		)
+		self.crypto_agents[record.id] = record
+		self._record_event(tenant_id, "crypto_agent_registered", record.id, f"Crypto agent registered: {record.name}", owner, "medium")
+		return record.to_dict()
+
+	def validate_crypto_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		stream = self._normalize_agent_token(event_stream)
+		result = self.evaluate({
+			"operation": "validate_crypto_lifecycle_batch",
+			"event_stream": stream,
+		})
+		if result["decision"] == "deny":
+			raise PermissionError(self._first_reason(result))
+		if mutation_count < 1:
+			raise ValueError("crypto_lifecycle_batch_empty")
+		return {
+			"tenant_id": tenant_id,
+			"event_stream": stream,
+			"mutation_count": int(mutation_count),
+			"accepted": True,
+			"required_processor": "bytewax",
+		}
+
 	def create_record(
 		self,
 		record_id: str,
@@ -537,12 +632,16 @@ class EncrService:
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.audit_events, tenant_id)
 
+	def list_crypto_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.crypto_agents, tenant_id)
+
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		operations = self.list_operations(tenant_id)
 		return {
 			"tenant_id": tenant_id,
 			"key_domain_count": len(self.list_key_domains(tenant_id)),
 			"operation_count": len(operations),
+			"crypto_agent_count": len(self.list_crypto_agents(tenant_id)),
 			"denied_operation_count": sum(1 for item in operations if item["status"] == "denied"),
 			"review_required_count": sum(1 for item in operations if item["status"] == "review_required"),
 			"pending_exception_count": sum(1 for item in self.list_exception_reviews(tenant_id) if item["status"] == "pending"),
@@ -605,6 +704,9 @@ class EncrService:
 				return str(action["reason"])
 		return "crypto_operation_denied"
 
+	def _normalize_agent_token(self, value: str) -> str:
+		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
 	def _list(self, records: dict[str, Any], tenant_id: str | None = None) -> list[dict[str, Any]]:
 		items = [record.to_dict() for record in records.values()]
 		if tenant_id is not None:
@@ -614,7 +716,7 @@ class EncrService:
 
 class APGEncryptionService:
 	"""
-	Revolutionary APG Encryption Service
+	Advanced APG Encryption Service
 
 	Provides quantum-safe encryption, zero-knowledge architecture,
 	autonomous key management, and homomorphic computation capabilities
@@ -636,7 +738,7 @@ class APGEncryptionService:
 		self.audit_service = None
 		self.config_service = None
 
-		# Revolutionary encryption engines
+		# Advanced encryption engines
 		self.quantum_entropy_harvester = QuantumEntropyHarvester()
 		self.post_quantum_crypto = PostQuantumCryptographicEngine()
 		self.zero_knowledge_engine = ZeroKnowledgeEncryptionEngine()
@@ -650,7 +752,7 @@ class APGEncryptionService:
 	def _log_initialization(self) -> None:
 		"""Log service initialization with APG standards"""
 		logger.info(f"APG Encryption Service initialized: {self.service_id}")
-		logger.info("Revolutionary capabilities: Quantum-safe, Zero-knowledge, Autonomous")
+		logger.info("Advanced capabilities: Quantum-safe, Zero-knowledge, Autonomous")
 
 	async def initialize(self, apg_dependencies: Dict[str, Any]) -> None:
 		"""Initialize service with APG dependency injection"""
@@ -664,7 +766,7 @@ class APGEncryptionService:
 		self.audit_service = apg_dependencies.get('audit_service')
 		self.config_service = apg_dependencies.get('config_service')
 
-		# Initialize revolutionary encryption engines
+		# Initialize advanced encryption engines
 		await self.quantum_entropy_harvester.initialize()
 		await self.post_quantum_crypto.initialize()
 		await self.zero_knowledge_engine.initialize()
@@ -701,7 +803,7 @@ class APGEncryptionService:
 		"""
 		Quantum-safe encryption using NIST post-quantum algorithms
 
-		Revolutionary implementation providing future-proof protection
+		Advanced implementation providing future-proof protection
 		against both classical and quantum computing attacks.
 		"""
 		assert isinstance(data, bytes), "Data must be bytes"
@@ -856,7 +958,7 @@ class APGEncryptionService:
 		"""
 		Zero-knowledge encryption with privacy preservation
 
-		Revolutionary encryption that never exposes plaintext data,
+		Advanced encryption that never exposes plaintext data,
 		even to system administrators.
 		"""
 		assert isinstance(data, bytes), "Data must be bytes"
@@ -925,7 +1027,7 @@ class APGEncryptionService:
 		"""
 		Homomorphic computation on encrypted data
 
-		Revolutionary capability to perform computations without decryption,
+		Advanced capability to perform computations without decryption,
 		enabling privacy-preserving analytics and machine learning.
 		"""
 		assert isinstance(encrypted_ciphertexts, list), "Ciphertexts must be list"
@@ -988,7 +1090,7 @@ class APGEncryptionService:
 		"""
 		Autonomous AI-driven key lifecycle management
 
-		Revolutionary AI system that automatically manages key generation,
+		Advanced AI system that automatically manages key generation,
 		rotation, backup, and destruction based on usage patterns and threats.
 		"""
 		assert isinstance(tenant_id, str) and len(tenant_id) >= 8, "Invalid tenant_id"
@@ -1173,8 +1275,8 @@ class APGEncryptionService:
 			data_classification='standard',
 			operation_latency_ms=latency_ms,
 			throughput_mbps=(data_size * 8 / 1024 / 1024) / (latency_ms / 1000) if latency_ms > 0 else 0,
-			cpu_usage_percent=25.0,  # Mock value
-			memory_usage_mb=128.0,   # Mock value
+			cpu_usage_percent=25.0,  # Simulated runtime metric
+			memory_usage_mb=128.0,   # Simulated runtime metric
 			threat_level_at_operation=ThreatLevel.LOW,
 			security_level_achieved=SecurityLevel.LEVEL_3,
 			entropy_quality=0.999,
@@ -1249,8 +1351,8 @@ class APGEncryptionService:
 		logger.info(f"Autonomous key management completed: {operation_id}, decisions={decisions}, actions={actions}")
 
 
-# Revolutionary Engine Implementations
-# These are placeholder implementations for the core functionality
+# Advanced Engine Implementations
+# Adapter-oriented engine scaffolding for optional provider integrations
 # In production, these would integrate with actual cryptographic libraries
 
 class QuantumEntropyHarvester:

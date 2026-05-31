@@ -27,7 +27,9 @@ def dashboard_model(
 		"operations": service.list_operations(tenant_id),
 		"exception_reviews": service.list_exception_reviews(tenant_id),
 		"rotations": service.list_rotations(tenant_id),
+		"crypto_agents": service.list_crypto_agents(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 	}
 
@@ -147,11 +149,41 @@ def audit_timeline_model(
 	}
 
 
+def crypto_agents_model(
+	service: EncrService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or api.SERVICE
+	contract = service.describe(tenant_id)
+	agents = contract["agents"]
+	return {
+		"route": "/encr/agents",
+		"tenant_id": tenant_id,
+		"crypto_agents": service.list_crypto_agents(tenant_id),
+		"supported_runtimes": agents["supported_runtimes"],
+		"supported_roles": agents["supported_roles"],
+		"privileged_roles": agents["privileged_roles"],
+		"guardrails": agents["guardrails"],
+		"required_fields": [
+			"id",
+			"name",
+			"runtime",
+			"role",
+			"scope",
+			"owner",
+			"purpose",
+			"contribution_disclosed",
+		],
+	}
+
+
 def settings_model(tenant_id: str = "default") -> dict[str, object]:
 	contract = get_capability_contract(tenant_id)
 	return {
 		"route": "/encr/settings",
 		"tenant_id": tenant_id,
 		"configuration": contract["configuration"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 	}

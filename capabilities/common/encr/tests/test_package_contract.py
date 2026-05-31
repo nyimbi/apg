@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import importlib.util
+import json
 import sys
 
 import pytest
@@ -32,8 +33,10 @@ def test_contract_shape_is_valid():
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "encr"
-	assert len(contract["ui"]["routes"]) >= 11
-	assert len(contract["rule_engine"]["rules"]) >= 9
+	assert len(contract["ui"]["routes"]) >= 12
+	assert len(contract["rule_engine"]["rules"]) >= 14
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["engine"] == "bytewax"
 	assert contract["theme"]["tokens"]["border.radius"]
 
 
@@ -43,16 +46,24 @@ def test_app_entrypoint_is_publishable():
 	self_test = module.self_test()
 	manifest = module.component_manifest()
 	model = module.semantic_model()
+	committed_model = json.loads((PACKAGE_DIR / "semantic_model.json").read_text())
+	committed_report = json.loads((PACKAGE_DIR / "release_report.json").read_text())
 	capability = model["capabilities"]["encr"]
 
 	assert self_test["passed"] is True
+	assert committed_model == model
+	assert committed_report["ok"] is True
+	assert committed_report["evidence"]["contracts"]["capability_contract"]["rule_count"] >= 14
 	assert manifest["kind"] == "apg.generated_application"
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "encr" in model["capabilities"]
-	assert len(capability["ui"]["routes"]) >= 11
+	assert len(capability["ui"]["routes"]) >= 12
 	assert capability["approvals"]["crypto_exception"] == "CryptoExceptionReviewRecord"
 	assert capability["approvals"]["key_rotation"] == "KeyRotationRecord"
+	assert capability["approvals"]["crypto_agent"] == "CryptoAgentRecord"
+	assert capability["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert capability["streaming"]["engine"] == "bytewax"
 
 
 def test_encryption_lifecycle_records_domains_operations_reviews_rotations_and_audit():
@@ -110,6 +121,22 @@ def test_encryption_lifecycle_records_domains_operations_reviews_rotations_and_a
 		actor="key-admin",
 		evidence="audit://encr/finance-pii/rotation",
 	)
+	agent = service.register_crypto_agent(
+		tenant_id="tenant-a",
+		agent_id="rotation-agent",
+		name="Rotation Reviewer",
+		runtime="opencode",
+		role="threat-rotation-reviewer",
+		scope="restricted key-domain rotation review",
+		owner="secops",
+		purpose="review compromise-triggered crypto rotation evidence",
+		human_approval_required=True,
+	)
+	batch = service.validate_crypto_lifecycle_batch(
+		tenant_id="tenant-a",
+		event_stream="ByteWax",
+		mutation_count=3,
+	)
 	after_rotation = service.evaluate_crypto_operation(
 		tenant_id="tenant-a",
 		operation_id="post-rotation",
@@ -125,9 +152,14 @@ def test_encryption_lifecycle_records_domains_operations_reviews_rotations_and_a
 	assert legacy["status"] == "review_required"
 	assert approved["status"] == "approved"
 	assert completed["status"] == "completed"
+	assert agent["runtime"] == "opencode"
+	assert agent["role"] == "threat_rotation_reviewer"
+	assert batch["event_stream"] == "bytewax"
+	assert batch["accepted"] is True
 	assert after_rotation["status"] == "allowed"
 	assert summary["key_domain_count"] == 1
 	assert summary["operation_count"] == 3
+	assert summary["crypto_agent_count"] == 1
 	assert summary["pending_exception_count"] == 0
 	assert summary["scheduled_rotation_count"] == 0
 	assert {event["event_type"] for event in service.list_audit_events("tenant-a")} >= {
@@ -138,6 +170,7 @@ def test_encryption_lifecycle_records_domains_operations_reviews_rotations_and_a
 		"crypto_exception_decided",
 		"key_rotation_scheduled",
 		"key_rotation_completed",
+		"crypto_agent_registered",
 	}
 
 
@@ -225,6 +258,21 @@ def test_guardrails_fail_closed_for_crypto_operations_reviews_and_rotations():
 	completed = service.complete_key_rotation("tenant-a", rotation["id"], "key-admin", "audit://rotation")
 	with pytest.raises(ValueError, match="key_rotation_already_completed"):
 		service.complete_key_rotation("tenant-a", completed["id"], "key-admin", "audit://rotation-again")
+	with pytest.raises(PermissionError, match="crypto_agent_privileged_role_requires_human_approval"):
+		service.register_crypto_agent(
+			"tenant-a",
+			"agent-denied",
+			"Agent Denied",
+			"codex",
+			"exception_reviewer",
+			"legacy exception review",
+			"secops",
+			"review crypto exceptions",
+		)
+	with pytest.raises(PermissionError, match="bytewax_crypto_stream_required"):
+		service.validate_crypto_lifecycle_batch("tenant-a", "kafka", 1)
+	with pytest.raises(ValueError, match="crypto_lifecycle_batch_empty"):
+		service.validate_crypto_lifecycle_batch("tenant-a", "bytewax", 0)
 
 	assert restricted_denied["status"] == "denied"
 	assert plaintext_denied["status"] == "denied"
@@ -296,6 +344,22 @@ def test_api_and_view_models_expose_crypto_posture_surfaces():
 		"actor": "key-admin",
 		"evidence": "audit://rotation/documents",
 	})
+	agent = api.register_crypto_agent({
+		"tenant_id": "tenant-b",
+		"id": "policy-agent",
+		"name": "Policy Agent",
+		"runtime": "claude-code",
+		"role": "crypto-policy-reviewer",
+		"scope": "crypto policy change review",
+		"owner": "secops",
+		"purpose": "review generated crypto policy changes",
+		"contribution_disclosed": True,
+	})
+	batch = api.validate_crypto_lifecycle_batch({
+		"tenant_id": "tenant-b",
+		"event_stream": "bytewax",
+		"mutation_count": 2,
+	})
 	with pytest.raises(PermissionError, match="tenant_context_required"):
 		api.evaluate_crypto_operation({
 			"id": "missing-tenant-operation",
@@ -317,12 +381,17 @@ def test_api_and_view_models_expose_crypto_posture_surfaces():
 	homomorphic = views.homomorphic_workspace_model("tenant-b")
 	analytics = views.analytics_model(tenant_id="tenant-b")
 	audit = views.audit_timeline_model(tenant_id="tenant-b")
+	agents = views.crypto_agents_model(tenant_id="tenant-b")
 	settings = views.settings_model("tenant-b")
 
 	assert status["key_domain_count"] == 1
 	assert status["operation_count"] == 2
+	assert status["crypto_agent_count"] == 1
 	assert posture["summary"]["scheduled_rotation_count"] == 0
+	assert posture["crypto_agents"][0]["id"] == agent["id"]
+	assert batch["required_processor"] == "bytewax"
 	assert dashboard["summary"]["operation_count"] == 2
+	assert dashboard["streaming"]["engine"] == "bytewax"
 	assert operations["review_required"] == []
 	assert keys["classifications"][-1] == "critical"
 	assert policies["decision_order"] == ["deny", "require_review", "allow"]
@@ -332,5 +401,9 @@ def test_api_and_view_models_expose_crypto_posture_surfaces():
 	assert "aggregate" in homomorphic["supported_operations"]
 	assert analytics["summary"]["key_domain_count"] == 1
 	assert audit["events"]
+	assert agents["crypto_agents"][0]["runtime"] == "claude_code"
+	assert "exception_reviewer" in agents["privileged_roles"]
+	assert settings["agents"]["first_class"] is True
+	assert settings["streaming"]["lifecycle_stream"] == "encr.lifecycle"
 	assert settings["theme"]["name"] == "encr_quantum_guard"
 	assert api_threat_bypass["status"] == "denied"

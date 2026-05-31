@@ -1,23 +1,9 @@
-"""
-APG Encryption Services Capability
+"""APG Encryption Services capability.
 
-Revolutionary enterprise encryption platform providing quantum-safe cryptography,
-zero-knowledge architecture, and autonomous key lifecycle management that surpasses
-industry leaders by 10x.
-
-This capability integrates seamlessly with the APG ecosystem to provide:
-- Quantum-resistant cryptographic algorithms (NIST post-quantum standards)
-- Zero-knowledge encryption architecture
-- Autonomous AI-driven key lifecycle management
-- Homomorphic computation on encrypted data
-- Neuromorphic cryptographic processing
-- Cognitive threat-adaptive encryption
-
-APG Integration:
-- Composition Engine: Registered as high-priority cryptographic capability
-- Dependencies: auth, secu, audl, keym capabilities
-- Multi-Tenant: Complete tenant isolation with shared threat intelligence
-- Performance: Sub-microsecond encryption operations
+ENCR supplies package-safe cryptographic governance for generated APG
+applications: key-domain posture, operation decisions, exception review,
+evidence-backed rotation, first-class crypto agents, and Bytewax lifecycle
+stream metadata.
 """
 
 import base64
@@ -37,7 +23,7 @@ from .capability_contract import (
 CAPABILITY_METADATA = {
 	"name": "encr",
 	"display_name": "Encryption Services",
-	"description": "Revolutionary quantum-safe encryption platform with zero-knowledge architecture",
+	"description": "Cryptographic governance capability with quantum-safe controls and first-class agent composition",
 	"version": "1.0.0",
 	"category": "security_foundation",
 	"priority": "HIGH",
@@ -48,7 +34,7 @@ CAPABILITY_METADATA = {
 	# APG Composition Engine Integration
 	"composition": {
 		"load_order": 15,  # After auth (10), secu (12), audl (14)
-		"dependencies": ["auth", "secu", "audl"],
+		"dependencies": ["conf", "auth", "secu", "audl"],
 		"optional_dependencies": ["keym", "moni", "aicr"],
 		"provides": [
 			"quantum_safe_encryption",
@@ -153,6 +139,8 @@ def register_capability() -> Dict[str, Any]:
 			"crypto_operation_governance": "Evaluate crypto operation decisions with package-backed audit state",
 			"crypto_exception_review": "Govern legacy algorithm exceptions with independent review",
 			"threat_adaptive_key_rotation": "Schedule and complete key rotations with evidence",
+			"crypto_agent_composition": "Register accountable AI agents for crypto governance workflows",
+			"bytewax_lifecycle_streaming": "Require Bytewax for crypto lifecycle batch mutations",
 			"capability_rules": "Evaluate deterministic cryptographic governance rules",
 			"visual_theming": "Apply encryption-control theme tokens and components"
 		},
@@ -163,6 +151,7 @@ def register_capability() -> Dict[str, Any]:
 			"entropy": "/encr/api/v1/entropy",
 			"exceptions": "/encr/api/v1/exceptions",
 			"rotations": "/encr/api/v1/rotations",
+			"agents": "/encr/api/v1/agents",
 			"homomorphic": "/encr/api/v1/homomorphic",
 			"analytics": "/encr/api/v1/analytics",
 			"audit": "/encr/api/v1/audit"
@@ -173,6 +162,8 @@ def register_capability() -> Dict[str, Any]:
 		},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"permissions": [
 			"encr:view",
 			"encr:operate",

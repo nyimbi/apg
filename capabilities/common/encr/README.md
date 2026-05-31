@@ -21,6 +21,9 @@ homomorphic, or KEYM integrations.
   threat-adaptive rotation.
 - Crypto exception review with independent reviewer and reviewer notes.
 - Key rotation scheduling and completion with evidence.
+- First-class crypto-agent composition for policy, lifecycle, entropy,
+  exception, threat-rotation, and homomorphic-compute review.
+- Bytewax lifecycle stream enforcement for grouped crypto mutations.
 - API helpers and UI view models for generated APG applications.
 - Contract, theme, semantic model, and release evidence for APG composition
   tooling.
@@ -99,6 +102,33 @@ completed = service.complete_key_rotation(
 )
 ```
 
+Register accountable crypto agents before allowing AI participation in ENCR
+governance workflows:
+
+```python
+agent = service.register_crypto_agent(
+	tenant_id="tenant-a",
+	agent_id="rotation-agent",
+	name="Rotation Reviewer",
+	runtime="opencode",
+	role="threat-rotation-reviewer",
+	scope="restricted key-domain rotation review",
+	owner="secops",
+	purpose="review compromise-triggered rotation evidence",
+	human_approval_required=True,
+)
+```
+
+Batch lifecycle mutations must be accepted through Bytewax:
+
+```python
+batch = service.validate_crypto_lifecycle_batch(
+	tenant_id="tenant-a",
+	event_stream="bytewax",
+	mutation_count=3,
+)
+```
+
 ## API Helpers
 
 `api.py` exposes a shared dependency-light service:
@@ -110,6 +140,8 @@ completed = service.complete_key_rotation(
 - `decide_crypto_exception`
 - `schedule_key_rotation`
 - `complete_key_rotation`
+- `register_crypto_agent`
+- `validate_crypto_lifecycle_batch`
 - `list_crypto_posture`
 - compatibility `create_record` and `list_records`
 
@@ -127,7 +159,21 @@ completed = service.complete_key_rotation(
 - homomorphic workspace
 - analytics
 - audit timeline
+- crypto-agent roster
 - settings
+
+## Agent Guardrails
+
+Supported runtimes are `codex`, `claude_code`, `opencode`, and `pi`. Supported
+roles are `crypto_policy_reviewer`, `key_lifecycle_reviewer`,
+`entropy_reviewer`, `exception_reviewer`, `threat_rotation_reviewer`, and
+`homomorphic_compute_reviewer`. Privileged roles require human approval:
+`exception_reviewer`, `threat_rotation_reviewer`, and
+`homomorphic_compute_reviewer`.
+
+Every crypto agent must declare owner, purpose, scope, and contribution
+disclosure. The service rejects unsupported runtimes, unsupported roles, missing
+scope, missing disclosure, and privileged registrations without human approval.
 
 ## Adapter Boundaries
 

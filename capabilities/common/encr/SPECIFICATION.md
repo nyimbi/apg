@@ -25,6 +25,11 @@ evidence.
   operations that require review, especially legacy algorithm use.
 - **Key rotation**: scheduled and completed rotation evidence for threat
   adaptive encryption.
+- **Crypto agent**: an accountable first-class AI agent that can review crypto
+  policy, key lifecycle, entropy posture, exceptions, threat-triggered
+  rotations, or homomorphic compute requests.
+- **Crypto lifecycle stream**: the Bytewax-backed event stream that must carry
+  batch crypto lifecycle mutations into generated APG applications.
 - **Audit event**: immutable package evidence for key-domain, operation,
   review, and rotation lifecycle transitions.
 
@@ -44,9 +49,16 @@ evidence.
 8. Active threat signals must deny sensitive operations until affected key
    domains have completed rotation.
 9. Rotation completion must require actor and evidence.
-10. API helpers and UI view models must expose the lifecycle state for generated
+10. Crypto agents must use supported APG runtimes: `codex`, `claude_code`,
+    `opencode`, or `pi`.
+11. Crypto agents must declare supported ENCR roles, owner, purpose, operating
+    scope, and contribution disclosure.
+12. Privileged crypto-agent roles must require human approval.
+13. Crypto lifecycle batch mutations must use Bytewax and be rejected when
+    routed through any other stream engine.
+14. API helpers and UI view models must expose the lifecycle state for generated
     APG applications.
-11. `app.py`, `semantic_model.json`, `release_report.json`, and
+15. `app.py`, `semantic_model.json`, `release_report.json`, and
     `package_manifest.json` must reflect the live capability contract.
 
 ## Adapter Boundaries
@@ -62,14 +74,20 @@ Production integrations belong behind adapters that preserve the same contract:
 
 ## Current Lifecycle Packet
 
-This slice adds the executable cryptographic governance packet:
+This slice maintains the executable cryptographic governance packet and extends
+it with first-class agent composition:
 
 - register key domains;
 - evaluate crypto operations against ENCR deterministic rules;
 - request and decide crypto exception reviews;
 - schedule and complete key rotations with evidence;
+- register crypto agents with runtime, role, owner, purpose, scope, disclosure,
+  and privileged human-approval evidence;
+- validate Bytewax crypto lifecycle batches before accepting grouped mutation
+  work;
 - expose operation queues, exception queues, rotation consoles, audit timelines,
-  and contract-derived semantic evidence.
+  crypto-agent rosters, Bytewax stream metadata, and contract-derived semantic
+  evidence.
 
 ## Focused Proof
 

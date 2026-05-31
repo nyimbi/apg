@@ -30,8 +30,10 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"compliance",
 		"ui",
 		"theme",
+		"agents",
+		"streaming",
 	]
-	assert len(contract["rule_engine"]["rules"]) >= 9
+	assert len(contract["rule_engine"]["rules"]) >= 14
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
 		"operations",
@@ -43,6 +45,7 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"homomorphic",
 		"analytics",
 		"audit",
+		"agents",
 		"settings",
 	}
 	assert contract["ui"]["api_prefix"] == "/encr/api/v1"
@@ -53,7 +56,12 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"crypto_exception_queue",
 		"key_rotation_timeline",
 		"crypto_audit_timeline",
+		"crypto_agent_roster",
+		"bytewax_stream_indicator",
 	} <= set(contract["theme"]["components"])
+	assert contract["agents"]["first_class"] is True
+	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert contract["streaming"]["engine"] == "bytewax"
 
 
 def test_rule_engine_enforces_crypto_guardrails():
@@ -107,6 +115,35 @@ def test_rule_engine_enforces_crypto_guardrails():
 			},
 			"key_rotation_evidence_required",
 		),
+		(
+			{
+				"operation": "register_crypto_agent",
+				"crypto_agent_runtime_supported": False,
+				"crypto_agent_role_supported": True,
+				"crypto_agent_scope_attached": True,
+				"crypto_agent_privileged_role": False,
+				"human_approval_required": False,
+			},
+			"crypto_agent_runtime_not_supported",
+		),
+		(
+			{
+				"operation": "register_crypto_agent",
+				"crypto_agent_runtime_supported": True,
+				"crypto_agent_role_supported": True,
+				"crypto_agent_scope_attached": True,
+				"crypto_agent_privileged_role": True,
+				"human_approval_required": False,
+			},
+			"crypto_agent_privileged_role_requires_human_approval",
+		),
+		(
+			{
+				"operation": "validate_crypto_lifecycle_batch",
+				"event_stream": "kafka",
+			},
+			"bytewax_crypto_stream_required",
+		),
 	],
 )
 def test_rule_engine_enforces_exception_and_rotation_guardrails(context, reason):
@@ -126,6 +163,9 @@ def test_registration_includes_full_capability_contract():
 	assert registration["ui_components"]["homomorphic"] == "/encr/homomorphic"
 	assert registration["ui_components"]["exceptions"] == "/encr/exceptions"
 	assert registration["ui_components"]["rotations"] == "/encr/rotations"
+	assert registration["ui_components"]["agents"] == "/encr/agents"
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["engine"] == "bytewax"
 	assert "secu" in registration["dependencies"]
 	assert "encr:review" in registration["permissions"]
 	assert "encr:rotate" in registration["permissions"]

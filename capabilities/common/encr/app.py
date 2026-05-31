@@ -52,14 +52,15 @@ def semantic_model() -> dict[str, Any]:
 			"encr": {
 				"name": contract["display_name"],
 				"configuration": contract["configuration"],
-				"provides": ["encr_operations"],
-				"requires": [],
+				"provides": contract["provides"],
+				"requires": contract["requires"],
 				"erp_modules": ["common"],
 				"rule_engine": contract["rule_engine"],
 				"rules": contract["rule_engine"]["rules"],
 				"ui": contract["ui"],
 				"screens": routes,
 				"theme": contract["theme"],
+				"agents": contract["agents"],
 				"runtime": {
 					"api": "api.py",
 					"entrypoint": "app.py",
@@ -71,18 +72,21 @@ def semantic_model() -> dict[str, Any]:
 				"approvals": {
 					"crypto_exception": "CryptoExceptionReviewRecord",
 					"key_rotation": "KeyRotationRecord",
+					"crypto_agent": "CryptoAgentRecord",
 				},
 				"i18n": {},
 				"master_data": {},
-				"streaming": {},
+				"streaming": contract["streaming"],
 			}
 		},
 		"contracts": {
 			"encr": {
 				"id": "encr",
 				"configuration": contract["configuration"],
-				"provides": ["encr_operations"],
-				"requires": [],
+				"provides": contract["provides"],
+				"requires": contract["requires"],
+				"agents": contract["agents"],
+				"streaming": contract["streaming"],
 			}
 		},
 		"rules": {
@@ -90,16 +94,23 @@ def semantic_model() -> dict[str, Any]:
 			for rule in contract["rule_engine"]["rules"]
 		},
 		"composition": {
-			"capability_dependencies": {"encr": []},
+			"capability_dependencies": {"encr": contract["requires"]},
 			"applications": {},
-			"agent_teams": {},
+			"agent_teams": {
+				"encr_crypto_governance": {
+					"capability": "encr",
+					"roles": contract["agents"]["supported_roles"],
+					"runtimes": contract["agents"]["supported_runtimes"],
+					"guardrails": contract["agents"]["guardrails"],
+				}
+			},
 		},
 		"deployment": {
 			"source": "capability_contract.py",
 			"target": "python",
 		},
 		"graphs": {
-			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"capability": {"kind": "capability", "nodes": 1, "edges": len(contract["requires"])},
 			"package": {"kind": "package", "nodes": 2, "edges": 1},
 		},
 		"source_files": ["capability_contract.py"],
@@ -116,7 +127,7 @@ def semantic_model() -> dict[str, Any]:
 				"references": [],
 			}
 		},
-		"agents": {},
+		"agents": {"encr_agent_contract": contract["agents"]},
 		"flows": {},
 		"llms": {},
 		"operations": {},
@@ -152,6 +163,8 @@ def self_test() -> dict[str, Any]:
 	errors: list[str] = []
 	routes = model.get("capabilities", {}).get("encr", {}).get("ui", {}).get("routes", [])
 	approvals = model.get("capabilities", {}).get("encr", {}).get("approvals", {})
+	streaming = model.get("capabilities", {}).get("encr", {}).get("streaming", {})
+	agents = model.get("capabilities", {}).get("encr", {}).get("agents", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "encr" not in model.get("capabilities", {}):
@@ -160,8 +173,12 @@ def self_test() -> dict[str, Any]:
 		errors.append("component manifest semantic model interface mismatch")
 	if len(routes) < 11:
 		errors.append("ENCR semantic model route manifest is stale")
-	if "crypto_exception" not in approvals or "key_rotation" not in approvals:
+	if "crypto_exception" not in approvals or "key_rotation" not in approvals or "crypto_agent" not in approvals:
 		errors.append("ENCR semantic model approval manifest is stale")
+	if streaming.get("engine") != "bytewax":
+		errors.append("ENCR semantic model streaming manifest is stale")
+	if not agents.get("first_class"):
+		errors.append("ENCR semantic model agent manifest is stale")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

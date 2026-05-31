@@ -4,27 +4,31 @@
 
 Build one coherent lifecycle and guardrail packet for Encryption Services:
 tenant key domains, cryptographic operation decisions, crypto exception review,
-threat-adaptive key rotation, UI view models, rule/contract evidence, tests,
+threat-adaptive key rotation, first-class crypto-agent composition, Bytewax
+lifecycle stream enforcement, UI view models, rule/contract evidence, tests,
 and publish proof.
 
 ## Steps
 
-1. Add package documentation: `SPECIFICATION.md`, `PLAN.md`, top-level
-   `README.md`, and current lifecycle notes in `cap_spec.md`.
-2. Add a dependency-light `EncrService` to `service.py` without disturbing the
-   existing async encryption engine.
-3. Extend `api.py` and `views.py` to expose key domains, operations, exception
-   reviews, rotations, audit events, and shared service state.
-4. Extend `capability_contract.py` with operation governance configuration,
-   exception/rotation/audit routes, additional deterministic rules, and theme
-   components.
-5. Replace embedded semantic evidence in `app.py` with contract-derived
-   evidence and add self-test staleness checks.
-6. Rename the stale package test and add positive/negative lifecycle coverage.
-7. Refresh `semantic_model.json`, `release_report.json`, and
-   `package_manifest.json`.
-8. Run focused py_compile, focused pytest, implementation audit, publish plan,
-   stale marker search, and whitespace checks.
+1. Refresh `SPECIFICATION.md`, `PLAN.md`, `README.md`, `cap_spec.md`, and
+   `todo.md` so ENCR documentation names the current source of truth.
+2. Extend `capability_contract.py` with agent runtime/role metadata, Bytewax
+   streaming metadata, deterministic agent/stream guardrails, route metadata,
+   and theme components.
+3. Extend `EncrService` with `CryptoAgentRecord`, agent registration, agent
+   listing, Bytewax lifecycle batch validation, dashboard counts, and audit
+   evidence.
+4. Extend `api.py` and `views.py` to expose crypto-agent registration,
+   crypto-agent rosters, streaming metadata, and posture evidence.
+5. Extend `app.py` and generated semantic evidence with contract-derived
+   `provides`, `requires`, `agents`, `streaming`, dependency graph edges, and
+   self-test staleness checks.
+6. Update package tests for the agent lifecycle, privileged-role denials,
+   non-Bytewax denials, API helpers, and view models.
+7. Refresh `semantic_model.json` and `release_report.json`.
+8. Run focused py_compile, focused pytest, app self-test, inspect,
+   implementation audit, publish plan, stale marker search on touched source,
+   and whitespace checks.
 9. Record progress in `docs/progress_log.md`, commit with Lore trailers, and
    push.
 
@@ -33,5 +37,10 @@ and publish proof.
 - Do not allow caller-supplied booleans to bypass fail-closed rule checks.
 - Do not approve legacy algorithm review through self-review or missing notes.
 - Do not complete rotations without evidence.
+- Do not allow AI agents to operate without owner, purpose, scope, and
+  contribution disclosure.
+- Do not allow privileged crypto-agent roles without explicit human approval.
+- Do not accept crypto lifecycle batch mutations from Kafka or any non-Bytewax
+  stream.
 - Keep live KMS/HSM/KEYM/post-quantum/ZK/homomorphic providers behind adapters.
 - Keep generated semantic evidence derived from the live contract.

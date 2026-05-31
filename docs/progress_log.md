@@ -20494,3 +20494,62 @@ Not run to preserve battery:
 - Live SIEM, SOAR, EDR, MDM, IAM, GRC, DLP, notification, ticketing, AI threat
   providers, persistent storage, rendered browser UI, live Bytewax topology,
   and performance/load tests.
+
+### 2026-05-31 03:25 EAT
+
+ENCR crypto-agent composition and Bytewax guardrail packet:
+
+- Selected `capabilities/common/encr` as the next foundation capability after
+  SECU.
+- Extended the ENCR executable contract with first-class crypto-agent metadata,
+  supported runtimes `codex`, `claude_code`, `opencode`, and `pi`, supported
+  crypto governance roles, privileged-role metadata, Bytewax lifecycle stream
+  metadata, route metadata, theme components, and contract-level
+  `provides`/`requires`.
+- Added deterministic guardrails for unsupported crypto-agent runtime,
+  unsupported crypto-agent role, missing crypto-agent scope, privileged
+  crypto-agent registration without human approval, and non-Bytewax crypto
+  lifecycle batch routing.
+- Added `CryptoAgentRecord`, tenant-qualified crypto-agent storage,
+  registration, listing, audit events, lifecycle batch validation, dashboard
+  counts, API helper payload handling, and crypto-agent roster view models.
+- Added `/encr/agents`, crypto-agent roster theme metadata, and Bytewax stream
+  indicator theme metadata.
+- Regenerated `semantic_model.json` and `release_report.json` from the live
+  `app.py` contract and added test coverage proving the committed JSON matches
+  the live semantic model.
+- Replaced stale `cap_spec.md` and `todo.md` content with current
+  source-of-truth and adapter-backlog notes.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/encr/capability_contract.py capabilities/common/encr/service.py capabilities/common/encr/api.py capabilities/common/encr/views.py capabilities/common/encr/app.py capabilities/common/encr/__init__.py capabilities/common/encr/tests/test_capability_contract.py capabilities/common/encr/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/encr/tests/test_capability_contract.py capabilities/common/encr/tests/test_package_contract.py`
+  passed with 14 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python capabilities/common/encr/app.py` passed with `passed:
+  true`.
+- `./.venv/bin/apg capabilities inspect encr --json` passed with `ok: true`,
+  12 APG Python routes, 14 deterministic rules, first-class agents, and
+  Bytewax streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/encr --json`
+  passed with `ok: true`; ENCR remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/encr --json`
+  passed with side-effect-free package evidence and no warnings.
+- `find capabilities/common/encr -name '*.py' -not -path '*/__pycache__/*' -exec ./.venv/bin/python -m py_compile {} +`
+  passed.
+- `./.venv/bin/python -c "... EncrService ... register_crypto_agent ... validate_crypto_lifecycle_batch ..."`
+  returned one `claude_code` exception-review agent with owner and purpose
+  evidence, human approval required, normalized role, and `bytewax` stream
+  evidence.
+- Focused stale-marker scan over touched ENCR source, docs, and tests returned
+  only intentional non-Bytewax guardrail references.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live HSM, KMS, vault, APG KEYM, post-quantum SDK, entropy hardware,
+  zero-knowledge prover, homomorphic compute, SIEM, SOAR, DLP, GRC, audit
+  exporter, persistent storage, rendered browser UI, live Bytewax topology, and
+  performance/load tests.

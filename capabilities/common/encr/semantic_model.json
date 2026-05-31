@@ -1,5 +1,37 @@
 {
-  "agents": {},
+  "agents": {
+    "encr_agent_contract": {
+      "first_class": true,
+      "guardrails": [
+        "runtime_supported",
+        "role_supported",
+        "scope_required",
+        "owner_required",
+        "purpose_required",
+        "human_approval_for_privileged_roles",
+        "contribution_disclosure_required"
+      ],
+      "privileged_roles": [
+        "exception_reviewer",
+        "homomorphic_compute_reviewer",
+        "threat_rotation_reviewer"
+      ],
+      "supported_roles": [
+        "crypto_policy_reviewer",
+        "key_lifecycle_reviewer",
+        "entropy_reviewer",
+        "exception_reviewer",
+        "threat_rotation_reviewer",
+        "homomorphic_compute_reviewer"
+      ],
+      "supported_runtimes": [
+        "codex",
+        "claude_code",
+        "opencode",
+        "pi"
+      ]
+    }
+  },
   "app": {
     "description": "Encryption Services package-backed APG capability",
     "entity_count": 0,
@@ -8,13 +40,72 @@
   },
   "capabilities": {
     "encr": {
+      "agents": {
+        "first_class": true,
+        "guardrails": [
+          "runtime_supported",
+          "role_supported",
+          "scope_required",
+          "owner_required",
+          "purpose_required",
+          "human_approval_for_privileged_roles",
+          "contribution_disclosure_required"
+        ],
+        "privileged_roles": [
+          "exception_reviewer",
+          "homomorphic_compute_reviewer",
+          "threat_rotation_reviewer"
+        ],
+        "supported_roles": [
+          "crypto_policy_reviewer",
+          "key_lifecycle_reviewer",
+          "entropy_reviewer",
+          "exception_reviewer",
+          "threat_rotation_reviewer",
+          "homomorphic_compute_reviewer"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "approvals": {
+        "crypto_agent": "CryptoAgentRecord",
         "crypto_exception": "CryptoExceptionReviewRecord",
         "key_rotation": "KeyRotationRecord"
       },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "agents": {
+          "first_class": true,
+          "privileged_roles": [
+            "exception_reviewer",
+            "homomorphic_compute_reviewer",
+            "threat_rotation_reviewer"
+          ],
+          "require_contribution_disclosure": true,
+          "require_declared_purpose": true,
+          "require_human_approval_for_privileged_roles": true,
+          "require_owner": true,
+          "require_scope": true,
+          "supported_roles": [
+            "crypto_policy_reviewer",
+            "key_lifecycle_reviewer",
+            "entropy_reviewer",
+            "exception_reviewer",
+            "threat_rotation_reviewer",
+            "homomorphic_compute_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
         "compliance": {
           "audit_all_crypto_operations": true,
           "evidence_retention_days": 2555,
@@ -50,6 +141,22 @@
           "require_review_for_legacy_algorithms": true,
           "require_tenant_context": true
         },
+        "streaming": {
+          "engine": "bytewax",
+          "lifecycle_stream": "encr.lifecycle",
+          "required_operations": [
+            "crypto_lifecycle_batch",
+            "key_rotation_batch",
+            "crypto_agent_batch"
+          ],
+          "topics": [
+            "encr.key_domains",
+            "encr.operations",
+            "encr.rotations",
+            "encr.agents"
+          ],
+          "watermark": "event_time"
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
@@ -78,9 +185,16 @@
       "master_data": {},
       "name": "Encryption Services",
       "provides": [
-        "encr_operations"
+        "encr_operations",
+        "crypto_governance",
+        "crypto_agent_composition"
       ],
-      "requires": [],
+      "requires": [
+        "conf",
+        "auth",
+        "secu",
+        "audl"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -197,6 +311,72 @@
               "required_action": "attach_key_rotation_evidence"
             },
             "name": "key_rotation_completion_requires_evidence"
+          },
+          {
+            "condition": {
+              "crypto_agent_runtime_supported": false,
+              "operation": "register_crypto_agent"
+            },
+            "description": "Crypto agents must use an approved APG agent runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "crypto_agent_runtime_not_supported",
+              "required_action": "select_supported_crypto_agent_runtime"
+            },
+            "name": "crypto_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "crypto_agent_role_supported": false,
+              "operation": "register_crypto_agent"
+            },
+            "description": "Crypto agents must use an approved ENCR composition role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "crypto_agent_role_not_supported",
+              "required_action": "select_supported_crypto_agent_role"
+            },
+            "name": "crypto_agent_role_supported"
+          },
+          {
+            "condition": {
+              "crypto_agent_scope_attached": false,
+              "operation": "register_crypto_agent"
+            },
+            "description": "Crypto agents require a declared operating scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "crypto_agent_scope_required",
+              "required_action": "attach_crypto_agent_scope"
+            },
+            "name": "crypto_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "crypto_agent_privileged_role": true,
+              "human_approval_required": false,
+              "operation": "register_crypto_agent"
+            },
+            "description": "Privileged crypto-agent roles require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "crypto_agent_privileged_role_requires_human_approval",
+              "required_action": "require_human_crypto_approval"
+            },
+            "name": "crypto_agent_privileged_role_requires_human_approval"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "validate_crypto_lifecycle_batch"
+            },
+            "description": "Crypto lifecycle batch mutations must be routed through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_crypto_stream_required",
+              "required_action": "route_crypto_lifecycle_through_bytewax"
+            },
+            "name": "bytewax_crypto_stream_required"
           }
         ],
         "type": "deterministic"
@@ -316,6 +496,72 @@
             "required_action": "attach_key_rotation_evidence"
           },
           "name": "key_rotation_completion_requires_evidence"
+        },
+        {
+          "condition": {
+            "crypto_agent_runtime_supported": false,
+            "operation": "register_crypto_agent"
+          },
+          "description": "Crypto agents must use an approved APG agent runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "crypto_agent_runtime_not_supported",
+            "required_action": "select_supported_crypto_agent_runtime"
+          },
+          "name": "crypto_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "crypto_agent_role_supported": false,
+            "operation": "register_crypto_agent"
+          },
+          "description": "Crypto agents must use an approved ENCR composition role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "crypto_agent_role_not_supported",
+            "required_action": "select_supported_crypto_agent_role"
+          },
+          "name": "crypto_agent_role_supported"
+        },
+        {
+          "condition": {
+            "crypto_agent_scope_attached": false,
+            "operation": "register_crypto_agent"
+          },
+          "description": "Crypto agents require a declared operating scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "crypto_agent_scope_required",
+            "required_action": "attach_crypto_agent_scope"
+          },
+          "name": "crypto_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "crypto_agent_privileged_role": true,
+            "human_approval_required": false,
+            "operation": "register_crypto_agent"
+          },
+          "description": "Privileged crypto-agent roles require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "crypto_agent_privileged_role_requires_human_approval",
+            "required_action": "require_human_crypto_approval"
+          },
+          "name": "crypto_agent_privileged_role_requires_human_approval"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "validate_crypto_lifecycle_batch"
+          },
+          "description": "Crypto lifecycle batch mutations must be routed through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_crypto_stream_required",
+            "required_action": "route_crypto_lifecycle_through_bytewax"
+          },
+          "name": "bytewax_crypto_stream_required"
         }
       ],
       "runtime": {
@@ -325,6 +571,11 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "CryptoAgentRoster",
+          "permission": "encr:admin",
+          "route": "/encr/agents"
+        },
         "analytics": {
           "component": "CryptoAnalytics",
           "permission": "encr:view_analytics",
@@ -381,9 +632,50 @@
           "route": "/encr/settings"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax",
+        "events": [
+          "key_domain_registered",
+          "crypto_operation_allowed",
+          "crypto_operation_denied",
+          "crypto_operation_review_required",
+          "crypto_exception_decided",
+          "key_rotation_completed",
+          "crypto_agent_registered"
+        ],
+        "lifecycle_stream": "encr.lifecycle",
+        "required_operations": [
+          "crypto_lifecycle_batch",
+          "key_rotation_batch",
+          "crypto_agent_batch"
+        ],
+        "state": [
+          "key_domains",
+          "operations",
+          "exception_reviews",
+          "rotations",
+          "crypto_agents"
+        ],
+        "topics": [
+          "encr.key_domains",
+          "encr.operations",
+          "encr.rotations",
+          "encr.agents"
+        ],
+        "watermark": "event_time"
+      },
       "theme": {
         "components": {
+          "bytewax_stream_indicator": {
+            "icon": "activity",
+            "status_indicator": "stream-health",
+            "variant": "streaming"
+          },
+          "crypto_agent_roster": {
+            "icon": "bot",
+            "status_indicator": "approval-chip",
+            "variant": "agent-governance"
+          },
           "crypto_audit_timeline": {
             "icon": "scroll-text",
             "line_style": "segmented",
@@ -517,6 +809,13 @@
             "permission": "encr:view"
           },
           {
+            "component": "CryptoAgentRoster",
+            "name": "agents",
+            "nav_group": "Administration",
+            "path": "/encr/agents",
+            "permission": "encr:admin"
+          },
+          {
             "component": "EncryptionSettings",
             "name": "settings",
             "nav_group": "Administration",
@@ -534,15 +833,105 @@
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "encr_crypto_governance": {
+        "capability": "encr",
+        "guardrails": [
+          "runtime_supported",
+          "role_supported",
+          "scope_required",
+          "owner_required",
+          "purpose_required",
+          "human_approval_for_privileged_roles",
+          "contribution_disclosure_required"
+        ],
+        "roles": [
+          "crypto_policy_reviewer",
+          "key_lifecycle_reviewer",
+          "entropy_reviewer",
+          "exception_reviewer",
+          "threat_rotation_reviewer",
+          "homomorphic_compute_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
-      "encr": []
+      "encr": [
+        "conf",
+        "auth",
+        "secu",
+        "audl"
+      ]
     }
   },
   "contracts": {
     "encr": {
+      "agents": {
+        "first_class": true,
+        "guardrails": [
+          "runtime_supported",
+          "role_supported",
+          "scope_required",
+          "owner_required",
+          "purpose_required",
+          "human_approval_for_privileged_roles",
+          "contribution_disclosure_required"
+        ],
+        "privileged_roles": [
+          "exception_reviewer",
+          "homomorphic_compute_reviewer",
+          "threat_rotation_reviewer"
+        ],
+        "supported_roles": [
+          "crypto_policy_reviewer",
+          "key_lifecycle_reviewer",
+          "entropy_reviewer",
+          "exception_reviewer",
+          "threat_rotation_reviewer",
+          "homomorphic_compute_reviewer"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "configuration": {
+        "agents": {
+          "first_class": true,
+          "privileged_roles": [
+            "exception_reviewer",
+            "homomorphic_compute_reviewer",
+            "threat_rotation_reviewer"
+          ],
+          "require_contribution_disclosure": true,
+          "require_declared_purpose": true,
+          "require_human_approval_for_privileged_roles": true,
+          "require_owner": true,
+          "require_scope": true,
+          "supported_roles": [
+            "crypto_policy_reviewer",
+            "key_lifecycle_reviewer",
+            "entropy_reviewer",
+            "exception_reviewer",
+            "threat_rotation_reviewer",
+            "homomorphic_compute_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
         "compliance": {
           "audit_all_crypto_operations": true,
           "evidence_retention_days": 2555,
@@ -578,6 +967,22 @@
           "require_review_for_legacy_algorithms": true,
           "require_tenant_context": true
         },
+        "streaming": {
+          "engine": "bytewax",
+          "lifecycle_stream": "encr.lifecycle",
+          "required_operations": [
+            "crypto_lifecycle_batch",
+            "key_rotation_batch",
+            "crypto_agent_batch"
+          ],
+          "topics": [
+            "encr.key_domains",
+            "encr.operations",
+            "encr.rotations",
+            "encr.agents"
+          ],
+          "watermark": "event_time"
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
@@ -601,9 +1006,48 @@
       },
       "id": "encr",
       "provides": [
-        "encr_operations"
+        "encr_operations",
+        "crypto_governance",
+        "crypto_agent_composition"
       ],
-      "requires": []
+      "requires": [
+        "conf",
+        "auth",
+        "secu",
+        "audl"
+      ],
+      "streaming": {
+        "engine": "bytewax",
+        "events": [
+          "key_domain_registered",
+          "crypto_operation_allowed",
+          "crypto_operation_denied",
+          "crypto_operation_review_required",
+          "crypto_exception_decided",
+          "key_rotation_completed",
+          "crypto_agent_registered"
+        ],
+        "lifecycle_stream": "encr.lifecycle",
+        "required_operations": [
+          "crypto_lifecycle_batch",
+          "key_rotation_batch",
+          "crypto_agent_batch"
+        ],
+        "state": [
+          "key_domains",
+          "operations",
+          "exception_reviews",
+          "rotations",
+          "crypto_agents"
+        ],
+        "topics": [
+          "encr.key_domains",
+          "encr.operations",
+          "encr.rotations",
+          "encr.agents"
+        ],
+        "watermark": "event_time"
+      }
     }
   },
   "deployment": {
@@ -615,7 +1059,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 4,
       "kind": "capability",
       "nodes": 1
     },
@@ -648,6 +1092,72 @@
         "required_action": "rotate_affected_keys"
       },
       "name": "active_threat_requires_key_rotation"
+    },
+    "bytewax_crypto_stream_required": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "validate_crypto_lifecycle_batch"
+      },
+      "description": "Crypto lifecycle batch mutations must be routed through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_crypto_stream_required",
+        "required_action": "route_crypto_lifecycle_through_bytewax"
+      },
+      "name": "bytewax_crypto_stream_required"
+    },
+    "crypto_agent_privileged_role_requires_human_approval": {
+      "condition": {
+        "crypto_agent_privileged_role": true,
+        "human_approval_required": false,
+        "operation": "register_crypto_agent"
+      },
+      "description": "Privileged crypto-agent roles require human approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "crypto_agent_privileged_role_requires_human_approval",
+        "required_action": "require_human_crypto_approval"
+      },
+      "name": "crypto_agent_privileged_role_requires_human_approval"
+    },
+    "crypto_agent_requires_scope": {
+      "condition": {
+        "crypto_agent_scope_attached": false,
+        "operation": "register_crypto_agent"
+      },
+      "description": "Crypto agents require a declared operating scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "crypto_agent_scope_required",
+        "required_action": "attach_crypto_agent_scope"
+      },
+      "name": "crypto_agent_requires_scope"
+    },
+    "crypto_agent_role_supported": {
+      "condition": {
+        "crypto_agent_role_supported": false,
+        "operation": "register_crypto_agent"
+      },
+      "description": "Crypto agents must use an approved ENCR composition role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "crypto_agent_role_not_supported",
+        "required_action": "select_supported_crypto_agent_role"
+      },
+      "name": "crypto_agent_role_supported"
+    },
+    "crypto_agent_runtime_supported": {
+      "condition": {
+        "crypto_agent_runtime_supported": false,
+        "operation": "register_crypto_agent"
+      },
+      "description": "Crypto agents must use an approved APG agent runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "crypto_agent_runtime_not_supported",
+        "required_action": "select_supported_crypto_agent_runtime"
+      },
+      "name": "crypto_agent_runtime_supported"
     },
     "crypto_exception_requires_independent_reviewer": {
       "condition": {
