@@ -6,6 +6,30 @@ from copy import deepcopy
 from typing import Any
 
 
+SUPPORTED_AICR_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_AICR_AGENT_ROLES = [
+	"model_reviewer",
+	"prompt_reviewer",
+	"inference_reviewer",
+	"safety_reviewer",
+	"evaluation_reviewer",
+	"routing_reviewer",
+	"tool_reviewer",
+	"cost_reviewer",
+	"model_steward",
+]
+PRIVILEGED_AICR_AGENT_ROLES = [
+	"model_reviewer",
+	"prompt_reviewer",
+	"inference_reviewer",
+	"safety_reviewer",
+	"evaluation_reviewer",
+	"routing_reviewer",
+	"tool_reviewer",
+	"cost_reviewer",
+]
+
+
 DEFAULT_CONFIGURATION: dict[str, Any] = {
 	"tenant_id": "default",
 	"services": {
@@ -51,6 +75,43 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"handoff_audit_required": True,
 		"human_approval_for_external_actions": True,
 	},
+	"agents": {
+		"first_class": True,
+		"supported_runtimes": SUPPORTED_AICR_AGENT_RUNTIMES,
+		"supported_roles": SUPPORTED_AICR_AGENT_ROLES,
+		"privileged_roles": PRIVILEGED_AICR_AGENT_ROLES,
+		"require_owner": True,
+		"require_purpose": True,
+		"require_scope": True,
+		"require_contribution_disclosure": True,
+		"require_human_approval_for_privileged_roles": True,
+		"adapter_contract": "provider_neutral_cli_or_api_adapter",
+	},
+	"streaming": {
+		"engine": "bytewax",
+		"lifecycle_stream": "aicr.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"model_batch",
+			"prompt_batch",
+			"inference_batch",
+			"evaluation_batch",
+			"safety_batch",
+			"routing_batch",
+			"ai_agent_batch",
+		],
+		"topics": [
+			"aicr.models",
+			"aicr.prompts",
+			"aicr.inference",
+			"aicr.evaluations",
+			"aicr.safety",
+			"aicr.routing",
+			"aicr.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	},
 	"governance": {
 		"require_tenant_context": True,
 		"auth_required": True,
@@ -85,6 +146,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"enable_inference_console": True,
 		"enable_workflow_designer": True,
 		"enable_agent_runtime_console": True,
+		"enable_ai_agent_roster": True,
+		"enable_lifecycle_batch_monitor": True,
 		"enable_governance_center": True,
 		"enable_evaluation_console": True,
 		"enable_cost_and_metrics": True,
@@ -108,6 +171,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"inference",
 		"workflows",
 		"agent_runtimes",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
@@ -121,6 +186,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"inference",
 		"workflows",
 		"agent_runtimes",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
@@ -157,6 +224,14 @@ RULES: list[dict[str, Any]] = [
 	{"name": "workflow_requires_registered_services", "description": "AI workflows require registered service bindings.", "condition": {"operation": "create_workflow", "services_registered": False}, "effect": {"decision": "deny", "reason": "workflow_service_bindings_required", "required_action": "bind_registered_services"}},
 	{"name": "agent_runtime_must_be_supported", "description": "AI agent runtime must be supported.", "condition": {"operation": "register_agent_runtime", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_agent_runtime", "required_action": "choose_supported_agent_runtime"}},
 	{"name": "agent_runtime_requires_tool_policy", "description": "AI agent runtime requires tool policy.", "condition": {"operation": "register_agent_runtime", "tool_policy_attached": False}, "effect": {"decision": "deny", "reason": "agent_tool_policy_required", "required_action": "attach_tool_policy"}},
+	{"name": "ai_agent_runtime_supported", "description": "First-class AI agents must use supported runtimes.", "condition": {"operation": "register_ai_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_ai_agent_runtime", "required_action": "choose_supported_ai_agent_runtime"}},
+	{"name": "ai_agent_role_supported", "description": "First-class AI agents must use supported AI-core roles.", "condition": {"operation": "register_ai_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_ai_agent_role", "required_action": "choose_supported_ai_agent_role"}},
+	{"name": "ai_agent_requires_scope", "description": "First-class AI agents require an explicit bounded scope.", "condition": {"operation": "register_ai_agent", "scope_present": False}, "effect": {"decision": "deny", "reason": "ai_agent_scope_required", "required_action": "declare_ai_agent_scope"}},
+	{"name": "ai_agent_requires_owner", "description": "First-class AI agents require an accountable owner.", "condition": {"operation": "register_ai_agent", "owner_present": False}, "effect": {"decision": "deny", "reason": "ai_agent_owner_required", "required_action": "assign_ai_agent_owner"}},
+	{"name": "ai_agent_requires_purpose", "description": "First-class AI agents require a documented purpose.", "condition": {"operation": "register_ai_agent", "purpose_present": False}, "effect": {"decision": "deny", "reason": "ai_agent_purpose_required", "required_action": "document_ai_agent_purpose"}},
+	{"name": "ai_agent_requires_contribution_disclosure", "description": "First-class AI agents must disclose machine-authored AI-core contributions.", "condition": {"operation": "register_ai_agent", "contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "ai_agent_contribution_disclosure_required", "required_action": "disclose_machine_contribution"}},
+	{"name": "ai_agent_privileged_role_requires_human_approval", "description": "Privileged AI-agent roles require human approval evidence.", "condition": {"operation": "register_ai_agent", "privileged_role": True, "human_approval_required": False}, "effect": {"decision": "require_review", "reason": "ai_agent_human_approval_required", "required_action": "record_human_ai_agent_approval"}},
+	{"name": "bytewax_aicr_stream_required", "description": "AICR lifecycle batches must be routed through Bytewax.", "condition": {"operation": "validate_aicr_lifecycle_batch", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_aicr_lifecycle_batch_to_bytewax"}},
 	{"name": "external_agent_action_requires_approval", "description": "External AI agent actions require approval.", "condition": {"operation": "run_agent_action", "external_action": True, "approval_recorded": False}, "effect": {"decision": "deny", "reason": "external_agent_action_approval_required", "required_action": "record_agent_action_approval"}},
 	{"name": "completion_requires_audit_event", "description": "AI completions require audit evidence.", "condition": {"operation": "complete_inference", "audit_event_recorded": False}, "effect": {"decision": "deny", "reason": "ai_audit_event_required", "required_action": "record_ai_audit_event"}},
 	{"name": "streaming_requires_trace", "description": "Streaming AI output requires trace capture.", "condition": {"operation": "stream_inference", "trace_enabled": False}, "effect": {"decision": "deny", "reason": "ai_trace_required", "required_action": "enable_trace_capture"}},
@@ -171,7 +246,9 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "models", "path": "/aicr/models", "component": "ModelCatalog", "permission": "aicr:view_models", "nav_group": "Runtime"},
 	{"name": "inference", "path": "/aicr/inference", "component": "InferenceConsole", "permission": "aicr:run_inference", "nav_group": "Runtime"},
 	{"name": "workflows", "path": "/aicr/workflows", "component": "AIWorkflowDesigner", "permission": "aicr:manage_workflows", "nav_group": "Orchestration"},
-	{"name": "agents", "path": "/aicr/agents", "component": "AgentRuntimeConsole", "permission": "aicr:manage_agents", "nav_group": "Orchestration"},
+	{"name": "agent_runtimes", "path": "/aicr/agent-runtimes", "component": "AgentRuntimeConsole", "permission": "aicr:manage_agents", "nav_group": "Orchestration"},
+	{"name": "agents", "path": "/aicr/agents", "component": "AIAgentRoster", "permission": "aicr:manage_agents", "nav_group": "Orchestration"},
+	{"name": "lifecycle", "path": "/aicr/lifecycle", "component": "AICRLifecycleBatchMonitor", "permission": "aicr:govern", "nav_group": "Operations"},
 	{"name": "governance", "path": "/aicr/governance", "component": "AIGovernanceCenter", "permission": "aicr:govern", "nav_group": "Governance"},
 	{"name": "evaluations", "path": "/aicr/evaluations", "component": "ModelEvaluationConsole", "permission": "aicr:govern", "nav_group": "Governance"},
 	{"name": "metrics", "path": "/aicr/metrics", "component": "AICRMetrics", "permission": "aicr:view_metrics", "nav_group": "Operations"},
@@ -202,11 +279,63 @@ THEME: dict[str, Any] = {
 		"inference_trace_panel": {"visual": "request-timeline", "highlight": "latency-chip"},
 		"workflow_graph": {"visual": "directed-agent-graph", "edge_style": "handoff-line"},
 		"agent_runtime_card": {"icon": "bot", "status_indicator": "runtime-chip", "risk_style": "tool-policy-band"},
+		"ai_agent_roster": {"icon": "bot-message-square", "status_indicator": "agent-approval-chip", "risk_style": "scope-band"},
+		"bytewax_lifecycle_panel": {"icon": "git-branch", "status_indicator": "stream-chip", "risk_style": "processor-band"},
 		"governance_rule_stack": {"visual": "rule-ladder", "status_style": "decision-chip"},
 		"evaluation_console": {"visual": "score-grid", "highlight": "drift-chip"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "evidence-chip"},
 	},
 }
+
+
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class AICR agent composition manifest."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_AICR_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_AICR_AGENT_ROLES),
+		"privileged_roles": list(PRIVILEGED_AICR_AGENT_ROLES),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles",
+		],
+		"adapter_contract": "provider_neutral_cli_or_api_adapter",
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return AICR lifecycle stream-processing contract."""
+	return {
+		"engine": "bytewax",
+		"lifecycle_stream": "aicr.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"model_batch",
+			"prompt_batch",
+			"inference_batch",
+			"evaluation_batch",
+			"safety_batch",
+			"routing_batch",
+			"ai_agent_batch",
+		],
+		"topics": [
+			"aicr.models",
+			"aicr.prompts",
+			"aicr.inference",
+			"aicr.evaluations",
+			"aicr.safety",
+			"aicr.routing",
+			"aicr.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	}
 
 
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -218,6 +347,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "aicr",
 		"display_name": "AI Core Framework",
+		"provides": ["ai_core", "model_inference", "ai_agent_composition"],
+		"requires": ["conf", "auth", "mqeb", "moni"],
 		"configuration": config,
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},
@@ -229,6 +360,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"template_roots": ["templates/", "static/"],
 			"requires_theme": True,
 		},
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
 		"theme": deepcopy(THEME),
 	}
 
@@ -257,6 +390,9 @@ def _matches(condition: dict[str, Any], context: dict[str, Any]) -> bool:
 				return False
 		elif key.endswith("_lt"):
 			if not context.get(key[:-3], 0) < expected:
+				return False
+		elif key.endswith("_ne"):
+			if context.get(key[:-3]) == expected:
 				return False
 		elif context.get(key) != expected:
 			return False

@@ -114,6 +114,33 @@ def register_agent_runtime(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_ai_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	"""Register a first-class AI agent from an API-shaped payload."""
+	return SERVICE.register_ai_agent(
+		agent_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or payload["id"]),
+		runtime=str(payload.get("runtime") or "codex"),
+		role=str(payload.get("role") or "model_steward"),
+		scope=str(payload.get("scope") or ""),
+		owner=str(payload.get("owner") or ""),
+		purpose=str(payload.get("purpose") or ""),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", True)),
+		human_approval_required=bool(payload.get("human_approval_required", False)),
+	)
+
+
+def validate_aicr_lifecycle_batch(payload: dict[str, Any]) -> dict[str, Any]:
+	"""Validate an AICR lifecycle batch from an API-shaped payload."""
+	return SERVICE.validate_aicr_lifecycle_batch(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
+		mutation_count=int(payload.get("mutation_count") or 0),
+		operation=str(payload.get("operation") or "ai_agent_batch"),
+		batch_id=str(payload["id"]) if payload.get("id") else None,
+	)
+
+
 def list_providers(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_providers(tenant_id)
 
@@ -128,6 +155,14 @@ def list_workflows(tenant_id: str | None = None) -> list[dict[str, Any]]:
 
 def list_agent_runtimes(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_agent_runtimes(tenant_id)
+
+
+def list_ai_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_ai_agents(tenant_id)
+
+
+def list_lifecycle_batches(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_lifecycle_batches(tenant_id)
 
 
 def list_inference_approvals(tenant_id: str | None = None) -> list[dict[str, Any]]:
@@ -151,10 +186,14 @@ __all__ = [
 	"register_model",
 	"create_workflow",
 	"register_agent_runtime",
+	"register_ai_agent",
+	"validate_aicr_lifecycle_batch",
 	"list_providers",
 	"list_models",
 	"list_workflows",
 	"list_agent_runtimes",
+	"list_ai_agents",
+	"list_lifecycle_batches",
 	"list_inference_approvals",
 	"list_audit_events",
 ]

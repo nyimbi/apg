@@ -16,6 +16,11 @@ tenant, policy, approval, audit, and observability guardrails.
   large-context review, high-risk approval, PII redaction, tool allowlists, and
   cross-tenant routing denial.
 - Workflow and agent-runtime registration for first-class AI agent composition.
+- First-class AI-agent records for Codex, Claude Code, OpenCode, and Pi
+  contributors, including role, scope, owner, purpose, contribution disclosure,
+  and privileged approval status.
+- Bytewax lifecycle batch validation for model, prompt, inference, evaluation,
+  safety, routing, and AI-agent mutation streams.
 - Governance events for service, provider, model, workflow, agent, approval,
   and inference lifecycle actions.
 - UI models for dashboards, service registry, provider registry, model catalog,
@@ -83,6 +88,22 @@ service.decide_inference_approval(
 	"Large context accepted for this workflow.",
 )
 service.run_approved_inference(approval["id"], "tenant-a")
+agent = service.register_ai_agent(
+	"codex-reviewer",
+	"tenant-a",
+	"Codex Reviewer",
+	"codex",
+	"model_steward",
+	"model catalog triage",
+	"ai-platform",
+	"Keep model metadata consistent.",
+)
+batch = service.validate_aicr_lifecycle_batch(
+	"tenant-a",
+	"bytewax",
+	3,
+	"ai_agent_batch",
+)
 ```
 
 ## Guardrails
@@ -94,7 +115,9 @@ unsupported modalities, model promotion without evaluation, model retirement
 without impact review, inference without model policy, routing to unhealthy
 services, PII inference without redaction, tool calls without allowlists,
 cross-tenant routing, workflows without steps or registered services,
-unsupported agent runtimes, and external agent actions without approval.
+unsupported agent runtimes, first-class AI agents without supported runtime,
+supported role, scope, owner, purpose, or contribution disclosure, non-Bytewax
+lifecycle batches, and external agent actions without approval.
 
 ## Focused Verification
 

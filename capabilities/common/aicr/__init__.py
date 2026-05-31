@@ -830,6 +830,8 @@ def register_capability() -> Dict[str, Any]:
 			"inference_approval_governance": "Require approval for high-risk and large-context inference",
 			"model_catalog": "Register model metadata, policy, modality, evaluation, and lifecycle state",
 			"agent_runtime_registry": "Register Codex, Claude Code, OpenCode, Pi, Ollama, and custom agent runtimes as governed services",
+			"ai_agent_composition": "Register provider-neutral AI agents as first-class scoped, owned, auditable APG citizens",
+			"bytewax_lifecycle_processing": "Require AICR lifecycle batches to use Bytewax processing evidence",
 			"workflow_orchestration": "Compose AI workflows with human approval and monitoring",
 			"capability_rules": "Evaluate deterministic AI infrastructure governance rules",
 			"visual_theming": "Apply AI control-console theme tokens and components"
@@ -842,6 +844,7 @@ def register_capability() -> Dict[str, Any]:
 			"models": "/aicr/api/v1/models",
 			"workflows": "/aicr/api/v1/workflows",
 			"agents": "/aicr/api/v1/agents",
+			"lifecycle": "/aicr/api/v1/lifecycle",
 			"metrics": "/aicr/api/v1/metrics"
 		},
 		"ui_components": {
@@ -849,6 +852,8 @@ def register_capability() -> Dict[str, Any]:
 			for route in contract["ui"]["routes"]
 		},
 		"ui_manifest": contract["ui"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 		"permissions": [
 			"aicr:view",

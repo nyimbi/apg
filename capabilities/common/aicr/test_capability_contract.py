@@ -25,15 +25,23 @@ def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
 		"inference",
 		"workflows",
 		"agent_runtimes",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
 		"ui",
 		"theme",
 	]
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert len(contract["rule_engine"]["rules"]) >= 38
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "service.AicrService"
+	assert contract["provides"] == ["ai_core", "model_inference", "ai_agent_composition"]
+	assert contract["requires"] == ["conf", "auth", "mqeb", "moni"]
+	assert contract["agents"]["first_class"] is True
+	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert contract["streaming"]["engine"] == "bytewax"
+	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
 		"services",
@@ -41,7 +49,9 @@ def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
 		"models",
 		"inference",
 		"workflows",
+		"agent_runtimes",
 		"agents",
+		"lifecycle",
 		"governance",
 		"evaluations",
 		"metrics",
@@ -51,6 +61,8 @@ def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
 	assert contract["ui"]["api_prefix"] == "/aicr/api/v1"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "agent_runtime_card" in contract["theme"]["components"]
+	assert "ai_agent_roster" in contract["theme"]["components"]
+	assert "bytewax_lifecycle_panel" in contract["theme"]["components"]
 
 
 def test_rule_engine_enforces_ai_core_guardrails():
@@ -83,6 +95,39 @@ def test_rule_engine_enforces_ai_core_guardrails():
 	}
 
 
+def test_rule_engine_enforces_first_class_agent_and_bytewax_guardrails():
+	agent_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_ai_agent",
+		"agent_runtime_supported": False,
+		"agent_role_supported": False,
+		"scope_present": False,
+		"owner_present": False,
+		"purpose_present": False,
+		"contribution_disclosed": False,
+		"privileged_role": True,
+		"human_approval_required": False,
+	})
+	batch_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "validate_aicr_lifecycle_batch",
+		"event_stream": "kafka",
+	})
+
+	assert agent_result["decision"] == "deny"
+	assert set(agent_result["matched_rules"]) >= {
+		"ai_agent_runtime_supported",
+		"ai_agent_role_supported",
+		"ai_agent_requires_scope",
+		"ai_agent_requires_owner",
+		"ai_agent_requires_purpose",
+		"ai_agent_requires_contribution_disclosure",
+		"ai_agent_privileged_role_requires_human_approval",
+	}
+	assert batch_result["decision"] == "deny"
+	assert batch_result["matched_rules"] == ["bytewax_aicr_stream_required"]
+
+
 def test_registration_includes_full_capability_contract():
 	registration = register_capability()
 
@@ -94,6 +139,9 @@ def test_registration_includes_full_capability_contract():
 	assert registration["ui_components"]["services"] == "/aicr/services"
 	assert "inference_approval_governance" in registration["capabilities"]
 	assert "agent_runtime_registry" in registration["capabilities"]
+	assert "ai_agent_composition" in registration["capabilities"]
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["required_processor"] == "bytewax"
 	assert "auth" in registration["dependencies"]
 	assert "aicr:run_inference" in registration["permissions"]
 	assert "aicr:manage_agents" in registration["permissions"]
@@ -131,8 +179,21 @@ def test_service_registers_provider_model_workflow_and_agent_runtime():
 	promoted = service.promote_model("tenant-ai", "reasoning-model")
 	workflow = service.create_workflow("support-flow", "tenant-ai", "Support Flow", "workflow-owner", ["llm-router"], risk="high")
 	agent = service.register_agent_runtime("codex-runtime", "tenant-ai", "Codex Runtime", "codex", "agent-owner", "policy://tools")
+	ai_agent = service.register_ai_agent(
+		"codex-reviewer",
+		"tenant-ai",
+		"Codex Reviewer",
+		"codex",
+		"model_steward",
+		"model catalog triage",
+		"ai-platform",
+		"Keep model metadata consistent.",
+	)
+	batch = service.validate_aicr_lifecycle_batch("tenant-ai", "bytewax", 3, "ai_agent_batch", "agent-batch-1")
 	models = views.model_catalog_model(service, "tenant-ai")
 	agents = views.agent_runtime_console_model(service, "tenant-ai")
+	roster = views.ai_agent_roster_model(service, "tenant-ai")
+	lifecycle = views.lifecycle_batch_model(service, "tenant-ai")
 
 	assert provider["provider_type"] == "codex"
 	assert model["status"] == "registered"
@@ -140,9 +201,16 @@ def test_service_registers_provider_model_workflow_and_agent_runtime():
 	assert promoted["status"] == "promoted"
 	assert workflow["service_ids"] == ["llm-router"]
 	assert agent["runtime_type"] == "codex"
+	assert ai_agent["runtime"] == "codex"
+	assert ai_agent["status"] == "active"
+	assert batch["accepted"] is True
 	assert models["models"][0]["id"] == "reasoning-model"
 	assert agents["agent_runtimes"][0]["id"] == "codex-runtime"
+	assert roster["agents"][0]["id"] == "codex-reviewer"
+	assert lifecycle["batches"][0]["id"] == "agent-batch-1"
 	assert service.governance_summary("tenant-ai")["agent_runtime_count"] == 1
+	assert service.governance_summary("tenant-ai")["ai_agent_count"] == 1
+	assert service.governance_summary("tenant-ai")["lifecycle_batch_count"] == 1
 
 
 def test_service_blocks_provider_model_workflow_and_agent_guardrail_gaps():
@@ -163,6 +231,30 @@ def test_service_blocks_provider_model_workflow_and_agent_guardrail_gaps():
 		service.register_agent_runtime("runtime", "tenant-ai", "Runtime", "unknown", "owner", "policy://tools")
 	with pytest.raises(PermissionError, match="agent_tool_policy_required"):
 		service.register_agent_runtime("runtime", "tenant-ai", "Runtime", "codex", "owner", "")
+	with pytest.raises(PermissionError, match="unsupported_ai_agent_runtime"):
+		service.register_ai_agent("agent", "tenant-ai", "Agent", "unknown", "model_steward", "models", "owner", "purpose")
+	with pytest.raises(PermissionError, match="ai_agent_scope_required"):
+		service.register_ai_agent("agent", "tenant-ai", "Agent", "codex", "model_steward", "", "owner", "purpose")
+	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
+		service.validate_aicr_lifecycle_batch("tenant-ai", "kafka", 1)
+
+
+def test_privileged_ai_agent_without_human_approval_is_pending_review():
+	service = AicrService()
+
+	agent = service.register_ai_agent(
+		"cost-reviewer",
+		"tenant-ai",
+		"Cost Reviewer",
+		"claude_code",
+		"cost_reviewer",
+		"cost gates",
+		"finops-owner",
+		"Review expensive AI runs.",
+	)
+
+	assert agent["status"] == "pending_review"
+	assert service.governance_summary("tenant-ai")["ai_agent_count"] == 1
 
 
 def test_service_runs_high_risk_inference_approval_lifecycle():
@@ -358,3 +450,28 @@ def test_api_helpers_expose_governed_inference_lifecycle():
 	assert decision["decision"] == "approved"
 	assert result["status"] == "completed"
 	assert api_helpers.list_inference_approvals(record["tenant_id"])[0]["id"] == approval["id"]
+
+
+def test_api_helpers_expose_first_class_ai_agents_and_lifecycle_batches():
+	agent = api_helpers.register_ai_agent({
+		"id": "api-agent",
+		"tenant_id": "tenant-api-agent",
+		"name": "API Agent",
+		"runtime": "opencode",
+		"role": "model_steward",
+		"scope": "catalog hygiene",
+		"owner": "ai-platform",
+		"purpose": "Keep model metadata usable.",
+	})
+	batch = api_helpers.validate_aicr_lifecycle_batch({
+		"id": "api-batch",
+		"tenant_id": "tenant-api-agent",
+		"event_stream": "bytewax",
+		"mutation_count": 2,
+		"operation": "ai_agent_batch",
+	})
+
+	assert agent["id"] == "api-agent"
+	assert batch["accepted"] is True
+	assert api_helpers.list_ai_agents("tenant-api-agent")[0]["id"] == "api-agent"
+	assert api_helpers.list_lifecycle_batches("tenant-api-agent")[0]["id"] == "api-batch"

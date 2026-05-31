@@ -598,7 +598,7 @@ class AICRDashboard(BaseView):
 				result = {"success": True, "message": "Cache cleared successfully"}
 			elif action == 'export_logs':
 				# Export system logs
-				result = await self._export_logs()
+				result = asyncio.run(self._export_logs())
 			else:
 				result = {"success": False, "error": f"Unknown action: {action}"}
 

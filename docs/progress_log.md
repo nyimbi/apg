@@ -16,6 +16,74 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-31 06:19 EAT
+
+AICR AI-agent composition and Bytewax lifecycle guardrail packet:
+
+- Extended `capabilities/common/aicr/SPECIFICATION.md`, `PLAN.md`,
+  `README.md`, and `cap_spec.md` to define AICR as the provider-neutral AI
+  control plane for first-class AI agents and Bytewax lifecycle batches.
+- Added top-level AICR agent and streaming manifests for Codex, Claude Code,
+  opencode, and Pi runtimes across model, prompt, inference, safety,
+  evaluation, routing, tool, cost, and model-steward roles.
+- Added deterministic first-class AI-agent guardrails for supported runtime,
+  supported role, explicit scope, accountable owner, declared purpose, machine
+  contribution disclosure, and privileged-role human approval status.
+- Added Bytewax lifecycle stream metadata for `aicr.lifecycle`, model, prompt,
+  inference, evaluation, safety, routing, and AI-agent batches, plus a rule
+  that rejects non-Bytewax lifecycle processors.
+- Added dependency-light `AiAgentRecord` and `AiLifecycleBatchRecord` runtime
+  state, service registration/validation methods, API helpers, generated UI
+  models, dashboard/governance/metrics summaries, audit events, semantic-model
+  publication, and focused tests.
+- Added `/aicr/agent-runtimes`, `/aicr/agents`, and `/aicr/lifecycle` route
+  metadata plus theme components for AI-agent rosters and Bytewax lifecycle
+  monitoring.
+- Refreshed `semantic_model.json` and `release_report.json` from the live
+  executable app surface.
+- Fixed two legacy syntax blockers in `dashboard.py` and
+  `distributed_computing.py` so the full AICR Python package can compile.
+
+Battery-conscious verification:
+
+- Baseline focused test before edits: `./.venv/bin/pytest -q
+  capabilities/common/aicr/test_capability_contract.py
+  capabilities/common/aicr/tests/test_package_contract.py` passed with 11
+  tests and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- Focused `./.venv/bin/python -m py_compile` for AICR contract, service, API
+  helpers, view models, app, package init, and focused tests passed.
+- `./.venv/bin/python capabilities/common/aicr/app.py` passed package
+  self-test.
+- `./.venv/bin/pytest -q capabilities/common/aicr/test_capability_contract.py
+  capabilities/common/aicr/tests/test_package_contract.py` passed with 14
+  tests and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/apg capabilities inspect aicr --json` confirmed `ok: true`, 14
+  routes, 38 rules, Bytewax streaming, and first-class agents.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/aicr --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, no warnings, and no blocking gaps.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/aicr --json`
+  confirmed side-effect-free publish planning with no warnings and dependencies
+  `conf`, `auth`, `mqeb`, and `moni`.
+- `find capabilities/common/aicr -name '*.py' -not -path '*/__pycache__/*'
+  -exec ./.venv/bin/python -m py_compile {} +` passed after fixing legacy
+  AICR syntax blockers.
+- Service smoke executed provider -> service -> model -> first-class AI agent
+  -> Bytewax lifecycle batch and produced 5 audit events.
+- Distributed-computing smoke instantiated `DistributedComputingCluster` and
+  confirmed 1 healthy worker node after the async provisioning syntax fix.
+- AICR stale-marker scan returned no TODO/FIXME/placeholder/stub/baseline
+  matches across touched source, docs, tests, and generated evidence files.
+- `git diff --check -- capabilities/common/aicr docs/progress_log.md` passed.
+
+Known gaps:
+
+- Did not run full repository tests, rendered browser UI checks, live model
+  provider calls, live Codex/Claude Code/OpenCode/Pi adapters, durable stores,
+  durable Bytewax topology, MQEB/MONI/AUDL/KEYM/AUTH live adapters, load
+  checks, migration checks, or failover checks during this battery-conscious
+  slice.
+
 ### 2026-05-31 04:25 EAT
 
 HLTH health-agent and Bytewax lifecycle guardrail packet:

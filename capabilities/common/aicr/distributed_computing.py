@@ -996,7 +996,10 @@ class DistributedComputingCluster:
 		try:
 			# Create initial worker nodes
 			for i in range(self.scaling_config.min_nodes):
-				self._provision_worker_node(f"worker-{i:03d}")
+				node = self._build_worker_node(f"worker-{i:03d}")
+				node.update_state(WorkerNodeState.READY)
+				self._initialize_worker_node_metrics(node)
+				self.worker_nodes[node.node_id] = node
 
 			self.state = ClusterState.HEALTHY
 
@@ -1010,7 +1013,25 @@ class DistributedComputingCluster:
 			self._logger.error(f"Cluster initialization failed: {str(e)}")
 			raise
 
-	def _provision_worker_node(self, node_name: str, node_type: str = "standard") -> str:
+	def _build_worker_node(self, node_name: str, node_type: str = "standard") -> WorkerNode:
+		"""Build a worker-node record without async provisioning side effects."""
+		return WorkerNode(
+			cluster_id=self.cluster_id,
+			node_name=node_name,
+			node_type=node_type,
+			available_resources=self._get_node_resources(node_type),
+			capabilities=self._get_node_capabilities(node_type),
+			endpoint_url=f"http://worker-{uuid7str()[:8]}.cluster.local:8080",
+			container_id=f"container-{uuid7str()[:12]}",
+			host_information={
+				"os": "Linux",
+				"architecture": "x86_64",
+				"kernel_version": "5.15.0",
+				"container_runtime": "Docker 24.0.0"
+			}
+		)
+
+	async def _provision_worker_node(self, node_name: str, node_type: str = "standard") -> str:
 		"""Provision new worker node in the cluster.
 
 		Args:
@@ -1022,21 +1043,7 @@ class DistributedComputingCluster:
 		"""
 		try:
 			# Create worker node configuration
-			node = WorkerNode(
-				cluster_id=self.cluster_id,
-				node_name=node_name,
-				node_type=node_type,
-				available_resources=self._get_node_resources(node_type),
-				capabilities=self._get_node_capabilities(node_type),
-				endpoint_url=f"http://worker-{uuid7str()[:8]}.cluster.local:8080",
-				container_id=f"container-{uuid7str()[:12]}",
-				host_information={
-					"os": "Linux",
-					"architecture": "x86_64",
-					"kernel_version": "5.15.0",
-					"container_runtime": "Docker 24.0.0"
-				}
-			)
+			node = self._build_worker_node(node_name, node_type)
 
 			# Simulate node provisioning process
 			await self._simulate_node_provisioning(node)
@@ -1063,7 +1070,10 @@ class DistributedComputingCluster:
 		# Update node state
 		node.update_state(WorkerNodeState.READY)
 
-		# Initialize metrics
+		self._initialize_worker_node_metrics(node)
+
+	def _initialize_worker_node_metrics(self, node: WorkerNode) -> None:
+		"""Initialize synthetic worker-node metrics."""
 		initial_metrics = WorkerNodeMetrics(
 			node_id=node.node_id,
 			cpu_utilization=random.uniform(5, 15),
@@ -1071,7 +1081,6 @@ class DistributedComputingCluster:
 			health_score=random.uniform(0.9, 1.0),
 			uptime_seconds=0.0
 		)
-
 		node.update_metrics(initial_metrics)
 
 	def _get_node_resources(self, node_type: str) -> Dict[str, float]:

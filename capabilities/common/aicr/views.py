@@ -26,6 +26,8 @@ def dashboard_model(
 		"models": service.list_models(tenant_id),
 		"workflows": service.list_workflows(tenant_id),
 		"agent_runtimes": service.list_agent_runtimes(tenant_id),
+		"ai_agents": service.list_ai_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
 		"summary": service.governance_summary(tenant_id),
 		"inference_approvals": service.list_inference_approvals(tenant_id),
 		"inference_results": service.list_inference_results(tenant_id),
@@ -99,6 +101,8 @@ def governance_center_model(
 		"models": service.list_models(tenant_id),
 		"workflows": service.list_workflows(tenant_id),
 		"agent_runtimes": service.list_agent_runtimes(tenant_id),
+		"ai_agents": service.list_ai_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
 		"approvals": service.list_inference_approvals(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 	}
@@ -130,6 +134,36 @@ def agent_runtime_console_model(
 	}
 
 
+def ai_agent_roster_model(
+	service: AicrService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or AicrService()
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"agents": service.list_ai_agents(tenant_id),
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+		"required_fields": contract["agents"]["required_fields"],
+	}
+
+
+def lifecycle_batch_model(
+	service: AicrService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or AicrService()
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"batches": service.list_lifecycle_batches(tenant_id),
+		"streaming": contract["streaming"],
+		"required_operations": contract["streaming"]["required_operations"],
+	}
+
+
 def audit_timeline_model(
 	service: AicrService | None = None,
 	tenant_id: str = "default",
@@ -155,6 +189,9 @@ def metrics_model(
 		"model_count": summary["model_count"],
 		"workflow_count": summary["workflow_count"],
 		"agent_runtime_count": summary["agent_runtime_count"],
+		"ai_agent_count": summary["ai_agent_count"],
+		"lifecycle_batch_count": summary["lifecycle_batch_count"],
+		"denied_lifecycle_batch_count": summary["denied_lifecycle_batch_count"],
 		"healthy_service_count": summary["healthy_service_count"],
 		"pending_approval_count": summary["pending_approval_count"],
 		"inference_result_count": summary["inference_result_count"],

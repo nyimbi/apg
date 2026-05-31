@@ -10,6 +10,8 @@ control plane for generated applications.
 - Generated runtime: `service.AicrService`
 - Event stream adapter: `bytewax`
 - Primary dependencies: `conf`, `auth`, `mqeb`, `moni`, `audl`, `keym`
+- First-class AI agents: `codex`, `claude_code`, `opencode`, `pi`
+- Lifecycle processor: `bytewax`
 
 ## Executable Surface
 
@@ -29,9 +31,12 @@ control plane for generated applications.
 3. Register models.
 4. Record evaluations and promote models.
 5. Register workflows and agent runtimes.
-6. Request governed inference.
-7. Approve high-risk or large-context requests.
-8. Execute approved inference and record audit evidence.
+6. Register first-class AI agents with role, scope, owner, purpose, and
+   disclosure metadata.
+7. Validate lifecycle mutation batches through Bytewax.
+8. Request governed inference.
+9. Approve high-risk or large-context requests.
+10. Execute approved inference and record audit evidence.
 
 ## Guardrails
 
@@ -40,4 +45,5 @@ owners, endpoints, provider types, provider credentials, egress policy, model
 policy, modalities, evaluation, retirement review, service health,
 large-context review, high-risk approval, PII redaction, tool allowlists,
 cross-tenant routing, cost review, workflow composition, agent runtime policy,
-external agent actions, audit evidence, trace capture, and drift review.
+first-class AI-agent metadata, Bytewax lifecycle processing, external agent
+actions, audit evidence, trace capture, and drift review.

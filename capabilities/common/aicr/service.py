@@ -1676,6 +1676,74 @@ class AICoreService:
 			await result
 
 
+@dataclass
+class AiAgentRecord:
+	"""First-class AI-core agent registration."""
+
+	agent_id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	owner: str
+	purpose: str
+	contribution_disclosed: bool
+	human_approval_required: bool
+	status: str = "active"
+	created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"agent_id": self.agent_id,
+			"id": self.agent_id,
+			"tenant_id": self.tenant_id,
+			"name": self.name,
+			"runtime": self.runtime,
+			"role": self.role,
+			"scope": self.scope,
+			"owner": self.owner,
+			"purpose": self.purpose,
+			"contribution_disclosed": self.contribution_disclosed,
+			"human_approval_required": self.human_approval_required,
+			"status": self.status,
+			"created_at": self.created_at.isoformat(),
+		}
+
+
+@dataclass
+class AiLifecycleBatchRecord:
+	"""Bytewax lifecycle-batch validation evidence for AICR."""
+
+	batch_id: str
+	tenant_id: str
+	event_stream: str
+	mutation_count: int
+	operation: str
+	accepted: bool
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	required_processor: str = "bytewax"
+	status: str = "accepted"
+	created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"batch_id": self.batch_id,
+			"id": self.batch_id,
+			"tenant_id": self.tenant_id,
+			"event_stream": self.event_stream,
+			"mutation_count": self.mutation_count,
+			"operation": self.operation,
+			"accepted": self.accepted,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"required_processor": self.required_processor,
+			"status": self.status,
+			"created_at": self.created_at.isoformat(),
+		}
+
+
 class AicrService:
 	"""Dependency-light AI service governance facade for package composition."""
 
@@ -1685,9 +1753,16 @@ class AicrService:
 		self._models: dict[tuple[str, str], dict[str, Any]] = {}
 		self._workflows: dict[tuple[str, str], dict[str, Any]] = {}
 		self._agent_runtimes: dict[tuple[str, str], dict[str, Any]] = {}
+		self._ai_agents: dict[tuple[str, str], AiAgentRecord] = {}
+		self._lifecycle_batches: dict[tuple[str, str], AiLifecycleBatchRecord] = {}
 		self._approvals: dict[tuple[str, str], AICRInferenceApproval] = {}
 		self._events: list[AICRGovernanceEvent] = []
 		self._inference_results: dict[tuple[str, str], dict[str, Any]] = {}
+		contract = get_capability_contract()
+		self._agent_runtimes_supported = set(contract["agents"]["supported_runtimes"])
+		self._agent_roles = set(contract["agents"]["supported_roles"])
+		self._privileged_agent_roles = set(contract["agents"]["privileged_roles"])
+		self._lifecycle_operations = set(contract["streaming"]["required_operations"])
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -1883,6 +1958,107 @@ class AicrService:
 		self._record_event(tenant_id, "agent_runtime_registered", runtime_id, f"Registered agent runtime {name}.", {"runtime_type": runtime_type})
 		return dict(record)
 
+	def register_ai_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> dict[str, Any]:
+		"""Register a first-class AI agent with explicit governance metadata."""
+		runtime_value = self._normalize_agent_token(runtime)
+		role_value = self._normalize_agent_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_ai_agent",
+			"agent_runtime_supported": runtime_value in self._agent_runtimes_supported,
+			"agent_role_supported": role_value in self._agent_roles,
+			"scope_present": bool(str(scope or "").strip()),
+			"owner_present": bool(str(owner or "").strip()),
+			"purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+		})
+		if result["decision"] == "deny":
+			_raise_if_blocked(result)
+		if not name:
+			raise ValueError("AI agent name is required")
+		status = "pending_review" if result["decision"] == "require_review" else "active"
+		record = AiAgentRecord(
+			agent_id=agent_id,
+			tenant_id=tenant_id,
+			name=name,
+			runtime=runtime_value,
+			role=role_value,
+			scope=str(scope).strip(),
+			owner=str(owner).strip(),
+			purpose=str(purpose).strip(),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+			status=status,
+		)
+		self._ai_agents[self._tenant_key(tenant_id, agent_id)] = record
+		self._record_event(
+			tenant_id,
+			"ai_agent_registered",
+			agent_id,
+			f"Registered AI agent {name}.",
+			{"runtime": runtime_value, "role": role_value, "status": status, "matched_rules": result["matched_rules"]},
+		)
+		return record.to_dict()
+
+	def validate_aicr_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "ai_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Validate that AICR lifecycle mutations are processed by Bytewax."""
+		mutation_count = int(mutation_count)
+		if mutation_count <= 0:
+			raise ValueError("aicr_lifecycle_batch_empty")
+		stream_value = self._normalize_agent_token(event_stream)
+		operation_value = self._normalize_agent_token(operation)
+		if operation_value not in self._lifecycle_operations:
+			raise ValueError(f"unsupported_aicr_lifecycle_operation:{operation_value}")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "validate_aicr_lifecycle_batch",
+			"event_stream": stream_value,
+		})
+		accepted = result["decision"] == "allow"
+		record = AiLifecycleBatchRecord(
+			batch_id=batch_id or uuid7str(),
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			operation=operation_value,
+			accepted=accepted,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			status="accepted" if accepted else "denied",
+		)
+		self._lifecycle_batches[self._tenant_key(tenant_id, record.batch_id)] = record
+		self._record_event(
+			tenant_id,
+			f"lifecycle_batch_{record.status}",
+			record.batch_id,
+			f"AICR lifecycle batch {record.status}.",
+			record.to_dict(),
+		)
+		if not accepted:
+			_raise_if_blocked(result)
+		return record.to_dict()
+
 	def create_record(
 		self,
 		record_id: str,
@@ -1933,6 +2109,18 @@ class AicrService:
 		if tenant_id is not None:
 			records = [record for record in records if record["tenant_id"] == tenant_id]
 		return [dict(record) for record in sorted(records, key=lambda item: item["id"])]
+
+	def list_ai_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		records = list(self._ai_agents.values())
+		if tenant_id is not None:
+			records = [record for record in records if record.tenant_id == tenant_id]
+		return [record.to_dict() for record in sorted(records, key=lambda item: item.agent_id)]
+
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		records = list(self._lifecycle_batches.values())
+		if tenant_id is not None:
+			records = [record for record in records if record.tenant_id == tenant_id]
+		return [record.to_dict() for record in sorted(records, key=lambda item: item.batch_id)]
 
 	def request_inference(
 		self,
@@ -2073,6 +2261,12 @@ class AicrService:
 			"model_count": len(self.list_models(tenant_id)),
 			"workflow_count": len(self.list_workflows(tenant_id)),
 			"agent_runtime_count": len(self.list_agent_runtimes(tenant_id)),
+			"ai_agent_count": len(self.list_ai_agents(tenant_id)),
+			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
+			"denied_lifecycle_batch_count": len([
+				batch for batch in self.list_lifecycle_batches(tenant_id)
+				if batch["status"] == "denied"
+			]),
 			"healthy_service_count": len([service for service in services if service["health"] == "healthy"]),
 			"inference_approval_count": len(approvals),
 			"pending_approval_count": len([approval for approval in approvals if approval["decision"] == "pending"]),
@@ -2088,6 +2282,9 @@ class AicrService:
 
 	def _tenant_key(self, tenant_id: str, record_id: str) -> tuple[str, str]:
 		return (tenant_id, record_id)
+
+	def _normalize_agent_token(self, value: str) -> str:
+		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
 
 	def _complete_inference(
 		self,
@@ -2138,6 +2335,7 @@ def _raise_if_blocked(result: dict[str, Any]) -> None:
 __all__ = [
 	# Core service class
 	"ImportExportService", "AICoreService", "AicrService",
+	"AiAgentRecord", "AiLifecycleBatchRecord",
 
 	# Infrastructure components
 	"ModelRegistry", "InferenceEngine", "ResourcePool",

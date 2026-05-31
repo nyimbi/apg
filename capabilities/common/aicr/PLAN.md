@@ -4,7 +4,7 @@
 
 Build one coherent AI control-plane lifecycle packet:
 
-`provider -> service -> model -> evaluation -> workflow/agent runtime -> inference request -> approval -> result -> audit`
+`provider -> service -> model -> evaluation -> workflow/agent runtime -> AI agent -> Bytewax lifecycle batch -> inference request -> approval -> result -> audit`
 
 The packet must be dependency-light and provider-neutral so APG applications can
 compose AI services before live provider adapters are wired in.
@@ -14,18 +14,24 @@ compose AI services before live provider adapters are wired in.
 1. Contract
    - Expand configuration for providers, models, workflows, agent runtimes,
      observability, adapters, UI routes, and theme components.
+   - Promote AI agents and Bytewax lifecycle batches to top-level contract
+     citizens with explicit manifests.
    - Keep `service.AicrService` as the generated-app runtime.
    - Keep `bytewax` as event-stream adapter evidence.
 
 2. Runtime
    - Extend `AicrService` with provider, model, workflow, and agent-runtime
      lifecycle methods.
+   - Add first-class AI-agent registration and Bytewax lifecycle-batch
+     validation methods.
    - Keep existing high-risk inference approval behavior compatible.
    - Enforce key guardrails at runtime.
 
 3. API and UI
    - Extend `api_helpers.py` for provider, model, workflow, and agent runtime
      operations.
+   - Add API helper and view-model coverage for first-class AI agents and
+     lifecycle batch monitoring.
    - Extend `views.py` with provider registry, model catalog, workflow
      designer, agent runtime console, audit, and richer metrics models.
 
@@ -44,5 +50,9 @@ compose AI services before live provider adapters are wired in.
 - Provider and model lifecycle rules are enforced.
 - High-risk and large-context inference remains gated by approval.
 - Agent runtimes have explicit supported-runtime and tool-policy guardrails.
+- First-class AI agents have explicit supported-runtime, supported-role, scope,
+  owner, purpose, disclosure, and privileged approval guardrails.
+- AICR lifecycle batches require Bytewax and reject Kafka or other broker-first
+  streams.
 - Contract, runtime, semantic model, release report, and tests agree.
 - Docs describe current executable behavior without overclaiming.
