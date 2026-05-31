@@ -20612,3 +20612,63 @@ Not run to preserve battery:
   blockchain audit, AI lifecycle, security-intelligence, compliance, GRC, SIEM,
   SOAR, DLP, monitoring, notification, persistent storage, rendered browser UI,
   live Bytewax topology, and performance/load tests.
+
+### 2026-05-31 04:05 EAT
+
+MQEB event-agent composition and Bytewax guardrail packet:
+
+- Selected `capabilities/common/mqeb` as the next foundation event-fabric
+  capability after KEYM.
+- Extended the MQEB executable contract with first-class event-agent metadata,
+  supported runtimes `codex`, `claude_code`, `opencode`, and `pi`, supported
+  event governance roles, privileged-role metadata, Bytewax lifecycle stream
+  metadata, route metadata, theme components, and contract-level
+  `provides`/`requires`.
+- Added deterministic guardrails for unsupported event-agent runtime,
+  unsupported event-agent role, missing event-agent scope, owner, purpose,
+  missing machine contribution disclosure, privileged event-agent registration
+  without human approval, and non-Bytewax lifecycle batch routing.
+- Added `MqebAgentRecord`, `EventLifecycleBatchRecord`, tenant-qualified
+  event-agent storage, lifecycle-batch storage, registration, listing, audit
+  events, dashboard counts, API helper payload handling, and event-agent roster
+  view models.
+- Added `/mqeb/agents`, event-agent roster theme metadata, Bytewax stream
+  indicator theme metadata, and Bytewax lifecycle-batch status in the bridge
+  view model.
+- Regenerated `semantic_model.json` and `release_report.json` from the live
+  `app.py` contract and refreshed `package_manifest.json`.
+- Replaced stale `cap_spec.md` and `todo.md` content with current
+  source-of-truth and adapter-backlog notes.
+- Review pass found and fixed string boolean parsing for API event-agent
+  approval payloads so `"false"` does not become truthy.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/mqeb/capability_contract.py capabilities/common/mqeb/service.py capabilities/common/mqeb/api.py capabilities/common/mqeb/view_models.py capabilities/common/mqeb/app.py capabilities/common/mqeb/__init__.py capabilities/common/mqeb/tests/test_capability_contract.py capabilities/common/mqeb/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/mqeb/tests/test_capability_contract.py capabilities/common/mqeb/tests/test_package_contract.py`
+  passed with 12 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python capabilities/common/mqeb/app.py` passed with `passed:
+  true`.
+- `./.venv/bin/apg capabilities inspect mqeb --json` passed with `ok: true`,
+  14 APG Python routes, 23 deterministic rules, first-class agents, and
+  Bytewax streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/mqeb --json`
+  passed with `ok: true`; MQEB remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/mqeb --json`
+  passed with side-effect-free package evidence and no warnings.
+- `find capabilities/common/mqeb -name '*.py' -not -path '*/__pycache__/*' -exec ./.venv/bin/python -m py_compile {} +`
+  passed.
+- `./.venv/bin/python -c "... MqebService ... register_event_agent ... validate_event_lifecycle_batch ..."`
+  returned one `claude_code` replay-review agent with owner and purpose
+  evidence, human approval required, normalized role, and `bytewax` stream
+  evidence.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live broker, live Bytewax topology, cloud queue/event adapters, schema
+  registry, SIEM, SOAR, DLP, GRC, notification, incident-response systems,
+  APG AUTH/MTEN/AUDL/CONF/KEYM/ENCR/SECU/MONI/HLTH services, rendered browser
+  UI, and performance/load tests.

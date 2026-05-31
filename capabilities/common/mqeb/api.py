@@ -33,6 +33,15 @@ def _required_tenant_id(payload: Dict[str, Any]) -> str:
 	return tenant_id
 
 
+def _payload_bool(payload: Dict[str, Any], key: str, default: bool = False) -> bool:
+	value = payload.get(key, default)
+	if isinstance(value, bool):
+		return value
+	if isinstance(value, str):
+		return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+	return bool(value)
+
+
 def capability_status(tenant_id: str = "default") -> Dict[str, Any]:
 	contract = SERVICE.describe(tenant_id)
 	summary = SERVICE.dashboard_summary(tenant_id)
@@ -51,6 +60,8 @@ def capability_status(tenant_id: str = "default") -> Dict[str, Any]:
 		"dead_letter_count": summary["dead_letter_count"],
 		"pending_priority_exception_count": summary["pending_priority_exception_count"],
 		"pending_replay_count": summary["pending_replay_count"],
+		"event_agent_count": summary["event_agent_count"],
+		"lifecycle_batch_count": summary["lifecycle_batch_count"],
 	}
 
 
@@ -172,6 +183,29 @@ def decide_replay(payload: Dict[str, Any]) -> Dict[str, Any]:
 	)
 
 
+def register_event_agent(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.register_event_agent(
+		tenant_id=_required_tenant_id(payload),
+		agent_id=str(payload["id"]),
+		name=str(payload.get("name") or payload["id"]),
+		runtime=str(payload.get("runtime") or ""),
+		role=str(payload.get("role") or ""),
+		scope=str(payload.get("scope") or ""),
+		owner=str(payload.get("owner") or ""),
+		purpose=str(payload.get("purpose") or ""),
+		contribution_disclosed=_payload_bool(payload, "contribution_disclosed", True),
+		human_approval_required=_payload_bool(payload, "human_approval_required", False),
+	)
+
+
+def validate_event_lifecycle_batch(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.validate_event_lifecycle_batch(
+		tenant_id=_required_tenant_id(payload),
+		event_stream=str(payload.get("event_stream") or ""),
+		mutation_count=int(payload.get("mutation_count", 0) or 0),
+	)
+
+
 def create_record(payload: Dict[str, Any]) -> Dict[str, Any]:
 	return SERVICE.create_record(
 		record_id=str(payload["id"]),
@@ -193,6 +227,8 @@ def list_event_fabric(tenant_id: str = "default") -> Dict[str, Any]:
 		"delivery_attempts": SERVICE.list_delivery_attempts(tenant_id),
 		"priority_exceptions": SERVICE.list_priority_exceptions(tenant_id),
 		"replay_requests": SERVICE.list_replay_requests(tenant_id),
+		"event_agents": SERVICE.list_event_agents(tenant_id),
+		"lifecycle_batches": SERVICE.list_lifecycle_batches(tenant_id),
 		"audit_events": SERVICE.list_audit_events(tenant_id),
 		"summary": SERVICE.dashboard_summary(tenant_id),
 	}

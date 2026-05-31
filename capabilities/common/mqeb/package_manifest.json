@@ -7,6 +7,7 @@
     "SPECIFICATION.md",
     "PLAN.md",
     "cap_spec.md",
+    "todo.md",
     "models.py",
     "service.py",
     "api.py",

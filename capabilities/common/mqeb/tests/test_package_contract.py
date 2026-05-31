@@ -32,10 +32,12 @@ def test_contract_shape_is_valid():
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "mqeb"
-	assert len(contract["ui"]["routes"]) >= 13
-	assert len(contract["rule_engine"]["rules"]) >= 14
+	assert len(contract["ui"]["routes"]) >= 14
+	assert len(contract["rule_engine"]["rules"]) >= 22
 	assert contract["configuration"]["operation_governance"]["bytewax_first_runtime"] is True
 	assert contract["configuration"]["operation_governance"]["kafka_core_dependency_allowed"] is False
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["engine"] == "bytewax"
 
 
 def test_app_entrypoint_is_publishable():
@@ -50,9 +52,12 @@ def test_app_entrypoint_is_publishable():
 	assert manifest["kind"] == "apg.generated_application"
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
-	assert len(capability["ui"]["routes"]) >= 13
+	assert len(capability["ui"]["routes"]) >= 14
 	assert capability["adapters"]["preferred_stream_runtime"] == "bytewax"
 	assert capability["approvals"]["priority_quota"] == "PriorityQuotaExceptionRecord"
+	assert capability["approvals"]["event_agent"] == "MqebAgentRecord"
+	assert capability["agents"]["mqeb_agent_contract"]["first_class"] is True
+	assert capability["streaming"]["engine"] == "bytewax"
 
 
 def test_event_fabric_lifecycle_records_publish_delivery_replay_and_audit_state():
@@ -120,6 +125,70 @@ def test_event_fabric_lifecycle_records_publish_delivery_replay_and_audit_state(
 		"subscription_resumed",
 		"replay_requested",
 		"replay_decided",
+	}
+
+
+def test_event_agents_and_bytewax_lifecycle_batches_are_first_class_state():
+	service = MqebService()
+
+	with pytest.raises(PermissionError, match="unsupported_event_agent_runtime"):
+		service.register_event_agent(
+			tenant_id="tenant-a",
+			agent_id="bad-runtime",
+			name="Bad Runtime",
+			runtime="custom-runtime",
+			role="replay-reviewer",
+			scope="replay review",
+			owner="ops",
+			purpose="review replay requests",
+			contribution_disclosed=True,
+			human_approval_required=True,
+		)
+	with pytest.raises(PermissionError, match="event_agent_human_approval_required"):
+		service.register_event_agent(
+			tenant_id="tenant-a",
+			agent_id="privileged",
+			name="Privileged",
+			runtime="codex",
+			role="bytewax-topology-reviewer",
+			scope="bytewax topology review",
+			owner="platform",
+			purpose="review stream topology changes",
+			contribution_disclosed=True,
+			human_approval_required=False,
+		)
+	agent = service.register_event_agent(
+		tenant_id="tenant-a",
+		agent_id="replay-agent",
+		name="Replay Agent",
+		runtime="claude-code",
+		role="replay-reviewer",
+		scope="bounded replay review",
+		owner="platform",
+		purpose="review replay approvals",
+		contribution_disclosed=True,
+		human_approval_required=True,
+	)
+	batch = service.validate_event_lifecycle_batch("tenant-a", "ByteWax", 3)
+	with pytest.raises(PermissionError, match="bytewax_event_stream_required"):
+		service.validate_event_lifecycle_batch("tenant-a", "custom-broker", 1)
+	with pytest.raises(ValueError, match="event_lifecycle_batch_empty"):
+		service.validate_event_lifecycle_batch("tenant-a", "bytewax", 0)
+	summary = service.dashboard_summary("tenant-a")
+
+	assert agent["runtime"] == "claude_code"
+	assert agent["role"] == "replay_reviewer"
+	assert agent["human_approval_required"] is True
+	assert batch["event_stream"] == "bytewax"
+	assert batch["required_processor"] == "bytewax"
+	assert batch["accepted"] is True
+	assert summary["event_agent_count"] == 1
+	assert summary["lifecycle_batch_count"] == 2
+	assert summary["denied_lifecycle_batch_count"] == 1
+	assert {event["event_type"] for event in service.list_audit_events("tenant-a")} >= {
+		"event_agent_registered",
+		"event_lifecycle_batch_accepted",
+		"event_lifecycle_batch_denied",
 	}
 
 
@@ -236,6 +305,19 @@ def test_api_and_view_models_expose_event_fabric_surfaces():
 
 	with pytest.raises(PermissionError, match="tenant_context_required"):
 		api.create_topic_record({"id": "missing-tenant", "name": "Missing", "owner": "ops"})
+	with pytest.raises(PermissionError, match="event_agent_human_approval_required"):
+		api.register_event_agent({
+			"tenant_id": "tenant-b",
+			"id": "privileged-string-bool",
+			"name": "Privileged String Bool",
+			"runtime": "codex",
+			"role": "replay-reviewer",
+			"scope": "replay review",
+			"owner": "platform",
+			"purpose": "review replay decisions",
+			"contribution_disclosed": "true",
+			"human_approval_required": "false",
+		})
 	topic = api.create_topic_record({
 		"tenant_id": "tenant-b",
 		"id": "orders",
@@ -267,6 +349,22 @@ def test_api_and_view_models_expose_event_fabric_surfaces():
 		"subscription_id": subscription["id"],
 		"outcome": "delivered",
 	})
+	api.register_event_agent({
+		"tenant_id": "tenant-b",
+		"id": "routing-agent",
+		"name": "Routing Agent",
+		"runtime": "opencode",
+		"role": "routing-reviewer",
+		"scope": "routing changes",
+		"owner": "platform",
+		"purpose": "review routing rule changes",
+		"contribution_disclosed": True,
+	})
+	api.validate_event_lifecycle_batch({
+		"tenant_id": "tenant-b",
+		"event_stream": "bytewax",
+		"mutation_count": 2,
+	})
 
 	status = api.capability_status("tenant-b")
 	fabric = api.list_event_fabric("tenant-b")
@@ -277,19 +375,28 @@ def test_api_and_view_models_expose_event_fabric_surfaces():
 	delivery = view_models.delivery_model(tenant_id="tenant-b")
 	quota = view_models.quota_exception_queue_model(tenant_id="tenant-b")
 	replay = view_models.replay_console_model(tenant_id="tenant-b")
+	agents = view_models.event_agent_roster_model(tenant_id="tenant-b")
 	bytewax = view_models.bytewax_bridge_model(tenant_id="tenant-b")
 	audit = view_models.audit_timeline_model(tenant_id="tenant-b")
 	settings = view_models.settings_model("tenant-b")
 
 	assert status["topic_count"] == 1
+	assert status["event_agent_count"] == 1
 	assert fabric["summary"]["message_count"] == 1
+	assert fabric["event_agents"][0]["runtime"] == "opencode"
 	assert dashboard["summary"]["subscription_count"] == 1
+	assert dashboard["event_agents"][0]["role"] == "routing_reviewer"
 	assert topics["classifications"][-1] == "regulated"
 	assert publish["messages"][0]["status"] == "published"
 	assert subscriptions["protocols"][0] == "bytewax"
 	assert delivery["delivery_attempts"][0]["outcome"] == "delivered"
 	assert quota["pending"] == []
 	assert replay["pending"] == []
+	assert agents["supported_runtimes"][0] == "codex"
+	assert agents["event_agents"][0]["name"] == "Routing Agent"
 	assert bytewax["preferred_runtime"] == "bytewax"
+	assert bytewax["lifecycle_batches"][0]["accepted"] is True
 	assert audit["events"]
 	assert settings["configuration"]["operation_governance"]["bytewax_first_runtime"] is True
+	assert settings["agents"]["first_class"] is True
+	assert settings["streaming"]["engine"] == "bytewax"

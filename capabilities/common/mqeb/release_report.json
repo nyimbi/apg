@@ -1,11 +1,16 @@
 {
   "evidence": {
+    "agents": {
+      "first_class": true,
+      "role_count": 7,
+      "runtime_count": 4
+    },
     "contracts": {
       "capability_contract": {
         "display_name": "Message Queue Event Bus",
         "errors": [],
-        "route_count": 13,
-        "rule_count": 15
+        "route_count": 14,
+        "rule_count": 23
       }
     },
     "self_test": {
@@ -23,6 +28,10 @@
     "semantic_model": {
       "capability": "mqeb",
       "format": "apg.semantic-model.v1"
+    },
+    "streaming": {
+      "engine": "bytewax",
+      "required_processor": "bytewax"
     }
   },
   "format": "apg.release-report.v1",

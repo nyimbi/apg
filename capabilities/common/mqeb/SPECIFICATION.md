@@ -39,9 +39,16 @@ applications can depend on it safely.
   publishing above tenant priority quotas.
 - **Replay request**: reviewed replay action with bounded topic, time range,
   reason, actor, and evidence.
+- **Event agent**: first-class AI or automation participant that can review
+  routing, delivery, quota, replay, schema, Bytewax topology, or dead-letter
+  decisions. Agents must declare runtime, role, owner, purpose, scope, machine
+  contribution disclosure, and human approval posture.
+- **Lifecycle batch**: tenant-scoped MQEB mutation batch that must declare
+  Bytewax as the event-stream processor before generated applications compose
+  it into event-fabric flows.
 - **Operational audit event**: immutable package evidence for topic,
-  subscription, publish, delivery, exception, replay, pause, resume, and
-  dead-letter decisions.
+  subscription, publish, delivery, exception, replay, pause, resume, event
+  agent, lifecycle batch, and dead-letter decisions.
 
 ## Functional Requirements
 
@@ -64,10 +71,21 @@ applications can depend on it safely.
     reason, retry count, subscription, and audit evidence.
 11. API helpers and dependency-light view models must expose dashboard,
     topics, publishing, subscriptions, routing, dead letters, replay,
-    quotas, monitoring, and settings state.
+    quotas, event agents, Bytewax lifecycle batches, monitoring, and settings
+    state.
 12. `app.py`, `semantic_model.json`, `release_report.json`, and
     `package_manifest.json` must reflect the live capability contract and must
     not drift behind the package runtime.
+13. Event agents must be first-class APG citizens with supported runtime and
+    role manifests. The first supported runtimes are Codex, Claude Code,
+    opencode, and Pi.
+14. Event agents must fail closed when runtime, role, owner, purpose, scope, or
+    machine contribution disclosure is missing or unsupported.
+15. Event agents in privileged roles must require human approval. Privileged
+    roles include quota review, replay review, Bytewax topology review, and
+    dead-letter triage.
+16. Lifecycle batches must validate that the event stream processor is Bytewax
+    and must reject empty batches.
 
 ## Rule Engine Requirements
 
@@ -84,7 +102,11 @@ The deterministic rule engine must cover at least:
 - paused subscription blocks delivery;
 - priority quota exhaustion requires review;
 - replay requires bounded range and reason;
-- dead-letter replay requires reviewer evidence.
+- dead-letter replay requires reviewer evidence;
+- event-agent runtime and role must be supported;
+- event-agent scope, owner, purpose, and contribution disclosure are required;
+- privileged event-agent roles require human approval;
+- lifecycle batches require Bytewax stream processing.
 
 Rules must be expressible through the existing `CapabilityRuleEngine` pattern:
 small, declarative conditions and deterministic allow/deny/review decisions.
@@ -101,8 +123,9 @@ MQEB must expose generated-app UI models for:
 - dead-letter queue;
 - replay console;
 - priority quota review queue;
+- event-agent roster and approval posture;
 - consumer lag and delivery monitoring;
-- Bytewax pipeline bridge status;
+- Bytewax pipeline bridge and lifecycle-batch status;
 - settings and adapter configuration.
 
 The visual theme should remain compact and operational: dense tables,
@@ -130,11 +153,13 @@ The current package already contains:
 
 - `MQEBService` with async topic creation, publish, subscription, consume, and
   stats behavior;
-- Flask API and Flask-AppBuilder views;
-- deterministic capability contract with 8 routes and 6 rules;
+- dependency-light `MqebService`, API helpers, view models, and optional legacy
+  Flask integration surfaces;
+- deterministic capability contract with event-fabric, event-agent, Bytewax,
+  UI, theme, and rule manifests;
 - semantic, release, and package manifest evidence;
-- broad existing tests for basic functionality, compliance, edge, enterprise,
-  multi-cloud, quantum security, and materialized package shape.
+- focused package tests for event-fabric state, first-class event agents,
+  Bytewax lifecycle validation, and generated-app package shape.
 
 The next packet must convert this into a package-backed lifecycle guardrail
 slice like the recent SECU, ENCR, and KEYM work: dependency-light records and
@@ -152,6 +177,9 @@ The first coherent MQEB packet will implement:
 - delivery attempt records with retry/dead-letter outcomes;
 - priority quota exception request and independent review;
 - replay request scheduling and review evidence;
+- event-agent registration with runtime, role, owner, purpose, scope,
+  contribution disclosure, and human approval guardrails;
+- Bytewax lifecycle-batch validation;
 - operational audit events;
 - dependency-light API helpers and view models;
 - contract-derived semantic evidence and package proof.

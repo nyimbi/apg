@@ -25,12 +25,20 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"compliance",
 		"scaling",
 		"operation_governance",
+		"agents",
+		"streaming",
 		"ui",
 		"theme"
 	]
 	assert contract["configuration"]["operation_governance"]["bytewax_first_runtime"] is True
 	assert contract["configuration"]["operation_governance"]["kafka_core_dependency_allowed"] is False
-	assert len(contract["rule_engine"]["rules"]) >= 14
+	assert contract["agents"]["first_class"] is True
+	assert "codex" in contract["agents"]["supported_runtimes"]
+	assert "claude_code" in contract["agents"]["supported_runtimes"]
+	assert "bytewax_topology_reviewer" in contract["agents"]["privileged_roles"]
+	assert contract["streaming"]["engine"] == "bytewax"
+	assert contract["streaming"]["kafka_core_dependency_allowed"] is False
+	assert len(contract["rule_engine"]["rules"]) >= 22
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
 		"topics",
@@ -40,6 +48,7 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"dead_letters",
 		"quota_exceptions",
 		"replays",
+		"agents",
 		"bytewax",
 		"routing",
 		"scaling",
@@ -50,6 +59,7 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "message_flow_map" in contract["theme"]["components"]
 	assert "bytewax_bridge_panel" in contract["theme"]["components"]
+	assert "event_agent_roster" in contract["theme"]["components"]
 
 
 def test_rule_engine_enforces_message_governance_guardrails():
@@ -119,6 +129,37 @@ def test_rule_engine_enforces_regulated_topic_encryption_and_schema():
 	}
 
 
+def test_rule_engine_enforces_event_agent_and_bytewax_guardrails():
+	agent = evaluate_capability_rules({
+		"operation": "register_event_agent",
+		"agent_runtime_supported": False,
+		"agent_role_supported": False,
+		"agent_scope_present": False,
+		"agent_owner_present": False,
+		"agent_purpose_present": False,
+		"contribution_disclosed": False,
+		"privileged_agent_role": True,
+		"human_approval_required": False,
+	})
+	stream = evaluate_capability_rules({
+		"operation": "validate_event_lifecycle_batch",
+		"event_stream": "custom-broker",
+	})
+
+	assert agent["decision"] == "deny"
+	assert {action["reason"] for action in agent["actions"]} == {
+		"unsupported_event_agent_runtime",
+		"unsupported_event_agent_role",
+		"event_agent_scope_required",
+		"event_agent_owner_required",
+		"event_agent_purpose_required",
+		"event_agent_contribution_disclosure_required",
+		"event_agent_human_approval_required",
+	}
+	assert stream["decision"] == "deny"
+	assert stream["actions"][0]["reason"] == "bytewax_event_stream_required"
+
+
 def test_registration_includes_full_capability_contract():
 	registration = register_capability()
 
@@ -128,6 +169,10 @@ def test_registration_includes_full_capability_contract():
 	assert registration["theme"]["name"] == "mqeb_event_fabric"
 	assert registration["ui_components"]["routing"] == "/mqeb/routing"
 	assert registration["ui_components"]["bytewax"] == "/mqeb/bytewax"
+	assert registration["ui_components"]["agents"] == "/mqeb/agents"
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["engine"] == "bytewax"
 	assert "mqeb:review_quota" in registration["permissions"]
 	assert "mqeb:manage_bytewax" in registration["permissions"]
+	assert "mqeb:manage_agents" in registration["permissions"]
 	assert "auth_rbac" in registration["dependencies"]

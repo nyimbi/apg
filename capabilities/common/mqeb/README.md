@@ -3,8 +3,8 @@
 MQEB is APG's package-backed event fabric. It provides tenant-scoped topic
 management, governed message publishing, subscription lifecycle state,
 delivery/dead-letter evidence, replay review, priority quota review, rule
-evaluation, UI view models, and publishable package evidence for generated APG
-applications.
+evaluation, first-class event-agent composition, Bytewax lifecycle validation,
+UI view models, and publishable package evidence for generated APG applications.
 
 MQEB is **Bytewax-first**. Bytewax workers and dataflows are the preferred
 runtime boundary for stream processing. Kafka may be supported later through an
@@ -22,8 +22,12 @@ optional compatibility bridge, but it is not the MQEB core dependency.
 - Priority quota exception request and independent-review workflows.
 - Replay request and independent-review workflows with bounded ranges and
   evidence.
+- First-class event-agent registration for Codex, Claude Code, opencode, and
+  Pi with supported roles, owner, purpose, scope, contribution disclosure, and
+  human approval guardrails.
+- Bytewax lifecycle-batch validation for generated event-fabric mutations.
 - Audit event records for topic, publish, subscription, delivery, review, and
-  replay actions.
+  replay, event-agent, and lifecycle-batch actions.
 - Dependency-light API helpers and generated-app view models.
 - Contract-derived `app.py`, `semantic_model.json`, `release_report.json`, and
   `package_manifest.json` evidence.
@@ -85,6 +89,25 @@ service.record_delivery_attempt(
     subscription_id=subscription["id"],
     outcome="delivered",
 )
+
+agent = service.register_event_agent(
+    tenant_id="tenant-a",
+    agent_id="replay-agent",
+    name="Replay Agent",
+    runtime="claude-code",
+    role="replay-reviewer",
+    scope="bounded replay review",
+    owner="platform",
+    purpose="review replay approvals",
+    contribution_disclosed=True,
+    human_approval_required=True,
+)
+
+service.validate_event_lifecycle_batch(
+    tenant_id="tenant-a",
+    event_stream="bytewax",
+    mutation_count=3,
+)
 ```
 
 ## Guardrails
@@ -101,7 +124,10 @@ MQEB fails closed for:
 - paused subscription delivery;
 - priority bursts without an approved quota exception;
 - replay requests without bounded range and reason;
-- self-reviewed or note-less quota/replay reviews.
+- self-reviewed or note-less quota/replay reviews;
+- event-agent registration without supported runtime/role, owner, purpose,
+  scope, contribution disclosure, or privileged-role human approval;
+- lifecycle mutation batches that do not use Bytewax.
 
 ## API Helpers
 
@@ -117,6 +143,8 @@ MQEB fails closed for:
 - `decide_priority_exception`
 - `request_replay`
 - `decide_replay`
+- `register_event_agent`
+- `validate_event_lifecycle_batch`
 - `list_event_fabric`
 - `capability_status`
 
@@ -133,6 +161,7 @@ These helpers are separate from the Flask routes already present in the file.
 - delivery and dead letters;
 - priority quota review queue;
 - replay console;
+- event-agent roster;
 - Bytewax bridge status;
 - audit timeline;
 - settings.

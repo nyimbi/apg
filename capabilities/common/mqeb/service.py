@@ -165,6 +165,43 @@ class ReplayRequestRecord:
 
 
 @dataclass(slots=True)
+class MqebAgentRecord:
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	owner: str
+	purpose: str
+	contribution_disclosed: bool
+	human_approval_required: bool
+	status: str = "active"
+	created_at: str = field(default_factory=_utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass(slots=True)
+class EventLifecycleBatchRecord:
+	id: str
+	tenant_id: str
+	event_stream: str
+	mutation_count: int
+	accepted: bool
+	decision: str
+	matched_rules: list[str]
+	required_actions: list[str]
+	required_processor: str = "bytewax"
+	status: str = "accepted"
+	created_at: str = field(default_factory=_utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass(slots=True)
 class MqebAuditEventRecord:
 	id: str
 	tenant_id: str
@@ -183,16 +220,27 @@ class MqebService:
 	"""Dependency-light MQEB event-fabric service for generated APG applications."""
 
 	def __init__(self) -> None:
-		from .capability_contract import evaluate_capability_rules, get_capability_contract
+		from .capability_contract import (
+			PRIVILEGED_MQEB_AGENT_ROLES,
+			SUPPORTED_MQEB_AGENT_ROLES,
+			SUPPORTED_MQEB_AGENT_RUNTIMES,
+			evaluate_capability_rules,
+			get_capability_contract,
+		)
 
 		self._evaluate_rules = evaluate_capability_rules
 		self._get_contract = get_capability_contract
+		self._agent_runtimes = set(SUPPORTED_MQEB_AGENT_RUNTIMES)
+		self._agent_roles = set(SUPPORTED_MQEB_AGENT_ROLES)
+		self._privileged_agent_roles = set(PRIVILEGED_MQEB_AGENT_ROLES)
 		self.topics: dict[str, TopicRecord] = {}
 		self.messages: dict[str, MessageRecord] = {}
 		self.subscriptions: dict[str, SubscriptionRecord] = {}
 		self.delivery_attempts: dict[str, DeliveryAttemptRecord] = {}
 		self.priority_exceptions: dict[str, PriorityQuotaExceptionRecord] = {}
 		self.replay_requests: dict[str, ReplayRequestRecord] = {}
+		self.event_agents: dict[str, MqebAgentRecord] = {}
+		self.lifecycle_batches: dict[str, EventLifecycleBatchRecord] = {}
 		self.audit_events: dict[str, MqebAuditEventRecord] = {}
 
 	def describe(self, tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -471,6 +519,90 @@ class MqebService:
 		self._record_event(tenant_id, "replay_decided", record.id, f"Replay {record.status}: {record.topic_id}", reviewer, "medium")
 		return record.to_dict()
 
+	def register_event_agent(
+		self,
+		tenant_id: str,
+		agent_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> dict[str, Any]:
+		"""Register a first-class MQEB event agent with guardrail evidence."""
+		self._require_tenant(tenant_id)
+		if not str(agent_id or "").strip():
+			raise ValueError("event_agent_id_required")
+		if not str(name or "").strip():
+			raise ValueError("event_agent_name_required")
+		runtime_value = self._normalize_agent_token(runtime)
+		role_value = self._normalize_agent_token(role)
+		context = {
+			"operation": "register_event_agent",
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"agent_scope_present": bool(str(scope or "").strip()),
+			"agent_owner_present": bool(str(owner or "").strip()),
+			"agent_purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_agent_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+		}
+		result = self.evaluate(context)
+		if result["decision"] == "deny":
+			raise PermissionError(self._first_reason(result))
+		record_id = _stable_id("mqeb_agent", tenant_id, agent_id)
+		if record_id in self.event_agents:
+			raise ValueError(f"event_agent_already_exists:{agent_id}")
+		record = MqebAgentRecord(
+			id=record_id,
+			tenant_id=tenant_id,
+			name=str(name).strip(),
+			runtime=runtime_value,
+			role=role_value,
+			scope=str(scope).strip(),
+			owner=str(owner).strip(),
+			purpose=str(purpose).strip(),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+		)
+		self.event_agents[record.id] = record
+		self._record_event(tenant_id, "event_agent_registered", record.id, f"Event agent registered: {record.name}", record.owner)
+		return record.to_dict()
+
+	def validate_event_lifecycle_batch(self, tenant_id: str, event_stream: str, mutation_count: int) -> dict[str, Any]:
+		"""Validate that MQEB lifecycle mutation batches flow through Bytewax."""
+		self._require_tenant(tenant_id)
+		mutation_value = int(mutation_count)
+		if mutation_value <= 0:
+			raise ValueError("event_lifecycle_batch_empty")
+		stream_value = self._normalize_agent_token(event_stream)
+		result = self.evaluate({
+			"operation": "validate_event_lifecycle_batch",
+			"event_stream": stream_value,
+		})
+		accepted = result["decision"] == "allow"
+		record = EventLifecycleBatchRecord(
+			id=_stable_id("mqeb_lifecycle_batch", tenant_id, stream_value, len(self.lifecycle_batches)),
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_value,
+			accepted=accepted,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			required_actions=_required_actions(result),
+			status="accepted" if accepted else "denied",
+		)
+		self.lifecycle_batches[record.id] = record
+		severity = "info" if accepted else "high"
+		self._record_event(tenant_id, f"event_lifecycle_batch_{record.status}", record.id, f"Lifecycle batch {record.status}: {stream_value}", "mqeb", severity)
+		if not accepted:
+			raise PermissionError(self._first_reason(result))
+		return record.to_dict()
+
 	def create_record(self, record_id: str, tenant_id: str, metadata: dict[str, Any] | None = None, status: str = "active") -> dict[str, Any]:
 		metadata = dict(metadata or {})
 		return self.create_topic(
@@ -508,6 +640,12 @@ class MqebService:
 	def list_replay_requests(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.replay_requests, tenant_id)
 
+	def list_event_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.event_agents, tenant_id)
+
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.lifecycle_batches, tenant_id)
+
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.audit_events, tenant_id)
 
@@ -525,6 +663,9 @@ class MqebService:
 			"dead_letter_count": sum(1 for item in self.list_delivery_attempts(tenant_id) if item["outcome"] == "dead_letter"),
 			"pending_priority_exception_count": sum(1 for item in self.list_priority_exceptions(tenant_id) if item["status"] == "pending"),
 			"pending_replay_count": sum(1 for item in self.list_replay_requests(tenant_id) if item["status"] == "pending"),
+			"event_agent_count": len(self.list_event_agents(tenant_id)),
+			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
+			"denied_lifecycle_batch_count": sum(1 for item in self.list_lifecycle_batches(tenant_id) if not item["accepted"]),
 			"recent_events": self.list_audit_events(tenant_id)[-5:],
 		}
 
@@ -618,6 +759,9 @@ class MqebService:
 			if action.get("reason"):
 				return str(action["reason"])
 		return "message_operation_denied"
+
+	def _normalize_agent_token(self, value: str) -> str:
+		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
 
 	def _list(self, records: dict[str, Any], tenant_id: str | None = None) -> list[dict[str, Any]]:
 		items = [record.to_dict() for record in records.values()]

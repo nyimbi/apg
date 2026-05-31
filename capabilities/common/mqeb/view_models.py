@@ -26,7 +26,11 @@ def dashboard_model(service: MqebService | None = None, tenant_id: str = "defaul
 		"delivery_attempts": service.list_delivery_attempts(tenant_id),
 		"priority_exceptions": service.list_priority_exceptions(tenant_id),
 		"replay_requests": service.list_replay_requests(tenant_id),
+		"event_agents": service.list_event_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 	}
 
@@ -98,12 +102,29 @@ def replay_console_model(service: MqebService | None = None, tenant_id: str = "d
 
 def bytewax_bridge_model(service: MqebService | None = None, tenant_id: str = "default") -> dict[str, object]:
 	service = service or api.SERVICE
+	contract = service.describe(tenant_id)
 	return {
 		"route": "/mqeb/bytewax",
 		"tenant_id": tenant_id,
 		"preferred_runtime": "bytewax",
+		"streaming": contract["streaming"],
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
 		"subscriptions": [item for item in service.list_subscriptions(tenant_id) if item["protocol"] == "bytewax"],
 		"adapter_status": "adapter_boundary",
+	}
+
+
+def event_agent_roster_model(service: MqebService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or api.SERVICE
+	contract = service.describe(tenant_id)
+	return {
+		"route": "/mqeb/agents",
+		"tenant_id": tenant_id,
+		"event_agents": service.list_event_agents(tenant_id),
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+		"guardrails": contract["agents"]["guardrails"],
 	}
 
 
@@ -122,5 +143,7 @@ def settings_model(tenant_id: str = "default") -> dict[str, object]:
 		"route": "/mqeb/settings",
 		"tenant_id": tenant_id,
 		"configuration": contract["configuration"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 	}

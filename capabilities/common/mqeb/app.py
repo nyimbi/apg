@@ -52,13 +52,17 @@ def semantic_model() -> dict[str, Any]:
 			"mqeb": {
 				"name": contract["display_name"],
 				"configuration": contract["configuration"],
-				"provides": ["mqeb_operations"],
-				"requires": [],
+				"provides": contract["provides"],
+				"requires": contract["requires"],
 				"erp_modules": ["common"],
 				"rule_engine": contract["rule_engine"],
 				"rules": contract["rule_engine"]["rules"],
 				"ui": contract["ui"],
 				"screens": routes,
+				"agents": {
+					"mqeb_agent_contract": contract["agents"],
+				},
+				"streaming": contract["streaming"],
 				"theme": contract["theme"],
 				"runtime": {
 					"api": "api.py",
@@ -71,6 +75,7 @@ def semantic_model() -> dict[str, Any]:
 				"approvals": {
 					"priority_quota": "PriorityQuotaExceptionRecord",
 					"replay": "ReplayRequestRecord",
+					"event_agent": "MqebAgentRecord",
 				},
 				"delivery": {
 					"topic": "TopicRecord",
@@ -84,15 +89,16 @@ def semantic_model() -> dict[str, Any]:
 				},
 				"i18n": {},
 				"master_data": {},
-				"streaming": {},
 			}
 		},
 		"contracts": {
 			"mqeb": {
 				"id": "mqeb",
 				"configuration": contract["configuration"],
-				"provides": ["mqeb_operations"],
-				"requires": [],
+				"provides": contract["provides"],
+				"requires": contract["requires"],
+				"agents": contract["agents"],
+				"streaming": contract["streaming"],
 			}
 		},
 		"rules": {
@@ -100,16 +106,22 @@ def semantic_model() -> dict[str, Any]:
 			for rule in contract["rule_engine"]["rules"]
 		},
 		"composition": {
-			"capability_dependencies": {"mqeb": []},
+			"capability_dependencies": {"mqeb": contract["requires"]},
 			"applications": {},
-			"agent_teams": {},
+			"agent_teams": {
+				"mqeb_event_governance": {
+					"roles": contract["agents"]["supported_roles"],
+					"runtimes": contract["agents"]["supported_runtimes"],
+					"requires_human_approval_for": contract["agents"]["privileged_roles"],
+				}
+			},
 		},
 		"deployment": {
 			"source": "capability_contract.py",
 			"target": "python",
 		},
 		"graphs": {
-			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"capability": {"kind": "capability", "nodes": 1, "edges": len(contract["requires"])},
 			"package": {"kind": "package", "nodes": 2, "edges": 1},
 		},
 		"source_files": ["capability_contract.py"],
@@ -126,7 +138,9 @@ def semantic_model() -> dict[str, Any]:
 				"references": [],
 			}
 		},
-		"agents": {},
+		"agents": {
+			"mqeb_agent_contract": contract["agents"],
+		},
 		"flows": {},
 		"llms": {},
 		"operations": {},
@@ -164,18 +178,24 @@ def self_test() -> dict[str, Any]:
 	routes = capability.get("ui", {}).get("routes", [])
 	rules = capability.get("rule_engine", {}).get("rules", [])
 	adapters = capability.get("adapters", {})
+	agents = capability.get("agents", {}).get("mqeb_agent_contract", {})
+	streaming = capability.get("streaming", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "mqeb" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
-	if len(routes) < 13:
+	if len(routes) < 14:
 		errors.append("MQEB semantic model route manifest is stale")
-	if len(rules) < 14:
+	if len(rules) < 22:
 		errors.append("MQEB semantic model rule manifest is stale")
 	if adapters.get("preferred_stream_runtime") != "bytewax" or adapters.get("kafka_core_dependency_allowed") is not False:
 		errors.append("MQEB adapter manifest must remain Bytewax-first")
+	if agents.get("first_class") is not True:
+		errors.append("MQEB event agents must remain first-class")
+	if streaming.get("engine") != "bytewax":
+		errors.append("MQEB streaming manifest must remain Bytewax-first")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

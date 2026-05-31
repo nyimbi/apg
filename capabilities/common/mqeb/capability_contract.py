@@ -13,6 +13,24 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+SUPPORTED_MQEB_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_MQEB_AGENT_ROLES = [
+	"routing_reviewer",
+	"delivery_reliability_reviewer",
+	"quota_reviewer",
+	"replay_reviewer",
+	"schema_governance_reviewer",
+	"bytewax_topology_reviewer",
+	"dead_letter_triage",
+]
+PRIVILEGED_MQEB_AGENT_ROLES = [
+	"quota_reviewer",
+	"replay_reviewer",
+	"bytewax_topology_reviewer",
+	"dead_letter_triage",
+]
+
+
 @dataclass(frozen=True)
 class CapabilityConfiguration:
 	"""Tenant-scoped MQEB configuration defaults and schema."""
@@ -61,6 +79,34 @@ class CapabilityConfiguration:
 			"require_independent_replay_review": True,
 			"record_delivery_audit": True
 		},
+		"agents": {
+			"first_class": True,
+			"supported_runtimes": SUPPORTED_MQEB_AGENT_RUNTIMES,
+			"supported_roles": SUPPORTED_MQEB_AGENT_ROLES,
+			"privileged_roles": PRIVILEGED_MQEB_AGENT_ROLES,
+			"require_owner": True,
+			"require_purpose": True,
+			"require_scope": True,
+			"require_contribution_disclosure": True,
+			"require_human_approval_for_privileged_roles": True
+		},
+		"streaming": {
+			"engine": "bytewax",
+			"lifecycle_stream": "mqeb.lifecycle",
+			"watermark": "event_time",
+			"required_operations": [
+				"event_fabric_batch",
+				"message_delivery_batch",
+				"event_agent_batch"
+			],
+			"topics": [
+				"mqeb.topics",
+				"mqeb.messages",
+				"mqeb.subscriptions",
+				"mqeb.replays",
+				"mqeb.agents"
+			]
+		},
 		"ui": {
 			"enable_dashboard": True,
 			"enable_topic_manager": True,
@@ -69,7 +115,8 @@ class CapabilityConfiguration:
 			"enable_dead_letter_console": True,
 			"enable_replay_console": True,
 			"enable_quota_exception_queue": True,
-			"enable_bytewax_bridge": True
+			"enable_bytewax_bridge": True,
+			"enable_event_agent_roster": True
 		},
 		"theme": {
 			"default_theme": "mqeb_event_fabric",
@@ -87,6 +134,8 @@ class CapabilityConfiguration:
 			"compliance",
 			"scaling",
 			"operation_governance",
+			"agents",
+			"streaming",
 			"ui",
 			"theme"
 		],
@@ -99,6 +148,8 @@ class CapabilityConfiguration:
 			"compliance": {"type": "object"},
 			"scaling": {"type": "object"},
 			"operation_governance": {"type": "object"},
+			"agents": {"type": "object"},
+			"streaming": {"type": "object"},
 			"ui": {"type": "object"},
 			"theme": {"type": "object"}
 		}
@@ -220,6 +271,16 @@ class CapabilityTheme:
 			"icon": "git-branch",
 			"status_indicator": "adapter-state",
 			"variant": "stream-runtime"
+		},
+		"event_agent_roster": {
+			"icon": "bot",
+			"status_indicator": "approval-state",
+			"variant": "agent-governance"
+		},
+		"bytewax_stream_indicator": {
+			"icon": "activity",
+			"status_indicator": "processor-state",
+			"variant": "stream-lifecycle"
 		}
 	})
 
@@ -376,6 +437,86 @@ def default_rules() -> list[CapabilityRule]:
 				"reason": "review_notes_required",
 				"required_action": "attach_review_notes"
 			}
+		),
+		CapabilityRule(
+			name="event_agent_runtime_supported",
+			description="MQEB event agents must use a supported runtime adapter.",
+			condition={"operation": "register_event_agent", "agent_runtime_supported": False},
+			effect={
+				"decision": "deny",
+				"reason": "unsupported_event_agent_runtime",
+				"required_action": "select_supported_agent_runtime"
+			}
+		),
+		CapabilityRule(
+			name="event_agent_role_supported",
+			description="MQEB event agents must use a supported event-fabric role.",
+			condition={"operation": "register_event_agent", "agent_role_supported": False},
+			effect={
+				"decision": "deny",
+				"reason": "unsupported_event_agent_role",
+				"required_action": "select_supported_agent_role"
+			}
+		),
+		CapabilityRule(
+			name="event_agent_requires_scope",
+			description="MQEB event agents require an explicit operating scope.",
+			condition={"operation": "register_event_agent", "agent_scope_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "event_agent_scope_required",
+				"required_action": "attach_agent_scope"
+			}
+		),
+		CapabilityRule(
+			name="event_agent_requires_owner",
+			description="MQEB event agents require an accountable owner.",
+			condition={"operation": "register_event_agent", "agent_owner_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "event_agent_owner_required",
+				"required_action": "attach_agent_owner"
+			}
+		),
+		CapabilityRule(
+			name="event_agent_requires_purpose",
+			description="MQEB event agents require a declared purpose.",
+			condition={"operation": "register_event_agent", "agent_purpose_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "event_agent_purpose_required",
+				"required_action": "attach_agent_purpose"
+			}
+		),
+		CapabilityRule(
+			name="event_agent_requires_contribution_disclosure",
+			description="MQEB event agents must disclose machine contribution in event decisions.",
+			condition={"operation": "register_event_agent", "contribution_disclosed": False},
+			effect={
+				"decision": "deny",
+				"reason": "event_agent_contribution_disclosure_required",
+				"required_action": "enable_agent_contribution_disclosure"
+			}
+		),
+		CapabilityRule(
+			name="event_agent_privileged_role_requires_human_approval",
+			description="Privileged MQEB event-agent roles require human approval.",
+			condition={"operation": "register_event_agent", "privileged_agent_role": True, "human_approval_required": False},
+			effect={
+				"decision": "deny",
+				"reason": "event_agent_human_approval_required",
+				"required_action": "require_human_approval_for_agent"
+			}
+		),
+		CapabilityRule(
+			name="bytewax_event_stream_required",
+			description="MQEB lifecycle batches must declare Bytewax as the event stream processor.",
+			condition={"operation": "validate_event_lifecycle_batch", "event_stream_ne": "bytewax"},
+			effect={
+				"decision": "deny",
+				"reason": "bytewax_event_stream_required",
+				"required_action": "route_batch_through_bytewax"
+			}
 		)
 	]
 
@@ -391,6 +532,7 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("dead_letters", "/mqeb/dead-letters", "DeadLetterQueue", "mqeb:manage_routing", "Reliability"),
 		CapabilityUIRoute("quota_exceptions", "/mqeb/quota-exceptions", "PriorityQuotaExceptionQueue", "mqeb:admin", "Governance"),
 		CapabilityUIRoute("replays", "/mqeb/replays", "ReplayConsole", "mqeb:admin", "Governance"),
+		CapabilityUIRoute("agents", "/mqeb/agents", "EventAgentRoster", "mqeb:admin", "Administration"),
 		CapabilityUIRoute("bytewax", "/mqeb/bytewax", "BytewaxBridgeStatus", "mqeb:admin", "Runtime"),
 		CapabilityUIRoute("routing", "/mqeb/routing", "RoutingDesigner", "mqeb:manage_routing", "Governance"),
 		CapabilityUIRoute("scaling", "/mqeb/scaling", "PredictiveScalingConsole", "mqeb:admin", "Reliability"),
@@ -407,6 +549,49 @@ def ui_manifest() -> dict[str, Any]:
 	}
 
 
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class MQEB event-agent composition manifest."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_MQEB_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_MQEB_AGENT_ROLES),
+		"privileged_roles": list(PRIVILEGED_MQEB_AGENT_ROLES),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles"
+		]
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return MQEB stream-processing contract."""
+	return {
+		"engine": "bytewax",
+		"lifecycle_stream": "mqeb.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"event_fabric_batch",
+			"message_delivery_batch",
+			"event_agent_batch"
+		],
+		"topics": [
+			"mqeb.topics",
+			"mqeb.messages",
+			"mqeb.subscriptions",
+			"mqeb.replays",
+			"mqeb.agents"
+		],
+		"kafka_core_dependency_allowed": False
+	}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable MQEB capability contract."""
 	config = CapabilityConfiguration()
@@ -414,6 +599,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "mqeb",
 		"display_name": "Message Queue Event Bus",
+		"provides": ["mqeb_event_fabric", "message_governance", "event_agent_composition"],
+		"requires": ["conf", "auth", "audl", "secu"],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
 		"rule_engine": {
@@ -421,6 +608,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"rules": [rule.__dict__ for rule in default_rules()]
 		},
 		"ui": ui_manifest(),
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
 		"theme": {
 			"name": theme.name,
 			"tokens": theme.tokens,
@@ -439,6 +628,10 @@ def _matches(condition: dict[str, Any], context: dict[str, Any]) -> bool:
 		if key.endswith("_gt"):
 			field_name = key[:-3]
 			if not context.get(field_name, 0) > expected:
+				return False
+		elif key.endswith("_ne"):
+			field_name = key[:-3]
+			if context.get(field_name) == expected:
 				return False
 		elif context.get(key) != expected:
 			return False

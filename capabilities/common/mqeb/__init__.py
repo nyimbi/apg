@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 """
 APG Message Queue Event Bus (MQEB) Capability
-AI-powered universal messaging platform with 10x performance improvements
+Package-backed event fabric with Bytewax-first lifecycle guardrails
 
 Author: Nyimbi Odero
 Copyright: © 2025 Datacraft
 
 The MQEB capability provides:
-- Intelligent message routing with AI-powered optimization
-- Universal protocol support (MQTT, AMQP, Bytewax, WebSocket, gRPC, HTTP/REST)
-- Quantum-safe security with post-quantum cryptography
-- Real-time analytics and predictive scaling
-- Multi-cloud federation with edge computing support
-- Compliance automation for GDPR, HIPAA, PCI-DSS, and more
+- Tenant-scoped topics, messages, subscriptions, and delivery evidence
+- Deterministic message, replay, quota, and event-agent guardrails
+- First-class event-agent composition for Codex, Claude Code, opencode, and Pi
+- Bytewax-first lifecycle-batch validation and streaming manifests
+- Dependency-light API helpers, UI manifests, view models, and package evidence
 """
 
 from .models import (
@@ -22,9 +21,10 @@ from .models import (
 )
 
 from .service import (
-    DeliveryAttemptRecord, MessageRecord, MqebAuditEventRecord, MqebService,
-    MQEBService, PriorityQuotaExceptionRecord, ReplayRequestRecord,
-    SubscriptionRecord, TopicRecord, create_mqeb_service
+    DeliveryAttemptRecord, EventLifecycleBatchRecord, MessageRecord,
+    MqebAgentRecord, MqebAuditEventRecord, MqebService, MQEBService,
+    PriorityQuotaExceptionRecord, ReplayRequestRecord, SubscriptionRecord,
+    TopicRecord, create_mqeb_service
 )
 
 from .capability_contract import (
@@ -79,14 +79,14 @@ APG_CAPABILITY_INFO = {
     "name": "mqeb",
     "display_name": "Message Queue Event Bus",
     "version": __version__,
-    "description": "AI-powered universal messaging platform with 10x performance improvements",
+    "description": "Package-backed APG event fabric with first-class event agents and Bytewax-first lifecycle guardrails",
     "category": "messaging",
     "author": __author__,
     "copyright": __copyright__,
     
     # Performance specifications
     "performance": {
-        "max_throughput_msg_per_sec": 10_000_000,
+        "max_throughput_msg_per_sec": 1_000_000,
         "target_p99_latency_ms": 5,
         "max_concurrent_connections": 1_000_000,
         "max_topics": 100_000,
@@ -105,6 +105,9 @@ APG_CAPABILITY_INFO = {
     
     # Key features
     "features": [
+        "event_agent_composition",
+        "deterministic_message_guardrails",
+        "bytewax_lifecycle_validation",
         "intelligent_routing",
         "predictive_scaling", 
         "quantum_safe_encryption",
@@ -179,11 +182,11 @@ INDUSTRY_BENCHMARKS = {
         "serverless": True
     },
     "mqeb_advantage": {
-        "throughput_improvement": "10x",
-        "latency_improvement": "4x",
-        "connection_improvement": "10x",
+        "throughput_improvement": "adapter-dependent",
+        "latency_improvement": "adapter-dependent",
+        "connection_improvement": "adapter-dependent",
         "additional_features": [
-            "AI-powered routing",
+            "event-agent composition",
             "Quantum-safe security",
             "Universal protocol support",
             "Edge computing",
@@ -221,6 +224,8 @@ def register_capability() -> dict:
             "quota_exception_review": "Review priority burst exceptions with independent approval evidence",
             "replay_governance": "Govern message replay requests with bounded range, reason, reviewer, and evidence",
             "bytewax_event_fabric": "Expose Bytewax-first adapter boundaries for APG event flows",
+            "event_agent_composition": "Register first-class event agents with runtime, role, owner, purpose, scope, disclosure, and approval guardrails",
+            "lifecycle_batch_validation": "Validate MQEB lifecycle mutation batches against Bytewax-first stream rules",
             "predictive_scaling": "Scale messaging infrastructure from demand signals",
             "capability_rules": "Evaluate deterministic message governance rules",
             "visual_theming": "Apply event-fabric theme tokens and components"
@@ -233,6 +238,8 @@ def register_capability() -> dict:
             "dead_letters": "/mqeb/api/v1/dead-letters",
             "quota_exceptions": "/mqeb/api/v1/quota-exceptions",
             "replays": "/mqeb/api/v1/replays",
+            "agents": "/mqeb/api/v1/agents",
+            "lifecycle_batches": "/mqeb/api/v1/lifecycle-batches",
             "bytewax": "/mqeb/api/v1/bytewax",
             "routing": "/mqeb/api/v1/routing",
             "metrics": "/mqeb/api/v1/metrics",
@@ -243,6 +250,8 @@ def register_capability() -> dict:
             for route in contract["ui"]["routes"]
         },
         "ui_manifest": contract["ui"],
+        "agents": contract["agents"],
+        "streaming": contract["streaming"],
         "theme": contract["theme"],
         "permissions": [
             "mqeb:view",
@@ -255,6 +264,7 @@ def register_capability() -> dict:
             "mqeb:review_replay",
             "mqeb:manage_delivery",
             "mqeb:manage_bytewax",
+            "mqeb:manage_agents",
             "mqeb:admin"
         ]
     }
@@ -275,8 +285,9 @@ __all__ = [
     'TopicType', 'EncryptionMode', 'RetryStrategy', 'CompressionType',
     
     # Service
-    'DeliveryAttemptRecord', 'MessageRecord', 'MqebAuditEventRecord',
-    'MqebService', 'PriorityQuotaExceptionRecord', 'ReplayRequestRecord',
+    'DeliveryAttemptRecord', 'EventLifecycleBatchRecord', 'MessageRecord',
+    'MqebAgentRecord', 'MqebAuditEventRecord', 'MqebService',
+    'PriorityQuotaExceptionRecord', 'ReplayRequestRecord',
     'SubscriptionRecord', 'TopicRecord', 'MQEBService', 'create_mqeb_service',
     
     # Flask-AppBuilder integration
