@@ -29,8 +29,12 @@ def dashboard_model(
 		"remediation_board": service.list_findings(tenant_id),
 		"report_builder": service.list_reports(tenant_id),
 		"attestation_center": service.list_attestations(tenant_id),
+		"compliance_agents": service.list_compliance_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
 		"audit_timeline": service.list_audit_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 	}
 
@@ -138,6 +142,42 @@ def audit_model(service: CompService | None = None, tenant_id: str = "default") 
 		"tenant_id": tenant_id,
 		"audit_events": service.list_audit_events(tenant_id),
 		"theme_component": "audit_timeline",
+	}
+
+
+def compliance_agent_roster_model(service: CompService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or CompService()
+	contract = service.describe(tenant_id)
+	agents = service.list_compliance_agents(tenant_id)
+	return {
+		"route": "/comp/agents",
+		"tenant_id": tenant_id,
+		"agents": agents,
+		"active": [agent for agent in agents if agent["status"] == "active"],
+		"pending_review": [agent for agent in agents if agent["status"] == "pending_review"],
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+		"actions": ["register_compliance_agent", "record_human_compliance_agent_approval"],
+		"theme_component": "compliance_agent_roster",
+	}
+
+
+def lifecycle_batch_model(service: CompService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or CompService()
+	contract = service.describe(tenant_id)
+	batches = service.list_lifecycle_batches(tenant_id)
+	return {
+		"route": "/comp/lifecycle",
+		"tenant_id": tenant_id,
+		"lifecycle_stream": contract["streaming"]["lifecycle_stream"],
+		"required_processor": contract["streaming"]["required_processor"],
+		"required_operations": contract["streaming"]["required_operations"],
+		"batches": batches,
+		"accepted": [batch for batch in batches if batch["status"] == "accepted"],
+		"denied": [batch for batch in batches if batch["status"] == "denied"],
+		"actions": ["validate_lifecycle_batch", "inspect_bytewax_lifecycle"],
+		"theme_component": "bytewax_lifecycle_panel",
 	}
 
 

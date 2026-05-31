@@ -22,7 +22,11 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"framework_count": summary["framework_count"],
 		"control_count": summary["control_count"],
 		"open_finding_count": summary["open_finding_count"],
+		"compliance_agent_count": summary["compliance_agent_count"],
+		"lifecycle_batch_count": summary["lifecycle_batch_count"],
 		"coverage": summary["coverage"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 	}
 
 
@@ -131,6 +135,31 @@ def publish_report(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_compliance_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_compliance_agent(
+		agent_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload["name"]),
+		runtime=str(payload["runtime"]),
+		role=str(payload["role"]),
+		scope=str(payload["scope"]),
+		owner=str(payload["owner"]),
+		purpose=str(payload["purpose"]),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", True)),
+		human_approval_required=bool(payload.get("human_approval_required", False)),
+	)
+
+
+def validate_lifecycle_batch(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_comp_lifecycle_batch(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
+		mutation_count=int(payload.get("mutation_count") or 0),
+		operation=str(payload.get("operation") or "compliance_agent_batch"),
+		batch_id=payload.get("batch_id"),
+	)
+
+
 def compliance_state(tenant_id: str = "default") -> dict[str, Any]:
 	return {
 		"summary": SERVICE.dashboard_summary(tenant_id),
@@ -141,5 +170,7 @@ def compliance_state(tenant_id: str = "default") -> dict[str, Any]:
 		"findings": SERVICE.list_findings(tenant_id),
 		"reports": SERVICE.list_reports(tenant_id),
 		"attestations": SERVICE.list_attestations(tenant_id),
+		"compliance_agents": SERVICE.list_compliance_agents(tenant_id),
+		"lifecycle_batches": SERVICE.list_lifecycle_batches(tenant_id),
 		"audit_events": SERVICE.list_audit_events(tenant_id),
 	}

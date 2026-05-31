@@ -4,8 +4,9 @@
 
 `comp` provides a composable Compliance Management capability for APG
 applications. It turns frameworks, obligations, controls, evidence,
-assessments, findings, reports, attestations, and audit records into executable
-compliance operations with deterministic guardrails and UI-ready view models.
+assessments, findings, reports, attestations, first-class AI agents, Bytewax
+lifecycle batches, and audit records into executable compliance operations
+with deterministic guardrails and UI-ready view models.
 
 The capability does not replace a live GRC suite, document repository,
 regulator feed, policy engine, DLP product, identity provider, or audit-log
@@ -26,6 +27,13 @@ In scope:
 - findings, escalation, remediation, and resolution evidence;
 - report preparation, independent approval, attestation, publication, and
   critical-finding blocking;
+- first-class compliance-agent composition across provider-neutral runtimes
+  `codex`, `claude_code`, `opencode`, and `pi`;
+- compliance-agent role, scope, owner, purpose, machine-contribution
+  disclosure, and privileged human-approval guardrails;
+- Bytewax lifecycle-batch validation for framework, control, evidence,
+  assessment, finding, report, attestation, exception, and compliance-agent
+  mutation batches;
 - hashed audit-event metadata;
 - route, permission, view-model, theme, and adapter metadata;
 - package self-test, semantic model, manifest, release report, audit, and
@@ -40,6 +48,7 @@ Out of scope for the local package:
 - browser rendering;
 - persistent database migrations;
 - live Bytewax execution.
+- direct calls to external AI-agent CLIs or providers.
 
 ## Users
 
@@ -48,6 +57,8 @@ Out of scope for the local package:
 - Auditors and assessors testing controls.
 - Risk committees approving reports and attestations.
 - Platform engineers composing APG compliance applications.
+- AI-agent operators assigning governed automation to compliance lifecycle
+  scopes.
 
 ## Domain Model
 
@@ -60,6 +71,8 @@ The runtime owns these records:
 - `ComplianceFinding`
 - `ComplianceReport`
 - `AttestationRecord`
+- `ComplianceAgentRecord`
+- `CompLifecycleBatchRecord`
 - `ComplianceAuditEvent`
 
 All internal storage keys include tenant context so repeated business IDs can
@@ -110,9 +123,27 @@ exist safely across tenants.
 4. Publish only when approval and attestation exist.
 5. Block publication while critical findings remain open.
 
+### AI Agent
+
+1. Register a compliance agent with tenant, name, runtime, role, scope, owner,
+   purpose, and contribution disclosure.
+2. Deny unsupported runtimes and roles.
+3. Deny missing scope, owner, purpose, or machine-contribution disclosure.
+4. Mark privileged roles as `pending_review` unless human approval evidence is
+   recorded.
+5. Record audit evidence for every accepted agent registration.
+
+### Lifecycle Batch
+
+1. Validate a tenant-scoped lifecycle batch before composing bulk mutations.
+2. Require at least one mutation.
+3. Require a supported COMP lifecycle operation.
+4. Require Bytewax as the event stream and lifecycle processor.
+5. Record accepted and denied batch evidence for dashboards and audit trails.
+
 ## Deterministic Rules
 
-The contract currently exposes at least 30 rules covering:
+The contract currently exposes at least 45 rules covering:
 
 - tenant context;
 - framework ownership, obligations, policy versions, and duplicates;
@@ -127,7 +158,11 @@ The contract currently exposes at least 30 rules covering:
 - critical finding publication blocks;
 - tenant isolation;
 - compliance audit requirements;
-- Bytewax for batch compliance mutation.
+- Bytewax for batch compliance mutation;
+- provider-neutral compliance-agent runtime support;
+- compliance-agent role, scope, owner, purpose, contribution disclosure, and
+  privileged human-approval review;
+- Bytewax lifecycle batch mutation and stream guardrails.
 
 Rule decisions are one of:
 
@@ -152,6 +187,8 @@ Required configuration sections:
 - `security`
 - `governance`
 - `observability`
+- `agents`
+- `streaming`
 - `adapters`
 - `ui`
 - `theme`
@@ -169,6 +206,10 @@ Key defaults:
 - independent report approval required;
 - report attestation required;
 - Bytewax event stream for batch mutations;
+- first-class compliance agents enabled;
+- supported compliance-agent runtimes `codex`, `claude_code`, `opencode`, and
+  `pi`;
+- Bytewax lifecycle stream `comp.lifecycle`;
 - tenant isolation required;
 - compliance audit events required.
 
@@ -187,6 +228,8 @@ Routes:
 - `/comp/attestations`
 - `/comp/exports`
 - `/comp/audit`
+- `/comp/agents`
+- `/comp/lifecycle`
 - `/comp/settings`
 
 View models must remain dependency-light data payloads. Browser rendering
@@ -208,6 +251,8 @@ Theme components:
 - `attestation_center`
 - `regulatory_export`
 - `audit_timeline`
+- `compliance_agent_roster`
+- `bytewax_lifecycle_panel`
 
 ## Adapter Boundaries
 
@@ -225,6 +270,7 @@ Adapter keys are declared in the capability contract:
 - `workflow`: `wflo`
 - `notification`: `ntfy`
 - `event_stream`: `bytewax`
+- `agent_adapter`: `aicr_provider_neutral_compliance_agent_adapter`
 
 Adapters must not be required for local package self-tests.
 
@@ -232,11 +278,14 @@ Adapters must not be required for local package self-tests.
 
 - Contract exposes configuration, schema, deterministic rules, UI routes,
   theme, and adapters.
-- Rule count is at least 30.
-- UI route count is at least 12.
+- Rule count is at least 45.
+- UI route count is at least 14.
 - Bytewax is the event-stream adapter.
+- Agents are first-class and provider-neutral.
+- Lifecycle batches require Bytewax.
 - Service executes framework, control, evidence, assessment, finding, report,
-  attestation, publication, and audit lifecycles.
+  attestation, publication, compliance-agent, lifecycle-batch, and audit
+  lifecycles.
 - Tenant-local business IDs do not collide across tenants.
 - Regulated controls require DLP linkage.
 - Evidence requires encryption and immutable references.

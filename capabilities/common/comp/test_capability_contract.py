@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from capabilities.common.comp import register_capability
+from capabilities.common.comp import api
 from capabilities.common.comp import views
 from capabilities.common.comp.capability_contract import evaluate_capability_rules, get_capability_contract
 from capabilities.common.comp.service import CompService
@@ -28,16 +29,24 @@ def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
 		"security",
 		"governance",
 		"observability",
+		"agents",
+		"streaming",
 		"adapters",
 		"ui",
 		"theme",
 	}
-	assert len(contract["rule_engine"]["rules"]) >= 30
-	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "frameworks", "controls", "evidence", "assessments", "findings", "exceptions", "reports", "attestations", "exports", "audit", "settings"}
+	assert len(contract["rule_engine"]["rules"]) >= 45
+	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "frameworks", "controls", "evidence", "assessments", "findings", "exceptions", "reports", "attestations", "exports", "audit", "agents", "lifecycle", "settings"}
 	assert contract["ui"]["api_prefix"] == "/comp/api/v1"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "assessment_workbench" in contract["theme"]["components"]
+	assert "compliance_agent_roster" in contract["theme"]["components"]
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert contract["configuration"]["adapters"]["agent_adapter"] == "aicr_provider_neutral_compliance_agent_adapter"
+	assert contract["agents"]["first_class"] is True
+	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert "compliance_agent_batch" in contract["streaming"]["required_operations"]
 
 
 def test_rule_engine_enforces_compliance_guardrails():
@@ -56,6 +65,29 @@ def test_rule_engine_enforces_compliance_guardrails():
 	})
 	report_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "publish_report", "approval_recorded": False, "attestation_recorded": False})
 	stream_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_compliance_mutation", "event_stream": "kafka"})
+	agent_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_compliance_agent",
+		"agent_runtime_supported": False,
+		"agent_role_supported": False,
+		"scope_present": False,
+		"owner_present": False,
+		"purpose_present": False,
+		"contribution_disclosed": False,
+	})
+	privileged_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_compliance_agent",
+		"agent_runtime_supported": True,
+		"agent_role_supported": True,
+		"scope_present": True,
+		"owner_present": True,
+		"purpose_present": True,
+		"contribution_disclosed": True,
+		"privileged_role": True,
+		"human_approval_required": False,
+	})
+	lifecycle_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "validate_comp_lifecycle_batch", "event_stream": "kafka", "mutation_count": 1})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) >= {
@@ -70,6 +102,19 @@ def test_rule_engine_enforces_compliance_guardrails():
 	assert report_result["matched_rules"] == ["report_requires_approval", "report_requires_attestation"]
 	assert stream_result["decision"] == "deny"
 	assert "batch_compliance_mutation_requires_bytewax" in stream_result["matched_rules"]
+	assert agent_result["decision"] == "deny"
+	assert set(agent_result["matched_rules"]) >= {
+		"compliance_agent_runtime_supported",
+		"compliance_agent_role_supported",
+		"compliance_agent_requires_scope",
+		"compliance_agent_requires_owner",
+		"compliance_agent_requires_purpose",
+		"compliance_agent_requires_contribution_disclosure",
+	}
+	assert privileged_result["decision"] == "require_review"
+	assert privileged_result["matched_rules"] == ["compliance_agent_privileged_role_requires_human_approval"]
+	assert lifecycle_result["decision"] == "deny"
+	assert lifecycle_result["matched_rules"] == ["bytewax_comp_stream_required"]
 
 
 def test_registration_includes_full_capability_contract():
@@ -82,8 +127,11 @@ def test_registration_includes_full_capability_contract():
 	assert registration["theme"]["name"] == "comp_compliance_command_center"
 	assert registration["ui_components"]["controls"] == "/comp/controls"
 	assert registration["ui_components"]["audit"] == "/comp/audit"
+	assert registration["ui_components"]["agents"] == "/comp/agents"
 	assert "dlpd" in registration["dependencies"]
 	assert registration["adapters"]["event_stream"] == "bytewax"
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["lifecycle_stream"] == "comp.lifecycle"
 	assert "comp:approve_reports" in registration["permissions"]
 	assert "comp:audit" in registration["permissions"]
 
@@ -108,6 +156,8 @@ def test_service_runs_compliance_lifecycle_with_attested_report_and_views():
 	approved = service.approve_report("report-soc2-q1", "tenant-comp", "risk-committee")
 	attestation = service.attest_report("attest-soc2-q1", "report-soc2-q1", "tenant-comp", "chief-risk-officer", "Control evidence and known findings have been reviewed.")
 	published = service.publish_report("report-soc2-q1", "tenant-comp")
+	agent = service.register_compliance_agent("agent-steward", "tenant-comp", "Compliance Steward", "codex", "compliance_steward", "framework:fw-soc2", "chief-risk-officer", "review framework posture", human_approval_required=True)
+	batch = service.validate_comp_lifecycle_batch("tenant-comp", "bytewax", 3, "compliance_agent_batch", "batch-agent")
 	summary = service.dashboard_summary("tenant-comp")
 
 	assert framework["owner"] == "chief-risk-officer"
@@ -119,14 +169,21 @@ def test_service_runs_compliance_lifecycle_with_attested_report_and_views():
 	assert approved["status"] == "approved"
 	assert attestation["attested_by"] == "chief-risk-officer"
 	assert published["status"] == "published"
+	assert agent["runtime"] == "codex"
+	assert agent["status"] == "active"
+	assert batch["status"] == "accepted"
 	assert summary["framework_count"] == 1
 	assert summary["control_count"] == 1
 	assert summary["open_finding_count"] == 1
 	assert summary["coverage"]["assurance"] == "findings_open"
+	assert summary["compliance_agent_count"] == 1
+	assert summary["lifecycle_batch_count"] == 1
 	assert views.framework_matrix_model(service, "tenant-comp")["frameworks"][0]["id"] == "fw-soc2"
 	assert views.assessment_workbench_model(service, "tenant-comp")["assessments"][0]["id"] == "assess-access-review"
 	assert views.report_builder_model(service, "tenant-comp")["published"][0]["id"] == "report-soc2-q1"
-	assert len(views.audit_model(service, "tenant-comp")["audit_events"]) >= 8
+	assert views.compliance_agent_roster_model(service, "tenant-comp")["active"][0]["id"] == "agent-steward"
+	assert views.lifecycle_batch_model(service, "tenant-comp")["accepted"][0]["id"] == "batch-agent"
+	assert len(views.audit_model(service, "tenant-comp")["audit_events"]) >= 10
 
 
 def test_service_enforces_control_evidence_and_report_guardrails():
@@ -186,3 +243,55 @@ def test_tenant_local_ids_do_not_collide_and_cross_tenant_lookups_fail():
 	assert service.list_controls("tenant-beta")[0]["owner"] == "beta-owner"
 	with pytest.raises(KeyError, match="control_not_found"):
 		service.record_evidence("ev-cross", "tenant-alpha", "missing-control", "source", "auditor", encrypted=True, immutable_reference="sha256:x")
+
+
+def test_service_and_api_enforce_compliance_agent_and_lifecycle_guardrails():
+	service = CompService()
+
+	with pytest.raises(PermissionError, match="unsupported_compliance_agent_runtime"):
+		service.register_compliance_agent("agent-unsupported", "tenant-comp", "Unsupported", "kafka_agent", "framework_reviewer", "framework:*", "owner", "review frameworks")
+
+	with pytest.raises(PermissionError, match="compliance_agent_contribution_disclosure_required"):
+		service.register_compliance_agent("agent-undisclosed", "tenant-comp", "Undisclosed", "codex", "framework_reviewer", "framework:*", "owner", "review frameworks", contribution_disclosed=False)
+
+	pending = service.register_compliance_agent(
+		"agent-report-reviewer",
+		"tenant-comp",
+		"Report Reviewer",
+		"claude_code",
+		"report_reviewer",
+		"report:*",
+		"risk-office",
+		"review regulatory report drafts",
+	)
+
+	with pytest.raises(ValueError, match="comp_lifecycle_batch_empty"):
+		service.validate_comp_lifecycle_batch("tenant-comp", "bytewax", 0, "report_batch")
+	with pytest.raises(ValueError, match="unsupported_comp_lifecycle_operation"):
+		service.validate_comp_lifecycle_batch("tenant-comp", "bytewax", 1, "unknown_batch")
+	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
+		service.validate_comp_lifecycle_batch("tenant-comp", "kafka", 1, "report_batch")
+
+	api.SERVICE = CompService()
+	api_agent = api.register_compliance_agent({
+		"id": "agent-api",
+		"tenant_id": "tenant-api",
+		"name": "API Agent",
+		"runtime": "opencode",
+		"role": "framework_reviewer",
+		"scope": "framework:*",
+		"owner": "compliance-owner",
+		"purpose": "review framework drift",
+	})
+	api_batch = api.validate_lifecycle_batch({"tenant_id": "tenant-api", "event_stream": "bytewax", "mutation_count": 2, "operation": "framework_batch", "batch_id": "batch-api"})
+	status = api.capability_status("tenant-api")
+	state = api.compliance_state("tenant-api")
+
+	assert pending["status"] == "pending_review"
+	assert pending["human_approval_required"] is False
+	assert api_agent["runtime"] == "opencode"
+	assert api_batch["accepted"] is True
+	assert status["agents"]["first_class"] is True
+	assert status["lifecycle_batch_count"] == 1
+	assert state["compliance_agents"][0]["id"] == "agent-api"
+	assert state["lifecycle_batches"][0]["id"] == "batch-api"

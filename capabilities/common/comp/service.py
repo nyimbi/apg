@@ -9,6 +9,8 @@ from .capability_contract import DEFAULT_CONFIGURATION, evaluate_capability_rule
 from .compliance_engine import assessment_result, evidence_age_days, finding_age_days, framework_coverage, stable_digest
 from .models import (
 	AttestationRecord,
+	CompLifecycleBatchRecord,
+	ComplianceAgentRecord,
 	ComplianceAuditEvent,
 	ComplianceControl,
 	ComplianceFinding,
@@ -31,7 +33,13 @@ class CompService:
 		self._findings: dict[str, ComplianceFinding] = {}
 		self._reports: dict[str, ComplianceReport] = {}
 		self._attestations: dict[str, AttestationRecord] = {}
+		self._compliance_agents: dict[str, ComplianceAgentRecord] = {}
+		self._lifecycle_batches: dict[str, CompLifecycleBatchRecord] = {}
 		self._audit_events: list[ComplianceAuditEvent] = []
+		self._agent_runtimes = {_normalize_token(runtime) for runtime in DEFAULT_CONFIGURATION["agents"]["supported_runtimes"]}
+		self._agent_roles = {_normalize_token(role) for role in DEFAULT_CONFIGURATION["agents"]["supported_roles"]}
+		self._privileged_agent_roles = {_normalize_token(role) for role in DEFAULT_CONFIGURATION["agents"]["privileged_roles"]}
+		self._lifecycle_operations = {_normalize_token(operation) for operation in DEFAULT_CONFIGURATION["streaming"]["required_operations"]}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -376,6 +384,101 @@ class CompService:
 		self._record_audit(tenant_id, "report_published", report_id, report.approved_by or "system", report.to_dict())
 		return report.to_dict()
 
+	def register_compliance_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		record_key = self._key(tenant_id, agent_id)
+		if record_key in self._compliance_agents:
+			raise ValueError(f"compliance_agent_already_exists:{agent_id}")
+		runtime_value = _normalize_token(runtime)
+		role_value = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_compliance_agent",
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"scope_present": bool(str(scope or "").strip()),
+			"owner_present": bool(str(owner or "").strip()),
+			"purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		self._raise_if_denied(result)
+		if not str(name or "").strip():
+			raise ValueError("compliance_agent_name_required")
+		agent = ComplianceAgentRecord(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=str(name).strip(),
+			runtime=runtime_value,
+			role=role_value,
+			scope=str(scope).strip(),
+			owner=str(owner).strip(),
+			purpose=str(purpose).strip(),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+			status="pending_review" if result["decision"] == "require_review" else "active",
+		)
+		self._compliance_agents[record_key] = agent
+		self._record_audit(tenant_id, "compliance_agent_registered", agent_id, owner, {**agent.to_dict(), "rule_decision": result["decision"]})
+		return agent.to_dict()
+
+	def validate_comp_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "compliance_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		mutation_count = int(mutation_count)
+		if mutation_count <= 0:
+			raise ValueError("comp_lifecycle_batch_empty")
+		stream_value = _normalize_token(event_stream)
+		operation_value = _normalize_token(operation)
+		if operation_value not in self._lifecycle_operations:
+			raise ValueError(f"unsupported_comp_lifecycle_operation:{operation_value}")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "validate_comp_lifecycle_batch",
+			"event_stream": stream_value,
+			"mutation_count": mutation_count,
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		accepted = result["decision"] == "allow"
+		record_id = batch_id or f"comp-batch-{len(self._lifecycle_batches) + 1:06d}"
+		record = CompLifecycleBatchRecord(
+			id=record_id,
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			operation=operation_value,
+			accepted=accepted,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			status="accepted" if accepted else "denied",
+		)
+		self._lifecycle_batches[self._key(tenant_id, record_id)] = record
+		self._record_audit(tenant_id, f"comp_lifecycle_batch_{record.status}", record_id, "bytewax", record.to_dict())
+		self._raise_if_denied(result)
+		return record.to_dict()
+
 	def dashboard_summary(self, tenant_id: str) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		controls = [control for control in self._controls.values() if control.tenant_id == tenant_id]
@@ -393,6 +496,10 @@ class CompService:
 			"escalated_finding_count": len([finding for finding in findings if finding.escalated]),
 			"report_count": len([report for report in self._reports.values() if report.tenant_id == tenant_id]),
 			"attestation_count": len([attestation for attestation in self._attestations.values() if attestation.tenant_id == tenant_id]),
+			"compliance_agent_count": len(self.list_compliance_agents(tenant_id)),
+			"pending_agent_review_count": sum(1 for item in self.list_compliance_agents(tenant_id) if item["status"] == "pending_review"),
+			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
+			"denied_lifecycle_batch_count": sum(1 for item in self.list_lifecycle_batches(tenant_id) if item["status"] == "denied"),
 			"coverage": coverage,
 		}
 
@@ -416,6 +523,12 @@ class CompService:
 
 	def list_attestations(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._tenant_sorted(self._attestations.values(), tenant_id)
+
+	def list_compliance_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._tenant_sorted(self._compliance_agents.values(), tenant_id)
+
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._tenant_sorted(self._lifecycle_batches.values(), tenant_id)
 
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		events = self._audit_events
@@ -482,3 +595,7 @@ class CompService:
 	@staticmethod
 	def _key(tenant_id: str, record_id: str) -> str:
 		return f"{tenant_id}:{record_id}"
+
+
+def _normalize_token(value: str) -> str:
+	return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")

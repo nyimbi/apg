@@ -7,6 +7,32 @@ from numbers import Number
 from typing import Any
 
 
+SUPPORTED_COMP_AGENT_RUNTIMES: list[str] = ["codex", "claude_code", "opencode", "pi"]
+
+SUPPORTED_COMP_AGENT_ROLES: list[str] = [
+	"framework_reviewer",
+	"control_reviewer",
+	"evidence_reviewer",
+	"assessment_reviewer",
+	"finding_reviewer",
+	"report_reviewer",
+	"attestation_reviewer",
+	"regulatory_export_reviewer",
+	"lifecycle_batch_reviewer",
+	"compliance_steward",
+]
+
+PRIVILEGED_COMP_AGENT_ROLES: list[str] = [
+	"assessment_reviewer",
+	"finding_reviewer",
+	"report_reviewer",
+	"attestation_reviewer",
+	"regulatory_export_reviewer",
+	"lifecycle_batch_reviewer",
+	"compliance_steward",
+]
+
+
 DEFAULT_CONFIGURATION: dict[str, Any] = {
 	"tenant_id": "default",
 	"frameworks": {
@@ -78,6 +104,47 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"trace_required": True,
 		"event_stream": "bytewax",
 	},
+	"agents": {
+		"first_class": True,
+		"supported_runtimes": SUPPORTED_COMP_AGENT_RUNTIMES,
+		"supported_roles": SUPPORTED_COMP_AGENT_ROLES,
+		"privileged_roles": PRIVILEGED_COMP_AGENT_ROLES,
+		"require_scope": True,
+		"require_owner": True,
+		"require_purpose": True,
+		"require_contribution_disclosure": True,
+		"require_human_approval_for_privileged_roles": True,
+		"adapter_contract": "aicr_provider_neutral_compliance_agent_adapter",
+	},
+	"streaming": {
+		"engine": "bytewax",
+		"lifecycle_stream": "comp.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"framework_batch",
+			"control_batch",
+			"evidence_batch",
+			"assessment_batch",
+			"finding_batch",
+			"report_batch",
+			"attestation_batch",
+			"exception_batch",
+			"compliance_agent_batch",
+		],
+		"topics": [
+			"comp.frameworks",
+			"comp.controls",
+			"comp.evidence",
+			"comp.assessments",
+			"comp.findings",
+			"comp.reports",
+			"comp.attestations",
+			"comp.exceptions",
+			"comp.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	},
 	"adapters": {
 		"generated_app_runtime": "service.CompService",
 		"helper_runtime": "compliance_engine.py",
@@ -100,6 +167,7 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"notification": "ntfy",
 		"message_bus": "mqeb",
 		"cache": "cach",
+		"agent_adapter": "aicr_provider_neutral_compliance_agent_adapter",
 	},
 	"ui": {
 		"enable_compliance_dashboard": True,
@@ -113,6 +181,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"enable_attestation_center": True,
 		"enable_regulatory_exports": True,
 		"enable_audit": True,
+		"enable_compliance_agent_roster": True,
+		"enable_lifecycle_batch_monitor": True,
 		"enable_settings": True,
 	},
 	"theme": {"default_theme": "comp_compliance_command_center", "allow_tenant_overrides": True},
@@ -133,6 +203,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"security",
 		"governance",
 		"observability",
+		"agents",
+		"streaming",
 		"adapters",
 		"ui",
 		"theme",
@@ -148,6 +220,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"security",
 		"governance",
 		"observability",
+		"agents",
+		"streaming",
 		"adapters",
 		"ui",
 		"theme",
@@ -192,6 +266,15 @@ RULES: list[dict[str, Any]] = [
 	{"name": "cross_tenant_compliance_access_denied", "description": "Compliance records may not cross tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_compliance_access_denied", "required_action": "use_tenant_local_context"}},
 	{"name": "compliance_state_change_requires_audit", "description": "Compliance state changes require audit evidence.", "condition": {"state_change_requested": True, "audit_event_recorded": False}, "effect": {"decision": "deny", "reason": "compliance_audit_event_required", "required_action": "record_compliance_audit"}},
 	{"name": "batch_compliance_mutation_requires_bytewax", "description": "Batch compliance mutations must use Bytewax event streams.", "condition": {"operation": "batch_compliance_mutation", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}},
+	{"name": "compliance_agent_runtime_supported", "description": "Compliance agents must use supported provider-neutral runtimes.", "condition": {"operation": "register_compliance_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_compliance_agent_runtime", "required_action": "choose_supported_compliance_agent_runtime"}},
+	{"name": "compliance_agent_role_supported", "description": "Compliance agents must use supported compliance-governance roles.", "condition": {"operation": "register_compliance_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_compliance_agent_role", "required_action": "choose_supported_compliance_agent_role"}},
+	{"name": "compliance_agent_requires_scope", "description": "Compliance agents require explicit framework, control, evidence, assessment, finding, report, attestation, export, or lifecycle scope.", "condition": {"operation": "register_compliance_agent", "scope_present": False}, "effect": {"decision": "deny", "reason": "compliance_agent_scope_required", "required_action": "declare_compliance_agent_scope"}},
+	{"name": "compliance_agent_requires_owner", "description": "Compliance agents require an accountable owner.", "condition": {"operation": "register_compliance_agent", "owner_present": False}, "effect": {"decision": "deny", "reason": "compliance_agent_owner_required", "required_action": "assign_compliance_agent_owner"}},
+	{"name": "compliance_agent_requires_purpose", "description": "Compliance agents require a documented compliance purpose.", "condition": {"operation": "register_compliance_agent", "purpose_present": False}, "effect": {"decision": "deny", "reason": "compliance_agent_purpose_required", "required_action": "document_compliance_agent_purpose"}},
+	{"name": "compliance_agent_requires_contribution_disclosure", "description": "Compliance agents must disclose machine-authored framework, control, evidence, assessment, finding, report, attestation, export, and lifecycle contributions.", "condition": {"operation": "register_compliance_agent", "contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "compliance_agent_contribution_disclosure_required", "required_action": "disclose_machine_contribution"}},
+	{"name": "compliance_agent_privileged_role_requires_human_approval", "description": "Privileged compliance-agent roles require human approval evidence.", "condition": {"operation": "register_compliance_agent", "privileged_role": True, "human_approval_required": False}, "effect": {"decision": "require_review", "reason": "compliance_agent_human_approval_required", "required_action": "record_human_compliance_agent_approval"}},
+	{"name": "comp_lifecycle_batch_requires_mutations", "description": "COMP lifecycle batches must include at least one mutation.", "condition": {"operation": "validate_comp_lifecycle_batch", "mutation_count_lte": 0}, "effect": {"decision": "deny", "reason": "comp_lifecycle_batch_empty", "required_action": "include_comp_lifecycle_mutations"}},
+	{"name": "bytewax_comp_stream_required", "description": "COMP lifecycle batches must be routed through Bytewax.", "condition": {"operation": "validate_comp_lifecycle_batch", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_comp_lifecycle_batch_to_bytewax"}},
 ]
 
 
@@ -207,6 +290,8 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "attestations", "path": "/comp/attestations", "component": "AttestationCenter", "permission": "comp:approve_reports", "nav_group": "Reporting"},
 	{"name": "exports", "path": "/comp/exports", "component": "RegulatoryExportCenter", "permission": "comp:approve_reports", "nav_group": "Reporting"},
 	{"name": "audit", "path": "/comp/audit", "component": "ComplianceAuditTrail", "permission": "comp:audit", "nav_group": "Governance"},
+	{"name": "agents", "path": "/comp/agents", "component": "ComplianceAgentRoster", "permission": "comp:admin", "nav_group": "Governance"},
+	{"name": "lifecycle", "path": "/comp/lifecycle", "component": "COMPLifecycleBatchMonitor", "permission": "comp:admin", "nav_group": "Operations"},
 	{"name": "settings", "path": "/comp/settings", "component": "COMPSettings", "permission": "comp:admin", "nav_group": "Administration"},
 ]
 
@@ -237,6 +322,8 @@ THEME: dict[str, Any] = {
 		"attestation_center": {"visual": "attestation-list", "status_style": "signature-chip"},
 		"regulatory_export": {"visual": "export-table", "status_style": "delivery-chip"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "hash-chip"},
+		"compliance_agent_roster": {"icon": "bot", "visual": "agent-roster", "status_style": "approval-chip"},
+		"bytewax_lifecycle_panel": {"icon": "activity", "visual": "lifecycle-batch-list", "status_style": "stream-chip"},
 	},
 }
 
@@ -262,6 +349,44 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"requires_theme": True,
 		},
 		"theme": deepcopy(THEME),
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
+	}
+
+
+def agent_manifest() -> dict[str, Any]:
+	"""Return provider-neutral compliance agent composition metadata."""
+	agents = DEFAULT_CONFIGURATION["agents"]
+	return {
+		"first_class": bool(agents["first_class"]),
+		"supported_runtimes": list(agents["supported_runtimes"]),
+		"supported_roles": list(agents["supported_roles"]),
+		"privileged_roles": list(agents["privileged_roles"]),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles",
+		],
+		"adapter_contract": agents["adapter_contract"],
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return Bytewax lifecycle stream metadata for COMP composition."""
+	streaming = DEFAULT_CONFIGURATION["streaming"]
+	return {
+		"engine": streaming["engine"],
+		"lifecycle_stream": streaming["lifecycle_stream"],
+		"watermark": streaming["watermark"],
+		"required_processor": streaming["required_processor"],
+		"required_operations": list(streaming["required_operations"]),
+		"topics": list(streaming["topics"]),
+		"broker_core_dependency_allowed": bool(streaming["broker_core_dependency_allowed"]),
 	}
 
 

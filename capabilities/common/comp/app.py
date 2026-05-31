@@ -47,14 +47,16 @@ def semantic_model() -> dict[str, Any]:
 			"comp": {
 				"name": contract["display_name"],
 				"configuration": contract["configuration"],
-				"provides": ["comp_operations"],
-				"requires": ["audl", "dlpd", "encr", "auth"],
+				"provides": ["comp_operations", "compliance_management", "compliance_agent_composition"],
+				"requires": ["audl", "dlpd", "encr", "auth", "secu", "mten", "idfd", "ztna", "mqeb", "cach"],
 				"erp_modules": ["common"],
 				"rule_engine": contract["rule_engine"],
 				"rules": contract["rule_engine"]["rules"],
 				"ui": contract["ui"],
 				"screens": routes,
 				"theme": contract["theme"],
+				"agents": contract["agents"],
+				"streaming": contract["streaming"],
 				"runtime": {
 					"entrypoint": "app.py",
 					"service": contract["configuration"]["adapters"]["generated_app_runtime"],
@@ -79,23 +81,34 @@ def semantic_model() -> dict[str, Any]:
 					"report": "ComplianceReport",
 					"attestation": "AttestationRecord",
 					"audit": "ComplianceAuditEvent",
+					"compliance_agent": "ComplianceAgentRecord",
+					"lifecycle_batch": "CompLifecycleBatchRecord",
 				},
 				"adapters": contract["configuration"]["adapters"],
 				"i18n": {},
 				"master_data": {},
-				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
 			}
 		},
 		"contracts": {
 			"comp": {
 				"id": "comp",
 				"configuration": contract["configuration"],
-				"provides": ["comp_operations"],
-				"requires": ["audl", "dlpd", "encr", "auth"],
+				"provides": ["comp_operations", "compliance_management", "compliance_agent_composition"],
+				"requires": ["audl", "dlpd", "encr", "auth", "secu", "mten", "idfd", "ztna", "mqeb", "cach"],
 			}
 		},
 		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
-		"composition": {"capability_dependencies": {"comp": ["audl", "dlpd", "encr", "auth"]}, "applications": {}, "agent_teams": {}},
+		"composition": {
+			"capability_dependencies": {"comp": ["audl", "dlpd", "encr", "auth", "secu", "mten", "idfd", "ztna", "mqeb", "cach"]},
+			"applications": {},
+			"agent_teams": {
+				"compliance_assurance_team": {
+					"runtimes": contract["agents"]["supported_runtimes"],
+					"roles": contract["agents"]["supported_roles"],
+					"stream": contract["streaming"]["lifecycle_stream"],
+				}
+			},
+		},
 		"deployment": {"source": "capability_contract.py", "target": "python"},
 		"graphs": {
 			"capability": {"kind": "capability", "nodes": 1, "edges": 4},
@@ -112,7 +125,9 @@ def semantic_model() -> dict[str, Any]:
 				"references": [],
 			}
 		},
-		"agents": {},
+		"agents": {
+			"comp": contract["agents"],
+		},
 		"flows": {},
 		"llms": {},
 		"operations": {},
@@ -156,12 +171,16 @@ def self_test() -> dict[str, Any]:
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
-	if len(routes) < 12:
+	if len(routes) < 14:
 		errors.append("COMP semantic model route manifest is stale")
-	if len(rules) < 30:
+	if len(rules) < 45:
 		errors.append("COMP semantic model rule manifest is stale")
 	if adapters.get("event_stream") != "bytewax":
 		errors.append("COMP adapter manifest must use Bytewax for event streaming")
+	if not capability.get("agents", {}).get("first_class"):
+		errors.append("COMP semantic model must expose first-class agents")
+	if capability.get("streaming", {}).get("required_processor") != "bytewax":
+		errors.append("COMP lifecycle streaming must require Bytewax")
 	if capability.get("runtime", {}).get("service") != "service.CompService":
 		errors.append("COMP generated-app runtime is missing")
 	return {

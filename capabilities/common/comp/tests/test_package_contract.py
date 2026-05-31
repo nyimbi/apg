@@ -37,15 +37,18 @@ def test_package_contract_shape_and_entrypoint_are_publishable():
 	model = app_module.semantic_model()
 
 	assert contract["capability"] == "comp"
-	assert len(contract["ui"]["routes"]) >= 12
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert len(contract["ui"]["routes"]) >= 14
+	assert len(contract["rule_engine"]["rules"]) >= 45
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert contract["theme"]["tokens"]["border.radius"]
 	assert self_test["passed"] is True
 	assert manifest["kind"] == "apg.generated_application"
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert model["capabilities"]["comp"]["streaming"]["engine"] == "bytewax"
+	assert model["capabilities"]["comp"]["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
 	assert model["capabilities"]["comp"]["runtime"]["service"] == "service.CompService"
 
 
@@ -61,6 +64,17 @@ def test_api_helpers_execute_compliance_lifecycle():
 	approved = api.approve_report({"report_id": report["id"], "tenant_id": "tenant-api", "approved_by": "risk-committee"})
 	attestation = api.attest_report({"id": "attest-api", "tenant_id": "tenant-api", "report_id": report["id"], "attested_by": "cro", "statement": "Reviewed"})
 	published = api.publish_report({"report_id": report["id"], "tenant_id": "tenant-api"})
+	agent = api.register_compliance_agent({
+		"id": "agent-api",
+		"tenant_id": "tenant-api",
+		"name": "API Compliance Reviewer",
+		"runtime": "pi",
+		"role": "control_reviewer",
+		"scope": "control:*",
+		"owner": "compliance-owner",
+		"purpose": "review control drift",
+	})
+	batch = api.validate_lifecycle_batch({"tenant_id": "tenant-api", "event_stream": "bytewax", "mutation_count": 2, "operation": "control_batch", "batch_id": "batch-api"})
 	state = api.compliance_state("tenant-api")
 
 	assert assessment["result"] == "effective"
@@ -68,7 +82,11 @@ def test_api_helpers_execute_compliance_lifecycle():
 	assert approved["status"] == "approved"
 	assert attestation["statement"] == "Reviewed"
 	assert published["status"] == "published"
+	assert agent["runtime"] == "pi"
+	assert batch["status"] == "accepted"
 	assert state["summary"]["framework_count"] == 1
+	assert state["summary"]["compliance_agent_count"] == 1
+	assert state["lifecycle_batches"][0]["id"] == "batch-api"
 	assert state["audit_events"]
 
 
@@ -90,6 +108,8 @@ def test_view_models_match_routes_and_runtime_state():
 	reports = views.report_builder_model(service, "tenant-view")
 	attestations = views.attestation_center_model(service, "tenant-view")
 	audit = views.audit_model(service, "tenant-view")
+	agents = views.compliance_agent_roster_model(service, "tenant-view")
+	lifecycle = views.lifecycle_batch_model(service, "tenant-view")
 	settings = views.settings_model("tenant-view")
 
 	assert dashboard["summary"]["control_count"] == 1
@@ -100,6 +120,9 @@ def test_view_models_match_routes_and_runtime_state():
 	assert findings["open"][0]["id"] == "finding-view"
 	assert reports["drafts"][0]["id"] == "report-view"
 	assert attestations["attestations"] == []
+	assert agents["agents"] == []
+	assert agents["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert lifecycle["required_processor"] == "bytewax"
 	assert audit["audit_events"]
 	assert settings["theme"]["name"] == "comp_compliance_command_center"
 
@@ -119,3 +142,36 @@ def test_report_publication_blocks_critical_findings_and_self_approval():
 	service.attest_report("attest-critical", report["id"], "tenant-critical", "cro", "Reviewed")
 	with pytest.raises(PermissionError, match="critical_findings_open"):
 		service.publish_report(report["id"], "tenant-critical")
+
+
+def test_agent_and_lifecycle_api_guardrails_are_publishable():
+	api.SERVICE = CompService()
+
+	with pytest.raises(PermissionError, match="unsupported_compliance_agent_runtime"):
+		api.register_compliance_agent({
+			"id": "agent-bad",
+			"tenant_id": "tenant-agent",
+			"name": "Bad Agent",
+			"runtime": "kafka_agent",
+			"role": "framework_reviewer",
+			"scope": "framework:*",
+			"owner": "compliance-owner",
+			"purpose": "review frameworks",
+		})
+
+	pending = api.register_compliance_agent({
+		"id": "agent-report",
+		"tenant_id": "tenant-agent",
+		"name": "Report Agent",
+		"runtime": "codex",
+		"role": "report_reviewer",
+		"scope": "report:*",
+		"owner": "risk-office",
+		"purpose": "review report packages",
+	})
+	with pytest.raises(ValueError, match="comp_lifecycle_batch_empty"):
+		api.validate_lifecycle_batch({"tenant_id": "tenant-agent", "event_stream": "bytewax", "mutation_count": 0, "operation": "report_batch"})
+	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
+		api.validate_lifecycle_batch({"tenant_id": "tenant-agent", "event_stream": "broker_core", "mutation_count": 1, "operation": "report_batch"})
+
+	assert pending["status"] == "pending_review"

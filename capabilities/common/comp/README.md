@@ -3,8 +3,8 @@
 `comp` is APG's package-backed Compliance Management capability. It gives
 generated applications a tenant-scoped compliance runtime for frameworks,
 obligations, controls, encrypted evidence, assessments, findings, remediation,
-reports, attestations, audit events, UI route metadata, and visual theme
-metadata.
+reports, attestations, governed AI agents, Bytewax lifecycle batches, audit
+events, UI route metadata, and visual theme metadata.
 
 The package is dependency-light. It proves compliance lifecycle behavior and
 guardrails locally, while live GRC suites, audit-log sinks, DLP engines,
@@ -22,10 +22,19 @@ remain APG adapter boundaries.
 - Finding opening, escalation, remediation, and resolution evidence.
 - Report preparation, independent approval, attestation, publication, and
   critical-finding blocking.
+- First-class provider-neutral compliance agents for `codex`, `claude_code`,
+  `opencode`, and `pi`.
+- Human-review guardrails for privileged agent roles such as report reviewers,
+  attestation reviewers, regulatory export reviewers, lifecycle reviewers, and
+  compliance stewards.
+- Bytewax-only lifecycle batch validation for framework, control, evidence,
+  assessment, finding, report, attestation, exception, and compliance-agent
+  mutations.
 - Tenant isolation for repeated business IDs across tenants.
 - Hashed audit events for compliance state changes.
 - UI view models for dashboard, frameworks, controls, evidence, assessments,
-  findings, reports, attestations, audit, and settings.
+  findings, reports, attestations, agents, lifecycle batches, audit, and
+  settings.
 - Contract-derived semantic model, package manifest, release report, and
   publish-plan support.
 
@@ -55,6 +64,9 @@ remain APG adapter boundaries.
 8. Attest the approved report.
 9. Publish the report if approval, attestation, and critical-finding guardrails
    pass.
+10. Register scoped AI agents for compliance review, automation, and stewarding.
+11. Validate batch lifecycle mutations through Bytewax before composing larger
+    applications.
 
 ## Python Usage
 
@@ -98,6 +110,50 @@ assessment = service.assess_control(
 )
 ```
 
+## AI Agent Composition
+
+Compliance agents are first-class records. They are not hard-wired to one model
+or CLI. The contract accepts provider-neutral runtimes:
+
+- `codex`
+- `claude_code`
+- `opencode`
+- `pi`
+
+Every agent must declare a runtime, supported role, explicit scope, accountable
+owner, purpose, and machine-contribution disclosure. Privileged roles enter
+`pending_review` unless human approval evidence is recorded.
+
+```python
+agent = service.register_compliance_agent(
+	"agent-steward",
+	"tenant-a",
+	"Compliance Steward",
+	"codex",
+	"compliance_steward",
+	"framework:fw-soc2",
+	"risk-owner",
+	"review framework posture before attestation",
+	human_approval_required=True,
+)
+```
+
+## Bytewax Lifecycle Batches
+
+Batch mutations must use Bytewax. The local package validates stream metadata
+and records accepted or denied lifecycle-batch evidence without starting a live
+Bytewax topology.
+
+```python
+batch = service.validate_comp_lifecycle_batch(
+	"tenant-a",
+	"bytewax",
+	3,
+	"compliance_agent_batch",
+	"batch-agent-001",
+)
+```
+
 ## Reporting And Attestation
 
 ```python
@@ -131,6 +187,7 @@ Important adapters:
 - `api_helpers`: `api.py`
 - `view_models`: `views.py`
 - `event_stream`: `bytewax`
+- `agent_adapter`: `aicr_provider_neutral_compliance_agent_adapter`
 - `audit_sink`: `audl`
 - `data_loss_prevention`: `dlpd`
 - `encryption`: `encr`
@@ -153,6 +210,8 @@ The contract exposes these route names:
 - `attestations`
 - `exports`
 - `audit`
+- `agents`
+- `lifecycle`
 - `settings`
 
 `views.py` returns data-only models for generated UIs. The generated UI should
@@ -164,7 +223,8 @@ colors or layout assumptions.
 ```bash
 ./.venv/bin/python -m py_compile capabilities/common/comp/__init__.py capabilities/common/comp/capability_contract.py capabilities/common/comp/compliance_engine.py capabilities/common/comp/models.py capabilities/common/comp/service.py capabilities/common/comp/api.py capabilities/common/comp/views.py capabilities/common/comp/app.py capabilities/common/comp/test_capability_contract.py capabilities/common/comp/tests/test_package_contract.py
 ./.venv/bin/pytest -q capabilities/common/comp/test_capability_contract.py capabilities/common/comp/tests/test_package_contract.py
-./.venv/bin/python -c "from capabilities.common.comp import app; r=app.self_test(); print(r); assert r['passed']"
+./.venv/bin/python capabilities/common/comp/app.py
+./.venv/bin/apg capabilities inspect comp --json
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/common/comp --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/comp --json
 ```

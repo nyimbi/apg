@@ -22585,3 +22585,67 @@ Not run to preserve battery:
   MFAU/MONI/AUDL/IDFD/ANOM/MQEB/CACH adapters, rendered browser UI, external
   AI-agent runtime clients, zero-trust interoperability certification, and
   load/performance checks.
+
+### 2026-05-31 11:17 EAT
+
+COMP compliance agent composition and Bytewax lifecycle guardrail packet:
+
+- Selected `capabilities/common/comp` as the next ordered capability packet
+  after ZTNA and preserved its existing framework, control, evidence,
+  assessment, finding, report, attestation, audit, and tenant-isolation
+  lifecycle.
+- Extended the COMP executable contract with first-class compliance-agent
+  metadata, supported runtimes `codex`, `claude_code`, `opencode`, and `pi`,
+  supported compliance-governance roles, privileged-role metadata, Bytewax
+  lifecycle stream metadata, route metadata, theme components, and expanded
+  `provides`/`requires` evidence.
+- Added deterministic guardrails for unsupported compliance-agent runtime,
+  unsupported role, missing scope, owner, purpose, missing machine
+  contribution disclosure, privileged compliance-agent registration without
+  human approval, empty lifecycle batches, unsupported lifecycle operations,
+  and non-Bytewax COMP lifecycle batch routing.
+- Added `ComplianceAgentRecord`, `CompLifecycleBatchRecord`,
+  tenant-qualified agent storage, lifecycle-batch storage, registration,
+  listing, audit events, dashboard counts, compliance-agent roster view
+  models, lifecycle-batch monitor view models, and API helpers.
+- Added `/comp/agents`, `/comp/lifecycle`, compliance-agent roster theme
+  metadata, and Bytewax lifecycle panel theme metadata.
+- Regenerated `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract and refreshed `README.md`,
+  `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md`.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/comp/__init__.py capabilities/common/comp/capability_contract.py capabilities/common/comp/compliance_engine.py capabilities/common/comp/models.py capabilities/common/comp/service.py capabilities/common/comp/api.py capabilities/common/comp/views.py capabilities/common/comp/app.py capabilities/common/comp/test_capability_contract.py capabilities/common/comp/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/python capabilities/common/comp/app.py` passed the package
+  self-test.
+- `./.venv/bin/pytest -q capabilities/common/comp/test_capability_contract.py capabilities/common/comp/tests/test_package_contract.py`
+  passed with 13 tests and only existing shared-module deprecation warnings.
+- `./.venv/bin/apg capabilities inspect comp --json` passed with `ok: true`,
+  14 APG Python routes, 45 deterministic rules, first-class agents, and
+  Bytewax streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/comp --json`
+  passed with `ok: true`; COMP remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/comp --json`
+  passed with `side_effect_free: true` and no warnings.
+- `./.venv/bin/python -m json.tool capabilities/common/comp/semantic_model.json`,
+  `./.venv/bin/python -m json.tool capabilities/common/comp/release_report.json`,
+  and `./.venv/bin/python -m json.tool capabilities/common/comp/package_manifest.json`
+  passed.
+- Runtime smoke returned one published report, one active `codex` compliance
+  steward agent, and one accepted `bytewax` lifecycle-batch evidence record.
+- Focused stale-marker scan over touched COMP packet source, docs, tests, and
+  evidence returned only intentional non-Bytewax denial examples and
+  no-broker-core dependency metadata.
+- `git diff --check -- capabilities/common/comp docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live GRC platform synchronization, live document repository storage, live
+  regulator submissions, live DLP inspection, production databases, durable
+  Bytewax topology, live AUDL/DLPD/ENCR/AUTH/SECU/MTEN/IDFD/ZTNA/MQEB/CACH
+  adapters, rendered browser UI, external AI-agent runtime clients, compliance
+  interoperability certification, and load/performance checks.

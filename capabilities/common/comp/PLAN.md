@@ -4,7 +4,8 @@
 
 Deliver one coherent lifecycle and guardrail packet for `comp`: specification,
 contract, runtime, API helpers, view models, tests, generated evidence, review,
-and progress log entry.
+and progress log entry. This packet extends the existing compliance lifecycle
+with first-class provider-neutral AI agents and Bytewax lifecycle validation.
 
 ## Implementation Packets
 
@@ -15,7 +16,11 @@ and progress log entry.
   observability, adapters, UI, and theme.
 - Add deterministic rules for lifecycle and guardrail coverage.
 - Declare Bytewax as the batch/event stream adapter.
-- Add UI routes for assessments, exceptions, exports, and audit.
+- Add first-class agent metadata for `codex`, `claude_code`, `opencode`, and
+  `pi`.
+- Add Bytewax lifecycle stream metadata for bulk compliance mutations.
+- Add UI routes for assessments, exceptions, exports, audit, agents, and
+  lifecycle batches.
 
 ### 2. Runtime
 
@@ -24,13 +29,18 @@ and progress log entry.
 - Route framework, control, evidence, assessment, finding, report, attestation,
   publish, and resolution operations through `evaluate_capability_rules()`.
 - Record hashed audit events for state changes.
+- Register scoped compliance agents with owner, purpose, role, runtime,
+  contribution disclosure, and privileged-review status.
+- Validate Bytewax lifecycle batches and record accepted/denied evidence.
 - Preserve deterministic dependency-light behavior.
 
 ### 3. API And Views
 
 - Expose finding resolution through `api.py`.
+- Expose compliance-agent registration and lifecycle-batch validation through
+  `api.py`.
 - Add view models for frameworks, controls, evidence, assessments, findings,
-  reports, attestations, audit, and settings.
+  reports, attestations, agents, lifecycle batches, audit, and settings.
 - Keep view models data-only and framework-neutral.
 
 ### 4. Documentation
@@ -50,6 +60,10 @@ and progress log entry.
   report approval, attestation, independent approval, critical finding blocking,
   finding resolution, and tenant-local IDs.
 - Rename stale package-test terminology.
+- Cover supported/unsupported compliance-agent runtimes and roles.
+- Cover privileged agent review state.
+- Cover Bytewax-only lifecycle batches, empty batches, and unsupported
+  operations.
 
 ### 6. Evidence
 
@@ -61,6 +75,8 @@ and progress log entry.
 ## Review Checklist
 
 - Contract and runtime rules agree.
+- Agent and streaming manifests are exposed by contract, semantic model, and
+  registration metadata.
 - Tenant-local storage cannot collide on repeated IDs.
 - Report publication cannot bypass approval, attestation, or critical-finding
   blocks.
@@ -68,7 +84,8 @@ and progress log entry.
 - Regulated controls cannot bypass DLP linkage.
 - API helpers cover service operations.
 - View models cover declared route families.
-- Docs describe current behavior, not planned provider integrations.
+- Docs describe current behavior, provider-neutral agent integration points,
+  and Bytewax-only lifecycle handling.
 - Stale-marker scan has no primary-slice hits.
 
 ## Focused Verification
@@ -76,7 +93,8 @@ and progress log entry.
 ```bash
 ./.venv/bin/python -m py_compile capabilities/common/comp/__init__.py capabilities/common/comp/capability_contract.py capabilities/common/comp/compliance_engine.py capabilities/common/comp/models.py capabilities/common/comp/service.py capabilities/common/comp/api.py capabilities/common/comp/views.py capabilities/common/comp/app.py capabilities/common/comp/test_capability_contract.py capabilities/common/comp/tests/test_package_contract.py
 ./.venv/bin/pytest -q capabilities/common/comp/test_capability_contract.py capabilities/common/comp/tests/test_package_contract.py
-./.venv/bin/python -c "from capabilities.common.comp import app; r=app.self_test(); print(r); assert r['passed']"
+./.venv/bin/python capabilities/common/comp/app.py
+./.venv/bin/apg capabilities inspect comp --json
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/common/comp --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/comp --json
 git diff --check -- capabilities/common/comp docs/progress_log.md
@@ -90,4 +108,5 @@ git diff --check -- capabilities/common/comp docs/progress_log.md
 - Live DLP, audit, workflow, or identity provider integrations.
 - Browser-rendered UI validation.
 - Bytewax runtime deployment.
+- External `codex`, `claude_code`, `opencode`, or `pi` invocation.
 - Performance, scale, interoperability, or certification work.
