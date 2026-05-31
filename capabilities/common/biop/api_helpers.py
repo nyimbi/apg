@@ -18,6 +18,8 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"tenant_id": tenant_id,
 		"route_count": len(contract["ui"]["routes"]),
 		"rule_count": len(contract["rule_engine"]["rules"]),
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		**SERVICE.biometric_summary(tenant_id),
 	}
 
@@ -124,6 +126,31 @@ def decide_match_review(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_biometric_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_biometric_agent(
+		agent_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload["name"]),
+		runtime=str(payload["runtime"]),
+		role=str(payload["role"]),
+		scope=str(payload["scope"]),
+		owner=str(payload["owner"]),
+		purpose=str(payload["purpose"]),
+		contribution_disclosed=_payload_bool(payload, "contribution_disclosed", True),
+		human_approval_required=_payload_bool(payload, "human_approval_required", False),
+	)
+
+
+def validate_lifecycle_batch(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_biop_lifecycle_batch(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
+		mutation_count=int(payload.get("mutation_count") or 1),
+		operation=str(payload.get("operation") or "biometric_agent_batch"),
+		batch_id=payload.get("id"),
+	)
+
+
 def list_consents(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_consents(tenant_id)
 
@@ -142,6 +169,14 @@ def list_reviews(tenant_id: str | None = None, review_type: str | None = None) -
 
 def list_audit_events(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_audit_events(tenant_id)
+
+
+def list_biometric_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_biometric_agents(tenant_id)
+
+
+def list_lifecycle_batches(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_lifecycle_batches(tenant_id)
 
 
 def _payload_bool(payload: dict[str, Any], key: str, default: bool) -> bool:

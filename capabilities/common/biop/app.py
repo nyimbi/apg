@@ -52,8 +52,8 @@ def semantic_model() -> dict[str, Any]:
 			"biop": {
 				"name": contract["display_name"],
 				"configuration": contract["configuration"],
-				"provides": ["biop_operations"],
-				"requires": ["mfau", "cvsn", "aicr"],
+				"provides": contract["provides"],
+				"requires": contract["requires"],
 				"erp_modules": ["common"],
 				"rule_engine": contract["rule_engine"],
 				"rules": contract["rule_engine"]["rules"],
@@ -73,19 +73,32 @@ def semantic_model() -> dict[str, Any]:
 				"approvals": {
 					"match_review": "BiometricReviewApproval",
 					"privacy_review": "BiometricReviewApproval",
+					"biometric_agent": "BiometricAgentRecord",
+				},
+				"biometric_lifecycle": {
+					"consent": "BiometricConsent",
+					"template": "BiometricTemplateRecord",
+					"verification": "BiometricVerificationRecord",
+					"review": "BiometricReviewApproval",
+					"biometric_agent": "BiometricAgentRecord",
+					"lifecycle_batch": "BiopLifecycleBatchRecord",
+					"audit": "BiometricAuditEvent",
 				},
 				"i18n": {},
 				"master_data": {},
 				"adapters": contract["configuration"]["adapters"],
-				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
+				"agents": contract["agents"],
+				"streaming": contract["streaming"],
 			}
 		},
 		"contracts": {
 			"biop": {
 				"id": "biop",
 				"configuration": contract["configuration"],
-				"provides": ["biop_operations"],
-				"requires": ["mfau", "cvsn", "aicr"],
+				"provides": contract["provides"],
+				"requires": contract["requires"],
+				"agents": contract["agents"],
+				"streaming": contract["streaming"],
 			}
 		},
 		"rules": {
@@ -93,9 +106,15 @@ def semantic_model() -> dict[str, Any]:
 			for rule in contract["rule_engine"]["rules"]
 		},
 		"composition": {
-			"capability_dependencies": {"biop": ["mfau", "cvsn", "aicr"]},
+			"capability_dependencies": {"biop": contract["requires"]},
 			"applications": {},
-			"agent_teams": {},
+			"agent_teams": {
+				"biometric_governance": {
+					"roles": contract["agents"]["supported_roles"],
+					"runtimes": contract["agents"]["supported_runtimes"],
+					"stream": contract["streaming"]["lifecycle_stream"],
+				}
+			},
 		},
 		"deployment": {
 			"source": "capability_contract.py",
@@ -119,7 +138,7 @@ def semantic_model() -> dict[str, Any]:
 				"references": [],
 			}
 		},
-		"agents": {},
+		"agents": {"biometric_governance": contract["agents"]},
 		"flows": {},
 		"llms": {},
 		"operations": {},
@@ -156,18 +175,24 @@ def self_test() -> dict[str, Any]:
 	routes = model.get("capabilities", {}).get("biop", {}).get("ui", {}).get("routes", [])
 	rules = model.get("capabilities", {}).get("biop", {}).get("rule_engine", {}).get("rules", [])
 	adapters = model.get("capabilities", {}).get("biop", {}).get("adapters", {})
+	agents = model.get("capabilities", {}).get("biop", {}).get("agents", {})
+	streaming = model.get("capabilities", {}).get("biop", {}).get("streaming", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "biop" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
-	if len(routes) < 12:
+	if len(routes) < 14:
 		errors.append("BIOP semantic model route manifest is stale")
-	if len(rules) < 30:
+	if len(rules) < 48:
 		errors.append("BIOP semantic model rule manifest is stale")
 	if adapters.get("event_stream") != "bytewax":
 		errors.append("BIOP adapter manifest must use Bytewax for event streaming")
+	if agents.get("first_class") is not True:
+		errors.append("BIOP agents must be first-class biometric governance citizens")
+	if streaming.get("required_processor") != "bytewax":
+		errors.append("BIOP lifecycle stream must require Bytewax")
 	if model.get("capabilities", {}).get("biop", {}).get("runtime", {}).get("service") != "biometric_runtime.BiopService":
 		errors.append("BIOP generated-app runtime is missing")
 	return {

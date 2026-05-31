@@ -22244,3 +22244,74 @@ Not run to preserve battery:
   adapters, rendered browser UI, external AI-agent runtime clients, load
   checks, migrations, authenticator interoperability, and risk-model quality
   benchmarks.
+
+### 2026-05-31 08:54 EAT
+
+BIOP biometric-agent composition and Bytewax lifecycle guardrail packet:
+
+- Selected `capabilities/common/biop` as the next ordered capability packet
+  after MFAU and preserved its biometric consent, encrypted-template,
+  liveness, verification, match-review, privacy-review, revocation,
+  retirement, and audit lifecycle.
+- Extended the BIOP executable contract with first-class biometric governance
+  agent metadata, supported runtimes `codex`, `claude_code`, `opencode`, and
+  `pi`, supported biometric-governance roles, privileged-role metadata,
+  Bytewax lifecycle stream metadata, route metadata, theme components, and
+  contract `provides`/`requires`.
+- Added deterministic guardrails for unsupported biometric-agent runtime,
+  unsupported biometric-agent role, missing scope, owner, purpose, missing
+  machine contribution disclosure, privileged biometric-agent registration
+  without human approval, empty lifecycle batches, unsupported lifecycle
+  operations, and non-Bytewax BIOP lifecycle batch routing.
+- Added `BiometricAgentRecord`, `BiopLifecycleBatchRecord`,
+  tenant-qualified agent storage, lifecycle-batch storage, registration,
+  listing, audit events, dashboard counts, biometric-agent roster view models,
+  and lifecycle-batch monitor view models.
+- Added `/biop/agents`, `/biop/lifecycle`, biometric-agent roster theme
+  metadata, and Bytewax lifecycle panel theme metadata.
+- Regenerated `semantic_model.json` and `release_report.json` from the live
+  `app.py` contract while keeping `package_manifest.json` in the APG
+  package-manifest shape required by publish-plan.
+- Refreshed `README.md`, `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md` so
+  the documented packet matches the executable contract and keeps external
+  AI-agent runtimes, biometric capture hardware, matchers, HSM template
+  vaults, CV/model services, and durable Bytewax topologies behind adapter
+  boundaries.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/biop/capability_contract.py capabilities/common/biop/biometric_runtime.py capabilities/common/biop/api_helpers.py capabilities/common/biop/view_models.py capabilities/common/biop/app.py capabilities/common/biop/__init__.py capabilities/common/biop/test_capability_contract.py capabilities/common/biop/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/python capabilities/common/biop/app.py` passed the package
+  self-test.
+- `./.venv/bin/pytest -q capabilities/common/biop/test_capability_contract.py capabilities/common/biop/tests/test_package_contract.py`
+  passed with 9 tests and only existing shared-module deprecation warnings.
+- `./.venv/bin/apg capabilities inspect biop --json` passed with `ok: true`,
+  14 APG Python routes, 48 deterministic rules, first-class agents, and
+  Bytewax streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/biop --json`
+  passed with `ok: true`; BIOP remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/biop --json`
+  passed with `side_effect_free: true`.
+- `./.venv/bin/python -m json.tool capabilities/common/biop/semantic_model.json`,
+  `./.venv/bin/python -m json.tool capabilities/common/biop/release_report.json`,
+  and `./.venv/bin/python -m json.tool capabilities/common/biop/package_manifest.json`
+  passed.
+- `./.venv/bin/python -c "... BiopService ... register_biometric_agent ... validate_biop_lifecycle_batch ..."`
+  returned one verified biometric request, one `codex` active biometric
+  governance agent, and one `bytewax` lifecycle-batch evidence record.
+- Focused stale-marker scan over touched BIOP packet source, docs, tests, and
+  evidence returned only intentional Bytewax-not-Kafka documentation and
+  Kafka-denial tests.
+- `git diff --check -- capabilities/common/biop docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live biometric capture hardware, raw face/voice/fingerprint/iris
+  processing, matcher/model servers, HSM-backed template vaults, production
+  databases, durable Bytewax topology, live MFAU/CVSN/AICR/ENCR/AUDL/CONF
+  adapters, rendered browser UI, external AI-agent runtime clients,
+  presentation-attack benchmarks, biometric interoperability checks, privacy
+  workflow approvals, and load/performance benchmarks.

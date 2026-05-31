@@ -42,8 +42,8 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["capability"] == "biop"
 	assert contract["configuration"]["tenant_id"] == "tenant-bio"
 	assert contract["configuration"]["modalities"]["minimum_match_confidence"] == 0.9
-	assert set(contract["configuration_schema"]["required"]) >= {"tenant_id", "consent", "modalities", "enrollment", "templates", "verification", "liveness", "reviews", "privacy", "retention", "security", "governance", "observability", "adapters", "ui", "theme"}
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert set(contract["configuration_schema"]["required"]) >= {"tenant_id", "consent", "modalities", "enrollment", "templates", "verification", "liveness", "reviews", "privacy", "agents", "streaming", "retention", "security", "governance", "observability", "adapters", "ui", "theme"}
+	assert len(contract["rule_engine"]["rules"]) >= 48
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
 		"users",
@@ -54,15 +54,23 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"liveness",
 		"match_reviews",
 		"privacy_reviews",
+		"agents",
+		"lifecycle",
 		"compliance",
 		"analytics",
 		"settings",
 	}
 	assert contract["ui"]["api_prefix"] == "/biop/api/v1"
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert contract["agents"]["first_class"] is True
+	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert contract["streaming"]["broker_core_dependency_allowed"] is False
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "template_vault" in contract["theme"]["components"]
 	assert "privacy_review_queue" in contract["theme"]["components"]
+	assert "biometric_agent_roster" in contract["theme"]["components"]
+	assert "bytewax_lifecycle_panel" in contract["theme"]["components"]
 
 
 def test_rule_engine_enforces_biometric_guardrails():
@@ -82,6 +90,28 @@ def test_rule_engine_enforces_biometric_guardrails():
 	match_review_result = evaluate_capability_rules({"operation": "approve_match_review", "match_reviewer_same_as_requester": True})
 	privacy_review_result = evaluate_capability_rules({"operation": "approve_privacy_review", "privacy_reviewer_same_as_requester": True})
 	batch_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_biometric_mutation", "event_stream": "kafka"})
+	agent_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_biometric_agent",
+		"agent_runtime_supported": False,
+		"agent_role_supported": False,
+		"scope_present": False,
+		"owner_present": False,
+		"purpose_present": False,
+		"contribution_disclosed": False,
+	})
+	lifecycle_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "validate_biop_lifecycle_batch",
+		"event_stream": "kafka",
+		"mutation_count": 1,
+	})
+	empty_lifecycle_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "validate_biop_lifecycle_batch",
+		"event_stream": "bytewax",
+		"mutation_count": 0,
+	})
 	audit_result = evaluate_capability_rules({"tenant_context_present": True, "state_change_requested": True, "audit_event_recorded": False})
 	quality_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "enroll_template", "quality_score": 0.5})
 
@@ -99,6 +129,16 @@ def test_rule_engine_enforces_biometric_guardrails():
 	assert match_review_result["matched_rules"] == ["match_review_requires_independent_reviewer"]
 	assert privacy_review_result["matched_rules"] == ["privacy_review_requires_independent_reviewer"]
 	assert batch_result["matched_rules"] == ["batch_biometric_mutation_requires_bytewax"]
+	assert set(agent_result["matched_rules"]) >= {
+		"biometric_agent_runtime_supported",
+		"biometric_agent_role_supported",
+		"biometric_agent_requires_scope",
+		"biometric_agent_requires_owner",
+		"biometric_agent_requires_purpose",
+		"biometric_agent_requires_contribution_disclosure",
+	}
+	assert lifecycle_result["matched_rules"] == ["bytewax_biop_stream_required"]
+	assert empty_lifecycle_result["matched_rules"] == ["biop_lifecycle_batch_requires_mutations"]
 	assert audit_result["matched_rules"] == ["biometric_state_change_requires_audit"]
 	assert quality_result["matched_rules"] == ["template_quality_requires_threshold"]
 
@@ -113,8 +153,13 @@ def test_registration_includes_full_capability_contract():
 	assert registration["theme"]["name"] == "biop_biometric_control"
 	assert registration["ui_components"]["verification"] == "/biop/verification"
 	assert registration["ui_components"]["privacy_reviews"] == "/biop/reviews/privacy"
+	assert registration["ui_components"]["agents"] == "/biop/agents"
+	assert registration["ui_components"]["lifecycle"] == "/biop/lifecycle"
 	assert "mfau" in registration["dependencies"]
+	assert "encr" in registration["dependencies"]
 	assert registration["adapters"]["event_stream"] == "bytewax"
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["required_processor"] == "bytewax"
 	assert registration["endpoints"]["audit"] == "/biop/api/v1/audit"
 	assert "biop:verify" in registration["permissions"]
 	assert "biop:manage_consent" in registration["permissions"]
@@ -175,8 +220,29 @@ def test_service_runs_consent_template_verification_review_and_audit_lifecycle()
 		decision="approved",
 		notes="Secondary evidence confirms the subject.",
 	)
+	agent = service.register_biometric_agent(
+		agent_id="agent-privacy",
+		tenant_id="tenant-bio",
+		name="Privacy Reviewer",
+		runtime="codex",
+		role="privacy_reviewer",
+		scope="cross-border biometric reviews",
+		owner="privacy-office",
+		purpose="Review biometric transfer risk",
+		contribution_disclosed=True,
+		human_approval_required=True,
+	)
+	lifecycle_batch = service.validate_biop_lifecycle_batch(
+		tenant_id="tenant-bio",
+		event_stream="bytewax",
+		mutation_count=2,
+		operation="biometric_agent_batch",
+		batch_id="batch-1",
+	)
 	summary = service.biometric_summary("tenant-bio")
 	dashboard = view_models.dashboard_model(service, "tenant-bio")
+	agents = view_models.biometric_agent_roster_model(service, "tenant-bio")
+	lifecycle = view_models.lifecycle_batch_model(service, "tenant-bio")
 
 	assert local_verified["status"] == "verified"
 	assert cross_border["status"] == "pending_privacy_review"
@@ -184,11 +250,18 @@ def test_service_runs_consent_template_verification_review_and_audit_lifecycle()
 	assert after_match["status"] == "verified"
 	assert after_match["privacy_review_id"] == "privacy-review-1"
 	assert after_match["match_review_id"] == "match-review-1"
+	assert agent["runtime"] == "codex"
+	assert agent["status"] == "active"
+	assert lifecycle_batch["required_processor"] == "bytewax"
 	assert summary["active_consent_count"] == 1
 	assert summary["active_template_count"] == 1
 	assert summary["verified_count"] == 2
 	assert summary["review_count"] == 2
-	assert dashboard["summary"]["audit_event_count"] >= 6
+	assert summary["biometric_agent_count"] == 1
+	assert summary["lifecycle_batch_count"] == 1
+	assert dashboard["summary"]["audit_event_count"] >= 8
+	assert agents["agents"][0]["id"] == "agent-privacy"
+	assert lifecycle["batches"][0]["id"] == "batch-1"
 
 
 def test_service_enforces_biometric_guardrails():
@@ -220,6 +293,37 @@ def test_service_enforces_biometric_guardrails():
 			consent_id="consent-1",
 			retention_policy="default",
 		)
+	with pytest.raises(PermissionError, match="unsupported_biometric_agent_runtime"):
+		service.register_biometric_agent(
+			agent_id="agent-unsupported",
+			tenant_id="tenant-bio",
+			name="Unsupported Agent",
+			runtime="unknown",
+			role="privacy_reviewer",
+			scope="privacy",
+			owner="privacy-office",
+			purpose="Review transfers",
+			contribution_disclosed=True,
+			human_approval_required=True,
+		)
+	pending_agent = service.register_biometric_agent(
+		agent_id="agent-pending",
+		tenant_id="tenant-bio",
+		name="Pending Privacy Reviewer",
+		runtime="claude_code",
+		role="privacy_reviewer",
+		scope="privacy",
+		owner="privacy-office",
+		purpose="Review transfers",
+		contribution_disclosed=True,
+		human_approval_required=False,
+	)
+	with pytest.raises(ValueError, match="biop_lifecycle_batch_empty"):
+		service.validate_biop_lifecycle_batch("tenant-bio", "bytewax", 0, "biometric_agent_batch")
+	with pytest.raises(ValueError, match="unsupported_biop_lifecycle_operation"):
+		service.validate_biop_lifecycle_batch("tenant-bio", "bytewax", 1, "unknown_batch")
+	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
+		service.validate_biop_lifecycle_batch("tenant-bio", "kafka", 1, "biometric_agent_batch")
 	with pytest.raises(PermissionError, match="biometric_template_quality_too_low"):
 		service.enroll_template(
 			template_id="template-low-quality",
@@ -376,6 +480,7 @@ def test_service_enforces_biometric_guardrails():
 	assert rejected["decision"] == "deny"
 	assert low_match["status"] == "pending_match_review"
 	assert match_rejected["status"] == "rejected"
+	assert pending_agent["status"] == "pending_review"
 
 
 def test_service_keeps_duplicate_ids_isolated_by_tenant():
@@ -470,9 +575,30 @@ def test_api_helpers_and_view_models_expose_biop_lifecycle():
 		"decision": "approved",
 		"notes": "Approved from API helper path.",
 	})
+	agent = api_helpers.register_biometric_agent({
+		"id": "api-agent",
+		"tenant_id": tenant_id,
+		"name": "API Match Reviewer",
+		"runtime": "opencode",
+		"role": "match_reviewer",
+		"scope": "match reviews",
+		"owner": "api-governance",
+		"purpose": "Review low confidence biometric matches",
+		"contribution_disclosed": "true",
+		"human_approval_required": "true",
+	})
+	batch = api_helpers.validate_lifecycle_batch({
+		"id": "api-batch",
+		"tenant_id": tenant_id,
+		"event_stream": "bytewax",
+		"mutation_count": 1,
+		"operation": "biometric_agent_batch",
+	})
 	dashboard = view_models.dashboard_model(tenant_id=tenant_id)
 	reviews = view_models.review_queue_model(tenant_id=tenant_id)
 	templates = view_models.template_vault_model(tenant_id=tenant_id)
+	agents = view_models.biometric_agent_roster_model(tenant_id=tenant_id)
+	lifecycle = view_models.lifecycle_batch_model(tenant_id=tenant_id)
 
 	assert verification["status"] == "pending_match_review"
 	assert approved["status"] == "verified"
@@ -480,3 +606,7 @@ def test_api_helpers_and_view_models_expose_biop_lifecycle():
 	assert dashboard["summary"]["review_count"] == 1
 	assert reviews["decided_reviews"][0]["id"] == "api-match-review"
 	assert templates["active_templates"][0]["id"] == "api-template"
+	assert agent["runtime"] == "opencode"
+	assert batch["required_processor"] == "bytewax"
+	assert agents["agents"][0]["id"] == "api-agent"
+	assert lifecycle["batches"][0]["id"] == "api-batch"

@@ -128,15 +128,68 @@ class BiometricAuditEvent:
 		return data
 
 
+@dataclass(frozen=True)
+class BiometricAgentRecord:
+	"""Provider-neutral AI agent registered for biometric governance."""
+
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	owner: str
+	purpose: str
+	contribution_disclosed: bool
+	human_approval_required: bool
+	status: str = "active"
+	created_at: str = ""
+
+	def to_dict(self) -> dict[str, Any]:
+		data = asdict(self)
+		data["agent_id"] = self.id
+		return data
+
+
+@dataclass(frozen=True)
+class BiopLifecycleBatchRecord:
+	"""Bytewax lifecycle batch validation evidence for biometric changes."""
+
+	id: str
+	tenant_id: str
+	event_stream: str
+	mutation_count: int
+	operation: str
+	accepted: bool
+	decision: str
+	matched_rules: tuple[str, ...] = ()
+	required_processor: str = "bytewax"
+	status: str = "accepted"
+	created_at: str = ""
+
+	def to_dict(self) -> dict[str, Any]:
+		data = asdict(self)
+		data["batch_id"] = self.id
+		data["matched_rules"] = list(self.matched_rules)
+		return data
+
+
 class BiopService:
 	"""Consent, template, verification, review, and audit lifecycle facade."""
 
 	def __init__(self) -> None:
+		self.contract = get_capability_contract()
 		self._consents: dict[tuple[str, str], BiometricConsent] = {}
 		self._templates: dict[tuple[str, str], BiometricTemplateRecord] = {}
 		self._verifications: dict[tuple[str, str], BiometricVerificationRecord] = {}
 		self._reviews: dict[tuple[str, str], BiometricReviewApproval] = {}
 		self._audit_events: dict[tuple[str, str], BiometricAuditEvent] = {}
+		self._biometric_agents: dict[tuple[str, str], BiometricAgentRecord] = {}
+		self._lifecycle_batches: dict[tuple[str, str], BiopLifecycleBatchRecord] = {}
+		self._agent_runtimes = set(self.contract["agents"]["supported_runtimes"])
+		self._agent_roles = set(self.contract["agents"]["supported_roles"])
+		self._privileged_agent_roles = set(self.contract["agents"]["privileged_roles"])
+		self._lifecycle_operations = set(self.contract["streaming"]["required_operations"])
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -281,6 +334,111 @@ class BiopService:
 		)
 		return retired.to_dict()
 
+	def register_biometric_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> dict[str, Any]:
+		self._ensure_new(self._biometric_agents, tenant_id, agent_id, "biometric agent")
+		runtime_value = _normalize_token(runtime)
+		role_value = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(str(tenant_id or "").strip()),
+			"operation": "register_biometric_agent",
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"scope_present": bool(str(scope or "").strip()),
+			"owner_present": bool(str(owner or "").strip()),
+			"purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+		})
+		self._raise_if_denied(result)
+		if not str(name or "").strip():
+			raise ValueError("biometric_agent_name_required")
+		agent = BiometricAgentRecord(
+			id=str(agent_id).strip(),
+			tenant_id=tenant_id,
+			name=str(name).strip(),
+			runtime=runtime_value,
+			role=role_value,
+			scope=str(scope).strip(),
+			owner=str(owner).strip(),
+			purpose=str(purpose).strip(),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+			status="pending_review" if result["decision"] == "require_review" else "active",
+			created_at=self._now(),
+		)
+		self._biometric_agents[self._tenant_key(tenant_id, agent.id)] = agent
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id="biometric-agent",
+			event_type="biometric_agent_registered",
+			actor=owner,
+			decision=result["decision"],
+			reasons=self._reasons(result),
+			metadata={"agent_id": agent.id, "runtime": runtime_value, "role": role_value},
+		)
+		return agent.to_dict()
+
+	def validate_biop_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "biometric_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		mutation_count = int(mutation_count)
+		if mutation_count <= 0:
+			raise ValueError("biop_lifecycle_batch_empty")
+		stream_value = _normalize_token(event_stream)
+		operation_value = _normalize_token(operation)
+		if operation_value not in self._lifecycle_operations:
+			raise ValueError(f"unsupported_biop_lifecycle_operation:{operation_value}")
+		result = self.evaluate({
+			"tenant_context_present": bool(str(tenant_id or "").strip()),
+			"operation": "validate_biop_lifecycle_batch",
+			"event_stream": stream_value,
+			"mutation_count": mutation_count,
+		})
+		accepted = result["decision"] == "allow"
+		record = BiopLifecycleBatchRecord(
+			id=batch_id or f"biopbatch:{len(self._lifecycle_batches) + 1:06d}",
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			operation=operation_value,
+			accepted=accepted,
+			decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			status="accepted" if accepted else "denied",
+			created_at=self._now(),
+		)
+		self._lifecycle_batches[self._tenant_key(tenant_id, record.id)] = record
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id="biop-lifecycle",
+			event_type=f"biop_lifecycle_batch_{record.status}",
+			actor="bytewax" if accepted else stream_value,
+			decision=result["decision"],
+			reasons=self._reasons(result),
+			metadata={"batch_id": record.id, "operation": operation_value, "event_stream": stream_value},
+		)
+		self._raise_if_denied(result)
+		return record.to_dict()
+
 	def request_verification(
 		self,
 		verification_id: str,
@@ -424,6 +582,12 @@ class BiopService:
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events.values(), tenant_id)
 
+	def list_biometric_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._biometric_agents.values(), tenant_id)
+
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._lifecycle_batches.values(), tenant_id)
+
 	def biometric_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		consents = self.list_consents(tenant_id)
 		templates = self.list_templates(tenant_id)
@@ -441,6 +605,10 @@ class BiopService:
 			"rejected_count": len([item for item in verifications if item["status"] == "rejected"]),
 			"review_count": len(reviews),
 			"pending_review_count": len([item for item in reviews if item["status"] == "pending"]),
+			"biometric_agent_count": len(self.list_biometric_agents(tenant_id)),
+			"pending_agent_review_count": len([item for item in self.list_biometric_agents(tenant_id) if item["status"] == "pending_review"]),
+			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
+			"denied_lifecycle_batch_count": len([item for item in self.list_lifecycle_batches(tenant_id) if item["status"] == "denied"]),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 		}
 
@@ -709,3 +877,7 @@ class BiopService:
 
 	def _now(self) -> str:
 		return datetime.now(timezone.utc).isoformat()
+
+
+def _normalize_token(value: str) -> str:
+	return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")

@@ -30,8 +30,10 @@ def test_package_contract_shape_is_valid():
 	assert contract["capability"] == "biop"
 	assert contract["ui"]["routes"]
 	assert contract["theme"]["tokens"]["border.radius"]
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert len(contract["rule_engine"]["rules"]) >= 48
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["required_processor"] == "bytewax"
 
 
 def test_package_app_entrypoint_is_publishable():
@@ -47,4 +49,6 @@ def test_package_app_entrypoint_is_publishable():
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "biop" in model["capabilities"]
 	assert model["capabilities"]["biop"]["runtime"]["service"] == "biometric_runtime.BiopService"
-	assert model["capabilities"]["biop"]["streaming"]["engine"] == "bytewax"
+	assert model["capabilities"]["biop"]["agents"]["first_class"] is True
+	assert model["capabilities"]["biop"]["streaming"]["required_processor"] == "bytewax"
+	assert model["capabilities"]["biop"]["biometric_lifecycle"]["lifecycle_batch"] == "BiopLifecycleBatchRecord"

@@ -23,9 +23,13 @@ def dashboard_model(
 		"verifications": service.list_verifications(tenant_id),
 		"privacy_reviews": service.list_reviews(tenant_id, "privacy"),
 		"match_reviews": service.list_reviews(tenant_id, "match"),
+		"biometric_agents": service.list_biometric_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"routes": contract["ui"]["routes"],
 		"theme": contract["theme"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 	}
 
 
@@ -96,6 +100,44 @@ def review_queue_model(
 	}
 
 
+def biometric_agent_roster_model(
+	service: BiopService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, Any]:
+	service = _service_or_default(service)
+	contract = service.describe(tenant_id)
+	agents = service.list_biometric_agents(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"component": "BiometricAgentRoster",
+		"agents": agents,
+		"pending_review": [item for item in agents if item["status"] == "pending_review"],
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+		"theme_component": "biometric_agent_roster",
+	}
+
+
+def lifecycle_batch_model(
+	service: BiopService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, Any]:
+	service = _service_or_default(service)
+	contract = service.describe(tenant_id)
+	batches = service.list_lifecycle_batches(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"component": "BIOPLifecycleBatchMonitor",
+		"batches": batches,
+		"denied": [item for item in batches if item["status"] == "denied"],
+		"required_processor": contract["streaming"]["required_processor"],
+		"required_operations": contract["streaming"]["required_operations"],
+		"topics": contract["streaming"]["topics"],
+		"theme_component": "bytewax_lifecycle_panel",
+	}
+
+
 def audit_model(
 	service: BiopService | None = None,
 	tenant_id: str = "default",
@@ -108,6 +150,8 @@ def audit_model(
 		"audit_events": service.list_audit_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 	}
 
 

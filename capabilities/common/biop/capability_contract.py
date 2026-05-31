@@ -7,6 +7,31 @@ from numbers import Number
 from typing import Any
 
 
+SUPPORTED_BIOP_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_BIOP_AGENT_ROLES = [
+	"consent_reviewer",
+	"enrollment_reviewer",
+	"liveness_reviewer",
+	"match_reviewer",
+	"privacy_reviewer",
+	"template_vault_reviewer",
+	"presentation_attack_reviewer",
+	"retention_reviewer",
+	"lifecycle_batch_reviewer",
+	"biometric_security_steward",
+]
+PRIVILEGED_BIOP_AGENT_ROLES = [
+	"liveness_reviewer",
+	"match_reviewer",
+	"privacy_reviewer",
+	"template_vault_reviewer",
+	"presentation_attack_reviewer",
+	"retention_reviewer",
+	"lifecycle_batch_reviewer",
+	"biometric_security_steward",
+]
+
+
 DEFAULT_CONFIGURATION: dict[str, Any] = {
 	"tenant_id": "default",
 	"consent": {
@@ -16,7 +41,7 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"revocation_supported": True,
 	},
 	"modalities": {
-		"enabled": ["face", "fingerprint", "voice", "iris", "behavioral"],
+		"enabled": ["face", "fingerprint", "voice", "iris", "palm", "behavioral", "document"],
 		"multi_modal_required_for_high_risk": True,
 		"minimum_match_confidence": 0.86,
 		"quality_threshold": 0.72
@@ -55,6 +80,45 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"cross_border_processing_review": True,
 		"jurisdiction_mismatch_blocks_processing": True,
 		"privacy_review_notes_required": True,
+	},
+	"agents": {
+		"first_class": True,
+		"supported_runtimes": SUPPORTED_BIOP_AGENT_RUNTIMES,
+		"supported_roles": SUPPORTED_BIOP_AGENT_ROLES,
+		"privileged_roles": PRIVILEGED_BIOP_AGENT_ROLES,
+		"require_owner": True,
+		"require_purpose": True,
+		"require_scope": True,
+		"require_contribution_disclosure": True,
+		"require_human_approval_for_privileged_roles": True,
+		"adapter_contract": "aicr_provider_neutral_biometric_agent_adapter",
+	},
+	"streaming": {
+		"engine": "bytewax",
+		"lifecycle_stream": "biop.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"consent_batch",
+			"template_batch",
+			"verification_batch",
+			"liveness_batch",
+			"match_review_batch",
+			"privacy_review_batch",
+			"retention_batch",
+			"biometric_agent_batch",
+		],
+		"topics": [
+			"biop.consents",
+			"biop.templates",
+			"biop.verifications",
+			"biop.liveness",
+			"biop.match_reviews",
+			"biop.privacy_reviews",
+			"biop.retention",
+			"biop.agents",
+		],
+		"broker_core_dependency_allowed": False,
 	},
 	"retention": {
 		"raw_sample_retention": "disabled",
@@ -105,6 +169,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"enable_template_vault": True,
 		"enable_verification_workbench": True,
 		"enable_review_queues": True,
+		"enable_biometric_agent_roster": True,
+		"enable_lifecycle_batch_monitor": True,
 		"enable_compliance_view": True
 	},
 	"theme": {
@@ -125,6 +191,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"liveness",
 		"reviews",
 		"privacy",
+		"agents",
+		"streaming",
 		"retention",
 		"security",
 		"governance",
@@ -142,6 +210,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"liveness",
 		"reviews",
 		"privacy",
+		"agents",
+		"streaming",
 		"retention",
 		"security",
 		"governance",
@@ -193,7 +263,16 @@ RULES: list[dict[str, Any]] = [
 	{"name": "template_retirement_requires_reason", "description": "Template retirement requires a reason.", "condition": {"operation": "retire_template", "retirement_reason_present": False}, "effect": {"decision": "deny", "reason": "biometric_template_retirement_reason_required", "required_action": "record_retirement_reason"}},
 	{"name": "batch_biometric_mutation_requires_bytewax", "description": "Batch biometric lifecycle mutations must use Bytewax event streams.", "condition": {"operation": "batch_biometric_mutation", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}},
 	{"name": "cross_tenant_biometric_access_denied", "description": "Biometric records may not cross tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_biometric_access_denied", "required_action": "use_tenant_local_context"}},
-	{"name": "biometric_state_change_requires_audit", "description": "Biometric state changes require audit evidence.", "condition": {"state_change_requested": True, "audit_event_recorded": False}, "effect": {"decision": "deny", "reason": "biometric_audit_event_required", "required_action": "record_biometric_audit_event"}}
+	{"name": "biometric_state_change_requires_audit", "description": "Biometric state changes require audit evidence.", "condition": {"state_change_requested": True, "audit_event_recorded": False}, "effect": {"decision": "deny", "reason": "biometric_audit_event_required", "required_action": "record_biometric_audit_event"}},
+	{"name": "biometric_agent_runtime_supported", "description": "Biometric governance agents must use supported provider-neutral runtimes.", "condition": {"operation": "register_biometric_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_biometric_agent_runtime", "required_action": "choose_supported_biometric_agent_runtime"}},
+	{"name": "biometric_agent_role_supported", "description": "Biometric governance agents must use supported biometric governance roles.", "condition": {"operation": "register_biometric_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_biometric_agent_role", "required_action": "choose_supported_biometric_agent_role"}},
+	{"name": "biometric_agent_requires_scope", "description": "Biometric governance agents require an explicit consent, enrollment, template, liveness, match, privacy, retention, or lifecycle scope.", "condition": {"operation": "register_biometric_agent", "scope_present": False}, "effect": {"decision": "deny", "reason": "biometric_agent_scope_required", "required_action": "declare_biometric_agent_scope"}},
+	{"name": "biometric_agent_requires_owner", "description": "Biometric governance agents require an accountable owner.", "condition": {"operation": "register_biometric_agent", "owner_present": False}, "effect": {"decision": "deny", "reason": "biometric_agent_owner_required", "required_action": "assign_biometric_agent_owner"}},
+	{"name": "biometric_agent_requires_purpose", "description": "Biometric governance agents require a documented purpose.", "condition": {"operation": "register_biometric_agent", "purpose_present": False}, "effect": {"decision": "deny", "reason": "biometric_agent_purpose_required", "required_action": "document_biometric_agent_purpose"}},
+	{"name": "biometric_agent_requires_contribution_disclosure", "description": "Biometric governance agents must disclose machine-authored consent, template, liveness, match, privacy, and retention contributions.", "condition": {"operation": "register_biometric_agent", "contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "biometric_agent_contribution_disclosure_required", "required_action": "disclose_machine_contribution"}},
+	{"name": "biometric_agent_privileged_role_requires_human_approval", "description": "Privileged biometric governance-agent roles require human approval evidence.", "condition": {"operation": "register_biometric_agent", "privileged_role": True, "human_approval_required": False}, "effect": {"decision": "require_review", "reason": "biometric_agent_human_approval_required", "required_action": "record_human_biometric_agent_approval"}},
+	{"name": "biop_lifecycle_batch_requires_mutations", "description": "BIOP lifecycle batches must include at least one mutation.", "condition": {"operation": "validate_biop_lifecycle_batch", "mutation_count_lte": 0}, "effect": {"decision": "deny", "reason": "biop_lifecycle_batch_empty", "required_action": "include_biop_lifecycle_mutations"}},
+	{"name": "bytewax_biop_stream_required", "description": "BIOP lifecycle batches must be routed through Bytewax.", "condition": {"operation": "validate_biop_lifecycle_batch", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_biop_lifecycle_batch_to_bytewax"}}
 ]
 
 UI_ROUTES: list[dict[str, str]] = [
@@ -206,6 +285,8 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "liveness", "path": "/biop/liveness", "component": "LivenessWorkbench", "permission": "biop:verify", "nav_group": "Verification"},
 	{"name": "match_reviews", "path": "/biop/reviews/matches", "component": "BiometricMatchReviewQueue", "permission": "biop:review", "nav_group": "Governance"},
 	{"name": "privacy_reviews", "path": "/biop/reviews/privacy", "component": "BiometricPrivacyReviewQueue", "permission": "biop:review_privacy", "nav_group": "Governance"},
+	{"name": "agents", "path": "/biop/agents", "component": "BiometricAgentRoster", "permission": "biop:admin", "nav_group": "Governance"},
+	{"name": "lifecycle", "path": "/biop/lifecycle", "component": "BIOPLifecycleBatchMonitor", "permission": "biop:admin", "nav_group": "Operations"},
 	{"name": "compliance", "path": "/biop/compliance", "component": "BiometricCompliance", "permission": "biop:review", "nav_group": "Governance"},
 	{"name": "analytics", "path": "/biop/analytics", "component": "BiometricAnalytics", "permission": "biop:view", "nav_group": "Operations"},
 	{"name": "settings", "path": "/biop/settings", "component": "BIOPSettings", "permission": "biop:admin", "nav_group": "Administration"}
@@ -234,9 +315,63 @@ THEME: dict[str, Any] = {
 		"match_result": {"visual": "confidence-meter", "status_style": "review-chip"},
 		"match_review_queue": {"visual": "confidence-review-lane", "status_style": "match-review-chip"},
 		"privacy_review_queue": {"visual": "jurisdiction-review-lane", "status_style": "privacy-chip"},
-		"privacy_posture": {"visual": "jurisdiction-matrix", "status_style": "cross-border-chip"}
+		"privacy_posture": {"visual": "jurisdiction-matrix", "status_style": "cross-border-chip"},
+		"biometric_agent_roster": {"icon": "bot", "status_indicator": "agent-approval-chip", "risk_style": "biometric-scope-band"},
+		"bytewax_lifecycle_panel": {"icon": "git-branch", "status_indicator": "stream-chip", "risk_style": "processor-band"}
 	}
 }
+
+
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class BIOP agent composition manifest."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_BIOP_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_BIOP_AGENT_ROLES),
+		"privileged_roles": list(PRIVILEGED_BIOP_AGENT_ROLES),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles",
+		],
+		"adapter_contract": "aicr_provider_neutral_biometric_agent_adapter",
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return the BIOP Bytewax lifecycle stream contract."""
+	return {
+		"engine": "bytewax",
+		"lifecycle_stream": "biop.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"consent_batch",
+			"template_batch",
+			"verification_batch",
+			"liveness_batch",
+			"match_review_batch",
+			"privacy_review_batch",
+			"retention_batch",
+			"biometric_agent_batch",
+		],
+		"topics": [
+			"biop.consents",
+			"biop.templates",
+			"biop.verifications",
+			"biop.liveness",
+			"biop.match_reviews",
+			"biop.privacy_reviews",
+			"biop.retention",
+			"biop.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	}
 
 
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -248,6 +383,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "biop",
 		"display_name": "Biometric Processing",
+		"provides": ["biometric_processing", "biometric_verification", "biometric_agent_composition"],
+		"requires": ["mfau", "cvsn", "aicr", "encr", "audl", "conf"],
 		"configuration": config,
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},
@@ -259,6 +396,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"template_roots": ["templates/", "static/"],
 			"requires_theme": True
 		},
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
 		"theme": deepcopy(THEME)
 	}
 

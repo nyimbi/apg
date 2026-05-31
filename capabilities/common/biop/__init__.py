@@ -10,7 +10,7 @@ from .capability_contract import evaluate_capability_rules, get_capability_contr
 __version__ = "1.0.0"
 __capability_id__ = "biop"
 __capability_name__ = "Biometric Processing"
-__apg_dependencies__ = ["mfau", "cvsn", "aicr"]
+__apg_dependencies__ = ["mfau", "cvsn", "aicr", "encr", "audl", "conf"]
 
 capability_metadata: dict[str, Any] = {
 	"name": "biop",
@@ -32,6 +32,8 @@ capability_metadata: dict[str, Any] = {
 		"biometric_verification",
 		"match_review",
 		"privacy_review",
+		"biometric_agent_composition",
+		"bytewax_lifecycle_batches",
 		"biometric_audit",
 		"visual_theming",
 	],
@@ -54,7 +56,7 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["auth", "audl", "encr", "frec", "moni", "cach"],
+		"optional_dependencies": ["auth", "frec", "moni", "cach"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
@@ -67,6 +69,8 @@ def register_capability() -> dict[str, Any]:
 			"biometric_verification": "Run match and verification decisions with confidence thresholds",
 			"match_review": "Route low-confidence biometric matches for independent review",
 			"privacy_review": "Route cross-border biometric processing for independent privacy review",
+			"biometric_agent_composition": "Compose Codex, Claude Code, opencode, and Pi style biometric governance agents behind provider-neutral guardrails",
+			"bytewax_lifecycle_batches": "Validate biometric lifecycle batches through Bytewax-first processor contracts",
 			"capability_rules": "Evaluate deterministic biometric-processing rules",
 			"visual_theming": "Apply biometric-control theme tokens and components"
 		},
@@ -78,12 +82,16 @@ def register_capability() -> dict[str, Any]:
 			"templates": "/biop/api/v1/templates",
 			"match_reviews": "/biop/api/v1/reviews/matches",
 			"privacy_reviews": "/biop/api/v1/reviews/privacy",
+			"agents": "/biop/api/v1/agents",
+			"lifecycle": "/biop/api/v1/lifecycle",
 			"liveness": "/biop/api/v1/liveness",
 			"compliance": "/biop/api/v1/compliance",
 			"analytics": "/biop/api/v1/analytics",
 			"audit": "/biop/api/v1/audit"
 		},
 		"adapters": contract["configuration"]["adapters"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],

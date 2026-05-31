@@ -16,6 +16,8 @@ BIOP exposes these composable application components:
 - Low-confidence match review queue with independent reviewer decision and notes.
 - Cross-border biometric processing privacy review queue with independent reviewer decision and notes.
 - Template vault, retirement, and revocation state for privacy and security operations.
+- First-class biometric governance agents for consent, enrollment, template-vault, liveness, match, privacy, retention, and lifecycle-batch review.
+- Bytewax-first lifecycle batch validation for generated biometric mutation streams without Kafka or broker-core coupling.
 - Audit event stream for consent, enrollment, verification, review, revocation, and retirement evidence.
 - Dashboard and workbench view models that generated applications can render directly.
 
@@ -108,6 +110,26 @@ Every lifecycle transition emits tenant-scoped audit evidence with:
 
 Audit events are the package-level proof for generated applications. Production deployments may forward the same events to AUDL.
 
+### 8. Biometric Governance Agent Composition
+
+BIOP treats AI agents as first-class biometric governance citizens. A biometric agent registration must include:
+
+- tenant ID;
+- agent ID and display name;
+- provider-neutral runtime (`codex`, `claude_code`, `opencode`, or `pi`);
+- supported role;
+- bounded biometric scope;
+- accountable owner;
+- documented purpose;
+- machine contribution disclosure;
+- human approval evidence for privileged roles.
+
+BIOP stores agent registrations as tenant-scoped records and uses them as composition metadata for generated applications. Runtime-specific clients, prompts, credentials, and orchestration belong behind the AICR adapter contract.
+
+### 9. Bytewax Lifecycle Batches
+
+Generated applications may validate lifecycle batches for consent, template, verification, liveness, match-review, privacy-review, retention, and biometric-agent changes. BIOP accepts only Bytewax-routed lifecycle batches, requires at least one mutation, rejects unsupported lifecycle operations, and records accepted or denied batch evidence.
+
 ## Rule Engine
 
 The capability contract must include deterministic rules for:
@@ -122,6 +144,8 @@ The capability contract must include deterministic rules for:
 - independent privacy reviewer;
 - active consent for biometric operations;
 - active template for verification.
+- biometric governance-agent runtime, role, scope, owner, purpose, contribution disclosure, and privileged-role review;
+- non-empty Bytewax lifecycle batches.
 
 Rules are declarative guardrails for generated applications and publish-plan evidence. The runtime must enforce equivalent behavior.
 
@@ -138,11 +162,13 @@ BIOP must expose UI routes and theme components for:
 - liveness workbench;
 - match review queue;
 - privacy review queue;
+- biometric governance-agent roster;
+- lifecycle batch monitor;
 - compliance;
 - analytics;
 - settings.
 
-Theme components must support compact enterprise controls, including modality status, consent scope, encrypted template vault, liveness score, match confidence, review queue, and privacy posture.
+Theme components must support compact enterprise controls, including modality status, consent scope, encrypted template vault, liveness score, match confidence, review queue, privacy posture, biometric governance-agent roster, and Bytewax lifecycle posture.
 
 ## Adapter Boundaries
 
@@ -151,6 +177,7 @@ The package runtime must not implement or require:
 - real biometric capture hardware;
 - raw face/voice/fingerprint/iris processing;
 - model inference;
+- external AI-agent runtime clients;
 - production database persistence;
 - HSM template encryption;
 - legal/regulatory advice;
@@ -163,6 +190,7 @@ Those concerns belong behind adapters. The package runtime defines the executabl
 - The package has `SPECIFICATION.md` and `PLAN.md`.
 - The package exposes dependency-light runtime, API-helper, and view-model surfaces.
 - The contract, app semantic model, release report, and manifest include consent/review/template lifecycle surfaces.
+- The contract, app semantic model, release report, and manifest include first-class biometric governance agents and Bytewax lifecycle batch metadata.
 - Focused tests prove positive and negative governance paths.
 - The package imports and self-tests without Flask, Flask-AppBuilder, SQLAlchemy session setup, biometric engines, or external hardware.
 - Implementation audit and publish-plan pass for `capabilities/common/biop`.
