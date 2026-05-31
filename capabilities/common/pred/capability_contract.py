@@ -6,6 +6,27 @@ from copy import deepcopy
 from typing import Any
 
 
+SUPPORTED_PRED_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_PRED_AGENT_ROLES = [
+	"forecast_reviewer",
+	"score_reviewer",
+	"feature_lineage_reviewer",
+	"scenario_reviewer",
+	"drift_reviewer",
+	"model_release_reviewer",
+	"explainability_reviewer",
+	"batch_scoring_reviewer",
+	"prediction_steward",
+]
+PRIVILEGED_PRED_AGENT_ROLES = [
+	"score_reviewer",
+	"drift_reviewer",
+	"model_release_reviewer",
+	"explainability_reviewer",
+	"batch_scoring_reviewer",
+]
+
+
 DEFAULT_CONFIGURATION: dict[str, Any] = {
 	"tenant_id": "default",
 	"forecasting": {
@@ -47,6 +68,45 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"review_required_above_threshold": True,
 		"monitoring_window_days": 30,
 	},
+	"agents": {
+		"first_class": True,
+		"supported_runtimes": SUPPORTED_PRED_AGENT_RUNTIMES,
+		"supported_roles": SUPPORTED_PRED_AGENT_ROLES,
+		"privileged_roles": PRIVILEGED_PRED_AGENT_ROLES,
+		"require_owner": True,
+		"require_purpose": True,
+		"require_scope": True,
+		"require_contribution_disclosure": True,
+		"require_human_approval_for_privileged_roles": True,
+		"adapter_contract": "aicr_provider_neutral_prediction_agent_adapter",
+	},
+	"streaming": {
+		"engine": "bytewax",
+		"lifecycle_stream": "pred.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"model_batch",
+			"feature_set_batch",
+			"forecast_batch",
+			"score_batch",
+			"scenario_batch",
+			"drift_batch",
+			"explainability_batch",
+			"prediction_agent_batch",
+		],
+		"topics": [
+			"pred.models",
+			"pred.features",
+			"pred.forecasts",
+			"pred.scores",
+			"pred.scenarios",
+			"pred.drift",
+			"pred.explainability",
+			"pred.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	},
 	"governance": {
 		"require_tenant_context": True,
 		"audit_predictions": True,
@@ -85,6 +145,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"enable_drift_monitor": True,
 		"enable_batch_scoring": True,
 		"enable_explainability": True,
+		"enable_prediction_agent_roster": True,
+		"enable_lifecycle_batch_monitor": True,
 		"enable_governance": True,
 		"enable_audit_timeline": True,
 		"enable_settings": True,
@@ -103,6 +165,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"models",
 		"scenarios",
 		"drift",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
@@ -116,6 +180,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"models",
 		"scenarios",
 		"drift",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
@@ -157,6 +223,14 @@ RULES: list[dict[str, Any]] = [
 	{"name": "batch_scoring_requires_bytewax", "description": "Batch scoring streams must use Bytewax.", "condition": {"operation": "configure_batch_scoring", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}},
 	{"name": "cross_tenant_scoring_denied", "description": "Cross-tenant scoring is denied by default.", "condition": {"cross_tenant_scoring": True}, "effect": {"decision": "deny", "reason": "cross_tenant_scoring_denied", "required_action": "use_tenant_scoped_features"}},
 	{"name": "prediction_state_change_requires_audit", "description": "Prediction state changes require audit events.", "condition": {"state_change_requested": True, "audit_event_recorded": False}, "effect": {"decision": "deny", "reason": "audit_event_required", "required_action": "record_audit_event"}},
+	{"name": "prediction_agent_runtime_supported", "description": "Prediction agents must use supported runtimes.", "condition": {"operation": "register_prediction_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_prediction_agent_runtime", "required_action": "choose_supported_prediction_agent_runtime"}},
+	{"name": "prediction_agent_role_supported", "description": "Prediction agents must use supported analytics-governance roles.", "condition": {"operation": "register_prediction_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_prediction_agent_role", "required_action": "choose_supported_prediction_agent_role"}},
+	{"name": "prediction_agent_requires_scope", "description": "Prediction agents require an explicit bounded scope.", "condition": {"operation": "register_prediction_agent", "scope_present": False}, "effect": {"decision": "deny", "reason": "prediction_agent_scope_required", "required_action": "declare_prediction_agent_scope"}},
+	{"name": "prediction_agent_requires_owner", "description": "Prediction agents require an accountable owner.", "condition": {"operation": "register_prediction_agent", "owner_present": False}, "effect": {"decision": "deny", "reason": "prediction_agent_owner_required", "required_action": "assign_prediction_agent_owner"}},
+	{"name": "prediction_agent_requires_purpose", "description": "Prediction agents require a documented purpose.", "condition": {"operation": "register_prediction_agent", "purpose_present": False}, "effect": {"decision": "deny", "reason": "prediction_agent_purpose_required", "required_action": "document_prediction_agent_purpose"}},
+	{"name": "prediction_agent_requires_contribution_disclosure", "description": "Prediction agents must disclose machine-authored predictive-analytics contributions.", "condition": {"operation": "register_prediction_agent", "contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "prediction_agent_contribution_disclosure_required", "required_action": "disclose_machine_contribution"}},
+	{"name": "prediction_agent_privileged_role_requires_human_approval", "description": "Privileged prediction-agent roles require human approval evidence.", "condition": {"operation": "register_prediction_agent", "privileged_role": True, "human_approval_required": False}, "effect": {"decision": "require_review", "reason": "prediction_agent_human_approval_required", "required_action": "record_human_prediction_agent_approval"}},
+	{"name": "bytewax_pred_stream_required", "description": "PRED lifecycle batches must be routed through Bytewax.", "condition": {"operation": "validate_pred_lifecycle_batch", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_pred_lifecycle_batch_to_bytewax"}},
 ]
 
 
@@ -170,6 +244,8 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "drift", "path": "/pred/drift", "component": "DriftMonitor", "permission": "pred:govern", "nav_group": "Models"},
 	{"name": "batch", "path": "/pred/batch", "component": "BatchScoringQueue", "permission": "pred:score", "nav_group": "Scoring"},
 	{"name": "explainability", "path": "/pred/explainability", "component": "ExplainabilityWorkbench", "permission": "pred:govern", "nav_group": "Governance"},
+	{"name": "agents", "path": "/pred/agents", "component": "PredictionAgentRoster", "permission": "pred:govern", "nav_group": "Governance"},
+	{"name": "lifecycle", "path": "/pred/lifecycle", "component": "PREDLifecycleBatchMonitor", "permission": "pred:govern", "nav_group": "Operations"},
 	{"name": "governance", "path": "/pred/governance", "component": "PredictionGovernance", "permission": "pred:govern", "nav_group": "Governance"},
 	{"name": "audit", "path": "/pred/audit", "component": "PredictionAuditTimeline", "permission": "pred:audit", "nav_group": "Governance"},
 	{"name": "settings", "path": "/pred/settings", "component": "PREDSettings", "permission": "pred:admin", "nav_group": "Administration"},
@@ -199,9 +275,63 @@ THEME: dict[str, Any] = {
 		"drift_monitor": {"visual": "threshold-band", "status_style": "review-chip"},
 		"model_board": {"visual": "model-card-grid", "status_style": "approval-chip"},
 		"batch_queue": {"visual": "queue-table", "status_style": "bytewax-chip"},
+		"prediction_agent_roster": {"icon": "bot", "status_indicator": "agent-approval-chip", "risk_style": "impact-scope-band"},
+		"bytewax_lifecycle_panel": {"icon": "git-branch", "status_indicator": "stream-chip", "risk_style": "processor-band"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "evidence-chip"},
 	},
 }
+
+
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class PRED agent composition manifest."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_PRED_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_PRED_AGENT_ROLES),
+		"privileged_roles": list(PRIVILEGED_PRED_AGENT_ROLES),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles",
+		],
+		"adapter_contract": "aicr_provider_neutral_prediction_agent_adapter",
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return the PRED Bytewax lifecycle stream contract."""
+	return {
+		"engine": "bytewax",
+		"lifecycle_stream": "pred.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"model_batch",
+			"feature_set_batch",
+			"forecast_batch",
+			"score_batch",
+			"scenario_batch",
+			"drift_batch",
+			"explainability_batch",
+			"prediction_agent_batch",
+		],
+		"topics": [
+			"pred.models",
+			"pred.features",
+			"pred.forecasts",
+			"pred.scores",
+			"pred.scenarios",
+			"pred.drift",
+			"pred.explainability",
+			"pred.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	}
 
 
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -213,6 +343,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "pred",
 		"display_name": "Predictive Analytics",
+		"provides": ["predictive_analytics", "forecasting", "prediction_agent_composition"],
+		"requires": ["aicr", "mlcm", "etlp", "conf"],
 		"configuration": config,
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},
@@ -224,6 +356,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"template_roots": ["templates/", "static/"],
 			"requires_theme": True,
 		},
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
 		"theme": deepcopy(THEME),
 	}
 

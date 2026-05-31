@@ -22,6 +22,8 @@ def dashboard_model(
 		"tenant_id": tenant_id,
 		"summary": service.dashboard_summary(tenant_id),
 		"routes": capability_routes(tenant_id),
+		"prediction_agents": service.list_prediction_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
 	}
@@ -111,11 +113,13 @@ def batch_scoring_model(
 	tenant_id: str = "default",
 ) -> dict[str, object]:
 	service = service or PredService()
-	event_stream = service.describe(tenant_id)["configuration"]["adapters"]["event_stream"]
+	contract = service.describe(tenant_id)
+	event_stream = contract["configuration"]["adapters"]["event_stream"]
 	return {
 		"tenant_id": tenant_id,
 		"event_stream": event_stream,
-		"streaming": {"engine": event_stream, "mode": "batch_scoring"},
+		"streaming": contract["streaming"],
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
 		"scores": service.list_scores(tenant_id),
 		"route": "/pred/batch",
 	}
@@ -139,11 +143,16 @@ def governance_model(
 	tenant_id: str = "default",
 ) -> dict[str, object]:
 	service = service or PredService()
+	contract = service.describe(tenant_id)
 	return {
 		"tenant_id": tenant_id,
 		"audit_events": service.list_audit_events(tenant_id),
 		"drift_reports": service.list_drift_reports(tenant_id),
-		"rules": service.describe(tenant_id)["rule_engine"]["rules"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
+		"prediction_agents": service.list_prediction_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
+		"rules": contract["rule_engine"]["rules"],
 		"route": "/pred/governance",
 	}
 
@@ -157,4 +166,40 @@ def audit_timeline_model(
 		"tenant_id": tenant_id,
 		"audit_events": service.list_audit_events(tenant_id),
 		"route": "/pred/audit",
+	}
+
+
+def prediction_agent_roster_model(
+	service: PredService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or PredService()
+	contract = service.describe(tenant_id)
+	agents = service.list_prediction_agents(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"route": "/pred/agents",
+		"agents": agents,
+		"pending_review": [item for item in agents if item["status"] == "pending_review"],
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+	}
+
+
+def lifecycle_batch_model(
+	service: PredService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or PredService()
+	contract = service.describe(tenant_id)
+	batches = service.list_lifecycle_batches(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"route": "/pred/lifecycle",
+		"batches": batches,
+		"denied": [item for item in batches if item["status"] == "denied"],
+		"required_processor": contract["streaming"]["required_processor"],
+		"required_operations": contract["streaming"]["required_operations"],
+		"topics": contract["streaming"]["topics"],
 	}

@@ -10,7 +10,9 @@ from .models import (
 	FeatureSet,
 	ForecastRun,
 	PredAuditEvent,
+	PredLifecycleBatchRecord,
 	PredictiveModel,
+	PredictionAgentRecord,
 	ScenarioSimulation,
 	ScoreRun,
 	utc_now,
@@ -37,7 +39,14 @@ class PredService:
 		self._scores: dict[str, ScoreRun] = {}
 		self._scenarios: dict[str, ScenarioSimulation] = {}
 		self._drift_reports: dict[str, DriftReport] = {}
+		self._agents: dict[str, PredictionAgentRecord] = {}
+		self._lifecycle_batches: dict[str, PredLifecycleBatchRecord] = {}
 		self._audit_events: dict[str, PredAuditEvent] = {}
+		contract = get_capability_contract()
+		self._agent_runtimes = set(contract["agents"]["supported_runtimes"])
+		self._agent_roles = set(contract["agents"]["supported_roles"])
+		self._privileged_agent_roles = set(contract["agents"]["privileged_roles"])
+		self._lifecycle_operations = set(contract["streaming"]["required_operations"])
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -332,6 +341,92 @@ class PredService:
 		self._record_audit(tenant_id, report.id, "drift_recorded", actor, report.status)
 		return report.to_dict()
 
+	def register_prediction_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> dict[str, Any]:
+		runtime_value = self._normalize_token(runtime)
+		role_value = self._normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_prediction_agent",
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"scope_present": bool(str(scope or "").strip()),
+			"owner_present": bool(str(owner or "").strip()),
+			"purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+		})
+		self._raise_if_denied(result)
+		if not name:
+			raise ValueError("prediction_agent_name_required")
+		status = "pending_review" if result["decision"] == "require_review" else "active"
+		agent = PredictionAgentRecord(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=name,
+			runtime=runtime_value,
+			role=role_value,
+			scope=str(scope).strip(),
+			owner=str(owner).strip(),
+			purpose=str(purpose).strip(),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+			status=status,
+		)
+		self._agents[self._tenant_record_key(tenant_id, agent.id)] = agent
+		self._record_audit(tenant_id, agent.id, "prediction_agent_registered", owner, result["decision"], self._reasons(result))
+		return agent.to_dict()
+
+	def validate_pred_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "prediction_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		mutation_count = int(mutation_count)
+		if mutation_count <= 0:
+			raise ValueError("pred_lifecycle_batch_empty")
+		stream_value = self._normalize_token(event_stream)
+		operation_value = self._normalize_token(operation)
+		if operation_value not in self._lifecycle_operations:
+			raise ValueError(f"unsupported_pred_lifecycle_operation:{operation_value}")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "validate_pred_lifecycle_batch",
+			"event_stream": stream_value,
+		})
+		accepted = result["decision"] == "allow"
+		batch = PredLifecycleBatchRecord(
+			id=batch_id or f"predbatch:{len(self._lifecycle_batches) + 1:06d}",
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			operation=operation_value,
+			accepted=accepted,
+			decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			status="accepted" if accepted else "denied",
+		)
+		self._lifecycle_batches[self._tenant_record_key(tenant_id, batch.id)] = batch
+		self._record_audit(tenant_id, batch.id, f"pred_lifecycle_batch_{batch.status}", "pred", result["decision"], self._reasons(result))
+		if not accepted:
+			self._raise_if_denied(result)
+		return batch.to_dict()
+
 	def create_record(
 		self,
 		record_id: str,
@@ -377,6 +472,12 @@ class PredService:
 	def list_drift_reports(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._drift_reports, tenant_id)
 
+	def list_prediction_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._agents, tenant_id)
+
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._lifecycle_batches, tenant_id)
+
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events, tenant_id)
 
@@ -390,6 +491,10 @@ class PredService:
 			"score_count": len(self.list_scores(tenant_id)),
 			"scenario_count": len(self.list_scenarios(tenant_id)),
 			"drift_review_count": sum(1 for report in self._drift_reports.values() if report.tenant_id == tenant_id and report.status == "review_required"),
+			"prediction_agent_count": len(self.list_prediction_agents(tenant_id)),
+			"pending_agent_review_count": len([item for item in self.list_prediction_agents(tenant_id) if item["status"] == "pending_review"]),
+			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
+			"denied_lifecycle_batch_count": len([item for item in self.list_lifecycle_batches(tenant_id) if item["status"] == "denied"]),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 		}
 
@@ -413,6 +518,10 @@ class PredService:
 		if result["decision"] == "allow":
 			return
 		raise PermissionError(", ".join(self._reasons(result)) or "prediction_policy_blocked")
+
+	def _raise_if_denied(self, result: dict[str, Any]) -> None:
+		if result["decision"] == "deny":
+			raise PermissionError(", ".join(self._reasons(result)) or "prediction_policy_blocked")
 
 	def _record_audit(
 		self,
@@ -442,3 +551,9 @@ class PredService:
 
 	def _reasons(self, result: dict[str, Any]) -> tuple[str, ...]:
 		return tuple(action.get("reason", "prediction_policy_blocked") for action in result["actions"])
+
+	def _normalize_token(self, value: str) -> str:
+		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+	def _tenant_record_key(self, tenant_id: str, record_id: str) -> str:
+		return f"{tenant_id}:{record_id}"

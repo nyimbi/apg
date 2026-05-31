@@ -26,13 +26,15 @@ def test_contract_exposes_full_lifecycle_configuration_rules_ui_and_theme():
 		"models",
 		"scenarios",
 		"drift",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
 		"ui",
 		"theme",
 	]
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert len(contract["rule_engine"]["rules"]) >= 39
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
 		"forecasts",
@@ -43,16 +45,23 @@ def test_contract_exposes_full_lifecycle_configuration_rules_ui_and_theme():
 		"drift",
 		"batch",
 		"explainability",
+		"agents",
+		"lifecycle",
 		"governance",
 		"audit",
 		"settings",
 	}
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "service.PredService"
+	assert contract["agents"]["first_class"] is True
+	assert {"codex", "claude_code", "opencode", "pi"} <= set(contract["agents"]["supported_runtimes"])
+	assert "drift_reviewer" in contract["agents"]["privileged_roles"]
+	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert "prediction_agent_batch" in contract["streaming"]["required_operations"]
 	assert next(route for route in contract["ui"]["routes"] if route["name"] == "audit")["permission"] == "pred:audit"
 	assert contract["ui"]["api_prefix"] == "/pred/api/v1"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
-	assert {"forecast_chart", "score_card", "drift_monitor", "batch_queue", "audit_timeline"} <= set(contract["theme"]["components"])
+	assert {"forecast_chart", "score_card", "drift_monitor", "batch_queue", "prediction_agent_roster", "bytewax_lifecycle_panel", "audit_timeline"} <= set(contract["theme"]["components"])
 
 
 def test_rule_engine_enforces_predictive_guardrails():
@@ -85,6 +94,23 @@ def test_rule_engine_enforces_predictive_guardrails():
 		"state_change_requested": True,
 		"audit_event_recorded": False,
 	})
+	agent_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_prediction_agent",
+		"agent_runtime_supported": False,
+		"agent_role_supported": False,
+		"scope_present": False,
+		"owner_present": False,
+		"purpose_present": False,
+		"contribution_disclosed": False,
+		"privileged_role": True,
+		"human_approval_required": False,
+	})
+	lifecycle_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "validate_pred_lifecycle_batch",
+		"event_stream": "kafka",
+	})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) == {
@@ -100,6 +126,17 @@ def test_rule_engine_enforces_predictive_guardrails():
 	assert batch_result["actions"][0]["reason"] == "bytewax_event_stream_required"
 	assert state_change_result["matched_rules"] == ["prediction_state_change_requires_audit"]
 	assert state_change_result["actions"][0]["reason"] == "audit_event_required"
+	assert agent_result["decision"] == "deny"
+	assert set(agent_result["matched_rules"]) >= {
+		"prediction_agent_runtime_supported",
+		"prediction_agent_role_supported",
+		"prediction_agent_requires_scope",
+		"prediction_agent_requires_owner",
+		"prediction_agent_requires_purpose",
+		"prediction_agent_requires_contribution_disclosure",
+		"prediction_agent_privileged_role_requires_human_approval",
+	}
+	assert lifecycle_result["matched_rules"] == ["bytewax_pred_stream_required"]
 
 
 def test_registration_includes_full_capability_contract():
@@ -109,9 +146,12 @@ def test_registration_includes_full_capability_contract():
 	assert registration["configuration"]["tenant_id"] == "default"
 	assert registration["rule_engine"]["type"] == "deterministic"
 	assert registration["adapters"]["event_stream"] == "bytewax"
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["required_processor"] == "bytewax"
 	assert registration["ui_manifest"]["requires_theme"] is True
 	assert registration["theme"]["name"] == "pred_forecast_console"
 	assert registration["ui_components"]["forecasts"] == "/pred/forecasts"
+	assert registration["ui_components"]["agents"] == "/pred/agents"
 	assert registration["ui_components"]["audit"] == "/pred/audit"
 	assert "mlcm" in registration["dependencies"]
 	assert "pred:audit" in registration["permissions"]
@@ -184,6 +224,17 @@ def test_service_runs_model_forecast_score_scenario_drift_and_audit_lifecycle():
 		review_recorded=True,
 		actor="monitor",
 	)
+	agent = service.register_prediction_agent(
+		agent_id="prediction-agent-1",
+		tenant_id=tenant_id,
+		name="Prediction Steward",
+		runtime="codex",
+		role="prediction_steward",
+		scope="demand forecasts and drift summaries",
+		owner="analytics",
+		purpose="review predictive analytics lifecycle changes",
+	)
+	batch = service.validate_pred_lifecycle_batch(tenant_id, "bytewax", 2, "prediction_agent_batch", "pred-batch-001")
 
 	summary = service.dashboard_summary(tenant_id)
 	dashboard = views.dashboard_model(service, tenant_id)
@@ -192,6 +243,8 @@ def test_service_runs_model_forecast_score_scenario_drift_and_audit_lifecycle():
 	drift_monitor = views.drift_monitor_model(service, tenant_id)
 	batch_queue = views.batch_scoring_model(service, tenant_id)
 	explainability = views.explainability_model(service, tenant_id)
+	agent_roster = views.prediction_agent_roster_model(service, tenant_id)
+	lifecycle = views.lifecycle_batch_model(service, tenant_id)
 	audit_timeline = views.audit_timeline_model(service, tenant_id)
 
 	assert forecast["history_points"] == 24
@@ -200,13 +253,19 @@ def test_service_runs_model_forecast_score_scenario_drift_and_audit_lifecycle():
 	assert scenario["delta"] == 3.0
 	assert drift["status"] == "review_required"
 	assert drift["review_recorded"] is True
+	assert agent["runtime"] == "codex"
+	assert batch["required_processor"] == "bytewax"
 	assert summary["approved_model_count"] == 1
+	assert summary["prediction_agent_count"] == 1
+	assert summary["lifecycle_batch_count"] == 1
 	assert dashboard["summary"]["forecast_count"] == 1
 	assert score_monitor["scores"][0]["id"] == "score-order-1"
 	assert feature_registry["feature_sets"][0]["source_system"] == "etlp"
 	assert drift_monitor["drift_reports"][0]["status"] == "review_required"
-	assert batch_queue["streaming"]["engine"] == "bytewax"
+	assert batch_queue["streaming"]["required_processor"] == "bytewax"
 	assert explainability["models"][0]["explainability_attached"] is True
+	assert agent_roster["agents"][0]["id"] == "prediction-agent-1"
+	assert lifecycle["batches"][0]["id"] == "pred-batch-001"
 	assert audit_timeline["audit_events"]
 
 
@@ -449,3 +508,40 @@ def test_service_preserves_compatibility_records_as_models():
 
 	assert record["status"] == "approved"
 	assert service.list_records("tenant-compat")[0]["id"] == "compat-model"
+
+
+def test_service_enforces_prediction_agent_and_lifecycle_guardrails():
+	service = PredService()
+	tenant_id = "tenant-agents"
+
+	with pytest.raises(PermissionError, match="unsupported_prediction_agent_runtime"):
+		service.register_prediction_agent("agent-bad-runtime", tenant_id, "Bad Runtime", "unknown", "prediction_steward", "doc", "owner", "purpose")
+	with pytest.raises(PermissionError, match="prediction_agent_scope_required"):
+		service.register_prediction_agent("agent-no-scope", tenant_id, "No Scope", "codex", "prediction_steward", "", "owner", "purpose")
+	with pytest.raises(PermissionError, match="prediction_agent_contribution_disclosure_required"):
+		service.register_prediction_agent("agent-no-disclosure", tenant_id, "No Disclosure", "codex", "prediction_steward", "doc", "owner", "purpose", contribution_disclosed=False)
+
+	agent = service.register_prediction_agent(
+		"agent-review",
+		tenant_id,
+		"Drift Reviewer",
+		"claude-code",
+		"drift reviewer",
+		"forecast drift review",
+		"analytics",
+		"review above-threshold drift decisions",
+	)
+	assert agent["runtime"] == "claude_code"
+	assert agent["role"] == "drift_reviewer"
+	assert agent["status"] == "pending_review"
+	assert service.dashboard_summary(tenant_id)["pending_agent_review_count"] == 1
+
+	with pytest.raises(ValueError, match="pred_lifecycle_batch_empty"):
+		service.validate_pred_lifecycle_batch(tenant_id, "bytewax", 0)
+	with pytest.raises(ValueError, match="unsupported_pred_lifecycle_operation"):
+		service.validate_pred_lifecycle_batch(tenant_id, "bytewax", 1, "unknown_batch")
+	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
+		service.validate_pred_lifecycle_batch(tenant_id, "kafka", 1)
+
+	assert service.list_lifecycle_batches(tenant_id)[0]["status"] == "denied"
+	assert service.dashboard_summary(tenant_id)["denied_lifecycle_batch_count"] == 1

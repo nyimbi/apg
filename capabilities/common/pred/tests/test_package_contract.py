@@ -30,10 +30,12 @@ def test_pred_contract_shape_is_valid_and_publishable():
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "pred"
-	assert len(contract["rule_engine"]["rules"]) >= 30
-	assert len(contract["ui"]["routes"]) >= 12
+	assert len(contract["rule_engine"]["rules"]) >= 39
+	assert len(contract["ui"]["routes"]) >= 14
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "service.PredService"
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 
 
@@ -54,6 +56,10 @@ def test_pred_app_entrypoint_is_publishable():
 	assert "pred" in model["capabilities"]
 	assert model["capabilities"]["pred"]["runtime"]["service"] == "service.PredService"
 	assert model["capabilities"]["pred"]["streaming"]["engine"] == "bytewax"
+	assert model["capabilities"]["pred"]["streaming"]["required_processor"] == "bytewax"
+	assert model["capabilities"]["pred"]["agents"]["first_class"] is True
+	assert model["composition"]["capability_dependencies"]["pred"] == ["aicr", "mlcm", "etlp", "conf"]
+	assert model["composition"]["agent_teams"]["pred_forecast_governance"]["stream"] == "pred.lifecycle"
 	assert "drift" in model["capabilities"]["pred"]["screens"]
 	assert committed_model == model
 	assert set(committed_manifest["generated_artifacts"]) >= {
@@ -68,10 +74,12 @@ def test_pred_app_entrypoint_is_publishable():
 		"app.py",
 	}
 	assert committed_report["ok"] is True
-	assert committed_report["evidence"]["contracts"]["capability_contract"]["route_count"] >= 12
-	assert committed_report["evidence"]["contracts"]["capability_contract"]["rule_count"] >= 30
+	assert committed_report["evidence"]["contracts"]["capability_contract"]["route_count"] >= 14
+	assert committed_report["evidence"]["contracts"]["capability_contract"]["rule_count"] >= 39
 	assert committed_report["evidence"]["runtime"]["event_stream"] == "bytewax"
 	assert committed_report["evidence"]["runtime"]["generated_app_runtime"] == "service.PredService"
+	assert committed_report["evidence"]["agents"]["first_class"] is True
+	assert committed_report["evidence"]["streaming"]["required_processor"] == "bytewax"
 
 
 def test_pred_compatibility_record_uses_predictive_model_registry():

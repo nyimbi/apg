@@ -21671,3 +21671,65 @@ Not run to preserve battery:
 - Live OpenCV/YOLO/OCR inference, live Bytewax topology, live AICR/MLCM/CONF/
   AUTH/AUDL/MONI/STOR/SRCH adapters, rendered browser UI, external AI-agent
   runtime clients, and performance/load/accuracy benchmark tests.
+
+### 2026-05-31 07:14 EAT
+
+PRED prediction-agent composition and Bytewax lifecycle guardrail packet:
+
+- Selected `capabilities/common/pred` as the next ordered AI capability after
+  CVSN.
+- Extended the PRED executable contract with first-class prediction-agent
+  metadata, supported runtimes `codex`, `claude_code`, `opencode`, and `pi`,
+  supported analytics-governance roles, privileged-role metadata, Bytewax
+  lifecycle stream metadata, route metadata, theme components, and contract
+  `provides`/`requires`.
+- Added deterministic guardrails for unsupported prediction-agent runtime,
+  unsupported prediction-agent role, missing agent scope, owner, purpose,
+  missing machine contribution disclosure, privileged prediction-agent
+  registration without human approval, and non-Bytewax PRED lifecycle batch
+  routing.
+- Added `PredictionAgentRecord`, `PredLifecycleBatchRecord`,
+  tenant-qualified prediction-agent storage, lifecycle-batch storage,
+  registration, listing, audit events, dashboard counts, prediction-agent
+  roster view models, and lifecycle-batch monitor view models.
+- Added `/pred/agents`, `/pred/lifecycle`, prediction-agent roster theme
+  metadata, and Bytewax lifecycle panel theme metadata.
+- Regenerated `semantic_model.json` and `release_report.json` from the live
+  `app.py` contract.
+- Refreshed `README.md`, `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md` so
+  the documented packet matches the executable contract and keeps external
+  AI-agent runtimes plus Bytewax workers behind adapter boundaries.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/pred/__init__.py capabilities/common/pred/capability_contract.py capabilities/common/pred/models.py capabilities/common/pred/predictive_runtime.py capabilities/common/pred/service.py capabilities/common/pred/views.py capabilities/common/pred/app.py capabilities/common/pred/test_capability_contract.py capabilities/common/pred/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/python capabilities/common/pred/app.py` passed with `passed:
+  true`.
+- `./.venv/bin/python -m json.tool capabilities/common/pred/semantic_model.json`
+  passed.
+- `./.venv/bin/python -m json.tool capabilities/common/pred/release_report.json`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/pred/test_capability_contract.py capabilities/common/pred/tests/test_package_contract.py`
+  passed with 10 tests and only existing shared-module deprecation warnings.
+- `./.venv/bin/apg capabilities inspect pred --json` passed with `ok: true`,
+  14 APG Python routes, 39 deterministic rules, first-class agents, and
+  Bytewax streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/pred --json`
+  passed with `ok: true`; PRED remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/pred --json`
+  passed with side-effect-free package evidence and no warnings.
+- `./.venv/bin/python -c "... PredService ... register_prediction_agent ... validate_pred_lifecycle_batch ..."`
+  returned one `codex` active prediction steward and one `bytewax`
+  lifecycle-batch evidence record.
+- Focused stale-marker scan over touched PRED packet source, docs, tests, and
+  evidence returned only intentional Kafka-denial tests.
+- `git diff --check -- capabilities/common/pred docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live forecasting/scoring model providers, live Bytewax topology, live AICR/
+  MLCM/ETLP/CONF/AUTH/AUDL/MONI/CACH adapters, rendered browser UI, external
+  AI-agent runtime clients, and performance/load/accuracy/drift benchmarks.

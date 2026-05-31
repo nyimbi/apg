@@ -33,7 +33,8 @@ capability_metadata: dict[str, Any] = {
 		"scenario_simulation",
 		"feature_lineage",
 		"prediction_monitoring",
-		"model_explainability"
+		"model_explainability",
+		"prediction_agent_composition",
 	],
 	"composition_patterns": [
 		"forecast_pipeline",
@@ -69,6 +70,8 @@ def register_capability() -> dict[str, Any]:
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
 		"adapters": contract["configuration"]["adapters"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"capabilities": {
 			"forecasting": "Run governed time-series and demand forecasts",
 			"predictive_scoring": "Score tenant-scoped entities through approved models",
@@ -77,6 +80,8 @@ def register_capability() -> dict[str, Any]:
 			"feature_lineage": "Track prediction features back to ETLP and metadata sources",
 			"drift_monitoring": "Record drift reports and review above-threshold drift",
 			"batch_scoring": "Expose Bytewax-backed batch scoring composition metadata",
+			"prediction_agent_composition": "Register provider-neutral AI prediction agents with runtime, role, scope, owner, purpose, disclosure, and human-review guardrails",
+			"lifecycle_batch_governance": "Validate predictive lifecycle mutations through Bytewax-only batch contracts",
 			"capability_rules": "Evaluate deterministic predictive-analytics governance rules",
 			"visual_theming": "Apply forecast-console theme tokens and components"
 		},
@@ -88,6 +93,8 @@ def register_capability() -> dict[str, Any]:
 			"scenarios": "/pred/api/v1/scenarios",
 			"drift": "/pred/api/v1/drift",
 			"batch": "/pred/api/v1/batch",
+			"agents": "/pred/api/v1/agents",
+			"lifecycle": "/pred/api/v1/lifecycle",
 			"audit": "/pred/api/v1/audit"
 		},
 		"ui_components": {

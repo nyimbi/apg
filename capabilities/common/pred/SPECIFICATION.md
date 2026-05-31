@@ -15,6 +15,10 @@ This packet establishes the executable baseline for PRED:
   routes, and visual theme tokens.
 - A dependency-light runtime service for generated applications.
 - UI view models that can be composed into APG screens.
+- First-class AI prediction-agent composition metadata, runtime records,
+  guardrails, and UI models.
+- Bytewax-only lifecycle batch validation for generated-application mutation
+  streams.
 - Package evidence that can be published and self-tested from the current
   executable contract.
 - Focused tests for the contract, lifecycle, guardrails, view models, and
@@ -26,6 +30,9 @@ This packet establishes the executable baseline for PRED:
   scenarios.
 - Analytics owner: registers models and feature sets.
 - Model governance team: approves predictive models and reviews drift.
+- AI prediction agent: assists with forecast review, score governance,
+  explainability review, drift triage, and lifecycle governance through a
+  provider-neutral APG contract.
 - Platform operator: configures adapters, Bytewax event streaming, audit, auth,
   metrics, cache, and generated app deployment.
 
@@ -75,10 +82,35 @@ This packet establishes the executable baseline for PRED:
   and audit events.
 - Deny over-threshold drift persistence when no review evidence exists.
 
+### AI Agent Lifecycle
+
+- Register provider-neutral AI prediction agents as first-class capability
+  records.
+- Support the runtimes `codex`, `claude_code`, `opencode`, and `pi`.
+- Support forecast, score, feature-lineage, scenario, drift, model-release,
+  explainability, batch-scoring, and prediction-steward roles.
+- Require tenant context, supported runtime, supported role, bounded scope,
+  accountable owner, documented purpose, and machine-contribution disclosure.
+- Mark privileged score, drift, model-release, explainability, and
+  batch-scoring roles as `pending_review` when human approval evidence is
+  absent.
+- Keep runtime invocation behind the AICR adapter boundary so APG can integrate
+  rapidly changing agent runtimes without changing analytics contracts.
+
+### Bytewax Lifecycle Batch
+
+- Validate lifecycle mutation batches before accepting generated-application
+  state changes.
+- Require the `bytewax` processor for model, feature-set, forecast, score,
+  scenario, drift, explainability, and prediction-agent batch operations.
+- Persist accepted and denied batch evidence for dashboard, governance, batch,
+  lifecycle, and audit views.
+
 ### UI and Theming
 
 - Expose routes for dashboard, forecasts, scores, features, scenarios, models,
-  drift, batch scoring, explainability, governance, audit, and settings.
+  drift, batch scoring, explainability, agents, lifecycle batches, governance,
+  audit, and settings.
 - Provide route-specific view models.
 - Publish forecast-console theme tokens and component hints.
 
@@ -101,11 +133,12 @@ stable.
 
 ## Acceptance Criteria
 
-- `get_capability_contract()` exposes at least 30 deterministic rules, at least
-  12 UI routes, Bytewax adapter evidence, runtime adapter evidence, and theme
-  component metadata.
+- `get_capability_contract()` exposes at least 39 deterministic rules, at least
+  14 UI routes, Bytewax adapter evidence, runtime adapter evidence,
+  first-class agent metadata, lifecycle-stream metadata, and theme component
+  metadata.
 - `PredService` executes model, feature set, forecast, score, scenario, drift,
-  list, dashboard, and APG record compatibility flows.
+  agent, lifecycle-batch, list, dashboard, and APG record compatibility flows.
 - Guardrail tests prove denied cases fail before state is accepted, and
   review-required cases are surfaced through explicit review state or
   PermissionError depending on the lifecycle stage.

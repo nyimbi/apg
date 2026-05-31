@@ -22,8 +22,14 @@ audit evidence through deterministic guardrails.
   and delta output.
 - Drift reports with metric, threshold, score, review evidence, status, and
   audit events.
+- First-class AI prediction-agent composition for `codex`, `claude_code`,
+  `opencode`, and `pi`, with role, scope, owner, purpose, contribution
+  disclosure, and privileged-role review guardrails.
+- Bytewax lifecycle batch validation for model, feature-set, forecast, score,
+  scenario, drift, explainability, and prediction-agent mutations.
 - UI view models for dashboard, forecasts, scores, features, scenarios, models,
-  drift, batch scoring, explainability, governance, and audit.
+  drift, batch scoring, explainability, agents, lifecycle batches, governance,
+  and audit.
 - Adapter configuration for AICR, MLCM, ETLP, CONF, AUTH, AUDL, MONI, CACH, and
   Bytewax event streaming.
 
@@ -88,6 +94,23 @@ score = service.score_entity(
 	impact="high",
 	explanation_ref="explain://score-order-1",
 )
+agent = service.register_prediction_agent(
+	"agent-001",
+	"tenant-a",
+	"Demand Forecast Steward",
+	"codex",
+	"prediction_steward",
+	"demand forecasting lifecycle review",
+	"analytics",
+	"govern forecast and drift changes",
+)
+batch = service.validate_pred_lifecycle_batch(
+	"tenant-a",
+	"bytewax",
+	1,
+	"prediction_agent_batch",
+	"batch-001",
+)
 ```
 
 ## Guardrails
@@ -102,7 +125,26 @@ metric or threshold, non-Bytewax batch scoring streams, cross-tenant scoring,
 and prediction state changes without audit evidence. PRED requires review for
 short model training history, missing model feature metadata, model approval
 without explainability, long forecast horizons, missing feature lineage during
-feature registration, and above-threshold drift without review.
+feature registration, and above-threshold drift without review. AI
+prediction-agent guardrails also block unsupported runtimes, unsupported roles,
+missing scope, missing owner, missing purpose, missing machine-contribution
+disclosure, and route privileged roles through pending human review when
+approval evidence is absent. Lifecycle mutation batches are accepted only
+through the declared Bytewax processor contract.
+
+## AI Agent Composition
+
+PRED treats predictive AI agents as first-class APG citizens. Generated
+applications can compose agents from multiple rapidly changing tool runtimes
+without binding forecasting, scoring, or governance logic to a single provider.
+The current executable contract supports `codex`, `claude_code`, `opencode`,
+and `pi`; roles include forecast review, score review, feature-lineage review,
+scenario review, drift review, model-release review, explainability review,
+batch-scoring review, and prediction stewardship.
+
+The runtime stores provider-neutral agent metadata only. Live CLI/API
+invocation, credential management, and remote agent orchestration belong behind
+the AICR adapter boundary.
 
 ## Focused Verification
 
