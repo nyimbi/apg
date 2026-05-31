@@ -62,7 +62,7 @@ class AccessPattern:
 
 class AutonomousOptimizer:
 	"""
-	Revolutionary AI-powered autonomous cache optimizer
+	Autonomous cache optimizer
 	Provides self-optimizing cache hierarchies and intelligent decision making
 	"""
 	
@@ -106,7 +106,7 @@ class AutonomousOptimizer:
 										metrics: CacheMetrics) -> AIOptimizationResult:
 		"""
 		Comprehensive cache performance analysis with AI recommendations
-		Revolutionary Differentiator #1: Autonomous Cache Intelligence
+		Autonomous cache intelligence path
 		"""
 		
 		analysis_start = datetime.utcnow()
@@ -169,7 +169,7 @@ class AutonomousOptimizer:
 	async def _analyze_access_patterns(self, entries: Dict[str, CacheEntry]) -> Dict[str, AccessPattern]:
 		"""
 		Advanced access pattern analysis using ML
-		Revolutionary Differentiator #2: Predictive Content Delivery
+		Predictive content delivery path
 		"""
 		
 		patterns = {}
@@ -362,7 +362,7 @@ class AutonomousOptimizer:
 								 entries: Dict[str, CacheEntry]) -> Dict[str, Any]:
 		"""
 		Apply optimization recommendations to cache
-		Revolutionary Differentiator #1: Autonomous Cache Intelligence
+		Autonomous cache intelligence path
 		"""
 		
 		application_results = {
@@ -633,45 +633,45 @@ class AutonomousOptimizer:
 				threshold_bytes = parameters.get('threshold_bytes', 1024)
 				
 				# Analyze compression effectiveness for different data types
-			compression_analysis = await self._analyze_compression_effectiveness(
-				entries, new_algorithm
-			)
-			
-			# Apply new compression strategy
-			recompressed_entries = await self._recompress_entries(
-				entries, new_algorithm, threshold_bytes
-			)
-			
-			return {
-				'recommendation_type': OptimizationType.COMPRESSION_STRATEGY.value,
-				'success': True,
-				'action': action,
-				'new_algorithm': new_algorithm,
-				'threshold_bytes': threshold_bytes,
-				'affected_entries': len(entries),
-				'recompressed_entries': recompressed_entries,
-				'space_savings_bytes': compression_analysis.get('space_savings', 0),
-				'compression_time_impact': compression_analysis.get('time_impact', 0)
-			}
+				compression_analysis = await self._analyze_compression_effectiveness(
+					entries, new_algorithm
+				)
+
+				# Apply new compression strategy
+				recompressed_entries = await self._recompress_entries(
+					entries, new_algorithm, threshold_bytes
+				)
+
+				return {
+					'recommendation_type': OptimizationType.COMPRESSION_STRATEGY.value,
+					'success': True,
+					'action': action,
+					'new_algorithm': new_algorithm,
+					'threshold_bytes': threshold_bytes,
+					'affected_entries': len(entries),
+					'recompressed_entries': recompressed_entries,
+					'space_savings_bytes': compression_analysis.get('space_savings', 0),
+					'compression_time_impact': compression_analysis.get('time_impact', 0)
+				}
 			
 			elif action == 'optimize_compression_threshold':
 				new_threshold = parameters.get('threshold_bytes', 2048)
 				
 				# Calculate optimal threshold based on entry size distribution
-			optimal_threshold = await self._calculate_optimal_compression_threshold(entries)
-			
-			# Apply threshold optimization
-			threshold_result = await self._update_compression_threshold(optimal_threshold)
-			
-			return {
-				'recommendation_type': OptimizationType.COMPRESSION_STRATEGY.value,
-				'success': True,
-				'action': action,
-				'old_threshold': parameters.get('current_threshold', 1024),
-				'new_threshold': optimal_threshold,
-				'affected_entries': sum(1 for entry in entries.values() 
-									   if entry.size_bytes >= optimal_threshold)
-			}
+				optimal_threshold = await self._calculate_optimal_compression_threshold(entries)
+
+				# Apply threshold optimization
+				await self._update_compression_threshold(optimal_threshold)
+
+				return {
+					'recommendation_type': OptimizationType.COMPRESSION_STRATEGY.value,
+					'success': True,
+					'action': action,
+					'old_threshold': parameters.get('current_threshold', 1024),
+					'new_threshold': optimal_threshold,
+					'affected_entries': sum(1 for entry in entries.values()
+										   if entry.size_bytes >= optimal_threshold)
+				}
 			
 			else:
 				return {

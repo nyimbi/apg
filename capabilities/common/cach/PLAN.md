@@ -16,6 +16,9 @@ The packet will be narrow, executable, and reviewable:
 5. Replace stale semantic-model embedding with live contract-derived evidence.
 6. Prove the packet with focused tests and publish-plan validation.
 
+The current packet extends that baseline with first-class cache-agent
+composition and Bytewax lifecycle-batch guardrails.
+
 ## Implementation Tasks
 
 ### 1. Specification and Documentation
@@ -29,12 +32,15 @@ The packet will be narrow, executable, and reviewable:
 ### 2. Capability Contract
 
 - Add lifecycle-oriented configuration for namespaces, entries, warming, memory
-  pressure, eviction review, adapters, and audit.
+  pressure, eviction review, adapters, first-class agents, Bytewax lifecycle
+  streams, and audit.
 - Add rules for disabled namespaces, TTL review, warming source registration,
-  warming batch review, independent eviction review, and review notes.
-- Add routes for namespaces, eviction reviews, adapters, and audit.
-- Add theme components for entry freshness, eviction queue, adapter health, and
-  audit events.
+  warming batch review, independent eviction review, review notes, agent
+  registration, privileged agent approvals, and Bytewax lifecycle batches.
+- Add routes for namespaces, eviction reviews, adapters, cache agents,
+  lifecycle batches, and audit.
+- Add theme components for entry freshness, eviction queue, adapter health,
+  cache agents, lifecycle batches, and audit events.
 
 ### 3. Lifecycle Service
 
@@ -42,6 +48,7 @@ The packet will be narrow, executable, and reviewable:
 - Add a dependency-light `CacheGovernanceService` with dataclass records for:
   namespace policies, entry records, warming plans, eviction reviews, and audit
   events.
+- Add records for cache agents and lifecycle batches.
 - Enforce the deterministic rule engine from `capability_contract.py`.
 - Provide summaries for generated UI and release evidence.
 
@@ -52,6 +59,7 @@ The packet will be narrow, executable, and reviewable:
 - Add `view_models.py` with compact generated-application models for dashboard,
   namespace inventory, entry explorer, warming console, eviction queue, topology,
   adapters, audit, and settings.
+- Add cache-agent roster and lifecycle-batch monitor models.
 
 ### 5. Packaging Evidence
 
@@ -63,7 +71,7 @@ The packet will be narrow, executable, and reviewable:
 
 - Run focused compile and package tests only.
 - Run `apg capabilities publish-plan capabilities/common/cach --json`.
-- Search for stale materialized-package markers and overclaiming README claims.
+- Search for stale package markers and overclaiming README claims.
 - Run `git diff --check`.
 - Perform a focused code review and fix emergent issues before commit.
 
@@ -71,6 +79,7 @@ The packet will be narrow, executable, and reviewable:
 
 - Live Redis or Valkey adapter proof.
 - Distributed invalidation over MQEB/Bytewax.
+- Live Bytewax worker topology for lifecycle-batch execution.
 - Production persistence for policy and review records.
 - Full APG auth/audit/monitoring integration.
 - Full dashboard rendering and browser verification.

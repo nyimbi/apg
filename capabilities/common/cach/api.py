@@ -21,7 +21,9 @@ from uuid_extensions import uuid7str
 
 from .service import (
 	CacheEvictionReviewRecord,
+	CacheAgentRecord,
 	CacheGovernanceService,
+	CacheLifecycleBatchRecord,
 	CacheNamespaceRecord,
 	CacheEntryRecord,
 	CacheService,
@@ -156,6 +158,16 @@ def capability_status() -> dict[str, Any]:
 	}
 
 
+def _payload_bool(value: Any, default: bool = False) -> bool:
+	if value is None:
+		return default
+	if isinstance(value, bool):
+		return value
+	if isinstance(value, str):
+		return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+	return bool(value)
+
+
 def create_namespace_record(**kwargs: Any) -> CacheNamespaceRecord:
 	"""Create a CACH namespace policy record."""
 	return SERVICE.create_namespace(**kwargs)
@@ -196,6 +208,20 @@ def decide_eviction_review(**kwargs: Any) -> CacheEvictionReviewRecord:
 	return SERVICE.decide_eviction_review(**kwargs)
 
 
+def register_cache_agent(**kwargs: Any) -> CacheAgentRecord:
+	"""Register a first-class cache governance agent."""
+	if "contribution_disclosed" in kwargs:
+		kwargs["contribution_disclosed"] = _payload_bool(kwargs["contribution_disclosed"], True)
+	if "human_approval_required" in kwargs:
+		kwargs["human_approval_required"] = _payload_bool(kwargs["human_approval_required"], False)
+	return SERVICE.register_cache_agent(**kwargs)
+
+
+def validate_cache_lifecycle_batch(**kwargs: Any) -> CacheLifecycleBatchRecord:
+	"""Validate a CACH lifecycle mutation batch against the Bytewax guardrail."""
+	return SERVICE.validate_cache_lifecycle_batch(**kwargs)
+
+
 def list_records(record_type: str, tenant_id: str | None = None) -> list[dict[str, Any]]:
 	"""List dependency-light CACH records."""
 	return SERVICE.list_records(record_type, tenant_id)
@@ -209,6 +235,8 @@ def list_cache_governance(tenant_id: str | None = None) -> dict[str, Any]:
 		"entries": SERVICE.list_records("entries", tenant_id),
 		"warming_plans": SERVICE.list_records("warming_plans", tenant_id),
 		"eviction_reviews": SERVICE.list_records("eviction_reviews", tenant_id),
+		"cache_agents": SERVICE.list_records("cache_agents", tenant_id),
+		"lifecycle_batches": SERVICE.list_records("lifecycle_batches", tenant_id),
 		"audit_events": SERVICE.list_records("audit_events", tenant_id),
 	}
 

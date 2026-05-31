@@ -1,5 +1,49 @@
 {
-  "agents": {},
+  "agents": {
+    "cach_agent_contract": {
+      "first_class": true,
+      "guardrails": [
+        "supported_runtime",
+        "supported_role",
+        "explicit_scope",
+        "accountable_owner",
+        "declared_purpose",
+        "machine_contribution_disclosure",
+        "human_approval_for_privileged_roles"
+      ],
+      "privileged_roles": [
+        "warming_reviewer",
+        "eviction_reviewer",
+        "tier_optimization_reviewer",
+        "adapter_health_reviewer"
+      ],
+      "required_fields": [
+        "tenant_id",
+        "agent_id",
+        "name",
+        "runtime",
+        "role",
+        "scope",
+        "owner",
+        "purpose"
+      ],
+      "supported_roles": [
+        "namespace_policy_reviewer",
+        "warming_reviewer",
+        "eviction_reviewer",
+        "freshness_reviewer",
+        "tier_optimization_reviewer",
+        "adapter_health_reviewer",
+        "lifecycle_auditor"
+      ],
+      "supported_runtimes": [
+        "codex",
+        "claude_code",
+        "opencode",
+        "pi"
+      ]
+    }
+  },
   "app": {
     "description": "Cache Management package-backed APG capability",
     "entity_count": 0,
@@ -21,7 +65,53 @@
           "query_cache"
         ]
       },
+      "agents": {
+        "cach_agent_contract": {
+          "first_class": true,
+          "guardrails": [
+            "supported_runtime",
+            "supported_role",
+            "explicit_scope",
+            "accountable_owner",
+            "declared_purpose",
+            "machine_contribution_disclosure",
+            "human_approval_for_privileged_roles"
+          ],
+          "privileged_roles": [
+            "warming_reviewer",
+            "eviction_reviewer",
+            "tier_optimization_reviewer",
+            "adapter_health_reviewer"
+          ],
+          "required_fields": [
+            "tenant_id",
+            "agent_id",
+            "name",
+            "runtime",
+            "role",
+            "scope",
+            "owner",
+            "purpose"
+          ],
+          "supported_roles": [
+            "namespace_policy_reviewer",
+            "warming_reviewer",
+            "eviction_reviewer",
+            "freshness_reviewer",
+            "tier_optimization_reviewer",
+            "adapter_health_reviewer",
+            "lifecycle_auditor"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        }
+      },
       "approvals": {
+        "cache_agent": "CacheAgentRecord",
         "eviction": "CacheEvictionReviewRecord",
         "warming": "CacheWarmingPlanRecord"
       },
@@ -29,6 +119,7 @@
       "cache_lifecycle": {
         "audit": "CacheAuditEventRecord",
         "entry": "CacheEntryRecord",
+        "lifecycle_batch": "CacheLifecycleBatchRecord",
         "namespace": "CacheNamespaceRecord"
       },
       "components": {},
@@ -44,6 +135,35 @@
             "edge",
             "cdn",
             "query_cache"
+          ]
+        },
+        "agents": {
+          "first_class": true,
+          "privileged_roles": [
+            "warming_reviewer",
+            "eviction_reviewer",
+            "tier_optimization_reviewer",
+            "adapter_health_reviewer"
+          ],
+          "require_contribution_disclosure": true,
+          "require_human_approval_for_privileged_roles": true,
+          "require_owner": true,
+          "require_purpose": true,
+          "require_scope": true,
+          "supported_roles": [
+            "namespace_policy_reviewer",
+            "warming_reviewer",
+            "eviction_reviewer",
+            "freshness_reviewer",
+            "tier_optimization_reviewer",
+            "adapter_health_reviewer",
+            "lifecycle_auditor"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
           ]
         },
         "hierarchy": {
@@ -78,6 +198,24 @@
           "restricted_entries_require_encryption": true,
           "sensitive_entries_require_encryption": true
         },
+        "streaming": {
+          "engine": "bytewax",
+          "lifecycle_stream": "cach.lifecycle",
+          "required_operations": [
+            "cache_policy_batch",
+            "cache_warming_batch",
+            "cache_agent_batch",
+            "cache_eviction_batch"
+          ],
+          "topics": [
+            "cach.namespaces",
+            "cach.entries",
+            "cach.warming",
+            "cach.evictions",
+            "cach.agents"
+          ],
+          "watermark": "event_time"
+        },
         "telemetry": {
           "emit_cache_events": true,
           "metrics_enabled": true,
@@ -93,9 +231,11 @@
         "ui": {
           "enable_adapter_health": true,
           "enable_audit_timeline": true,
+          "enable_cache_agent_roster": true,
           "enable_dashboard": true,
           "enable_eviction_review_queue": true,
           "enable_hierarchy_map": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_namespace_inventory": true,
           "enable_policy_manager": true,
           "enable_warming_console": true
@@ -115,9 +255,15 @@
       "master_data": {},
       "name": "Cache Management",
       "provides": [
-        "cach_operations"
+        "cache_governance",
+        "cache_runtime_adapters",
+        "cache_agent_composition"
       ],
-      "requires": [],
+      "requires": [
+        "conf",
+        "auth",
+        "audl"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -322,6 +468,111 @@
               "required_action": "attach_review_notes"
             },
             "name": "review_notes_required"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_cache_agent"
+            },
+            "description": "Cache agents must use a supported runtime adapter.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_cache_agent_runtime",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "cache_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_cache_agent"
+            },
+            "description": "Cache agents must use a supported cache governance role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_cache_agent_role",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "cache_agent_role_supported"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "operation": "register_cache_agent"
+            },
+            "description": "Cache agents require an explicit operating scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cache_agent_scope_required",
+              "required_action": "attach_agent_scope"
+            },
+            "name": "cache_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "agent_owner_present": false,
+              "operation": "register_cache_agent"
+            },
+            "description": "Cache agents require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cache_agent_owner_required",
+              "required_action": "attach_agent_owner"
+            },
+            "name": "cache_agent_requires_owner"
+          },
+          {
+            "condition": {
+              "agent_purpose_present": false,
+              "operation": "register_cache_agent"
+            },
+            "description": "Cache agents require a declared purpose.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cache_agent_purpose_required",
+              "required_action": "attach_agent_purpose"
+            },
+            "name": "cache_agent_requires_purpose"
+          },
+          {
+            "condition": {
+              "contribution_disclosed": false,
+              "operation": "register_cache_agent"
+            },
+            "description": "Cache agents must disclose machine contribution in cache decisions.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cache_agent_contribution_disclosure_required",
+              "required_action": "enable_agent_contribution_disclosure"
+            },
+            "name": "cache_agent_requires_contribution_disclosure"
+          },
+          {
+            "condition": {
+              "human_approval_required": false,
+              "operation": "register_cache_agent",
+              "privileged_agent_role": true
+            },
+            "description": "Privileged cache-agent roles require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cache_agent_human_approval_required",
+              "required_action": "require_human_approval_for_agent"
+            },
+            "name": "cache_agent_privileged_role_requires_human_approval"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "validate_cache_lifecycle_batch"
+            },
+            "description": "CACH lifecycle batches must declare Bytewax as the cache lifecycle processor.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_cache_stream_required",
+              "required_action": "route_batch_through_bytewax"
+            },
+            "name": "bytewax_cache_stream_required"
           }
         ],
         "type": "deterministic"
@@ -529,6 +780,111 @@
             "required_action": "attach_review_notes"
           },
           "name": "review_notes_required"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_cache_agent"
+          },
+          "description": "Cache agents must use a supported runtime adapter.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_cache_agent_runtime",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "cache_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_cache_agent"
+          },
+          "description": "Cache agents must use a supported cache governance role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_cache_agent_role",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "cache_agent_role_supported"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "operation": "register_cache_agent"
+          },
+          "description": "Cache agents require an explicit operating scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cache_agent_scope_required",
+            "required_action": "attach_agent_scope"
+          },
+          "name": "cache_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "agent_owner_present": false,
+            "operation": "register_cache_agent"
+          },
+          "description": "Cache agents require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cache_agent_owner_required",
+            "required_action": "attach_agent_owner"
+          },
+          "name": "cache_agent_requires_owner"
+        },
+        {
+          "condition": {
+            "agent_purpose_present": false,
+            "operation": "register_cache_agent"
+          },
+          "description": "Cache agents require a declared purpose.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cache_agent_purpose_required",
+            "required_action": "attach_agent_purpose"
+          },
+          "name": "cache_agent_requires_purpose"
+        },
+        {
+          "condition": {
+            "contribution_disclosed": false,
+            "operation": "register_cache_agent"
+          },
+          "description": "Cache agents must disclose machine contribution in cache decisions.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cache_agent_contribution_disclosure_required",
+            "required_action": "enable_agent_contribution_disclosure"
+          },
+          "name": "cache_agent_requires_contribution_disclosure"
+        },
+        {
+          "condition": {
+            "human_approval_required": false,
+            "operation": "register_cache_agent",
+            "privileged_agent_role": true
+          },
+          "description": "Privileged cache-agent roles require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cache_agent_human_approval_required",
+            "required_action": "require_human_approval_for_agent"
+          },
+          "name": "cache_agent_privileged_role_requires_human_approval"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "validate_cache_lifecycle_batch"
+          },
+          "description": "CACH lifecycle batches must declare Bytewax as the cache lifecycle processor.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_cache_stream_required",
+            "required_action": "route_batch_through_bytewax"
+          },
+          "name": "bytewax_cache_stream_required"
         }
       ],
       "runtime": {
@@ -542,6 +898,11 @@
           "component": "CacheAdapterHealth",
           "permission": "cach:admin",
           "route": "/cach/adapters"
+        },
+        "agents": {
+          "component": "CacheAgentRoster",
+          "permission": "cach:admin",
+          "route": "/cach/agents"
         },
         "analytics": {
           "component": "CacheAnalytics",
@@ -573,6 +934,11 @@
           "permission": "cach:view",
           "route": "/cach/hierarchy"
         },
+        "lifecycle": {
+          "component": "CacheLifecycleBatchMonitor",
+          "permission": "cach:admin",
+          "route": "/cach/lifecycle"
+        },
         "namespaces": {
           "component": "CacheNamespaceInventory",
           "permission": "cach:manage_namespaces",
@@ -599,7 +965,26 @@
           "route": "/cach/warming"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax",
+        "kafka_core_dependency_allowed": false,
+        "lifecycle_stream": "cach.lifecycle",
+        "required_operations": [
+          "cache_policy_batch",
+          "cache_warming_batch",
+          "cache_agent_batch",
+          "cache_eviction_batch"
+        ],
+        "required_processor": "bytewax",
+        "topics": [
+          "cach.namespaces",
+          "cach.entries",
+          "cach.warming",
+          "cach.evictions",
+          "cach.agents"
+        ],
+        "watermark": "event_time"
+      },
       "theme": {
         "components": {
           "adapter_health_panel": {
@@ -610,6 +995,16 @@
           "audit_event_timeline": {
             "highlight": "matched-rule-chip",
             "visual": "decision-timeline"
+          },
+          "bytewax_lifecycle_panel": {
+            "icon": "activity",
+            "status_indicator": "processor-state",
+            "variant": "stream-lifecycle"
+          },
+          "cache_agent_roster": {
+            "icon": "bot",
+            "status_indicator": "approval-state",
+            "variant": "agent-governance"
           },
           "cache_hit_card": {
             "icon": "gauge",
@@ -728,6 +1123,20 @@
             "permission": "cach:admin"
           },
           {
+            "component": "CacheAgentRoster",
+            "name": "agents",
+            "nav_group": "Administration",
+            "path": "/cach/agents",
+            "permission": "cach:admin"
+          },
+          {
+            "component": "CacheLifecycleBatchMonitor",
+            "name": "lifecycle",
+            "nav_group": "Runtime",
+            "path": "/cach/lifecycle",
+            "permission": "cach:admin"
+          },
+          {
             "component": "CacheAuditTimeline",
             "name": "audit",
             "nav_group": "Governance",
@@ -752,14 +1161,85 @@
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "cach_cache_governance": {
+        "requires_human_approval_for": [
+          "warming_reviewer",
+          "eviction_reviewer",
+          "tier_optimization_reviewer",
+          "adapter_health_reviewer"
+        ],
+        "roles": [
+          "namespace_policy_reviewer",
+          "warming_reviewer",
+          "eviction_reviewer",
+          "freshness_reviewer",
+          "tier_optimization_reviewer",
+          "adapter_health_reviewer",
+          "lifecycle_auditor"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
-      "cach": []
+      "cach": [
+        "conf",
+        "auth",
+        "audl"
+      ]
     }
   },
   "contracts": {
     "cach": {
+      "agents": {
+        "first_class": true,
+        "guardrails": [
+          "supported_runtime",
+          "supported_role",
+          "explicit_scope",
+          "accountable_owner",
+          "declared_purpose",
+          "machine_contribution_disclosure",
+          "human_approval_for_privileged_roles"
+        ],
+        "privileged_roles": [
+          "warming_reviewer",
+          "eviction_reviewer",
+          "tier_optimization_reviewer",
+          "adapter_health_reviewer"
+        ],
+        "required_fields": [
+          "tenant_id",
+          "agent_id",
+          "name",
+          "runtime",
+          "role",
+          "scope",
+          "owner",
+          "purpose"
+        ],
+        "supported_roles": [
+          "namespace_policy_reviewer",
+          "warming_reviewer",
+          "eviction_reviewer",
+          "freshness_reviewer",
+          "tier_optimization_reviewer",
+          "adapter_health_reviewer",
+          "lifecycle_auditor"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "configuration": {
         "adapters": {
           "backend_binding_required_for_production": true,
@@ -772,6 +1252,35 @@
             "edge",
             "cdn",
             "query_cache"
+          ]
+        },
+        "agents": {
+          "first_class": true,
+          "privileged_roles": [
+            "warming_reviewer",
+            "eviction_reviewer",
+            "tier_optimization_reviewer",
+            "adapter_health_reviewer"
+          ],
+          "require_contribution_disclosure": true,
+          "require_human_approval_for_privileged_roles": true,
+          "require_owner": true,
+          "require_purpose": true,
+          "require_scope": true,
+          "supported_roles": [
+            "namespace_policy_reviewer",
+            "warming_reviewer",
+            "eviction_reviewer",
+            "freshness_reviewer",
+            "tier_optimization_reviewer",
+            "adapter_health_reviewer",
+            "lifecycle_auditor"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
           ]
         },
         "hierarchy": {
@@ -806,6 +1315,24 @@
           "restricted_entries_require_encryption": true,
           "sensitive_entries_require_encryption": true
         },
+        "streaming": {
+          "engine": "bytewax",
+          "lifecycle_stream": "cach.lifecycle",
+          "required_operations": [
+            "cache_policy_batch",
+            "cache_warming_batch",
+            "cache_agent_batch",
+            "cache_eviction_batch"
+          ],
+          "topics": [
+            "cach.namespaces",
+            "cach.entries",
+            "cach.warming",
+            "cach.evictions",
+            "cach.agents"
+          ],
+          "watermark": "event_time"
+        },
         "telemetry": {
           "emit_cache_events": true,
           "metrics_enabled": true,
@@ -821,9 +1348,11 @@
         "ui": {
           "enable_adapter_health": true,
           "enable_audit_timeline": true,
+          "enable_cache_agent_roster": true,
           "enable_dashboard": true,
           "enable_eviction_review_queue": true,
           "enable_hierarchy_map": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_namespace_inventory": true,
           "enable_policy_manager": true,
           "enable_warming_console": true
@@ -838,9 +1367,35 @@
       },
       "id": "cach",
       "provides": [
-        "cach_operations"
+        "cache_governance",
+        "cache_runtime_adapters",
+        "cache_agent_composition"
       ],
-      "requires": []
+      "requires": [
+        "conf",
+        "auth",
+        "audl"
+      ],
+      "streaming": {
+        "engine": "bytewax",
+        "kafka_core_dependency_allowed": false,
+        "lifecycle_stream": "cach.lifecycle",
+        "required_operations": [
+          "cache_policy_batch",
+          "cache_warming_batch",
+          "cache_agent_batch",
+          "cache_eviction_batch"
+        ],
+        "required_processor": "bytewax",
+        "topics": [
+          "cach.namespaces",
+          "cach.entries",
+          "cach.warming",
+          "cach.evictions",
+          "cach.agents"
+        ],
+        "watermark": "event_time"
+      }
     }
   },
   "deployment": {
@@ -852,7 +1407,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 3,
       "kind": "capability",
       "nodes": 1
     },
@@ -873,6 +1428,111 @@
   },
   "roles": {},
   "rules": {
+    "bytewax_cache_stream_required": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "validate_cache_lifecycle_batch"
+      },
+      "description": "CACH lifecycle batches must declare Bytewax as the cache lifecycle processor.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_cache_stream_required",
+        "required_action": "route_batch_through_bytewax"
+      },
+      "name": "bytewax_cache_stream_required"
+    },
+    "cache_agent_privileged_role_requires_human_approval": {
+      "condition": {
+        "human_approval_required": false,
+        "operation": "register_cache_agent",
+        "privileged_agent_role": true
+      },
+      "description": "Privileged cache-agent roles require human approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cache_agent_human_approval_required",
+        "required_action": "require_human_approval_for_agent"
+      },
+      "name": "cache_agent_privileged_role_requires_human_approval"
+    },
+    "cache_agent_requires_contribution_disclosure": {
+      "condition": {
+        "contribution_disclosed": false,
+        "operation": "register_cache_agent"
+      },
+      "description": "Cache agents must disclose machine contribution in cache decisions.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cache_agent_contribution_disclosure_required",
+        "required_action": "enable_agent_contribution_disclosure"
+      },
+      "name": "cache_agent_requires_contribution_disclosure"
+    },
+    "cache_agent_requires_owner": {
+      "condition": {
+        "agent_owner_present": false,
+        "operation": "register_cache_agent"
+      },
+      "description": "Cache agents require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cache_agent_owner_required",
+        "required_action": "attach_agent_owner"
+      },
+      "name": "cache_agent_requires_owner"
+    },
+    "cache_agent_requires_purpose": {
+      "condition": {
+        "agent_purpose_present": false,
+        "operation": "register_cache_agent"
+      },
+      "description": "Cache agents require a declared purpose.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cache_agent_purpose_required",
+        "required_action": "attach_agent_purpose"
+      },
+      "name": "cache_agent_requires_purpose"
+    },
+    "cache_agent_requires_scope": {
+      "condition": {
+        "agent_scope_present": false,
+        "operation": "register_cache_agent"
+      },
+      "description": "Cache agents require an explicit operating scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cache_agent_scope_required",
+        "required_action": "attach_agent_scope"
+      },
+      "name": "cache_agent_requires_scope"
+    },
+    "cache_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_cache_agent"
+      },
+      "description": "Cache agents must use a supported cache governance role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_cache_agent_role",
+        "required_action": "select_supported_agent_role"
+      },
+      "name": "cache_agent_role_supported"
+    },
+    "cache_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_cache_agent"
+      },
+      "description": "Cache agents must use a supported runtime adapter.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_cache_agent_runtime",
+        "required_action": "select_supported_agent_runtime"
+      },
+      "name": "cache_agent_runtime_supported"
+    },
     "critical_stale_read_requires_refresh": {
       "condition": {
         "data_criticality": "critical",

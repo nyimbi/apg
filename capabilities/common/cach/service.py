@@ -154,6 +154,40 @@ class CacheEvictionReviewRecord:
 
 
 @dataclass
+class CacheAgentRecord:
+	"""First-class cache governance agent registration."""
+
+	agent_id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	owner: str
+	purpose: str
+	contribution_disclosed: bool
+	human_approval_required: bool
+	status: str = "active"
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class CacheLifecycleBatchRecord:
+	"""Bytewax lifecycle-batch validation evidence."""
+
+	batch_id: str
+	tenant_id: str
+	event_stream: str
+	mutation_count: int
+	accepted: bool
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	required_processor: str = "bytewax"
+	status: str = "accepted"
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
 class CacheAuditEventRecord:
 	"""Dependency-light audit event for CACH lifecycle decisions."""
 
@@ -172,12 +206,23 @@ class CacheGovernanceService:
 	"""Dependency-light CACH lifecycle and guardrail control plane."""
 
 	def __init__(self, tenant_id: str = "default"):
+		from .capability_contract import (
+			PRIVILEGED_CACH_AGENT_ROLES,
+			SUPPORTED_CACH_AGENT_ROLES,
+			SUPPORTED_CACH_AGENT_RUNTIMES,
+		)
+
 		self.tenant_id = tenant_id
 		self.contract = get_capability_contract(tenant_id)
+		self._agent_runtimes = set(SUPPORTED_CACH_AGENT_RUNTIMES)
+		self._agent_roles = set(SUPPORTED_CACH_AGENT_ROLES)
+		self._privileged_agent_roles = set(PRIVILEGED_CACH_AGENT_ROLES)
 		self.namespaces: dict[str, CacheNamespaceRecord] = {}
 		self.entries: dict[str, CacheEntryRecord] = {}
 		self.warming_plans: dict[str, CacheWarmingPlanRecord] = {}
 		self.eviction_reviews: dict[str, CacheEvictionReviewRecord] = {}
+		self.cache_agents: dict[str, CacheAgentRecord] = {}
+		self.lifecycle_batches: dict[str, CacheLifecycleBatchRecord] = {}
 		self.audit_events: list[CacheAuditEventRecord] = []
 
 	def create_namespace(
@@ -506,6 +551,96 @@ class CacheGovernanceService:
 		self._audit(record.tenant_id, "eviction.decided", record.namespace, reviewer, record.decision, record.matched_rules, context)
 		return record
 
+	def register_cache_agent(
+		self,
+		*,
+		tenant_id: str,
+		agent_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> CacheAgentRecord:
+		"""Register a first-class cache governance agent with guardrail evidence."""
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		agent_id = self._require_text(agent_id, "agent_id")
+		name = self._require_text(name, "name")
+		runtime_value = self._normalize_agent_token(runtime)
+		role_value = self._normalize_agent_token(role)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_cache_agent",
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"agent_scope_present": bool(str(scope or "").strip()),
+			"agent_owner_present": bool(str(owner or "").strip()),
+			"agent_purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_agent_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+		}
+		rule_decision = evaluate_capability_rules(context)
+		if rule_decision["decision"] == "deny":
+			raise PermissionError(self._first_reason(rule_decision))
+		record_key = self._agent_key(tenant_id, agent_id)
+		if record_key in self.cache_agents:
+			raise ValueError(f"cache_agent_already_exists:{agent_id}")
+		record = CacheAgentRecord(
+			agent_id=agent_id,
+			tenant_id=tenant_id,
+			name=name,
+			runtime=runtime_value,
+			role=role_value,
+			scope=self._require_text(scope, "scope"),
+			owner=self._require_text(owner, "owner"),
+			purpose=self._require_text(purpose, "purpose"),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+		)
+		self.cache_agents[record_key] = record
+		self._audit(tenant_id, "agent.registered", agent_id, record.owner, "allow", rule_decision["matched_rules"], asdict(record))
+		return record
+
+	def validate_cache_lifecycle_batch(
+		self,
+		*,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+	) -> CacheLifecycleBatchRecord:
+		"""Validate that CACH lifecycle mutation batches flow through Bytewax."""
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		mutation_count = int(mutation_count)
+		if mutation_count <= 0:
+			raise ValueError("cache_lifecycle_batch_empty")
+		stream_value = self._normalize_agent_token(event_stream)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "validate_cache_lifecycle_batch",
+			"event_stream": stream_value,
+		}
+		rule_decision = evaluate_capability_rules(context)
+		accepted = rule_decision["decision"] == "allow"
+		record = CacheLifecycleBatchRecord(
+			batch_id=uuid7str(),
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			accepted=accepted,
+			decision=rule_decision["decision"],
+			matched_rules=list(rule_decision["matched_rules"]),
+			status="accepted" if accepted else "denied",
+		)
+		self.lifecycle_batches[record.batch_id] = record
+		self._audit(tenant_id, f"lifecycle_batch.{record.status}", stream_value, "cach", rule_decision["decision"], rule_decision["matched_rules"], asdict(record))
+		if not accepted:
+			raise PermissionError(self._first_reason(rule_decision))
+		return record
+
 	def dashboard_summary(self, tenant_id: str | None = None) -> dict[str, Any]:
 		"""Return summary metrics for generated CACH dashboards."""
 		tenant_id = tenant_id or self.tenant_id
@@ -527,6 +662,9 @@ class CacheGovernanceService:
 			"denied_entry_count": sum(1 for entry in entries if entry.status == "denied"),
 			"pending_warming_reviews": len(pending_warming),
 			"pending_eviction_reviews": len(pending_evictions),
+			"cache_agent_count": sum(1 for agent in self.cache_agents.values() if agent.tenant_id == tenant_id),
+			"lifecycle_batch_count": sum(1 for batch in self.lifecycle_batches.values() if batch.tenant_id == tenant_id),
+			"denied_lifecycle_batch_count": sum(1 for batch in self.lifecycle_batches.values() if batch.tenant_id == tenant_id and not batch.accepted),
 			"audit_event_count": sum(1 for event in self.audit_events if event.tenant_id == tenant_id),
 		}
 
@@ -538,6 +676,8 @@ class CacheGovernanceService:
 			"entries": self.entries.values(),
 			"warming_plans": self.warming_plans.values(),
 			"eviction_reviews": self.eviction_reviews.values(),
+			"cache_agents": self.cache_agents.values(),
+			"lifecycle_batches": self.lifecycle_batches.values(),
 			"audit_events": self.audit_events,
 		}
 		if record_type not in collections:
@@ -582,6 +722,21 @@ class CacheGovernanceService:
 	@staticmethod
 	def _entry_key(tenant_id: str, namespace: str, key: str) -> str:
 		return f"{tenant_id}:{namespace}:{key}"
+
+	@staticmethod
+	def _agent_key(tenant_id: str, agent_id: str) -> str:
+		return f"{tenant_id}:{agent_id}"
+
+	@staticmethod
+	def _normalize_agent_token(value: str) -> str:
+		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+	@staticmethod
+	def _first_reason(result: dict[str, Any]) -> str:
+		for action in result.get("actions", []):
+			if action.get("reason"):
+				return str(action["reason"])
+		return "cache_operation_denied"
 
 
 class CacheService:

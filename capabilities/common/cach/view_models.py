@@ -20,12 +20,15 @@ def dashboard_model(service: CacheGovernanceService, tenant_id: str = "default")
 		"title": "Cache Management",
 		"tenant_id": tenant_id,
 		"summary": service.dashboard_summary(tenant_id),
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 		"primary_actions": [
 			{"id": "create_namespace", "label": "Create namespace", "permission": "cach:manage_namespaces"},
 			{"id": "write_entry", "label": "Write entry", "permission": "cach:write"},
 			{"id": "request_warming", "label": "Request warming", "permission": "cach:warm"},
 			{"id": "review_eviction", "label": "Review eviction", "permission": "cach:review_eviction"},
+			{"id": "register_agent", "label": "Register agent", "permission": "cach:admin"},
 		],
 	}
 
@@ -142,6 +145,31 @@ def adapter_health_model(tenant_id: str = "default") -> dict[str, Any]:
 	}
 
 
+def cache_agent_roster_model(service: CacheGovernanceService, tenant_id: str = "default") -> dict[str, Any]:
+	"""Return first-class cache-agent roster state."""
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"rows": service.list_records("cache_agents", tenant_id),
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+		"guardrails": contract["agents"]["guardrails"],
+		"columns": ["name", "runtime", "role", "owner", "purpose", "status", "human_approval_required"],
+	}
+
+
+def lifecycle_batch_model(service: CacheGovernanceService, tenant_id: str = "default") -> dict[str, Any]:
+	"""Return Bytewax lifecycle-batch monitor state."""
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"streaming": contract["streaming"],
+		"rows": service.list_records("lifecycle_batches", tenant_id),
+		"columns": ["event_stream", "mutation_count", "accepted", "decision", "required_processor", "status"],
+	}
+
+
 def audit_timeline_model(service: CacheGovernanceService, tenant_id: str = "default") -> dict[str, Any]:
 	"""Return cache lifecycle audit timeline state."""
 	return {
@@ -158,6 +186,8 @@ def settings_model(tenant_id: str = "default") -> dict[str, Any]:
 		"tenant_id": tenant_id,
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 		"routes": contract["ui"]["routes"],
 	}

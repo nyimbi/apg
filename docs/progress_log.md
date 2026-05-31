@@ -20672,3 +20672,63 @@ Not run to preserve battery:
   registry, SIEM, SOAR, DLP, GRC, notification, incident-response systems,
   APG AUTH/MTEN/AUDL/CONF/KEYM/ENCR/SECU/MONI/HLTH services, rendered browser
   UI, and performance/load tests.
+
+### 2026-05-31 04:32 EAT
+
+CACH cache-agent composition and Bytewax guardrail packet:
+
+- Selected `capabilities/common/cach` as the next foundation infrastructure
+  capability after MQEB.
+- Extended the CACH executable contract with first-class cache-agent metadata,
+  supported runtimes `codex`, `claude_code`, `opencode`, and `pi`, supported
+  cache governance roles, privileged-role metadata, Bytewax lifecycle stream
+  metadata, route metadata, theme components, and contract-level
+  `provides`/`requires`.
+- Added deterministic guardrails for unsupported cache-agent runtime,
+  unsupported cache-agent role, missing cache-agent scope, owner, purpose,
+  missing machine contribution disclosure, privileged cache-agent registration
+  without human approval, and non-Bytewax cache lifecycle batch routing.
+- Added `CacheAgentRecord`, `CacheLifecycleBatchRecord`, tenant-qualified
+  cache-agent storage, lifecycle-batch storage, registration, listing, audit
+  events, dashboard counts, API helper payload handling, cache-agent roster
+  view models, and lifecycle-batch monitor view models.
+- Added `/cach/agents`, `/cach/lifecycle`, cache-agent roster theme metadata,
+  and Bytewax lifecycle panel theme metadata.
+- Regenerated `semantic_model.json` and `release_report.json` from the live
+  `app.py` contract and refreshed `package_manifest.json`.
+- Replaced stale `cap_spec.md` and `todo.md` content with current
+  source-of-truth and adapter-backlog notes.
+- Review pass found and fixed a CACH `ai_optimization.py` indentation syntax
+  blocker so the full CACH package compiles.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/cach/capability_contract.py capabilities/common/cach/service.py capabilities/common/cach/api.py capabilities/common/cach/view_models.py capabilities/common/cach/app.py capabilities/common/cach/__init__.py capabilities/common/cach/tests/test_capability_contract.py capabilities/common/cach/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/cach/tests/test_capability_contract.py capabilities/common/cach/tests/test_package_contract.py`
+  passed with 9 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python capabilities/common/cach/app.py` passed with `passed:
+  true`.
+- `./.venv/bin/apg capabilities inspect cach --json` passed with `ok: true`,
+  14 APG Python routes, 24 deterministic rules, first-class agents, and
+  Bytewax streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/cach --json`
+  passed with `ok: true`; CACH remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/cach --json`
+  passed with side-effect-free package evidence and no warnings.
+- `find capabilities/common/cach -name '*.py' -not -path '*/__pycache__/*' -exec ./.venv/bin/python -m py_compile {} +`
+  passed after fixing the syntax blocker.
+- `./.venv/bin/python -c "... CacheGovernanceService ... register_cache_agent ... validate_cache_lifecycle_batch ..."`
+  returned one `claude_code` warming-review agent with owner and purpose
+  evidence, human approval required, normalized role, and `bytewax` stream
+  evidence.
+- Focused stale-marker scan over touched CACH source, docs, and tests returned
+  no matches.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live Redis, Valkey, CDN, edge cache, query-cache, live Bytewax topology,
+  external APG services, rendered browser UI, production persistence, and
+  performance/load tests.

@@ -3,7 +3,8 @@
 CACH is APG's cache governance and runtime-adapter capability. It gives
 generated applications a tenant-aware way to register cache namespaces, enforce
 entry admission rules, manage warming and eviction reviews, publish UI metadata,
-and connect to cache backends without hard-coding a specific store.
+compose first-class cache agents, validate Bytewax lifecycle batches, and
+connect to cache backends without hard-coding a specific store.
 
 The current packet is intentionally dependency-light. It can publish a capability
 contract, evaluate guardrails, build view models, and run focused tests without
@@ -18,6 +19,11 @@ Redis, Flask-AppBuilder, AI services, or optional compression packages.
   refresh-required cache entries.
 - Warming plans with source evidence, batch limits, and review state.
 - Eviction and capacity reviews with independent reviewer evidence.
+- First-class cache-agent registration for Codex, Claude Code, opencode, and Pi
+  with owner, purpose, scope, contribution disclosure, and human approval
+  guardrails.
+- Bytewax lifecycle-batch validation for cache policy, warming, agent, and
+  eviction mutations.
 - Compact generated-application view models for operations UIs.
 - Theme tokens and component metadata for cache dashboards and control surfaces.
 - Contract-derived semantic-model and release evidence for APG publish tooling.
@@ -59,6 +65,8 @@ from capabilities.common.cach.api import (
     read_cache_entry_record,
     request_eviction_review,
     decide_eviction_review,
+    register_cache_agent,
+    validate_cache_lifecycle_batch,
 )
 
 namespace = create_namespace_record(
@@ -101,6 +109,25 @@ decision = decide_eviction_review(
     reviewer="cache-sre",
     decision="approved",
     notes="Cold entries can be evicted; source of truth is healthy.",
+)
+
+agent = register_cache_agent(
+    tenant_id="tenant-a",
+    agent_id="warming-agent",
+    name="Warming Agent",
+    runtime="claude-code",
+    role="warming-reviewer",
+    scope="warming plan review",
+    owner="platform",
+    purpose="review warming plans",
+    contribution_disclosed=True,
+    human_approval_required=True,
+)
+
+batch = validate_cache_lifecycle_batch(
+    tenant_id="tenant-a",
+    event_stream="bytewax",
+    mutation_count=3,
 )
 ```
 
@@ -148,6 +175,7 @@ The capability registration exposes these permissions:
 - `cach:warm`
 - `cach:review_eviction`
 - `cach:view_analytics`
+- `cach:manage_agents`
 - `cach:admin`
 
 ## Adapter Boundary

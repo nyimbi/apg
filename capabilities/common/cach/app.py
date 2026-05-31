@@ -52,13 +52,17 @@ def semantic_model() -> dict[str, Any]:
 			"cach": {
 				"name": contract["display_name"],
 				"configuration": contract["configuration"],
-				"provides": ["cach_operations"],
-				"requires": [],
+				"provides": contract["provides"],
+				"requires": contract["requires"],
 				"erp_modules": ["common"],
 				"rule_engine": contract["rule_engine"],
 				"rules": contract["rule_engine"]["rules"],
 				"ui": contract["ui"],
 				"screens": routes,
+				"agents": {
+					"cach_agent_contract": contract["agents"],
+				},
+				"streaming": contract["streaming"],
 				"theme": contract["theme"],
 				"runtime": {
 					"api": "api.py",
@@ -71,24 +75,27 @@ def semantic_model() -> dict[str, Any]:
 				"approvals": {
 					"warming": "CacheWarmingPlanRecord",
 					"eviction": "CacheEvictionReviewRecord",
+					"cache_agent": "CacheAgentRecord",
 				},
 				"cache_lifecycle": {
 					"namespace": "CacheNamespaceRecord",
 					"entry": "CacheEntryRecord",
+					"lifecycle_batch": "CacheLifecycleBatchRecord",
 					"audit": "CacheAuditEventRecord",
 				},
 				"adapters": contract["configuration"]["adapters"],
 				"i18n": {},
 				"master_data": {},
-				"streaming": {},
 			}
 		},
 		"contracts": {
 			"cach": {
 				"id": "cach",
 				"configuration": contract["configuration"],
-				"provides": ["cach_operations"],
-				"requires": [],
+				"provides": contract["provides"],
+				"requires": contract["requires"],
+				"agents": contract["agents"],
+				"streaming": contract["streaming"],
 			}
 		},
 		"rules": {
@@ -96,16 +103,22 @@ def semantic_model() -> dict[str, Any]:
 			for rule in contract["rule_engine"]["rules"]
 		},
 		"composition": {
-			"capability_dependencies": {"cach": []},
+			"capability_dependencies": {"cach": contract["requires"]},
 			"applications": {},
-			"agent_teams": {},
+			"agent_teams": {
+				"cach_cache_governance": {
+					"roles": contract["agents"]["supported_roles"],
+					"runtimes": contract["agents"]["supported_runtimes"],
+					"requires_human_approval_for": contract["agents"]["privileged_roles"],
+				}
+			},
 		},
 		"deployment": {
 			"source": "capability_contract.py",
 			"target": "python",
 		},
 		"graphs": {
-			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"capability": {"kind": "capability", "nodes": 1, "edges": len(contract["requires"])},
 			"package": {"kind": "package", "nodes": 2, "edges": 1},
 		},
 		"source_files": ["capability_contract.py"],
@@ -122,7 +135,9 @@ def semantic_model() -> dict[str, Any]:
 				"references": [],
 			}
 		},
-		"agents": {},
+		"agents": {
+			"cach_agent_contract": contract["agents"],
+		},
 		"flows": {},
 		"llms": {},
 		"operations": {},
@@ -160,18 +175,24 @@ def self_test() -> dict[str, Any]:
 	routes = capability.get("ui", {}).get("routes", [])
 	rules = capability.get("rule_engine", {}).get("rules", [])
 	adapters = capability.get("adapters", {})
+	agents = capability.get("agents", {}).get("cach_agent_contract", {})
+	streaming = capability.get("streaming", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "cach" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
-	if len(routes) < 12:
+	if len(routes) < 14:
 		errors.append("CACH semantic model route manifest is stale")
-	if len(rules) < 13:
+	if len(rules) < 22:
 		errors.append("CACH semantic model rule manifest is stale")
 	if "memory" not in adapters.get("supported_backends", []):
 		errors.append("CACH adapter manifest must include memory backend")
+	if agents.get("first_class") is not True:
+		errors.append("CACH cache agents must remain first-class")
+	if streaming.get("engine") != "bytewax":
+		errors.append("CACH streaming manifest must remain Bytewax-first")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

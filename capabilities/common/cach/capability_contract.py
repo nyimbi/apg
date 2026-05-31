@@ -13,6 +13,24 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+SUPPORTED_CACH_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_CACH_AGENT_ROLES = [
+	"namespace_policy_reviewer",
+	"warming_reviewer",
+	"eviction_reviewer",
+	"freshness_reviewer",
+	"tier_optimization_reviewer",
+	"adapter_health_reviewer",
+	"lifecycle_auditor",
+]
+PRIVILEGED_CACH_AGENT_ROLES = [
+	"warming_reviewer",
+	"eviction_reviewer",
+	"tier_optimization_reviewer",
+	"adapter_health_reviewer",
+]
+
+
 @dataclass(frozen=True)
 class CapabilityConfiguration:
 	"""Tenant-scoped CACH configuration defaults and schema."""
@@ -60,6 +78,35 @@ class CapabilityConfiguration:
 			"backend_binding_required_for_production": True,
 			"emit_mqeb_events": True
 		},
+		"agents": {
+			"first_class": True,
+			"supported_runtimes": SUPPORTED_CACH_AGENT_RUNTIMES,
+			"supported_roles": SUPPORTED_CACH_AGENT_ROLES,
+			"privileged_roles": PRIVILEGED_CACH_AGENT_ROLES,
+			"require_owner": True,
+			"require_purpose": True,
+			"require_scope": True,
+			"require_contribution_disclosure": True,
+			"require_human_approval_for_privileged_roles": True
+		},
+		"streaming": {
+			"engine": "bytewax",
+			"lifecycle_stream": "cach.lifecycle",
+			"watermark": "event_time",
+			"required_operations": [
+				"cache_policy_batch",
+				"cache_warming_batch",
+				"cache_agent_batch",
+				"cache_eviction_batch"
+			],
+			"topics": [
+				"cach.namespaces",
+				"cach.entries",
+				"cach.warming",
+				"cach.evictions",
+				"cach.agents"
+			]
+		},
 		"telemetry": {
 			"metrics_enabled": True,
 			"track_access_patterns": True,
@@ -75,7 +122,9 @@ class CapabilityConfiguration:
 			"enable_eviction_review_queue": True,
 			"enable_hierarchy_map": True,
 			"enable_adapter_health": True,
-			"enable_audit_timeline": True
+			"enable_audit_timeline": True,
+			"enable_cache_agent_roster": True,
+			"enable_lifecycle_batch_monitor": True
 		},
 		"theme": {
 			"default_theme": "cach_memory_fabric",
@@ -92,6 +141,8 @@ class CapabilityConfiguration:
 			"security",
 			"optimization",
 			"adapters",
+			"agents",
+			"streaming",
 			"telemetry",
 			"ui",
 			"theme"
@@ -104,6 +155,8 @@ class CapabilityConfiguration:
 			"security": {"type": "object"},
 			"optimization": {"type": "object"},
 			"adapters": {"type": "object"},
+			"agents": {"type": "object"},
+			"streaming": {"type": "object"},
 			"telemetry": {"type": "object"},
 			"ui": {"type": "object"},
 			"theme": {"type": "object"}
@@ -224,6 +277,16 @@ class CapabilityTheme:
 		"audit_event_timeline": {
 			"visual": "decision-timeline",
 			"highlight": "matched-rule-chip"
+		},
+		"cache_agent_roster": {
+			"icon": "bot",
+			"status_indicator": "approval-state",
+			"variant": "agent-governance"
+		},
+		"bytewax_lifecycle_panel": {
+			"icon": "activity",
+			"status_indicator": "processor-state",
+			"variant": "stream-lifecycle"
 		}
 	})
 
@@ -390,6 +453,86 @@ def default_rules() -> list[CapabilityRule]:
 				"reason": "review_notes_required",
 				"required_action": "attach_review_notes"
 			}
+		),
+		CapabilityRule(
+			name="cache_agent_runtime_supported",
+			description="Cache agents must use a supported runtime adapter.",
+			condition={"operation": "register_cache_agent", "agent_runtime_supported": False},
+			effect={
+				"decision": "deny",
+				"reason": "unsupported_cache_agent_runtime",
+				"required_action": "select_supported_agent_runtime"
+			}
+		),
+		CapabilityRule(
+			name="cache_agent_role_supported",
+			description="Cache agents must use a supported cache governance role.",
+			condition={"operation": "register_cache_agent", "agent_role_supported": False},
+			effect={
+				"decision": "deny",
+				"reason": "unsupported_cache_agent_role",
+				"required_action": "select_supported_agent_role"
+			}
+		),
+		CapabilityRule(
+			name="cache_agent_requires_scope",
+			description="Cache agents require an explicit operating scope.",
+			condition={"operation": "register_cache_agent", "agent_scope_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "cache_agent_scope_required",
+				"required_action": "attach_agent_scope"
+			}
+		),
+		CapabilityRule(
+			name="cache_agent_requires_owner",
+			description="Cache agents require an accountable owner.",
+			condition={"operation": "register_cache_agent", "agent_owner_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "cache_agent_owner_required",
+				"required_action": "attach_agent_owner"
+			}
+		),
+		CapabilityRule(
+			name="cache_agent_requires_purpose",
+			description="Cache agents require a declared purpose.",
+			condition={"operation": "register_cache_agent", "agent_purpose_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "cache_agent_purpose_required",
+				"required_action": "attach_agent_purpose"
+			}
+		),
+		CapabilityRule(
+			name="cache_agent_requires_contribution_disclosure",
+			description="Cache agents must disclose machine contribution in cache decisions.",
+			condition={"operation": "register_cache_agent", "contribution_disclosed": False},
+			effect={
+				"decision": "deny",
+				"reason": "cache_agent_contribution_disclosure_required",
+				"required_action": "enable_agent_contribution_disclosure"
+			}
+		),
+		CapabilityRule(
+			name="cache_agent_privileged_role_requires_human_approval",
+			description="Privileged cache-agent roles require human approval.",
+			condition={"operation": "register_cache_agent", "privileged_agent_role": True, "human_approval_required": False},
+			effect={
+				"decision": "deny",
+				"reason": "cache_agent_human_approval_required",
+				"required_action": "require_human_approval_for_agent"
+			}
+		),
+		CapabilityRule(
+			name="bytewax_cache_stream_required",
+			description="CACH lifecycle batches must declare Bytewax as the cache lifecycle processor.",
+			condition={"operation": "validate_cache_lifecycle_batch", "event_stream_ne": "bytewax"},
+			effect={
+				"decision": "deny",
+				"reason": "bytewax_cache_stream_required",
+				"required_action": "route_batch_through_bytewax"
+			}
 		)
 	]
 
@@ -407,6 +550,8 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("analytics", "/cach/analytics", "CacheAnalytics", "cach:view_analytics", "Intelligence"),
 		CapabilityUIRoute("security", "/cach/security", "CacheSecurityView", "cach:admin", "Governance"),
 		CapabilityUIRoute("adapters", "/cach/adapters", "CacheAdapterHealth", "cach:admin", "Runtime"),
+		CapabilityUIRoute("agents", "/cach/agents", "CacheAgentRoster", "cach:admin", "Administration"),
+		CapabilityUIRoute("lifecycle", "/cach/lifecycle", "CacheLifecycleBatchMonitor", "cach:admin", "Runtime"),
 		CapabilityUIRoute("audit", "/cach/audit", "CacheAuditTimeline", "cach:admin", "Governance"),
 		CapabilityUIRoute("settings", "/cach/settings", "CacheSettings", "cach:admin", "Administration")
 	]
@@ -420,6 +565,50 @@ def ui_manifest() -> dict[str, Any]:
 	}
 
 
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class CACH agent composition manifest."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_CACH_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_CACH_AGENT_ROLES),
+		"privileged_roles": list(PRIVILEGED_CACH_AGENT_ROLES),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles"
+		]
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return CACH lifecycle stream-processing contract."""
+	return {
+		"engine": "bytewax",
+		"lifecycle_stream": "cach.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"cache_policy_batch",
+			"cache_warming_batch",
+			"cache_agent_batch",
+			"cache_eviction_batch"
+		],
+		"topics": [
+			"cach.namespaces",
+			"cach.entries",
+			"cach.warming",
+			"cach.evictions",
+			"cach.agents"
+		],
+		"kafka_core_dependency_allowed": False
+	}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable CACH capability contract."""
 	config = CapabilityConfiguration()
@@ -427,6 +616,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "cach",
 		"display_name": "Cache Management",
+		"provides": ["cache_governance", "cache_runtime_adapters", "cache_agent_composition"],
+		"requires": ["conf", "auth", "audl"],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
 		"rule_engine": {
@@ -434,6 +625,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"rules": [rule.__dict__ for rule in default_rules()]
 		},
 		"ui": ui_manifest(),
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
 		"theme": {
 			"name": theme.name,
 			"tokens": theme.tokens,
@@ -452,6 +645,10 @@ def _matches(condition: dict[str, Any], context: dict[str, Any]) -> bool:
 		if key.endswith("_gt"):
 			field_name = key[:-3]
 			if not context.get(field_name, 0) > expected:
+				return False
+		elif key.endswith("_ne"):
+			field_name = key[:-3]
+			if context.get(field_name) == expected:
 				return False
 		elif context.get(key) != expected:
 			return False

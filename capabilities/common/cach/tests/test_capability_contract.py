@@ -10,8 +10,10 @@ from capabilities.common.cach.capability_contract import (
 from capabilities.common.cach.service import CacheGovernanceService
 from capabilities.common.cach.view_models import (
 	adapter_health_model,
+	cache_agent_roster_model,
 	dashboard_model,
 	eviction_review_model,
+	lifecycle_batch_model,
 	namespace_inventory_model,
 	warming_console_model,
 )
@@ -34,11 +36,18 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"security",
 		"optimization",
 		"adapters",
+		"agents",
+		"streaming",
 		"telemetry",
 		"ui",
 		"theme"
 	]
-	assert len(contract["rule_engine"]["rules"]) >= 16
+	assert contract["agents"]["first_class"] is True
+	assert "codex" in contract["agents"]["supported_runtimes"]
+	assert "eviction_reviewer" in contract["agents"]["privileged_roles"]
+	assert contract["streaming"]["engine"] == "bytewax"
+	assert contract["streaming"]["kafka_core_dependency_allowed"] is False
+	assert len(contract["rule_engine"]["rules"]) >= 24
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
 		"namespaces",
@@ -50,12 +59,15 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"analytics",
 		"security",
 		"adapters",
+		"agents",
+		"lifecycle",
 		"audit",
 		"settings"
 	}
 	assert contract["ui"]["api_prefix"] == "/cach/api/v1"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "tier_hierarchy_map" in contract["theme"]["components"]
+	assert "cache_agent_roster" in contract["theme"]["components"]
 
 
 def test_rule_engine_enforces_cache_governance_guardrails():
@@ -80,6 +92,37 @@ def test_rule_engine_enforces_cache_governance_guardrails():
 		"cross_tenant_cache_access_denied",
 		"high_memory_pressure_requires_review"
 	}
+
+
+def test_rule_engine_enforces_cache_agent_and_bytewax_guardrails():
+	agent = evaluate_capability_rules({
+		"operation": "register_cache_agent",
+		"agent_runtime_supported": False,
+		"agent_role_supported": False,
+		"agent_scope_present": False,
+		"agent_owner_present": False,
+		"agent_purpose_present": False,
+		"contribution_disclosed": False,
+		"privileged_agent_role": True,
+		"human_approval_required": False,
+	})
+	stream = evaluate_capability_rules({
+		"operation": "validate_cache_lifecycle_batch",
+		"event_stream": "custom-broker",
+	})
+
+	assert agent["decision"] == "deny"
+	assert {action["reason"] for action in agent["actions"]} == {
+		"unsupported_cache_agent_runtime",
+		"unsupported_cache_agent_role",
+		"cache_agent_scope_required",
+		"cache_agent_owner_required",
+		"cache_agent_purpose_required",
+		"cache_agent_contribution_disclosure_required",
+		"cache_agent_human_approval_required",
+	}
+	assert stream["decision"] == "deny"
+	assert stream["actions"][0]["reason"] == "bytewax_cache_stream_required"
 
 
 def test_governance_service_enforces_namespace_entry_warming_and_eviction_lifecycle():
@@ -198,6 +241,48 @@ def test_governance_service_enforces_namespace_entry_warming_and_eviction_lifecy
 		decision="approved",
 		notes="cold entries are backed by source of truth",
 	)
+	with pytest.raises(PermissionError, match="cache_agent_human_approval_required"):
+		service.register_cache_agent(
+			tenant_id="tenant-cache",
+			agent_id="eviction-agent-denied",
+			name="Eviction Agent Denied",
+			runtime="codex",
+			role="eviction-reviewer",
+			scope="eviction review",
+			owner="platform",
+			purpose="review memory pressure decisions",
+			contribution_disclosed=True,
+			human_approval_required=False,
+		)
+	cache_agent = service.register_cache_agent(
+		tenant_id="tenant-cache",
+		agent_id="warming-agent",
+		name="Warming Agent",
+		runtime="claude-code",
+		role="warming-reviewer",
+		scope="warming plan review",
+		owner="platform",
+		purpose="review warming plans",
+		contribution_disclosed=True,
+		human_approval_required=True,
+	)
+	lifecycle_batch = service.validate_cache_lifecycle_batch(
+		tenant_id="tenant-cache",
+		event_stream="ByteWax",
+		mutation_count=3,
+	)
+	with pytest.raises(PermissionError, match="bytewax_cache_stream_required"):
+		service.validate_cache_lifecycle_batch(
+			tenant_id="tenant-cache",
+			event_stream="custom-broker",
+			mutation_count=1,
+		)
+	with pytest.raises(ValueError, match="cache_lifecycle_batch_empty"):
+		service.validate_cache_lifecycle_batch(
+			tenant_id="tenant-cache",
+			event_stream="bytewax",
+			mutation_count=0,
+		)
 
 	assert namespace.namespace == "orders"
 	assert denied_entry.status == "denied"
@@ -217,6 +302,15 @@ def test_governance_service_enforces_namespace_entry_warming_and_eviction_lifecy
 	assert denied_status == "review_denied"
 	assert "eviction_review_requires_independent_reviewer" in denied_rules
 	assert approved_review.status == "approved"
+	assert cache_agent.runtime == "claude_code"
+	assert cache_agent.role == "warming_reviewer"
+	assert cache_agent.human_approval_required is True
+	assert lifecycle_batch.event_stream == "bytewax"
+	assert lifecycle_batch.required_processor == "bytewax"
+	assert lifecycle_batch.accepted is True
+	assert service.dashboard_summary("tenant-cache")["cache_agent_count"] == 1
+	assert service.dashboard_summary("tenant-cache")["lifecycle_batch_count"] == 2
+	assert service.dashboard_summary("tenant-cache")["denied_lifecycle_batch_count"] == 1
 	assert service.dashboard_summary("tenant-cache")["active_entry_count"] == 1
 	assert service.dashboard_summary("tenant-cache")["denied_entry_count"] == 1
 	assert {
@@ -253,11 +347,30 @@ def test_generated_view_models_are_operable():
 		reason="login path",
 		source_registered=True,
 	)
+	service.register_cache_agent(
+		tenant_id="tenant-cache",
+		agent_id="policy-agent",
+		name="Policy Agent",
+		runtime="opencode",
+		role="namespace-policy-reviewer",
+		scope="namespace policy review",
+		owner="identity",
+		purpose="review cache namespace policy changes",
+		contribution_disclosed=True,
+	)
+	service.validate_cache_lifecycle_batch(
+		tenant_id="tenant-cache",
+		event_stream="bytewax",
+		mutation_count=1,
+	)
 
 	assert dashboard_model(service, "tenant-cache")["summary"]["namespace_count"] == 1
 	assert namespace_inventory_model(service, "tenant-cache")["rows"][0]["namespace"] == "profiles"
 	assert warming_console_model(service, "tenant-cache")["rows"][0]["status"] == "ready"
 	assert eviction_review_model(service, "tenant-cache")["review_actions"] == ["approved", "rejected"]
+	assert cache_agent_roster_model(service, "tenant-cache")["rows"][0]["runtime"] == "opencode"
+	assert lifecycle_batch_model(service, "tenant-cache")["rows"][0]["accepted"] is True
+	assert adapter_health_model("tenant-cache")["default_backend"] == "memory"
 	assert "redis" in adapter_health_model("tenant-cache")["supported_backends"]
 
 

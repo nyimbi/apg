@@ -22,9 +22,11 @@ from .capability_contract import (
 try:
 	from .service import (
 		CacheAuditEventRecord,
+		CacheAgentRecord,
 		CacheEntryRecord,
 		CacheEvictionReviewRecord,
 		CacheGovernanceService,
+		CacheLifecycleBatchRecord,
 		CacheNamespaceRecord,
 		CacheService,
 		CacheServiceConfig,
@@ -43,6 +45,8 @@ except ModuleNotFoundError as exc:
 	CacheWarmingPlanRecord = None
 	CacheEvictionReviewRecord = None
 	CacheAuditEventRecord = None
+	CacheAgentRecord = None
+	CacheLifecycleBatchRecord = None
 	_SERVICE_IMPORT_ERROR = exc
 
 	def create_cache_service(*args, **kwargs):
@@ -74,7 +78,7 @@ except (ImportError, ModuleNotFoundError) as exc:
 		"description": "Tenant-scoped cache governance, warming, eviction review, and runtime adapter control",
 		"version": "1.0.0",
 		"category": "infrastructure",
-		"dependencies": ["auth", "audl", "mten", "moni", "conf"],
+		"dependencies": ["auth", "audl", "conf"],
 		"optional_dependencies": ["aicr", "pred", "anom", "agnt"]
 	}
 
@@ -86,7 +90,7 @@ except (ImportError, ModuleNotFoundError) as exc:
 __capability_name__ = "cach"
 __capability_version__ = "1.0.0"
 __capability_description__ = "Tenant-scoped cache governance, warming, eviction review, and runtime adapter control"
-__capability_dependencies__ = ["auth", "audl", "mten", "moni", "conf"]
+__capability_dependencies__ = ["auth", "audl", "conf"]
 __capability_optional_dependencies__ = ["aicr", "pred", "anom", "agnt"]
 
 # Export main components
@@ -95,6 +99,8 @@ __all__ = [
 	'CacheService',
 	'CacheServiceConfig', 
 	'CacheGovernanceService',
+	'CacheAgentRecord',
+	'CacheLifecycleBatchRecord',
 	'CacheNamespaceRecord',
 	'CacheEntryRecord',
 	'CacheWarmingPlanRecord',
@@ -182,6 +188,8 @@ def register_capability() -> dict:
 			"cache_policy_governance": "Apply namespace, TTL, eviction, and security policies",
 			"intelligent_warming": "Warm cache namespaces from configured data sources",
 			"eviction_review": "Capture memory pressure, eviction plans, independent review, and audit notes",
+			"cache_agent_composition": "Register first-class cache agents with runtime, role, owner, purpose, scope, disclosure, and approval guardrails",
+			"lifecycle_batch_validation": "Validate cache lifecycle mutation batches against Bytewax-first stream rules",
 			"adaptive_optimization": "Tune cache tiers from performance and access signals",
 			"capability_rules": "Evaluate deterministic cache governance rules",
 			"visual_theming": "Apply cache-control theme tokens and components"
@@ -192,6 +200,8 @@ def register_capability() -> dict:
 			"policies": "/cach/api/v1/policies",
 			"warming": "/cach/api/v1/warming",
 			"evictions": "/cach/api/v1/evictions",
+			"agents": "/cach/api/v1/agents",
+			"lifecycle": "/cach/api/v1/lifecycle",
 			"tiers": "/cach/api/v1/tiers",
 			"adapters": "/cach/api/v1/adapters",
 			"audit": "/cach/api/v1/audit",
@@ -203,6 +213,8 @@ def register_capability() -> dict:
 			for route in contract["ui"]["routes"]
 		},
 		"ui_manifest": contract["ui"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 		"permissions": [
 			"cach:view",
@@ -214,6 +226,7 @@ def register_capability() -> dict:
 			"cach:warm",
 			"cach:review_eviction",
 			"cach:view_analytics",
+			"cach:manage_agents",
 			"cach:admin"
 		]
 	}

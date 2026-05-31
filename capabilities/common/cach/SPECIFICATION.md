@@ -42,9 +42,18 @@ CACH must let a generated application:
 10. Record eviction/capacity review decisions with independent reviewer notes.
 11. Provide generated-application view models for dashboard, namespace
    inventory, entry explorer, policy manager, warming console, eviction review,
-   tier topology, adapter health, audit timeline, and settings.
+   tier topology, adapter health, cache-agent roster, lifecycle batches, audit
+   timeline, and settings.
 12. Publish a current semantic model and release report from the live capability
    contract rather than stale embedded JSON.
+13. Register cache agents as first-class APG actors for namespace policy,
+   warming, eviction, freshness, tier optimization, adapter health, and
+   lifecycle audit decisions.
+14. Fail closed when cache agents omit supported runtime, supported role, owner,
+   purpose, scope, contribution disclosure, or privileged-role human approval.
+15. Validate cache lifecycle batches through a Bytewax-first stream manifest
+   before generated applications compose cache policy, warming, agent, or
+   eviction mutations.
 
 ## Functional Scope
 
@@ -95,6 +104,27 @@ CACH must represent memory-pressure and eviction reviews as first-class records.
 Eviction plans above configured thresholds require an independent reviewer and
 review notes before they can be approved.
 
+### Cache Agents
+
+Cache agents are first-class APG actors. The initial supported runtimes are
+Codex, Claude Code, opencode, and Pi. Each agent must declare tenant, agent ID,
+name, runtime, role, scope, owner, purpose, contribution disclosure, and human
+approval posture.
+
+Privileged roles require human approval:
+
+- warming reviewer
+- eviction reviewer
+- tier optimization reviewer
+- adapter health reviewer
+
+### Lifecycle Batches
+
+Cache lifecycle batches represent groups of namespace, entry, warming, eviction,
+and agent mutations. They must be non-empty and declare Bytewax as the lifecycle
+processor. Live workers remain adapter work; this packet records the contract
+and validation evidence.
+
 ### Rules
 
 The rule engine is deterministic. It evaluates simple context dictionaries and
@@ -114,6 +144,10 @@ Baseline rules:
 - memory pressure without an eviction plan requires review
 - eviction review requires an independent reviewer
 - review notes are required for capacity and eviction decisions
+- cache-agent runtime and role must be supported
+- cache-agent scope, owner, purpose, and contribution disclosure are required
+- privileged cache-agent roles require human approval
+- lifecycle batches require Bytewax stream processing
 
 ### UI and Theming
 
@@ -133,6 +167,8 @@ Required screens:
 - analytics
 - security
 - adapters
+- cache agents
+- lifecycle batches
 - audit
 - settings
 
@@ -148,8 +184,9 @@ CACH depends conceptually on:
 - `conf` for tenant defaults and environment configuration
 - `auth` for user and permission context
 - `audl` for immutable audit evidence
-- `mten` for tenant isolation
-- `moni` for metrics, health, traces, and alerts
+- `mten` for tenant isolation when the runtime adapter binds tenant services
+- `moni` for metrics, health, traces, and alerts when adapter telemetry is bound
+- `mqeb` for optional event publication after Bytewax lifecycle validation
 
 The dependency-light packet must not require those capabilities at import time.
 Adapters must be allowed to bind them at runtime.
@@ -179,7 +216,7 @@ The CACH packet is serviceable when:
   components that cover the lifecycle above.
 - `service.py` includes a dependency-light lifecycle/governance service that can
   create namespaces, admit/read/delete entries, request warming, and decide
-  eviction reviews.
+  eviction reviews, register cache agents, and validate lifecycle batches.
 - `api.py` exposes simple callable helpers over the lifecycle service.
 - `view_models.py` exposes generated-application view models.
 - `app.py`, `semantic_model.json`, and `release_report.json` are derived from
