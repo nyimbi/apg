@@ -3,7 +3,8 @@
 MONI is APG's tenant-scoped monitoring and observability capability. It gives
 generated applications a dependency-light control plane for registering signal
 sources, governing metrics/logs/traces, managing SLOs, routing alerts,
-correlating incidents, approving remediation, and publishing UI/theme metadata.
+correlating incidents, approving remediation, composing monitoring AI agents,
+validating Bytewax lifecycle batches, and publishing UI/theme metadata.
 
 The current packet can be composed without starting OpenTelemetry collectors,
 metrics databases, log stores, trace stores, notification systems, or incident
@@ -19,6 +20,10 @@ guardrail decisions.
 - Metric, log, and trace signal records with decision evidence.
 - SLO records and alert/incident lifecycle records.
 - Remediation request and approval workflows with independent reviewer evidence.
+- First-class monitoring-agent registration for Codex, Claude Code, opencode,
+  Pi, and future runtime adapters.
+- Bytewax-first lifecycle batch validation for metrics, SLOs, alerts,
+  incidents, and monitoring-agent mutations.
 - Generated-application view models for dashboards and operations screens.
 - Theme tokens and component metadata for signal consoles.
 - Contract-derived semantic-model and release evidence for APG publish tooling.
@@ -46,6 +51,8 @@ from capabilities.common.moni.api import (
     create_alert_record,
     request_remediation,
     decide_remediation,
+    register_monitoring_agent,
+    validate_monitoring_lifecycle_batch,
 )
 
 source = register_source_record(
@@ -103,6 +110,24 @@ decision = decide_remediation(
     decision="approved",
     notes="Runbook is approved and capacity is available.",
 )
+
+agent = register_monitoring_agent(
+    tenant_id="tenant-a",
+    agent_id="slo-agent",
+    name="SLO Reviewer",
+    runtime="claude code",
+    role="slo reviewer",
+    scope="orders service SLOs",
+    owner="sre-lead",
+    purpose="review SLO burn and alert route quality",
+    human_approval_required=True,
+)
+
+batch = validate_monitoring_lifecycle_batch(
+    tenant_id="tenant-a",
+    event_stream="bytewax",
+    mutation_count=8,
+)
 ```
 
 ## Rule Evaluation
@@ -122,14 +147,34 @@ assert decision["decision"] == "deny"
 assert "pii_logs_blocked" in decision["matched_rules"]
 ```
 
+Bytewax is mandatory for lifecycle batches:
+
+```python
+decision = evaluate_capability_rules({
+    "tenant_context_present": True,
+    "operation": "validate_monitoring_lifecycle_batch",
+    "event_stream": "legacy_broker",
+})
+
+assert decision["decision"] == "deny"
+assert "bytewax_monitoring_stream_required" in decision["matched_rules"]
+```
+
 ## View Models
 
 ```python
 from capabilities.common.moni.api import SERVICE
-from capabilities.common.moni.view_models import dashboard_model, incident_model
+from capabilities.common.moni.view_models import (
+    dashboard_model,
+    incident_model,
+    monitoring_agent_roster_model,
+    lifecycle_batch_model,
+)
 
 dashboard = dashboard_model(SERVICE, tenant_id="tenant-a")
 incidents = incident_model(SERVICE, tenant_id="tenant-a")
+agents = monitoring_agent_roster_model(SERVICE, tenant_id="tenant-a")
+lifecycle = lifecycle_batch_model(SERVICE, tenant_id="tenant-a")
 ```
 
 ## Adapter Boundary
@@ -143,6 +188,10 @@ Production adapters should:
 4. Route critical alerts only through configured notification routes.
 5. Emit audit evidence through APG `audl` when available.
 6. Treat MONI remediation approvals as control-plane decisions, not execution.
+7. Treat MONI monitoring-agent registrations as governance records, not as
+   embedded runtime clients.
+8. Route lifecycle mutation batches through Bytewax and preserve the
+   `moni.lifecycle` event-time contract.
 
 ## Verification
 

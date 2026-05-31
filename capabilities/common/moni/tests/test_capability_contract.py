@@ -13,6 +13,8 @@ from capabilities.common.moni.view_models import (
 	alert_center_model,
 	dashboard_model,
 	incident_model,
+	lifecycle_batch_model,
+	monitoring_agent_roster_model,
 	remediation_model,
 	signal_explorer_model,
 	source_inventory_model,
@@ -38,10 +40,23 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"retention",
 		"remediation",
 		"adapters",
+		"agents",
+		"streaming",
 		"security",
 		"ui",
 		"theme"
 	]
+	assert contract["provides"] == [
+		"observability_governance",
+		"metrics_lifecycle",
+		"monitoring_agent_composition"
+	]
+	assert contract["requires"] == ["conf", "audl", "mqeb"]
+	assert contract["agents"]["first_class"] is True
+	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert "slo_reviewer" in contract["agents"]["privileged_roles"]
+	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert contract["streaming"]["broker_core_dependency_allowed"] is False
 	assert len(contract["rule_engine"]["rules"]) >= 16
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
@@ -57,12 +72,16 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"remediation",
 		"audit",
 		"adapters",
+		"agents",
+		"lifecycle",
 		"settings"
 	}
 	assert contract["ui"]["api_prefix"] == "/moni/api/v1"
 	assert contract["ui"]["view_module"] == "view_models.py"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "alert_correlation_stack" in contract["theme"]["components"]
+	assert "monitoring_agent_roster" in contract["theme"]["components"]
+	assert "bytewax_lifecycle_panel" in contract["theme"]["components"]
 
 
 def test_rule_engine_enforces_observability_guardrails():
@@ -90,6 +109,40 @@ def test_rule_engine_enforces_observability_guardrails():
 		"high_cardinality_metric_requires_review",
 		"production_remediation_requires_runbook"
 	}
+
+
+def test_rule_engine_enforces_monitoring_agent_guardrails():
+	result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_monitoring_agent",
+		"agent_runtime_supported": False,
+		"agent_role_supported": False,
+		"agent_scope_present": False,
+		"agent_owner_present": False,
+		"agent_purpose_present": False,
+		"contribution_disclosed": False
+	})
+
+	assert result["decision"] == "deny"
+	assert set(result["matched_rules"]) >= {
+		"monitoring_agent_runtime_supported",
+		"monitoring_agent_role_supported",
+		"monitoring_agent_requires_scope",
+		"monitoring_agent_requires_owner",
+		"monitoring_agent_requires_purpose",
+		"monitoring_agent_requires_contribution_disclosure"
+	}
+
+
+def test_bytewax_lifecycle_rule_rejects_non_bytewax_streams():
+	result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "validate_monitoring_lifecycle_batch",
+		"event_stream": "legacy_broker",
+	})
+
+	assert result["decision"] == "deny"
+	assert "bytewax_monitoring_stream_required" in result["matched_rules"]
 
 
 def test_moni_service_governs_sources_signals_alerts_incidents_and_remediation():
@@ -173,6 +226,33 @@ def test_moni_service_governs_sources_signals_alerts_incidents_and_remediation()
 		decision="approved",
 		notes="approved runbook and capacity available",
 	)
+	with pytest.raises(PermissionError, match="monitoring_agent_human_approval_required"):
+		service.register_monitoring_agent(
+			tenant_id="tenant-signals",
+			agent_id="agent-denied",
+			name="Denied Incident Agent",
+			runtime="codex",
+			role="incident_reviewer",
+			scope="production incidents",
+			owner="platform",
+			purpose="review critical incidents",
+		)
+	agent = service.register_monitoring_agent(
+		tenant_id="tenant-signals",
+		agent_id="agent-slo",
+		name="SLO Reviewer",
+		runtime="Claude Code",
+		role="slo reviewer",
+		scope="orders service SLOs",
+		owner="sre-lead",
+		purpose="review SLO burn and alert route quality",
+		human_approval_required=True,
+	)
+	batch = service.validate_monitoring_lifecycle_batch(
+		tenant_id="tenant-signals",
+		event_stream="bytewax",
+		mutation_count=5,
+	)
 
 	assert source.source_id == "orders-api"
 	assert metric.status == "accepted"
@@ -186,8 +266,13 @@ def test_moni_service_governs_sources_signals_alerts_incidents_and_remediation()
 	assert alert.incident_id in service.incidents
 	assert denied_status == "review_denied"
 	assert approved.status == "approved"
+	assert agent.runtime == "claude_code"
+	assert agent.role == "slo_reviewer"
+	assert batch.accepted is True
+	assert batch.required_processor == "bytewax"
 	assert service.dashboard_summary("tenant-signals")["source_count"] == 1
 	assert service.dashboard_summary("tenant-signals")["open_incident_count"] == 1
+	assert service.dashboard_summary("tenant-signals")["monitoring_agent_count"] == 1
 
 
 def test_moni_service_fails_closed_for_missing_source_disabled_source_and_invalid_inputs():
@@ -256,6 +341,51 @@ def test_moni_service_fails_closed_for_missing_source_disabled_source_and_invali
 			proposed_action="scale orders workers",
 			reason="latency burn",
 		)
+	with pytest.raises(PermissionError, match="unsupported_monitoring_agent_runtime"):
+		service.register_monitoring_agent(
+			tenant_id="tenant-signals",
+			agent_id="bad-agent",
+			name="Bad Agent",
+			runtime="unsupported",
+			role="alert_reviewer",
+			scope="alerts",
+			owner="platform",
+			purpose="review alerts",
+			human_approval_required=True,
+		)
+	with pytest.raises(PermissionError, match="bytewax_monitoring_stream_required"):
+		service.validate_monitoring_lifecycle_batch(
+			tenant_id="tenant-signals",
+			event_stream="legacy_broker",
+			mutation_count=1,
+		)
+
+
+def test_view_models_expose_agent_and_lifecycle_surfaces():
+	service = MoniService("tenant-signals")
+	service.register_monitoring_agent(
+		tenant_id="tenant-signals",
+		agent_id="metric-quality",
+		name="Metric Quality",
+		runtime="opencode",
+		role="metric_quality_reviewer",
+		scope="metric naming and cardinality",
+		owner="observability",
+		purpose="review metric quality drift",
+	)
+	service.validate_monitoring_lifecycle_batch(
+		tenant_id="tenant-signals",
+		event_stream="bytewax",
+		mutation_count=3,
+	)
+
+	agent_model = monitoring_agent_roster_model(service, "tenant-signals")
+	lifecycle_model = lifecycle_batch_model(service, "tenant-signals")
+
+	assert agent_model["rows"][0]["role"] == "metric_quality_reviewer"
+	assert "codex" in agent_model["supported_runtimes"]
+	assert lifecycle_model["streaming"]["required_processor"] == "bytewax"
+	assert lifecycle_model["rows"][0]["mutation_count"] == 3
 
 
 def test_generated_view_models_are_operable():
@@ -294,4 +424,6 @@ def test_registration_includes_full_capability_contract():
 	assert registration["theme"]["name"] == "moni_signal_console"
 	assert registration["ui_components"]["alerts"] == "/moni/alerts"
 	assert registration["ui_components"]["incidents"] == "/moni/incidents"
-	assert "auth" in registration["dependencies"]
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["required_processor"] == "bytewax"
+	assert registration["dependencies"] == ["conf", "audl", "mqeb"]

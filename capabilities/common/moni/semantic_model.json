@@ -1,5 +1,49 @@
 {
-  "agents": {},
+  "agents": {
+    "monitoring_agents": {
+      "first_class": true,
+      "guardrails": [
+        "supported_runtime",
+        "supported_role",
+        "explicit_scope",
+        "accountable_owner",
+        "declared_purpose",
+        "machine_contribution_disclosure",
+        "human_approval_for_privileged_roles"
+      ],
+      "privileged_roles": [
+        "slo_reviewer",
+        "alert_reviewer",
+        "incident_reviewer",
+        "anomaly_triage"
+      ],
+      "required_fields": [
+        "tenant_id",
+        "agent_id",
+        "name",
+        "runtime",
+        "role",
+        "scope",
+        "owner",
+        "purpose"
+      ],
+      "supported_roles": [
+        "slo_reviewer",
+        "alert_reviewer",
+        "incident_reviewer",
+        "anomaly_triage",
+        "metric_quality_reviewer",
+        "trace_correlation_reviewer",
+        "dashboard_reviewer"
+      ],
+      "supported_runtimes": [
+        "codex",
+        "claude_code",
+        "opencode",
+        "pi"
+      ]
+    }
+  },
   "app": {
     "description": "Monitoring and Observability package-backed APG capability",
     "entity_count": 0,
@@ -19,7 +63,53 @@
         ],
         "trace_store": "adapter"
       },
+      "agents": {
+        "monitoring_agent_contract": {
+          "first_class": true,
+          "guardrails": [
+            "supported_runtime",
+            "supported_role",
+            "explicit_scope",
+            "accountable_owner",
+            "declared_purpose",
+            "machine_contribution_disclosure",
+            "human_approval_for_privileged_roles"
+          ],
+          "privileged_roles": [
+            "slo_reviewer",
+            "alert_reviewer",
+            "incident_reviewer",
+            "anomaly_triage"
+          ],
+          "required_fields": [
+            "tenant_id",
+            "agent_id",
+            "name",
+            "runtime",
+            "role",
+            "scope",
+            "owner",
+            "purpose"
+          ],
+          "supported_roles": [
+            "slo_reviewer",
+            "alert_reviewer",
+            "incident_reviewer",
+            "anomaly_triage",
+            "metric_quality_reviewer",
+            "trace_correlation_reviewer",
+            "dashboard_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        }
+      },
       "approvals": {
+        "monitoring_agent": "MonitoringAgentRecord",
         "remediation": "RemediationRequestRecord"
       },
       "business_rules": [],
@@ -35,6 +125,35 @@
             "apg_native"
           ],
           "trace_store": "adapter"
+        },
+        "agents": {
+          "first_class": true,
+          "privileged_roles": [
+            "slo_reviewer",
+            "alert_reviewer",
+            "incident_reviewer",
+            "anomaly_triage"
+          ],
+          "require_contribution_disclosure": true,
+          "require_human_approval_for_privileged_roles": true,
+          "require_owner": true,
+          "require_purpose": true,
+          "require_scope": true,
+          "supported_roles": [
+            "slo_reviewer",
+            "alert_reviewer",
+            "incident_reviewer",
+            "anomaly_triage",
+            "metric_quality_reviewer",
+            "trace_correlation_reviewer",
+            "dashboard_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "alerts": {
           "critical_alert_route_required": true,
@@ -89,6 +208,25 @@
           "default_window_minutes": 60,
           "owner_required": true
         },
+        "streaming": {
+          "engine": "bytewax",
+          "lifecycle_stream": "moni.lifecycle",
+          "required_operations": [
+            "metric_batch",
+            "alert_batch",
+            "incident_batch",
+            "slo_batch",
+            "monitoring_agent_batch"
+          ],
+          "topics": [
+            "moni.metrics",
+            "moni.alerts",
+            "moni.incidents",
+            "moni.slos",
+            "moni.agents"
+          ],
+          "watermark": "event_time"
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
@@ -100,7 +238,9 @@
           "enable_audit_timeline": true,
           "enable_dashboard": true,
           "enable_incident_console": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_log_explorer": true,
+          "enable_monitoring_agent_roster": true,
           "enable_remediation_console": true,
           "enable_slo_console": true,
           "enable_source_inventory": true,
@@ -117,14 +257,21 @@
         "alert": "AlertRecord",
         "audit": "MoniAuditEventRecord",
         "incident": "IncidentRecord",
+        "lifecycle_batch": "MonitoringLifecycleBatchRecord",
         "signal": "SignalRecord",
         "slo": "SloRecord",
         "source": "SignalSourceRecord"
       },
       "provides": [
-        "moni_operations"
+        "observability_governance",
+        "metrics_lifecycle",
+        "monitoring_agent_composition"
       ],
-      "requires": [],
+      "requires": [
+        "conf",
+        "audl",
+        "mqeb"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -332,6 +479,111 @@
               "required_action": "attach_review_notes"
             },
             "name": "review_notes_required"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_monitoring_agent"
+            },
+            "description": "Monitoring agents must use a supported runtime adapter.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_monitoring_agent_runtime",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "monitoring_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_monitoring_agent"
+            },
+            "description": "Monitoring agents must use a supported observability role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_monitoring_agent_role",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "monitoring_agent_role_supported"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "operation": "register_monitoring_agent"
+            },
+            "description": "Monitoring agents require an explicit operating scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "monitoring_agent_scope_required",
+              "required_action": "attach_agent_scope"
+            },
+            "name": "monitoring_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "agent_owner_present": false,
+              "operation": "register_monitoring_agent"
+            },
+            "description": "Monitoring agents require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "monitoring_agent_owner_required",
+              "required_action": "attach_agent_owner"
+            },
+            "name": "monitoring_agent_requires_owner"
+          },
+          {
+            "condition": {
+              "agent_purpose_present": false,
+              "operation": "register_monitoring_agent"
+            },
+            "description": "Monitoring agents require a declared purpose.",
+            "effect": {
+              "decision": "deny",
+              "reason": "monitoring_agent_purpose_required",
+              "required_action": "attach_agent_purpose"
+            },
+            "name": "monitoring_agent_requires_purpose"
+          },
+          {
+            "condition": {
+              "contribution_disclosed": false,
+              "operation": "register_monitoring_agent"
+            },
+            "description": "Monitoring agents must disclose machine contribution in observability decisions.",
+            "effect": {
+              "decision": "deny",
+              "reason": "monitoring_agent_contribution_disclosure_required",
+              "required_action": "enable_agent_contribution_disclosure"
+            },
+            "name": "monitoring_agent_requires_contribution_disclosure"
+          },
+          {
+            "condition": {
+              "human_approval_required": false,
+              "operation": "register_monitoring_agent",
+              "privileged_agent_role": true
+            },
+            "description": "Privileged monitoring-agent roles require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "monitoring_agent_human_approval_required",
+              "required_action": "require_human_approval_for_agent"
+            },
+            "name": "monitoring_agent_privileged_role_requires_human_approval"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "validate_monitoring_lifecycle_batch"
+            },
+            "description": "MONI lifecycle batches must declare Bytewax as the observability lifecycle processor.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_monitoring_stream_required",
+              "required_action": "route_batch_through_bytewax"
+            },
+            "name": "bytewax_monitoring_stream_required"
           }
         ],
         "type": "deterministic"
@@ -542,6 +794,111 @@
             "required_action": "attach_review_notes"
           },
           "name": "review_notes_required"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_monitoring_agent"
+          },
+          "description": "Monitoring agents must use a supported runtime adapter.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_monitoring_agent_runtime",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "monitoring_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_monitoring_agent"
+          },
+          "description": "Monitoring agents must use a supported observability role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_monitoring_agent_role",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "monitoring_agent_role_supported"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "operation": "register_monitoring_agent"
+          },
+          "description": "Monitoring agents require an explicit operating scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "monitoring_agent_scope_required",
+            "required_action": "attach_agent_scope"
+          },
+          "name": "monitoring_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "agent_owner_present": false,
+            "operation": "register_monitoring_agent"
+          },
+          "description": "Monitoring agents require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "monitoring_agent_owner_required",
+            "required_action": "attach_agent_owner"
+          },
+          "name": "monitoring_agent_requires_owner"
+        },
+        {
+          "condition": {
+            "agent_purpose_present": false,
+            "operation": "register_monitoring_agent"
+          },
+          "description": "Monitoring agents require a declared purpose.",
+          "effect": {
+            "decision": "deny",
+            "reason": "monitoring_agent_purpose_required",
+            "required_action": "attach_agent_purpose"
+          },
+          "name": "monitoring_agent_requires_purpose"
+        },
+        {
+          "condition": {
+            "contribution_disclosed": false,
+            "operation": "register_monitoring_agent"
+          },
+          "description": "Monitoring agents must disclose machine contribution in observability decisions.",
+          "effect": {
+            "decision": "deny",
+            "reason": "monitoring_agent_contribution_disclosure_required",
+            "required_action": "enable_agent_contribution_disclosure"
+          },
+          "name": "monitoring_agent_requires_contribution_disclosure"
+        },
+        {
+          "condition": {
+            "human_approval_required": false,
+            "operation": "register_monitoring_agent",
+            "privileged_agent_role": true
+          },
+          "description": "Privileged monitoring-agent roles require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "monitoring_agent_human_approval_required",
+            "required_action": "require_human_approval_for_agent"
+          },
+          "name": "monitoring_agent_privileged_role_requires_human_approval"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "validate_monitoring_lifecycle_batch"
+          },
+          "description": "MONI lifecycle batches must declare Bytewax as the observability lifecycle processor.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_monitoring_stream_required",
+            "required_action": "route_batch_through_bytewax"
+          },
+          "name": "bytewax_monitoring_stream_required"
         }
       ],
       "runtime": {
@@ -555,6 +912,11 @@
           "component": "MonitoringAdapterHealth",
           "permission": "moni:admin",
           "route": "/moni/adapters"
+        },
+        "agents": {
+          "component": "MonitoringAgentRoster",
+          "permission": "moni:admin",
+          "route": "/moni/agents"
         },
         "alerts": {
           "component": "AlertCenter",
@@ -580,6 +942,11 @@
           "component": "IncidentConsole",
           "permission": "moni:manage_incidents",
           "route": "/moni/incidents"
+        },
+        "lifecycle": {
+          "component": "MonitoringLifecycleBatchMonitor",
+          "permission": "moni:admin",
+          "route": "/moni/lifecycle"
         },
         "logs": {
           "component": "LogExplorer",
@@ -622,7 +989,27 @@
           "route": "/moni/traces"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "broker_core_dependency_allowed": false,
+        "engine": "bytewax",
+        "lifecycle_stream": "moni.lifecycle",
+        "required_operations": [
+          "metric_batch",
+          "alert_batch",
+          "incident_batch",
+          "slo_batch",
+          "monitoring_agent_batch"
+        ],
+        "required_processor": "bytewax",
+        "topics": [
+          "moni.metrics",
+          "moni.alerts",
+          "moni.incidents",
+          "moni.slos",
+          "moni.agents"
+        ],
+        "watermark": "event_time"
+      },
       "theme": {
         "components": {
           "adapter_status_panel": {
@@ -637,6 +1024,11 @@
             "highlight": "matched-rule-chip",
             "visual": "decision-timeline"
           },
+          "bytewax_lifecycle_panel": {
+            "icon": "activity",
+            "status_indicator": "processor-state",
+            "variant": "stream-lifecycle"
+          },
           "incident_timeline": {
             "highlight": "severity-chip",
             "visual": "event-timeline"
@@ -644,6 +1036,11 @@
           "metric_query_panel": {
             "threshold_style": "slo-lines",
             "visual": "time-series-grid"
+          },
+          "monitoring_agent_roster": {
+            "icon": "bot",
+            "status_indicator": "approval-state",
+            "variant": "agent-governance"
           },
           "remediation_runbook_trace": {
             "status_style": "approval-gate",
@@ -774,6 +1171,20 @@
             "permission": "moni:admin"
           },
           {
+            "component": "MonitoringAgentRoster",
+            "name": "agents",
+            "nav_group": "Administration",
+            "path": "/moni/agents",
+            "permission": "moni:admin"
+          },
+          {
+            "component": "MonitoringLifecycleBatchMonitor",
+            "name": "lifecycle",
+            "nav_group": "Runtime",
+            "path": "/moni/lifecycle",
+            "permission": "moni:admin"
+          },
+          {
             "component": "MonitoringSettings",
             "name": "settings",
             "nav_group": "Administration",
@@ -791,14 +1202,80 @@
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "moni_observability_governance": {
+        "roles": [
+          "slo_reviewer",
+          "alert_reviewer",
+          "incident_reviewer",
+          "anomaly_triage",
+          "metric_quality_reviewer",
+          "trace_correlation_reviewer",
+          "dashboard_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ],
+        "stream": "moni.lifecycle"
+      }
+    },
     "applications": {},
     "capability_dependencies": {
-      "moni": []
+      "moni": [
+        "conf",
+        "audl",
+        "mqeb"
+      ]
     }
   },
   "contracts": {
     "moni": {
+      "agents": {
+        "first_class": true,
+        "guardrails": [
+          "supported_runtime",
+          "supported_role",
+          "explicit_scope",
+          "accountable_owner",
+          "declared_purpose",
+          "machine_contribution_disclosure",
+          "human_approval_for_privileged_roles"
+        ],
+        "privileged_roles": [
+          "slo_reviewer",
+          "alert_reviewer",
+          "incident_reviewer",
+          "anomaly_triage"
+        ],
+        "required_fields": [
+          "tenant_id",
+          "agent_id",
+          "name",
+          "runtime",
+          "role",
+          "scope",
+          "owner",
+          "purpose"
+        ],
+        "supported_roles": [
+          "slo_reviewer",
+          "alert_reviewer",
+          "incident_reviewer",
+          "anomaly_triage",
+          "metric_quality_reviewer",
+          "trace_correlation_reviewer",
+          "dashboard_reviewer"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "configuration": {
         "adapters": {
           "log_store": "adapter",
@@ -810,6 +1287,35 @@
             "apg_native"
           ],
           "trace_store": "adapter"
+        },
+        "agents": {
+          "first_class": true,
+          "privileged_roles": [
+            "slo_reviewer",
+            "alert_reviewer",
+            "incident_reviewer",
+            "anomaly_triage"
+          ],
+          "require_contribution_disclosure": true,
+          "require_human_approval_for_privileged_roles": true,
+          "require_owner": true,
+          "require_purpose": true,
+          "require_scope": true,
+          "supported_roles": [
+            "slo_reviewer",
+            "alert_reviewer",
+            "incident_reviewer",
+            "anomaly_triage",
+            "metric_quality_reviewer",
+            "trace_correlation_reviewer",
+            "dashboard_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "alerts": {
           "critical_alert_route_required": true,
@@ -864,6 +1370,25 @@
           "default_window_minutes": 60,
           "owner_required": true
         },
+        "streaming": {
+          "engine": "bytewax",
+          "lifecycle_stream": "moni.lifecycle",
+          "required_operations": [
+            "metric_batch",
+            "alert_batch",
+            "incident_batch",
+            "slo_batch",
+            "monitoring_agent_batch"
+          ],
+          "topics": [
+            "moni.metrics",
+            "moni.alerts",
+            "moni.incidents",
+            "moni.slos",
+            "moni.agents"
+          ],
+          "watermark": "event_time"
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
@@ -875,7 +1400,9 @@
           "enable_audit_timeline": true,
           "enable_dashboard": true,
           "enable_incident_console": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_log_explorer": true,
+          "enable_monitoring_agent_roster": true,
           "enable_remediation_console": true,
           "enable_slo_console": true,
           "enable_source_inventory": true,
@@ -884,9 +1411,36 @@
       },
       "id": "moni",
       "provides": [
-        "moni_operations"
+        "observability_governance",
+        "metrics_lifecycle",
+        "monitoring_agent_composition"
       ],
-      "requires": []
+      "requires": [
+        "conf",
+        "audl",
+        "mqeb"
+      ],
+      "streaming": {
+        "broker_core_dependency_allowed": false,
+        "engine": "bytewax",
+        "lifecycle_stream": "moni.lifecycle",
+        "required_operations": [
+          "metric_batch",
+          "alert_batch",
+          "incident_batch",
+          "slo_batch",
+          "monitoring_agent_batch"
+        ],
+        "required_processor": "bytewax",
+        "topics": [
+          "moni.metrics",
+          "moni.alerts",
+          "moni.incidents",
+          "moni.slos",
+          "moni.agents"
+        ],
+        "watermark": "event_time"
+      }
     }
   },
   "deployment": {
@@ -919,6 +1473,19 @@
   },
   "roles": {},
   "rules": {
+    "bytewax_monitoring_stream_required": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "validate_monitoring_lifecycle_batch"
+      },
+      "description": "MONI lifecycle batches must declare Bytewax as the observability lifecycle processor.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_monitoring_stream_required",
+        "required_action": "route_batch_through_bytewax"
+      },
+      "name": "bytewax_monitoring_stream_required"
+    },
     "critical_alert_requires_owner": {
       "condition": {
         "alert_owner_present": false,
@@ -996,6 +1563,98 @@
         "required_action": "attach_metric_source"
       },
       "name": "metric_ingestion_requires_source"
+    },
+    "monitoring_agent_privileged_role_requires_human_approval": {
+      "condition": {
+        "human_approval_required": false,
+        "operation": "register_monitoring_agent",
+        "privileged_agent_role": true
+      },
+      "description": "Privileged monitoring-agent roles require human approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "monitoring_agent_human_approval_required",
+        "required_action": "require_human_approval_for_agent"
+      },
+      "name": "monitoring_agent_privileged_role_requires_human_approval"
+    },
+    "monitoring_agent_requires_contribution_disclosure": {
+      "condition": {
+        "contribution_disclosed": false,
+        "operation": "register_monitoring_agent"
+      },
+      "description": "Monitoring agents must disclose machine contribution in observability decisions.",
+      "effect": {
+        "decision": "deny",
+        "reason": "monitoring_agent_contribution_disclosure_required",
+        "required_action": "enable_agent_contribution_disclosure"
+      },
+      "name": "monitoring_agent_requires_contribution_disclosure"
+    },
+    "monitoring_agent_requires_owner": {
+      "condition": {
+        "agent_owner_present": false,
+        "operation": "register_monitoring_agent"
+      },
+      "description": "Monitoring agents require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "monitoring_agent_owner_required",
+        "required_action": "attach_agent_owner"
+      },
+      "name": "monitoring_agent_requires_owner"
+    },
+    "monitoring_agent_requires_purpose": {
+      "condition": {
+        "agent_purpose_present": false,
+        "operation": "register_monitoring_agent"
+      },
+      "description": "Monitoring agents require a declared purpose.",
+      "effect": {
+        "decision": "deny",
+        "reason": "monitoring_agent_purpose_required",
+        "required_action": "attach_agent_purpose"
+      },
+      "name": "monitoring_agent_requires_purpose"
+    },
+    "monitoring_agent_requires_scope": {
+      "condition": {
+        "agent_scope_present": false,
+        "operation": "register_monitoring_agent"
+      },
+      "description": "Monitoring agents require an explicit operating scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "monitoring_agent_scope_required",
+        "required_action": "attach_agent_scope"
+      },
+      "name": "monitoring_agent_requires_scope"
+    },
+    "monitoring_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_monitoring_agent"
+      },
+      "description": "Monitoring agents must use a supported observability role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_monitoring_agent_role",
+        "required_action": "select_supported_agent_role"
+      },
+      "name": "monitoring_agent_role_supported"
+    },
+    "monitoring_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_monitoring_agent"
+      },
+      "description": "Monitoring agents must use a supported runtime adapter.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_monitoring_agent_runtime",
+        "required_action": "select_supported_agent_runtime"
+      },
+      "name": "monitoring_agent_runtime_supported"
     },
     "pii_logs_blocked": {
       "condition": {

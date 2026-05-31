@@ -1,11 +1,16 @@
 {
   "evidence": {
+    "agents": {
+      "first_class": true,
+      "role_count": 7,
+      "runtime_count": 4
+    },
     "contracts": {
       "capability_contract": {
         "display_name": "Monitoring and Observability",
         "errors": [],
-        "route_count": 14,
-        "rule_count": 16
+        "route_count": 16,
+        "rule_count": 24
       }
     },
     "runtime": {
@@ -29,6 +34,10 @@
     "semantic_model": {
       "capability": "moni",
       "format": "apg.semantic-model.v1"
+    },
+    "streaming": {
+      "engine": "bytewax",
+      "required_processor": "bytewax"
     }
   },
   "format": "apg.release-report.v1",

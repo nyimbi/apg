@@ -20,6 +20,8 @@ from .service import (
 	IncidentRecord,
 	MoniAuditEventRecord,
 	MoniService,
+	MonitoringAgentRecord,
+	MonitoringLifecycleBatchRecord,
 	MonitoringService,
 	MonitoringServiceConfig,
 	RemediationRequestRecord,
@@ -42,8 +44,8 @@ from .capability_contract import (
 __capability_name__ = "moni"
 __capability_version__ = "1.0.0"
 __capability_description__ = "Tenant-scoped monitoring, observability, incident, and remediation governance"
-__capability_dependencies__ = ["auth", "audl", "mten", "conf"]
-__capability_optional_dependencies__ = ["aicr", "pred", "ntfy", "cach"]
+__capability_dependencies__ = ["conf", "audl", "mqeb"]
+__capability_optional_dependencies__ = ["auth", "mten", "aicr", "pred", "ntfy", "cach"]
 
 # APG Composition Engine Registration Metadata
 CAPABILITY_METADATA = {
@@ -52,8 +54,8 @@ CAPABILITY_METADATA = {
 	'version': '1.0.0',
 	'category': 'platform_infrastructure',
 	'load_order': 5,
-	'dependencies': ['auth', 'audl', 'mten', 'conf'],
-	'optional_dependencies': ['aicr', 'pred', 'ntfy', 'cach'],
+	'dependencies': ['conf', 'audl', 'mqeb'],
+	'optional_dependencies': ['auth', 'mten', 'aicr', 'pred', 'ntfy', 'cach'],
 	'export_functions': [
 		'track_metric', 'log_event', 'create_alert', 'query_metrics',
 		'get_health_status', 'get_performance_metrics', 'predict_resource_usage',
@@ -64,7 +66,7 @@ CAPABILITY_METADATA = {
 		'handle_performance_analysis', 'handle_anomaly_detected'
 	],
 	'health_check_endpoint': '/api/v1/health',
-	'api_prefix': '/api/v1/monitoring'
+	'api_prefix': '/moni/api/v1'
 }
 
 # Export main components
@@ -79,6 +81,8 @@ __all__ = [
 	'AlertRecord',
 	'IncidentRecord',
 	'RemediationRequestRecord',
+	'MonitoringAgentRecord',
+	'MonitoringLifecycleBatchRecord',
 	'MoniAuditEventRecord',
 	'create_monitoring_service',
 	
@@ -144,6 +148,7 @@ def register_capability() -> dict:
 		"version": __capability_version__,
 		"dependencies": __capability_dependencies__,
 		"optional_dependencies": __capability_optional_dependencies__,
+		"api_prefix": CAPABILITY_METADATA["api_prefix"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
@@ -157,7 +162,9 @@ def register_capability() -> dict:
 			"alert_orchestration": "Create, route, deduplicate, and correlate alerts",
 			"autonomous_remediation": "Coordinate runbook-backed remediation workflows",
 			"capability_rules": "Evaluate deterministic observability governance rules",
-			"visual_theming": "Apply signal-console theme tokens and components"
+			"visual_theming": "Apply signal-console theme tokens and components",
+			"monitoring_agent_composition": "Register first-class monitoring agents across Codex, Claude Code, opencode, Pi, and future runtime adapters",
+			"lifecycle_batch_validation": "Validate monitoring lifecycle mutation batches against Bytewax-first stream rules"
 		},
 		"endpoints": {
 			"metrics": "/moni/api/v1/metrics",
@@ -171,7 +178,9 @@ def register_capability() -> dict:
 			"remediation": "/moni/api/v1/remediation",
 			"audit": "/moni/api/v1/audit",
 			"adapters": "/moni/api/v1/adapters",
-			"analytics": "/moni/api/v1/analytics"
+			"analytics": "/moni/api/v1/analytics",
+			"agents": "/moni/api/v1/agents",
+			"lifecycle": "/moni/api/v1/lifecycle"
 		},
 		"ui_components": {
 			route["name"]: route["path"]
@@ -192,7 +201,9 @@ def register_capability() -> dict:
 			"moni:view_analytics",
 			"moni:remediate",
 			"moni:admin"
-		]
+		],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"]
 	}
 
 
@@ -207,6 +218,8 @@ def get_capability_info() -> dict:
 			"SLO and alert route evidence",
 			"Incident ownership and correlation",
 			"Runbook-backed remediation review",
+			"First-class monitoring-agent composition",
+			"Bytewax-first observability lifecycle batch validation",
 			"Backend-neutral observability adapter boundaries"
 		]
 	}

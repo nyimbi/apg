@@ -13,6 +13,24 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+SUPPORTED_MONI_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_MONI_AGENT_ROLES = [
+	"slo_reviewer",
+	"alert_reviewer",
+	"incident_reviewer",
+	"anomaly_triage",
+	"metric_quality_reviewer",
+	"trace_correlation_reviewer",
+	"dashboard_reviewer",
+]
+PRIVILEGED_MONI_AGENT_ROLES = [
+	"slo_reviewer",
+	"alert_reviewer",
+	"incident_reviewer",
+	"anomaly_triage",
+]
+
+
 @dataclass(frozen=True)
 class CapabilityConfiguration:
 	"""Tenant-scoped MONI configuration defaults and schema."""
@@ -71,6 +89,36 @@ class CapabilityConfiguration:
 			"trace_store": "adapter",
 			"notification_adapter_required_for_critical": True
 		},
+		"agents": {
+			"first_class": True,
+			"supported_runtimes": SUPPORTED_MONI_AGENT_RUNTIMES,
+			"supported_roles": SUPPORTED_MONI_AGENT_ROLES,
+			"privileged_roles": PRIVILEGED_MONI_AGENT_ROLES,
+			"require_owner": True,
+			"require_purpose": True,
+			"require_scope": True,
+			"require_contribution_disclosure": True,
+			"require_human_approval_for_privileged_roles": True
+		},
+		"streaming": {
+			"engine": "bytewax",
+			"lifecycle_stream": "moni.lifecycle",
+			"watermark": "event_time",
+			"required_operations": [
+				"metric_batch",
+				"alert_batch",
+				"incident_batch",
+				"slo_batch",
+				"monitoring_agent_batch"
+			],
+			"topics": [
+				"moni.metrics",
+				"moni.alerts",
+				"moni.incidents",
+				"moni.slos",
+				"moni.agents"
+			]
+		},
 		"security": {
 			"require_tenant_context": True,
 			"block_pii_in_logs": True,
@@ -87,7 +135,9 @@ class CapabilityConfiguration:
 			"enable_incident_console": True,
 			"enable_remediation_console": True,
 			"enable_adapter_health": True,
-			"enable_audit_timeline": True
+			"enable_audit_timeline": True,
+			"enable_monitoring_agent_roster": True,
+			"enable_lifecycle_batch_monitor": True
 		},
 		"theme": {
 			"default_theme": "moni_signal_console",
@@ -106,6 +156,8 @@ class CapabilityConfiguration:
 			"retention",
 			"remediation",
 			"adapters",
+			"agents",
+			"streaming",
 			"security",
 			"ui",
 			"theme"
@@ -120,6 +172,8 @@ class CapabilityConfiguration:
 			"retention": {"type": "object"},
 			"remediation": {"type": "object"},
 			"adapters": {"type": "object"},
+			"agents": {"type": "object"},
+			"streaming": {"type": "object"},
 			"security": {"type": "object"},
 			"ui": {"type": "object"},
 			"theme": {"type": "object"}
@@ -242,6 +296,16 @@ class CapabilityTheme:
 		"audit_decision_timeline": {
 			"visual": "decision-timeline",
 			"highlight": "matched-rule-chip"
+		},
+		"monitoring_agent_roster": {
+			"icon": "bot",
+			"status_indicator": "approval-state",
+			"variant": "agent-governance"
+		},
+		"bytewax_lifecycle_panel": {
+			"icon": "activity",
+			"status_indicator": "processor-state",
+			"variant": "stream-lifecycle"
 		}
 	})
 
@@ -408,6 +472,86 @@ def default_rules() -> list[CapabilityRule]:
 				"reason": "review_notes_required",
 				"required_action": "attach_review_notes"
 			}
+		),
+		CapabilityRule(
+			name="monitoring_agent_runtime_supported",
+			description="Monitoring agents must use a supported runtime adapter.",
+			condition={"operation": "register_monitoring_agent", "agent_runtime_supported": False},
+			effect={
+				"decision": "deny",
+				"reason": "unsupported_monitoring_agent_runtime",
+				"required_action": "select_supported_agent_runtime"
+			}
+		),
+		CapabilityRule(
+			name="monitoring_agent_role_supported",
+			description="Monitoring agents must use a supported observability role.",
+			condition={"operation": "register_monitoring_agent", "agent_role_supported": False},
+			effect={
+				"decision": "deny",
+				"reason": "unsupported_monitoring_agent_role",
+				"required_action": "select_supported_agent_role"
+			}
+		),
+		CapabilityRule(
+			name="monitoring_agent_requires_scope",
+			description="Monitoring agents require an explicit operating scope.",
+			condition={"operation": "register_monitoring_agent", "agent_scope_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "monitoring_agent_scope_required",
+				"required_action": "attach_agent_scope"
+			}
+		),
+		CapabilityRule(
+			name="monitoring_agent_requires_owner",
+			description="Monitoring agents require an accountable owner.",
+			condition={"operation": "register_monitoring_agent", "agent_owner_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "monitoring_agent_owner_required",
+				"required_action": "attach_agent_owner"
+			}
+		),
+		CapabilityRule(
+			name="monitoring_agent_requires_purpose",
+			description="Monitoring agents require a declared purpose.",
+			condition={"operation": "register_monitoring_agent", "agent_purpose_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "monitoring_agent_purpose_required",
+				"required_action": "attach_agent_purpose"
+			}
+		),
+		CapabilityRule(
+			name="monitoring_agent_requires_contribution_disclosure",
+			description="Monitoring agents must disclose machine contribution in observability decisions.",
+			condition={"operation": "register_monitoring_agent", "contribution_disclosed": False},
+			effect={
+				"decision": "deny",
+				"reason": "monitoring_agent_contribution_disclosure_required",
+				"required_action": "enable_agent_contribution_disclosure"
+			}
+		),
+		CapabilityRule(
+			name="monitoring_agent_privileged_role_requires_human_approval",
+			description="Privileged monitoring-agent roles require human approval.",
+			condition={"operation": "register_monitoring_agent", "privileged_agent_role": True, "human_approval_required": False},
+			effect={
+				"decision": "deny",
+				"reason": "monitoring_agent_human_approval_required",
+				"required_action": "require_human_approval_for_agent"
+			}
+		),
+		CapabilityRule(
+			name="bytewax_monitoring_stream_required",
+			description="MONI lifecycle batches must declare Bytewax as the observability lifecycle processor.",
+			condition={"operation": "validate_monitoring_lifecycle_batch", "event_stream_ne": "bytewax"},
+			effect={
+				"decision": "deny",
+				"reason": "bytewax_monitoring_stream_required",
+				"required_action": "route_batch_through_bytewax"
+			}
 		)
 	]
 
@@ -428,6 +572,8 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("remediation", "/moni/remediation", "RemediationConsole", "moni:remediate", "Reliability"),
 		CapabilityUIRoute("audit", "/moni/audit", "MonitoringAuditTimeline", "moni:admin", "Governance"),
 		CapabilityUIRoute("adapters", "/moni/adapters", "MonitoringAdapterHealth", "moni:admin", "Runtime"),
+		CapabilityUIRoute("agents", "/moni/agents", "MonitoringAgentRoster", "moni:admin", "Administration"),
+		CapabilityUIRoute("lifecycle", "/moni/lifecycle", "MonitoringLifecycleBatchMonitor", "moni:admin", "Runtime"),
 		CapabilityUIRoute("settings", "/moni/settings", "MonitoringSettings", "moni:admin", "Administration")
 	]
 	return {
@@ -440,6 +586,51 @@ def ui_manifest() -> dict[str, Any]:
 	}
 
 
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class MONI agent composition manifest."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_MONI_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_MONI_AGENT_ROLES),
+		"privileged_roles": list(PRIVILEGED_MONI_AGENT_ROLES),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles"
+		]
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return MONI lifecycle stream-processing contract."""
+	return {
+		"engine": "bytewax",
+		"lifecycle_stream": "moni.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"metric_batch",
+			"alert_batch",
+			"incident_batch",
+			"slo_batch",
+			"monitoring_agent_batch"
+		],
+		"topics": [
+			"moni.metrics",
+			"moni.alerts",
+			"moni.incidents",
+			"moni.slos",
+			"moni.agents"
+		],
+		"broker_core_dependency_allowed": False
+	}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable MONI capability contract."""
 	config = CapabilityConfiguration()
@@ -447,6 +638,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "moni",
 		"display_name": "Monitoring and Observability",
+		"provides": ["observability_governance", "metrics_lifecycle", "monitoring_agent_composition"],
+		"requires": ["conf", "audl", "mqeb"],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
 		"rule_engine": {
@@ -454,6 +647,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"rules": [rule.__dict__ for rule in default_rules()]
 		},
 		"ui": ui_manifest(),
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
 		"theme": {
 			"name": theme.name,
 			"tokens": theme.tokens,
@@ -472,6 +667,10 @@ def _matches(condition: dict[str, Any], context: dict[str, Any]) -> bool:
 		if key.endswith("_gt"):
 			field_name = key[:-3]
 			if not context.get(field_name, 0) > expected:
+				return False
+		elif key.endswith("_ne"):
+			field_name = key[:-3]
+			if context.get(field_name) == expected:
 				return False
 		elif context.get(key) != expected:
 			return False

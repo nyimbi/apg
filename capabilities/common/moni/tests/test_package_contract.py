@@ -28,9 +28,13 @@ def test_package_contract_shape_is_valid():
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "moni"
+	assert contract["provides"] == ["observability_governance", "metrics_lifecycle", "monitoring_agent_composition"]
+	assert contract["requires"] == ["conf", "audl", "mqeb"]
+	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert contract["ui"]["routes"]
 	assert contract["theme"]["tokens"]["border.radius"]
-	assert len(contract["rule_engine"]["rules"]) >= 16
+	assert len(contract["rule_engine"]["rules"]) >= 24
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"sources",
 		"logs",
@@ -38,6 +42,8 @@ def test_package_contract_shape_is_valid():
 		"incidents",
 		"audit",
 		"adapters",
+		"agents",
+		"lifecycle",
 	}
 
 
@@ -55,4 +61,7 @@ def test_package_app_entrypoint_is_publishable():
 	assert "moni" in model["capabilities"]
 	assert model["capabilities"]["moni"]["runtime"]["views"] == "view_models.py"
 	assert model["capabilities"]["moni"]["approvals"]["remediation"] == "RemediationRequestRecord"
+	assert model["capabilities"]["moni"]["approvals"]["monitoring_agent"] == "MonitoringAgentRecord"
+	assert model["capabilities"]["moni"]["streaming"]["required_processor"] == "bytewax"
+	assert "codex" in model["capabilities"]["moni"]["agents"]["monitoring_agent_contract"]["supported_runtimes"]
 	assert "opentelemetry" in model["capabilities"]["moni"]["adapters"]["supported_collectors"]

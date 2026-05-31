@@ -16,6 +16,64 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-31 04:14 EAT
+
+MONI monitoring-agent and Bytewax lifecycle guardrail packet:
+
+- Extended `capabilities/common/moni/SPECIFICATION.md`, `PLAN.md`,
+  `README.md`, `cap_spec.md`, and `todo.md` to define MONI as a first-class
+  observability governance capability with AI-agent composition and
+  Bytewax-first lifecycle processing.
+- Added first-class monitoring-agent contract metadata for Codex, Claude Code,
+  opencode, and Pi runtimes across SLO, alert, incident, anomaly, metric
+  quality, trace correlation, and dashboard review roles.
+- Added privileged monitoring-agent role guardrails for human approval,
+  supported runtime, supported role, explicit scope, accountable owner,
+  declared purpose, and machine-contribution disclosure.
+- Added MONI Bytewax lifecycle stream metadata for `moni.lifecycle`, metrics,
+  alerts, incidents, SLOs, and monitoring-agent batches, plus a deterministic
+  rule that rejects non-Bytewax lifecycle processors.
+- Added dependency-light `MonitoringAgentRecord` and
+  `MonitoringLifecycleBatchRecord` service records, API helpers, generated UI
+  view models, dashboard summary counts, registration validation, lifecycle
+  batch validation, audit events, and semantic-model publication.
+- Added `/moni/agents` and `/moni/lifecycle` UI route metadata and matching
+  theme components for agent governance and Bytewax lifecycle operations.
+- Refreshed `semantic_model.json` and `release_report.json` from the live
+  executable app surface.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile` for MONI contract, service, API, view
+  models, app, package init, and focused tests passed.
+- `find capabilities/common/moni -name '*.py' -not -path '*/__pycache__/*'
+  -exec ./.venv/bin/python -m py_compile {} +` passed.
+- `./.venv/bin/pytest -q capabilities/common/moni/tests/test_capability_contract.py
+  capabilities/common/moni/tests/test_package_contract.py` passed with 11
+  tests and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python capabilities/common/moni/app.py` passed package
+  self-test.
+- `./.venv/bin/apg capabilities inspect moni --json` confirmed `ok: true`, 16
+  routes, 24 rules, Bytewax streaming, and first-class agents.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/moni --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, no warnings, and no blocking gaps.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/moni --json`
+  confirmed side-effect-free publish planning with no warnings.
+- Service smoke executed source -> signal -> critical alert/incident ->
+  monitoring agent -> Bytewax lifecycle batch and produced 6 audit events.
+- MONI stale-marker scan returned no matches across touched source, docs,
+  tests, and generated evidence files.
+- `git diff --check -- capabilities/common/moni docs/progress_log.md` passed.
+
+Known gaps:
+
+- Did not run full repository tests, rendered browser UI checks, live
+  OpenTelemetry/metrics/log/trace/notification/incident/SIEM/runbook adapters,
+  durable stores, durable Bytewax topology, live AI-runtime adapters, load
+  checks, migration checks, or failover checks during this battery-conscious
+  slice.
+
 ### 2026-05-31 01:36 EAT
 
 HCM payroll lifecycle/guardrail packet:

@@ -8,6 +8,8 @@ from .service import (
 	AlertRecord,
 	IncidentRecord,
 	MoniService,
+	MonitoringAgentRecord,
+	MonitoringLifecycleBatchRecord,
 	RemediationRequestRecord,
 	SignalRecord,
 	SignalSourceRecord,
@@ -58,6 +60,14 @@ def decide_remediation(**kwargs: Any) -> RemediationRequestRecord:
 	return SERVICE.decide_remediation(**kwargs)
 
 
+def register_monitoring_agent(**kwargs: Any) -> MonitoringAgentRecord:
+	return SERVICE.register_monitoring_agent(**kwargs)
+
+
+def validate_monitoring_lifecycle_batch(**kwargs: Any) -> MonitoringLifecycleBatchRecord:
+	return SERVICE.validate_monitoring_lifecycle_batch(**kwargs)
+
+
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.create_record(
 		record_id=str(payload["id"]),
@@ -80,5 +90,7 @@ def list_observability(tenant_id: str | None = None) -> dict[str, Any]:
 		"alerts": SERVICE.list_records(tenant_id, "alerts"),
 		"incidents": SERVICE.list_records(tenant_id, "incidents"),
 		"remediation_requests": SERVICE.list_records(tenant_id, "remediation_requests"),
+		"monitoring_agents": SERVICE.list_records(tenant_id, "monitoring_agents"),
+		"lifecycle_batches": SERVICE.list_records(tenant_id, "lifecycle_batches"),
 		"audit_events": SERVICE.list_records(tenant_id, "audit_events"),
 	}

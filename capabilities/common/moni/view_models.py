@@ -26,6 +26,7 @@ def dashboard_model(service: MoniService, tenant_id: str = "default") -> dict[st
 			{"id": "create_slo", "label": "Create SLO", "permission": "moni:manage_slos"},
 			{"id": "create_alert", "label": "Create alert", "permission": "moni:manage_alerts"},
 			{"id": "review_remediation", "label": "Review remediation", "permission": "moni:remediate"},
+			{"id": "register_agent", "label": "Register agent", "permission": "moni:admin"},
 		],
 	}
 
@@ -91,6 +92,8 @@ def analytics_model(service: MoniService, tenant_id: str = "default") -> dict[st
 			{"id": "open_alerts", "value": summary["open_alert_count"]},
 			{"id": "open_incidents", "value": summary["open_incident_count"]},
 			{"id": "pending_remediation", "value": summary["pending_remediation_count"]},
+			{"id": "monitoring_agents", "value": summary["monitoring_agent_count"]},
+			{"id": "lifecycle_batches", "value": summary["lifecycle_batch_count"]},
 		],
 	}
 
@@ -104,6 +107,31 @@ def adapter_health_model(tenant_id: str = "default") -> dict[str, Any]:
 		"log_store": adapters["log_store"],
 		"trace_store": adapters["trace_store"],
 		"notification_adapter_required_for_critical": adapters["notification_adapter_required_for_critical"],
+	}
+
+
+def monitoring_agent_roster_model(service: MoniService, tenant_id: str = "default") -> dict[str, Any]:
+	"""Return first-class monitoring-agent roster state."""
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"rows": service.list_records(tenant_id, "monitoring_agents"),
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+		"guardrails": contract["agents"]["guardrails"],
+		"columns": ["name", "runtime", "role", "owner", "purpose", "status", "human_approval_required"],
+	}
+
+
+def lifecycle_batch_model(service: MoniService, tenant_id: str = "default") -> dict[str, Any]:
+	"""Return Bytewax lifecycle-batch monitor state."""
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"streaming": contract["streaming"],
+		"rows": service.list_records(tenant_id, "lifecycle_batches"),
+		"columns": ["event_stream", "mutation_count", "accepted", "decision", "required_processor", "status"],
 	}
 
 
@@ -121,6 +149,8 @@ def settings_model(tenant_id: str = "default") -> dict[str, Any]:
 		"tenant_id": tenant_id,
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 		"routes": contract["ui"]["routes"],
 	}
