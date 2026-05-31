@@ -1,6 +1,12 @@
 # GRAG - Graph-based RAG
 
-GRAG is the APG capability for graph-grounded retrieval augmented generation. It composes the document and answer workflow from RAGN with the graph management surfaces from KNGR and GRPH so generated applications can retrieve context from both vector indexes and knowledge-graph paths, then produce cited answers with reasoning evidence.
+GRAG is the APG capability for graph-grounded retrieval augmented generation.
+It composes the document and answer workflow from RAGN with the graph
+management surfaces from KNGR and GRPH so generated applications can retrieve
+context from both vector indexes and knowledge-graph paths, then produce cited
+answers with reasoning evidence. It also treats GraphRAG agents as first-class
+citizens so Codex, Claude Code, opencode, Pi, and future runtimes can review
+retrieval, reasoning, provenance, and generation behind the same APG guardrails.
 
 The generated-app surface is dependency-light and executable. The heavier Apache AGE, Ollama, visualization, and service modules remain available as production adapters, but application composition should start from the contract, runtime, API helpers, and UI metadata in this directory.
 
@@ -12,6 +18,12 @@ The generated-app surface is dependency-light and executable. The heavier Apache
 - Multi-hop reasoning paths with start node, hop count, evidence path, explanation, and review gates.
 - Graph-grounded answer generation with provenance refs, citations, model policy controls, confidence gates, and unsafe-answer blocking.
 - Curation and publication lifecycle for approved answers.
+- First-class GraphRAG agents for provider-neutral runtime composition, scoped
+  review roles, accountable ownership, machine-contribution disclosure, and
+  privileged-role approval.
+- Bytewax lifecycle batch validation for graph source, vector source, hybrid
+  query, reasoning path, provenance, generation, curation, publication, and
+  GraphRAG-agent operations.
 - Deterministic rule evaluation for tenant isolation, evidence, provenance, Bytewax streaming, and audit readiness.
 - UI route metadata and view models for dashboards, query console, source management, retrieval, reasoning, provenance, generation, curation, governance, audit, and settings.
 - Theme tokens and component-level theme hooks for generated APG applications.
@@ -83,6 +95,23 @@ publication = service.publish_answer(
 	curation["id"],
 	"knowledge-steward",
 )
+agent = service.register_grag_agent(
+	"agent-reasoning",
+	"tenant-a",
+	"Reasoning reviewer",
+	"codex",
+	"reasoning_path_reviewer",
+	"policy graph reasoning paths",
+	"knowledge-steward",
+	"Review multi-hop graph reasoning for grounded answers",
+	human_approval_required=True,
+)
+batch = service.validate_grag_lifecycle_batch(
+	"tenant-a",
+	"bytewax",
+	4,
+	"graphrag_agent_batch",
+)
 ```
 
 Use `capabilities.common.grag.api` when a generated app wants simple function-style endpoints. Use `capability_contract.py` when the APG compiler or composition layer needs configuration, rules, routes, adapters, or theme tokens.
@@ -99,7 +128,15 @@ Optional adapters include `srch`, `nlpc`, `aicr`, `onto`, `meta`, `auth`, `audl`
 
 ## Guardrails
 
-The contract exposes more than 30 deterministic rules. The runtime enforces the important lifecycle rules directly, including tenant context, source registration, hybrid retrieval readiness, restricted source filtering, low confidence reviews, reasoning evidence, citations, provenance, external model policy, unsafe answer blocking, curation evidence, publication approval, Bytewax streaming, cross-tenant denial, and audit evidence.
+The contract exposes more than 45 deterministic rules. The runtime enforces the
+important lifecycle rules directly, including tenant context, source
+registration, hybrid retrieval readiness, restricted source filtering, low
+confidence reviews, reasoning evidence, citations, provenance, external model
+policy, unsafe answer blocking, curation evidence, publication approval,
+Bytewax streaming, cross-tenant denial, audit evidence, supported GraphRAG
+agent runtime and role, explicit agent scope, owner, purpose, machine
+contribution disclosure, privileged-role human approval status, and Bytewax-only
+lifecycle batches.
 
 ## Files
 

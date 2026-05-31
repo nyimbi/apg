@@ -10,9 +10,11 @@ from capabilities.common.grag.views import (
 	curation_model,
 	dashboard_model,
 	generation_model,
+	graphrag_agent_roster_model,
 	governance_model,
 	graph_source_model,
 	hybrid_retrieval_model,
+	lifecycle_batch_model,
 	provenance_model,
 	query_model,
 	reasoning_model,
@@ -27,14 +29,24 @@ def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
 	assert contract["capability"] == "grag"
 	assert contract["configuration"]["tenant_id"] == "tenant-grag"
 	assert contract["configuration"]["reasoning"]["max_hops"] == 2
-	assert set(contract["configuration_schema"]["required"]) >= {"tenant_id", "graph_sources", "vector_sources", "hybrid_retrieval", "reasoning", "generation", "adapters", "ui", "theme"}
-	assert len(contract["rule_engine"]["rules"]) >= 30
-	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "query", "graph_sources", "vector_sources", "hybrid_retrieval", "reasoning", "provenance", "generation", "curation", "governance", "audit", "settings"}
+	assert set(contract["configuration_schema"]["required"]) >= {"tenant_id", "graph_sources", "vector_sources", "hybrid_retrieval", "reasoning", "generation", "agents", "streaming", "adapters", "ui", "theme"}
+	assert len(contract["rule_engine"]["rules"]) >= 45
+	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "query", "graph_sources", "vector_sources", "hybrid_retrieval", "reasoning", "provenance", "generation", "curation", "governance", "agents", "lifecycle", "audit", "settings"}
 	assert contract["ui"]["api_prefix"] == "/grag/api/v1"
+	assert contract["provides"] == ["graph_based_rag", "hybrid_graph_vector_retrieval", "graphrag_agent_composition"]
+	assert set(contract["requires"]) >= {"ragn", "kngr", "grph", "srch", "nlpc", "aicr", "conf", "audl"}
+	assert contract["agents"]["first_class"] is True
+	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert "reasoning_path_reviewer" in contract["agents"]["privileged_roles"]
+	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert contract["streaming"]["lifecycle_stream"] == "grag.lifecycle"
+	assert "graphrag_agent_batch" in contract["streaming"]["required_operations"]
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "grag_runtime.GragService"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "reasoning_path" in contract["theme"]["components"]
+	assert "graphrag_agent_roster" in contract["theme"]["components"]
+	assert "bytewax_lifecycle_panel" in contract["theme"]["components"]
 
 
 def test_rule_engine_enforces_graphrag_guardrails():
@@ -56,6 +68,23 @@ def test_rule_engine_enforces_graphrag_guardrails():
 	batch_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "batch_grag_mutation",
+		"event_stream": "kafka",
+	})
+	agent_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_grag_agent",
+		"agent_runtime_supported": False,
+		"agent_role_supported": False,
+		"scope_present": False,
+		"owner_present": False,
+		"purpose_present": False,
+		"contribution_disclosed": False,
+		"privileged_role": True,
+		"human_approval_required": False,
+	})
+	lifecycle_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "validate_grag_lifecycle_batch",
 		"event_stream": "kafka",
 	})
 	reasoning_result = evaluate_capability_rules({
@@ -83,6 +112,18 @@ def test_rule_engine_enforces_graphrag_guardrails():
 	}
 	assert batch_result["decision"] == "deny"
 	assert batch_result["matched_rules"] == ["batch_grag_mutation_requires_bytewax"]
+	assert agent_result["decision"] == "deny"
+	assert {
+		"graphrag_agent_runtime_supported",
+		"graphrag_agent_role_supported",
+		"graphrag_agent_requires_scope",
+		"graphrag_agent_requires_owner",
+		"graphrag_agent_requires_purpose",
+		"graphrag_agent_requires_contribution_disclosure",
+		"graphrag_agent_privileged_role_requires_human_approval",
+	} <= set(agent_result["matched_rules"])
+	assert lifecycle_result["decision"] == "deny"
+	assert lifecycle_result["matched_rules"] == ["bytewax_grag_stream_required"]
 	assert set(reasoning_result["matched_rules"]) >= {"reasoning_requires_start_node", "reasoning_requires_evidence_path", "reasoning_requires_positive_hops", "reasoning_requires_explanation"}
 
 
@@ -97,8 +138,12 @@ def test_registration_includes_full_capability_contract():
 	assert registration["ui_components"]["reasoning"] == "/grag/reasoning"
 	assert "ragn" in registration["dependencies"]
 	assert registration["adapters"]["event_stream"] == "bytewax"
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["required_processor"] == "bytewax"
 	assert registration["capabilities"]["graph_grounded_generation"]
+	assert registration["capabilities"]["graphrag_agent_composition"]
 	assert registration["endpoints"]["audit"] == "/grag/api/v1/audit"
+	assert registration["endpoints"]["agents"] == "/grag/api/v1/agents"
 	assert "grag:reason" in registration["permissions"]
 	assert "grag:audit" in registration["permissions"]
 
@@ -165,6 +210,25 @@ def test_grag_lifecycle_is_executable():
 		curation_id=curation["id"],
 		publisher="knowledge-steward",
 	)
+	agent = service.register_grag_agent(
+		agent_id="agent-reasoning",
+		tenant_id="tenant-grag",
+		name="Reasoning reviewer",
+		runtime="codex",
+		role="reasoning_path_reviewer",
+		scope="policy graph reasoning paths",
+		owner="knowledge-steward",
+		purpose="Review multi-hop graph reasoning for grounded answers",
+		contribution_disclosed=True,
+		human_approval_required=True,
+	)
+	batch = service.validate_grag_lifecycle_batch(
+		tenant_id="tenant-grag",
+		event_stream="bytewax",
+		mutation_count=4,
+		operation="graphrag_agent_batch",
+		batch_id="gragbatch-travel",
+	)
 
 	assert graph["metadata"]["owner"] == "knowledge-steward"
 	assert vector["status"] == "indexed"
@@ -173,9 +237,18 @@ def test_grag_lifecycle_is_executable():
 	assert answer["metadata"]["citation_count"] == 1
 	assert curation["status"] == "approved"
 	assert publication["status"] == "published"
+	assert agent["runtime"] == "codex"
+	assert agent["role"] == "reasoning_path_reviewer"
+	assert agent["status"] == "active"
+	assert batch["required_processor"] == "bytewax"
+	assert batch["accepted"] is True
 	assert service.dashboard_summary("tenant-grag")["publication_count"] == 1
+	assert service.dashboard_summary("tenant-grag")["graphrag_agent_count"] == 1
+	assert service.dashboard_summary("tenant-grag")["lifecycle_batch_count"] == 1
 	assert service.grag_package("tenant-grag")["summary"]["answer_count"] == 1
+	assert service.grag_package("tenant-grag")["graphrag_agents"][0]["id"] == "agent-reasoning"
 	assert dashboard_model(service, "tenant-grag")["summary"]["graph_source_count"] == 1
+	assert dashboard_model(service, "tenant-grag")["streaming"]["required_processor"] == "bytewax"
 	assert query_model(service, "tenant-grag")["answers"][0]["id"] == "answer-travel"
 	assert graph_source_model(service, "tenant-grag")["graph_sources"][0]["id"] == "graph-policy"
 	assert vector_source_model(service, "tenant-grag")["vector_sources"][0]["id"] == "vector-policy"
@@ -185,8 +258,12 @@ def test_grag_lifecycle_is_executable():
 	assert generation_model(service, "tenant-grag")["answers"][0]["id"] == "answer-travel"
 	assert curation_model(service, "tenant-grag")["curations"][0]["id"] == "curation-travel"
 	assert governance_model(service, "tenant-grag")["rules"]
+	assert governance_model(service, "tenant-grag")["graphrag_agents"][0]["id"] == "agent-reasoning"
+	assert graphrag_agent_roster_model(service, "tenant-grag")["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert lifecycle_batch_model(service, "tenant-grag")["required_processor"] == "bytewax"
 	assert audit_timeline_model(service, "tenant-grag")["audit_events"]
 	assert settings_model(service, "tenant-grag")["adapters"]["event_stream"] == "bytewax"
+	assert settings_model(service, "tenant-grag")["streaming"]["required_processor"] == "bytewax"
 
 
 def test_grag_service_enforces_policy_guardrails():
@@ -350,3 +427,38 @@ def test_grag_service_enforces_policy_guardrails():
 			curation_id=curation["id"],
 			publisher="steward",
 		)
+
+	with pytest.raises(PermissionError, match="unsupported_graphrag_agent_runtime"):
+		service.register_grag_agent(
+			agent_id="agent-unsupported",
+			tenant_id="tenant-grag",
+			name="Unsupported runtime",
+			runtime="bespoke-cli",
+			role="reasoning_path_reviewer",
+			scope="policy graph",
+			owner="steward",
+			purpose="Review graph reasoning",
+		)
+
+	pending_agent = service.register_grag_agent(
+		agent_id="agent-approval",
+		tenant_id="tenant-grag",
+		name="Approval needed",
+		runtime="codex",
+		role="safety_reviewer",
+		scope="generated graph-grounded answers",
+		owner="steward",
+		purpose="Review answer safety",
+		contribution_disclosed=True,
+		human_approval_required=False,
+	)
+	assert pending_agent["status"] == "pending_review"
+
+	with pytest.raises(ValueError, match="grag_lifecycle_batch_empty"):
+		service.validate_grag_lifecycle_batch("tenant-grag", "bytewax", 0)
+
+	with pytest.raises(ValueError, match="unsupported_grag_lifecycle_operation"):
+		service.validate_grag_lifecycle_batch("tenant-grag", "bytewax", 1, "unknown_batch")
+
+	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
+		service.validate_grag_lifecycle_batch("tenant-grag", "kafka", 1, "graphrag_agent_batch")

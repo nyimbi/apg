@@ -30,9 +30,11 @@ def test_grag_contract_shape_is_valid():
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "grag"
-	assert len(contract["ui"]["routes"]) >= 12
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert len(contract["ui"]["routes"]) >= 14
+	assert len(contract["rule_engine"]["rules"]) >= 45
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert contract["theme"]["tokens"]["border.radius"]
 
 
@@ -48,8 +50,10 @@ def test_grag_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "grag" in model["capabilities"]
-	assert model["capabilities"]["grag"]["streaming"]["engine"] == "bytewax"
-	assert len(model["capabilities"]["grag"]["ui"]["routes"]) >= 12
+	assert model["capabilities"]["grag"]["agents"]["first_class"] is True
+	assert model["capabilities"]["grag"]["streaming"]["required_processor"] == "bytewax"
+	assert model["capabilities"]["grag"]["graph_rag_lifecycle"]["lifecycle_batch"] == "GragLifecycleBatchRecord"
+	assert len(model["capabilities"]["grag"]["ui"]["routes"]) >= 14
 
 
 def test_grag_package_evidence_matches_entrypoint():
@@ -68,4 +72,4 @@ def test_grag_api_imports_without_production_dependencies():
 	status = module.capability_status("tenant-test")
 
 	assert status["capability"] == "grag"
-	assert status["rule_count"] >= 30
+	assert status["rule_count"] >= 45

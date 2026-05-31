@@ -134,8 +134,41 @@ def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_grag_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_grag_agent(
+		agent_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload["name"]),
+		runtime=str(payload["runtime"]),
+		role=str(payload["role"]),
+		scope=str(payload["scope"]),
+		owner=str(payload["owner"]),
+		purpose=str(payload["purpose"]),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", True)),
+		human_approval_required=bool(payload.get("human_approval_required", False)),
+	)
+
+
+def validate_grag_lifecycle_batch(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_grag_lifecycle_batch(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
+		mutation_count=int(payload.get("mutation_count", 1)),
+		operation=str(payload.get("operation") or "graphrag_agent_batch"),
+		batch_id=payload.get("id") or payload.get("batch_id"),
+	)
+
+
 def list_records(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_records(tenant_id)
+
+
+def list_graphrag_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_graphrag_agents(tenant_id)
+
+
+def list_lifecycle_batches(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_lifecycle_batches(tenant_id)
 
 
 def grag_package(tenant_id: str | None = None) -> dict[str, Any]:

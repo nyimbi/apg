@@ -10,7 +10,7 @@ from .capability_contract import evaluate_capability_rules, get_capability_contr
 __version__ = "1.0.0"
 __capability_id__ = "grag"
 __capability_name__ = "Graph-based RAG"
-__apg_dependencies__ = ["ragn", "kngr", "grph"]
+__apg_dependencies__ = ["ragn", "kngr", "grph", "srch", "nlpc", "aicr", "conf", "audl"]
 
 capability_metadata: dict[str, Any] = {
 	"name": "grag",
@@ -24,7 +24,7 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["hybrid_retrieval", "multi_hop_reasoning", "graph_grounded_generation", "reasoning_explanations", "knowledge_curation", "answer_publication"],
+	"provides": ["hybrid_retrieval", "multi_hop_reasoning", "graph_grounded_generation", "reasoning_explanations", "knowledge_curation", "answer_publication", "graphrag_agent_composition", "bytewax_lifecycle_batches"],
 	"permissions": ["grag:view", "grag:query", "grag:reason", "grag:generate", "grag:curate", "grag:manage_graphs", "grag:manage_sources", "grag:govern", "grag:audit", "grag:admin"]
 }
 
@@ -51,6 +51,8 @@ def register_capability() -> dict[str, Any]:
 			"graph_grounded_generation": "Generate cited answers grounded in graph evidence",
 			"answer_publication": "Curate and publish graph-grounded answers with audit evidence",
 			"reasoning_explanations": "Expose answer paths, confidence, and provenance",
+			"graphrag_agent_composition": "Compose Codex, Claude Code, opencode, and Pi style GraphRAG agents behind provider-neutral guardrails",
+			"bytewax_lifecycle_batches": "Validate GraphRAG lifecycle batches through Bytewax-first processor contracts",
 			"capability_rules": "Evaluate deterministic GraphRAG governance rules",
 			"visual_theming": "Apply graph-RAG reasoning theme tokens and components"
 		},
@@ -65,9 +67,13 @@ def register_capability() -> dict[str, Any]:
 			"generation": "/grag/api/v1/generation",
 			"curation": "/grag/api/v1/curation",
 			"publications": "/grag/api/v1/publications",
+			"agents": "/grag/api/v1/agents",
+			"lifecycle": "/grag/api/v1/lifecycle",
 			"audit": "/grag/api/v1/audit"
 		},
 		"adapters": contract["configuration"]["adapters"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],

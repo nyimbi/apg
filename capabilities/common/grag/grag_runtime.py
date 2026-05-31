@@ -33,6 +33,74 @@ class GragRecord:
 		}
 
 
+@dataclass(frozen=True)
+class GraphRAGAgentRecord:
+	"""Provider-neutral AI agent registered for graph-RAG governance."""
+
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	owner: str
+	purpose: str
+	contribution_disclosed: bool
+	human_approval_required: bool
+	status: str = "active"
+	created_at: str = field(default_factory=utc_now_iso)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"agent_id": self.id,
+			"tenant_id": self.tenant_id,
+			"name": self.name,
+			"runtime": self.runtime,
+			"role": self.role,
+			"scope": self.scope,
+			"owner": self.owner,
+			"purpose": self.purpose,
+			"contribution_disclosed": self.contribution_disclosed,
+			"human_approval_required": self.human_approval_required,
+			"status": self.status,
+			"created_at": self.created_at,
+		}
+
+
+@dataclass(frozen=True)
+class GragLifecycleBatchRecord:
+	"""Bytewax lifecycle batch validation evidence for GraphRAG changes."""
+
+	id: str
+	tenant_id: str
+	event_stream: str
+	mutation_count: int
+	operation: str
+	accepted: bool
+	decision: str
+	matched_rules: tuple[str, ...] = ()
+	required_processor: str = "bytewax"
+	status: str = "accepted"
+	created_at: str = field(default_factory=utc_now_iso)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"batch_id": self.id,
+			"tenant_id": self.tenant_id,
+			"event_stream": self.event_stream,
+			"mutation_count": self.mutation_count,
+			"operation": self.operation,
+			"accepted": self.accepted,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"required_processor": self.required_processor,
+			"status": self.status,
+			"created_at": self.created_at,
+		}
+
+
 class GragService:
 	"""Import-light GraphRAG lifecycle service for generated APG applications."""
 
@@ -44,7 +112,14 @@ class GragService:
 		self._answers: dict[str, GragRecord] = {}
 		self._curations: dict[str, GragRecord] = {}
 		self._publications: dict[str, GragRecord] = {}
+		self._graphrag_agents: dict[str, GraphRAGAgentRecord] = {}
+		self._lifecycle_batches: dict[str, GragLifecycleBatchRecord] = {}
 		self._audit_events: dict[str, GragRecord] = {}
+		contract = get_capability_contract()
+		self._agent_runtimes = set(contract["agents"]["supported_runtimes"])
+		self._agent_roles = set(contract["agents"]["supported_roles"])
+		self._privileged_agent_roles = set(contract["agents"]["privileged_roles"])
+		self._lifecycle_operations = set(contract["streaming"]["required_operations"])
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -346,6 +421,94 @@ class GragService:
 		)
 		return record | {"status": status}
 
+	def register_grag_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> dict[str, Any]:
+		runtime_value = _normalize_token(runtime)
+		role_value = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(str(tenant_id or "").strip()),
+			"operation": "register_grag_agent",
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"scope_present": bool(str(scope or "").strip()),
+			"owner_present": bool(str(owner or "").strip()),
+			"purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+		})
+		self._raise_if_denied(result)
+		if not str(agent_id or "").strip():
+			raise ValueError("graphrag_agent_id_required")
+		if not str(name or "").strip():
+			raise ValueError("graphrag_agent_name_required")
+		status = "pending_review" if result["decision"] == "require_review" else "active"
+		record = GraphRAGAgentRecord(
+			id=str(agent_id).strip(),
+			tenant_id=tenant_id,
+			name=str(name).strip(),
+			runtime=runtime_value,
+			role=role_value,
+			scope=str(scope).strip(),
+			owner=str(owner).strip(),
+			purpose=str(purpose).strip(),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+			status=status,
+		)
+		self._graphrag_agents[self._tenant_record_key(tenant_id, record.id)] = record
+		self._audit(tenant_id, record.id, "graphrag_agent_registered", owner, result)
+		return record.to_dict()
+
+	def validate_grag_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "graphrag_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		mutation_count = int(mutation_count)
+		if mutation_count <= 0:
+			raise ValueError("grag_lifecycle_batch_empty")
+		stream_value = _normalize_token(event_stream)
+		operation_value = _normalize_token(operation)
+		if operation_value not in self._lifecycle_operations:
+			raise ValueError(f"unsupported_grag_lifecycle_operation:{operation_value}")
+		result = self.evaluate({
+			"tenant_context_present": bool(str(tenant_id or "").strip()),
+			"operation": "validate_grag_lifecycle_batch",
+			"event_stream": stream_value,
+		})
+		accepted = result["decision"] == "allow"
+		record = GragLifecycleBatchRecord(
+			id=batch_id or f"gragbatch:{len(self._lifecycle_batches) + 1:06d}",
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			operation=operation_value,
+			accepted=accepted,
+			decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			status="accepted" if accepted else "denied",
+		)
+		self._lifecycle_batches[self._tenant_record_key(tenant_id, record.id)] = record
+		self._audit(tenant_id, record.id, f"grag_lifecycle_batch_{record.status}", "grag", result)
+		if not accepted:
+			self._raise_if_denied(result)
+		return record.to_dict()
+
 	def list_records(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._graph_sources, tenant_id)
 
@@ -370,6 +533,12 @@ class GragService:
 	def list_publications(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._publications, tenant_id)
 
+	def list_graphrag_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._graphrag_agents, tenant_id)
+
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._lifecycle_batches, tenant_id)
+
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events, tenant_id)
 
@@ -385,6 +554,10 @@ class GragService:
 			"answer_count": len(answers),
 			"curation_count": len(self.list_curations(tenant_id)),
 			"publication_count": len(self.list_publications(tenant_id)),
+			"graphrag_agent_count": len(self.list_graphrag_agents(tenant_id)),
+			"pending_agent_review_count": len([item for item in self.list_graphrag_agents(tenant_id) if item["status"] == "pending_review"]),
+			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
+			"denied_lifecycle_batch_count": len([item for item in self.list_lifecycle_batches(tenant_id) if item["status"] == "denied"]),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 			"citation_count": sum(int(answer["metadata"].get("citation_count", 0)) for answer in answers),
 			"low_confidence_query_count": len([query for query in queries if query["metadata"].get("retrieval_confidence", 1.0) < 0.7]),
@@ -400,6 +573,8 @@ class GragService:
 			"answers": self.list_answers(tenant_id),
 			"curations": self.list_curations(tenant_id),
 			"publications": self.list_publications(tenant_id),
+			"graphrag_agents": self.list_graphrag_agents(tenant_id),
+			"lifecycle_batches": self.list_lifecycle_batches(tenant_id),
 			"audit_events": self.list_audit_events(tenant_id),
 			"summary": self.dashboard_summary(tenant_id),
 		}
@@ -429,7 +604,7 @@ class GragService:
 			metadata={"subject_id": subject_id, "event_type": event_type, "actor": actor, "reasons": self._reasons(result)},
 		)
 
-	def _list(self, records: dict[str, GragRecord], tenant_id: str | None = None) -> list[dict[str, Any]]:
+	def _list(self, records: dict[str, Any], tenant_id: str | None = None) -> list[dict[str, Any]]:
 		values = list(records.values())
 		if tenant_id is not None:
 			values = [record for record in values if record.tenant_id == tenant_id]
@@ -437,3 +612,10 @@ class GragService:
 
 	def _reasons(self, result: dict[str, Any]) -> tuple[str, ...]:
 		return tuple(action.get("reason", "grag_policy_blocked") for action in result.get("actions", ()))
+
+	def _tenant_record_key(self, tenant_id: str, record_id: str) -> str:
+		return f"{tenant_id}:{record_id}"
+
+
+def _normalize_token(value: str) -> str:
+	return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")

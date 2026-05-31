@@ -7,6 +7,29 @@ from numbers import Number
 from typing import Any
 
 
+SUPPORTED_GRAG_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_GRAG_AGENT_ROLES = [
+	"graph_retrieval_reviewer",
+	"vector_retrieval_reviewer",
+	"fusion_reviewer",
+	"reasoning_path_reviewer",
+	"provenance_reviewer",
+	"grounded_generation_reviewer",
+	"citation_reviewer",
+	"safety_reviewer",
+	"lifecycle_batch_reviewer",
+	"graphrag_steward",
+]
+PRIVILEGED_GRAG_AGENT_ROLES = [
+	"fusion_reviewer",
+	"reasoning_path_reviewer",
+	"provenance_reviewer",
+	"grounded_generation_reviewer",
+	"safety_reviewer",
+	"lifecycle_batch_reviewer",
+]
+
+
 DEFAULT_CONFIGURATION: dict[str, Any] = {
 	"tenant_id": "default",
 	"graph_sources": {
@@ -71,6 +94,47 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"unsafe_generation_blocking": True,
 		"tenant_isolation_required": True,
 	},
+	"agents": {
+		"first_class": True,
+		"supported_runtimes": SUPPORTED_GRAG_AGENT_RUNTIMES,
+		"supported_roles": SUPPORTED_GRAG_AGENT_ROLES,
+		"privileged_roles": PRIVILEGED_GRAG_AGENT_ROLES,
+		"require_owner": True,
+		"require_purpose": True,
+		"require_scope": True,
+		"require_contribution_disclosure": True,
+		"require_human_approval_for_privileged_roles": True,
+		"adapter_contract": "aicr_provider_neutral_graphrag_agent_adapter",
+	},
+	"streaming": {
+		"engine": "bytewax",
+		"lifecycle_stream": "grag.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"graph_source_batch",
+			"vector_source_batch",
+			"hybrid_query_batch",
+			"reasoning_path_batch",
+			"provenance_batch",
+			"generation_batch",
+			"curation_batch",
+			"publication_batch",
+			"graphrag_agent_batch",
+		],
+		"topics": [
+			"grag.graph_sources",
+			"grag.vector_sources",
+			"grag.hybrid_queries",
+			"grag.reasoning_paths",
+			"grag.provenance",
+			"grag.generations",
+			"grag.curations",
+			"grag.publications",
+			"grag.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	},
 	"governance": {
 		"require_tenant_context": True,
 		"audit_graph_sources": True,
@@ -116,6 +180,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"enable_generation": True,
 		"enable_curation": True,
 		"enable_governance": True,
+		"enable_graphrag_agent_roster": True,
+		"enable_lifecycle_batch_monitor": True,
 		"enable_audit": True,
 		"enable_settings": True,
 	},
@@ -135,6 +201,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"provenance",
 		"curation",
 		"security",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
@@ -150,6 +218,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"provenance",
 		"curation",
 		"security",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
@@ -201,6 +271,14 @@ RULES: list[dict[str, Any]] = [
 	{"name": "batch_grag_mutation_requires_bytewax", "description": "Batch GraphRAG mutations must use Bytewax event streams.", "condition": {"operation": "batch_grag_mutation", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}},
 	{"name": "cross_tenant_graph_access_denied", "description": "GraphRAG operations may not cross tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_graph_access_denied", "required_action": "use_tenant_local_context"}},
 	{"name": "graph_state_change_requires_audit", "description": "GraphRAG state changes require audit events.", "condition": {"state_change_requested": True, "audit_event_recorded": False}, "effect": {"decision": "deny", "reason": "audit_event_required", "required_action": "record_audit_event"}},
+	{"name": "graphrag_agent_runtime_supported", "description": "GraphRAG agents must use supported provider-neutral runtimes.", "condition": {"operation": "register_grag_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_graphrag_agent_runtime", "required_action": "choose_supported_graphrag_agent_runtime"}},
+	{"name": "graphrag_agent_role_supported", "description": "GraphRAG agents must use supported graph-RAG roles.", "condition": {"operation": "register_grag_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_graphrag_agent_role", "required_action": "choose_supported_graphrag_agent_role"}},
+	{"name": "graphrag_agent_requires_scope", "description": "GraphRAG agents require an explicit bounded graph, retrieval, reasoning, or answer scope.", "condition": {"operation": "register_grag_agent", "scope_present": False}, "effect": {"decision": "deny", "reason": "graphrag_agent_scope_required", "required_action": "declare_graphrag_agent_scope"}},
+	{"name": "graphrag_agent_requires_owner", "description": "GraphRAG agents require an accountable owner.", "condition": {"operation": "register_grag_agent", "owner_present": False}, "effect": {"decision": "deny", "reason": "graphrag_agent_owner_required", "required_action": "assign_graphrag_agent_owner"}},
+	{"name": "graphrag_agent_requires_purpose", "description": "GraphRAG agents require a documented purpose.", "condition": {"operation": "register_grag_agent", "purpose_present": False}, "effect": {"decision": "deny", "reason": "graphrag_agent_purpose_required", "required_action": "document_graphrag_agent_purpose"}},
+	{"name": "graphrag_agent_requires_contribution_disclosure", "description": "GraphRAG agents must disclose machine-authored retrieval, reasoning, and answer-review contributions.", "condition": {"operation": "register_grag_agent", "contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "graphrag_agent_contribution_disclosure_required", "required_action": "disclose_machine_contribution"}},
+	{"name": "graphrag_agent_privileged_role_requires_human_approval", "description": "Privileged GraphRAG-agent roles require human approval evidence.", "condition": {"operation": "register_grag_agent", "privileged_role": True, "human_approval_required": False}, "effect": {"decision": "require_review", "reason": "graphrag_agent_human_approval_required", "required_action": "record_human_graphrag_agent_approval"}},
+	{"name": "bytewax_grag_stream_required", "description": "GRAG lifecycle batches must be routed through Bytewax.", "condition": {"operation": "validate_grag_lifecycle_batch", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_grag_lifecycle_batch_to_bytewax"}},
 ]
 
 
@@ -215,6 +293,8 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "generation", "path": "/grag/generation", "component": "GroundedGenerationWorkbench", "permission": "grag:generate", "nav_group": "Ask"},
 	{"name": "curation", "path": "/grag/curation", "component": "GraphAnswerCuration", "permission": "grag:curate", "nav_group": "Governance"},
 	{"name": "governance", "path": "/grag/governance", "component": "GRAGGovernance", "permission": "grag:govern", "nav_group": "Governance"},
+	{"name": "agents", "path": "/grag/agents", "component": "GraphRAGAgentRoster", "permission": "grag:govern", "nav_group": "Governance"},
+	{"name": "lifecycle", "path": "/grag/lifecycle", "component": "GRAGLifecycleBatchMonitor", "permission": "grag:admin", "nav_group": "Operations"},
 	{"name": "audit", "path": "/grag/audit", "component": "GRAGAuditTimeline", "permission": "grag:audit", "nav_group": "Governance"},
 	{"name": "settings", "path": "/grag/settings", "component": "GRAGSettings", "permission": "grag:admin", "nav_group": "Administration"},
 ]
@@ -243,10 +323,66 @@ THEME: dict[str, Any] = {
 		"provenance_panel": {"visual": "source-graph", "status_style": "confidence-pill"},
 		"generation_panel": {"visual": "answer-draft", "status_style": "grounding-chip"},
 		"curation_queue": {"visual": "review-list", "threshold_style": "quality-band"},
+		"graphrag_agent_roster": {"icon": "bot", "status_indicator": "agent-approval-chip", "risk_style": "reasoning-scope-band"},
+		"bytewax_lifecycle_panel": {"icon": "git-branch", "status_indicator": "stream-chip", "risk_style": "processor-band"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "evidence-chip"},
 		"query_console": {"visual": "ranked-context", "status_style": "retrieval-chip"},
 	},
 }
+
+
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class GRAG agent composition manifest."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_GRAG_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_GRAG_AGENT_ROLES),
+		"privileged_roles": list(PRIVILEGED_GRAG_AGENT_ROLES),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles",
+		],
+		"adapter_contract": "aicr_provider_neutral_graphrag_agent_adapter",
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return the GRAG Bytewax lifecycle stream contract."""
+	return {
+		"engine": "bytewax",
+		"lifecycle_stream": "grag.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"graph_source_batch",
+			"vector_source_batch",
+			"hybrid_query_batch",
+			"reasoning_path_batch",
+			"provenance_batch",
+			"generation_batch",
+			"curation_batch",
+			"publication_batch",
+			"graphrag_agent_batch",
+		],
+		"topics": [
+			"grag.graph_sources",
+			"grag.vector_sources",
+			"grag.hybrid_queries",
+			"grag.reasoning_paths",
+			"grag.provenance",
+			"grag.generations",
+			"grag.curations",
+			"grag.publications",
+			"grag.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	}
 
 
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -257,6 +393,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "grag",
 		"display_name": "Graph-based RAG",
+		"provides": ["graph_based_rag", "hybrid_graph_vector_retrieval", "graphrag_agent_composition"],
+		"requires": ["ragn", "kngr", "grph", "srch", "nlpc", "aicr", "conf", "audl"],
 		"configuration": config,
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},
@@ -268,6 +406,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"template_roots": ["templates/", "static/"],
 			"requires_theme": True,
 		},
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
 		"theme": deepcopy(THEME),
 	}
 

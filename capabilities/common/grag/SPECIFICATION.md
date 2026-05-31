@@ -15,9 +15,16 @@ GRAG owns the generated-app lifecycle for graph-based RAG:
 5. Generate an answer grounded in retrieval context and reasoning path evidence.
 6. Curate the answer with an allowed review decision and evidence.
 7. Publish only approved answers.
-8. Expose UI route metadata, view models, theme tokens, audit events, and package evidence.
+8. Register provider-neutral GraphRAG agents with bounded graph, retrieval,
+   reasoning, provenance, generation, citation, safety, lifecycle, and steward
+   roles.
+9. Validate GraphRAG lifecycle batches through Bytewax-first processor
+   contracts.
+10. Expose UI route metadata, view models, theme tokens, audit events, and package evidence.
 
-The capability does not require a live graph database, vector store, Bytewax worker, LLM provider, or browser runtime for the generated-app baseline. Those are adapters.
+The capability does not require a live graph database, vector store, Bytewax
+worker, LLM provider, or browser runtime for the dependency-light generated-app
+surface. Those are adapters.
 
 ## Runtime Model
 
@@ -46,6 +53,8 @@ The contract has explicit sections for:
 - `provenance`
 - `curation`
 - `security`
+- `agents`
+- `streaming`
 - `governance`
 - `observability`
 - `adapters`
@@ -53,6 +62,8 @@ The contract has explicit sections for:
 - `theme`
 
 The `observability.event_stream` and `adapters.event_stream` values are `bytewax`.
+The `streaming.required_processor` value is `bytewax`, and the lifecycle stream
+is `grag.lifecycle`.
 
 ## Rule Engine
 
@@ -74,10 +85,14 @@ Rule categories:
 - Generation query, retrieval context, reasoning path, answer text, provenance, citation, model policy, unsafe answer, and confidence guardrails.
 - Curation and publication approval guardrails.
 - Bytewax event-stream and audit guardrails.
+- GraphRAG-agent supported runtime, supported role, explicit scope, accountable
+  owner, declared purpose, machine-contribution disclosure, and human approval
+  review status for privileged roles.
+- Bytewax-only GRAG lifecycle batch validation.
 
 ## UI Requirements
 
-The generated UI manifest exposes 12 route surfaces:
+The generated UI manifest exposes 14 route surfaces:
 
 - Dashboard
 - Query
@@ -89,10 +104,14 @@ The generated UI manifest exposes 12 route surfaces:
 - Generation
 - Curation
 - Governance
+- Agents
+- Lifecycle batch monitor
 - Audit
 - Settings
 
 Theme components cover hybrid results, graph source cards, vector index cards, reasoning paths, provenance panels, generation panels, curation queues, audit timelines, and query console displays.
+Theme components also include GraphRAG-agent roster and Bytewax lifecycle panel
+hooks.
 
 ## API Requirements
 
@@ -106,6 +125,8 @@ Theme components cover hybrid results, graph source cards, vector index cards, r
 - Answer generation
 - Curation
 - Publication
+- GraphRAG-agent registration and listing
+- Lifecycle batch validation and listing
 - Generic APG record compatibility
 - Package/dashboard summaries
 
@@ -116,9 +137,16 @@ Generated apps should call `grag_runtime.GragService`. Production deployments ma
 ## Acceptance Criteria
 
 - The capability has root `README.md`, `SPECIFICATION.md`, and `PLAN.md`.
-- The contract exposes at least 30 rules, 12 UI routes, Bytewax adapter configuration, and visual theme metadata.
+- The contract exposes at least 45 rules, 14 UI routes, first-class agents,
+  Bytewax lifecycle streaming, Bytewax adapter configuration, and visual theme
+  metadata.
 - The runtime executes the lifecycle from source registration to publication.
+- The runtime executes GraphRAG-agent registration and Bytewax lifecycle batch
+  validation.
 - Guardrails block missing tenant context, source data, indexes, evidence, provenance, citations, curation evidence, unsafe answers, and unapproved publication.
+- Guardrails block unsupported agent runtimes, unsupported roles, missing
+  scope, missing owner, missing purpose, missing contribution disclosure, and
+  non-Bytewax lifecycle streams.
 - The API and app entrypoint import without production dependencies.
 - Package semantic evidence is generated from the current contract.
 - Focused tests cover the lifecycle, guardrails, view helpers, package shape, and import-light API.

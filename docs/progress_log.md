@@ -22044,3 +22044,66 @@ Not run to preserve battery:
   Bytewax topology, live ETLP/META/NLPC/AICR/CONF/AUTH/AUDL/CACH/MONI
   adapters, rendered browser UI, external AI-agent runtime clients, and
   performance/load/recall/ranking benchmarks.
+
+### 2026-05-31 08:22 EAT
+
+GRAG graph-RAG agent composition and Bytewax lifecycle guardrail packet:
+
+- Selected `capabilities/common/grag` as the next ordered capability packet
+  after SRCH and kept the existing graph/vector/reasoning lifecycle intact.
+- Extended the GRAG executable contract with first-class GraphRAG-agent
+  metadata, supported runtimes `codex`, `claude_code`, `opencode`, and `pi`,
+  supported graph-RAG governance roles, privileged-role metadata, Bytewax
+  lifecycle stream metadata, route metadata, theme components, and contract
+  `provides`/`requires`.
+- Added deterministic guardrails for unsupported GraphRAG-agent runtime,
+  unsupported GraphRAG-agent role, missing scope, owner, purpose, missing
+  machine contribution disclosure, privileged GraphRAG-agent registration
+  without human approval, empty lifecycle batches, unsupported lifecycle
+  operations, and non-Bytewax GRAG lifecycle batch routing.
+- Added `GraphRAGAgentRecord`, `GragLifecycleBatchRecord`,
+  tenant-qualified agent storage, lifecycle-batch storage, registration,
+  listing, audit events, dashboard counts, GraphRAG-agent roster view models,
+  and lifecycle-batch monitor view models.
+- Added `/grag/agents`, `/grag/lifecycle`, GraphRAG-agent roster theme
+  metadata, and Bytewax lifecycle panel theme metadata.
+- Regenerated `semantic_model.json` and `release_report.json` from the live
+  `app.py` contract.
+- Refreshed `README.md`, `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md` so
+  the documented packet matches the executable contract and keeps external
+  AI-agent runtimes, graph/vector stores, model providers, and durable Bytewax
+  topologies behind adapter boundaries.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/grag/capability_contract.py capabilities/common/grag/grag_runtime.py capabilities/common/grag/api.py capabilities/common/grag/views.py capabilities/common/grag/app.py capabilities/common/grag/__init__.py capabilities/common/grag/test_capability_contract.py capabilities/common/grag/test_package_contract.py`
+  passed.
+- `./.venv/bin/python capabilities/common/grag/app.py` passed the package
+  self-test.
+- `./.venv/bin/pytest -q capabilities/common/grag/test_capability_contract.py capabilities/common/grag/test_package_contract.py`
+  passed with 9 tests and only existing shared-module deprecation warnings.
+- `./.venv/bin/apg capabilities inspect grag --json` passed with `ok: true`,
+  14 APG Python routes, 49 deterministic rules, first-class agents, and
+  Bytewax streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/grag --json`
+  passed with `ok: true`; GRAG remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/grag --json`
+  passed with side-effect-free package evidence and no warnings.
+- `./.venv/bin/python -m json.tool capabilities/common/grag/semantic_model.json`
+  and `./.venv/bin/python -m json.tool capabilities/common/grag/release_report.json`
+  passed.
+- `./.venv/bin/python -c "... GragService ... register_grag_agent ... validate_grag_lifecycle_batch ..."`
+  returned one `codex` active GraphRAG steward and one `bytewax`
+  lifecycle-batch evidence record.
+- Focused stale-marker scan over touched GRAG packet source, docs, tests, and
+  evidence returned only intentional Kafka-denial tests.
+- `git diff --check -- capabilities/common/grag docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live graph databases, vector stores, embedding providers, model providers,
+  durable Bytewax topology, live RAGN/KNGR/GRPH/SRCH/NLPC/AICR/CONF/AUDL
+  adapters, rendered browser UI, external AI-agent runtime clients, and
+  performance/load/retrieval/reasoning/generation quality benchmarks.
