@@ -33,6 +33,13 @@ def test_package_contract_shape_is_valid():
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert contract["streaming"]["processor"] == "bytewax"
 	assert "conf_agents" in contract["configuration"]
+	assert "review_evidence" in contract["provides"]
+	assert contract["review_evidence"]["pending_queues"] == [
+		"configuration_changes",
+		"drift_remediations",
+		"configuration_agents",
+		"configuration_batches",
+	]
 
 
 def test_package_app_entrypoint_is_publishable():
@@ -50,3 +57,5 @@ def test_package_app_entrypoint_is_publishable():
 	assert "approvals" in model["capabilities"]["conf"]
 	assert model["capabilities"]["conf"]["streaming"]["processor"] == "bytewax"
 	assert "conf_agents" in model["capabilities"]["conf"]["provides"]
+	assert "review_evidence" in model["capabilities"]["conf"]["provides"]
+	assert model["capabilities"]["conf"]["review_evidence"]["durable_statuses"] == ["review_required", "denied", "accepted"]

@@ -65,6 +65,8 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert contract["streaming"]["processor"] == "bytewax"
 	assert contract["configuration"]["conf_agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert "review_evidence" in contract["provides"]
+	assert contract["review_evidence"]["durable_statuses"] == ["review_required", "denied", "accepted"]
 	assert "change_approval_queue" in contract["theme"]["components"]
 	assert "drift_remediation_queue" in contract["theme"]["components"]
 	assert "configuration_agent_roster" in contract["theme"]["components"]
@@ -108,6 +110,22 @@ def test_rule_engine_denies_unsafe_configuration_operations():
 		"privileged_action": True,
 		"human_approved": False,
 	})
+	production_review_result = evaluate_capability_rules({
+		"operation": "request_change",
+		"target_environment": "production",
+	})
+	drift_request_review_result = evaluate_capability_rules({
+		"operation": "request_drift_remediation",
+		"drift_detected": True,
+		"remediation_plan_available": True,
+	})
+	agent_review_result = evaluate_capability_rules({
+		"operation": "register_conf_agent",
+		"runtime_supported": True,
+		"role_supported": True,
+		"privileged_role": True,
+		"human_approval_required": False,
+	})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) == {
@@ -117,13 +135,24 @@ def test_rule_engine_denies_unsafe_configuration_operations():
 		"production_changes_require_approval",
 		"encrypted_secrets_required",
 		"drift_requires_remediation_plan",
-		"production_deployment_requires_rollback",
 	}
+	rollback_result = evaluate_capability_rules({
+		"operation": "deploy_change",
+		"target_environment": "production",
+		"rollback_plan_available": False,
+	})
+	assert rollback_result["matched_rules"] == ["production_deployment_requires_rollback"]
 	assert review_result["matched_rules"] == ["change_review_requires_independent_reviewer"]
 	assert drift_review_result["matched_rules"] == ["drift_review_requires_independent_reviewer"]
 	assert batch_result["matched_rules"] == ["bytewax_event_stream_required"]
 	assert set(agent_result["matched_rules"]) == {"conf_agent_runtime_supported", "conf_agent_role_supported"}
 	assert agent_action_result["matched_rules"] == ["conf_agent_privileged_action_requires_approval"]
+	assert production_review_result["decision"] == "require_review"
+	assert production_review_result["matched_rules"] == ["production_change_requires_review"]
+	assert drift_request_review_result["decision"] == "require_review"
+	assert drift_request_review_result["matched_rules"] == ["drift_remediation_requires_review"]
+	assert agent_review_result["decision"] == "require_review"
+	assert agent_review_result["matched_rules"] == ["conf_agent_privileged_role_requires_human_approval"]
 
 
 def test_registration_includes_full_capability_contract():
@@ -139,6 +168,8 @@ def test_registration_includes_full_capability_contract():
 	assert "conf:approve" in registration["permissions"]
 	assert "conf:remediate" in registration["permissions"]
 	assert "conf:agent_manage" in registration["permissions"]
+	assert "review_evidence" in registration["capabilities"]
+	assert registration["endpoints"]["pending_reviews"] == "/api/v1/config/pending-reviews"
 
 
 def test_service_promotes_configuration_change_and_reviews_drift():
@@ -154,6 +185,11 @@ def test_service_promotes_configuration_change_and_reviews_drift():
 		validation_passed=True,
 		rollback_plan="Revert apg.database.url to postgresql://primary.",
 	)
+	assert change["status"] == "review_required"
+	assert change["policy_decision"] == "require_review"
+	assert change["review_reasons"] == ["production_change_review_required"]
+	assert change["audit_evidence"]["required_actions"] == ["review_production_change"]
+	assert service.list_pending_reviews("tenant-conf")[0]["id"] == change["id"]
 	approved_change = service.decide_change(
 		change_id=change["id"],
 		tenant_id="tenant-conf",
@@ -161,6 +197,7 @@ def test_service_promotes_configuration_change_and_reviews_drift():
 		decision="approved",
 		notes="Validation, maintenance window, and rollback evidence checked.",
 	)
+	assert service.list_pending_reviews("tenant-conf") == []
 	deployment = service.deploy_change(
 		deployment_id="deploy-prod-url",
 		tenant_id="tenant-conf",
@@ -177,6 +214,10 @@ def test_service_promotes_configuration_change_and_reviews_drift():
 		drift_summary="Runtime URL differs from declared production URL.",
 		remediation_plan="Re-apply approved production URL through deployment center.",
 	)
+	assert remediation["status"] == "review_required"
+	assert remediation["policy_decision"] == "require_review"
+	assert remediation["review_reasons"] == ["drift_remediation_review_required"]
+	assert service.list_pending_reviews("tenant-conf")[0]["id"] == remediation["id"]
 	approved_remediation = service.decide_drift_remediation(
 		remediation_id=remediation["id"],
 		tenant_id="tenant-conf",
@@ -201,6 +242,7 @@ def test_service_promotes_configuration_change_and_reviews_drift():
 	assert service.list_records("tenant-conf")[0]["value"] == "postgresql://primary-prod"
 	assert approved_remediation["status"] == "approved"
 	assert agent["runtime"] == "codex"
+	assert agent["policy_decision"] == "allow"
 	assert service.governance_summary("tenant-conf")["audit_event_count"] >= 5
 	assert model["summary"]["deployment_count"] == 1
 	assert model["summary"]["drift_remediation_count"] == 1
@@ -333,6 +375,11 @@ def test_service_enforces_change_deployment_and_drift_guardrails():
 		)
 	with pytest.raises(PermissionError, match="bytewax_event_stream_required"):
 		service.validate_batch("tenant-conf", 1, "queue")
+	denied_batch = service.list_batches("tenant-conf")[0]
+	assert denied_batch["status"] == "denied"
+	assert denied_batch["policy_decision"] == "deny"
+	assert denied_batch["review_reasons"] == ["bytewax_event_stream_required"]
+	assert denied_batch["audit_evidence"]["required_actions"] == ["route_to_bytewax_stream"]
 	with pytest.raises(PermissionError, match="conf_agent_runtime_not_supported"):
 		service.register_conf_agent(
 			agent_id="bad-agent-runtime",
@@ -353,6 +400,20 @@ def test_service_enforces_change_deployment_and_drift_guardrails():
 			purpose="review configuration",
 			owner="ops",
 		)
+	review_agent = service.register_conf_agent(
+		agent_id="review-agent",
+		tenant_id="tenant-conf",
+		name="Deployment Reviewer",
+		runtime="codex",
+		role="deployment_reviewer",
+		purpose="review production deployments",
+		owner="ops",
+		human_approval_required=False,
+	)
+	assert review_agent["status"] == "pending_review"
+	assert review_agent["policy_decision"] == "require_review"
+	assert review_agent["review_reasons"] == ["conf_agent_human_approval_required"]
+	assert review_agent["audit_evidence"]["required_actions"] == ["record_conf_agent_human_approval"]
 	remediation = service.request_drift_remediation(
 		remediation_id="self-drift-review",
 		tenant_id="tenant-conf",
@@ -484,9 +545,14 @@ def test_api_helpers_and_view_models_share_default_state():
 
 	assert api.capability_status("tenant-api")["deployment_count"] == 1
 	assert api.capability_status("tenant-api")["agent_count"] == 1
+	assert api.capability_status("tenant-api")["pending_review_count"] == 0
 	assert model["summary"]["record_count"] == 1
+	assert model["pending_reviews"] == []
 	assert queue["approved_changes"][0]["id"] == "api-change"
 	assert agent["role"] == "deployment_reviewer"
 	assert batch["processor"] == "bytewax"
+	assert api.list_batches("tenant-api")[0]["status"] == "accepted"
+	assert api.list_pending_reviews("tenant-api") == []
 	assert agents["agents"][0]["id"] == "api-agent"
+	assert agents["pending_reviews"] == []
 	assert audit["events"]

@@ -27,6 +27,8 @@ def dashboard_model(
 		"deployments": service.list_deployments(tenant_id),
 		"drift_remediations": service.list_drift_remediations(tenant_id),
 		"agents": service.list_agents(tenant_id),
+		"batches": service.list_batches(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"summary": service.governance_summary(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
@@ -44,7 +46,11 @@ def change_queue_model(
 		"tenant_id": tenant_id,
 		"pending_changes": [
 			item for item in service.list_changes(tenant_id)
-			if item["status"] == "pending"
+			if item["status"] in {"pending", "review_required"}
+		],
+		"pending_reviews": [
+			item for item in service.list_changes(tenant_id)
+			if item["status"] == "review_required"
 		],
 		"approved_changes": [
 			item for item in service.list_changes(tenant_id)
@@ -61,6 +67,10 @@ def drift_remediation_model(
 	return {
 		"tenant_id": tenant_id,
 		"remediations": service.list_drift_remediations(tenant_id),
+		"pending_reviews": [
+			item for item in service.list_drift_remediations(tenant_id)
+			if item["status"] == "review_required"
+		],
 		"drifted_records": [
 			item for item in service.list_records(tenant_id)
 			if item["status"] == "drifted"
@@ -88,6 +98,10 @@ def agent_model(
 	return {
 		"tenant_id": tenant_id,
 		"agents": service.list_agents(tenant_id),
+		"pending_reviews": [
+			item for item in service.list_agents(tenant_id)
+			if item["status"] == "pending_review"
+		],
 		"policy": contract["configuration"]["conf_agents"],
 		"route": "/config/agents",
 	}

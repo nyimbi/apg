@@ -133,6 +133,8 @@ class CapabilityRuleEngine:
 				actions.append(rule.effect)
 				if rule.effect.get("decision") == "deny":
 					decision = "deny"
+				elif rule.effect.get("decision") == "require_review" and decision != "deny":
+					decision = "require_review"
 
 		return {
 			"decision": decision,
@@ -274,11 +276,31 @@ def default_rules() -> list[CapabilityRule]:
 		CapabilityRule(
 			name="production_deployment_requires_rollback",
 			description="Production deployments require rollback evidence.",
-			condition={"target_environment": "production", "rollback_plan_available": False},
+			condition={"operation": "deploy_change", "target_environment": "production", "rollback_plan_available": False},
 			effect={
 				"decision": "deny",
 				"reason": "production_rollback_plan_required",
 				"required_action": "attach_rollback_plan"
+			}
+		),
+		CapabilityRule(
+			name="production_change_requires_review",
+			description="Production configuration change requests must enter the review queue.",
+			condition={"operation": "request_change", "target_environment": "production"},
+			effect={
+				"decision": "require_review",
+				"reason": "production_change_review_required",
+				"required_action": "review_production_change"
+			}
+		),
+		CapabilityRule(
+			name="drift_remediation_requires_review",
+			description="Configuration drift remediation requests must enter the review queue.",
+			condition={"operation": "request_drift_remediation", "drift_detected": True, "remediation_plan_available": True},
+			effect={
+				"decision": "require_review",
+				"reason": "drift_remediation_review_required",
+				"required_action": "review_drift_remediation"
 			}
 		),
 		CapabilityRule(
@@ -329,6 +351,16 @@ def default_rules() -> list[CapabilityRule]:
 				"decision": "deny",
 				"reason": "conf_agent_role_not_supported",
 				"required_action": "choose_supported_role"
+			}
+		),
+		CapabilityRule(
+			name="conf_agent_privileged_role_requires_human_approval",
+			description="Privileged configuration-agent roles require human approval evidence.",
+			condition={"operation": "register_conf_agent", "privileged_role": True, "human_approval_required": False},
+			effect={
+				"decision": "require_review",
+				"reason": "conf_agent_human_approval_required",
+				"required_action": "record_conf_agent_human_approval"
 			}
 		),
 		CapabilityRule(
@@ -397,6 +429,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "conf",
 		"display_name": "Configuration Management",
+		"provides": ["conf_operations", "conf_agents", "review_evidence"],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
 		"rule_engine": {
@@ -410,6 +443,12 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"components": theme.components
 		},
 		"streaming": streaming_manifest(),
+		"review_evidence": {
+			"durable_statuses": ["review_required", "denied", "accepted"],
+			"policy_fields": ["policy_decision", "matched_rules", "review_reasons", "audit_evidence"],
+			"pending_queues": ["configuration_changes", "drift_remediations", "configuration_agents", "configuration_batches"],
+			"deny_behavior": "Denied configuration lifecycle batches persist evidence before PermissionError",
+		},
 	}
 
 

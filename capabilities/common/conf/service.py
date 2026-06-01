@@ -24,7 +24,7 @@ from .models import (
 	AIModelConfiguration, MLPipelineConfiguration, NLPServiceConfiguration,
 	AIModelFramework, AIModelType, AIModelState, ModelProvider,
 	ConfigurationAuditEvent, ConfigurationChange, ConfigurationDeployment,
-	ConfigurationAgent, ConfigurationRecord, DriftRemediation
+	ConfigurationAgent, ConfigurationBatchEvidence, ConfigurationRecord, DriftRemediation
 )
 from .capability_contract import SUPPORTED_CONF_AGENT_ROLES, SUPPORTED_CONF_AGENT_RUNTIMES, evaluate_capability_rules, get_capability_contract
 from .ai_engine_advanced import AIIntelligenceEngine
@@ -1344,6 +1344,7 @@ class ConfService:
 		self._deployments: Dict[tuple[str, str], ConfigurationDeployment] = {}
 		self._drift_remediations: Dict[tuple[str, str], DriftRemediation] = {}
 		self._agents: Dict[tuple[str, str], ConfigurationAgent] = {}
+		self._batches: Dict[tuple[str, str], ConfigurationBatchEvidence] = {}
 		self._audit_events: Dict[tuple[str, str], ConfigurationAuditEvent] = {}
 
 	def describe(self, tenant_id: str = "default") -> Dict[str, Any]:
@@ -1432,8 +1433,10 @@ class ConfService:
 			"secrets_encrypted": bool(secrets_encrypted),
 			"target_environment": target_environment,
 			"change_approved": True,
+			"rollback_plan_available": bool(rollback_plan) or target_environment != "production",
 		})
 		self._raise_if_denied(result)
+		policy_decision = result["decision"]
 		change = ConfigurationChange(
 			id=change_id,
 			tenant_id=tenant_id,
@@ -1446,6 +1449,11 @@ class ConfService:
 			contains_secrets=contains_secrets,
 			secrets_encrypted=secrets_encrypted,
 			rollback_plan=rollback_plan,
+			status="review_required" if policy_decision == "require_review" else "pending",
+			policy_decision=policy_decision,
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._reasons(result),
+			audit_evidence=self._audit_evidence(result),
 		)
 		self._changes[self._tenant_key(tenant_id, change_id)] = change
 		self._record_audit(
@@ -1453,8 +1461,10 @@ class ConfService:
 			subject_id=change_id,
 			event_type="configuration_change_requested",
 			actor=requested_by,
-			decision="require_review" if target_environment == "production" else "allow",
+			decision=policy_decision,
 			reasons=self._reasons(result),
+			matched_rules=result["matched_rules"],
+			audit_evidence=self._audit_evidence(result),
 			metadata={"record_id": record_id, "target_environment": target_environment},
 		)
 		return change.to_dict()
@@ -1468,7 +1478,7 @@ class ConfService:
 		notes: str,
 	) -> Dict[str, Any]:
 		change = self._require_change(change_id, tenant_id)
-		if change.status != "pending":
+		if change.status not in {"pending", "review_required"}:
 			raise ValueError("configuration_change_already_decided")
 		if decision not in {"approved", "rejected"}:
 			raise ValueError("configuration_change_decision_invalid")
@@ -1482,7 +1492,17 @@ class ConfService:
 			"change_reviewer_same_as_requester": reviewer == change.requested_by,
 		})
 		self._raise_if_denied(result)
-		decided = replace(change, status=decision, decision=decision, reviewer=reviewer, notes=notes)
+		decided = replace(
+			change,
+			status=decision,
+			decision=decision,
+			reviewer=reviewer,
+			notes=notes,
+			policy_decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._reasons(result),
+			audit_evidence=self._audit_evidence(result, review_recorded=True),
+		)
 		self._changes[self._tenant_key(tenant_id, change_id)] = decided
 		self._record_audit(
 			tenant_id=tenant_id,
@@ -1491,6 +1511,8 @@ class ConfService:
 			actor=reviewer,
 			decision=decision,
 			reasons=self._reasons(result),
+			matched_rules=result["matched_rules"],
+			audit_evidence=self._audit_evidence(result, review_recorded=True),
 			metadata={"record_id": change.record_id, "target_environment": change.target_environment},
 		)
 		return decided.to_dict()
@@ -1539,6 +1561,10 @@ class ConfService:
 			status="completed",
 			rollback_plan=effective_rollback or "",
 			applied_version=record.version + 1,
+			policy_decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._reasons(result),
+			audit_evidence=self._audit_evidence(result, review_recorded=approved),
 		)
 		updated_record = replace(
 			record,
@@ -1559,6 +1585,8 @@ class ConfService:
 			actor=requested_by,
 			decision=result["decision"],
 			reasons=self._reasons(result),
+			matched_rules=result["matched_rules"],
+			audit_evidence=self._audit_evidence(result, review_recorded=approved),
 			metadata={
 				"change_id": change_id,
 				"record_id": record.id,
@@ -1596,6 +1624,7 @@ class ConfService:
 			"remediation_plan_available": bool(remediation_plan),
 		})
 		self._raise_if_denied(result)
+		policy_decision = result["decision"]
 		remediation = DriftRemediation(
 			id=remediation_id,
 			tenant_id=tenant_id,
@@ -1603,6 +1632,11 @@ class ConfService:
 			detected_by=detected_by,
 			drift_summary=drift_summary,
 			remediation_plan=remediation_plan,
+			status="review_required" if policy_decision == "require_review" else "pending",
+			policy_decision=policy_decision,
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._reasons(result),
+			audit_evidence=self._audit_evidence(result),
 		)
 		self._drift_remediations[self._tenant_key(tenant_id, remediation_id)] = remediation
 		self._records[self._tenant_key(tenant_id, record_id)] = replace(record, status="drifted")
@@ -1611,8 +1645,10 @@ class ConfService:
 			subject_id=remediation_id,
 			event_type="configuration_drift_detected",
 			actor=detected_by,
-			decision="require_review",
+			decision=policy_decision,
 			reasons=self._reasons(result),
+			matched_rules=result["matched_rules"],
+			audit_evidence=self._audit_evidence(result),
 			metadata={"record_id": record_id},
 		)
 		return remediation.to_dict()
@@ -1626,7 +1662,7 @@ class ConfService:
 		notes: str,
 	) -> Dict[str, Any]:
 		remediation = self._require_drift_remediation(remediation_id, tenant_id)
-		if remediation.status != "pending":
+		if remediation.status not in {"pending", "review_required"}:
 			raise ValueError("drift_remediation_already_decided")
 		if decision not in {"approved", "rejected"}:
 			raise ValueError("drift_remediation_decision_invalid")
@@ -1640,7 +1676,17 @@ class ConfService:
 			"drift_reviewer_same_as_detector": reviewer == remediation.detected_by,
 		})
 		self._raise_if_denied(result)
-		decided = replace(remediation, status=decision, decision=decision, reviewer=reviewer, notes=notes)
+		decided = replace(
+			remediation,
+			status=decision,
+			decision=decision,
+			reviewer=reviewer,
+			notes=notes,
+			policy_decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._reasons(result),
+			audit_evidence=self._audit_evidence(result, review_recorded=True),
+		)
 		self._drift_remediations[self._tenant_key(tenant_id, remediation_id)] = decided
 		if decision == "approved":
 			record = self._require_record(remediation.record_id, tenant_id)
@@ -1652,6 +1698,8 @@ class ConfService:
 			actor=reviewer,
 			decision=decision,
 			reasons=self._reasons(result),
+			matched_rules=result["matched_rules"],
+			audit_evidence=self._audit_evidence(result, review_recorded=True),
 			metadata={"record_id": remediation.record_id},
 		)
 		return decided.to_dict()
@@ -1682,6 +1730,8 @@ class ConfService:
 			"operation": "register_conf_agent",
 			"runtime_supported": runtime in SUPPORTED_CONF_AGENT_RUNTIMES,
 			"role_supported": role in SUPPORTED_CONF_AGENT_ROLES,
+			"privileged_role": role in {"policy_reviewer", "deployment_reviewer"},
+			"human_approval_required": bool(human_approval_required),
 		})
 		self._raise_if_denied(result)
 		agent = ConfigurationAgent(
@@ -1693,6 +1743,11 @@ class ConfService:
 			purpose=purpose,
 			owner=owner,
 			human_approval_required=human_approval_required,
+			status="pending_review" if result["decision"] == "require_review" else "active",
+			policy_decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._reasons(result),
+			audit_evidence=self._audit_evidence(result, review_recorded=human_approval_required),
 		)
 		self._agents[self._tenant_key(tenant_id, agent_id)] = agent
 		self._record_audit(
@@ -1702,6 +1757,8 @@ class ConfService:
 			actor=owner,
 			decision=result["decision"],
 			reasons=self._reasons(result),
+			matched_rules=result["matched_rules"],
+			audit_evidence=self._audit_evidence(result, review_recorded=human_approval_required),
 			metadata={"runtime": runtime, "role": role, "purpose": purpose},
 		)
 		return agent.to_dict()
@@ -1712,21 +1769,60 @@ class ConfService:
 			"operation": "configuration_batch",
 			"event_stream": event_stream,
 		})
-		self._raise_if_denied(result)
 		contract = self.describe(tenant_id)
-		return {
-			"tenant_id": tenant_id,
-			"record_count": int(record_count),
-			"accepted": True,
-			"processor": contract["streaming"]["processor"],
-			"event_stream": contract["streaming"]["event_stream"],
-		}
+		batch_id = uuid7str()
+		batch = ConfigurationBatchEvidence(
+			id=batch_id,
+			tenant_id=tenant_id,
+			record_count=int(record_count),
+			event_stream=event_stream,
+			status="denied" if result["decision"] == "deny" else "accepted",
+			processor=contract["streaming"]["processor"],
+			policy_decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._reasons(result),
+			audit_evidence=self._audit_evidence(result),
+		)
+		self._batches[self._tenant_key(tenant_id, batch_id)] = batch
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=batch_id,
+			event_type="configuration_batch_validated",
+			actor="conf",
+			decision=result["decision"],
+			reasons=self._reasons(result),
+			matched_rules=result["matched_rules"],
+			audit_evidence=self._audit_evidence(result),
+			metadata={"event_stream": event_stream, "record_count": int(record_count)},
+		)
+		if result["decision"] == "deny":
+			self._raise_if_denied(result)
+		payload = batch.to_dict()
+		payload["accepted"] = True
+		payload["event_stream"] = contract["streaming"]["event_stream"]
+		return payload
 
 	def list_agents(self, tenant_id: str | None = None) -> List[Dict[str, Any]]:
 		return self._list(self._agents.values(), tenant_id)
 
+	def list_batches(self, tenant_id: str | None = None) -> List[Dict[str, Any]]:
+		return self._list(self._batches.values(), tenant_id)
+
 	def list_audit_events(self, tenant_id: str | None = None) -> List[Dict[str, Any]]:
 		return self._list(self._audit_events.values(), tenant_id)
+
+	def list_pending_reviews(self, tenant_id: str | None = None) -> List[Dict[str, Any]]:
+		items = (
+			self.list_changes(tenant_id)
+			+ self.list_drift_remediations(tenant_id)
+			+ self.list_agents(tenant_id)
+			+ self.list_batches(tenant_id)
+		)
+		return [
+			item
+			for item in items
+			if item.get("status") in {"review_required", "pending_review"}
+		]
 
 	def governance_summary(self, tenant_id: str | None = None) -> Dict[str, int]:
 		records = self.list_records(tenant_id)
@@ -1734,14 +1830,18 @@ class ConfService:
 		deployments = self.list_deployments(tenant_id)
 		drift = self.list_drift_remediations(tenant_id)
 		agents = self.list_agents(tenant_id)
+		batches = self.list_batches(tenant_id)
 		audit = self.list_audit_events(tenant_id)
 		return {
 			"record_count": len(records),
-			"pending_change_count": len([item for item in changes if item["status"] == "pending"]),
+			"pending_change_count": len([item for item in changes if item["status"] in {"pending", "review_required"}]),
 			"approved_change_count": len([item for item in changes if item["status"] == "approved"]),
 			"deployment_count": len(deployments),
 			"drift_remediation_count": len(drift),
 			"agent_count": len(agents),
+			"batch_count": len(batches),
+			"denied_batch_count": len([item for item in batches if item["status"] == "denied"]),
+			"pending_review_count": len(self.list_pending_reviews(tenant_id)),
 			"audit_event_count": len(audit),
 		}
 
@@ -1783,6 +1883,8 @@ class ConfService:
 		actor: str,
 		decision: str = "allow",
 		reasons: list[str] | tuple[str, ...] | None = None,
+		matched_rules: list[str] | tuple[str, ...] | None = None,
+		audit_evidence: Dict[str, Any] | None = None,
 		metadata: Dict[str, Any] | None = None,
 	) -> None:
 		event_id = uuid7str()
@@ -1794,6 +1896,8 @@ class ConfService:
 			actor=actor,
 			decision=decision,
 			reasons=tuple(reasons or ()),
+			matched_rules=tuple(matched_rules or ()),
+			audit_evidence=dict(audit_evidence or {}),
 			metadata=dict(metadata or {}),
 		)
 		self._audit_events[self._tenant_key(tenant_id, event_id)] = event
@@ -1809,6 +1913,17 @@ class ConfService:
 			for action in result.get("actions", [])
 			if action.get("reason")
 		]
+
+	def _audit_evidence(self, result: Dict[str, Any], review_recorded: bool = False) -> Dict[str, Any]:
+		return {
+			"required_actions": [
+				str(action.get("required_action"))
+				for action in result.get("actions", [])
+				if action.get("required_action")
+			],
+			"reasons": self._reasons(result),
+			"review_recorded": bool(review_recorded),
+		}
 
 	def _list(self, values: Any, tenant_id: str | None = None) -> List[Dict[str, Any]]:
 		return [

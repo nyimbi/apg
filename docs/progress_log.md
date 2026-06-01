@@ -16,6 +16,74 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-06-01 06:21 EAT
+
+CONF review-evidence lifecycle packet:
+
+- Extended configuration changes, deployments, drift remediations,
+  configuration agents, configuration lifecycle batches, and audit events with
+  durable policy evidence: policy decision, matched rules, review reasons, and
+  audit evidence.
+- Added deterministic `require_review` rules for production configuration
+  changes, drift remediation requests, and privileged configuration-agent roles
+  that lack human approval evidence.
+- Preserved production changes and drift remediation requests as
+  `review_required` records until an independent reviewer decides them.
+- Preserved privileged deployment and policy reviewer agents as
+  `pending_review` records when human approval evidence is missing.
+- Changed denied non-Bytewax configuration batches to persist `denied` batch
+  evidence before raising `PermissionError`, keeping Bytewax as the required
+  lifecycle stream processor.
+- Added pending-review and batch evidence to the CONF service, API helpers,
+  dashboard, change queue, drift remediation queue, agent view, registration
+  metadata, package contract, semantic model, docs, and focused tests.
+- Kept CONF agents provider-neutral for Codex, Claude Code, OpenCode, Pi, and
+  future review runtimes while retaining human approval controls for
+  privileged roles.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for CONF models, contract,
+  service, API, views, app, and tests passed.
+- `./.venv/bin/pytest -q capabilities/common/conf/tests/test_capability_contract.py
+  capabilities/common/conf/tests/test_package_contract.py` passed with 9 tests
+  and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.conf import app; ..."`
+  passed package self-test.
+- `./.venv/bin/python -m json.tool
+  capabilities/common/conf/semantic_model.json` passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/conf --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/conf --strict --json` passed with no warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/conf --json`
+  passed with no warnings and side-effect-free publish planning.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/common/conf --json` passed with complete lifecycle evidence and
+  16 rules.
+- CONF stale-marker scan returned no TODO/FIXME/stub/placeholder, Kafka,
+  materialized-baseline, contract-only, or not-implemented markers across the
+  edited CONF packet.
+- Service smoke executed production change review evidence, drift remediation
+  review evidence, privileged configuration-agent review evidence, and denied
+  non-Bytewax batch persistence, printing `review_required review_required
+  pending_review denied bytewax_event_stream_required 3 PermissionError`.
+- Inline code review found no blocking issues after tightening rollback-plan
+  enforcement to deployment time; residual risks remain around live GitOps
+  mutation, live cloud provider deployment, durable persistence, secret manager
+  integration, rendered UI, live Bytewax workers, AI optimization adapters, and
+  load checks.
+
+Known gaps:
+
+- Full repository tests, rendered configuration control-room UI, live GitOps
+  repository mutation, live cloud provider deployment, production database and
+  migrations, live secret manager/HSM integration, natural-language
+  configuration generation, live Bytewax workers, AI optimization adapters, and
+  load checks still need later verification outside this battery-conscious
+  slice.
+
 ### 2026-06-01 06:09 EAT
 
 WFLO review-evidence lifecycle packet:

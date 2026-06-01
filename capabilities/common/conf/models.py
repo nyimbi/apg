@@ -98,6 +98,10 @@ class ConfigurationChange:
 	decision: str = ""
 	reviewer: str = ""
 	notes: str = ""
+	policy_decision: str = "allow"
+	matched_rules: List[str] = field(default_factory=list)
+	review_reasons: List[str] = field(default_factory=list)
+	audit_evidence: Dict[str, Any] = field(default_factory=dict)
 
 	def to_dict(self) -> Dict[str, Any]:
 		return {
@@ -116,6 +120,10 @@ class ConfigurationChange:
 			"decision": self.decision,
 			"reviewer": self.reviewer,
 			"notes": self.notes,
+			"policy_decision": self.policy_decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 		}
 
 
@@ -133,6 +141,10 @@ class ConfigurationDeployment:
 	status: str
 	rollback_plan: str
 	applied_version: int
+	policy_decision: str = "allow"
+	matched_rules: List[str] = field(default_factory=list)
+	review_reasons: List[str] = field(default_factory=list)
+	audit_evidence: Dict[str, Any] = field(default_factory=dict)
 
 	def to_dict(self) -> Dict[str, Any]:
 		return {
@@ -146,6 +158,10 @@ class ConfigurationDeployment:
 			"status": self.status,
 			"rollback_plan": self.rollback_plan,
 			"applied_version": self.applied_version,
+			"policy_decision": self.policy_decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 		}
 
 
@@ -163,6 +179,10 @@ class DriftRemediation:
 	decision: str = ""
 	reviewer: str = ""
 	notes: str = ""
+	policy_decision: str = "allow"
+	matched_rules: List[str] = field(default_factory=list)
+	review_reasons: List[str] = field(default_factory=list)
+	audit_evidence: Dict[str, Any] = field(default_factory=dict)
 
 	def to_dict(self) -> Dict[str, Any]:
 		return {
@@ -176,6 +196,10 @@ class DriftRemediation:
 			"decision": self.decision,
 			"reviewer": self.reviewer,
 			"notes": self.notes,
+			"policy_decision": self.policy_decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 		}
 
 
@@ -192,6 +216,10 @@ class ConfigurationAgent:
 	owner: str
 	human_approval_required: bool = True
 	status: str = "active"
+	policy_decision: str = "allow"
+	matched_rules: List[str] = field(default_factory=list)
+	review_reasons: List[str] = field(default_factory=list)
+	audit_evidence: Dict[str, Any] = field(default_factory=dict)
 
 	def to_dict(self) -> Dict[str, Any]:
 		return {
@@ -204,6 +232,40 @@ class ConfigurationAgent:
 			"owner": self.owner,
 			"human_approval_required": self.human_approval_required,
 			"status": self.status,
+			"policy_decision": self.policy_decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
+		}
+
+
+@dataclass(frozen=True)
+class ConfigurationBatchEvidence:
+	"""Bytewax configuration lifecycle batch evidence."""
+
+	id: str
+	tenant_id: str
+	record_count: int
+	event_stream: str
+	status: str
+	processor: str = "bytewax"
+	policy_decision: str = "allow"
+	matched_rules: List[str] = field(default_factory=list)
+	review_reasons: List[str] = field(default_factory=list)
+	audit_evidence: Dict[str, Any] = field(default_factory=dict)
+
+	def to_dict(self) -> Dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"record_count": self.record_count,
+			"event_stream": self.event_stream,
+			"status": self.status,
+			"processor": self.processor,
+			"policy_decision": self.policy_decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 		}
 
 
@@ -218,6 +280,8 @@ class ConfigurationAuditEvent:
 	actor: str
 	decision: str = "allow"
 	reasons: tuple[str, ...] = ()
+	matched_rules: tuple[str, ...] = ()
+	audit_evidence: Dict[str, Any] = field(default_factory=dict)
 	metadata: Dict[str, Any] = field(default_factory=dict)
 
 	def to_dict(self) -> Dict[str, Any]:
@@ -229,6 +293,8 @@ class ConfigurationAuditEvent:
 			"actor": self.actor,
 			"decision": self.decision,
 			"reasons": list(self.reasons),
+			"matched_rules": list(self.matched_rules),
+			"audit_evidence": dict(self.audit_evidence),
 			"metadata": dict(self.metadata),
 		}
 

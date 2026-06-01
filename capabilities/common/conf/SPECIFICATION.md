@@ -17,6 +17,9 @@ The capability must be executable without importing the full production automati
 - Treat configuration review agents as first-class configuration citizens with supported runtime, role, owner, purpose, and human-approval policy evidence.
 - Publish lifecycle stream metadata through Bytewax so composition tooling can route configuration events without broker-specific assumptions.
 - Expose rule, API, UI, theme, audit, and semantic model evidence for APG composition.
+- Persist review-required and denied lifecycle evidence so generated consoles
+  can show pending decisions, matched rules, review reasons, and remediation
+  actions without replaying policy rules.
 
 ## First-Class Domain Concepts
 
@@ -59,6 +62,10 @@ Required evidence:
 - `decision`
 - `reviewer`
 - `notes`
+- `policy_decision`
+- `matched_rules`
+- `review_reasons`
+- `audit_evidence`
 
 ### Configuration Deployment
 
@@ -76,6 +83,10 @@ Required evidence:
 - `status`
 - `rollback_plan`
 - `applied_version`
+- `policy_decision`
+- `matched_rules`
+- `review_reasons`
+- `audit_evidence`
 
 ### Drift Remediation
 
@@ -93,6 +104,10 @@ Required evidence:
 - `decision`
 - `reviewer`
 - `notes`
+- `policy_decision`
+- `matched_rules`
+- `review_reasons`
+- `audit_evidence`
 
 ### Audit Event
 
@@ -107,6 +122,8 @@ Required evidence:
 - `actor`
 - `decision`
 - `reasons`
+- `matched_rules`
+- `audit_evidence`
 - `metadata`
 
 ### Configuration Agent
@@ -126,6 +143,28 @@ Required evidence:
 - `owner`
 - `human_approval_required`
 - `status`
+- `policy_decision`
+- `matched_rules`
+- `review_reasons`
+- `audit_evidence`
+
+### Configuration Batch Evidence
+
+A Bytewax lifecycle batch validation record retained for accepted and denied
+configuration batches.
+
+Required evidence:
+
+- `id`
+- `tenant_id`
+- `record_count`
+- `event_stream`
+- `status`
+- `processor`
+- `policy_decision`
+- `matched_rules`
+- `review_reasons`
+- `audit_evidence`
 
 ## Lifecycle Requirements
 
@@ -145,6 +184,8 @@ Required evidence:
 - Validation evidence must be captured.
 - Secret-bearing changes must include encrypted secret evidence.
 - Production changes may be requested before approval but cannot deploy until approved.
+- Production change requests enter `review_required` state with durable policy
+  evidence.
 
 ### Change Decision
 
@@ -167,6 +208,8 @@ Required evidence:
 
 - Drift findings require a target record in the same tenant.
 - Drift findings require a remediation plan before approval.
+- Drift remediation requests enter `review_required` state with durable policy
+  evidence.
 - Drift approval requires independent reviewer and notes.
 - Approved remediation changes the record status back to `active`.
 - Rejected remediation leaves the finding as rejected and does not mutate the record.
@@ -179,6 +222,8 @@ Required evidence:
 - Agent name, purpose, and owner are required.
 - Agents may inspect, prepare, and recommend; they may not autonomously approve,
   deploy, or remediate privileged changes without human approval evidence.
+- Privileged deployment and policy reviewer agents without human approval
+  evidence enter `pending_review` state.
 
 ### Lifecycle Streaming
 
@@ -186,6 +231,8 @@ Required evidence:
   `apg.common.conf.lifecycle`.
 - Stream processor metadata must be `bytewax`.
 - Event ordering is tenant-scoped through `tenant_id`.
+- Denied non-Bytewax lifecycle batches must be persisted as `denied` before
+  raising `PermissionError`.
 
 ## Rules
 
@@ -197,12 +244,15 @@ The deterministic rule engine must enforce at least:
 - `encrypted_secrets_required`
 - `production_changes_require_approval`
 - `production_deployment_requires_rollback`
+- `production_change_requires_review`
+- `drift_remediation_requires_review`
 - `change_review_requires_independent_reviewer`
 - `drift_requires_remediation_plan`
 - `drift_review_requires_independent_reviewer`
 - `bytewax_event_stream_required`
 - `conf_agent_runtime_supported`
 - `conf_agent_role_supported`
+- `conf_agent_privileged_role_requires_human_approval`
 - `conf_agent_privileged_action_requires_approval`
 
 ## UI Surfaces

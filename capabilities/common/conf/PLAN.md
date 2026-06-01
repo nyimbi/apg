@@ -10,6 +10,10 @@ Current hardening extends that packet with first-class configuration agents,
 Bytewax lifecycle stream metadata, compact theme tokens, and a current
 source-of-truth capability specification.
 
+This slice also preserves durable review evidence for production changes, drift
+remediation, privileged configuration agents, configuration batches, and audit
+events so generated applications can compose review queues immediately.
+
 ## Implementation Steps
 
 1. Add package-local lifecycle models:
@@ -67,6 +71,8 @@ source-of-truth capability specification.
    - add CONF agent registration, API helper, view model, route, and tests
    - add Bytewax stream metadata to contract, app semantic model, package
      manifest, service validation, and tests
+   - add durable review evidence fields and pending-review queues for changes,
+     drift remediations, privileged agents, denied batches, and audit events
    - align the UI border radius token with the current 8px APG standard
    - replace legacy `cap_spec.md` claims with a pointer to this specification
 
@@ -77,6 +83,12 @@ source-of-truth capability specification.
    - publish plan
    - stale marker search
    - diff whitespace check
+
+10. Preserve current review-evidence packet:
+   - production changes and drift remediation requests enter `review_required`
+   - privileged deployment/policy reviewer agents can enter `pending_review`
+   - denied non-Bytewax batches persist evidence before `PermissionError`
+   - API helpers and view models expose pending review and batch evidence
 
 ## Non-Goals For This Slice
 

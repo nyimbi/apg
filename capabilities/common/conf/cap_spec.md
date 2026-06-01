@@ -23,3 +23,7 @@ The active CONF packet covers tenant-scoped configuration records, governed
 change approval, production deployment guardrails, drift remediation review,
 configuration review agents, compact UI theming, deterministic rules, and
 Bytewax lifecycle stream metadata.
+
+The current review-evidence packet also covers durable pending-review and deny
+evidence for production changes, drift remediations, privileged configuration
+agents, configuration lifecycle batches, and audit events.

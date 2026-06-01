@@ -53,6 +53,7 @@ def register_capability() -> dict:
 			"gitops": "Manage GitOps-driven configuration promotion",
 			"drift_management": "Detect and review configuration drift remediation",
 			"configuration_agents": "Register and govern configuration review agents",
+			"review_evidence": "Persist review-required and denied configuration governance decisions with policy evidence",
 			"audit_events": "Expose configuration governance evidence",
 			"capability_rules": "Evaluate deterministic capability-specific rules",
 			"visual_theming": "Apply tenant-aware configuration workspace theming"
@@ -66,6 +67,8 @@ def register_capability() -> dict:
 			"drift": "/api/v1/config/drift",
 			"drift_remediation": "/api/v1/config/drift/remediation",
 			"agents": "/api/v1/config/agents",
+			"pending_reviews": "/api/v1/config/pending-reviews",
+			"batches": "/api/v1/config/batches",
 			"audit": "/api/v1/config/audit",
 			"insights": "/api/v1/config/insights",
 			"metrics": "/api/v1/config/metrics"

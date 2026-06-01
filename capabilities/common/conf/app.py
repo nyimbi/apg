@@ -25,6 +25,8 @@ except ImportError:  # pragma: no cover - standalone package loading path
 def semantic_model() -> dict[str, Any]:
 	"""Return the package semantic model from the current capability contract."""
 	contract = get_capability_contract("default")
+	provides = contract.get("provides", ["conf_operations", "conf_agents", "review_evidence"])
+	review_evidence = contract["review_evidence"]
 	routes = {
 		route["name"]: {
 			"route": route["path"],
@@ -52,7 +54,7 @@ def semantic_model() -> dict[str, Any]:
 			"conf": {
 				"name": contract["display_name"],
 				"configuration": contract["configuration"],
-				"provides": ["conf_operations", "conf_agents"],
+				"provides": provides,
 				"requires": [],
 				"erp_modules": ["common"],
 				"rule_engine": contract["rule_engine"],
@@ -72,6 +74,7 @@ def semantic_model() -> dict[str, Any]:
 					"configuration_change": "ConfigurationChange",
 					"drift_remediation": "DriftRemediation",
 				},
+				"review_evidence": review_evidence,
 				"i18n": {},
 				"master_data": {},
 				"streaming": contract["streaming"],
@@ -81,8 +84,9 @@ def semantic_model() -> dict[str, Any]:
 			"conf": {
 				"id": "conf",
 				"configuration": contract["configuration"],
-				"provides": ["conf_operations", "conf_agents"],
+				"provides": provides,
 				"requires": [],
+				"review_evidence": review_evidence,
 			}
 		},
 		"rules": {
@@ -168,6 +172,10 @@ def self_test() -> dict[str, Any]:
 		errors.append("CONF streaming metadata must use Bytewax")
 	if "conf_agents" not in model.get("capabilities", {}).get("conf", {}).get("provides", []):
 		errors.append("CONF agent provide is missing")
+	if "review_evidence" not in model.get("capabilities", {}).get("conf", {}).get("provides", []):
+		errors.append("CONF review evidence provide is missing")
+	if "review_evidence" not in model.get("capabilities", {}).get("conf", {}):
+		errors.append("CONF durable review evidence is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

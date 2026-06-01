@@ -107,9 +107,30 @@
       "name": "Configuration Management",
       "provides": [
         "conf_operations",
-        "conf_agents"
+        "conf_agents",
+        "review_evidence"
       ],
       "requires": [],
+      "review_evidence": {
+        "deny_behavior": "Denied configuration lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "review_required",
+          "denied",
+          "accepted"
+        ],
+        "pending_queues": [
+          "configuration_changes",
+          "drift_remediations",
+          "configuration_agents",
+          "configuration_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "audit_evidence"
+        ]
+      },
       "rule_engine": {
         "rules": [
           {
@@ -191,6 +212,7 @@
           },
           {
             "condition": {
+              "operation": "deploy_change",
               "rollback_plan_available": false,
               "target_environment": "production"
             },
@@ -201,6 +223,33 @@
               "required_action": "attach_rollback_plan"
             },
             "name": "production_deployment_requires_rollback"
+          },
+          {
+            "condition": {
+              "operation": "request_change",
+              "target_environment": "production"
+            },
+            "description": "Production configuration change requests must enter the review queue.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "production_change_review_required",
+              "required_action": "review_production_change"
+            },
+            "name": "production_change_requires_review"
+          },
+          {
+            "condition": {
+              "drift_detected": true,
+              "operation": "request_drift_remediation",
+              "remediation_plan_available": true
+            },
+            "description": "Configuration drift remediation requests must enter the review queue.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "drift_remediation_review_required",
+              "required_action": "review_drift_remediation"
+            },
+            "name": "drift_remediation_requires_review"
           },
           {
             "condition": {
@@ -266,6 +315,20 @@
               "required_action": "choose_supported_role"
             },
             "name": "conf_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_required": false,
+              "operation": "register_conf_agent",
+              "privileged_role": true
+            },
+            "description": "Privileged configuration-agent roles require human approval evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "conf_agent_human_approval_required",
+              "required_action": "record_conf_agent_human_approval"
+            },
+            "name": "conf_agent_privileged_role_requires_human_approval"
           },
           {
             "condition": {
@@ -364,6 +427,7 @@
         },
         {
           "condition": {
+            "operation": "deploy_change",
             "rollback_plan_available": false,
             "target_environment": "production"
           },
@@ -374,6 +438,33 @@
             "required_action": "attach_rollback_plan"
           },
           "name": "production_deployment_requires_rollback"
+        },
+        {
+          "condition": {
+            "operation": "request_change",
+            "target_environment": "production"
+          },
+          "description": "Production configuration change requests must enter the review queue.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "production_change_review_required",
+            "required_action": "review_production_change"
+          },
+          "name": "production_change_requires_review"
+        },
+        {
+          "condition": {
+            "drift_detected": true,
+            "operation": "request_drift_remediation",
+            "remediation_plan_available": true
+          },
+          "description": "Configuration drift remediation requests must enter the review queue.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "drift_remediation_review_required",
+            "required_action": "review_drift_remediation"
+          },
+          "name": "drift_remediation_requires_review"
         },
         {
           "condition": {
@@ -439,6 +530,20 @@
             "required_action": "choose_supported_role"
           },
           "name": "conf_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_required": false,
+            "operation": "register_conf_agent",
+            "privileged_role": true
+          },
+          "description": "Privileged configuration-agent roles require human approval evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "conf_agent_human_approval_required",
+            "required_action": "record_conf_agent_human_approval"
+          },
+          "name": "conf_agent_privileged_role_requires_human_approval"
         },
         {
           "condition": {
@@ -792,9 +897,30 @@
       "id": "conf",
       "provides": [
         "conf_operations",
-        "conf_agents"
+        "conf_agents",
+        "review_evidence"
       ],
-      "requires": []
+      "requires": [],
+      "review_evidence": {
+        "deny_behavior": "Denied configuration lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "review_required",
+          "denied",
+          "accepted"
+        ],
+        "pending_queues": [
+          "configuration_changes",
+          "drift_remediations",
+          "configuration_agents",
+          "configuration_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "audit_evidence"
+        ]
+      }
     }
   },
   "deployment": {
@@ -867,6 +993,20 @@
       },
       "name": "conf_agent_privileged_action_requires_approval"
     },
+    "conf_agent_privileged_role_requires_human_approval": {
+      "condition": {
+        "human_approval_required": false,
+        "operation": "register_conf_agent",
+        "privileged_role": true
+      },
+      "description": "Privileged configuration-agent roles require human approval evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "conf_agent_human_approval_required",
+        "required_action": "record_conf_agent_human_approval"
+      },
+      "name": "conf_agent_privileged_role_requires_human_approval"
+    },
     "conf_agent_role_supported": {
       "condition": {
         "operation": "register_conf_agent",
@@ -905,6 +1045,20 @@
         "required_action": "assign_configuration_owner"
       },
       "name": "configuration_record_requires_owner"
+    },
+    "drift_remediation_requires_review": {
+      "condition": {
+        "drift_detected": true,
+        "operation": "request_drift_remediation",
+        "remediation_plan_available": true
+      },
+      "description": "Configuration drift remediation requests must enter the review queue.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "drift_remediation_review_required",
+        "required_action": "review_drift_remediation"
+      },
+      "name": "drift_remediation_requires_review"
     },
     "drift_requires_remediation_plan": {
       "condition": {
@@ -945,6 +1099,19 @@
       },
       "name": "encrypted_secrets_required"
     },
+    "production_change_requires_review": {
+      "condition": {
+        "operation": "request_change",
+        "target_environment": "production"
+      },
+      "description": "Production configuration change requests must enter the review queue.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "production_change_review_required",
+        "required_action": "review_production_change"
+      },
+      "name": "production_change_requires_review"
+    },
     "production_changes_require_approval": {
       "condition": {
         "change_approved": false,
@@ -960,6 +1127,7 @@
     },
     "production_deployment_requires_rollback": {
       "condition": {
+        "operation": "deploy_change",
         "rollback_plan_available": false,
         "target_environment": "production"
       },

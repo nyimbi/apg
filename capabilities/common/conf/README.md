@@ -18,6 +18,9 @@ The Configuration Management capability (`conf`) is the foundational capability 
   guardrails.
 - **Lifecycle Streaming**: APG composition metadata publishes configuration
   lifecycle events on Bytewax stream metadata.
+- **Durable Review Evidence**: Production changes, drift remediation, privileged
+  configuration agents, lifecycle batches, and audit events retain policy
+  decisions, matched rules, review reasons, and required actions.
 
 ## Features
 
@@ -43,6 +46,23 @@ The Configuration Management capability (`conf`) is the foundational capability 
 - **ConfigurationService** - Business logic and validation layer
 - **REST API** - HTTP endpoints for configuration operations
 - **Data Models** - Pydantic models for validation and serialization
+
+### Review Evidence
+
+Generated APG applications can build operator queues directly from the
+dependency-light `ConfService`:
+
+- `request_change()` stores production changes as `review_required` with
+  `policy_decision`, `matched_rules`, `review_reasons`, and `audit_evidence`.
+- `request_drift_remediation()` stores drift remediation requests as
+  `review_required` when a remediation plan is present.
+- `register_conf_agent()` stores privileged deployment and policy reviewer
+  agents as `pending_review` when human approval evidence is missing.
+- `validate_batch()` persists denied non-Bytewax batch evidence before raising
+  `PermissionError`, so generated consoles can show the rejected stream,
+  matched rule, and remediation action.
+- `list_pending_reviews()` returns reviewable changes, drift remediations,
+  agents, and batches without replaying rules.
 
 ## Installation & Setup
 
