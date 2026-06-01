@@ -69,6 +69,7 @@ CAPABILITY_META = {
 		'radio',       # Radio Intelligence Listener
 		'surveillance', # Digital Surveillance
 		'monitoring',  # Real-Time Monitoring
+		'fusion',      # Intelligence Fusion
 	],
 	'security_requirements': {
 		'classification_handling': True,

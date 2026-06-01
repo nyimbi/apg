@@ -29603,3 +29603,106 @@ Known gaps:
   stream persistence, notification delivery, case-management writes, GraphRAG
   projection, response automation, dissemination delivery, durable Bytewax
   topology, or performance/load checks during this battery-conscious slice.
+
+## 2026-06-01 - Intel Fusion executable package
+
+Implemented and reviewed `capabilities/intel/fusion` as a complete executable
+APG package for lawful, evidence-led intelligence fusion.
+
+What changed:
+
+- Replaced the placeholder marker with an executable package exporting
+  `IntelligenceFusionService`, `IntelFusionService`, and `get_capability_contract`.
+- Added a detailed `SPECIFICATION.md`, `PLAN.md`, `README.md`, and `cap_spec.md`
+  defining the authority, workspace, source, artifact, correlation, hypothesis,
+  assessment, referral, dissemination, review, Bytewax lifecycle, AI-agent,
+  UI, theme, and adapter-boundary model.
+- Added `capability_contract.py` with 67 deterministic rules, 13 UI routes,
+  compact `intel_fusion_control` theme tokens, APG dependencies, Bytewax
+  lifecycle metadata, and provider-neutral AI-agent runtimes for `codex`,
+  `claude_code`, `opencode`, and `pi`.
+- Added in-memory domain models and a tenant-scoped service for lawful
+  authority records, fusion workspaces, source lineage, evidence artifacts,
+  correlations, hypotheses, assessments, referrals, dissemination, reviews,
+  Bytewax batch validation, and AI-agent guardrails.
+- Added API helpers, dashboard/console/agent view models, and a publishable
+  `app.py` entrypoint with self-test, component manifest, and semantic-model
+  generation.
+- Added package manifest, release evidence, generated semantic model, and
+  focused tests for contract shape, rule-engine denial paths, full fusion
+  lifecycle execution, tenant isolation, guardrail rejection, API helpers, view
+  models, and app entrypoint.
+- Updated `capabilities/intel/__init__.py` so `fusion` is listed as an
+  implemented sub-capability.
+- Updated `capabilities/README.md` so the catalog snapshot reports 147 valid
+  contracts, 147 domain-specific packages, 147 strict complete package artifact
+  sets, and 13 Intel packages.
+
+Focused verification:
+
+- Generated `capabilities/intel/fusion/semantic_model.json` from
+  `app.semantic_model()`.
+- `./.venv/bin/python -m py_compile
+  capabilities/intel/fusion/__init__.py
+  capabilities/intel/fusion/capability_contract.py
+  capabilities/intel/fusion/models.py
+  capabilities/intel/fusion/fusion_runtime.py
+  capabilities/intel/fusion/service.py
+  capabilities/intel/fusion/api.py
+  capabilities/intel/fusion/views.py
+  capabilities/intel/fusion/app.py
+  capabilities/intel/fusion/tests/test_package_contract.py` passed.
+- `./.venv/bin/python capabilities/intel/fusion/app.py` passed self-test with
+  `passed: true` and `status: ok`.
+- `./.venv/bin/python -m json.tool
+  capabilities/intel/fusion/package_manifest.json` passed.
+- `./.venv/bin/python -m json.tool
+  capabilities/intel/fusion/release_report.json` passed.
+- `./.venv/bin/pytest -q
+  capabilities/intel/fusion/tests/test_package_contract.py` passed with 7
+  tests.
+- `./.venv/bin/apg capabilities inspect intel_fusion --json` passed with 67
+  rules, 13 UI routes, theme `intel_fusion_control`, shell `apg_python`, and
+  Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan capabilities/intel/fusion --json`
+  passed with `side_effect_free: true` and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/intel/fusion --json` passed with 1 domain-specific capability,
+  0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/intel/fusion --json` passed with 1 complete lifecycle, 0
+  warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 147 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 147 operable contracts, 147 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/intel/fusion`, `capabilities/intel/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed authority, workspace, source, artifact, correlation, hypothesis,
+  assessment, referral, dissemination, review, Bytewax batch, and AI-agent
+  lifecycle paths so rule evaluation happens before state mutation.
+- Confirmed service state is keyed by tenant plus record ID and covered by a
+  regression test with shared authority/workspace IDs across tenants.
+- Confirmed artifact recording requires workspace and source records in the
+  same tenant and rejects workspace/source lawful-authority mismatches.
+- Confirmed AI-agent actions deny evidence fabrication, source tampering,
+  privacy bypass, unsupported identity resolution, autonomous dissemination,
+  and unapproved attribution scopes.
+- Kept live source connectors, cross-domain data movement, entity-resolution
+  engines, graph writes, RAG indexing, storage backends, dissemination delivery,
+  and durable Bytewax workers behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live source connectors,
+  cross-domain data movement, entity-resolution engines, graph writes, RAG
+  indexing, storage backends, dissemination delivery, durable Bytewax topology,
+  or performance/load checks during this battery-conscious slice.
