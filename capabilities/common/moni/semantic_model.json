@@ -265,13 +265,43 @@
       "provides": [
         "observability_governance",
         "metrics_lifecycle",
-        "monitoring_agent_composition"
+        "monitoring_agent_composition",
+        "review_evidence"
       ],
       "requires": [
         "conf",
         "audl",
         "mqeb"
       ],
+      "review_evidence": {
+        "deny_behavior": "Denied MONI lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "pending",
+          "pending_review",
+          "review_required",
+          "denied",
+          "accepted",
+          "active",
+          "open",
+          "resolved",
+          "approved",
+          "rejected"
+        ],
+        "pending_queues": [
+          "signals",
+          "alerts",
+          "incidents",
+          "remediation_requests",
+          "monitoring_agents",
+          "lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "review_evidence"
+        ]
+      },
       "rule_engine": {
         "rules": [
           {
@@ -564,9 +594,9 @@
               "operation": "register_monitoring_agent",
               "privileged_agent_role": true
             },
-            "description": "Privileged monitoring-agent roles require human approval.",
+            "description": "Privileged monitoring-agent roles require human approval evidence or review.",
             "effect": {
-              "decision": "deny",
+              "decision": "require_review",
               "reason": "monitoring_agent_human_approval_required",
               "required_action": "require_human_approval_for_agent"
             },
@@ -879,9 +909,9 @@
             "operation": "register_monitoring_agent",
             "privileged_agent_role": true
           },
-          "description": "Privileged monitoring-agent roles require human approval.",
+          "description": "Privileged monitoring-agent roles require human approval evidence or review.",
           "effect": {
-            "decision": "deny",
+            "decision": "require_review",
             "reason": "monitoring_agent_human_approval_required",
             "required_action": "require_human_approval_for_agent"
           },
@@ -1413,13 +1443,43 @@
       "provides": [
         "observability_governance",
         "metrics_lifecycle",
-        "monitoring_agent_composition"
+        "monitoring_agent_composition",
+        "review_evidence"
       ],
       "requires": [
         "conf",
         "audl",
         "mqeb"
       ],
+      "review_evidence": {
+        "deny_behavior": "Denied MONI lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "pending",
+          "pending_review",
+          "review_required",
+          "denied",
+          "accepted",
+          "active",
+          "open",
+          "resolved",
+          "approved",
+          "rejected"
+        ],
+        "pending_queues": [
+          "signals",
+          "alerts",
+          "incidents",
+          "remediation_requests",
+          "monitoring_agents",
+          "lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "review_evidence"
+        ]
+      },
       "streaming": {
         "broker_core_dependency_allowed": false,
         "engine": "bytewax",
@@ -1570,9 +1630,9 @@
         "operation": "register_monitoring_agent",
         "privileged_agent_role": true
       },
-      "description": "Privileged monitoring-agent roles require human approval.",
+      "description": "Privileged monitoring-agent roles require human approval evidence or review.",
       "effect": {
-        "decision": "deny",
+        "decision": "require_review",
         "reason": "monitoring_agent_human_approval_required",
         "required_action": "require_human_approval_for_agent"
       },

@@ -17,6 +17,7 @@ from capabilities.common.moni.view_models import (
 	monitoring_agent_roster_model,
 	remediation_model,
 	signal_explorer_model,
+	settings_model,
 	source_inventory_model,
 )
 
@@ -49,8 +50,11 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["provides"] == [
 		"observability_governance",
 		"metrics_lifecycle",
-		"monitoring_agent_composition"
+		"monitoring_agent_composition",
+		"review_evidence",
 	]
+	assert "monitoring_agents" in contract["review_evidence"]["pending_queues"]
+	assert "policy_decision" in contract["review_evidence"]["policy_fields"]
 	assert contract["requires"] == ["conf", "audl", "mqeb"]
 	assert contract["agents"]["first_class"] is True
 	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
@@ -132,6 +136,25 @@ def test_rule_engine_enforces_monitoring_agent_guardrails():
 		"monitoring_agent_requires_purpose",
 		"monitoring_agent_requires_contribution_disclosure"
 	}
+
+
+def test_rule_engine_preserves_privileged_monitoring_agent_review_state():
+	result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_monitoring_agent",
+		"agent_runtime_supported": True,
+		"agent_role_supported": True,
+		"agent_scope_present": True,
+		"agent_owner_present": True,
+		"agent_purpose_present": True,
+		"contribution_disclosed": True,
+		"privileged_agent_role": True,
+		"human_approval_required": False,
+	})
+
+	assert result["decision"] == "require_review"
+	assert result["matched_rules"] == ["monitoring_agent_privileged_role_requires_human_approval"]
+	assert result["actions"][0]["required_action"] == "require_human_approval_for_agent"
 
 
 def test_bytewax_lifecycle_rule_rejects_non_bytewax_streams():
@@ -226,17 +249,16 @@ def test_moni_service_governs_sources_signals_alerts_incidents_and_remediation()
 		decision="approved",
 		notes="approved runbook and capacity available",
 	)
-	with pytest.raises(PermissionError, match="monitoring_agent_human_approval_required"):
-		service.register_monitoring_agent(
-			tenant_id="tenant-signals",
-			agent_id="agent-denied",
-			name="Denied Incident Agent",
-			runtime="codex",
-			role="incident_reviewer",
-			scope="production incidents",
-			owner="platform",
-			purpose="review critical incidents",
-		)
+	review_agent = service.register_monitoring_agent(
+		tenant_id="tenant-signals",
+		agent_id="agent-review",
+		name="Review Incident Agent",
+		runtime="codex",
+		role="incident_reviewer",
+		scope="production incidents",
+		owner="platform",
+		purpose="review critical incidents",
+	)
 	agent = service.register_monitoring_agent(
 		tenant_id="tenant-signals",
 		agent_id="agent-slo",
@@ -261,18 +283,28 @@ def test_moni_service_governs_sources_signals_alerts_incidents_and_remediation()
 	assert trace.status == "accepted"
 	assert high_cardinality.status == "pending_review"
 	assert "high_cardinality_metric_requires_review" in high_cardinality.matched_rules
+	assert high_cardinality.policy_decision == "require_review"
+	assert high_cardinality.review_reasons == ["cardinality_review_required"]
 	assert slo.status == "active"
 	assert alert.status == "open"
+	assert alert.policy_decision == "allow"
 	assert alert.incident_id in service.incidents
 	assert denied_status == "review_denied"
 	assert approved.status == "approved"
+	assert approved.policy_decision == "allow"
+	assert review_agent.status == "pending_review"
+	assert review_agent.policy_decision == "require_review"
+	assert review_agent.review_reasons == ["monitoring_agent_human_approval_required"]
 	assert agent.runtime == "claude_code"
 	assert agent.role == "slo_reviewer"
 	assert batch.accepted is True
+	assert batch.policy_decision == "allow"
 	assert batch.required_processor == "bytewax"
 	assert service.dashboard_summary("tenant-signals")["source_count"] == 1
 	assert service.dashboard_summary("tenant-signals")["open_incident_count"] == 1
-	assert service.dashboard_summary("tenant-signals")["monitoring_agent_count"] == 1
+	assert service.dashboard_summary("tenant-signals")["monitoring_agent_count"] == 2
+	assert service.dashboard_summary("tenant-signals")["pending_monitoring_agent_review_count"] == 1
+	assert service.dashboard_summary("tenant-signals")["pending_review_count"] >= 2
 
 
 def test_moni_service_fails_closed_for_missing_source_disabled_source_and_invalid_inputs():
@@ -359,6 +391,12 @@ def test_moni_service_fails_closed_for_missing_source_disabled_source_and_invali
 			event_stream="legacy_broker",
 			mutation_count=1,
 		)
+	denied_batch = [
+		item for item in service.list_records("tenant-signals", "lifecycle_batches")
+		if item["status"] == "denied"
+	][0]
+	assert denied_batch["policy_decision"] == "deny"
+	assert denied_batch["review_reasons"] == ["bytewax_monitoring_stream_required"]
 
 
 def test_view_models_expose_agent_and_lifecycle_surfaces():
@@ -386,6 +424,7 @@ def test_view_models_expose_agent_and_lifecycle_surfaces():
 	assert "codex" in agent_model["supported_runtimes"]
 	assert lifecycle_model["streaming"]["required_processor"] == "bytewax"
 	assert lifecycle_model["rows"][0]["mutation_count"] == 3
+	assert settings_model("tenant-signals")["review_evidence"]["pending_queues"]
 
 
 def test_generated_view_models_are_operable():
@@ -426,4 +465,5 @@ def test_registration_includes_full_capability_contract():
 	assert registration["ui_components"]["incidents"] == "/moni/incidents"
 	assert registration["agents"]["first_class"] is True
 	assert registration["streaming"]["required_processor"] == "bytewax"
+	assert registration["review_evidence"]["deny_behavior"] == "Denied MONI lifecycle batches persist evidence before PermissionError"
 	assert registration["dependencies"] == ["conf", "audl", "mqeb"]

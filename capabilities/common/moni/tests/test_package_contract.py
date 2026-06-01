@@ -28,7 +28,8 @@ def test_package_contract_shape_is_valid():
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "moni"
-	assert contract["provides"] == ["observability_governance", "metrics_lifecycle", "monitoring_agent_composition"]
+	assert contract["provides"] == ["observability_governance", "metrics_lifecycle", "monitoring_agent_composition", "review_evidence"]
+	assert contract["review_evidence"]["pending_queues"]
 	assert contract["requires"] == ["conf", "audl", "mqeb"]
 	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
 	assert contract["streaming"]["required_processor"] == "bytewax"
@@ -63,5 +64,7 @@ def test_package_app_entrypoint_is_publishable():
 	assert model["capabilities"]["moni"]["approvals"]["remediation"] == "RemediationRequestRecord"
 	assert model["capabilities"]["moni"]["approvals"]["monitoring_agent"] == "MonitoringAgentRecord"
 	assert model["capabilities"]["moni"]["streaming"]["required_processor"] == "bytewax"
+	assert "review_evidence" in model["capabilities"]["moni"]["provides"]
+	assert model["capabilities"]["moni"]["review_evidence"]["pending_queues"]
 	assert "codex" in model["capabilities"]["moni"]["agents"]["monitoring_agent_contract"]["supported_runtimes"]
 	assert "opentelemetry" in model["capabilities"]["moni"]["adapters"]["supported_collectors"]

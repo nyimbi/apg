@@ -19,7 +19,11 @@ The packet will:
 6. Add first-class monitoring-agent registration and Bytewax lifecycle-batch
    validation so AI observability agents are composable under explicit
    guardrails.
-7. Prove the packet with focused tests, implementation audit, publish-plan, and
+7. Preserve durable policy decisions, matched rules, review reasons, and review
+   evidence across review-required signals, remediation requests, privileged
+   monitoring agents, denied lifecycle batches, alerts, incidents, and audit
+   events.
+8. Prove the packet with focused tests, implementation audit, publish-plan, and
    stale-marker scans.
 
 ## Implementation Tasks
@@ -54,6 +58,14 @@ The packet will:
 - Add dataclass records for source, signal, SLO, alert, incident, remediation,
   monitoring-agent, lifecycle-batch, and audit state.
 - Add deterministic guardrail evaluation using `capability_contract.py`.
+- Preserve privileged monitoring agents without human approval as
+  pending-review records while keeping unsupported runtimes, unsupported roles,
+  missing scope, missing owner, missing purpose, and missing disclosure as
+  blocking denials.
+- Preserve denied non-Bytewax lifecycle batches before raising
+  `PermissionError`.
+- Add a composed pending-review queue across signals, alerts, incidents,
+  remediation requests, monitoring agents, and lifecycle batches.
 - Add summaries for dashboards and release evidence.
 
 ### 4. API and View Models

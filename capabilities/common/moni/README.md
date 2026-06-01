@@ -22,6 +22,10 @@ guardrail decisions.
 - Remediation request and approval workflows with independent reviewer evidence.
 - First-class monitoring-agent registration for Codex, Claude Code, opencode,
   Pi, and future runtime adapters.
+- Durable review evidence across review-required signals, remediation requests,
+  privileged monitoring agents, denied lifecycle batches, alerts, incidents,
+  and audit events.
+- Pending-review queue composition for generated observability consoles.
 - Bytewax-first lifecycle batch validation for metrics, SLOs, alerts,
   incidents, and monitoring-agent mutations.
 - Generated-application view models for dashboards and operations screens.
@@ -130,6 +134,13 @@ batch = validate_monitoring_lifecycle_batch(
 )
 ```
 
+Privileged monitoring agents that are otherwise valid but missing human
+approval are stored as `pending_review` with
+`policy_decision="require_review"`. Denied non-Bytewax lifecycle batches are
+stored as `denied` before `PermissionError` is raised. Generated applications
+can use `list_pending_reviews()` or `list_observability()` to compose one
+operator review queue.
+
 ## Rule Evaluation
 
 ```python
@@ -192,6 +203,8 @@ Production adapters should:
    embedded runtime clients.
 8. Route lifecycle mutation batches through Bytewax and preserve the
    `moni.lifecycle` event-time contract.
+9. Preserve MONI policy evidence fields when moving records between durable
+   storage, generated UIs, and runtime telemetry adapters.
 
 ## Verification
 

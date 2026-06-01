@@ -4,7 +4,7 @@ MONI is APG's tenant-scoped monitoring and observability control plane. It
 provides source registration, governed signal ingestion, SLO definitions, alert
 routing, incident records, remediation review, deterministic guardrails, UI
 metadata, monitoring-agent composition, Bytewax lifecycle batch validation,
-theming, and release evidence.
+theming, durable review evidence, and release evidence.
 
 ## Current Executable Runtime
 
@@ -34,6 +34,8 @@ MONI defines first-class records for:
 - monitoring-agent registrations
 - Bytewax lifecycle-batch validation evidence
 - observability lifecycle audit events
+- pending-review queues across signals, remediation requests, monitoring
+  agents, lifecycle batches, alerts, and incidents
 
 These records let generated APG applications compose observability controls
 without hand-writing monitoring governance for each application.
@@ -53,7 +55,10 @@ Bytewax lifecycle stream routing.
 Monitoring agents are first-class APG records. MONI supports the `codex`,
 `claude_code`, `opencode`, and `pi` runtime identifiers and governs SLO,
 alert, incident, anomaly, metric-quality, trace-correlation, and dashboard
-review roles. Privileged roles require human approval before registration.
+review roles. Privileged roles without human approval are preserved as
+`pending_review` records for operator review, while unsupported runtimes,
+unsupported roles, missing ownership, missing purpose, missing scope, and
+missing contribution disclosure remain blocking denials.
 
 ## Bytewax Lifecycle
 

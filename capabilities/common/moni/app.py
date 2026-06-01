@@ -63,6 +63,7 @@ def semantic_model() -> dict[str, Any]:
 					"monitoring_agent_contract": contract["agents"],
 				},
 				"streaming": contract["streaming"],
+				"review_evidence": contract["review_evidence"],
 				"theme": contract["theme"],
 				"runtime": {
 					"api": "api.py",
@@ -98,6 +99,7 @@ def semantic_model() -> dict[str, Any]:
 				"requires": contract["requires"],
 				"agents": contract["agents"],
 				"streaming": contract["streaming"],
+				"review_evidence": contract["review_evidence"],
 			}
 		},
 		"rules": {
@@ -179,6 +181,7 @@ def self_test() -> dict[str, Any]:
 	adapters = capability.get("adapters", {})
 	agents = capability.get("agents", {}).get("monitoring_agent_contract", {})
 	streaming = capability.get("streaming", {})
+	review_evidence = capability.get("review_evidence", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "moni" not in model.get("capabilities", {}):
@@ -195,6 +198,8 @@ def self_test() -> dict[str, Any]:
 		errors.append("MONI agent manifest must include Codex runtime")
 	if streaming.get("required_processor") != "bytewax":
 		errors.append("MONI streaming manifest must remain Bytewax-first")
+	if "monitoring_agents" not in review_evidence.get("pending_queues", []):
+		errors.append("MONI review evidence must expose monitoring-agent pending queue")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

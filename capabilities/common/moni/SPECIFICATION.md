@@ -46,8 +46,12 @@ MONI must let a generated application:
 13. Publish semantic-model and release evidence from the live capability
     contract rather than stale embedded JSON.
 14. Register first-class monitoring agents with supported runtime, role, owner,
-    scope, purpose, contribution-disclosure, and privileged-role approval.
-15. Validate monitoring lifecycle mutation batches through a Bytewax-first
+    scope, purpose, contribution-disclosure, and privileged-role approval or
+    review evidence.
+15. Preserve durable policy evidence for review-required signals,
+    remediation decisions, privileged monitoring agents, denied lifecycle
+    batches, alerts, incidents, and audit events.
+16. Validate monitoring lifecycle mutation batches through a Bytewax-first
     stream contract and explicitly reject non-Bytewax core stream declarations.
 
 ## Functional Scope
@@ -95,7 +99,11 @@ Supported runtimes in this packet are `codex`, `claude_code`, `opencode`, and
 `trace_correlation_reviewer`, and `dashboard_reviewer`.
 
 Privileged roles are `slo_reviewer`, `alert_reviewer`, `incident_reviewer`, and
-`anomaly_triage`. They require explicit human approval before registration.
+`anomaly_triage`. If a privileged monitoring agent is otherwise valid but lacks
+human approval evidence, MONI must preserve it with `status="pending_review"`
+and `policy_decision="require_review"` so generated review queues can route the
+approval. Unsupported runtimes, unsupported roles, missing scope, missing owner,
+missing purpose, and missing contribution disclosure remain blocking denials.
 
 ### Bytewax Lifecycle Stream
 
@@ -103,8 +111,23 @@ MONI lifecycle batches represent bulk mutations that affect metrics, alerts,
 incidents, SLOs, or monitoring-agent records. The executable contract requires
 Bytewax as the lifecycle processor, uses `moni.lifecycle` as the lifecycle
 stream name, and covers the `moni.metrics`, `moni.alerts`, `moni.incidents`,
-`moni.slos`, and `moni.agents` topics. Non-Bytewax deployment endpoint declarations are not
-accepted as core lifecycle processors for this packet.
+`moni.slos`, and `moni.agents` topics. Non-Bytewax deployment endpoint
+declarations are not accepted as core lifecycle processors for this packet.
+Denied lifecycle batches must be preserved with `status="denied"` before
+raising `PermissionError` so operators can inspect the rejected stream path.
+
+### Durable Review Evidence
+
+Every reviewable MONI record must expose:
+
+- `policy_decision`
+- `matched_rules`
+- `review_reasons`
+- `review_evidence`
+
+Generated applications must be able to compose a pending-review queue across
+signals, alerts, incidents, remediation requests, monitoring agents, and
+lifecycle batches.
 
 ### Rules
 

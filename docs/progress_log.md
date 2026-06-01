@@ -16,6 +16,67 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-06-01 08:26 EAT
+
+MONI durable review-evidence packet:
+
+- Extended review-required signals, remediation requests, privileged monitoring
+  agents, lifecycle batch evidence, alerts, incidents, and audit events with
+  durable policy evidence: policy decision, matched rules, review reasons, and
+  review evidence.
+- Added contract-level `review_evidence` metadata and exposed it through
+  registration metadata, API helpers, view models, semantic model, package
+  tests, and app self-test.
+- Preserved privileged monitoring agents without human approval as
+  `pending_review` records instead of discarding registration evidence.
+- Preserved denied non-Bytewax monitoring lifecycle batch validations as
+  `denied` evidence before raising `PermissionError`.
+- Added pending-review queue composition for signals, alerts, incidents,
+  remediation requests, monitoring agents, and lifecycle batches.
+- Kept MONI monitoring agents provider-neutral for Codex, Claude Code,
+  OpenCode, Pi, and future observability-governance runtimes while retaining
+  human approval controls for privileged roles and Bytewax-first lifecycle
+  processing.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for MONI package init, models,
+  service, API helpers, contract, app, view models, and focused tests passed.
+- `./.venv/bin/pytest -q capabilities/common/moni/tests/test_capability_contract.py
+  capabilities/common/moni/tests/test_package_contract.py` passed with 12 tests
+  and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.moni import app; ..."`
+  passed package self-test.
+- `./.venv/bin/python -m json.tool
+  capabilities/common/moni/semantic_model.json` passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/moni --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/moni --strict --json` passed with no warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/moni --json`
+  passed with no warnings and side-effect-free publish planning.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/common/moni --json` passed with complete lifecycle evidence,
+  release evidence, review evidence, and 24 rules.
+- MONI stale-marker scan returned no TODO/FIXME/stub/placeholder, Kafka,
+  materialized-baseline, contract-only, or not-implemented markers across the
+  edited MONI packet.
+- Service smoke executed high-cardinality metric review evidence, approved
+  production remediation evidence, privileged monitoring-agent review evidence,
+  accepted Bytewax batch evidence, and denied non-Bytewax batch persistence,
+  printing `require_review allow pending_review require_review accepted denied
+  bytewax_monitoring_stream_required 2`.
+
+Known gaps:
+
+- Full repository tests, rendered MONI UI, live OpenTelemetry collectors,
+  Prometheus, ClickHouse, Elasticsearch, Grafana, SIEM, SOAR, PagerDuty, and
+  notification adapters, production persistence and retention enforcement, live
+  Bytewax workers and dataflows, APG AUTH/MTEN/AUDL/CONF/MQEB/CACH/NTFY
+  adapters, benchmark/load checks, runtime SLO validation, and live AI runtime
+  adapters still need later validation outside this battery-conscious slice.
+
 ### 2026-06-01 08:13 EAT
 
 CACH durable review-evidence packet:

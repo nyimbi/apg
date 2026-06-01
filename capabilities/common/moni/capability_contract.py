@@ -535,10 +535,10 @@ def default_rules() -> list[CapabilityRule]:
 		),
 		CapabilityRule(
 			name="monitoring_agent_privileged_role_requires_human_approval",
-			description="Privileged monitoring-agent roles require human approval.",
+			description="Privileged monitoring-agent roles require human approval evidence or review.",
 			condition={"operation": "register_monitoring_agent", "privileged_agent_role": True, "human_approval_required": False},
 			effect={
-				"decision": "deny",
+				"decision": "require_review",
 				"reason": "monitoring_agent_human_approval_required",
 				"required_action": "require_human_approval_for_agent"
 			}
@@ -638,7 +638,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "moni",
 		"display_name": "Monitoring and Observability",
-		"provides": ["observability_governance", "metrics_lifecycle", "monitoring_agent_composition"],
+		"provides": ["observability_governance", "metrics_lifecycle", "monitoring_agent_composition", "review_evidence"],
 		"requires": ["conf", "audl", "mqeb"],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
@@ -649,6 +649,35 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		"ui": ui_manifest(),
 		"agents": agent_manifest(),
 		"streaming": streaming_manifest(),
+		"review_evidence": {
+			"durable_statuses": [
+				"pending",
+				"pending_review",
+				"review_required",
+				"denied",
+				"accepted",
+				"active",
+				"open",
+				"resolved",
+				"approved",
+				"rejected"
+			],
+			"policy_fields": [
+				"policy_decision",
+				"matched_rules",
+				"review_reasons",
+				"review_evidence"
+			],
+			"pending_queues": [
+				"signals",
+				"alerts",
+				"incidents",
+				"remediation_requests",
+				"monitoring_agents",
+				"lifecycle_batches"
+			],
+			"deny_behavior": "Denied MONI lifecycle batches persist evidence before PermissionError"
+		},
 		"theme": {
 			"name": theme.name,
 			"tokens": theme.tokens,

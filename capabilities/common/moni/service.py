@@ -101,6 +101,9 @@ class SignalRecord:
 	contains_pii: bool = False
 	pii_redacted: bool = True
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -135,6 +138,9 @@ class AlertRecord:
 	owner: str | None = None
 	incident_id: str | None = None
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 	acknowledged_at: datetime | None = None
 	resolved_at: datetime | None = None
@@ -153,6 +159,9 @@ class IncidentRecord:
 	status: str
 	alert_ids: list[str] = field(default_factory=list)
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 	resolved_at: datetime | None = None
 
@@ -175,6 +184,9 @@ class RemediationRequestRecord:
 	reviewer: str | None = None
 	review_notes: str | None = None
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "require_review"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 	decided_at: datetime | None = None
 
@@ -194,6 +206,10 @@ class MonitoringAgentRecord:
 	contribution_disclosed: bool
 	human_approval_required: bool
 	status: str = "active"
+	policy_decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -208,6 +224,9 @@ class MonitoringLifecycleBatchRecord:
 	accepted: bool
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	required_processor: str = "bytewax"
 	status: str = "accepted"
 	created_at: datetime = field(default_factory=datetime.utcnow)
@@ -224,6 +243,9 @@ class MoniAuditEventRecord:
 	actor: str
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	details: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -1865,7 +1887,7 @@ class MoniService:
 			"created_at": datetime.utcnow().isoformat(),
 		}
 		self.records[f"{tenant_id}:{record_id}"] = record
-		self._audit(tenant_id, "record.created", record_id, "system", "allow", [], record)
+		self._audit(tenant_id, "record.created", record_id, "system", _allow_result(), record)
 		return record
 
 	def register_source(
@@ -1895,7 +1917,7 @@ class MoniService:
 			status=status,
 		)
 		self.sources[self._source_key(record.tenant_id, record.source_id)] = record
-		self._audit(record.tenant_id, "source.registered", record.source_id, record.owner, "allow", [], asdict(record))
+		self._audit(record.tenant_id, "source.registered", record.source_id, record.owner, _allow_result(), asdict(record))
 		return record
 
 	def ingest_signal(
@@ -1974,9 +1996,12 @@ class MoniService:
 			decision=decision["decision"],
 			status=status,
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 		)
 		self.signals[record.signal_id] = record
-		self._audit(tenant_id, "signal.ingested", name, source_id, decision["decision"], decision["matched_rules"], context)
+		self._audit(tenant_id, "signal.ingested", name, source_id, decision, context)
 		return record
 
 	def create_slo(
@@ -2014,7 +2039,7 @@ class MoniService:
 			notification_route=self._require_text(notification_route or "", "notification_route"),
 		)
 		self.slos[record.slo_id] = record
-		self._audit(record.tenant_id, "slo.created", record.slo_id, record.owner, "allow", [], asdict(record))
+		self._audit(record.tenant_id, "slo.created", record.slo_id, record.owner, _allow_result(), asdict(record))
 		return record
 
 	def create_alert(
@@ -2061,9 +2086,12 @@ class MoniService:
 			decision=decision["decision"],
 			status=status,
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 		)
 		self.alerts[record.alert_id] = record
-		self._audit(record.tenant_id, "alert.created", record.alert_id, record.owner or "system", decision["decision"], decision["matched_rules"], context)
+		self._audit(record.tenant_id, "alert.created", record.alert_id, record.owner or "system", decision, context)
 		return record
 
 	def create_incident(
@@ -2094,9 +2122,12 @@ class MoniService:
 			status="open" if decision["decision"] == "allow" else "denied",
 			alert_ids=list(alert_ids or []),
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 		)
 		self.incidents[record.incident_id] = record
-		self._audit(record.tenant_id, "incident.created", record.incident_id, owner or "system", decision["decision"], decision["matched_rules"], context)
+		self._audit(record.tenant_id, "incident.created", record.incident_id, owner or "system", decision, context)
 		return record
 
 	def request_remediation(
@@ -2141,9 +2172,12 @@ class MoniService:
 			decision=decision["decision"],
 			status="pending_review" if decision["decision"] != "deny" else "denied",
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 		)
 		self.remediation_requests[record.request_id] = record
-		self._audit(record.tenant_id, "remediation.requested", record.request_id, record.requester, decision["decision"], decision["matched_rules"], context)
+		self._audit(record.tenant_id, "remediation.requested", record.request_id, record.requester, decision, context)
 		return record
 
 	def decide_remediation(
@@ -2179,7 +2213,10 @@ class MoniService:
 		record.review_notes = notes
 		record.decided_at = datetime.utcnow()
 		record.matched_rules = rule_decision["matched_rules"]
-		self._audit(record.tenant_id, "remediation.decided", request_id, reviewer, record.decision, record.matched_rules, context)
+		record.policy_decision = rule_decision["decision"]
+		record.review_reasons = self._reasons(rule_decision)
+		record.review_evidence = self._review_evidence(rule_decision, review_recorded=True)
+		self._audit(record.tenant_id, "remediation.decided", request_id, reviewer, rule_decision, context)
 		return record
 
 	def register_monitoring_agent(
@@ -2231,9 +2268,14 @@ class MoniService:
 			purpose=self._require_text(purpose, "purpose"),
 			contribution_disclosed=bool(contribution_disclosed),
 			human_approval_required=bool(human_approval_required),
+			status="pending_review" if rule_decision["decision"] == "require_review" else "active",
+			policy_decision=rule_decision["decision"],
+			matched_rules=list(rule_decision["matched_rules"]),
+			review_reasons=self._reasons(rule_decision),
+			review_evidence=self._review_evidence(rule_decision, review_recorded=bool(human_approval_required)),
 		)
 		self.monitoring_agents[record_key] = record
-		self._audit(tenant_id, "agent.registered", agent_id, record.owner, "allow", rule_decision["matched_rules"], asdict(record))
+		self._audit(tenant_id, "agent.registered", agent_id, record.owner, rule_decision, asdict(record))
 		return record
 
 	def validate_monitoring_lifecycle_batch(
@@ -2264,10 +2306,13 @@ class MoniService:
 			accepted=accepted,
 			decision=rule_decision["decision"],
 			matched_rules=list(rule_decision["matched_rules"]),
+			policy_decision=rule_decision["decision"],
+			review_reasons=self._reasons(rule_decision),
+			review_evidence=self._review_evidence(rule_decision),
 			status="accepted" if accepted else "denied",
 		)
 		self.lifecycle_batches[record.batch_id] = record
-		self._audit(tenant_id, f"lifecycle_batch.{record.status}", stream_value, "moni", rule_decision["decision"], rule_decision["matched_rules"], asdict(record))
+		self._audit(tenant_id, f"lifecycle_batch.{record.status}", stream_value, "moni", rule_decision, asdict(record))
 		if not accepted:
 			raise PermissionError(self._first_reason(rule_decision))
 		return record
@@ -2313,10 +2358,29 @@ class MoniService:
 			"open_incident_count": sum(1 for row in self.list_records(tenant_id, "incidents") if row["status"] == "open"),
 			"pending_remediation_count": sum(1 for row in self.list_records(tenant_id, "remediation_requests") if row["status"] == "pending_review"),
 			"monitoring_agent_count": len(self.list_records(tenant_id, "monitoring_agents")),
+			"pending_monitoring_agent_review_count": sum(1 for row in self.list_records(tenant_id, "monitoring_agents") if row["status"] == "pending_review"),
 			"lifecycle_batch_count": len(self.list_records(tenant_id, "lifecycle_batches")),
 			"denied_lifecycle_batch_count": sum(1 for row in self.list_records(tenant_id, "lifecycle_batches") if not row["accepted"]),
+			"pending_review_count": len(self.list_pending_reviews(tenant_id)),
 			"audit_event_count": len(self.list_records(tenant_id, "audit_events")),
 		}
+
+	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		"""Return all MONI records awaiting operator or human review."""
+		tenant_id = tenant_id or self.tenant_id
+		items = (
+			self.list_records(tenant_id, "signals")
+			+ self.list_records(tenant_id, "alerts")
+			+ self.list_records(tenant_id, "incidents")
+			+ self.list_records(tenant_id, "remediation_requests")
+			+ self.list_records(tenant_id, "monitoring_agents")
+			+ self.list_records(tenant_id, "lifecycle_batches")
+		)
+		return [
+			item
+			for item in items
+			if item.get("status") in {"pending", "pending_review", "review_required"}
+		]
 
 	def _audit(
 		self,
@@ -2324,20 +2388,41 @@ class MoniService:
 		event_type: str,
 		subject: str,
 		actor: str,
-		decision: str,
-		matched_rules: list[str],
+		policy_result: dict[str, Any],
 		details: dict[str, Any],
 	) -> None:
+		policy_result = policy_result or _allow_result()
 		self.audit_events.append(MoniAuditEventRecord(
 			event_id=uuid_like(),
 			tenant_id=tenant_id,
 			event_type=event_type,
 			subject=subject,
 			actor=actor,
-			decision=decision,
-			matched_rules=list(matched_rules),
+			decision=policy_result["decision"],
+			matched_rules=list(policy_result["matched_rules"]),
+			policy_decision=policy_result["decision"],
+			review_reasons=self._reasons(policy_result),
+			review_evidence=self._review_evidence(policy_result),
 			details=details,
 		))
+
+	def _reasons(self, result: dict[str, Any]) -> list[str]:
+		return list(dict.fromkeys(
+			str(action["reason"])
+			for action in result.get("actions", [])
+			if action.get("reason")
+		))
+
+	def _review_evidence(self, result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+		return {
+			"required_actions": list(dict.fromkeys(
+				str(action.get("required_action"))
+				for action in result.get("actions", [])
+				if action.get("required_action")
+			)),
+			"reasons": self._reasons(result),
+			"review_recorded": bool(review_recorded),
+		}
 
 	@staticmethod
 	def _merge_decisions(first: dict[str, Any], second: dict[str, Any]) -> dict[str, Any]:
@@ -2384,6 +2469,10 @@ class MoniService:
 			if action.get("reason"):
 				return str(action["reason"])
 		return "monitoring_operation_denied"
+
+
+def _allow_result() -> dict[str, Any]:
+	return {"decision": "allow", "matched_rules": [], "actions": []}
 
 
 def uuid_like() -> str:

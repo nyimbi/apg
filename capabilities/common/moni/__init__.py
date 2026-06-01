@@ -164,7 +164,8 @@ def register_capability() -> dict:
 			"capability_rules": "Evaluate deterministic observability governance rules",
 			"visual_theming": "Apply signal-console theme tokens and components",
 			"monitoring_agent_composition": "Register first-class monitoring agents across Codex, Claude Code, opencode, Pi, and future runtime adapters",
-			"lifecycle_batch_validation": "Validate monitoring lifecycle mutation batches against Bytewax-first stream rules"
+			"lifecycle_batch_validation": "Validate monitoring lifecycle mutation batches against Bytewax-first stream rules",
+			"review_evidence": "Compose durable pending-review, denial, matched-rule, and reviewer evidence across observability lifecycle records"
 		},
 		"endpoints": {
 			"metrics": "/moni/api/v1/metrics",
@@ -187,6 +188,7 @@ def register_capability() -> dict:
 			for route in contract["ui"]["routes"]
 		},
 		"ui_manifest": contract["ui"],
+		"review_evidence": contract["review_evidence"],
 		"theme": contract["theme"],
 		"permissions": [
 			"moni:view",
