@@ -30155,3 +30155,115 @@ Known gaps:
   notification delivery, report rendering, sandbox detonation, automated
   takedown, durable Bytewax topology, or performance/load checks during this
   battery-conscious slice.
+
+## 2026-06-01 - Intel Reporting executable package
+
+Implemented and reviewed `capabilities/intel/reporting` as a complete
+executable APG package for governed, evidence-backed intelligence reporting.
+
+What changed:
+
+- Replaced the placeholder marker with an executable package exporting
+  `IntelligenceReportingService`, `IntelReportingService`, and
+  `get_capability_contract`.
+- Added a detailed `SPECIFICATION.md`, `PLAN.md`, `README.md`, and
+  `cap_spec.md` defining the authority, workspace, template, product, section,
+  citation, approval, distribution, publication, review, Bytewax lifecycle,
+  AI-agent, UI, theme, and adapter-boundary model.
+- Added `capability_contract.py` with 63 deterministic rules, 13 UI routes,
+  compact `intel_reporting_control` theme tokens, APG dependencies, Bytewax
+  lifecycle metadata, and provider-neutral AI-agent runtimes for `codex`,
+  `claude_code`, `opencode`, and `pi`.
+- Added in-memory domain models and a tenant-scoped service for lawful
+  authority records, reporting workspaces, templates, products, sections,
+  citations, approvals, distributions, publications, reviews, Bytewax batch
+  validation, and AI-agent guardrails.
+- Added API helpers, dashboard/console/agent view models, and a publishable
+  `app.py` entrypoint with self-test, component manifest, and semantic-model
+  generation.
+- Added package manifest, release evidence, generated semantic model, and
+  focused tests for contract shape, rule-engine denial paths, full reporting
+  lifecycle execution, tenant isolation, guardrail rejection, API helpers, view
+  models, and app entrypoint.
+- Updated `capabilities/intel/__init__.py` so `reporting` is listed as an
+  implemented sub-capability.
+- Updated `capabilities/README.md` so the catalog snapshot reports 152 valid
+  contracts, 152 domain-specific packages, 152 strict complete package artifact
+  sets, and 18 Intel packages.
+
+Focused verification:
+
+- Generated `capabilities/intel/reporting/semantic_model.json` from
+  `app.semantic_model()`.
+- `./.venv/bin/python -m py_compile
+  capabilities/intel/reporting/__init__.py
+  capabilities/intel/reporting/capability_contract.py
+  capabilities/intel/reporting/models.py
+  capabilities/intel/reporting/reporting_runtime.py
+  capabilities/intel/reporting/service.py
+  capabilities/intel/reporting/api.py
+  capabilities/intel/reporting/views.py
+  capabilities/intel/reporting/app.py
+  capabilities/intel/reporting/tests/test_package_contract.py` passed.
+- `./.venv/bin/python capabilities/intel/reporting/app.py` passed self-test
+  with `passed: true` and `status: ok`.
+- `./.venv/bin/python -m json.tool
+  capabilities/intel/reporting/package_manifest.json` passed.
+- `./.venv/bin/python -m json.tool
+  capabilities/intel/reporting/release_report.json` passed.
+- `./.venv/bin/python -m json.tool
+  capabilities/intel/reporting/semantic_model.json` passed.
+- `./.venv/bin/pytest -q
+  capabilities/intel/reporting/tests/test_package_contract.py` passed with 7
+  tests.
+- `./.venv/bin/apg capabilities inspect intel_reporting --json` passed with
+  63 rules, 13 UI routes, theme `intel_reporting_control`, shell
+  `apg_python`, and Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/intel/reporting --json` passed with `side_effect_free: true`
+  and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/intel/reporting --json` passed with 1 domain-specific
+  capability, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/intel/reporting --json` passed with 1 complete lifecycle, 0
+  warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 152 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 152 operable contracts, 152 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/intel/reporting`, `capabilities/intel/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed authority, workspace, template, product, section, citation,
+  approval, distribution, publication, review, Bytewax batch, and AI-agent
+  lifecycle paths so rule evaluation happens before state mutation.
+- Confirmed service state is keyed by tenant plus record ID and covered by a
+  regression test with shared authority/workspace IDs across tenants.
+- Confirmed templates require existing tenant workspaces, supported template
+  type, classification, reference, and evidence before products can be created.
+- Confirmed products require authors and classifications, sections require
+  bounded confidence, citations require source references, and distribution
+  plus publication paths require approval before mutation.
+- Confirmed AI-agent registration requires supported runtime, supported role,
+  name, and bounded operational scope.
+- Confirmed AI-agent actions deny uncited claims, classification downgrades,
+  source fabrication, privacy bypass, autonomous publication, unapproved
+  distribution, and privileged scopes without human approval.
+- Kept PDF/HTML rendering, notification delivery, case-file writes, external
+  portal publication, graph/RAG writes, persistent document stores, export
+  pipelines, and durable Bytewax workers behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, PDF/HTML rendering,
+  live notifications, case-file writes, external portal publication, graph/RAG
+  writes, persistent document stores, export pipelines, durable Bytewax
+  topology, or performance/load checks during this battery-conscious slice.

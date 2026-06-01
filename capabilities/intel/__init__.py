@@ -74,6 +74,7 @@ CAPABILITY_META = {
 		'correlation', # Data Correlation
 		'prediction',  # Predictive Intelligence
 		'threats',     # Threat Intelligence
+		'reporting',   # Intelligence Reporting
 	],
 	'security_requirements': {
 		'classification_handling': True,

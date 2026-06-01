@@ -1,0 +1,2346 @@
+{
+  "app": {
+    "description": "Intelligence Reporting package-backed APG capability",
+    "entity_count": 11,
+    "name": "intel_reporting",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "intel_reporting": {
+      "configuration": {
+        "adapters": {
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "geospatial": "geos",
+          "graph": "grph",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "rag": "ragn"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "name_required": true,
+          "scope_required": true,
+          "supported_roles": [
+            "draft_writer",
+            "source_citation_reviewer",
+            "classification_reviewer",
+            "editorial_reviewer",
+            "distribution_reviewer",
+            "briefing_preparer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "approvals": {
+          "approver_required": true,
+          "evidence_required": true,
+          "product_required": true,
+          "supported_approval_types": [
+            "editorial",
+            "classification",
+            "legal",
+            "operational",
+            "partner_release",
+            "executive_release"
+          ],
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "authorities": {
+          "approver_required": true,
+          "evidence_required": true,
+          "expiry_required": true,
+          "supported_authority_types": [
+            "mission_order",
+            "legal_mandate",
+            "partner_authority",
+            "consent",
+            "incident_response_authority",
+            "public_interest_authority"
+          ],
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ]
+        },
+        "citations": {
+          "evidence_required": true,
+          "section_required": true,
+          "source_required": true,
+          "supported_citation_types": [
+            "source_extract",
+            "case_reference",
+            "graph_reference",
+            "rag_reference",
+            "geospatial_reference",
+            "model_output",
+            "analyst_note"
+          ]
+        },
+        "distributions": {
+          "approval_required": true,
+          "evidence_required": true,
+          "product_required": true,
+          "recipient_required": true,
+          "supported_distribution_types": [
+            "internal",
+            "partner",
+            "executive",
+            "field_team",
+            "watch_center",
+            "case_team"
+          ]
+        },
+        "governance": {
+          "audit_events": true,
+          "autonomous_publication_denied": true,
+          "classification_downgrade_denied": true,
+          "cross_tenant_reporting_denied": true,
+          "lawful_authority_required": true,
+          "policy_attached_for_writes": true,
+          "privacy_bypass_denied": true,
+          "require_tenant_context": true,
+          "source_fabrication_denied": true,
+          "unapproved_distribution_denied": true,
+          "uncited_claim_denied": true
+        },
+        "observability": {
+          "event_stream": "apg.intel.reporting.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "products": {
+          "author_required": true,
+          "classification_required": true,
+          "evidence_required": true,
+          "supported_product_types": [
+            "intelligence_brief",
+            "threat_advisory",
+            "situation_report",
+            "investigative_report",
+            "watchlist",
+            "executive_digest",
+            "partner_notice"
+          ],
+          "template_required": true,
+          "title_required": true
+        },
+        "publications": {
+          "approval_required": true,
+          "distribution_required": true,
+          "evidence_required": true,
+          "publication_reference_required": true,
+          "supported_publication_types": [
+            "portal",
+            "email_digest",
+            "notification",
+            "case_file",
+            "secure_export",
+            "briefing_pack"
+          ]
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "sections": {
+          "confidence_required": true,
+          "evidence_required": true,
+          "product_required": true,
+          "supported_section_types": [
+            "summary",
+            "key_judgement",
+            "background",
+            "evidence",
+            "assessment",
+            "recommendation",
+            "annex",
+            "dissemination_note"
+          ]
+        },
+        "templates": {
+          "classification_required": true,
+          "evidence_required": true,
+          "supported_template_types": [
+            "brief",
+            "advisory",
+            "bulletin",
+            "estimate",
+            "situation_report",
+            "watchlist",
+            "case_summary",
+            "executive_summary"
+          ],
+          "workspace_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "intel_reporting_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_approvals": true,
+          "enable_authorities": true,
+          "enable_citations": true,
+          "enable_dashboard": true,
+          "enable_distributions": true,
+          "enable_products": true,
+          "enable_publications": true,
+          "enable_reviews": true,
+          "enable_sections": true,
+          "enable_templates": true,
+          "enable_workspaces": true
+        },
+        "workspaces": {
+          "authority_required": true,
+          "evidence_required": true,
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ],
+          "supported_workspace_types": [
+            "strategic_reporting",
+            "tactical_reporting",
+            "threat_reporting",
+            "incident_reporting",
+            "investigative_reporting",
+            "executive_reporting",
+            "partner_reporting"
+          ]
+        }
+      },
+      "name": "Intelligence Reporting",
+      "provides": [
+        "reporting_authority_workflow",
+        "reporting_workspace_workflow",
+        "reporting_template_workflow",
+        "reporting_product_workflow",
+        "reporting_section_workflow",
+        "reporting_citation_workflow",
+        "reporting_approval_workflow",
+        "reporting_distribution_workflow",
+        "reporting_publication_workflow",
+        "reporting_review_workflow",
+        "reporting_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "grph",
+        "ragn",
+        "geos"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "reporting_policy_required",
+              "required_action": "attach_reporting_policy"
+            },
+            "name": "reporting_write_requires_policy"
+          },
+          {
+            "condition": {
+              "authority_type_supported": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_type_not_supported",
+              "required_action": "select_supported_authority_type"
+            },
+            "name": "authority_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_authority",
+              "scope_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_scope_required",
+              "required_action": "attach_scope_reference"
+            },
+            "name": "authority_scope_required"
+          },
+          {
+            "condition": {
+              "classification_supported": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "classification_not_supported",
+              "required_action": "select_supported_classification"
+            },
+            "name": "authority_classification_supported"
+          },
+          {
+            "condition": {
+              "approver_present": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_approver_required",
+              "required_action": "record_approver"
+            },
+            "name": "authority_approver_required"
+          },
+          {
+            "condition": {
+              "expiry_present": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_expiry_required",
+              "required_action": "set_expiry"
+            },
+            "name": "authority_expiry_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_evidence_required",
+              "required_action": "attach_authority_evidence"
+            },
+            "name": "authority_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_workspace",
+              "workspace_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "workspace_type_not_supported",
+              "required_action": "select_supported_workspace_type"
+            },
+            "name": "workspace_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_workspace",
+              "workspace_name_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "workspace_name_required",
+              "required_action": "name_workspace"
+            },
+            "name": "workspace_name_required"
+          },
+          {
+            "condition": {
+              "classification_supported": false,
+              "operation": "record_workspace"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "classification_not_supported",
+              "required_action": "select_supported_classification"
+            },
+            "name": "workspace_classification_supported"
+          },
+          {
+            "condition": {
+              "authority_present": false,
+              "operation": "record_workspace"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "lawful_authority_required",
+              "required_action": "select_authority"
+            },
+            "name": "workspace_authority_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_workspace"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "workspace_evidence_required",
+              "required_action": "attach_workspace_evidence"
+            },
+            "name": "workspace_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_template",
+              "workspace_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "workspace_required",
+              "required_action": "select_workspace"
+            },
+            "name": "template_workspace_required"
+          },
+          {
+            "condition": {
+              "operation": "record_template",
+              "template_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "template_type_not_supported",
+              "required_action": "select_supported_template_type"
+            },
+            "name": "template_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_template",
+              "template_reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "template_reference_required",
+              "required_action": "attach_template_reference"
+            },
+            "name": "template_reference_required"
+          },
+          {
+            "condition": {
+              "classification_supported": false,
+              "operation": "record_template"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "classification_not_supported",
+              "required_action": "select_supported_classification"
+            },
+            "name": "template_classification_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_template"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "template_evidence_required",
+              "required_action": "attach_template_evidence"
+            },
+            "name": "template_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_product",
+              "template_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "template_required",
+              "required_action": "select_template"
+            },
+            "name": "product_template_required"
+          },
+          {
+            "condition": {
+              "operation": "record_product",
+              "product_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "product_type_not_supported",
+              "required_action": "select_supported_product_type"
+            },
+            "name": "product_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_product",
+              "title_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "product_title_required",
+              "required_action": "title_product"
+            },
+            "name": "product_title_required"
+          },
+          {
+            "condition": {
+              "author_present": false,
+              "operation": "record_product"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "product_author_required",
+              "required_action": "assign_author"
+            },
+            "name": "product_author_required"
+          },
+          {
+            "condition": {
+              "classification_supported": false,
+              "operation": "record_product"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "classification_not_supported",
+              "required_action": "select_supported_classification"
+            },
+            "name": "product_classification_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_product"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "product_evidence_required",
+              "required_action": "attach_product_evidence"
+            },
+            "name": "product_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_section",
+              "product_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "product_required",
+              "required_action": "select_product"
+            },
+            "name": "section_product_required"
+          },
+          {
+            "condition": {
+              "operation": "record_section",
+              "section_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "section_type_not_supported",
+              "required_action": "select_supported_section_type"
+            },
+            "name": "section_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_section",
+              "section_reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "section_reference_required",
+              "required_action": "attach_section_reference"
+            },
+            "name": "section_reference_required"
+          },
+          {
+            "condition": {
+              "confidence_valid": false,
+              "operation": "record_section"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "confidence_score_invalid",
+              "required_action": "set_confidence_0_to_1"
+            },
+            "name": "section_confidence_valid"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_section"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "section_evidence_required",
+              "required_action": "attach_section_evidence"
+            },
+            "name": "section_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_citation",
+              "section_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "section_required",
+              "required_action": "select_section"
+            },
+            "name": "citation_section_required"
+          },
+          {
+            "condition": {
+              "citation_type_supported": false,
+              "operation": "record_citation"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "citation_type_not_supported",
+              "required_action": "select_supported_citation_type"
+            },
+            "name": "citation_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_citation",
+              "source_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "citation_source_required",
+              "required_action": "attach_source_reference"
+            },
+            "name": "citation_source_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_citation"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "citation_evidence_required",
+              "required_action": "attach_citation_evidence"
+            },
+            "name": "citation_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_approval",
+              "product_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "product_required",
+              "required_action": "select_product"
+            },
+            "name": "approval_product_required"
+          },
+          {
+            "condition": {
+              "approval_type_supported": false,
+              "operation": "record_approval"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "approval_type_not_supported",
+              "required_action": "select_supported_approval_type"
+            },
+            "name": "approval_type_supported"
+          },
+          {
+            "condition": {
+              "approver_present": false,
+              "operation": "record_approval"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "approval_approver_required",
+              "required_action": "assign_approver"
+            },
+            "name": "approval_approver_required"
+          },
+          {
+            "condition": {
+              "operation": "record_approval",
+              "status_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "approval_status_not_supported",
+              "required_action": "select_supported_status"
+            },
+            "name": "approval_status_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_approval"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "approval_evidence_required",
+              "required_action": "attach_approval_evidence"
+            },
+            "name": "approval_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_distribution",
+              "product_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "product_required",
+              "required_action": "select_product"
+            },
+            "name": "distribution_product_required"
+          },
+          {
+            "condition": {
+              "distribution_type_supported": false,
+              "operation": "record_distribution"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "distribution_type_not_supported",
+              "required_action": "select_supported_distribution_type"
+            },
+            "name": "distribution_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_distribution",
+              "recipient_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "recipient_reference_required",
+              "required_action": "attach_recipient_reference"
+            },
+            "name": "distribution_recipient_required"
+          },
+          {
+            "condition": {
+              "approval_present": false,
+              "operation": "record_distribution"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "distribution_approval_required",
+              "required_action": "attach_distribution_approval"
+            },
+            "name": "distribution_approval_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_distribution"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "distribution_evidence_required",
+              "required_action": "attach_distribution_evidence"
+            },
+            "name": "distribution_evidence_required"
+          },
+          {
+            "condition": {
+              "distribution_present": false,
+              "operation": "record_publication"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "distribution_required",
+              "required_action": "select_distribution"
+            },
+            "name": "publication_distribution_required"
+          },
+          {
+            "condition": {
+              "operation": "record_publication",
+              "publication_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "publication_type_not_supported",
+              "required_action": "select_supported_publication_type"
+            },
+            "name": "publication_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_publication",
+              "publication_reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "publication_reference_required",
+              "required_action": "attach_publication_reference"
+            },
+            "name": "publication_reference_required"
+          },
+          {
+            "condition": {
+              "approval_present": false,
+              "operation": "record_publication"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "publication_approval_required",
+              "required_action": "attach_publication_approval"
+            },
+            "name": "publication_approval_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_publication"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "publication_evidence_required",
+              "required_action": "attach_publication_evidence"
+            },
+            "name": "publication_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "status_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_status_not_supported",
+              "required_action": "select_supported_status"
+            },
+            "name": "review_status_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "reviewer_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "reviewer_required",
+              "required_action": "assign_reviewer"
+            },
+            "name": "review_reviewer_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_review"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_evidence_required",
+              "required_action": "attach_review_evidence"
+            },
+            "name": "review_evidence_required"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "reporting_batch"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_reporting_batch_to_bytewax"
+            },
+            "name": "reporting_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_reporting_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "reporting_agent_runtime_not_supported",
+              "required_action": "select_supported_runtime"
+            },
+            "name": "reporting_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_reporting_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "reporting_agent_role_not_supported",
+              "required_action": "select_supported_role"
+            },
+            "name": "reporting_agent_role_supported"
+          },
+          {
+            "condition": {
+              "agent_name_present": false,
+              "operation": "register_reporting_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "reporting_agent_name_required",
+              "required_action": "name_reporting_agent"
+            },
+            "name": "reporting_agent_name_required"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "operation": "register_reporting_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "reporting_agent_scope_required",
+              "required_action": "bound_reporting_agent_scope"
+            },
+            "name": "reporting_agent_scope_required"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "reporting_agent_action",
+              "privileged_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_reporting_agent_action_requires_human_approval"
+          },
+          {
+            "condition": {
+              "operation": "reporting_agent_action",
+              "uncited_claim_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "uncited_claim_scope_denied",
+              "required_action": "remove_uncited_claim_scope"
+            },
+            "name": "uncited_claim_action_denied"
+          },
+          {
+            "condition": {
+              "classification_downgrade_scope": true,
+              "operation": "reporting_agent_action"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "classification_downgrade_scope_denied",
+              "required_action": "remove_classification_downgrade_scope"
+            },
+            "name": "classification_downgrade_action_denied"
+          },
+          {
+            "condition": {
+              "operation": "reporting_agent_action",
+              "source_fabrication_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_fabrication_scope_denied",
+              "required_action": "remove_source_fabrication_scope"
+            },
+            "name": "source_fabrication_action_denied"
+          },
+          {
+            "condition": {
+              "operation": "reporting_agent_action",
+              "privacy_bypass_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "privacy_bypass_scope_denied",
+              "required_action": "remove_privacy_bypass_scope"
+            },
+            "name": "privacy_bypass_action_denied"
+          },
+          {
+            "condition": {
+              "autonomous_publication_scope": true,
+              "operation": "reporting_agent_action"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "autonomous_publication_scope_denied",
+              "required_action": "remove_autonomous_publication_scope"
+            },
+            "name": "autonomous_publication_action_denied"
+          },
+          {
+            "condition": {
+              "operation": "reporting_agent_action",
+              "unapproved_distribution_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "unapproved_distribution_scope_denied",
+              "required_action": "remove_unapproved_distribution_scope"
+            },
+            "name": "unapproved_distribution_action_denied"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "reporting_policy_required",
+            "required_action": "attach_reporting_policy"
+          },
+          "name": "reporting_write_requires_policy"
+        },
+        {
+          "condition": {
+            "authority_type_supported": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_type_not_supported",
+            "required_action": "select_supported_authority_type"
+          },
+          "name": "authority_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_authority",
+            "scope_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_scope_required",
+            "required_action": "attach_scope_reference"
+          },
+          "name": "authority_scope_required"
+        },
+        {
+          "condition": {
+            "classification_supported": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "classification_not_supported",
+            "required_action": "select_supported_classification"
+          },
+          "name": "authority_classification_supported"
+        },
+        {
+          "condition": {
+            "approver_present": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_approver_required",
+            "required_action": "record_approver"
+          },
+          "name": "authority_approver_required"
+        },
+        {
+          "condition": {
+            "expiry_present": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_expiry_required",
+            "required_action": "set_expiry"
+          },
+          "name": "authority_expiry_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_evidence_required",
+            "required_action": "attach_authority_evidence"
+          },
+          "name": "authority_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_workspace",
+            "workspace_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "workspace_type_not_supported",
+            "required_action": "select_supported_workspace_type"
+          },
+          "name": "workspace_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_workspace",
+            "workspace_name_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "workspace_name_required",
+            "required_action": "name_workspace"
+          },
+          "name": "workspace_name_required"
+        },
+        {
+          "condition": {
+            "classification_supported": false,
+            "operation": "record_workspace"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "classification_not_supported",
+            "required_action": "select_supported_classification"
+          },
+          "name": "workspace_classification_supported"
+        },
+        {
+          "condition": {
+            "authority_present": false,
+            "operation": "record_workspace"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "lawful_authority_required",
+            "required_action": "select_authority"
+          },
+          "name": "workspace_authority_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_workspace"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "workspace_evidence_required",
+            "required_action": "attach_workspace_evidence"
+          },
+          "name": "workspace_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_template",
+            "workspace_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "workspace_required",
+            "required_action": "select_workspace"
+          },
+          "name": "template_workspace_required"
+        },
+        {
+          "condition": {
+            "operation": "record_template",
+            "template_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "template_type_not_supported",
+            "required_action": "select_supported_template_type"
+          },
+          "name": "template_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_template",
+            "template_reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "template_reference_required",
+            "required_action": "attach_template_reference"
+          },
+          "name": "template_reference_required"
+        },
+        {
+          "condition": {
+            "classification_supported": false,
+            "operation": "record_template"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "classification_not_supported",
+            "required_action": "select_supported_classification"
+          },
+          "name": "template_classification_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_template"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "template_evidence_required",
+            "required_action": "attach_template_evidence"
+          },
+          "name": "template_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_product",
+            "template_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "template_required",
+            "required_action": "select_template"
+          },
+          "name": "product_template_required"
+        },
+        {
+          "condition": {
+            "operation": "record_product",
+            "product_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "product_type_not_supported",
+            "required_action": "select_supported_product_type"
+          },
+          "name": "product_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_product",
+            "title_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "product_title_required",
+            "required_action": "title_product"
+          },
+          "name": "product_title_required"
+        },
+        {
+          "condition": {
+            "author_present": false,
+            "operation": "record_product"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "product_author_required",
+            "required_action": "assign_author"
+          },
+          "name": "product_author_required"
+        },
+        {
+          "condition": {
+            "classification_supported": false,
+            "operation": "record_product"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "classification_not_supported",
+            "required_action": "select_supported_classification"
+          },
+          "name": "product_classification_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_product"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "product_evidence_required",
+            "required_action": "attach_product_evidence"
+          },
+          "name": "product_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_section",
+            "product_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "product_required",
+            "required_action": "select_product"
+          },
+          "name": "section_product_required"
+        },
+        {
+          "condition": {
+            "operation": "record_section",
+            "section_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "section_type_not_supported",
+            "required_action": "select_supported_section_type"
+          },
+          "name": "section_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_section",
+            "section_reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "section_reference_required",
+            "required_action": "attach_section_reference"
+          },
+          "name": "section_reference_required"
+        },
+        {
+          "condition": {
+            "confidence_valid": false,
+            "operation": "record_section"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "confidence_score_invalid",
+            "required_action": "set_confidence_0_to_1"
+          },
+          "name": "section_confidence_valid"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_section"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "section_evidence_required",
+            "required_action": "attach_section_evidence"
+          },
+          "name": "section_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_citation",
+            "section_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "section_required",
+            "required_action": "select_section"
+          },
+          "name": "citation_section_required"
+        },
+        {
+          "condition": {
+            "citation_type_supported": false,
+            "operation": "record_citation"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "citation_type_not_supported",
+            "required_action": "select_supported_citation_type"
+          },
+          "name": "citation_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_citation",
+            "source_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "citation_source_required",
+            "required_action": "attach_source_reference"
+          },
+          "name": "citation_source_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_citation"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "citation_evidence_required",
+            "required_action": "attach_citation_evidence"
+          },
+          "name": "citation_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_approval",
+            "product_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "product_required",
+            "required_action": "select_product"
+          },
+          "name": "approval_product_required"
+        },
+        {
+          "condition": {
+            "approval_type_supported": false,
+            "operation": "record_approval"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "approval_type_not_supported",
+            "required_action": "select_supported_approval_type"
+          },
+          "name": "approval_type_supported"
+        },
+        {
+          "condition": {
+            "approver_present": false,
+            "operation": "record_approval"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "approval_approver_required",
+            "required_action": "assign_approver"
+          },
+          "name": "approval_approver_required"
+        },
+        {
+          "condition": {
+            "operation": "record_approval",
+            "status_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "approval_status_not_supported",
+            "required_action": "select_supported_status"
+          },
+          "name": "approval_status_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_approval"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "approval_evidence_required",
+            "required_action": "attach_approval_evidence"
+          },
+          "name": "approval_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_distribution",
+            "product_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "product_required",
+            "required_action": "select_product"
+          },
+          "name": "distribution_product_required"
+        },
+        {
+          "condition": {
+            "distribution_type_supported": false,
+            "operation": "record_distribution"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "distribution_type_not_supported",
+            "required_action": "select_supported_distribution_type"
+          },
+          "name": "distribution_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_distribution",
+            "recipient_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "recipient_reference_required",
+            "required_action": "attach_recipient_reference"
+          },
+          "name": "distribution_recipient_required"
+        },
+        {
+          "condition": {
+            "approval_present": false,
+            "operation": "record_distribution"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "distribution_approval_required",
+            "required_action": "attach_distribution_approval"
+          },
+          "name": "distribution_approval_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_distribution"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "distribution_evidence_required",
+            "required_action": "attach_distribution_evidence"
+          },
+          "name": "distribution_evidence_required"
+        },
+        {
+          "condition": {
+            "distribution_present": false,
+            "operation": "record_publication"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "distribution_required",
+            "required_action": "select_distribution"
+          },
+          "name": "publication_distribution_required"
+        },
+        {
+          "condition": {
+            "operation": "record_publication",
+            "publication_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "publication_type_not_supported",
+            "required_action": "select_supported_publication_type"
+          },
+          "name": "publication_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_publication",
+            "publication_reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "publication_reference_required",
+            "required_action": "attach_publication_reference"
+          },
+          "name": "publication_reference_required"
+        },
+        {
+          "condition": {
+            "approval_present": false,
+            "operation": "record_publication"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "publication_approval_required",
+            "required_action": "attach_publication_approval"
+          },
+          "name": "publication_approval_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_publication"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "publication_evidence_required",
+            "required_action": "attach_publication_evidence"
+          },
+          "name": "publication_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "status_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_status_not_supported",
+            "required_action": "select_supported_status"
+          },
+          "name": "review_status_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "reviewer_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "reviewer_required",
+            "required_action": "assign_reviewer"
+          },
+          "name": "review_reviewer_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_review"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_evidence_required",
+            "required_action": "attach_review_evidence"
+          },
+          "name": "review_evidence_required"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "reporting_batch"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_reporting_batch_to_bytewax"
+          },
+          "name": "reporting_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_reporting_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "reporting_agent_runtime_not_supported",
+            "required_action": "select_supported_runtime"
+          },
+          "name": "reporting_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_reporting_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "reporting_agent_role_not_supported",
+            "required_action": "select_supported_role"
+          },
+          "name": "reporting_agent_role_supported"
+        },
+        {
+          "condition": {
+            "agent_name_present": false,
+            "operation": "register_reporting_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "reporting_agent_name_required",
+            "required_action": "name_reporting_agent"
+          },
+          "name": "reporting_agent_name_required"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "operation": "register_reporting_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "reporting_agent_scope_required",
+            "required_action": "bound_reporting_agent_scope"
+          },
+          "name": "reporting_agent_scope_required"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "reporting_agent_action",
+            "privileged_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_reporting_agent_action_requires_human_approval"
+        },
+        {
+          "condition": {
+            "operation": "reporting_agent_action",
+            "uncited_claim_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "uncited_claim_scope_denied",
+            "required_action": "remove_uncited_claim_scope"
+          },
+          "name": "uncited_claim_action_denied"
+        },
+        {
+          "condition": {
+            "classification_downgrade_scope": true,
+            "operation": "reporting_agent_action"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "classification_downgrade_scope_denied",
+            "required_action": "remove_classification_downgrade_scope"
+          },
+          "name": "classification_downgrade_action_denied"
+        },
+        {
+          "condition": {
+            "operation": "reporting_agent_action",
+            "source_fabrication_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_fabrication_scope_denied",
+            "required_action": "remove_source_fabrication_scope"
+          },
+          "name": "source_fabrication_action_denied"
+        },
+        {
+          "condition": {
+            "operation": "reporting_agent_action",
+            "privacy_bypass_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "privacy_bypass_scope_denied",
+            "required_action": "remove_privacy_bypass_scope"
+          },
+          "name": "privacy_bypass_action_denied"
+        },
+        {
+          "condition": {
+            "autonomous_publication_scope": true,
+            "operation": "reporting_agent_action"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "autonomous_publication_scope_denied",
+            "required_action": "remove_autonomous_publication_scope"
+          },
+          "name": "autonomous_publication_action_denied"
+        },
+        {
+          "condition": {
+            "operation": "reporting_agent_action",
+            "unapproved_distribution_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "unapproved_distribution_scope_denied",
+            "required_action": "remove_unapproved_distribution_scope"
+          },
+          "name": "unapproved_distribution_action_denied"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "agents": {
+          "component": "ReportingAgentWorkbench",
+          "permission": "intel_reporting:admin",
+          "route": "/intel-reporting/agents"
+        },
+        "approvals": {
+          "component": "ReportingApprovalConsole",
+          "permission": "intel_reporting:approvals",
+          "route": "/intel-reporting/approvals"
+        },
+        "authorities": {
+          "component": "ReportingAuthorityConsole",
+          "permission": "intel_reporting:authorities",
+          "route": "/intel-reporting/authorities"
+        },
+        "citations": {
+          "component": "ReportingCitationLedger",
+          "permission": "intel_reporting:citations",
+          "route": "/intel-reporting/citations"
+        },
+        "dashboard": {
+          "component": "ReportingDashboard",
+          "permission": "intel_reporting:view",
+          "route": "/intel-reporting/dashboard"
+        },
+        "distributions": {
+          "component": "ReportingDistributionConsole",
+          "permission": "intel_reporting:distributions",
+          "route": "/intel-reporting/distributions"
+        },
+        "products": {
+          "component": "ReportingProductWorkbench",
+          "permission": "intel_reporting:products",
+          "route": "/intel-reporting/products"
+        },
+        "publications": {
+          "component": "ReportingPublicationConsole",
+          "permission": "intel_reporting:publications",
+          "route": "/intel-reporting/publications"
+        },
+        "reviews": {
+          "component": "ReportingReviewConsole",
+          "permission": "intel_reporting:reviews",
+          "route": "/intel-reporting/reviews"
+        },
+        "sections": {
+          "component": "ReportingSectionEditor",
+          "permission": "intel_reporting:sections",
+          "route": "/intel-reporting/sections"
+        },
+        "settings": {
+          "component": "ReportingSettings",
+          "permission": "intel_reporting:admin",
+          "route": "/intel-reporting/settings"
+        },
+        "templates": {
+          "component": "ReportingTemplateLibrary",
+          "permission": "intel_reporting:templates",
+          "route": "/intel-reporting/templates"
+        },
+        "workspaces": {
+          "component": "ReportingWorkspaceConsole",
+          "permission": "intel_reporting:workspaces",
+          "route": "/intel-reporting/workspaces"
+        }
+      },
+      "streaming": {
+        "events": [
+          "reporting_authority_recorded",
+          "reporting_workspace_recorded",
+          "reporting_template_recorded",
+          "reporting_product_recorded",
+          "reporting_section_recorded",
+          "reporting_citation_recorded",
+          "reporting_approval_recorded",
+          "reporting_distribution_recorded",
+          "reporting_publication_recorded",
+          "reporting_review_recorded",
+          "reporting_agent_registered"
+        ],
+        "guardrails": [
+          "reporting_batch_requires_bytewax",
+          "privileged_reporting_agent_action_requires_human_approval",
+          "uncited_claim_action_denied",
+          "classification_downgrade_action_denied",
+          "source_fabrication_action_denied",
+          "privacy_bypass_action_denied",
+          "autonomous_publication_action_denied",
+          "unapproved_distribution_action_denied"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.intel.reporting.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "approvals": {
+            "icon": "badge-check",
+            "status_indicator": "approval-chip"
+          },
+          "authorities": {
+            "icon": "shield-check",
+            "status_indicator": "authority-chip"
+          },
+          "citations": {
+            "icon": "quote",
+            "status_indicator": "citation-chip"
+          },
+          "distributions": {
+            "icon": "send",
+            "status_indicator": "distribution-chip"
+          },
+          "products": {
+            "icon": "file-text",
+            "status_indicator": "product-chip"
+          },
+          "publications": {
+            "icon": "upload-cloud",
+            "status_indicator": "publication-chip"
+          },
+          "reviews": {
+            "icon": "clipboard-check",
+            "status_indicator": "review-chip"
+          },
+          "sections": {
+            "icon": "pilcrow",
+            "status_indicator": "section-chip"
+          },
+          "templates": {
+            "icon": "file-cog",
+            "status_indicator": "template-chip"
+          },
+          "workspaces": {
+            "icon": "layout-dashboard",
+            "status_indicator": "workspace-chip"
+          }
+        },
+        "name": "intel_reporting_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#0F766E",
+          "color.danger": "#B91C1C",
+          "color.primary": "#1D4ED8",
+          "color.success": "#166534",
+          "color.warning": "#A16207",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/intel-reporting/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "ReportingDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/intel-reporting/dashboard",
+            "permission": "intel_reporting:view"
+          },
+          {
+            "component": "ReportingAuthorityConsole",
+            "name": "authorities",
+            "nav_group": "Governance",
+            "path": "/intel-reporting/authorities",
+            "permission": "intel_reporting:authorities"
+          },
+          {
+            "component": "ReportingWorkspaceConsole",
+            "name": "workspaces",
+            "nav_group": "Planning",
+            "path": "/intel-reporting/workspaces",
+            "permission": "intel_reporting:workspaces"
+          },
+          {
+            "component": "ReportingTemplateLibrary",
+            "name": "templates",
+            "nav_group": "Products",
+            "path": "/intel-reporting/templates",
+            "permission": "intel_reporting:templates"
+          },
+          {
+            "component": "ReportingProductWorkbench",
+            "name": "products",
+            "nav_group": "Products",
+            "path": "/intel-reporting/products",
+            "permission": "intel_reporting:products"
+          },
+          {
+            "component": "ReportingSectionEditor",
+            "name": "sections",
+            "nav_group": "Products",
+            "path": "/intel-reporting/sections",
+            "permission": "intel_reporting:sections"
+          },
+          {
+            "component": "ReportingCitationLedger",
+            "name": "citations",
+            "nav_group": "Evidence",
+            "path": "/intel-reporting/citations",
+            "permission": "intel_reporting:citations"
+          },
+          {
+            "component": "ReportingApprovalConsole",
+            "name": "approvals",
+            "nav_group": "Governance",
+            "path": "/intel-reporting/approvals",
+            "permission": "intel_reporting:approvals"
+          },
+          {
+            "component": "ReportingDistributionConsole",
+            "name": "distributions",
+            "nav_group": "Dissemination",
+            "path": "/intel-reporting/distributions",
+            "permission": "intel_reporting:distributions"
+          },
+          {
+            "component": "ReportingPublicationConsole",
+            "name": "publications",
+            "nav_group": "Dissemination",
+            "path": "/intel-reporting/publications",
+            "permission": "intel_reporting:publications"
+          },
+          {
+            "component": "ReportingReviewConsole",
+            "name": "reviews",
+            "nav_group": "Governance",
+            "path": "/intel-reporting/reviews",
+            "permission": "intel_reporting:reviews"
+          },
+          {
+            "component": "ReportingAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/intel-reporting/agents",
+            "permission": "intel_reporting:admin"
+          },
+          {
+            "component": "ReportingSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/intel-reporting/settings",
+            "permission": "intel_reporting:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "reporting_operations": {
+        "roles": [
+          "draft_writer",
+          "source_citation_reviewer",
+          "classification_reviewer",
+          "editorial_reviewer",
+          "distribution_reviewer",
+          "briefing_preparer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "intel_reporting": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "grph",
+        "ragn",
+        "geos"
+      ]
+    }
+  },
+  "contracts": {
+    "intel_reporting": {
+      "configuration": {
+        "adapters": {
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "geospatial": "geos",
+          "graph": "grph",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "rag": "ragn"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "name_required": true,
+          "scope_required": true,
+          "supported_roles": [
+            "draft_writer",
+            "source_citation_reviewer",
+            "classification_reviewer",
+            "editorial_reviewer",
+            "distribution_reviewer",
+            "briefing_preparer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "approvals": {
+          "approver_required": true,
+          "evidence_required": true,
+          "product_required": true,
+          "supported_approval_types": [
+            "editorial",
+            "classification",
+            "legal",
+            "operational",
+            "partner_release",
+            "executive_release"
+          ],
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "authorities": {
+          "approver_required": true,
+          "evidence_required": true,
+          "expiry_required": true,
+          "supported_authority_types": [
+            "mission_order",
+            "legal_mandate",
+            "partner_authority",
+            "consent",
+            "incident_response_authority",
+            "public_interest_authority"
+          ],
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ]
+        },
+        "citations": {
+          "evidence_required": true,
+          "section_required": true,
+          "source_required": true,
+          "supported_citation_types": [
+            "source_extract",
+            "case_reference",
+            "graph_reference",
+            "rag_reference",
+            "geospatial_reference",
+            "model_output",
+            "analyst_note"
+          ]
+        },
+        "distributions": {
+          "approval_required": true,
+          "evidence_required": true,
+          "product_required": true,
+          "recipient_required": true,
+          "supported_distribution_types": [
+            "internal",
+            "partner",
+            "executive",
+            "field_team",
+            "watch_center",
+            "case_team"
+          ]
+        },
+        "governance": {
+          "audit_events": true,
+          "autonomous_publication_denied": true,
+          "classification_downgrade_denied": true,
+          "cross_tenant_reporting_denied": true,
+          "lawful_authority_required": true,
+          "policy_attached_for_writes": true,
+          "privacy_bypass_denied": true,
+          "require_tenant_context": true,
+          "source_fabrication_denied": true,
+          "unapproved_distribution_denied": true,
+          "uncited_claim_denied": true
+        },
+        "observability": {
+          "event_stream": "apg.intel.reporting.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "products": {
+          "author_required": true,
+          "classification_required": true,
+          "evidence_required": true,
+          "supported_product_types": [
+            "intelligence_brief",
+            "threat_advisory",
+            "situation_report",
+            "investigative_report",
+            "watchlist",
+            "executive_digest",
+            "partner_notice"
+          ],
+          "template_required": true,
+          "title_required": true
+        },
+        "publications": {
+          "approval_required": true,
+          "distribution_required": true,
+          "evidence_required": true,
+          "publication_reference_required": true,
+          "supported_publication_types": [
+            "portal",
+            "email_digest",
+            "notification",
+            "case_file",
+            "secure_export",
+            "briefing_pack"
+          ]
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "sections": {
+          "confidence_required": true,
+          "evidence_required": true,
+          "product_required": true,
+          "supported_section_types": [
+            "summary",
+            "key_judgement",
+            "background",
+            "evidence",
+            "assessment",
+            "recommendation",
+            "annex",
+            "dissemination_note"
+          ]
+        },
+        "templates": {
+          "classification_required": true,
+          "evidence_required": true,
+          "supported_template_types": [
+            "brief",
+            "advisory",
+            "bulletin",
+            "estimate",
+            "situation_report",
+            "watchlist",
+            "case_summary",
+            "executive_summary"
+          ],
+          "workspace_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "intel_reporting_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_approvals": true,
+          "enable_authorities": true,
+          "enable_citations": true,
+          "enable_dashboard": true,
+          "enable_distributions": true,
+          "enable_products": true,
+          "enable_publications": true,
+          "enable_reviews": true,
+          "enable_sections": true,
+          "enable_templates": true,
+          "enable_workspaces": true
+        },
+        "workspaces": {
+          "authority_required": true,
+          "evidence_required": true,
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ],
+          "supported_workspace_types": [
+            "strategic_reporting",
+            "tactical_reporting",
+            "threat_reporting",
+            "incident_reporting",
+            "investigative_reporting",
+            "executive_reporting",
+            "partner_reporting"
+          ]
+        }
+      },
+      "id": "intel_reporting",
+      "provides": [
+        "reporting_authority_workflow",
+        "reporting_workspace_workflow",
+        "reporting_template_workflow",
+        "reporting_product_workflow",
+        "reporting_section_workflow",
+        "reporting_citation_workflow",
+        "reporting_approval_workflow",
+        "reporting_distribution_workflow",
+        "reporting_publication_workflow",
+        "reporting_review_workflow",
+        "reporting_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "grph",
+        "ragn",
+        "geos"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 7,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "intel_reporting": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}

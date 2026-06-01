@@ -23,18 +23,18 @@ Use the local CLI as the source of truth:
 
 ## Current Registry Snapshot
 
-The current registry exposes 151 valid capability contracts. The latest focused
+The current registry exposes 152 valid capability contracts. The latest focused
 implementation audit reports:
 
-- 151 domain-specific capability packages;
+- 152 domain-specific capability packages;
 - 0 materialized-baseline packages;
 - 0 mixed-implementation packages;
 - 0 contract-only packages;
 - 0 blocking implementation gaps;
 - 0 implementation-audit warnings.
 
-The strict package-artifact operability audit also currently reports 151
-operable contracts, 151 complete package artifact sets, 0 package gaps, 0
+The strict package-artifact operability audit also currently reports 152
+operable contracts, 152 complete package artifact sets, 0 package gaps, 0
 warnings, and 0 errors.
 
 Category coverage:
@@ -52,7 +52,7 @@ Category coverage:
 | `ecd` | 1 | ESG and sustainability management. |
 | `fintech` | 27 | Fintech gateway, digital payments, digital cards, digital wallet, mobile banking, banking APIs, embedded finance, wealth management, robo advisory, portfolio management, algorithmic trading, crowdfunding, digital neobanking, digital lending, buy now pay later, agency banking, remittance, insurtech, risk management, regulatory technology, KYC, AML, fraud, compliance automation, blockchain services, cryptocurrency services, and decentralized finance. |
 | `int` | 1 | Integration API management. |
-| `intel` | 17 | Intelligence crawler services, open source intelligence, signals intelligence, human intelligence, geospatial intelligence, cyber intelligence, financial intelligence, social media intelligence, dark web monitoring, radio intelligence listening, digital surveillance, real-time monitoring, intelligence fusion, intelligence analytics, data correlation, predictive intelligence, and threat intelligence. |
+| `intel` | 18 | Intelligence crawler services, open source intelligence, signals intelligence, human intelligence, geospatial intelligence, cyber intelligence, financial intelligence, social media intelligence, dark web monitoring, radio intelligence listening, digital surveillance, real-time monitoring, intelligence fusion, intelligence analytics, data correlation, predictive intelligence, threat intelligence, and intelligence reporting. |
 | `pde` | 1 | Product information management. |
 | `scm` | 1 | Supply-chain vendor management. |
 
