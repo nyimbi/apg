@@ -34,6 +34,9 @@ def test_package_contract_shape_is_valid():
 	assert contract["agents"]["first_class"] is True
 	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert "virtualization_agent_composition" in contract["provides"]
+	assert "review_evidence" in contract["provides"]
+	assert "virtualization_agents" in contract["review_evidence"]["pending_queues"]
+	assert "policy_decision" in contract["review_evidence"]["policy_fields"]
 	assert contract["requires"] == ["mdm", "etlp", "meta"]
 	assert contract["theme"]["tokens"]["border.radius"]
 
@@ -54,4 +57,6 @@ def test_package_app_entrypoint_is_publishable():
 	assert model["capabilities"]["dvrl"]["virtualization_lifecycle"]["query"] == "DVRLQueryRecord"
 	assert model["capabilities"]["dvrl"]["virtualization_lifecycle"]["virtualization_agent"] == "DVRLVirtualizationAgentRecord"
 	assert model["capabilities"]["dvrl"]["streaming"]["required_processor"] == "bytewax"
+	assert "virtualization_agents" in model["capabilities"]["dvrl"]["review_evidence"]["pending_queues"]
+	assert model["contracts"]["dvrl"]["review_evidence"]["deny_behavior"].startswith("Denied DVRL")
 	assert model["agents"]["dvrl_virtualization_agents"]["first_class"] is True

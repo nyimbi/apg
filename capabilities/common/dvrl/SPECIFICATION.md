@@ -68,6 +68,13 @@ DVRL must evaluate deterministic guardrails before side effects. Decisions must
 return `allow`, `deny`, or `require_review`, matched rule names, required
 actions, and evaluated context.
 
+Reviewable and denied records must persist durable evidence for generated
+applications and governance consoles. Source, schema, virtual table, query,
+cache, policy, virtualization-agent, lifecycle-batch, and audit records expose
+`policy_decision`, `matched_rules`, `review_reasons`, and `review_evidence`.
+Generated applications can list pending review queues across those record
+families without replaying rule evaluation.
+
 ### Virtualization Agents
 
 DVRL must treat AI and automation agents as first-class composition
@@ -92,6 +99,10 @@ processing is outside the DVRL packet boundary unless routed through a Bytewax
 adapter that preserves event-time ordering, audit evidence, and deterministic
 rule decisions.
 
+Denied non-Bytewax lifecycle batches must be persisted with policy evidence
+before `PermissionError` is raised so remediation workflows can show the
+required processor, matched rule, reason, and required action.
+
 ## Adapter Boundaries
 
 The dependency-light lifecycle service must not connect to physical sources or
@@ -106,12 +117,14 @@ decisions only through declared agent records and APG approval/audit controls.
 - Root `README.md`, `SPECIFICATION.md`, and `PLAN.md` describe current DVRL
   behavior and adapter boundaries.
 - Contract exposes configuration, rule engine, UI routes, theme, agents,
-  streaming, and adapter evidence for source, schema, query, cache, policy,
-  agent, lifecycle-batch, and audit workflows.
+  streaming, review evidence, and adapter evidence for source, schema, query,
+  cache, policy, agent, lifecycle-batch, and audit workflows.
 - Generated apps can use a dependency-light lifecycle service for source,
   schema, virtual table, query, cache, policy, retirement, virtualization-agent,
   Bytewax lifecycle-batch, and audit records.
 - Tests cover positive and negative guardrail paths.
+- Tests cover durable review evidence and pending-review queues for generated
+  data-virtualization governance consoles.
 - `app.py`, `semantic_model.json`, `package_manifest.json`, and
   `release_report.json` match the current contract.
 - Focused compile, tests, implementation audit, publish-plan, stale marker

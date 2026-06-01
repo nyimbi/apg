@@ -16,6 +16,76 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-06-01 09:43 EAT
+
+DVRL durable review-evidence packet:
+
+- Extended source, schema, virtual table, query, cache, policy,
+  virtualization-agent, lifecycle-batch, and audit records with durable policy
+  evidence: policy decision, matched rules, review reasons, and review
+  evidence.
+- Added contract-level `review_evidence` metadata and exposed it through
+  registration metadata, API helpers, view models, semantic model, release
+  evidence, package tests, and app self-test.
+- Preserved privileged virtualization agents without human approval as
+  `pending_review` records instead of discarding registration evidence.
+- Preserved denied non-Bytewax DVRL lifecycle batch validations as `denied`
+  evidence before raising `PermissionError`, including the required Bytewax
+  processor evidence.
+- Added pending-review queue composition for sources, schemas, virtual tables,
+  queries, caches, policies, virtualization agents, and lifecycle batches.
+- Kept DVRL virtualization agents provider-neutral for Codex, Claude Code,
+  OpenCode, Pi, and future virtualization-governance runtimes while retaining
+  human approval controls for privileged roles and Bytewax-first lifecycle
+  processing.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for DVRL package init, models,
+  service, API helpers, contract, app, view models, and focused tests passed.
+- `./.venv/bin/pytest -q capabilities/common/dvrl/test_capability_contract.py
+  capabilities/common/dvrl/tests/test_package_contract.py` passed with 7 tests
+  and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "import importlib; app =
+  importlib.import_module('capabilities.common.dvrl.app'); ..."` passed package
+  self-test.
+- `./.venv/bin/python -m json.tool
+  capabilities/common/dvrl/semantic_model.json` passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/dvrl --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/dvrl --strict --json` passed with no warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/dvrl --json`
+  passed with no warnings and side-effect-free publish planning.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/common/dvrl --json` passed with complete lifecycle evidence,
+  release evidence, review evidence, and 28 rules.
+- DVRL stale-marker scan returned no TODO/FIXME/stub/placeholder, Kafka,
+  materialized-baseline, contract-only, or not-implemented markers across the
+  edited DVRL packet.
+- Service smoke executed pending schema/query review evidence, privileged
+  virtualization-agent review evidence, accepted Bytewax batch evidence, and
+  denied non-Bytewax batch persistence, printing `pending_review
+  require_review pending_review require_review accepted deny bytewax_required
+  3`.
+- `git diff --check -- capabilities/common/dvrl docs/progress_log.md` passed.
+
+Known gaps:
+
+- Full repository tests, rendered DVRL UI, production database persistence and
+  migrations, live database/SaaS/object-store/stream connectors, durable
+  Bytewax workers and dataflows, physical federated query execution, live query
+  planner/cache/credential/audit adapters, APG AUTH, MTEN, AUDL, CONF, MQEB,
+  MONI, META, MDM, CACH, KEYM adapters, benchmark and load checks, runtime SLO
+  validation, and live AI runtime adapters still need later verification.
+
+Next capability:
+
+- Continue the common capability sequence with the next package after DVRL,
+  applying the same specification, plan, implementation, review, verification,
+  progress-log, commit, and push lifecycle.
+
 ### 2026-06-01 09:14 EAT
 
 ETLP durable review-evidence packet:

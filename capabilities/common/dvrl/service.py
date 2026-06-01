@@ -74,6 +74,9 @@ class DVRLSourceRecord:
 	status: str
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	metadata: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 	updated_at: datetime = field(default_factory=datetime.utcnow)
@@ -89,6 +92,9 @@ class DVRLSchemaRecord:
 	status: str
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	tables: list[str] = field(default_factory=list)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -104,6 +110,9 @@ class DVRLVirtualTableRecord:
 	status: str
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	columns: list[dict[str, Any]] = field(default_factory=list)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -121,6 +130,9 @@ class DVRLQueryRecord:
 	status: str
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	source_ids: list[str] = field(default_factory=list)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 	updated_at: datetime = field(default_factory=datetime.utcnow)
@@ -135,6 +147,9 @@ class DVRLCacheRecord:
 	status: str
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -147,6 +162,9 @@ class DVRLPolicyRecord:
 	status: str
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	metadata: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -160,6 +178,9 @@ class DVRLAuditEventRecord:
 	actor: str
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	details: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -179,6 +200,9 @@ class DVRLVirtualizationAgentRecord:
 	status: str = "active"
 	decision: str = "allow"
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -191,6 +215,10 @@ class DVRLLifecycleBatchRecord:
 	accepted: bool
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
+	required_processor: str = "bytewax"
 	status: str = "accepted"
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -253,6 +281,9 @@ class DVRLLifecycleService:
 			status="registered" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
 			decision=decision["decision"],
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 			metadata=dict(metadata or {}),
 		)
 		self.sources[self._key(tenant_id, record.source_id)] = record
@@ -270,6 +301,9 @@ class DVRLLifecycleService:
 		decision = evaluate_capability_rules(context)
 		source.decision = decision["decision"]
 		source.matched_rules = decision["matched_rules"]
+		source.policy_decision = decision["decision"]
+		source.review_reasons = self._reasons(decision)
+		source.review_evidence = self._review_evidence(decision, source_approval_recorded)
 		if decision["decision"] == "allow":
 			source.approved = True
 			source.status = "active"
@@ -298,6 +332,9 @@ class DVRLLifecycleService:
 			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
 			decision=decision["decision"],
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision, schema_review_recorded),
 			tables=list(tables or []),
 		)
 		self.schemas[self._key(tenant_id, record.schema_id)] = record
@@ -335,6 +372,9 @@ class DVRLLifecycleService:
 			status="published" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
 			decision=decision["decision"],
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision, classification_complete),
 			columns=list(columns or []),
 		)
 		self.virtual_tables[self._key(tenant_id, record.table_id)] = record
@@ -394,6 +434,9 @@ class DVRLLifecycleService:
 			status="planned" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
 			decision=decision["decision"],
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision, cost_review_recorded or join_review_recorded),
 			source_ids=list(source_ids),
 		)
 		self.queries[self._key(tenant_id, record.query_id)] = record
@@ -417,6 +460,9 @@ class DVRLLifecycleService:
 			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
 			decision=decision["decision"],
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 		)
 		self.caches[self._key(tenant_id, record.cache_id)] = record
 		self._audit(tenant_id, "cache.evaluated", record.cache_id, query.actor, decision, context)
@@ -438,6 +484,9 @@ class DVRLLifecycleService:
 			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
 			decision=decision["decision"],
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision, policy_review_recorded),
 			metadata=dict(metadata or {}),
 		)
 		self.policies[self._key(tenant_id, record.policy_id)] = record
@@ -455,6 +504,9 @@ class DVRLLifecycleService:
 		decision = evaluate_capability_rules(context)
 		source.decision = decision["decision"]
 		source.matched_rules = decision["matched_rules"]
+		source.policy_decision = decision["decision"]
+		source.review_reasons = self._reasons(decision)
+		source.review_evidence = self._review_evidence(decision, impact_review_recorded)
 		if decision["decision"] == "allow":
 			source.status = "retired"
 			source.updated_at = datetime.utcnow()
@@ -522,6 +574,9 @@ class DVRLLifecycleService:
 			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
 			decision=decision["decision"],
 			matched_rules=list(decision["matched_rules"]),
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision, bool(human_approval_required)),
 		)
 		self.virtualization_agents[record_key] = record
 		self._audit(tenant_id, "agent.registered", agent_id, record.owner, decision, asdict(record))
@@ -554,6 +609,9 @@ class DVRLLifecycleService:
 			accepted=accepted,
 			decision=decision["decision"],
 			matched_rules=list(decision["matched_rules"]),
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 			status="accepted" if accepted else "denied",
 		)
 		self.lifecycle_batches[self._key(tenant_id, record.batch_id)] = record
@@ -596,11 +654,32 @@ class DVRLLifecycleService:
 			"query_count": len(self.list_records(tenant_id, "queries")),
 			"cache_count": len(self.list_records(tenant_id, "caches")),
 			"virtualization_agent_count": len(self.list_records(tenant_id, "virtualization_agents")),
+			"pending_virtualization_agent_review_count": sum(1 for row in self.list_records(tenant_id, "virtualization_agents") if row["status"] == "pending_review"),
 			"lifecycle_batch_count": len(self.list_records(tenant_id, "lifecycle_batches")),
 			"denied_lifecycle_batch_count": sum(1 for row in self.list_records(tenant_id, "lifecycle_batches") if row["status"] == "denied"),
-			"review_count": sum(1 for kind in ("sources", "schemas", "queries", "policies", "virtualization_agents") for row in self.list_records(tenant_id, kind) if row["status"] == "pending_review"),
+			"review_count": len(self.list_pending_reviews(tenant_id)),
+			"pending_review_count": len(self.list_pending_reviews(tenant_id)),
 			"audit_event_count": len(self.list_records(tenant_id, "audit_events")),
 		}
+
+	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		"""Return all DVRL records awaiting operator, steward, or human review."""
+		tenant_id = tenant_id or self.tenant_id
+		items = (
+			self.list_records(tenant_id, "sources")
+			+ self.list_records(tenant_id, "schemas")
+			+ self.list_records(tenant_id, "virtual_tables")
+			+ self.list_records(tenant_id, "queries")
+			+ self.list_records(tenant_id, "caches")
+			+ self.list_records(tenant_id, "policies")
+			+ self.list_records(tenant_id, "virtualization_agents")
+			+ self.list_records(tenant_id, "lifecycle_batches")
+		)
+		return [
+			item
+			for item in items
+			if item.get("status") in {"pending", "pending_review", "review_required"}
+		]
 
 	def _audit(self, tenant_id: str, event_type: str, subject: str, actor: str, decision: dict[str, Any], details: dict[str, Any]) -> None:
 		self.audit_events.append(DVRLAuditEventRecord(
@@ -611,8 +690,29 @@ class DVRLLifecycleService:
 			actor=actor,
 			decision=decision["decision"],
 			matched_rules=list(decision["matched_rules"]),
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 			details=details,
 		))
+
+	def _reasons(self, result: dict[str, Any]) -> list[str]:
+		return list(dict.fromkeys(
+			str(action["reason"])
+			for action in result.get("actions", [])
+			if action.get("reason")
+		))
+
+	def _review_evidence(self, result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+		return {
+			"required_actions": list(dict.fromkeys(
+				str(action.get("required_action"))
+				for action in result.get("actions", [])
+				if action.get("required_action")
+			)),
+			"reasons": self._reasons(result),
+			"review_recorded": bool(review_recorded),
+		}
 
 	def _require_source(self, tenant_id: str, source_id: str) -> DVRLSourceRecord:
 		source_id = self._require_text(source_id, "source_id")

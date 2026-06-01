@@ -32,6 +32,10 @@ DVRL is intentionally split into two layers:
 - First-class virtualization-agent records for AI and automation tools.
 - Bytewax lifecycle-batch validation before generated applications apply
   batched DVRL state changes.
+- Durable review evidence on reviewable records: `policy_decision`,
+  `matched_rules`, `review_reasons`, and `review_evidence`.
+- Pending-review queues for sources, schemas, virtual tables, queries, caches,
+  policies, virtualization agents, and lifecycle batches.
 - Audit events for every lifecycle decision.
 - Generated UI view models for dashboard, source manager, schema browser,
   virtual table catalog, query workbench, federation map, cache console,
@@ -130,6 +134,28 @@ batch = service.validate_dvrl_lifecycle_batch(
 
 assert agent.status == "active"
 assert batch.status == "accepted"
+```
+
+Privileged agents and reviewable lifecycle events preserve operator-facing
+evidence instead of disappearing into transient exceptions:
+
+```python
+pending_agent = service.register_virtualization_agent(
+    tenant_id="tenant-a",
+    agent_id="pending-query-policy-agent",
+    name="Pending Query Policy Agent",
+    runtime="claude-code",
+    role="query-policy-reviewer",
+    scope="restricted federated query policy recommendations",
+    owner="data-governance",
+    purpose="prepare query policy recommendations for approval",
+    human_approval_required=False,
+)
+
+assert pending_agent.status == "pending_review"
+assert pending_agent.policy_decision == "require_review"
+assert pending_agent.review_reasons == ["privileged_agent_human_approval_required"]
+assert service.list_pending_reviews("tenant-a")
 ```
 
 ## UI Composition

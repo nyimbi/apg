@@ -237,13 +237,46 @@
       "provides": [
         "data_virtualization",
         "federated_query_lifecycle",
-        "virtualization_agent_composition"
+        "virtualization_agent_composition",
+        "review_evidence"
       ],
       "requires": [
         "mdm",
         "etlp",
         "meta"
       ],
+      "review_evidence": {
+        "deny_behavior": "Denied DVRL lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "pending",
+          "pending_review",
+          "review_required",
+          "review_denied",
+          "denied",
+          "accepted",
+          "registered",
+          "active",
+          "planned",
+          "published",
+          "retired"
+        ],
+        "pending_queues": [
+          "sources",
+          "schemas",
+          "virtual_tables",
+          "queries",
+          "caches",
+          "policies",
+          "virtualization_agents",
+          "lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "review_evidence"
+        ]
+      },
       "rule_engine": {
         "rules": [
           {
@@ -1475,13 +1508,46 @@
       "provides": [
         "data_virtualization",
         "federated_query_lifecycle",
-        "virtualization_agent_composition"
+        "virtualization_agent_composition",
+        "review_evidence"
       ],
       "requires": [
         "mdm",
         "etlp",
         "meta"
       ],
+      "review_evidence": {
+        "deny_behavior": "Denied DVRL lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "pending",
+          "pending_review",
+          "review_required",
+          "review_denied",
+          "denied",
+          "accepted",
+          "registered",
+          "active",
+          "planned",
+          "published",
+          "retired"
+        ],
+        "pending_queues": [
+          "sources",
+          "schemas",
+          "virtual_tables",
+          "queries",
+          "caches",
+          "policies",
+          "virtualization_agents",
+          "lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "review_evidence"
+        ]
+      },
       "streaming": {
         "engine": "bytewax",
         "lifecycle_stream": "dvrl.lifecycle",

@@ -577,6 +577,11 @@ def validate_dvrl_lifecycle_batch_record(**kwargs) -> Dict[str, Any]:
 	return SERVICE.validate_dvrl_lifecycle_batch(**kwargs).__dict__
 
 
+def list_pending_reviews(tenant_id: str = "default") -> List[Dict[str, Any]]:
+	"""List DVRL records awaiting generated-app or operator review."""
+	return SERVICE.list_pending_reviews(tenant_id)
+
+
 def list_records(tenant_id: str = "default", record_type: str | None = None) -> List[Dict[str, Any]]:
 	"""List dependency-light DVRL lifecycle records."""
 	return SERVICE.list_records(tenant_id, record_type)
@@ -590,9 +595,12 @@ def list_metadata(tenant_id: str = "default") -> Dict[str, Any]:
 		"schemas": SERVICE.list_records(tenant_id, "schemas"),
 		"virtual_tables": SERVICE.list_records(tenant_id, "virtual_tables"),
 		"queries": SERVICE.list_records(tenant_id, "queries"),
+		"caches": SERVICE.list_records(tenant_id, "caches"),
 		"policies": SERVICE.list_records(tenant_id, "policies"),
 		"virtualization_agents": SERVICE.list_records(tenant_id, "virtualization_agents"),
 		"lifecycle_batches": SERVICE.list_records(tenant_id, "lifecycle_batches"),
+		"pending_reviews": SERVICE.list_pending_reviews(tenant_id),
+		"audit_events": SERVICE.list_records(tenant_id, "audit_events"),
 	}
 
 
@@ -616,6 +624,7 @@ __all__ = [
 	"retire_source_record",
 	"register_virtualization_agent_record",
 	"validate_dvrl_lifecycle_batch_record",
+	"list_pending_reviews",
 	"list_records",
 	"list_metadata",
 ]

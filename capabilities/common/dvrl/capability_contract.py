@@ -333,7 +333,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "dvrl",
 		"display_name": "Data Virtualization",
-		"provides": ["data_virtualization", "federated_query_lifecycle", "virtualization_agent_composition"],
+		"provides": ["data_virtualization", "federated_query_lifecycle", "virtualization_agent_composition", "review_evidence"],
 		"requires": ["mdm", "etlp", "meta"],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
@@ -342,6 +342,38 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		"theme": {"name": theme.name, "tokens": theme.tokens, "components": theme.components},
 		"agents": agent_manifest(),
 		"streaming": streaming_manifest(),
+		"review_evidence": {
+			"durable_statuses": [
+				"pending",
+				"pending_review",
+				"review_required",
+				"review_denied",
+				"denied",
+				"accepted",
+				"registered",
+				"active",
+				"planned",
+				"published",
+				"retired"
+			],
+			"policy_fields": [
+				"policy_decision",
+				"matched_rules",
+				"review_reasons",
+				"review_evidence"
+			],
+			"pending_queues": [
+				"sources",
+				"schemas",
+				"virtual_tables",
+				"queries",
+				"caches",
+				"policies",
+				"virtualization_agents",
+				"lifecycle_batches"
+			],
+			"deny_behavior": "Denied DVRL lifecycle batches persist evidence before PermissionError"
+		},
 	}
 
 

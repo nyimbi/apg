@@ -90,6 +90,7 @@ def register_capability() -> Dict[str, Any]:
 		"rule_engine": contract["rule_engine"],
 		"agents": contract["agents"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"capabilities": {
 			"data_virtualization": "Expose unified access across heterogeneous data sources",
 			"federated_queries": "Plan, execute, cache, and audit federated queries",
@@ -97,6 +98,7 @@ def register_capability() -> Dict[str, Any]:
 			"query_optimization": "Apply cost, cache, and policy-aware query planning",
 			"virtualization_agent_composition": "Register governed AI and automation agents as first-class DVRL participants",
 			"bytewax_lifecycle_batches": "Validate Bytewax-routed lifecycle batches before generated applications mutate DVRL state",
+			"review_evidence": "Preserve policy decisions, matched rules, review reasons, and review evidence for generated data-virtualization governance queues",
 			"capability_rules": "Evaluate deterministic virtualization governance rules",
 			"visual_theming": "Apply federation-console theme tokens and components"
 		},

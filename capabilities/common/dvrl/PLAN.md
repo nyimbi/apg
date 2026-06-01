@@ -19,6 +19,8 @@ Known packet gaps:
 - Generated applications now need first-class virtualization-agent composition
   and explicit Bytewax lifecycle-batch guardrails aligned with MDM, META, and
   ETLP.
+- Generated applications need durable review evidence on every reviewable or
+  denied lifecycle record.
 
 ## Build Sequence
 
@@ -44,6 +46,10 @@ Known packet gaps:
      table, query, cache, policy, source retirement, and audit workflows.
    - Add virtualization-agent records, registration guardrails, lifecycle-batch
      records, Bytewax validation, and dashboard counts.
+   - Persist `policy_decision`, `matched_rules`, `review_reasons`, and
+     `review_evidence` across reviewable lifecycle records and audit events.
+   - Preserve denied non-Bytewax lifecycle-batch evidence before raising
+     `PermissionError`.
    - Keep the production `DVRLService` intact as the runtime surface.
 
 4. API and view models
@@ -58,6 +64,9 @@ Known packet gaps:
    - Refresh `semantic_model.json`, `package_manifest.json`, and
      `release_report.json`.
    - Rename the package test and expand focused contract/lifecycle coverage.
+   - Assert pending-review queues and review evidence appear in service,
+     API/view models, registration metadata, semantic model, and release
+     evidence.
 
 6. Verification and commit
    - Run focused compile, package tests, implementation audit, publish plan,

@@ -28,6 +28,7 @@ The current package keeps two boundaries clear:
 - `data_virtualization`
 - `federated_query_lifecycle`
 - `virtualization_agent_composition`
+- `review_evidence`
 - virtual source lifecycle governance
 - schema refresh and virtual table publication workflows
 - federated query guardrail evaluation
@@ -36,6 +37,8 @@ The current package keeps two boundaries clear:
 - provider-neutral AI/automation agent participation for Codex, Claude Code,
   OpenCode, Pi, and future runtimes
 - Bytewax lifecycle-batch validation
+- durable review evidence and pending-review queues for generated governance
+  consoles
 - generated-application UI route and theme metadata
 
 ## Required Services
@@ -74,6 +77,12 @@ DVRL ships deterministic guardrails for:
 - virtualization-agent scope, owner, purpose, contribution disclosure, and
   privileged-role human approval
 - Bytewax-only lifecycle-batch routing
+
+Reviewable records expose `policy_decision`, `matched_rules`,
+`review_reasons`, and `review_evidence`. Otherwise valid privileged
+virtualization agents without human approval remain durable `pending_review`
+records, while denied non-Bytewax lifecycle batches are persisted with denial
+evidence before the service raises `PermissionError`.
 
 ## UI
 

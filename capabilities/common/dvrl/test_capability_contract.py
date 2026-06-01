@@ -64,8 +64,10 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert "query_policy_reviewer" in contract["agents"]["privileged_roles"]
 	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert "virtualization_agent_batch" in contract["streaming"]["operations"]
-	assert contract["provides"] == ["data_virtualization", "federated_query_lifecycle", "virtualization_agent_composition"]
+	assert contract["provides"] == ["data_virtualization", "federated_query_lifecycle", "virtualization_agent_composition", "review_evidence"]
 	assert contract["requires"] == ["mdm", "etlp", "meta"]
+	assert "virtualization_agents" in contract["review_evidence"]["pending_queues"]
+	assert "policy_decision" in contract["review_evidence"]["policy_fields"]
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "federation_map" in contract["theme"]["components"]
 	assert "virtualization_agent_roster" in contract["theme"]["components"]
@@ -156,6 +158,8 @@ def test_registration_includes_full_capability_contract():
 	assert registration["ui_components"]["query"] == "/dvrl/query"
 	assert registration["agents"]["first_class"] is True
 	assert registration["streaming"]["required_processor"] == "bytewax"
+	assert registration["review_evidence"]["deny_behavior"].startswith("Denied DVRL")
+	assert "review_evidence" in registration["capabilities"]
 	assert "etlp" in registration["dependencies"]
 
 
@@ -198,6 +202,9 @@ def test_lifecycle_service_enforces_source_schema_query_cache_and_policy_guardra
 	)
 	assert pending_activation.status == "pending_review"
 	assert pending_activation.matched_rules == ["source_activation_requires_approval"]
+	assert pending_activation.policy_decision == "require_review"
+	assert pending_activation.review_reasons == ["source_approval_required"]
+	assert pending_activation.review_evidence["review_recorded"] is False
 
 	active_source = service.activate_source(
 		tenant_id=tenant_id,
@@ -218,6 +225,7 @@ def test_lifecycle_service_enforces_source_schema_query_cache_and_policy_guardra
 	)
 	assert schema.status == "pending_review"
 	assert schema.matched_rules == ["schema_refresh_requires_review"]
+	assert schema.policy_decision == "require_review"
 
 	rejected_table = service.publish_virtual_table(
 		tenant_id=tenant_id,
@@ -298,6 +306,11 @@ def test_lifecycle_service_enforces_source_schema_query_cache_and_policy_guardra
 		"high_cost_query_requires_review",
 		"cross_source_join_requires_review",
 	}
+	assert review_query.policy_decision == "require_review"
+	assert set(review_query.review_reasons) == {
+		"query_cost_review_required",
+		"cross_source_join_review_required",
+	}
 
 	allowed_query = service.execute_query(
 		tenant_id=tenant_id,
@@ -338,6 +351,7 @@ def test_lifecycle_service_enforces_source_schema_query_cache_and_policy_guardra
 	)
 	assert policy.status == "pending_review"
 	assert policy.matched_rules == ["policy_change_requires_review"]
+	assert policy.policy_decision == "require_review"
 
 	retired = service.retire_source(
 		tenant_id=tenant_id,
@@ -379,6 +393,8 @@ def test_lifecycle_service_enforces_source_schema_query_cache_and_policy_guardra
 	assert pending_agent.runtime == "claude_code"
 	assert pending_agent.role == "query_policy_reviewer"
 	assert pending_agent.matched_rules == ["virtualization_agent_privileged_role_requires_human_approval"]
+	assert pending_agent.policy_decision == "require_review"
+	assert pending_agent.review_reasons == ["privileged_agent_human_approval_required"]
 
 	agent = service.register_virtualization_agent(
 		tenant_id=tenant_id,
@@ -412,9 +428,20 @@ def test_lifecycle_service_enforces_source_schema_query_cache_and_policy_guardra
 	assert batch.status == "accepted"
 	summary = service.dashboard_summary(tenant_id)
 	assert summary["virtualization_agent_count"] == 2
+	assert summary["pending_virtualization_agent_review_count"] == 1
+	assert summary["pending_review_count"] >= 4
 	assert summary["lifecycle_batch_count"] == 2
 	assert summary["denied_lifecycle_batch_count"] == 1
 	assert summary["audit_event_count"] >= 17
+	denied_batch = [
+		row
+		for row in service.list_records(tenant_id, "lifecycle_batches")
+		if row["status"] == "denied"
+	][0]
+	assert denied_batch["policy_decision"] == "deny"
+	assert denied_batch["required_processor"] == "bytewax"
+	assert denied_batch["review_reasons"] == ["bytewax_required"]
+	assert service.list_pending_reviews(tenant_id)
 
 
 def test_generated_view_models_expose_composable_surfaces():
@@ -448,18 +475,35 @@ def test_generated_view_models_expose_composable_surfaces():
 		owner="ui",
 		purpose="review lineage and federation output",
 	)
+	service.register_virtualization_agent(
+		tenant_id=tenant_id,
+		agent_id="ui-review-agent",
+		name="UI Review Agent",
+		runtime="pi",
+		role="query_policy_reviewer",
+		scope="query policy",
+		owner="ui",
+		purpose="review policy-sensitive query plans",
+		human_approval_required=False,
+	)
 	service.validate_dvrl_lifecycle_batch(
 		tenant_id=tenant_id,
 		event_stream="bytewax",
 		mutation_count=1,
 	)
 
-	assert dashboard_model(service, tenant_id)["summary"]["source_count"] == 1
+	dashboard = dashboard_model(service, tenant_id)
+	assert dashboard["summary"]["source_count"] == 1
+	assert dashboard["pending_reviews"]
+	assert dashboard["review_evidence"]["pending_queues"]
 	assert source_manager_model(service, tenant_id)["columns"][0] == "source_id"
 	assert virtual_table_catalog_model(service, tenant_id)["rows"][0]["table_id"] == "vt-ui"
 	assert federation_map_model(service, tenant_id)["edges"] == [{"from": "src-ui", "to": "vt-ui", "kind": "publishes"}]
 	assert query_workbench_model(service, tenant_id)["defaults"]["max_result_rows"] == 100000
 	assert adapter_health_model(tenant_id)["event_stream"] == "bytewax"
-	assert virtualization_agent_roster_model(service, tenant_id)["rows"][0]["agent_id"] == "ui-agent"
+	roster = virtualization_agent_roster_model(service, tenant_id)
+	assert roster["rows"][0]["agent_id"] == "ui-agent"
+	assert roster["pending_reviews"][0]["agent_id"] == "ui-review-agent"
 	assert lifecycle_batch_model(service, tenant_id)["streaming"]["required_processor"] == "bytewax"
 	assert settings_model(tenant_id)["routes"]
+	assert settings_model(tenant_id)["review_evidence"]["pending_queues"]
