@@ -28331,3 +28331,95 @@ Known gaps:
   transaction signing, private-key custody, chain indexing, bridge operation,
   oracle vendor connections, durable Bytewax topology, or performance/load
   checks during this battery-conscious slice.
+
+## 2026-06-01 - FinTech Cryptocurrency Services executable capability
+
+- Promoted `capabilities/fintech/crypto` from placeholder into a first-class
+  executable APG capability with README, specification, plan, capability spec,
+  package manifest, semantic model, release evidence, focused tests, and
+  code-review notes.
+- Added executable crypto asset registration, custody account opening, balance
+  recording, order creation, trade recording, transfer request, compliance
+  screening, price snapshot, review recording, Bytewax batch validation,
+  dashboard summary, and provider-neutral crypto agent registration workflows.
+- Added deterministic guardrails for tenant context, write policy evidence,
+  asset symbol/type/network/precision/owner/evidence, custody provider/model/
+  policy/owner/evidence, balance account/asset/amount/valuation/currency/
+  evidence, order account/asset/side/type/quantity/limit price/policy/
+  requester/evidence, trade order/venue/price/quantity/fee/status/settlement,
+  transfer account/asset/type/destination/amount/approval/evidence/status,
+  screening reference/type/status/evidence/reviewer, price asset/source/amount/
+  currency/timestamp/evidence, review status/reviewer/evidence, Bytewax
+  lifecycle events, supported AI-agent runtimes/roles, and privileged AI-agent
+  approval.
+- Added compact UI/view models and theme tokens for dashboards, assets, custody,
+  balances, orders, trades, transfers, screening, prices, reviews, agents, and
+  settings.
+- Updated fintech capability metadata so `crypto` is listed as an implemented
+  sub-capability.
+- Updated `capabilities/README.md` so the catalog snapshot reports 134 valid
+  contracts, 134 domain-specific packages, 134 strict complete package artifact
+  sets, and 26 fintech packages.
+- Removed the empty `_Cryptocurrency` marker file and regenerated
+  `semantic_model.json` from the executable application.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/fintech/crypto/__init__.py
+  capabilities/fintech/crypto/capability_contract.py
+  capabilities/fintech/crypto/models.py
+  capabilities/fintech/crypto/crypto_runtime.py
+  capabilities/fintech/crypto/service.py
+  capabilities/fintech/crypto/api.py
+  capabilities/fintech/crypto/views.py
+  capabilities/fintech/crypto/app.py
+  capabilities/fintech/crypto/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/fintech/crypto/tests/test_package_contract.py` passed with 6
+  tests.
+- `./.venv/bin/python capabilities/fintech/crypto/app.py` passed self-test
+  with `passed: true` and `status: ok`.
+- `./.venv/bin/apg capabilities inspect fintech_crypto --json` passed with 61
+  rules, 12 UI routes, theme `fintech_crypto_control`, shell `apg_python`, and
+  Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/fintech/crypto --json` passed with `side_effect_free: true` and
+  0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/fintech/crypto --json` passed with 1 domain-specific capability,
+  0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/fintech/crypto --json` passed with 1 complete lifecycle, 61
+  rules, 12 UI routes, 11 theme tokens, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 134 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 134 operable contracts, 134 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/fintech/crypto`, `capabilities/fintech/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed asset, custody, balance, order, trade, transfer, screening, price,
+  review, and AI-agent lifecycle paths so rule evaluation happens before state
+  mutation.
+- Tightened crypto semantics around Blockchain Services composition, custody
+  policy evidence, limit-order pricing, transfer approval, non-clear screening
+  review, and market price evidence capture.
+- Kept live exchange connectivity, custody-provider APIs, order routing,
+  transaction signing, private-key custody, chain RPC access, chain indexing,
+  market-data feeds, and durable Bytewax workers behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live exchange
+  connectivity, custody-provider APIs, order routing, transaction signing,
+  private-key custody, chain RPC access, chain indexing, market-data feeds,
+  durable Bytewax topology, or performance/load checks during this
+  battery-conscious slice.

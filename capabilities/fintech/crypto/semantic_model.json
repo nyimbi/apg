@@ -1,0 +1,2252 @@
+{
+  "app": {
+    "description": "Cryptocurrency Services package-backed APG capability",
+    "entity_count": 10,
+    "name": "fintech_crypto",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "fintech_crypto": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "audit": "audl",
+          "auth": "auth",
+          "blockchain": "fintech_blockchain",
+          "compliance": "fintech_compliance",
+          "event_stream": "bytewax",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "regtech": "fintech_regtech",
+          "risk": "fintech_risk",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "portfolio_monitor",
+            "trade_reviewer",
+            "custody_reconciler",
+            "compliance_screening_agent",
+            "treasury_rebalancer",
+            "market_data_agent"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "assets": {
+          "evidence_required": true,
+          "network_reference_required": true,
+          "owner_required": true,
+          "precision_non_negative": true,
+          "supported_types": [
+            "native_coin",
+            "stablecoin",
+            "utility_token",
+            "security_token",
+            "governance_token",
+            "tokenized_deposit"
+          ],
+          "symbol_required": true
+        },
+        "balances": {
+          "account_required": true,
+          "amount_non_negative": true,
+          "asset_required": true,
+          "currency_required": true,
+          "evidence_required": true,
+          "valuation_non_negative": true
+        },
+        "custody_accounts": {
+          "evidence_required": true,
+          "owner_required": true,
+          "policy_required": true,
+          "provider_required": true,
+          "supported_custody_models": [
+            "self_custody",
+            "mpc",
+            "hsm",
+            "exchange_custody",
+            "smart_contract",
+            "custodial"
+          ]
+        },
+        "governance": {
+          "audit_events": true,
+          "large_transfer_requires_approval": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "observability": {
+          "event_stream": "apg.fintech.crypto.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "orders": {
+          "account_required": true,
+          "asset_required": true,
+          "evidence_required": true,
+          "limit_price_required_for_limit_orders": true,
+          "policy_required": true,
+          "quantity_positive": true,
+          "requester_required": true,
+          "supported_sides": [
+            "buy",
+            "sell",
+            "swap"
+          ],
+          "supported_types": [
+            "market",
+            "limit",
+            "stop_limit",
+            "rfq",
+            "rebalance"
+          ]
+        },
+        "prices": {
+          "asset_required": true,
+          "currency_required": true,
+          "evidence_required": true,
+          "observed_at_required": true,
+          "price_non_negative": true,
+          "supported_sources": [
+            "exchange",
+            "oracle",
+            "custodian",
+            "manual",
+            "aggregator"
+          ]
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "screening": {
+          "evidence_required": true,
+          "reference_required": true,
+          "reviewer_required_for_non_clear": true,
+          "supported_statuses": [
+            "clear",
+            "review",
+            "blocked",
+            "escalated"
+          ],
+          "supported_types": [
+            "wallet",
+            "transaction",
+            "asset",
+            "counterparty",
+            "sanctions",
+            "travel_rule"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_crypto_control"
+        },
+        "trades": {
+          "execution_price_non_negative": true,
+          "fee_non_negative": true,
+          "order_required": true,
+          "quantity_positive": true,
+          "settlement_reference_required": true,
+          "supported_statuses": [
+            "requested",
+            "approved",
+            "executed",
+            "settled",
+            "failed",
+            "cancelled"
+          ],
+          "venue_required": true
+        },
+        "transfers": {
+          "account_required": true,
+          "amount_positive": true,
+          "approval_required": true,
+          "asset_required": true,
+          "destination_required": true,
+          "evidence_required": true,
+          "supported_statuses": [
+            "requested",
+            "approved",
+            "broadcast",
+            "confirmed",
+            "failed",
+            "cancelled"
+          ],
+          "supported_types": [
+            "deposit",
+            "withdrawal",
+            "internal",
+            "settlement",
+            "treasury_rebalance"
+          ]
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_assets": true,
+          "enable_balances": true,
+          "enable_custody": true,
+          "enable_dashboard": true,
+          "enable_orders": true,
+          "enable_prices": true,
+          "enable_reviews": true,
+          "enable_screening": true,
+          "enable_trades": true,
+          "enable_transfers": true
+        }
+      },
+      "name": "Cryptocurrency Services",
+      "provides": [
+        "crypto_asset_workflow",
+        "crypto_custody_workflow",
+        "crypto_balance_workflow",
+        "crypto_order_workflow",
+        "crypto_trade_workflow",
+        "crypto_transfer_workflow",
+        "crypto_screening_workflow",
+        "crypto_price_workflow",
+        "crypto_review_workflow",
+        "crypto_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_blockchain",
+        "fintech_wallets",
+        "fintech_risk",
+        "fintech_compliance",
+        "fintech_regtech",
+        "fintech_aml",
+        "fintech_kyc"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "crypto_policy_required",
+              "required_action": "attach_crypto_policy"
+            },
+            "name": "crypto_write_requires_policy"
+          },
+          {
+            "condition": {
+              "operation": "register_asset",
+              "symbol_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "asset_symbol_required",
+              "required_action": "attach_symbol"
+            },
+            "name": "asset_symbol_required"
+          },
+          {
+            "condition": {
+              "asset_type_supported": false,
+              "operation": "register_asset"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "asset_type_not_supported",
+              "required_action": "select_supported_asset_type"
+            },
+            "name": "asset_type_supported"
+          },
+          {
+            "condition": {
+              "network_present": false,
+              "operation": "register_asset"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "asset_network_required",
+              "required_action": "attach_network_reference"
+            },
+            "name": "asset_network_required"
+          },
+          {
+            "condition": {
+              "operation": "register_asset",
+              "precision_valid": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "asset_precision_invalid",
+              "required_action": "set_non_negative_precision"
+            },
+            "name": "asset_precision_valid"
+          },
+          {
+            "condition": {
+              "operation": "register_asset",
+              "owner_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "asset_owner_required",
+              "required_action": "assign_asset_owner"
+            },
+            "name": "asset_owner_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "register_asset"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "asset_evidence_required",
+              "required_action": "attach_asset_evidence"
+            },
+            "name": "asset_evidence_required"
+          },
+          {
+            "condition": {
+              "custody_model_supported": false,
+              "operation": "open_custody_account"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "custody_model_not_supported",
+              "required_action": "select_supported_custody_model"
+            },
+            "name": "custody_model_supported"
+          },
+          {
+            "condition": {
+              "operation": "open_custody_account",
+              "provider_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "custody_provider_required",
+              "required_action": "attach_provider_reference"
+            },
+            "name": "custody_provider_required"
+          },
+          {
+            "condition": {
+              "operation": "open_custody_account",
+              "policy_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "custody_policy_required",
+              "required_action": "attach_policy_reference"
+            },
+            "name": "custody_policy_required"
+          },
+          {
+            "condition": {
+              "operation": "open_custody_account",
+              "owner_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "custody_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "custody_owner_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "open_custody_account"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "custody_evidence_required",
+              "required_action": "attach_evidence"
+            },
+            "name": "custody_evidence_required"
+          },
+          {
+            "condition": {
+              "account_present": false,
+              "operation": "record_balance"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "custody_account_required",
+              "required_action": "select_custody_account"
+            },
+            "name": "balance_account_required"
+          },
+          {
+            "condition": {
+              "asset_present": false,
+              "operation": "record_balance"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "asset_required",
+              "required_action": "select_asset"
+            },
+            "name": "balance_asset_required"
+          },
+          {
+            "condition": {
+              "amount_valid": false,
+              "operation": "record_balance"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "balance_amount_invalid",
+              "required_action": "set_non_negative_amount"
+            },
+            "name": "balance_amount_valid"
+          },
+          {
+            "condition": {
+              "operation": "record_balance",
+              "valuation_valid": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "valuation_amount_invalid",
+              "required_action": "set_non_negative_valuation"
+            },
+            "name": "balance_valuation_valid"
+          },
+          {
+            "condition": {
+              "currency_present": false,
+              "operation": "record_balance"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "valuation_currency_required",
+              "required_action": "set_currency"
+            },
+            "name": "balance_currency_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_balance"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "balance_evidence_required",
+              "required_action": "attach_balance_evidence"
+            },
+            "name": "balance_evidence_required"
+          },
+          {
+            "condition": {
+              "account_present": false,
+              "operation": "create_order"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "custody_account_required",
+              "required_action": "select_custody_account"
+            },
+            "name": "order_account_required"
+          },
+          {
+            "condition": {
+              "asset_present": false,
+              "operation": "create_order"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "asset_required",
+              "required_action": "select_asset"
+            },
+            "name": "order_asset_required"
+          },
+          {
+            "condition": {
+              "operation": "create_order",
+              "side_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "order_side_not_supported",
+              "required_action": "select_supported_side"
+            },
+            "name": "order_side_supported"
+          },
+          {
+            "condition": {
+              "operation": "create_order",
+              "order_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "order_type_not_supported",
+              "required_action": "select_supported_order_type"
+            },
+            "name": "order_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "create_order",
+              "quantity_valid": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "order_quantity_invalid",
+              "required_action": "set_positive_quantity"
+            },
+            "name": "order_quantity_valid"
+          },
+          {
+            "condition": {
+              "limit_price_present": false,
+              "limit_price_required": true,
+              "operation": "create_order"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "limit_price_required",
+              "required_action": "set_limit_price"
+            },
+            "name": "limit_order_requires_price"
+          },
+          {
+            "condition": {
+              "operation": "create_order",
+              "policy_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "order_policy_required",
+              "required_action": "attach_order_policy"
+            },
+            "name": "order_policy_required"
+          },
+          {
+            "condition": {
+              "operation": "create_order",
+              "requester_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "order_requester_required",
+              "required_action": "record_requester"
+            },
+            "name": "order_requester_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "create_order"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "order_evidence_required",
+              "required_action": "attach_order_evidence"
+            },
+            "name": "order_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_trade",
+              "order_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "order_required",
+              "required_action": "select_order"
+            },
+            "name": "trade_order_required"
+          },
+          {
+            "condition": {
+              "operation": "record_trade",
+              "venue_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "trade_venue_required",
+              "required_action": "attach_venue"
+            },
+            "name": "trade_venue_required"
+          },
+          {
+            "condition": {
+              "execution_price_valid": false,
+              "operation": "record_trade"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "execution_price_invalid",
+              "required_action": "set_non_negative_price"
+            },
+            "name": "trade_price_valid"
+          },
+          {
+            "condition": {
+              "operation": "record_trade",
+              "quantity_valid": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "trade_quantity_invalid",
+              "required_action": "set_positive_quantity"
+            },
+            "name": "trade_quantity_valid"
+          },
+          {
+            "condition": {
+              "fee_valid": false,
+              "operation": "record_trade"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "trade_fee_invalid",
+              "required_action": "set_non_negative_fee"
+            },
+            "name": "trade_fee_valid"
+          },
+          {
+            "condition": {
+              "operation": "record_trade",
+              "status_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "trade_status_not_supported",
+              "required_action": "select_supported_status"
+            },
+            "name": "trade_status_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_trade",
+              "settlement_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "trade_settlement_required",
+              "required_action": "attach_settlement_reference"
+            },
+            "name": "trade_settlement_required"
+          },
+          {
+            "condition": {
+              "account_present": false,
+              "operation": "request_transfer"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "custody_account_required",
+              "required_action": "select_custody_account"
+            },
+            "name": "transfer_account_required"
+          },
+          {
+            "condition": {
+              "asset_present": false,
+              "operation": "request_transfer"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "asset_required",
+              "required_action": "select_asset"
+            },
+            "name": "transfer_asset_required"
+          },
+          {
+            "condition": {
+              "operation": "request_transfer",
+              "transfer_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "transfer_type_not_supported",
+              "required_action": "select_supported_transfer_type"
+            },
+            "name": "transfer_type_supported"
+          },
+          {
+            "condition": {
+              "destination_present": false,
+              "operation": "request_transfer"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "transfer_destination_required",
+              "required_action": "attach_destination"
+            },
+            "name": "transfer_destination_required"
+          },
+          {
+            "condition": {
+              "amount_valid": false,
+              "operation": "request_transfer"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "transfer_amount_invalid",
+              "required_action": "set_positive_amount"
+            },
+            "name": "transfer_amount_valid"
+          },
+          {
+            "condition": {
+              "approval_present": false,
+              "operation": "request_transfer"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "transfer_approval_required",
+              "required_action": "attach_transfer_approval"
+            },
+            "name": "transfer_approval_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "request_transfer"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "transfer_evidence_required",
+              "required_action": "attach_transfer_evidence"
+            },
+            "name": "transfer_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "request_transfer",
+              "status_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "transfer_status_not_supported",
+              "required_action": "select_supported_status"
+            },
+            "name": "transfer_status_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_screening",
+              "reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "screening_reference_required",
+              "required_action": "attach_reference"
+            },
+            "name": "screening_reference_required"
+          },
+          {
+            "condition": {
+              "operation": "record_screening",
+              "screening_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "screening_type_not_supported",
+              "required_action": "select_supported_screening_type"
+            },
+            "name": "screening_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_screening",
+              "status_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "screening_status_not_supported",
+              "required_action": "select_supported_status"
+            },
+            "name": "screening_status_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_screening"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "screening_evidence_required",
+              "required_action": "attach_screening_evidence"
+            },
+            "name": "screening_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_screening",
+              "reviewer_present": false,
+              "reviewer_required": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "screening_reviewer_required",
+              "required_action": "assign_screening_reviewer"
+            },
+            "name": "non_clear_screening_requires_reviewer"
+          },
+          {
+            "condition": {
+              "asset_present": false,
+              "operation": "record_price"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "asset_required",
+              "required_action": "select_asset"
+            },
+            "name": "price_asset_required"
+          },
+          {
+            "condition": {
+              "operation": "record_price",
+              "source_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "price_source_not_supported",
+              "required_action": "select_supported_price_source"
+            },
+            "name": "price_source_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_price",
+              "price_valid": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "price_amount_invalid",
+              "required_action": "set_non_negative_price"
+            },
+            "name": "price_amount_valid"
+          },
+          {
+            "condition": {
+              "currency_present": false,
+              "operation": "record_price"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "price_currency_required",
+              "required_action": "set_currency"
+            },
+            "name": "price_currency_required"
+          },
+          {
+            "condition": {
+              "observed_at_present": false,
+              "operation": "record_price"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "price_observed_at_required",
+              "required_action": "record_observed_at"
+            },
+            "name": "price_observed_at_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_price"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "price_evidence_required",
+              "required_action": "attach_price_evidence"
+            },
+            "name": "price_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "status_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_status_not_supported",
+              "required_action": "select_supported_status"
+            },
+            "name": "review_status_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "reviewer_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "reviewer_required",
+              "required_action": "assign_reviewer"
+            },
+            "name": "review_reviewer_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_review"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_evidence_required",
+              "required_action": "attach_review_evidence"
+            },
+            "name": "review_evidence_required"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "crypto_batch"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_crypto_batch_to_bytewax"
+            },
+            "name": "crypto_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_crypto_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "crypto_agent_runtime_not_supported",
+              "required_action": "select_supported_runtime"
+            },
+            "name": "crypto_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_crypto_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "crypto_agent_role_not_supported",
+              "required_action": "select_supported_role"
+            },
+            "name": "crypto_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "crypto_agent_action",
+              "privileged_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_crypto_agent_action_requires_human_approval"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "crypto_policy_required",
+            "required_action": "attach_crypto_policy"
+          },
+          "name": "crypto_write_requires_policy"
+        },
+        {
+          "condition": {
+            "operation": "register_asset",
+            "symbol_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "asset_symbol_required",
+            "required_action": "attach_symbol"
+          },
+          "name": "asset_symbol_required"
+        },
+        {
+          "condition": {
+            "asset_type_supported": false,
+            "operation": "register_asset"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "asset_type_not_supported",
+            "required_action": "select_supported_asset_type"
+          },
+          "name": "asset_type_supported"
+        },
+        {
+          "condition": {
+            "network_present": false,
+            "operation": "register_asset"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "asset_network_required",
+            "required_action": "attach_network_reference"
+          },
+          "name": "asset_network_required"
+        },
+        {
+          "condition": {
+            "operation": "register_asset",
+            "precision_valid": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "asset_precision_invalid",
+            "required_action": "set_non_negative_precision"
+          },
+          "name": "asset_precision_valid"
+        },
+        {
+          "condition": {
+            "operation": "register_asset",
+            "owner_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "asset_owner_required",
+            "required_action": "assign_asset_owner"
+          },
+          "name": "asset_owner_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "register_asset"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "asset_evidence_required",
+            "required_action": "attach_asset_evidence"
+          },
+          "name": "asset_evidence_required"
+        },
+        {
+          "condition": {
+            "custody_model_supported": false,
+            "operation": "open_custody_account"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "custody_model_not_supported",
+            "required_action": "select_supported_custody_model"
+          },
+          "name": "custody_model_supported"
+        },
+        {
+          "condition": {
+            "operation": "open_custody_account",
+            "provider_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "custody_provider_required",
+            "required_action": "attach_provider_reference"
+          },
+          "name": "custody_provider_required"
+        },
+        {
+          "condition": {
+            "operation": "open_custody_account",
+            "policy_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "custody_policy_required",
+            "required_action": "attach_policy_reference"
+          },
+          "name": "custody_policy_required"
+        },
+        {
+          "condition": {
+            "operation": "open_custody_account",
+            "owner_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "custody_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "custody_owner_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "open_custody_account"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "custody_evidence_required",
+            "required_action": "attach_evidence"
+          },
+          "name": "custody_evidence_required"
+        },
+        {
+          "condition": {
+            "account_present": false,
+            "operation": "record_balance"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "custody_account_required",
+            "required_action": "select_custody_account"
+          },
+          "name": "balance_account_required"
+        },
+        {
+          "condition": {
+            "asset_present": false,
+            "operation": "record_balance"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "asset_required",
+            "required_action": "select_asset"
+          },
+          "name": "balance_asset_required"
+        },
+        {
+          "condition": {
+            "amount_valid": false,
+            "operation": "record_balance"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "balance_amount_invalid",
+            "required_action": "set_non_negative_amount"
+          },
+          "name": "balance_amount_valid"
+        },
+        {
+          "condition": {
+            "operation": "record_balance",
+            "valuation_valid": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "valuation_amount_invalid",
+            "required_action": "set_non_negative_valuation"
+          },
+          "name": "balance_valuation_valid"
+        },
+        {
+          "condition": {
+            "currency_present": false,
+            "operation": "record_balance"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "valuation_currency_required",
+            "required_action": "set_currency"
+          },
+          "name": "balance_currency_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_balance"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "balance_evidence_required",
+            "required_action": "attach_balance_evidence"
+          },
+          "name": "balance_evidence_required"
+        },
+        {
+          "condition": {
+            "account_present": false,
+            "operation": "create_order"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "custody_account_required",
+            "required_action": "select_custody_account"
+          },
+          "name": "order_account_required"
+        },
+        {
+          "condition": {
+            "asset_present": false,
+            "operation": "create_order"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "asset_required",
+            "required_action": "select_asset"
+          },
+          "name": "order_asset_required"
+        },
+        {
+          "condition": {
+            "operation": "create_order",
+            "side_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "order_side_not_supported",
+            "required_action": "select_supported_side"
+          },
+          "name": "order_side_supported"
+        },
+        {
+          "condition": {
+            "operation": "create_order",
+            "order_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "order_type_not_supported",
+            "required_action": "select_supported_order_type"
+          },
+          "name": "order_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "create_order",
+            "quantity_valid": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "order_quantity_invalid",
+            "required_action": "set_positive_quantity"
+          },
+          "name": "order_quantity_valid"
+        },
+        {
+          "condition": {
+            "limit_price_present": false,
+            "limit_price_required": true,
+            "operation": "create_order"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "limit_price_required",
+            "required_action": "set_limit_price"
+          },
+          "name": "limit_order_requires_price"
+        },
+        {
+          "condition": {
+            "operation": "create_order",
+            "policy_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "order_policy_required",
+            "required_action": "attach_order_policy"
+          },
+          "name": "order_policy_required"
+        },
+        {
+          "condition": {
+            "operation": "create_order",
+            "requester_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "order_requester_required",
+            "required_action": "record_requester"
+          },
+          "name": "order_requester_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "create_order"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "order_evidence_required",
+            "required_action": "attach_order_evidence"
+          },
+          "name": "order_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_trade",
+            "order_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "order_required",
+            "required_action": "select_order"
+          },
+          "name": "trade_order_required"
+        },
+        {
+          "condition": {
+            "operation": "record_trade",
+            "venue_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "trade_venue_required",
+            "required_action": "attach_venue"
+          },
+          "name": "trade_venue_required"
+        },
+        {
+          "condition": {
+            "execution_price_valid": false,
+            "operation": "record_trade"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "execution_price_invalid",
+            "required_action": "set_non_negative_price"
+          },
+          "name": "trade_price_valid"
+        },
+        {
+          "condition": {
+            "operation": "record_trade",
+            "quantity_valid": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "trade_quantity_invalid",
+            "required_action": "set_positive_quantity"
+          },
+          "name": "trade_quantity_valid"
+        },
+        {
+          "condition": {
+            "fee_valid": false,
+            "operation": "record_trade"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "trade_fee_invalid",
+            "required_action": "set_non_negative_fee"
+          },
+          "name": "trade_fee_valid"
+        },
+        {
+          "condition": {
+            "operation": "record_trade",
+            "status_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "trade_status_not_supported",
+            "required_action": "select_supported_status"
+          },
+          "name": "trade_status_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_trade",
+            "settlement_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "trade_settlement_required",
+            "required_action": "attach_settlement_reference"
+          },
+          "name": "trade_settlement_required"
+        },
+        {
+          "condition": {
+            "account_present": false,
+            "operation": "request_transfer"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "custody_account_required",
+            "required_action": "select_custody_account"
+          },
+          "name": "transfer_account_required"
+        },
+        {
+          "condition": {
+            "asset_present": false,
+            "operation": "request_transfer"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "asset_required",
+            "required_action": "select_asset"
+          },
+          "name": "transfer_asset_required"
+        },
+        {
+          "condition": {
+            "operation": "request_transfer",
+            "transfer_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "transfer_type_not_supported",
+            "required_action": "select_supported_transfer_type"
+          },
+          "name": "transfer_type_supported"
+        },
+        {
+          "condition": {
+            "destination_present": false,
+            "operation": "request_transfer"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "transfer_destination_required",
+            "required_action": "attach_destination"
+          },
+          "name": "transfer_destination_required"
+        },
+        {
+          "condition": {
+            "amount_valid": false,
+            "operation": "request_transfer"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "transfer_amount_invalid",
+            "required_action": "set_positive_amount"
+          },
+          "name": "transfer_amount_valid"
+        },
+        {
+          "condition": {
+            "approval_present": false,
+            "operation": "request_transfer"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "transfer_approval_required",
+            "required_action": "attach_transfer_approval"
+          },
+          "name": "transfer_approval_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "request_transfer"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "transfer_evidence_required",
+            "required_action": "attach_transfer_evidence"
+          },
+          "name": "transfer_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "request_transfer",
+            "status_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "transfer_status_not_supported",
+            "required_action": "select_supported_status"
+          },
+          "name": "transfer_status_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_screening",
+            "reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "screening_reference_required",
+            "required_action": "attach_reference"
+          },
+          "name": "screening_reference_required"
+        },
+        {
+          "condition": {
+            "operation": "record_screening",
+            "screening_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "screening_type_not_supported",
+            "required_action": "select_supported_screening_type"
+          },
+          "name": "screening_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_screening",
+            "status_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "screening_status_not_supported",
+            "required_action": "select_supported_status"
+          },
+          "name": "screening_status_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_screening"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "screening_evidence_required",
+            "required_action": "attach_screening_evidence"
+          },
+          "name": "screening_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_screening",
+            "reviewer_present": false,
+            "reviewer_required": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "screening_reviewer_required",
+            "required_action": "assign_screening_reviewer"
+          },
+          "name": "non_clear_screening_requires_reviewer"
+        },
+        {
+          "condition": {
+            "asset_present": false,
+            "operation": "record_price"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "asset_required",
+            "required_action": "select_asset"
+          },
+          "name": "price_asset_required"
+        },
+        {
+          "condition": {
+            "operation": "record_price",
+            "source_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "price_source_not_supported",
+            "required_action": "select_supported_price_source"
+          },
+          "name": "price_source_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_price",
+            "price_valid": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "price_amount_invalid",
+            "required_action": "set_non_negative_price"
+          },
+          "name": "price_amount_valid"
+        },
+        {
+          "condition": {
+            "currency_present": false,
+            "operation": "record_price"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "price_currency_required",
+            "required_action": "set_currency"
+          },
+          "name": "price_currency_required"
+        },
+        {
+          "condition": {
+            "observed_at_present": false,
+            "operation": "record_price"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "price_observed_at_required",
+            "required_action": "record_observed_at"
+          },
+          "name": "price_observed_at_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_price"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "price_evidence_required",
+            "required_action": "attach_price_evidence"
+          },
+          "name": "price_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "status_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_status_not_supported",
+            "required_action": "select_supported_status"
+          },
+          "name": "review_status_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "reviewer_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "reviewer_required",
+            "required_action": "assign_reviewer"
+          },
+          "name": "review_reviewer_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_review"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_evidence_required",
+            "required_action": "attach_review_evidence"
+          },
+          "name": "review_evidence_required"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "crypto_batch"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_crypto_batch_to_bytewax"
+          },
+          "name": "crypto_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_crypto_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "crypto_agent_runtime_not_supported",
+            "required_action": "select_supported_runtime"
+          },
+          "name": "crypto_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_crypto_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "crypto_agent_role_not_supported",
+            "required_action": "select_supported_role"
+          },
+          "name": "crypto_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "crypto_agent_action",
+            "privileged_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_crypto_agent_action_requires_human_approval"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "agents": {
+          "component": "CryptoAgentWorkbench",
+          "permission": "fintech_crypto:admin",
+          "route": "/fintech-crypto/agents"
+        },
+        "assets": {
+          "component": "CryptoAssetRegistry",
+          "permission": "fintech_crypto:assets",
+          "route": "/fintech-crypto/assets"
+        },
+        "balances": {
+          "component": "CryptoBalanceLedger",
+          "permission": "fintech_crypto:balances",
+          "route": "/fintech-crypto/balances"
+        },
+        "custody": {
+          "component": "CustodyAccountConsole",
+          "permission": "fintech_crypto:custody",
+          "route": "/fintech-crypto/custody"
+        },
+        "dashboard": {
+          "component": "CryptoDashboard",
+          "permission": "fintech_crypto:view",
+          "route": "/fintech-crypto/dashboard"
+        },
+        "orders": {
+          "component": "CryptoOrderWorkbench",
+          "permission": "fintech_crypto:orders",
+          "route": "/fintech-crypto/orders"
+        },
+        "prices": {
+          "component": "CryptoPriceConsole",
+          "permission": "fintech_crypto:prices",
+          "route": "/fintech-crypto/prices"
+        },
+        "reviews": {
+          "component": "CryptoReviewConsole",
+          "permission": "fintech_crypto:reviews",
+          "route": "/fintech-crypto/reviews"
+        },
+        "screening": {
+          "component": "CryptoScreeningConsole",
+          "permission": "fintech_crypto:screening",
+          "route": "/fintech-crypto/screening"
+        },
+        "settings": {
+          "component": "CryptoSettings",
+          "permission": "fintech_crypto:admin",
+          "route": "/fintech-crypto/settings"
+        },
+        "trades": {
+          "component": "CryptoTradeBlotter",
+          "permission": "fintech_crypto:trades",
+          "route": "/fintech-crypto/trades"
+        },
+        "transfers": {
+          "component": "CryptoTransferQueue",
+          "permission": "fintech_crypto:transfers",
+          "route": "/fintech-crypto/transfers"
+        }
+      },
+      "streaming": {
+        "events": [
+          "crypto_asset_registered",
+          "crypto_custody_account_opened",
+          "crypto_balance_recorded",
+          "crypto_order_created",
+          "crypto_trade_recorded",
+          "crypto_transfer_requested",
+          "crypto_screening_recorded",
+          "crypto_price_recorded",
+          "crypto_review_recorded",
+          "crypto_agent_registered"
+        ],
+        "guardrails": [
+          "crypto_batch_requires_bytewax",
+          "privileged_crypto_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.fintech.crypto.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "assets": {
+            "icon": "coins",
+            "status_indicator": "asset-chip"
+          },
+          "balances": {
+            "icon": "wallet",
+            "status_indicator": "balance-chip"
+          },
+          "custody": {
+            "icon": "shield-keyhole",
+            "status_indicator": "custody-chip"
+          },
+          "orders": {
+            "icon": "list-plus",
+            "status_indicator": "order-chip"
+          },
+          "prices": {
+            "icon": "chart-line",
+            "status_indicator": "price-chip"
+          },
+          "reviews": {
+            "icon": "clipboard-check",
+            "status_indicator": "review-chip"
+          },
+          "screening": {
+            "icon": "shield-alert",
+            "status_indicator": "screening-chip"
+          },
+          "trades": {
+            "icon": "candlestick-chart",
+            "status_indicator": "trade-chip"
+          },
+          "transfers": {
+            "icon": "send",
+            "status_indicator": "transfer-chip"
+          }
+        },
+        "name": "fintech_crypto_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#7C3AED",
+          "color.danger": "#B91C1C",
+          "color.primary": "#0E7490",
+          "color.success": "#15803D",
+          "color.warning": "#A16207",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/fintech-crypto/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "CryptoDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/fintech-crypto/dashboard",
+            "permission": "fintech_crypto:view"
+          },
+          {
+            "component": "CryptoAssetRegistry",
+            "name": "assets",
+            "nav_group": "Assets",
+            "path": "/fintech-crypto/assets",
+            "permission": "fintech_crypto:assets"
+          },
+          {
+            "component": "CustodyAccountConsole",
+            "name": "custody",
+            "nav_group": "Custody",
+            "path": "/fintech-crypto/custody",
+            "permission": "fintech_crypto:custody"
+          },
+          {
+            "component": "CryptoBalanceLedger",
+            "name": "balances",
+            "nav_group": "Portfolio",
+            "path": "/fintech-crypto/balances",
+            "permission": "fintech_crypto:balances"
+          },
+          {
+            "component": "CryptoOrderWorkbench",
+            "name": "orders",
+            "nav_group": "Trading",
+            "path": "/fintech-crypto/orders",
+            "permission": "fintech_crypto:orders"
+          },
+          {
+            "component": "CryptoTradeBlotter",
+            "name": "trades",
+            "nav_group": "Trading",
+            "path": "/fintech-crypto/trades",
+            "permission": "fintech_crypto:trades"
+          },
+          {
+            "component": "CryptoTransferQueue",
+            "name": "transfers",
+            "nav_group": "Treasury",
+            "path": "/fintech-crypto/transfers",
+            "permission": "fintech_crypto:transfers"
+          },
+          {
+            "component": "CryptoScreeningConsole",
+            "name": "screening",
+            "nav_group": "Compliance",
+            "path": "/fintech-crypto/screening",
+            "permission": "fintech_crypto:screening"
+          },
+          {
+            "component": "CryptoPriceConsole",
+            "name": "prices",
+            "nav_group": "Market Data",
+            "path": "/fintech-crypto/prices",
+            "permission": "fintech_crypto:prices"
+          },
+          {
+            "component": "CryptoReviewConsole",
+            "name": "reviews",
+            "nav_group": "Governance",
+            "path": "/fintech-crypto/reviews",
+            "permission": "fintech_crypto:reviews"
+          },
+          {
+            "component": "CryptoAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/fintech-crypto/agents",
+            "permission": "fintech_crypto:admin"
+          },
+          {
+            "component": "CryptoSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/fintech-crypto/settings",
+            "permission": "fintech_crypto:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "crypto_operations": {
+        "roles": [
+          "portfolio_monitor",
+          "trade_reviewer",
+          "custody_reconciler",
+          "compliance_screening_agent",
+          "treasury_rebalancer",
+          "market_data_agent"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "fintech_crypto": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_blockchain",
+        "fintech_wallets",
+        "fintech_risk",
+        "fintech_compliance",
+        "fintech_regtech",
+        "fintech_aml",
+        "fintech_kyc"
+      ]
+    }
+  },
+  "contracts": {
+    "fintech_crypto": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "audit": "audl",
+          "auth": "auth",
+          "blockchain": "fintech_blockchain",
+          "compliance": "fintech_compliance",
+          "event_stream": "bytewax",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "regtech": "fintech_regtech",
+          "risk": "fintech_risk",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "portfolio_monitor",
+            "trade_reviewer",
+            "custody_reconciler",
+            "compliance_screening_agent",
+            "treasury_rebalancer",
+            "market_data_agent"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "assets": {
+          "evidence_required": true,
+          "network_reference_required": true,
+          "owner_required": true,
+          "precision_non_negative": true,
+          "supported_types": [
+            "native_coin",
+            "stablecoin",
+            "utility_token",
+            "security_token",
+            "governance_token",
+            "tokenized_deposit"
+          ],
+          "symbol_required": true
+        },
+        "balances": {
+          "account_required": true,
+          "amount_non_negative": true,
+          "asset_required": true,
+          "currency_required": true,
+          "evidence_required": true,
+          "valuation_non_negative": true
+        },
+        "custody_accounts": {
+          "evidence_required": true,
+          "owner_required": true,
+          "policy_required": true,
+          "provider_required": true,
+          "supported_custody_models": [
+            "self_custody",
+            "mpc",
+            "hsm",
+            "exchange_custody",
+            "smart_contract",
+            "custodial"
+          ]
+        },
+        "governance": {
+          "audit_events": true,
+          "large_transfer_requires_approval": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "observability": {
+          "event_stream": "apg.fintech.crypto.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "orders": {
+          "account_required": true,
+          "asset_required": true,
+          "evidence_required": true,
+          "limit_price_required_for_limit_orders": true,
+          "policy_required": true,
+          "quantity_positive": true,
+          "requester_required": true,
+          "supported_sides": [
+            "buy",
+            "sell",
+            "swap"
+          ],
+          "supported_types": [
+            "market",
+            "limit",
+            "stop_limit",
+            "rfq",
+            "rebalance"
+          ]
+        },
+        "prices": {
+          "asset_required": true,
+          "currency_required": true,
+          "evidence_required": true,
+          "observed_at_required": true,
+          "price_non_negative": true,
+          "supported_sources": [
+            "exchange",
+            "oracle",
+            "custodian",
+            "manual",
+            "aggregator"
+          ]
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "screening": {
+          "evidence_required": true,
+          "reference_required": true,
+          "reviewer_required_for_non_clear": true,
+          "supported_statuses": [
+            "clear",
+            "review",
+            "blocked",
+            "escalated"
+          ],
+          "supported_types": [
+            "wallet",
+            "transaction",
+            "asset",
+            "counterparty",
+            "sanctions",
+            "travel_rule"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_crypto_control"
+        },
+        "trades": {
+          "execution_price_non_negative": true,
+          "fee_non_negative": true,
+          "order_required": true,
+          "quantity_positive": true,
+          "settlement_reference_required": true,
+          "supported_statuses": [
+            "requested",
+            "approved",
+            "executed",
+            "settled",
+            "failed",
+            "cancelled"
+          ],
+          "venue_required": true
+        },
+        "transfers": {
+          "account_required": true,
+          "amount_positive": true,
+          "approval_required": true,
+          "asset_required": true,
+          "destination_required": true,
+          "evidence_required": true,
+          "supported_statuses": [
+            "requested",
+            "approved",
+            "broadcast",
+            "confirmed",
+            "failed",
+            "cancelled"
+          ],
+          "supported_types": [
+            "deposit",
+            "withdrawal",
+            "internal",
+            "settlement",
+            "treasury_rebalance"
+          ]
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_assets": true,
+          "enable_balances": true,
+          "enable_custody": true,
+          "enable_dashboard": true,
+          "enable_orders": true,
+          "enable_prices": true,
+          "enable_reviews": true,
+          "enable_screening": true,
+          "enable_trades": true,
+          "enable_transfers": true
+        }
+      },
+      "id": "fintech_crypto",
+      "provides": [
+        "crypto_asset_workflow",
+        "crypto_custody_workflow",
+        "crypto_balance_workflow",
+        "crypto_order_workflow",
+        "crypto_trade_workflow",
+        "crypto_transfer_workflow",
+        "crypto_screening_workflow",
+        "crypto_price_workflow",
+        "crypto_review_workflow",
+        "crypto_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_blockchain",
+        "fintech_wallets",
+        "fintech_risk",
+        "fintech_compliance",
+        "fintech_regtech",
+        "fintech_aml",
+        "fintech_kyc"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 12,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "fintech_crypto": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}

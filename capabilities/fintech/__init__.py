@@ -94,6 +94,7 @@ CAPABILITY_META = {
 		'fraud',         # Fraud Detection
 		'compliance',    # Compliance Automation
 		'blockchain',    # Blockchain Services
+		'crypto',        # Cryptocurrency
 		'tms',           # Treasury Management System (existing)
 		'gateway',       # Payment Gateway (existing)
 		'switch',        # Payment Switch (existing)
