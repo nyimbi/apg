@@ -1,0 +1,2119 @@
+{
+  "app": {
+    "description": "Financial Intelligence package-backed APG capability",
+    "entity_count": 10,
+    "name": "intel_finint",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "intel_finint": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "graph": "grph",
+          "kyc": "fintech_kyc",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "rag": "ragn"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "authority_reviewer",
+            "source_steward",
+            "transaction_analyst",
+            "pattern_analyst",
+            "risk_analyst",
+            "dissemination_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "authorities": {
+          "approver_required": true,
+          "evidence_required": true,
+          "expiry_required": true,
+          "supported_authority_types": [
+            "legal_mandate",
+            "regulatory_authority",
+            "consent",
+            "partner_authority",
+            "mission_order"
+          ],
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ]
+        },
+        "dissemination": {
+          "approval_required": true,
+          "assessment_required": true,
+          "audience_required": true,
+          "evidence_required": true,
+          "release_marking_required": true
+        },
+        "governance": {
+          "audit_events": true,
+          "funds_movement_denied": true,
+          "lawful_authority_required": true,
+          "policy_attached_for_writes": true,
+          "privacy_review_required": true,
+          "require_tenant_context": true
+        },
+        "observability": {
+          "event_stream": "apg.intel.finint.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "patterns": {
+          "analyst_required": true,
+          "confidence_required": true,
+          "evidence_required": true,
+          "supported_types": [
+            "structuring",
+            "rapid_movement",
+            "round_tripping",
+            "trade_mismatch",
+            "sanctions_proximity",
+            "fraud_ring",
+            "crypto_mixing",
+            "unusual_velocity"
+          ],
+          "transaction_required": true
+        },
+        "referrals": {
+          "approval_required": true,
+          "assessment_required": true,
+          "evidence_required": true,
+          "recipient_required": true,
+          "supported_types": [
+            "sar",
+            "str",
+            "case_escalation",
+            "partner_notice",
+            "lawful_request",
+            "compliance_review"
+          ]
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "risk": {
+          "analyst_required": true,
+          "confidence_required": true,
+          "evidence_required": true,
+          "pattern_required": true,
+          "supported_levels": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "supported_types": [
+            "aml",
+            "sanctions",
+            "fraud",
+            "corruption",
+            "terror_financing",
+            "tax_evasion",
+            "proliferation_finance",
+            "market_abuse"
+          ]
+        },
+        "sources": {
+          "authority_required": true,
+          "evidence_required": true,
+          "jurisdiction_required": true,
+          "owner_required": true,
+          "supported_source_types": [
+            "bank_feed",
+            "payment_network",
+            "crypto_exchange",
+            "trade_registry",
+            "sanctions_feed",
+            "partner_report",
+            "public_filing",
+            "case_system"
+          ]
+        },
+        "subjects": {
+          "authority_required": true,
+          "evidence_required": true,
+          "subject_reference_required": true,
+          "supported_risk_tiers": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "supported_subject_types": [
+            "person",
+            "organization",
+            "account",
+            "wallet",
+            "merchant",
+            "vessel",
+            "case"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "intel_finint_control"
+        },
+        "transactions": {
+          "currency_required": true,
+          "evidence_required": true,
+          "occurred_at_required": true,
+          "positive_amount_required": true,
+          "source_required": true,
+          "subject_required": true,
+          "supported_transaction_types": [
+            "credit",
+            "debit",
+            "transfer",
+            "cash",
+            "card",
+            "crypto",
+            "trade",
+            "asset"
+          ],
+          "transaction_reference_required": true
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_authorities": true,
+          "enable_dashboard": true,
+          "enable_dissemination": true,
+          "enable_patterns": true,
+          "enable_referrals": true,
+          "enable_reviews": true,
+          "enable_risk": true,
+          "enable_sources": true,
+          "enable_subjects": true,
+          "enable_transactions": true
+        }
+      },
+      "name": "Financial Intelligence",
+      "provides": [
+        "finint_authority_workflow",
+        "finint_source_workflow",
+        "finint_subject_workflow",
+        "finint_transaction_workflow",
+        "finint_pattern_workflow",
+        "finint_risk_workflow",
+        "finint_referral_workflow",
+        "finint_dissemination_workflow",
+        "finint_review_workflow",
+        "finint_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "grph",
+        "ragn",
+        "fintech_kyc",
+        "fintech_aml"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "finint_policy_required",
+              "required_action": "attach_finint_policy"
+            },
+            "name": "finint_write_requires_policy"
+          },
+          {
+            "condition": {
+              "authority_type_supported": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_type_not_supported",
+              "required_action": "select_supported_authority_type"
+            },
+            "name": "authority_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_authority",
+              "scope_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_scope_required",
+              "required_action": "attach_scope_reference"
+            },
+            "name": "authority_scope_required"
+          },
+          {
+            "condition": {
+              "classification_supported": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "classification_not_supported",
+              "required_action": "select_supported_classification"
+            },
+            "name": "authority_classification_supported"
+          },
+          {
+            "condition": {
+              "approver_present": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_approver_required",
+              "required_action": "record_approver"
+            },
+            "name": "authority_approver_required"
+          },
+          {
+            "condition": {
+              "expiry_present": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_expiry_required",
+              "required_action": "set_expiry"
+            },
+            "name": "authority_expiry_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_evidence_required",
+              "required_action": "attach_authority_evidence"
+            },
+            "name": "authority_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "source_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_type_not_supported",
+              "required_action": "select_supported_source_type"
+            },
+            "name": "source_type_supported"
+          },
+          {
+            "condition": {
+              "jurisdiction_present": false,
+              "operation": "register_source"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "jurisdiction_required",
+              "required_action": "record_jurisdiction"
+            },
+            "name": "source_jurisdiction_required"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "owner_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_owner_required",
+              "required_action": "assign_source_owner"
+            },
+            "name": "source_owner_required"
+          },
+          {
+            "condition": {
+              "authority_present": false,
+              "operation": "register_source"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "lawful_authority_required",
+              "required_action": "select_authority"
+            },
+            "name": "source_authority_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "register_source"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_evidence_required",
+              "required_action": "attach_source_evidence"
+            },
+            "name": "source_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_subject",
+              "subject_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "subject_type_not_supported",
+              "required_action": "select_supported_subject_type"
+            },
+            "name": "subject_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_subject",
+              "subject_reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "subject_reference_required",
+              "required_action": "attach_subject_reference"
+            },
+            "name": "subject_reference_required"
+          },
+          {
+            "condition": {
+              "operation": "record_subject",
+              "risk_tier_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_tier_not_supported",
+              "required_action": "select_supported_risk_tier"
+            },
+            "name": "subject_risk_tier_supported"
+          },
+          {
+            "condition": {
+              "authority_present": false,
+              "operation": "record_subject"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "lawful_authority_required",
+              "required_action": "select_authority"
+            },
+            "name": "subject_authority_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_subject"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "subject_evidence_required",
+              "required_action": "attach_subject_evidence"
+            },
+            "name": "subject_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_transaction",
+              "source_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_required",
+              "required_action": "select_source"
+            },
+            "name": "transaction_source_required"
+          },
+          {
+            "condition": {
+              "operation": "record_transaction",
+              "subject_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "subject_required",
+              "required_action": "select_subject"
+            },
+            "name": "transaction_subject_required"
+          },
+          {
+            "condition": {
+              "operation": "record_transaction",
+              "source_subject_authority_match": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_mismatch",
+              "required_action": "align_source_subject_authority"
+            },
+            "name": "transaction_source_subject_authority_match"
+          },
+          {
+            "condition": {
+              "operation": "record_transaction",
+              "transaction_reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "transaction_reference_required",
+              "required_action": "attach_transaction_reference"
+            },
+            "name": "transaction_reference_required"
+          },
+          {
+            "condition": {
+              "amount_positive": false,
+              "operation": "record_transaction"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "amount_invalid",
+              "required_action": "set_positive_amount"
+            },
+            "name": "transaction_amount_positive"
+          },
+          {
+            "condition": {
+              "currency_present": false,
+              "operation": "record_transaction"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "currency_required",
+              "required_action": "record_currency"
+            },
+            "name": "transaction_currency_required"
+          },
+          {
+            "condition": {
+              "operation": "record_transaction",
+              "transaction_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "transaction_type_not_supported",
+              "required_action": "select_supported_transaction_type"
+            },
+            "name": "transaction_type_supported"
+          },
+          {
+            "condition": {
+              "occurred_at_present": false,
+              "operation": "record_transaction"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "occurred_at_required",
+              "required_action": "record_occurred_at"
+            },
+            "name": "transaction_occurred_at_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_transaction"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "transaction_evidence_required",
+              "required_action": "attach_transaction_evidence"
+            },
+            "name": "transaction_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_pattern",
+              "transaction_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "transaction_required",
+              "required_action": "select_transaction"
+            },
+            "name": "pattern_transaction_required"
+          },
+          {
+            "condition": {
+              "operation": "record_pattern",
+              "pattern_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "pattern_type_not_supported",
+              "required_action": "select_supported_pattern_type"
+            },
+            "name": "pattern_type_supported"
+          },
+          {
+            "condition": {
+              "confidence_valid": false,
+              "operation": "record_pattern"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "confidence_score_invalid",
+              "required_action": "set_confidence_0_to_1"
+            },
+            "name": "pattern_confidence_valid"
+          },
+          {
+            "condition": {
+              "analyst_present": false,
+              "operation": "record_pattern"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "analyst_required",
+              "required_action": "assign_analyst"
+            },
+            "name": "pattern_analyst_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_pattern"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "pattern_evidence_required",
+              "required_action": "attach_pattern_evidence"
+            },
+            "name": "pattern_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_risk",
+              "pattern_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "pattern_required",
+              "required_action": "select_pattern"
+            },
+            "name": "risk_pattern_required"
+          },
+          {
+            "condition": {
+              "operation": "record_risk",
+              "risk_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_type_not_supported",
+              "required_action": "select_supported_risk_type"
+            },
+            "name": "risk_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_risk",
+              "risk_level_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_level_not_supported",
+              "required_action": "select_supported_risk_level"
+            },
+            "name": "risk_level_supported"
+          },
+          {
+            "condition": {
+              "confidence_valid": false,
+              "operation": "record_risk"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "confidence_score_invalid",
+              "required_action": "set_confidence_0_to_1"
+            },
+            "name": "risk_confidence_valid"
+          },
+          {
+            "condition": {
+              "analyst_present": false,
+              "operation": "record_risk"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "analyst_required",
+              "required_action": "assign_analyst"
+            },
+            "name": "risk_analyst_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_risk"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_evidence_required",
+              "required_action": "attach_risk_evidence"
+            },
+            "name": "risk_evidence_required"
+          },
+          {
+            "condition": {
+              "assessment_present": false,
+              "operation": "record_referral"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_assessment_required",
+              "required_action": "select_risk_assessment"
+            },
+            "name": "referral_assessment_required"
+          },
+          {
+            "condition": {
+              "operation": "record_referral",
+              "referral_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "referral_type_not_supported",
+              "required_action": "select_supported_referral_type"
+            },
+            "name": "referral_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_referral",
+              "recipient_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "recipient_required",
+              "required_action": "select_recipient"
+            },
+            "name": "referral_recipient_required"
+          },
+          {
+            "condition": {
+              "approval_present": false,
+              "operation": "record_referral"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "referral_approval_required",
+              "required_action": "attach_referral_approval"
+            },
+            "name": "referral_approval_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_referral"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "referral_evidence_required",
+              "required_action": "attach_referral_evidence"
+            },
+            "name": "referral_evidence_required"
+          },
+          {
+            "condition": {
+              "assessment_present": false,
+              "operation": "record_dissemination"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_assessment_required",
+              "required_action": "select_risk_assessment"
+            },
+            "name": "dissemination_assessment_required"
+          },
+          {
+            "condition": {
+              "audience_present": false,
+              "operation": "record_dissemination"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "audience_required",
+              "required_action": "select_audience"
+            },
+            "name": "dissemination_audience_required"
+          },
+          {
+            "condition": {
+              "operation": "record_dissemination",
+              "release_marking_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "release_marking_required",
+              "required_action": "set_release_marking"
+            },
+            "name": "dissemination_release_required"
+          },
+          {
+            "condition": {
+              "approval_present": false,
+              "operation": "record_dissemination"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "dissemination_approval_required",
+              "required_action": "attach_release_approval"
+            },
+            "name": "dissemination_approval_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_dissemination"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "dissemination_evidence_required",
+              "required_action": "attach_dissemination_evidence"
+            },
+            "name": "dissemination_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "status_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_status_not_supported",
+              "required_action": "select_supported_status"
+            },
+            "name": "review_status_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "reviewer_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "reviewer_required",
+              "required_action": "assign_reviewer"
+            },
+            "name": "review_reviewer_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_review"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_evidence_required",
+              "required_action": "attach_review_evidence"
+            },
+            "name": "review_evidence_required"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "finint_batch"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_finint_batch_to_bytewax"
+            },
+            "name": "finint_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_finint_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "finint_agent_runtime_not_supported",
+              "required_action": "select_supported_runtime"
+            },
+            "name": "finint_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_finint_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "finint_agent_role_not_supported",
+              "required_action": "select_supported_role"
+            },
+            "name": "finint_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "finint_agent_action",
+              "privileged_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_finint_agent_action_requires_human_approval"
+          },
+          {
+            "condition": {
+              "funds_movement_scope": true,
+              "operation": "finint_agent_action"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "funds_movement_scope_denied",
+              "required_action": "remove_funds_movement_scope"
+            },
+            "name": "funds_movement_action_denied"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "finint_policy_required",
+            "required_action": "attach_finint_policy"
+          },
+          "name": "finint_write_requires_policy"
+        },
+        {
+          "condition": {
+            "authority_type_supported": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_type_not_supported",
+            "required_action": "select_supported_authority_type"
+          },
+          "name": "authority_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_authority",
+            "scope_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_scope_required",
+            "required_action": "attach_scope_reference"
+          },
+          "name": "authority_scope_required"
+        },
+        {
+          "condition": {
+            "classification_supported": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "classification_not_supported",
+            "required_action": "select_supported_classification"
+          },
+          "name": "authority_classification_supported"
+        },
+        {
+          "condition": {
+            "approver_present": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_approver_required",
+            "required_action": "record_approver"
+          },
+          "name": "authority_approver_required"
+        },
+        {
+          "condition": {
+            "expiry_present": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_expiry_required",
+            "required_action": "set_expiry"
+          },
+          "name": "authority_expiry_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_evidence_required",
+            "required_action": "attach_authority_evidence"
+          },
+          "name": "authority_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "source_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_type_not_supported",
+            "required_action": "select_supported_source_type"
+          },
+          "name": "source_type_supported"
+        },
+        {
+          "condition": {
+            "jurisdiction_present": false,
+            "operation": "register_source"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "jurisdiction_required",
+            "required_action": "record_jurisdiction"
+          },
+          "name": "source_jurisdiction_required"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "owner_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_owner_required",
+            "required_action": "assign_source_owner"
+          },
+          "name": "source_owner_required"
+        },
+        {
+          "condition": {
+            "authority_present": false,
+            "operation": "register_source"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "lawful_authority_required",
+            "required_action": "select_authority"
+          },
+          "name": "source_authority_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "register_source"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_evidence_required",
+            "required_action": "attach_source_evidence"
+          },
+          "name": "source_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_subject",
+            "subject_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "subject_type_not_supported",
+            "required_action": "select_supported_subject_type"
+          },
+          "name": "subject_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_subject",
+            "subject_reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "subject_reference_required",
+            "required_action": "attach_subject_reference"
+          },
+          "name": "subject_reference_required"
+        },
+        {
+          "condition": {
+            "operation": "record_subject",
+            "risk_tier_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_tier_not_supported",
+            "required_action": "select_supported_risk_tier"
+          },
+          "name": "subject_risk_tier_supported"
+        },
+        {
+          "condition": {
+            "authority_present": false,
+            "operation": "record_subject"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "lawful_authority_required",
+            "required_action": "select_authority"
+          },
+          "name": "subject_authority_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_subject"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "subject_evidence_required",
+            "required_action": "attach_subject_evidence"
+          },
+          "name": "subject_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_transaction",
+            "source_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_required",
+            "required_action": "select_source"
+          },
+          "name": "transaction_source_required"
+        },
+        {
+          "condition": {
+            "operation": "record_transaction",
+            "subject_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "subject_required",
+            "required_action": "select_subject"
+          },
+          "name": "transaction_subject_required"
+        },
+        {
+          "condition": {
+            "operation": "record_transaction",
+            "source_subject_authority_match": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_mismatch",
+            "required_action": "align_source_subject_authority"
+          },
+          "name": "transaction_source_subject_authority_match"
+        },
+        {
+          "condition": {
+            "operation": "record_transaction",
+            "transaction_reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "transaction_reference_required",
+            "required_action": "attach_transaction_reference"
+          },
+          "name": "transaction_reference_required"
+        },
+        {
+          "condition": {
+            "amount_positive": false,
+            "operation": "record_transaction"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "amount_invalid",
+            "required_action": "set_positive_amount"
+          },
+          "name": "transaction_amount_positive"
+        },
+        {
+          "condition": {
+            "currency_present": false,
+            "operation": "record_transaction"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "currency_required",
+            "required_action": "record_currency"
+          },
+          "name": "transaction_currency_required"
+        },
+        {
+          "condition": {
+            "operation": "record_transaction",
+            "transaction_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "transaction_type_not_supported",
+            "required_action": "select_supported_transaction_type"
+          },
+          "name": "transaction_type_supported"
+        },
+        {
+          "condition": {
+            "occurred_at_present": false,
+            "operation": "record_transaction"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "occurred_at_required",
+            "required_action": "record_occurred_at"
+          },
+          "name": "transaction_occurred_at_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_transaction"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "transaction_evidence_required",
+            "required_action": "attach_transaction_evidence"
+          },
+          "name": "transaction_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_pattern",
+            "transaction_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "transaction_required",
+            "required_action": "select_transaction"
+          },
+          "name": "pattern_transaction_required"
+        },
+        {
+          "condition": {
+            "operation": "record_pattern",
+            "pattern_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "pattern_type_not_supported",
+            "required_action": "select_supported_pattern_type"
+          },
+          "name": "pattern_type_supported"
+        },
+        {
+          "condition": {
+            "confidence_valid": false,
+            "operation": "record_pattern"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "confidence_score_invalid",
+            "required_action": "set_confidence_0_to_1"
+          },
+          "name": "pattern_confidence_valid"
+        },
+        {
+          "condition": {
+            "analyst_present": false,
+            "operation": "record_pattern"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "analyst_required",
+            "required_action": "assign_analyst"
+          },
+          "name": "pattern_analyst_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_pattern"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "pattern_evidence_required",
+            "required_action": "attach_pattern_evidence"
+          },
+          "name": "pattern_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_risk",
+            "pattern_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "pattern_required",
+            "required_action": "select_pattern"
+          },
+          "name": "risk_pattern_required"
+        },
+        {
+          "condition": {
+            "operation": "record_risk",
+            "risk_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_type_not_supported",
+            "required_action": "select_supported_risk_type"
+          },
+          "name": "risk_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_risk",
+            "risk_level_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_level_not_supported",
+            "required_action": "select_supported_risk_level"
+          },
+          "name": "risk_level_supported"
+        },
+        {
+          "condition": {
+            "confidence_valid": false,
+            "operation": "record_risk"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "confidence_score_invalid",
+            "required_action": "set_confidence_0_to_1"
+          },
+          "name": "risk_confidence_valid"
+        },
+        {
+          "condition": {
+            "analyst_present": false,
+            "operation": "record_risk"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "analyst_required",
+            "required_action": "assign_analyst"
+          },
+          "name": "risk_analyst_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_risk"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_evidence_required",
+            "required_action": "attach_risk_evidence"
+          },
+          "name": "risk_evidence_required"
+        },
+        {
+          "condition": {
+            "assessment_present": false,
+            "operation": "record_referral"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_assessment_required",
+            "required_action": "select_risk_assessment"
+          },
+          "name": "referral_assessment_required"
+        },
+        {
+          "condition": {
+            "operation": "record_referral",
+            "referral_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "referral_type_not_supported",
+            "required_action": "select_supported_referral_type"
+          },
+          "name": "referral_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_referral",
+            "recipient_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "recipient_required",
+            "required_action": "select_recipient"
+          },
+          "name": "referral_recipient_required"
+        },
+        {
+          "condition": {
+            "approval_present": false,
+            "operation": "record_referral"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "referral_approval_required",
+            "required_action": "attach_referral_approval"
+          },
+          "name": "referral_approval_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_referral"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "referral_evidence_required",
+            "required_action": "attach_referral_evidence"
+          },
+          "name": "referral_evidence_required"
+        },
+        {
+          "condition": {
+            "assessment_present": false,
+            "operation": "record_dissemination"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_assessment_required",
+            "required_action": "select_risk_assessment"
+          },
+          "name": "dissemination_assessment_required"
+        },
+        {
+          "condition": {
+            "audience_present": false,
+            "operation": "record_dissemination"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "audience_required",
+            "required_action": "select_audience"
+          },
+          "name": "dissemination_audience_required"
+        },
+        {
+          "condition": {
+            "operation": "record_dissemination",
+            "release_marking_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "release_marking_required",
+            "required_action": "set_release_marking"
+          },
+          "name": "dissemination_release_required"
+        },
+        {
+          "condition": {
+            "approval_present": false,
+            "operation": "record_dissemination"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "dissemination_approval_required",
+            "required_action": "attach_release_approval"
+          },
+          "name": "dissemination_approval_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_dissemination"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "dissemination_evidence_required",
+            "required_action": "attach_dissemination_evidence"
+          },
+          "name": "dissemination_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "status_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_status_not_supported",
+            "required_action": "select_supported_status"
+          },
+          "name": "review_status_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "reviewer_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "reviewer_required",
+            "required_action": "assign_reviewer"
+          },
+          "name": "review_reviewer_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_review"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_evidence_required",
+            "required_action": "attach_review_evidence"
+          },
+          "name": "review_evidence_required"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "finint_batch"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_finint_batch_to_bytewax"
+          },
+          "name": "finint_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_finint_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "finint_agent_runtime_not_supported",
+            "required_action": "select_supported_runtime"
+          },
+          "name": "finint_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_finint_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "finint_agent_role_not_supported",
+            "required_action": "select_supported_role"
+          },
+          "name": "finint_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "finint_agent_action",
+            "privileged_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_finint_agent_action_requires_human_approval"
+        },
+        {
+          "condition": {
+            "funds_movement_scope": true,
+            "operation": "finint_agent_action"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "funds_movement_scope_denied",
+            "required_action": "remove_funds_movement_scope"
+          },
+          "name": "funds_movement_action_denied"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "agents": {
+          "component": "FININTAgentWorkbench",
+          "permission": "intel_finint:admin",
+          "route": "/intel-finint/agents"
+        },
+        "authorities": {
+          "component": "FinancialAuthorityConsole",
+          "permission": "intel_finint:authorities",
+          "route": "/intel-finint/authorities"
+        },
+        "dashboard": {
+          "component": "FININTDashboard",
+          "permission": "intel_finint:view",
+          "route": "/intel-finint/dashboard"
+        },
+        "dissemination": {
+          "component": "FININTDisseminationConsole",
+          "permission": "intel_finint:dissemination",
+          "route": "/intel-finint/dissemination"
+        },
+        "patterns": {
+          "component": "FinancialPatternWorkbench",
+          "permission": "intel_finint:patterns",
+          "route": "/intel-finint/patterns"
+        },
+        "referrals": {
+          "component": "FinancialReferralConsole",
+          "permission": "intel_finint:referrals",
+          "route": "/intel-finint/referrals"
+        },
+        "reviews": {
+          "component": "FININTReviewConsole",
+          "permission": "intel_finint:reviews",
+          "route": "/intel-finint/reviews"
+        },
+        "risk": {
+          "component": "FinancialRiskWorkbench",
+          "permission": "intel_finint:risk",
+          "route": "/intel-finint/risk"
+        },
+        "settings": {
+          "component": "FININTSettings",
+          "permission": "intel_finint:admin",
+          "route": "/intel-finint/settings"
+        },
+        "sources": {
+          "component": "FinancialSourceRegistry",
+          "permission": "intel_finint:sources",
+          "route": "/intel-finint/sources"
+        },
+        "subjects": {
+          "component": "FinancialSubjectRegistry",
+          "permission": "intel_finint:subjects",
+          "route": "/intel-finint/subjects"
+        },
+        "transactions": {
+          "component": "FinancialTransactionLedger",
+          "permission": "intel_finint:transactions",
+          "route": "/intel-finint/transactions"
+        }
+      },
+      "streaming": {
+        "events": [
+          "finint_authority_recorded",
+          "finint_source_registered",
+          "finint_subject_recorded",
+          "finint_transaction_recorded",
+          "finint_pattern_recorded",
+          "finint_risk_recorded",
+          "finint_referral_recorded",
+          "finint_dissemination_recorded",
+          "finint_review_recorded",
+          "finint_agent_registered"
+        ],
+        "guardrails": [
+          "finint_batch_requires_bytewax",
+          "privileged_finint_agent_action_requires_human_approval",
+          "funds_movement_action_denied"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.intel.finint.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "authorities": {
+            "icon": "shield-check",
+            "status_indicator": "authority-chip"
+          },
+          "dissemination": {
+            "icon": "send",
+            "status_indicator": "release-chip"
+          },
+          "patterns": {
+            "icon": "activity",
+            "status_indicator": "confidence-chip"
+          },
+          "referrals": {
+            "icon": "file-output",
+            "status_indicator": "referral-chip"
+          },
+          "reviews": {
+            "icon": "clipboard-check",
+            "status_indicator": "review-chip"
+          },
+          "risk": {
+            "icon": "shield-alert",
+            "status_indicator": "risk-chip"
+          },
+          "sources": {
+            "icon": "database",
+            "status_indicator": "jurisdiction-chip"
+          },
+          "subjects": {
+            "icon": "id-card",
+            "status_indicator": "risk-tier-chip"
+          },
+          "transactions": {
+            "icon": "receipt",
+            "status_indicator": "currency-chip"
+          }
+        },
+        "name": "intel_finint_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#854D0E",
+          "color.danger": "#B91C1C",
+          "color.primary": "#0F766E",
+          "color.success": "#166534",
+          "color.warning": "#A16207",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/intel-finint/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "FININTDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/intel-finint/dashboard",
+            "permission": "intel_finint:view"
+          },
+          {
+            "component": "FinancialAuthorityConsole",
+            "name": "authorities",
+            "nav_group": "Governance",
+            "path": "/intel-finint/authorities",
+            "permission": "intel_finint:authorities"
+          },
+          {
+            "component": "FinancialSourceRegistry",
+            "name": "sources",
+            "nav_group": "Data",
+            "path": "/intel-finint/sources",
+            "permission": "intel_finint:sources"
+          },
+          {
+            "component": "FinancialSubjectRegistry",
+            "name": "subjects",
+            "nav_group": "Data",
+            "path": "/intel-finint/subjects",
+            "permission": "intel_finint:subjects"
+          },
+          {
+            "component": "FinancialTransactionLedger",
+            "name": "transactions",
+            "nav_group": "Intelligence",
+            "path": "/intel-finint/transactions",
+            "permission": "intel_finint:transactions"
+          },
+          {
+            "component": "FinancialPatternWorkbench",
+            "name": "patterns",
+            "nav_group": "Analysis",
+            "path": "/intel-finint/patterns",
+            "permission": "intel_finint:patterns"
+          },
+          {
+            "component": "FinancialRiskWorkbench",
+            "name": "risk",
+            "nav_group": "Analysis",
+            "path": "/intel-finint/risk",
+            "permission": "intel_finint:risk"
+          },
+          {
+            "component": "FinancialReferralConsole",
+            "name": "referrals",
+            "nav_group": "Release",
+            "path": "/intel-finint/referrals",
+            "permission": "intel_finint:referrals"
+          },
+          {
+            "component": "FININTDisseminationConsole",
+            "name": "dissemination",
+            "nav_group": "Release",
+            "path": "/intel-finint/dissemination",
+            "permission": "intel_finint:dissemination"
+          },
+          {
+            "component": "FININTReviewConsole",
+            "name": "reviews",
+            "nav_group": "Governance",
+            "path": "/intel-finint/reviews",
+            "permission": "intel_finint:reviews"
+          },
+          {
+            "component": "FININTAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/intel-finint/agents",
+            "permission": "intel_finint:admin"
+          },
+          {
+            "component": "FININTSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/intel-finint/settings",
+            "permission": "intel_finint:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "finint_operations": {
+        "roles": [
+          "authority_reviewer",
+          "source_steward",
+          "transaction_analyst",
+          "pattern_analyst",
+          "risk_analyst",
+          "dissemination_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "intel_finint": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "grph",
+        "ragn",
+        "fintech_kyc",
+        "fintech_aml"
+      ]
+    }
+  },
+  "contracts": {
+    "intel_finint": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "graph": "grph",
+          "kyc": "fintech_kyc",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "rag": "ragn"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "authority_reviewer",
+            "source_steward",
+            "transaction_analyst",
+            "pattern_analyst",
+            "risk_analyst",
+            "dissemination_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "authorities": {
+          "approver_required": true,
+          "evidence_required": true,
+          "expiry_required": true,
+          "supported_authority_types": [
+            "legal_mandate",
+            "regulatory_authority",
+            "consent",
+            "partner_authority",
+            "mission_order"
+          ],
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ]
+        },
+        "dissemination": {
+          "approval_required": true,
+          "assessment_required": true,
+          "audience_required": true,
+          "evidence_required": true,
+          "release_marking_required": true
+        },
+        "governance": {
+          "audit_events": true,
+          "funds_movement_denied": true,
+          "lawful_authority_required": true,
+          "policy_attached_for_writes": true,
+          "privacy_review_required": true,
+          "require_tenant_context": true
+        },
+        "observability": {
+          "event_stream": "apg.intel.finint.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "patterns": {
+          "analyst_required": true,
+          "confidence_required": true,
+          "evidence_required": true,
+          "supported_types": [
+            "structuring",
+            "rapid_movement",
+            "round_tripping",
+            "trade_mismatch",
+            "sanctions_proximity",
+            "fraud_ring",
+            "crypto_mixing",
+            "unusual_velocity"
+          ],
+          "transaction_required": true
+        },
+        "referrals": {
+          "approval_required": true,
+          "assessment_required": true,
+          "evidence_required": true,
+          "recipient_required": true,
+          "supported_types": [
+            "sar",
+            "str",
+            "case_escalation",
+            "partner_notice",
+            "lawful_request",
+            "compliance_review"
+          ]
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "risk": {
+          "analyst_required": true,
+          "confidence_required": true,
+          "evidence_required": true,
+          "pattern_required": true,
+          "supported_levels": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "supported_types": [
+            "aml",
+            "sanctions",
+            "fraud",
+            "corruption",
+            "terror_financing",
+            "tax_evasion",
+            "proliferation_finance",
+            "market_abuse"
+          ]
+        },
+        "sources": {
+          "authority_required": true,
+          "evidence_required": true,
+          "jurisdiction_required": true,
+          "owner_required": true,
+          "supported_source_types": [
+            "bank_feed",
+            "payment_network",
+            "crypto_exchange",
+            "trade_registry",
+            "sanctions_feed",
+            "partner_report",
+            "public_filing",
+            "case_system"
+          ]
+        },
+        "subjects": {
+          "authority_required": true,
+          "evidence_required": true,
+          "subject_reference_required": true,
+          "supported_risk_tiers": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "supported_subject_types": [
+            "person",
+            "organization",
+            "account",
+            "wallet",
+            "merchant",
+            "vessel",
+            "case"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "intel_finint_control"
+        },
+        "transactions": {
+          "currency_required": true,
+          "evidence_required": true,
+          "occurred_at_required": true,
+          "positive_amount_required": true,
+          "source_required": true,
+          "subject_required": true,
+          "supported_transaction_types": [
+            "credit",
+            "debit",
+            "transfer",
+            "cash",
+            "card",
+            "crypto",
+            "trade",
+            "asset"
+          ],
+          "transaction_reference_required": true
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_authorities": true,
+          "enable_dashboard": true,
+          "enable_dissemination": true,
+          "enable_patterns": true,
+          "enable_referrals": true,
+          "enable_reviews": true,
+          "enable_risk": true,
+          "enable_sources": true,
+          "enable_subjects": true,
+          "enable_transactions": true
+        }
+      },
+      "id": "intel_finint",
+      "provides": [
+        "finint_authority_workflow",
+        "finint_source_workflow",
+        "finint_subject_workflow",
+        "finint_transaction_workflow",
+        "finint_pattern_workflow",
+        "finint_risk_workflow",
+        "finint_referral_workflow",
+        "finint_dissemination_workflow",
+        "finint_review_workflow",
+        "finint_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "grph",
+        "ragn",
+        "fintech_kyc",
+        "fintech_aml"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 8,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "intel_finint": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}

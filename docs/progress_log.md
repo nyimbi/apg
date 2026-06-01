@@ -28964,3 +28964,95 @@ Known gaps:
   asset inventories, blocklist deployment, containment execution, storage
   backends, GraphRAG projections, dissemination delivery, durable Bytewax
   topology, or performance/load checks during this battery-conscious slice.
+
+## 2026-06-01 - Intel Financial Intelligence executable capability
+
+- Promoted `capabilities/intel/finint` from placeholder into a first-class
+  executable APG capability with README, specification, plan, capability spec,
+  package manifest, release evidence, focused tests, and code-review notes.
+- Added lawful authority, financial source, financial subject, transaction,
+  pattern, risk assessment, referral, dissemination, review, Bytewax batch
+  validation, dashboard summary, and provider-neutral FININT agent workflows.
+- Added deterministic guardrails for tenant context, write policy, lawful
+  authority, source jurisdiction, subject risk tier, source/subject authority
+  alignment, transaction reference/amount/currency/type/timestamp/evidence,
+  pattern confidence, risk type and level, referral approval, release approval,
+  Bytewax lifecycle events, supported AI-agent runtimes and roles, privileged
+  AI-agent approval, and denial of funds-movement automation scope.
+- Added compact UI/view models and theme tokens for dashboards, authorities,
+  sources, subjects, transactions, patterns, risk, referrals, dissemination,
+  reviews, agents, and settings.
+- Updated intelligence capability metadata so `finint` is listed as an
+  implemented sub-capability.
+- Updated `capabilities/README.md` so the catalog snapshot reports 141 valid
+  contracts, 141 domain-specific packages, 141 strict complete package artifact
+  sets, and 7 Intel packages.
+- Removed the empty `_Financial_Intelligence` marker file and added a generated
+  `semantic_model.json` from the executable application.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/intel/finint/__init__.py
+  capabilities/intel/finint/capability_contract.py
+  capabilities/intel/finint/models.py
+  capabilities/intel/finint/finint_runtime.py
+  capabilities/intel/finint/service.py
+  capabilities/intel/finint/api.py
+  capabilities/intel/finint/views.py
+  capabilities/intel/finint/app.py
+  capabilities/intel/finint/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/intel/finint/tests/test_package_contract.py` passed with 7
+  tests.
+- `./.venv/bin/python capabilities/intel/finint/app.py` passed self-test with
+  `passed: true` and `status: ok`.
+- `./.venv/bin/apg capabilities inspect intel_finint --json` passed with 56
+  rules, 12 UI routes, theme `intel_finint_control`, shell `apg_python`, and
+  Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/intel/finint --json` passed with `side_effect_free: true` and 0
+  warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/intel/finint --json` passed with 1 domain-specific capability,
+  0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/intel/finint --json` passed with 1 complete lifecycle, 56
+  rules, 12 UI routes, 11 theme tokens, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 141 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 141 operable contracts, 141 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/intel/finint`, `capabilities/intel/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed authority, source, subject, transaction, pattern, risk, referral,
+  dissemination, review, Bytewax batch, and AI-agent lifecycle paths so rule
+  evaluation happens before state mutation.
+- Confirmed service state is keyed by tenant plus record ID and covered by a
+  regression test with shared authority/source IDs across tenants.
+- Tightened FININT semantics around lawful authority, jurisdiction, source and
+  subject lineage, source/subject authority alignment, amount validation,
+  transaction evidence, referral approval, release approval, tenant-keyed state
+  isolation, and privileged or prohibited AI-agent actions.
+- Kept funds movement, payment execution, account freezing, trade placement,
+  crypto exchange execution, sanctions-screening engines, regulatory report
+  submission, live bank feeds, case-management writes, storage backends,
+  GraphRAG projections, dissemination delivery, and durable Bytewax workers
+  behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, funds movement,
+  payment execution, account freezing, trade placement, crypto exchange
+  execution, sanctions-screening engines, regulatory report submission, live
+  bank feeds, case-management writes, storage backends, GraphRAG projections,
+  dissemination delivery, durable Bytewax topology, or performance/load checks
+  during this battery-conscious slice.
