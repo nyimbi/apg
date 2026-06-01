@@ -159,6 +159,10 @@ def list_purges(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_purges(tenant_id)
 
 
+def list_batches(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_batches(tenant_id)
+
+
 def list_investigations(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_investigations(tenant_id)
 
@@ -169,6 +173,10 @@ def list_audit_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
 
 def list_governance_events(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_governance_events(tenant_id)
+
+
+def list_pending_reviews(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_pending_reviews(tenant_id)
 
 
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:

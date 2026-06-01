@@ -52,6 +52,8 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert "audit_agent_roster" in contract["theme"]["components"]
 	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
 	assert contract["streaming"]["engine"] == "bytewax"
+	assert "review_evidence" in contract["provides"]
+	assert contract["review_evidence"]["durable_statuses"] == ["review_required", "pending_review", "denied", "accepted"]
 
 
 def test_rule_engine_denies_unsafe_audit_operations():
@@ -74,6 +76,22 @@ def test_rule_engine_denies_unsafe_audit_operations():
 		"stream_processing_enabled": False,
 		"event_stream": "non_bytewax",
 	})
+	agent_review_result = evaluate_capability_rules({
+		"requested_operation": "register_audit_agent",
+		"agent_runtime_supported": True,
+		"agent_role_supported": True,
+		"privileged_action": True,
+		"human_approval_required": False,
+	})
+	export_review_result = evaluate_capability_rules({
+		"requested_operation": "export",
+		"contains_pii": True,
+		"masking_enabled": True,
+	})
+	purge_review_result = evaluate_capability_rules({
+		"requested_operation": "purge",
+		"legal_hold_active": False,
+	})
 
 	assert export_result["decision"] == "deny"
 	assert set(export_result["matched_rules"]) == {
@@ -88,6 +106,12 @@ def test_rule_engine_denies_unsafe_audit_operations():
 		"high_volume_ingestion_requires_stream_processing",
 		"bytewax_event_stream_required",
 	}
+	assert agent_review_result["decision"] == "require_review"
+	assert agent_review_result["matched_rules"] == ["audit_agent_privileged_action_requires_approval"]
+	assert export_review_result["decision"] == "require_review"
+	assert export_review_result["matched_rules"] == ["regulated_export_requires_review"]
+	assert purge_review_result["decision"] == "require_review"
+	assert purge_review_result["matched_rules"] == ["audit_purge_requires_dual_control_review"]
 
 
 def test_capability_info_includes_manifest_and_theme():
@@ -100,6 +124,7 @@ def test_capability_info_includes_manifest_and_theme():
 	assert info["theme"]["name"] == "audl_forensics"
 	assert info["agents"]["first_class"] is True
 	assert info["streaming"]["engine"] == "bytewax"
+	assert info["review_evidence"]["pending_queues"] == ["audit_exports", "audit_purges", "audit_agents", "audit_batches"]
 	assert {route["name"] for route in info["ui_manifest"]["routes"]} >= {
 		"timeline",
 		"investigations",
@@ -152,6 +177,10 @@ def test_service_runs_governed_audit_evidence_lifecycle():
 		masking_enabled=True,
 		reason="Regulator evidence request.",
 	)
+	assert export["decision"] == "review_required"
+	assert export["policy_decision"] == "require_review"
+	assert export["review_reasons"] == ["regulated_export_review_required"]
+	assert service.list_pending_reviews("tenant-audl")[0]["id"] == export["id"]
 	export_decision = service.decide_export(
 		export_id=export["id"],
 		tenant_id="tenant-audl",
@@ -159,6 +188,7 @@ def test_service_runs_governed_audit_evidence_lifecycle():
 		decision="approved",
 		notes="PII masking verified.",
 	)
+	assert service.list_pending_reviews("tenant-audl") == []
 	investigation = service.open_investigation(
 		investigation_id="case-001",
 		tenant_id="tenant-audl",
@@ -181,6 +211,10 @@ def test_service_runs_governed_audit_evidence_lifecycle():
 			scope={"resource_id": "acct-001"},
 			reason="Retention cleanup.",
 		)
+	denied_purge = service.list_purges("tenant-audl")[0]
+	assert denied_purge["decision"] == "denied"
+	assert denied_purge["policy_decision"] == "deny"
+	assert denied_purge["review_reasons"] == ["legal_hold_active"]
 
 	service.release_legal_hold(
 		hold_id=hold["id"],
@@ -195,6 +229,9 @@ def test_service_runs_governed_audit_evidence_lifecycle():
 		scope={"resource_id": "acct-001"},
 		reason="Retention cleanup.",
 	)
+	assert purge["decision"] == "review_required"
+	assert purge["policy_decision"] == "require_review"
+	assert purge["review_reasons"] == ["audit_purge_review_required"]
 	purge_decision = service.decide_purge(
 		purge_id=purge["id"],
 		tenant_id="tenant-audl",
@@ -206,6 +243,8 @@ def test_service_runs_governed_audit_evidence_lifecycle():
 
 	assert event["checksum"]
 	assert batch["accepted"] is True
+	assert batch["status"] == "accepted"
+	assert batch["policy_decision"] == "allow"
 	assert agent["runtime"] == "codex"
 	assert hold["status"] == "active"
 	assert export_decision["decision"] == "approved"
@@ -266,6 +305,10 @@ def test_service_blocks_audit_guardrail_violations():
 			masking_enabled=False,
 			reason="Unsafe export.",
 		)
+	denied_export = service.list_exports("tenant-audl")[0]
+	assert denied_export["decision"] == "denied"
+	assert denied_export["policy_decision"] == "deny"
+	assert denied_export["review_reasons"] == ["pii_masking_required"]
 
 	with pytest.raises(PermissionError, match="bytewax_event_stream_required"):
 		service.validate_batch(
@@ -274,6 +317,10 @@ def test_service_blocks_audit_guardrail_violations():
 			event_stream="queue",
 			stream_processing_enabled=True,
 		)
+	denied_batch = service.list_batches("tenant-audl")[0]
+	assert denied_batch["status"] == "denied"
+	assert denied_batch["policy_decision"] == "deny"
+	assert denied_batch["review_reasons"] == ["bytewax_event_stream_required"]
 
 	with pytest.raises(PermissionError, match="audit_agent_runtime_unsupported"):
 		service.register_audit_agent(
@@ -286,17 +333,20 @@ def test_service_blocks_audit_guardrail_violations():
 			owner="security-lead",
 		)
 
-	with pytest.raises(PermissionError, match="audit_agent_human_approval_required"):
-		service.register_audit_agent(
-			agent_id="agent-no-approval",
-			tenant_id="tenant-audl",
-			name="Privileged Agent",
-			runtime="codex",
-			role="purge_reviewer",
-			purpose="Privileged purge review.",
-			owner="records-lead",
-			human_approval_required=False,
-		)
+	review_agent = service.register_audit_agent(
+		agent_id="agent-no-approval",
+		tenant_id="tenant-audl",
+		name="Privileged Agent",
+		runtime="codex",
+		role="purge_reviewer",
+		purpose="Privileged purge review.",
+		owner="records-lead",
+		human_approval_required=False,
+	)
+	assert review_agent["status"] == "pending_review"
+	assert review_agent["policy_decision"] == "require_review"
+	assert review_agent["review_reasons"] == ["audit_agent_human_approval_required"]
+	assert review_agent["audit_evidence"]["required_actions"] == ["enable_human_approval_for_privileged_audit_agent"]
 
 	event = service.append_event(
 		event_id="evt-ok",
@@ -346,15 +396,23 @@ def test_service_blocks_audit_guardrail_violations():
 			decision="approved",
 			notes="Legal hold should block approval.",
 		)
+	assert service.list_purges("tenant-audl")[-1]["decision"] == "denied"
 	service.release_legal_hold(
 		hold_id="hold-after-purge-request",
 		tenant_id="tenant-audl",
 		released_by="legal-counsel",
 		release_evidence="Late hold resolved.",
 	)
+	purge_self_review = service.request_purge(
+		purge_id="purge-self-review",
+		tenant_id="tenant-audl",
+		requested_by="records-admin",
+		scope={"event_id": event["id"]},
+		reason="Retention cleanup self review check.",
+	)
 	with pytest.raises(PermissionError, match="dual_control_reviewer_required"):
 		service.decide_purge(
-			purge_id=purge["id"],
+			purge_id=purge_self_review["id"],
 			tenant_id="tenant-audl",
 			reviewer="records-admin",
 			decision="approved",
@@ -454,6 +512,10 @@ def test_api_helpers_and_view_models_expose_audit_lifecycle():
 	assert decision["decision"] == "approved"
 	assert api_helpers.capability_status(event["tenant_id"])["event_count"] == 1
 	assert api_helpers.capability_status(event["tenant_id"])["agent_count"] == 1
+	assert api_helpers.capability_status(event["tenant_id"])["pending_review_count"] == 0
 	assert model["exports"][0]["id"] == "api-export"
+	assert model["pending_reviews"] == []
 	assert agent["role"] == "export_reviewer"
 	assert agent_model["agents"][0]["id"] == "api-agent"
+	assert agent_model["pending_reviews"] == []
+	assert api_helpers.list_pending_reviews(event["tenant_id"]) == []

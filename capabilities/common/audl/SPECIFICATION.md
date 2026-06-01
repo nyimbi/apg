@@ -37,6 +37,9 @@ evidence, tenant isolation, agent composition, and composability.
   purge, investigation, compliance, and legal-hold review.
 - Generated APG applications can compose AUDL with AUTH, MTEN, CONF, SECU,
   NTFY, WFLO, MONI, APIG, and AICR without binding to one storage or UI stack.
+- Operators can inspect durable review and denial evidence for exports, purges,
+  privileged audit agents, batches, lifecycle events, and governance events
+  without replaying rules.
 
 ## Domain Model
 
@@ -49,6 +52,8 @@ AUDL owns these package-level records:
 - `AuditInvestigationRecord`: investigation lifecycle over audit event IDs.
 - `AuditAgentRecord`: first-class audit agent with runtime, role, owner,
   purpose, approval gate, and configuration.
+- `AuditBatchEvidence`: accepted or denied Bytewax audit batch validation
+  evidence.
 - `AuditGovernanceEvent`: tenant-scoped evidence event for AUDL decisions.
 
 All mutable package-level state must be tenant-qualified so duplicate IDs in
@@ -64,15 +69,21 @@ The focused lifecycle is:
 3. Open a legal hold over a tenant, resource, event, or query scope.
 4. Request a regulated export over audited evidence.
 5. Deny PII-bearing exports unless masking is enabled.
-6. Require reviewer identity and notes before export approval or rejection.
-7. Request purge with requester, reviewer, reason, and scope.
-8. Deny purge while legal hold is active or dual-control evidence is missing.
-9. Open and close investigations with assigned owner and resolution evidence.
-10. Register audit agents on approved runtimes and roles.
-11. Deny privileged audit-agent roles unless human approval is required.
-12. Validate audit batches before ingestion and require the Bytewax lifecycle
+6. Store masked PII-bearing exports as `review_required` before approval or
+   rejection.
+7. Require reviewer identity and notes before export approval or rejection.
+8. Request purge with requester, reviewer, reason, and scope.
+9. Store purge requests as `review_required` and deny purge while legal hold is
+   active or dual-control evidence is missing.
+10. Open and close investigations with assigned owner and resolution evidence.
+11. Register audit agents on approved runtimes and roles.
+12. Store privileged audit-agent registrations without human approval as
+   `pending_review`.
+13. Validate audit batches before ingestion and require the Bytewax lifecycle
     stream for high-volume batch work.
-13. Emit tenant-scoped governance events for every lifecycle decision.
+14. Persist denied export, purge, and batch evidence before raising
+    `PermissionError`.
+15. Emit tenant-scoped governance events for every lifecycle decision.
 
 ## Rules And Guardrails
 
@@ -93,10 +104,21 @@ The contract rules are executable guardrails:
   `claude_code`, `opencode`, or `pi`.
 - `audit_agent_role_supported`: audit agents must use an AUDL review role.
 - `audit_agent_privileged_action_requires_approval`: privileged audit-agent
-  roles require human approval.
+  roles require human approval evidence or review.
+- `regulated_export_requires_review`: masked PII-bearing exports require
+  review before release.
+- `audit_purge_requires_dual_control_review`: purge requests require
+  dual-control review before execution.
 
 Service methods must enforce these rules and expose the same decisions through
 API helpers and view models.
+
+Every review-required or denied lifecycle record must expose:
+
+- `policy_decision`
+- `matched_rules`
+- `review_reasons`
+- `audit_evidence`
 
 ## UI And Theme
 

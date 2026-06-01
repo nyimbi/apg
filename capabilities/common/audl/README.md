@@ -23,6 +23,8 @@ It currently provides:
   `opencode`, and `pi`;
 - role and approval guardrails for audit agents;
 - Bytewax lifecycle-stream metadata and batch validation guardrails;
+- durable review evidence for regulated exports, purge requests, privileged
+  audit agents, denied batches, lifecycle events, and governance events;
 - UI/view-model surfaces for dashboards, evidence timelines, review queues,
   compliance, rules, settings, and audit-agent rosters.
 
@@ -63,6 +65,23 @@ batch = service.validate_batch(
 
 Use `service.describe("tenant-audl")` to inspect the configuration schema,
 rules, UI routes, theme tokens, agent contract, and Bytewax stream metadata.
+
+### Review Evidence
+
+Generated applications can build review and exception queues without replaying
+the rule engine:
+
+- `request_export()` stores masked PII-bearing exports as `review_required`
+  and stores unmasked PII export denials before raising `PermissionError`.
+- `request_purge()` stores purge requests as `review_required` and stores
+  legal-hold denials before raising `PermissionError`.
+- `register_audit_agent()` stores privileged audit agents without human
+  approval as `pending_review` instead of discarding the registration evidence.
+- `validate_batch()` stores accepted and denied batch evidence, including
+  non-Bytewax stream denials, before any blocking exception.
+- `list_pending_reviews()` returns reviewable exports, purges, agents, and
+  batches with `policy_decision`, `matched_rules`, `review_reasons`, and
+  `audit_evidence` fields.
 
 ## Features
 

@@ -36,8 +36,10 @@ def dashboard_model(
 		"legal_holds": service.list_legal_holds(tenant_id),
 		"exports": service.list_exports(tenant_id),
 		"purges": service.list_purges(tenant_id),
+		"batches": service.list_batches(tenant_id),
 		"investigations": service.list_investigations(tenant_id),
 		"agents": service.list_audit_agents(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
 		"governance_events": service.list_governance_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"streaming": contract["streaming"],
@@ -87,7 +89,8 @@ def export_review_model(
 	service = service or AudlService()
 	return {
 		"exports": service.list_exports(tenant_id),
-		"pending_exports": [item for item in service.list_exports(tenant_id) if item["decision"] == "pending"],
+		"pending_exports": [item for item in service.list_exports(tenant_id) if item["decision"] in {"pending", "review_required"}],
+		"pending_reviews": [item for item in service.list_exports(tenant_id) if item["decision"] == "review_required"],
 		"required_controls": ["masking_enabled", "reviewer", "notes"],
 	}
 
@@ -99,7 +102,8 @@ def purge_review_model(
 	service = service or AudlService()
 	return {
 		"purges": service.list_purges(tenant_id),
-		"pending_purges": [item for item in service.list_purges(tenant_id) if item["decision"] == "pending"],
+		"pending_purges": [item for item in service.list_purges(tenant_id) if item["decision"] in {"pending", "review_required"}],
+		"pending_reviews": [item for item in service.list_purges(tenant_id) if item["decision"] == "review_required"],
 		"required_controls": ["dual_control_reviewer", "notes", "legal_hold_check"],
 	}
 
@@ -130,6 +134,7 @@ def compliance_center_model(
 		"legal_holds": service.list_legal_holds(tenant_id),
 		"exports": service.list_exports(tenant_id),
 		"purges": service.list_purges(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
 	}
 
 
@@ -141,6 +146,11 @@ def audit_agent_model(
 	contract = get_capability_contract(tenant_id)
 	return {
 		"agents": service.list_audit_agents(tenant_id),
+		"pending_reviews": [
+			agent
+			for agent in service.list_audit_agents(tenant_id)
+			if agent["status"] == "pending_review"
+		],
 		"agent_contract": contract["agents"],
 		"streaming": contract["streaming"],
 		"supported_runtimes": contract["agents"]["supported_runtimes"],

@@ -25,6 +25,8 @@ except ImportError:  # pragma: no cover - standalone package loading path
 def semantic_model() -> dict[str, Any]:
 	"""Return the package semantic model from the current capability contract."""
 	contract = get_capability_contract("default")
+	provides = contract.get("provides", ["audl_operations", "audit_agents", "review_evidence"])
+	review_evidence = contract["review_evidence"]
 	routes = {
 		route["name"]: {
 			"route": route["path"],
@@ -52,7 +54,7 @@ def semantic_model() -> dict[str, Any]:
 			"audl": {
 				"name": contract["display_name"],
 				"configuration": contract["configuration"],
-				"provides": ["audl_operations"],
+				"provides": provides,
 				"requires": [],
 				"erp_modules": ["common"],
 				"rule_engine": contract["rule_engine"],
@@ -73,6 +75,7 @@ def semantic_model() -> dict[str, Any]:
 				"business_rules": [],
 				"components": {},
 				"approvals": {},
+				"review_evidence": review_evidence,
 				"i18n": {},
 				"master_data": {},
 				"streaming": contract["streaming"],
@@ -82,8 +85,9 @@ def semantic_model() -> dict[str, Any]:
 			"audl": {
 				"id": "audl",
 				"configuration": contract["configuration"],
-				"provides": ["audl_operations"],
+				"provides": provides,
 				"requires": [],
+				"review_evidence": review_evidence,
 			}
 		},
 		"rules": {
@@ -173,6 +177,10 @@ def self_test() -> dict[str, Any]:
 		errors.append("AUDL semantic model agent manifest is stale")
 	if model.get("capabilities", {}).get("audl", {}).get("streaming", {}).get("engine") != "bytewax":
 		errors.append("AUDL semantic model Bytewax stream manifest is stale")
+	if "review_evidence" not in model.get("capabilities", {}).get("audl", {}).get("provides", []):
+		errors.append("AUDL review evidence provide is missing")
+	if "review_evidence" not in model.get("capabilities", {}).get("audl", {}):
+		errors.append("AUDL durable review evidence is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

@@ -16,6 +16,7 @@ from .capability_contract import (
 )
 from .models import (
 	AuditAgentRecord,
+	AuditBatchEvidence,
 	AuditExportRequest,
 	AuditGovernanceEvent,
 	AuditInvestigationRecord,
@@ -33,6 +34,7 @@ class AudlService:
 		self._holds: dict[tuple[str, str], AuditLegalHoldRecord] = {}
 		self._exports: dict[tuple[str, str], AuditExportRequest] = {}
 		self._purges: dict[tuple[str, str], AuditPurgeRequest] = {}
+		self._batches: dict[tuple[str, str], AuditBatchEvidence] = {}
 		self._investigations: dict[tuple[str, str], AuditInvestigationRecord] = {}
 		self._agents: dict[tuple[str, str], AuditAgentRecord] = {}
 		self._governance_events: list[AuditGovernanceEvent] = []
@@ -87,7 +89,7 @@ class AudlService:
 			"event_severity": severity,
 			"escalation_configured": escalation_configured,
 		})
-		_raise_if_blocked(result)
+		_raise_if_denied(result)
 		record = AuditLifecycleEvent(
 			id=event_id,
 			tenant_id=tenant_id,
@@ -100,6 +102,10 @@ class AudlService:
 			immutable=immutable,
 			checksum=expected_checksum,
 			details=dict(details or {}),
+			policy_decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=_review_reasons(result),
+			audit_evidence=_audit_evidence(result),
 		)
 		self._events[self._tenant_key(tenant_id, event_id)] = record
 		self._record_governance(
@@ -108,6 +114,7 @@ class AudlService:
 			subject_id=event_id,
 			message=f"Appended audit event {event_id}.",
 			evidence={"severity": severity, "resource_type": resource_type, "contains_pii": contains_pii},
+			policy_result=result,
 		)
 		return record.model_dump(mode="json")
 
@@ -130,15 +137,32 @@ class AudlService:
 			"stream_processing_enabled": stream_processing_enabled,
 			"event_stream": stream_name if stream_name == "bytewax" else "non_bytewax",
 		})
-		_raise_if_blocked(result)
-		return {
-			"tenant_id": tenant_id,
-			"record_count": record_count,
-			"event_stream": "bytewax",
-			"stream_processing_enabled": stream_processing_enabled,
-			"accepted": True,
-			"matched_rules": result["matched_rules"],
-		}
+		batch = AuditBatchEvidence(
+			tenant_id=tenant_id,
+			record_count=record_count,
+			event_stream=stream_name,
+			stream_processing_enabled=stream_processing_enabled,
+			status="denied" if result["decision"] == "deny" else "accepted",
+			policy_decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=_review_reasons(result),
+			audit_evidence=_audit_evidence(result),
+		)
+		self._batches[self._tenant_key(tenant_id, batch.id)] = batch
+		self._record_governance(
+			tenant_id=tenant_id,
+			event_type="audit_batch_validated",
+			subject_id=batch.id,
+			message=f"Audit batch {batch.status}: {record_count} records.",
+			evidence={"event_stream": stream_name, "record_count": record_count},
+			policy_result=result,
+		)
+		if result["decision"] == "deny":
+			_raise_if_denied(result)
+		payload = batch.model_dump(mode="json")
+		payload["accepted"] = True
+		payload["event_stream"] = "bytewax"
+		return payload
 
 	def register_audit_agent(
 		self,
@@ -172,7 +196,7 @@ class AudlService:
 			"privileged_action": role in PRIVILEGED_AUDIT_AGENT_ROLES,
 			"human_approval_required": human_approval_required,
 		})
-		_raise_if_blocked(result)
+		_raise_if_denied(result)
 		record = AuditAgentRecord(
 			id=agent_id,
 			tenant_id=tenant_id,
@@ -182,7 +206,12 @@ class AudlService:
 			purpose=purpose,
 			owner=owner,
 			human_approval_required=human_approval_required,
+			status="pending_review" if result["decision"] == "require_review" else "active",
 			configuration=dict(configuration or {}),
+			policy_decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=_review_reasons(result),
+			audit_evidence=_audit_evidence(result, review_recorded=human_approval_required),
 		)
 		self._agents[self._tenant_key(tenant_id, agent_id)] = record
 		self._record_governance(
@@ -196,6 +225,7 @@ class AudlService:
 				"owner": owner,
 				"human_approval_required": human_approval_required,
 			},
+			policy_result=result,
 		)
 		return record.model_dump(mode="json")
 
@@ -290,7 +320,6 @@ class AudlService:
 			"contains_pii": contains_pii,
 			"masking_enabled": masking_enabled,
 		})
-		_raise_if_blocked(result)
 		record = AuditExportRequest(
 			id=export_id,
 			tenant_id=tenant_id,
@@ -299,6 +328,11 @@ class AudlService:
 			contains_pii=contains_pii,
 			masking_enabled=masking_enabled,
 			reason=reason,
+			decision="denied" if result["decision"] == "deny" else "review_required" if result["decision"] == "require_review" else "pending",
+			policy_decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=_review_reasons(result),
+			audit_evidence=_audit_evidence(result),
 		)
 		self._exports[self._tenant_key(tenant_id, export_id)] = record
 		self._record_governance(
@@ -307,7 +341,10 @@ class AudlService:
 			subject_id=export_id,
 			message=f"Requested audit export {export_id}.",
 			evidence={"contains_pii": contains_pii, "masking_enabled": masking_enabled},
+			policy_result=result,
 		)
+		if result["decision"] == "deny":
+			_raise_if_denied(result)
 		return record.model_dump(mode="json")
 
 	def decide_export(
@@ -321,6 +358,10 @@ class AudlService:
 		record = self._exports.get(self._tenant_key(tenant_id, export_id))
 		if record is None:
 			raise KeyError(f"unknown export request for tenant: {export_id}")
+		if record.decision == "denied":
+			raise PermissionError("audit_export_denied")
+		if record.decision in {"approved", "rejected"}:
+			raise ValueError("export request already decided")
 		if decision not in {"approved", "rejected"}:
 			raise ValueError("export decision must be approved or rejected")
 		if not reviewer:
@@ -340,6 +381,8 @@ class AudlService:
 			notes=notes,
 			requested_at=record.requested_at,
 			decided_at=datetime.utcnow(),
+			policy_decision="allow",
+			audit_evidence=_audit_evidence(_allow_result(), review_recorded=True),
 		)
 		self._exports[self._tenant_key(tenant_id, export_id)] = decided
 		self._record_governance(
@@ -348,6 +391,7 @@ class AudlService:
 			subject_id=export_id,
 			message=f"Audit export {export_id} was {decision}.",
 			evidence={"reviewer": reviewer, "decision": decision},
+			policy_result=_allow_result(),
 		)
 		return decided.model_dump(mode="json")
 
@@ -374,13 +418,17 @@ class AudlService:
 			"requested_operation": "purge",
 			"legal_hold_active": legal_hold_active,
 		})
-		_raise_if_blocked(result)
 		record = AuditPurgeRequest(
 			id=purge_id,
 			tenant_id=tenant_id,
 			scope=dict(scope),
 			requested_by=requested_by,
 			reason=reason,
+			decision="denied" if result["decision"] == "deny" else "review_required" if result["decision"] == "require_review" else "pending",
+			policy_decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=_review_reasons(result),
+			audit_evidence=_audit_evidence(result),
 		)
 		self._purges[self._tenant_key(tenant_id, purge_id)] = record
 		self._record_governance(
@@ -389,7 +437,10 @@ class AudlService:
 			subject_id=purge_id,
 			message=f"Requested audit purge {purge_id}.",
 			evidence={"scope": record.scope, "requested_by": requested_by},
+			policy_result=result,
 		)
+		if result["decision"] == "deny":
+			_raise_if_denied(result)
 		return record.model_dump(mode="json")
 
 	def decide_purge(
@@ -403,6 +454,10 @@ class AudlService:
 		record = self._purges.get(self._tenant_key(tenant_id, purge_id))
 		if record is None:
 			raise KeyError(f"unknown purge request for tenant: {purge_id}")
+		if record.decision == "denied":
+			raise PermissionError("audit_purge_denied")
+		if record.decision in {"approved", "rejected"}:
+			raise ValueError("purge request already decided")
 		if decision not in {"approved", "rejected"}:
 			raise ValueError("purge decision must be approved or rejected")
 		if not reviewer:
@@ -412,6 +467,36 @@ class AudlService:
 		if not notes:
 			raise ValueError("purge reviewer notes are required")
 		if decision == "approved" and self._legal_hold_active(tenant_id, record.scope):
+			blocked_result = self.evaluate({
+				"tenant_id_missing": not bool(tenant_id),
+				"requested_operation": "purge",
+				"legal_hold_active": True,
+			})
+			blocked = AuditPurgeRequest(
+				id=record.id,
+				tenant_id=record.tenant_id,
+				scope=dict(record.scope),
+				requested_by=record.requested_by,
+				reason=record.reason,
+				decision="denied",
+				reviewer=reviewer,
+				notes=notes,
+				requested_at=record.requested_at,
+				decided_at=datetime.utcnow(),
+				policy_decision=blocked_result["decision"],
+				matched_rules=list(blocked_result["matched_rules"]),
+				review_reasons=_review_reasons(blocked_result),
+				audit_evidence=_audit_evidence(blocked_result, review_recorded=True),
+			)
+			self._purges[self._tenant_key(tenant_id, purge_id)] = blocked
+			self._record_governance(
+				tenant_id=tenant_id,
+				event_type="purge_decision_denied",
+				subject_id=purge_id,
+				message=f"Audit purge {purge_id} was denied by legal hold.",
+				evidence={"reviewer": reviewer, "decision": "denied"},
+				policy_result=blocked_result,
+			)
 			raise PermissionError("legal_hold_active")
 		decided = AuditPurgeRequest(
 			id=record.id,
@@ -424,6 +509,8 @@ class AudlService:
 			notes=notes,
 			requested_at=record.requested_at,
 			decided_at=datetime.utcnow(),
+			policy_decision="allow",
+			audit_evidence=_audit_evidence(_allow_result(), review_recorded=True),
 		)
 		self._purges[self._tenant_key(tenant_id, purge_id)] = decided
 		self._record_governance(
@@ -432,6 +519,7 @@ class AudlService:
 			subject_id=purge_id,
 			message=f"Audit purge {purge_id} was {decision}.",
 			evidence={"reviewer": reviewer, "decision": decision},
+			policy_result=_allow_result(),
 		)
 		return decided.model_dump(mode="json")
 
@@ -521,6 +609,9 @@ class AudlService:
 	def list_purges(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._dump_tenant_records(self._purges, tenant_id)
 
+	def list_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._dump_tenant_records(self._batches, tenant_id)
+
 	def list_investigations(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._dump_tenant_records(self._investigations, tenant_id)
 
@@ -533,6 +624,19 @@ class AudlService:
 			events = [event for event in events if event.tenant_id == tenant_id]
 		return [event.model_dump(mode="json") for event in events]
 
+	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		items = (
+			self.list_exports(tenant_id)
+			+ self.list_purges(tenant_id)
+			+ self.list_audit_agents(tenant_id)
+			+ self.list_batches(tenant_id)
+		)
+		return [
+			item
+			for item in items
+			if item.get("decision") == "review_required" or item.get("status") == "pending_review"
+		]
+
 	def audit_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		events = self.list_events(tenant_id)
 		holds = self.list_legal_holds(tenant_id)
@@ -540,16 +644,21 @@ class AudlService:
 		purges = self.list_purges(tenant_id)
 		investigations = self.list_investigations(tenant_id)
 		agents = self.list_audit_agents(tenant_id)
+		batches = self.list_batches(tenant_id)
 		return {
 			"tenant_id": tenant_id,
 			"event_count": len(events),
 			"critical_event_count": len([event for event in events if event["severity"] == "critical"]),
 			"pii_event_count": len([event for event in events if event["contains_pii"]]),
 			"active_legal_hold_count": len([hold for hold in holds if hold["status"] == "active"]),
-			"pending_export_count": len([item for item in exports if item["decision"] == "pending"]),
-			"pending_purge_count": len([item for item in purges if item["decision"] == "pending"]),
+			"pending_export_count": len([item for item in exports if item["decision"] in {"pending", "review_required"}]),
+			"pending_purge_count": len([item for item in purges if item["decision"] in {"pending", "review_required"}]),
 			"open_investigation_count": len([item for item in investigations if item["status"] == "open"]),
 			"agent_count": len(agents),
+			"batch_count": len(batches),
+			"denied_batch_count": len([item for item in batches if item["status"] == "denied"]),
+			"pending_agent_review_count": len([item for item in agents if item["status"] == "pending_review"]),
+			"pending_review_count": len(self.list_pending_reviews(tenant_id)),
 			"governance_event_count": len(self.list_governance_events(tenant_id)),
 		}
 
@@ -586,7 +695,7 @@ class AudlService:
 
 	def _enforce_tenant(self, tenant_id: str) -> None:
 		result = self.evaluate({"tenant_id_missing": not bool(tenant_id)})
-		_raise_if_blocked(result)
+		_raise_if_denied(result)
 
 	def _get_event(self, tenant_id: str, event_id: str) -> AuditLifecycleEvent:
 		event = self._events.get(self._tenant_key(tenant_id, event_id))
@@ -624,7 +733,9 @@ class AudlService:
 		subject_id: str,
 		message: str,
 		evidence: dict[str, Any] | None = None,
+		policy_result: dict[str, Any] | None = None,
 	) -> None:
+		policy_result = policy_result or _allow_result()
 		self._governance_events.append(
 			AuditGovernanceEvent(
 				tenant_id=tenant_id,
@@ -632,6 +743,10 @@ class AudlService:
 				subject_id=subject_id,
 				message=message,
 				evidence=dict(evidence or {}),
+				policy_decision=policy_result["decision"],
+				matched_rules=list(policy_result["matched_rules"]),
+				review_reasons=_review_reasons(policy_result),
+				audit_evidence=_audit_evidence(policy_result),
 			)
 		)
 
@@ -663,11 +778,35 @@ class AudlService:
 		return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()
 
 
-def _raise_if_blocked(result: dict[str, Any]) -> None:
-	if result["decision"] == "allow":
+def _raise_if_denied(result: dict[str, Any]) -> None:
+	if result["decision"] != "deny":
 		return
 	reasons = ", ".join(action.get("reason", "audit_policy_blocked") for action in result["actions"])
 	raise PermissionError(reasons or "audit_policy_blocked")
+
+
+def _review_reasons(result: dict[str, Any]) -> list[str]:
+	return [
+		str(action.get("reason"))
+		for action in result.get("actions", [])
+		if action.get("reason")
+	]
+
+
+def _audit_evidence(result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+	return {
+		"required_actions": [
+			str(action.get("required_action"))
+			for action in result.get("actions", [])
+			if action.get("required_action")
+		],
+		"reasons": _review_reasons(result),
+		"review_recorded": bool(review_recorded),
+	}
+
+
+def _allow_result() -> dict[str, Any]:
+	return {"decision": "allow", "matched_rules": [], "actions": []}
 
 
 __all__ = ["AudlService"]

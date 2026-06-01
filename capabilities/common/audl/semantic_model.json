@@ -181,9 +181,32 @@
       "master_data": {},
       "name": "Audit Logging",
       "provides": [
-        "audl_operations"
+        "audl_operations",
+        "audit_agents",
+        "review_evidence"
       ],
       "requires": [],
+      "review_evidence": {
+        "deny_behavior": "Denied audit exports, purges, and batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "review_required",
+          "pending_review",
+          "denied",
+          "accepted"
+        ],
+        "pending_queues": [
+          "audit_exports",
+          "audit_purges",
+          "audit_agents",
+          "audit_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "audit_evidence"
+        ]
+      },
       "rule_engine": {
         "rules": [
           {
@@ -309,13 +332,40 @@
               "privileged_action": true,
               "requested_operation": "register_audit_agent"
             },
-            "description": "Privileged audit-agent roles require human approval.",
+            "description": "Privileged audit-agent roles require human approval evidence or review.",
             "effect": {
-              "decision": "deny",
+              "decision": "require_review",
               "reason": "audit_agent_human_approval_required",
               "required_action": "enable_human_approval_for_privileged_audit_agent"
             },
             "name": "audit_agent_privileged_action_requires_approval"
+          },
+          {
+            "condition": {
+              "contains_pii": true,
+              "masking_enabled": true,
+              "requested_operation": "export"
+            },
+            "description": "Masked PII-bearing exports must enter review before release.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "regulated_export_review_required",
+              "required_action": "review_regulated_export"
+            },
+            "name": "regulated_export_requires_review"
+          },
+          {
+            "condition": {
+              "legal_hold_active": false,
+              "requested_operation": "purge"
+            },
+            "description": "Audit purge requests must enter dual-control review before execution.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "audit_purge_review_required",
+              "required_action": "review_audit_purge"
+            },
+            "name": "audit_purge_requires_dual_control_review"
           }
         ],
         "type": "deterministic"
@@ -444,13 +494,40 @@
             "privileged_action": true,
             "requested_operation": "register_audit_agent"
           },
-          "description": "Privileged audit-agent roles require human approval.",
+          "description": "Privileged audit-agent roles require human approval evidence or review.",
           "effect": {
-            "decision": "deny",
+            "decision": "require_review",
             "reason": "audit_agent_human_approval_required",
             "required_action": "enable_human_approval_for_privileged_audit_agent"
           },
           "name": "audit_agent_privileged_action_requires_approval"
+        },
+        {
+          "condition": {
+            "contains_pii": true,
+            "masking_enabled": true,
+            "requested_operation": "export"
+          },
+          "description": "Masked PII-bearing exports must enter review before release.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "regulated_export_review_required",
+            "required_action": "review_regulated_export"
+          },
+          "name": "regulated_export_requires_review"
+        },
+        {
+          "condition": {
+            "legal_hold_active": false,
+            "requested_operation": "purge"
+          },
+          "description": "Audit purge requests must enter dual-control review before execution.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "audit_purge_review_required",
+            "required_action": "review_audit_purge"
+          },
+          "name": "audit_purge_requires_dual_control_review"
         }
       ],
       "runtime": {
@@ -817,9 +894,32 @@
       },
       "id": "audl",
       "provides": [
-        "audl_operations"
+        "audl_operations",
+        "audit_agents",
+        "review_evidence"
       ],
-      "requires": []
+      "requires": [],
+      "review_evidence": {
+        "deny_behavior": "Denied audit exports, purges, and batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "review_required",
+          "pending_review",
+          "denied",
+          "accepted"
+        ],
+        "pending_queues": [
+          "audit_exports",
+          "audit_purges",
+          "audit_agents",
+          "audit_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "audit_evidence"
+        ]
+      }
     }
   },
   "deployment": {
@@ -858,9 +958,9 @@
         "privileged_action": true,
         "requested_operation": "register_audit_agent"
       },
-      "description": "Privileged audit-agent roles require human approval.",
+      "description": "Privileged audit-agent roles require human approval evidence or review.",
       "effect": {
-        "decision": "deny",
+        "decision": "require_review",
         "reason": "audit_agent_human_approval_required",
         "required_action": "enable_human_approval_for_privileged_audit_agent"
       },
@@ -891,6 +991,19 @@
         "required_action": "select_supported_audit_agent_runtime"
       },
       "name": "audit_agent_runtime_supported"
+    },
+    "audit_purge_requires_dual_control_review": {
+      "condition": {
+        "legal_hold_active": false,
+        "requested_operation": "purge"
+      },
+      "description": "Audit purge requests must enter dual-control review before execution.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "audit_purge_review_required",
+        "required_action": "review_audit_purge"
+      },
+      "name": "audit_purge_requires_dual_control_review"
     },
     "bytewax_event_stream_required": {
       "condition": {
@@ -956,6 +1069,20 @@
         "required_action": "release_legal_hold_or_abort"
       },
       "name": "legal_hold_blocks_purge"
+    },
+    "regulated_export_requires_review": {
+      "condition": {
+        "contains_pii": true,
+        "masking_enabled": true,
+        "requested_operation": "export"
+      },
+      "description": "Masked PII-bearing exports must enter review before release.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "regulated_export_review_required",
+        "required_action": "review_regulated_export"
+      },
+      "name": "regulated_export_requires_review"
     },
     "regulated_exports_require_masking": {
       "condition": {

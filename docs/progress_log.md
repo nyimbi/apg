@@ -16,6 +16,76 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-06-01 06:36 EAT
+
+AUDL review-evidence lifecycle packet:
+
+- Extended audit lifecycle events, regulated export requests, purge requests,
+  audit agents, audit batch evidence, and governance events with durable policy
+  evidence: policy decision, matched rules, review reasons, and audit
+  evidence.
+- Added deterministic `require_review` rules for masked PII-bearing exports,
+  purge requests, and privileged audit-agent roles without human approval
+  evidence.
+- Preserved masked PII export requests and purge requests as
+  `review_required` records until a reviewer decides them.
+- Preserved privileged audit agents without human approval as `pending_review`
+  records instead of discarding registration evidence.
+- Changed denied PII export requests, legal-hold purge requests, purge
+  decisions blocked by later legal holds, and non-Bytewax batch validations to
+  persist denial evidence before raising `PermissionError`.
+- Added pending-review and batch evidence to the AUDL dependency-light runtime,
+  API helpers, dashboard, export review queue, purge review queue, compliance
+  center, audit-agent roster, registration metadata, package contract, semantic
+  model, docs, and focused tests.
+- Kept audit agents provider-neutral for Codex, Claude Code, OpenCode, Pi, and
+  future evidence-review runtimes while retaining human approval controls for
+  privileged roles.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for AUDL models, contract,
+  runtime, API helpers, view models, app, and tests passed.
+- `./.venv/bin/pytest -q capabilities/common/audl/tests/test_capability_contract.py
+  capabilities/common/audl/tests/test_package_contract.py` passed with 9 tests
+  and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.audl import app; ..."`
+  passed package self-test.
+- `./.venv/bin/python -m json.tool
+  capabilities/common/audl/semantic_model.json` passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/audl --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/audl --strict --json` passed with no warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/audl --json`
+  passed with no warnings and side-effect-free publish planning.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/common/audl --json` passed with complete lifecycle evidence and
+  12 rules.
+- AUDL stale-marker scan returned no TODO/FIXME/stub/placeholder, Kafka,
+  materialized-baseline, contract-only, or not-implemented markers across the
+  edited AUDL packet.
+- Service smoke executed regulated export review evidence, purge review
+  evidence, privileged audit-agent review evidence, and denied non-Bytewax
+  batch persistence, printing `review_required review_required pending_review
+  denied bytewax_event_stream_required 3`.
+- Inline code review found no blocking issues; residual risks remain around
+  live Elasticsearch/OpenSearch/data-lake storage, live immutable object
+  storage, live Bytewax workers, SIEM/GRC/DLP adapters, notification/case
+  management adapters, cryptographic timestamping/blockchain proof providers,
+  rendered UI, ML anomaly detection, natural-language search, and load checks.
+
+Known gaps:
+
+- Full repository tests, rendered audit forensics UI, live Elasticsearch or
+  OpenSearch storage, live immutable object storage, live Bytewax workers,
+  SIEM/GRC/DLP integrations, notification and case-management adapters,
+  cryptographic timestamping or blockchain proof providers, ML anomaly
+  detection, natural-language search, production persistence and migrations,
+  and load checks still need later verification outside this battery-conscious
+  slice.
+
 ### 2026-06-01 06:21 EAT
 
 CONF review-evidence lifecycle packet:

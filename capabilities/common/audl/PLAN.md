@@ -13,6 +13,10 @@ first-class audit agents, Bytewax stream guardrails, and UI/view metadata so
 generated applications can compose AUDL as an executable audit-governance
 building block.
 
+The current hardening packet adds durable review evidence for regulated
+exports, purge requests, privileged audit agents, audit batches, lifecycle
+events, and governance events.
+
 ## Packet 1: Governed Audit Evidence Lifecycle
 
 Deliver a focused lifecycle packet:
@@ -70,6 +74,20 @@ Deliver a focused agent and streaming packet:
 - run the focused contract, package, self-test, implementation-audit,
   publish-plan, stale-marker, and diff checks.
 
+## Packet 3: Durable Review Evidence
+
+Preserve policy decisions for operator review queues:
+
+- add `policy_decision`, `matched_rules`, `review_reasons`, and
+  `audit_evidence` to reviewable AUDL records;
+- add `AuditBatchEvidence` for accepted and denied batch validation;
+- store masked PII exports and purge requests as `review_required`;
+- store privileged audit agents without human approval as `pending_review`;
+- persist denied export, purge, and batch evidence before raising
+  `PermissionError`;
+- expose `list_pending_reviews()` through the runtime, API helpers, view
+  models, contract, semantic model, and focused tests.
+
 ## Review Checklist
 
 - Event, legal hold, export, purge, investigation, and governance state is
@@ -78,12 +96,17 @@ Deliver a focused agent and streaming packet:
   tenant.
 - Audit agents use supported runtimes and roles.
 - Privileged audit-agent roles require human approval.
+- Privileged audit-agent roles without human approval are preserved as
+  `pending_review`.
 - Audit batch validation requires the Bytewax lifecycle stream.
+- Denied non-Bytewax audit batches persist evidence before `PermissionError`.
 - Immutable event append verifies checksum when a checksum is supplied.
 - PII-bearing exports require masking.
+- Masked PII-bearing exports enter the review queue.
 - Export decisions require reviewer identity and notes.
 - Legal hold blocks purge.
 - Purge decisions require dual-control reviewer evidence.
+- Purge requests enter the review queue.
 - Investigation closure requires actor, resolution, and evidence.
 - API helpers expose the same behavior as service methods.
 - View models expose event, timeline, hold, export, purge, investigation,

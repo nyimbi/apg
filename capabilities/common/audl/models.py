@@ -359,6 +359,10 @@ class AuditLifecycleEvent(BaseModel):
 	immutable: bool = Field(True, description="Whether immutable storage is required")
 	checksum: str = Field(..., description="Event integrity checksum")
 	details: Dict[str, Any] = Field(default_factory=dict, description="Additional event details")
+	policy_decision: str = Field("allow", description="Policy decision that allowed or reviewed the event")
+	matched_rules: List[str] = Field(default_factory=list, description="Policy rules matched for this event")
+	review_reasons: List[str] = Field(default_factory=list, description="Policy reasons requiring review or blocking")
+	audit_evidence: Dict[str, Any] = Field(default_factory=dict, description="Structured guardrail evidence")
 
 
 class AuditLegalHoldRecord(BaseModel):
@@ -393,6 +397,10 @@ class AuditExportRequest(BaseModel):
 	notes: Optional[str] = Field(None, description="Reviewer notes")
 	requested_at: datetime = Field(default_factory=datetime.utcnow, description="Request timestamp")
 	decided_at: Optional[datetime] = Field(None, description="Decision timestamp")
+	policy_decision: str = Field("allow", description="Policy decision for export lifecycle")
+	matched_rules: List[str] = Field(default_factory=list, description="Policy rules matched for export lifecycle")
+	review_reasons: List[str] = Field(default_factory=list, description="Policy reasons attached to export lifecycle")
+	audit_evidence: Dict[str, Any] = Field(default_factory=dict, description="Structured export guardrail evidence")
 
 
 class AuditPurgeRequest(BaseModel):
@@ -409,6 +417,10 @@ class AuditPurgeRequest(BaseModel):
 	notes: Optional[str] = Field(None, description="Reviewer notes")
 	requested_at: datetime = Field(default_factory=datetime.utcnow, description="Request timestamp")
 	decided_at: Optional[datetime] = Field(None, description="Decision timestamp")
+	policy_decision: str = Field("allow", description="Policy decision for purge lifecycle")
+	matched_rules: List[str] = Field(default_factory=list, description="Policy rules matched for purge lifecycle")
+	review_reasons: List[str] = Field(default_factory=list, description="Policy reasons attached to purge lifecycle")
+	audit_evidence: Dict[str, Any] = Field(default_factory=dict, description="Structured purge guardrail evidence")
 
 
 class AuditInvestigationRecord(BaseModel):
@@ -443,6 +455,27 @@ class AuditAgentRecord(BaseModel):
 	status: str = Field("active", description="active or disabled")
 	configuration: Dict[str, Any] = Field(default_factory=dict, description="Runtime-specific configuration")
 	registered_at: datetime = Field(default_factory=datetime.utcnow, description="Registration timestamp")
+	policy_decision: str = Field("allow", description="Policy decision for audit agent registration")
+	matched_rules: List[str] = Field(default_factory=list, description="Policy rules matched for audit agent registration")
+	review_reasons: List[str] = Field(default_factory=list, description="Policy reasons attached to audit agent registration")
+	audit_evidence: Dict[str, Any] = Field(default_factory=dict, description="Structured audit agent guardrail evidence")
+
+
+class AuditBatchEvidence(BaseModel):
+	"""Bytewax audit batch validation evidence."""
+	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
+
+	id: str = Field(default_factory=uuid7str, description="Batch evidence identifier")
+	tenant_id: str = Field(..., description="APG tenant identifier")
+	record_count: int = Field(..., description="Number of audit events in the batch")
+	event_stream: str = Field(..., description="Requested event stream")
+	stream_processing_enabled: bool = Field(True, description="Whether stream processing was enabled")
+	status: str = Field("accepted", description="accepted or denied")
+	processor: str = Field("bytewax", description="Required lifecycle stream processor")
+	policy_decision: str = Field("allow", description="Policy decision for batch validation")
+	matched_rules: List[str] = Field(default_factory=list, description="Policy rules matched for batch validation")
+	review_reasons: List[str] = Field(default_factory=list, description="Policy reasons attached to batch validation")
+	audit_evidence: Dict[str, Any] = Field(default_factory=dict, description="Structured batch guardrail evidence")
 
 
 class AuditGovernanceEvent(BaseModel):
@@ -455,6 +488,10 @@ class AuditGovernanceEvent(BaseModel):
 	subject_id: str = Field(..., description="Subject record identifier")
 	message: str = Field(..., description="Human-readable event message")
 	evidence: Dict[str, Any] = Field(default_factory=dict, description="Structured evidence")
+	policy_decision: str = Field("allow", description="Policy decision associated with the governance event")
+	matched_rules: List[str] = Field(default_factory=list, description="Policy rules matched for the governance event")
+	review_reasons: List[str] = Field(default_factory=list, description="Policy reasons attached to the governance event")
+	audit_evidence: Dict[str, Any] = Field(default_factory=dict, description="Structured policy evidence for the governance event")
 	timestamp: datetime = Field(default_factory=datetime.utcnow, description="Event timestamp")
 
 
@@ -468,7 +505,7 @@ __all__ = [
 	"AuditEvent", "AuditEventBatch", "ComplianceRule",
 	"AuditLifecycleEvent", "AuditLegalHoldRecord", "AuditExportRequest",
 	"AuditPurgeRequest", "AuditInvestigationRecord", "AuditAgentRecord",
-	"AuditGovernanceEvent",
+	"AuditBatchEvidence", "AuditGovernanceEvent",
 	
 	# Validators
 	"validate_tenant_id", "validate_event_severity", "validate_risk_score",

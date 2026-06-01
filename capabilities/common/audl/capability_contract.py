@@ -337,16 +337,36 @@ def default_rules() -> list[CapabilityRule]:
 		),
 		CapabilityRule(
 			name="audit_agent_privileged_action_requires_approval",
-			description="Privileged audit-agent roles require human approval.",
+			description="Privileged audit-agent roles require human approval evidence or review.",
 			condition={
 				"requested_operation": "register_audit_agent",
 				"privileged_action": True,
 				"human_approval_required": False
 			},
 			effect={
-				"decision": "deny",
+				"decision": "require_review",
 				"reason": "audit_agent_human_approval_required",
 				"required_action": "enable_human_approval_for_privileged_audit_agent"
+			}
+		),
+		CapabilityRule(
+			name="regulated_export_requires_review",
+			description="Masked PII-bearing exports must enter review before release.",
+			condition={"requested_operation": "export", "contains_pii": True, "masking_enabled": True},
+			effect={
+				"decision": "require_review",
+				"reason": "regulated_export_review_required",
+				"required_action": "review_regulated_export"
+			}
+		),
+		CapabilityRule(
+			name="audit_purge_requires_dual_control_review",
+			description="Audit purge requests must enter dual-control review before execution.",
+			condition={"requested_operation": "purge", "legal_hold_active": False},
+			effect={
+				"decision": "require_review",
+				"reason": "audit_purge_review_required",
+				"required_action": "review_audit_purge"
 			}
 		)
 	]
@@ -424,6 +444,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "audl",
 		"display_name": "Audit Logging",
+		"provides": ["audl_operations", "audit_agents", "review_evidence"],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
 		"rule_engine": {
@@ -437,7 +458,13 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"components": theme.components
 		},
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest()
+		"streaming": streaming_manifest(),
+		"review_evidence": {
+			"durable_statuses": ["review_required", "pending_review", "denied", "accepted"],
+			"policy_fields": ["policy_decision", "matched_rules", "review_reasons", "audit_evidence"],
+			"pending_queues": ["audit_exports", "audit_purges", "audit_agents", "audit_batches"],
+			"deny_behavior": "Denied audit exports, purges, and batches persist evidence before PermissionError",
+		},
 	}
 
 

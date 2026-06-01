@@ -396,6 +396,7 @@ def get_capability_info(tenant_id: str = "default", overrides: Optional[Dict[str
 		"theme": contract["theme"],
 		"agents": contract["agents"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 	}
 
 # APG Health Check Interface

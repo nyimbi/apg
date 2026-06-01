@@ -12,4 +12,6 @@ Current executable slice:
 - first-class audit agent registration for `codex`, `claude_code`,
   `opencode`, and `pi` runtimes;
 - Bytewax lifecycle-stream metadata and guardrails for audit batches;
+- durable review evidence for regulated exports, purge requests, privileged
+  audit agents, denied batches, lifecycle events, and governance events;
 - dependency-light API helpers and view models for generated APG apps.
