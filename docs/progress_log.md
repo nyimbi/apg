@@ -27867,3 +27867,100 @@ Known gaps:
   document signing, regulator filing, tax reporting, secondary trading, durable
   Bytewax topology, or performance/load checks during this battery-conscious
   slice.
+
+## 2026-06-01 - FinTech InsurTech executable capability
+
+Completed:
+
+- Promoted `capabilities/fintech/insurance` from placeholder into a first-class
+  executable APG capability with README, specification, plan, capability spec,
+  package manifest, semantic model, release evidence, focused tests, and
+  code-review notes.
+- Added executable policyholder onboarding, product publishing, quote
+  generation, policy binding, premium recording, claim intake, document
+  evidence, risk assessment, reinsurance attachment, compliance alert, review,
+  dashboard summary, Bytewax batch validation, and provider-neutral insurance
+  agent registration workflows.
+- Added deterministic guardrails for tenant context, write policy evidence,
+  policyholder KYC/contact, supported product line and coverage evidence, quote
+  policyholder/product/positive premium/underwriting evidence, policy
+  quote/payment evidence, premium policy/amount/currency/payment evidence, claim
+  policy/type/amount/loss/evidence, document type/evidence, risk
+  policyholder/score/source, reinsurance policy/treaty/positive share,
+  compliance severity/evidence, review status/evidence, Bytewax lifecycle
+  events, supported AI-agent runtimes/roles, and privileged AI-agent approval.
+- Added compact UI/view models and theme tokens for policyholders, products,
+  quotes, policies, premiums, claims, documents, risk, reinsurance, compliance,
+  reviews, agents, and settings.
+- Updated fintech capability metadata so `insurance` is listed as an
+  implemented sub-capability.
+- Updated `capabilities/README.md` so the catalog snapshot reports 129 valid
+  contracts, 129 domain-specific packages, 129 strict complete package artifact
+  sets, and 21 fintech packages.
+- Removed the empty `_InsurTech` marker file and regenerated
+  `semantic_model.json` from the executable application.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/fintech/insurance/__init__.py
+  capabilities/fintech/insurance/capability_contract.py
+  capabilities/fintech/insurance/models.py
+  capabilities/fintech/insurance/insurance_runtime.py
+  capabilities/fintech/insurance/service.py
+  capabilities/fintech/insurance/api.py
+  capabilities/fintech/insurance/views.py
+  capabilities/fintech/insurance/app.py
+  capabilities/fintech/insurance/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/fintech/insurance/tests/test_package_contract.py` passed with 6
+  tests.
+- `./.venv/bin/python capabilities/fintech/insurance/app.py` passed self-test
+  with `passed: true` and `status: ok`.
+- `./.venv/bin/apg capabilities inspect fintech_insurance --json` passed with
+  36 rules, 14 UI routes, theme `insurtech_control`, shell `apg_python`, and
+  Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/fintech/insurance --json` passed with `side_effect_free: true`
+  and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/fintech/insurance --json` passed with 1 domain-specific
+  capability, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/fintech/insurance --json` passed with 1 complete lifecycle, 36
+  rules, 14 UI routes, 11 theme tokens, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 129 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 129 operable contracts, 129 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/fintech/insurance`, `capabilities/fintech/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed policyholder, product, quote, policy, premium, claim, document,
+  risk, reinsurance, compliance, review, and AI-agent lifecycle paths so rule
+  evaluation happens before state mutation.
+- Tightened quote, premium, risk, and reinsurance workflows so underwriting,
+  currency, payment, source, and positive-share requirements declared in the
+  contract are enforced by runtime service methods.
+- Reviewed provider-neutral insurance agent behavior so Codex, Claude Code,
+  OpenCode, and Pi runtimes remain first-class configuration choices and
+  privileged actions require human approval.
+- Kept live payment capture, external underwriting engines, repair networks,
+  medical networks, reinsurance bordereaux, regulator filing, actuarial
+  reserving, document signing, and durable Bytewax workers behind adapter
+  boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live payment capture,
+  external underwriting engines, repair networks, medical networks, reinsurance
+  bordereaux, regulator filing, actuarial reserving, document signing, durable
+  Bytewax topology, or performance/load checks during this battery-conscious
+  slice.

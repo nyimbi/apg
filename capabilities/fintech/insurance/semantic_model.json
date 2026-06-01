@@ -1,0 +1,1608 @@
+{
+  "app": {
+    "description": "InsurTech package-backed APG capability",
+    "entity_count": 12,
+    "name": "fintech_insurance",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "fintech_insurance": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "analytics": "bia",
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "reporting": "fin_rpt",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "underwriting_reviewer",
+            "quote_reviewer",
+            "claim_triage_reviewer",
+            "fraud_review_agent",
+            "reinsurance_reviewer",
+            "insurance_compliance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "claims": {
+          "evidence_required": true,
+          "loss_date_required": true,
+          "policy_required": true,
+          "positive_amount_required": true,
+          "supported_types": [
+            "medical",
+            "accident",
+            "theft",
+            "damage",
+            "death",
+            "delay",
+            "weather"
+          ]
+        },
+        "compliance": {
+          "evidence_required": true,
+          "review_required": true,
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "documents": {
+          "evidence_required": true,
+          "reference_required": true,
+          "supported_types": [
+            "policy_schedule",
+            "proof_of_loss",
+            "medical_report",
+            "identity",
+            "invoice",
+            "photo_evidence"
+          ]
+        },
+        "governance": {
+          "audit_events": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "observability": {
+          "event_stream": "apg.fintech.insurance.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "policies": {
+          "effective_date_required": true,
+          "payment_reference_required": true,
+          "quote_required": true
+        },
+        "policyholders": {
+          "contact_required": true,
+          "kyc_required": true,
+          "risk_profile_required": true
+        },
+        "premiums": {
+          "payment_reference_required": true,
+          "policy_required": true,
+          "positive_amount_required": true,
+          "supported_currencies": [
+            "USD",
+            "KES",
+            "EUR",
+            "GBP",
+            "NGN",
+            "GHS",
+            "ZAR"
+          ]
+        },
+        "products": {
+          "coverage_terms_required": true,
+          "pricing_reference_required": true,
+          "supported_lines": [
+            "life",
+            "health",
+            "property",
+            "motor",
+            "travel",
+            "crop",
+            "microinsurance"
+          ]
+        },
+        "quotes": {
+          "policyholder_required": true,
+          "positive_premium_required": true,
+          "product_required": true,
+          "underwriting_reference_required": true
+        },
+        "reinsurance": {
+          "policy_required": true,
+          "positive_share_required": true,
+          "treaty_reference_required": true
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "risk_assessments": {
+          "policyholder_required": true,
+          "score_required": true,
+          "source_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "insurtech_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_claims": true,
+          "enable_compliance": true,
+          "enable_dashboard": true,
+          "enable_documents": true,
+          "enable_policies": true,
+          "enable_policyholders": true,
+          "enable_premiums": true,
+          "enable_products": true,
+          "enable_quotes": true,
+          "enable_reinsurance": true,
+          "enable_reviews": true,
+          "enable_risk": true
+        }
+      },
+      "name": "InsurTech",
+      "provides": [
+        "insurance_policyholder_workflow",
+        "insurance_product_workflow",
+        "insurance_quote_workflow",
+        "insurance_policy_workflow",
+        "insurance_premium_workflow",
+        "insurance_claim_workflow",
+        "insurance_document_workflow",
+        "insurance_risk_workflow",
+        "insurance_reinsurance_workflow",
+        "insurance_compliance_workflow",
+        "insurance_review_workflow",
+        "insurance_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "bia",
+        "fin_rpt"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "policy_evidence_required",
+              "required_action": "attach_policy_evidence"
+            },
+            "name": "insurance_write_requires_policy"
+          },
+          {
+            "condition": {
+              "kyc_present": false,
+              "operation": "onboard_policyholder"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "policyholder_kyc_required",
+              "required_action": "attach_kyc"
+            },
+            "name": "policyholder_kyc_required"
+          },
+          {
+            "condition": {
+              "contact_present": false,
+              "operation": "onboard_policyholder"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "policyholder_contact_required",
+              "required_action": "attach_contact"
+            },
+            "name": "policyholder_contact_required"
+          },
+          {
+            "condition": {
+              "operation": "publish_product",
+              "product_line_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "product_line_not_supported",
+              "required_action": "select_supported_product_line"
+            },
+            "name": "product_line_supported"
+          },
+          {
+            "condition": {
+              "coverage_terms_present": false,
+              "operation": "publish_product"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "coverage_terms_required",
+              "required_action": "attach_coverage_terms"
+            },
+            "name": "product_coverage_required"
+          },
+          {
+            "condition": {
+              "operation": "generate_quote",
+              "policyholder_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "quote_policyholder_required",
+              "required_action": "select_policyholder"
+            },
+            "name": "quote_policyholder_required"
+          },
+          {
+            "condition": {
+              "operation": "generate_quote",
+              "product_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "quote_product_required",
+              "required_action": "select_product"
+            },
+            "name": "quote_product_required"
+          },
+          {
+            "condition": {
+              "operation": "generate_quote",
+              "positive_premium": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_quote_premium_required",
+              "required_action": "set_positive_premium"
+            },
+            "name": "quote_positive_premium"
+          },
+          {
+            "condition": {
+              "operation": "generate_quote",
+              "underwriting_reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "quote_underwriting_reference_required",
+              "required_action": "attach_underwriting_reference"
+            },
+            "name": "quote_underwriting_required"
+          },
+          {
+            "condition": {
+              "operation": "bind_policy",
+              "quote_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "policy_quote_required",
+              "required_action": "select_quote"
+            },
+            "name": "policy_quote_required"
+          },
+          {
+            "condition": {
+              "operation": "bind_policy",
+              "payment_reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "policy_payment_reference_required",
+              "required_action": "attach_payment_reference"
+            },
+            "name": "policy_payment_required"
+          },
+          {
+            "condition": {
+              "operation": "record_premium",
+              "policy_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "premium_policy_required",
+              "required_action": "select_policy"
+            },
+            "name": "premium_policy_required"
+          },
+          {
+            "condition": {
+              "operation": "record_premium",
+              "positive_amount": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_premium_amount_required",
+              "required_action": "set_positive_amount"
+            },
+            "name": "premium_positive_amount"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "record_premium"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "premium_currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "premium_currency_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_premium",
+              "payment_reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "premium_payment_reference_required",
+              "required_action": "attach_payment_reference"
+            },
+            "name": "premium_payment_required"
+          },
+          {
+            "condition": {
+              "operation": "open_claim",
+              "policy_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "claim_policy_required",
+              "required_action": "select_policy"
+            },
+            "name": "claim_policy_required"
+          },
+          {
+            "condition": {
+              "claim_type_supported": false,
+              "operation": "open_claim"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "claim_type_not_supported",
+              "required_action": "select_supported_claim_type"
+            },
+            "name": "claim_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "open_claim",
+              "positive_amount": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_claim_amount_required",
+              "required_action": "set_positive_claim_amount"
+            },
+            "name": "claim_positive_amount"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "open_claim"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "claim_evidence_required",
+              "required_action": "attach_claim_evidence"
+            },
+            "name": "claim_evidence_required"
+          },
+          {
+            "condition": {
+              "document_type_supported": false,
+              "operation": "record_document"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "document_type_not_supported",
+              "required_action": "select_supported_document_type"
+            },
+            "name": "document_type_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_document"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "document_evidence_required",
+              "required_action": "attach_document_evidence"
+            },
+            "name": "document_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_risk_assessment",
+              "policyholder_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_policyholder_required",
+              "required_action": "select_policyholder"
+            },
+            "name": "risk_policyholder_required"
+          },
+          {
+            "condition": {
+              "operation": "record_risk_assessment",
+              "score_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_score_required",
+              "required_action": "set_risk_score"
+            },
+            "name": "risk_score_required"
+          },
+          {
+            "condition": {
+              "operation": "record_risk_assessment",
+              "source_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_source_required",
+              "required_action": "attach_risk_source"
+            },
+            "name": "risk_source_required"
+          },
+          {
+            "condition": {
+              "operation": "record_reinsurance_attachment",
+              "policy_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "reinsurance_policy_required",
+              "required_action": "select_policy"
+            },
+            "name": "reinsurance_policy_required"
+          },
+          {
+            "condition": {
+              "operation": "record_reinsurance_attachment",
+              "treaty_reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "reinsurance_treaty_required",
+              "required_action": "attach_treaty_reference"
+            },
+            "name": "reinsurance_treaty_required"
+          },
+          {
+            "condition": {
+              "operation": "record_reinsurance_attachment",
+              "positive_share": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_reinsurance_share_required",
+              "required_action": "set_positive_reinsurance_share"
+            },
+            "name": "reinsurance_positive_share"
+          },
+          {
+            "condition": {
+              "operation": "record_compliance_alert",
+              "severity_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "compliance_severity_not_supported",
+              "required_action": "select_supported_severity"
+            },
+            "name": "compliance_severity_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_compliance_alert"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "compliance_evidence_required",
+              "required_action": "attach_compliance_evidence"
+            },
+            "name": "compliance_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "status_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_status_not_supported",
+              "required_action": "select_supported_status"
+            },
+            "name": "review_status_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_review"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_evidence_required",
+              "required_action": "attach_review_evidence"
+            },
+            "name": "review_evidence_required"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "insurance_batch"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_insurance_batch_to_bytewax"
+            },
+            "name": "insurance_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_insurance_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "insurance_agent_runtime_not_supported",
+              "required_action": "select_supported_runtime"
+            },
+            "name": "insurance_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_insurance_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "insurance_agent_role_not_supported",
+              "required_action": "select_supported_role"
+            },
+            "name": "insurance_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "insurance_agent_action",
+              "privileged_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_insurance_agent_action_requires_human_approval"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "policy_evidence_required",
+            "required_action": "attach_policy_evidence"
+          },
+          "name": "insurance_write_requires_policy"
+        },
+        {
+          "condition": {
+            "kyc_present": false,
+            "operation": "onboard_policyholder"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "policyholder_kyc_required",
+            "required_action": "attach_kyc"
+          },
+          "name": "policyholder_kyc_required"
+        },
+        {
+          "condition": {
+            "contact_present": false,
+            "operation": "onboard_policyholder"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "policyholder_contact_required",
+            "required_action": "attach_contact"
+          },
+          "name": "policyholder_contact_required"
+        },
+        {
+          "condition": {
+            "operation": "publish_product",
+            "product_line_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "product_line_not_supported",
+            "required_action": "select_supported_product_line"
+          },
+          "name": "product_line_supported"
+        },
+        {
+          "condition": {
+            "coverage_terms_present": false,
+            "operation": "publish_product"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "coverage_terms_required",
+            "required_action": "attach_coverage_terms"
+          },
+          "name": "product_coverage_required"
+        },
+        {
+          "condition": {
+            "operation": "generate_quote",
+            "policyholder_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "quote_policyholder_required",
+            "required_action": "select_policyholder"
+          },
+          "name": "quote_policyholder_required"
+        },
+        {
+          "condition": {
+            "operation": "generate_quote",
+            "product_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "quote_product_required",
+            "required_action": "select_product"
+          },
+          "name": "quote_product_required"
+        },
+        {
+          "condition": {
+            "operation": "generate_quote",
+            "positive_premium": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_quote_premium_required",
+            "required_action": "set_positive_premium"
+          },
+          "name": "quote_positive_premium"
+        },
+        {
+          "condition": {
+            "operation": "generate_quote",
+            "underwriting_reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "quote_underwriting_reference_required",
+            "required_action": "attach_underwriting_reference"
+          },
+          "name": "quote_underwriting_required"
+        },
+        {
+          "condition": {
+            "operation": "bind_policy",
+            "quote_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "policy_quote_required",
+            "required_action": "select_quote"
+          },
+          "name": "policy_quote_required"
+        },
+        {
+          "condition": {
+            "operation": "bind_policy",
+            "payment_reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "policy_payment_reference_required",
+            "required_action": "attach_payment_reference"
+          },
+          "name": "policy_payment_required"
+        },
+        {
+          "condition": {
+            "operation": "record_premium",
+            "policy_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "premium_policy_required",
+            "required_action": "select_policy"
+          },
+          "name": "premium_policy_required"
+        },
+        {
+          "condition": {
+            "operation": "record_premium",
+            "positive_amount": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_premium_amount_required",
+            "required_action": "set_positive_amount"
+          },
+          "name": "premium_positive_amount"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "record_premium"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "premium_currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "premium_currency_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_premium",
+            "payment_reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "premium_payment_reference_required",
+            "required_action": "attach_payment_reference"
+          },
+          "name": "premium_payment_required"
+        },
+        {
+          "condition": {
+            "operation": "open_claim",
+            "policy_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "claim_policy_required",
+            "required_action": "select_policy"
+          },
+          "name": "claim_policy_required"
+        },
+        {
+          "condition": {
+            "claim_type_supported": false,
+            "operation": "open_claim"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "claim_type_not_supported",
+            "required_action": "select_supported_claim_type"
+          },
+          "name": "claim_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "open_claim",
+            "positive_amount": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_claim_amount_required",
+            "required_action": "set_positive_claim_amount"
+          },
+          "name": "claim_positive_amount"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "open_claim"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "claim_evidence_required",
+            "required_action": "attach_claim_evidence"
+          },
+          "name": "claim_evidence_required"
+        },
+        {
+          "condition": {
+            "document_type_supported": false,
+            "operation": "record_document"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "document_type_not_supported",
+            "required_action": "select_supported_document_type"
+          },
+          "name": "document_type_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_document"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "document_evidence_required",
+            "required_action": "attach_document_evidence"
+          },
+          "name": "document_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_risk_assessment",
+            "policyholder_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_policyholder_required",
+            "required_action": "select_policyholder"
+          },
+          "name": "risk_policyholder_required"
+        },
+        {
+          "condition": {
+            "operation": "record_risk_assessment",
+            "score_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_score_required",
+            "required_action": "set_risk_score"
+          },
+          "name": "risk_score_required"
+        },
+        {
+          "condition": {
+            "operation": "record_risk_assessment",
+            "source_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_source_required",
+            "required_action": "attach_risk_source"
+          },
+          "name": "risk_source_required"
+        },
+        {
+          "condition": {
+            "operation": "record_reinsurance_attachment",
+            "policy_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "reinsurance_policy_required",
+            "required_action": "select_policy"
+          },
+          "name": "reinsurance_policy_required"
+        },
+        {
+          "condition": {
+            "operation": "record_reinsurance_attachment",
+            "treaty_reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "reinsurance_treaty_required",
+            "required_action": "attach_treaty_reference"
+          },
+          "name": "reinsurance_treaty_required"
+        },
+        {
+          "condition": {
+            "operation": "record_reinsurance_attachment",
+            "positive_share": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_reinsurance_share_required",
+            "required_action": "set_positive_reinsurance_share"
+          },
+          "name": "reinsurance_positive_share"
+        },
+        {
+          "condition": {
+            "operation": "record_compliance_alert",
+            "severity_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "compliance_severity_not_supported",
+            "required_action": "select_supported_severity"
+          },
+          "name": "compliance_severity_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_compliance_alert"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "compliance_evidence_required",
+            "required_action": "attach_compliance_evidence"
+          },
+          "name": "compliance_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "status_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_status_not_supported",
+            "required_action": "select_supported_status"
+          },
+          "name": "review_status_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_review"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_evidence_required",
+            "required_action": "attach_review_evidence"
+          },
+          "name": "review_evidence_required"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "insurance_batch"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_insurance_batch_to_bytewax"
+          },
+          "name": "insurance_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_insurance_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "insurance_agent_runtime_not_supported",
+            "required_action": "select_supported_runtime"
+          },
+          "name": "insurance_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_insurance_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "insurance_agent_role_not_supported",
+            "required_action": "select_supported_role"
+          },
+          "name": "insurance_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "insurance_agent_action",
+            "privileged_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_insurance_agent_action_requires_human_approval"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "agents": {
+          "component": "InsuranceAgentWorkbench",
+          "permission": "fintech_insurance:admin",
+          "route": "/fintech-insurance/agents"
+        },
+        "claims": {
+          "component": "ClaimWorkbench",
+          "permission": "fintech_insurance:claims",
+          "route": "/fintech-insurance/claims"
+        },
+        "compliance": {
+          "component": "InsuranceComplianceConsole",
+          "permission": "fintech_insurance:compliance",
+          "route": "/fintech-insurance/compliance"
+        },
+        "dashboard": {
+          "component": "InsuranceDashboard",
+          "permission": "fintech_insurance:view",
+          "route": "/fintech-insurance/dashboard"
+        },
+        "documents": {
+          "component": "InsuranceDocumentConsole",
+          "permission": "fintech_insurance:documents",
+          "route": "/fintech-insurance/documents"
+        },
+        "policies": {
+          "component": "PolicyConsole",
+          "permission": "fintech_insurance:policies",
+          "route": "/fintech-insurance/policies"
+        },
+        "policyholders": {
+          "component": "PolicyholderConsole",
+          "permission": "fintech_insurance:policyholders",
+          "route": "/fintech-insurance/policyholders"
+        },
+        "premiums": {
+          "component": "PremiumLedger",
+          "permission": "fintech_insurance:premiums",
+          "route": "/fintech-insurance/premiums"
+        },
+        "products": {
+          "component": "InsuranceProductConsole",
+          "permission": "fintech_insurance:products",
+          "route": "/fintech-insurance/products"
+        },
+        "quotes": {
+          "component": "QuoteWorkbench",
+          "permission": "fintech_insurance:quotes",
+          "route": "/fintech-insurance/quotes"
+        },
+        "reinsurance": {
+          "component": "ReinsuranceConsole",
+          "permission": "fintech_insurance:reinsurance",
+          "route": "/fintech-insurance/reinsurance"
+        },
+        "reviews": {
+          "component": "InsuranceReviewConsole",
+          "permission": "fintech_insurance:reviews",
+          "route": "/fintech-insurance/reviews"
+        },
+        "risk": {
+          "component": "InsuranceRiskConsole",
+          "permission": "fintech_insurance:risk",
+          "route": "/fintech-insurance/risk"
+        },
+        "settings": {
+          "component": "InsuranceSettings",
+          "permission": "fintech_insurance:admin",
+          "route": "/fintech-insurance/settings"
+        }
+      },
+      "streaming": {
+        "events": [
+          "policyholder_onboarded",
+          "insurance_product_published",
+          "quote_generated",
+          "policy_bound",
+          "premium_recorded",
+          "claim_opened",
+          "document_recorded",
+          "risk_assessment_recorded",
+          "reinsurance_attachment_recorded",
+          "insurance_compliance_alert_recorded",
+          "insurance_review_recorded",
+          "insurance_agent_registered"
+        ],
+        "guardrails": [
+          "insurance_batch_requires_bytewax",
+          "privileged_insurance_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.fintech.insurance.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "claims": {
+            "icon": "file-warning",
+            "status_indicator": "claim-chip"
+          },
+          "compliance": {
+            "icon": "scale",
+            "status_indicator": "alert-chip"
+          },
+          "documents": {
+            "icon": "file-stack",
+            "status_indicator": "document-chip"
+          },
+          "policies": {
+            "icon": "shield-check",
+            "status_indicator": "policy-chip"
+          },
+          "policyholders": {
+            "icon": "users",
+            "status_indicator": "policyholder-chip"
+          },
+          "premiums": {
+            "icon": "receipt",
+            "status_indicator": "premium-chip"
+          },
+          "products": {
+            "icon": "package-check",
+            "status_indicator": "product-chip"
+          },
+          "quotes": {
+            "icon": "file-signature",
+            "status_indicator": "quote-chip"
+          },
+          "reinsurance": {
+            "icon": "layers-3",
+            "status_indicator": "reinsurance-chip"
+          },
+          "reviews": {
+            "icon": "clipboard-check",
+            "status_indicator": "review-chip"
+          },
+          "risk": {
+            "icon": "activity",
+            "status_indicator": "risk-chip"
+          }
+        },
+        "name": "insurtech_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#059669",
+          "color.danger": "#B91C1C",
+          "color.primary": "#0369A1",
+          "color.success": "#15803D",
+          "color.warning": "#A16207",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/fintech-insurance/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "InsuranceDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/fintech-insurance/dashboard",
+            "permission": "fintech_insurance:view"
+          },
+          {
+            "component": "PolicyholderConsole",
+            "name": "policyholders",
+            "nav_group": "Customers",
+            "path": "/fintech-insurance/policyholders",
+            "permission": "fintech_insurance:policyholders"
+          },
+          {
+            "component": "InsuranceProductConsole",
+            "name": "products",
+            "nav_group": "Products",
+            "path": "/fintech-insurance/products",
+            "permission": "fintech_insurance:products"
+          },
+          {
+            "component": "QuoteWorkbench",
+            "name": "quotes",
+            "nav_group": "Underwriting",
+            "path": "/fintech-insurance/quotes",
+            "permission": "fintech_insurance:quotes"
+          },
+          {
+            "component": "PolicyConsole",
+            "name": "policies",
+            "nav_group": "Policies",
+            "path": "/fintech-insurance/policies",
+            "permission": "fintech_insurance:policies"
+          },
+          {
+            "component": "PremiumLedger",
+            "name": "premiums",
+            "nav_group": "Policies",
+            "path": "/fintech-insurance/premiums",
+            "permission": "fintech_insurance:premiums"
+          },
+          {
+            "component": "ClaimWorkbench",
+            "name": "claims",
+            "nav_group": "Claims",
+            "path": "/fintech-insurance/claims",
+            "permission": "fintech_insurance:claims"
+          },
+          {
+            "component": "InsuranceDocumentConsole",
+            "name": "documents",
+            "nav_group": "Claims",
+            "path": "/fintech-insurance/documents",
+            "permission": "fintech_insurance:documents"
+          },
+          {
+            "component": "InsuranceRiskConsole",
+            "name": "risk",
+            "nav_group": "Risk",
+            "path": "/fintech-insurance/risk",
+            "permission": "fintech_insurance:risk"
+          },
+          {
+            "component": "ReinsuranceConsole",
+            "name": "reinsurance",
+            "nav_group": "Risk",
+            "path": "/fintech-insurance/reinsurance",
+            "permission": "fintech_insurance:reinsurance"
+          },
+          {
+            "component": "InsuranceComplianceConsole",
+            "name": "compliance",
+            "nav_group": "Governance",
+            "path": "/fintech-insurance/compliance",
+            "permission": "fintech_insurance:compliance"
+          },
+          {
+            "component": "InsuranceReviewConsole",
+            "name": "reviews",
+            "nav_group": "Governance",
+            "path": "/fintech-insurance/reviews",
+            "permission": "fintech_insurance:reviews"
+          },
+          {
+            "component": "InsuranceAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/fintech-insurance/agents",
+            "permission": "fintech_insurance:admin"
+          },
+          {
+            "component": "InsuranceSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/fintech-insurance/settings",
+            "permission": "fintech_insurance:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "insurance_review": {
+        "roles": [
+          "underwriting_reviewer",
+          "quote_reviewer",
+          "claim_triage_reviewer",
+          "fraud_review_agent",
+          "reinsurance_reviewer",
+          "insurance_compliance_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "fintech_insurance": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "bia",
+        "fin_rpt"
+      ]
+    }
+  },
+  "contracts": {
+    "fintech_insurance": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "analytics": "bia",
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "reporting": "fin_rpt",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "underwriting_reviewer",
+            "quote_reviewer",
+            "claim_triage_reviewer",
+            "fraud_review_agent",
+            "reinsurance_reviewer",
+            "insurance_compliance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "claims": {
+          "evidence_required": true,
+          "loss_date_required": true,
+          "policy_required": true,
+          "positive_amount_required": true,
+          "supported_types": [
+            "medical",
+            "accident",
+            "theft",
+            "damage",
+            "death",
+            "delay",
+            "weather"
+          ]
+        },
+        "compliance": {
+          "evidence_required": true,
+          "review_required": true,
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "documents": {
+          "evidence_required": true,
+          "reference_required": true,
+          "supported_types": [
+            "policy_schedule",
+            "proof_of_loss",
+            "medical_report",
+            "identity",
+            "invoice",
+            "photo_evidence"
+          ]
+        },
+        "governance": {
+          "audit_events": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "observability": {
+          "event_stream": "apg.fintech.insurance.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "policies": {
+          "effective_date_required": true,
+          "payment_reference_required": true,
+          "quote_required": true
+        },
+        "policyholders": {
+          "contact_required": true,
+          "kyc_required": true,
+          "risk_profile_required": true
+        },
+        "premiums": {
+          "payment_reference_required": true,
+          "policy_required": true,
+          "positive_amount_required": true,
+          "supported_currencies": [
+            "USD",
+            "KES",
+            "EUR",
+            "GBP",
+            "NGN",
+            "GHS",
+            "ZAR"
+          ]
+        },
+        "products": {
+          "coverage_terms_required": true,
+          "pricing_reference_required": true,
+          "supported_lines": [
+            "life",
+            "health",
+            "property",
+            "motor",
+            "travel",
+            "crop",
+            "microinsurance"
+          ]
+        },
+        "quotes": {
+          "policyholder_required": true,
+          "positive_premium_required": true,
+          "product_required": true,
+          "underwriting_reference_required": true
+        },
+        "reinsurance": {
+          "policy_required": true,
+          "positive_share_required": true,
+          "treaty_reference_required": true
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "risk_assessments": {
+          "policyholder_required": true,
+          "score_required": true,
+          "source_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "insurtech_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_claims": true,
+          "enable_compliance": true,
+          "enable_dashboard": true,
+          "enable_documents": true,
+          "enable_policies": true,
+          "enable_policyholders": true,
+          "enable_premiums": true,
+          "enable_products": true,
+          "enable_quotes": true,
+          "enable_reinsurance": true,
+          "enable_reviews": true,
+          "enable_risk": true
+        }
+      },
+      "id": "fintech_insurance",
+      "provides": [
+        "insurance_policyholder_workflow",
+        "insurance_product_workflow",
+        "insurance_quote_workflow",
+        "insurance_policy_workflow",
+        "insurance_premium_workflow",
+        "insurance_claim_workflow",
+        "insurance_document_workflow",
+        "insurance_risk_workflow",
+        "insurance_reinsurance_workflow",
+        "insurance_compliance_workflow",
+        "insurance_review_workflow",
+        "insurance_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "bia",
+        "fin_rpt"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 12,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "fintech_insurance": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}

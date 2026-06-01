@@ -86,6 +86,7 @@ CAPABILITY_META = {
 		'bnpl',          # Buy Now Pay Later
 		'agency',        # Agency Banking
 		'remittance',    # Cross-Border Remittance
+		'insurance',     # InsurTech
 		'kyc',           # Know Your Customer
 		'aml',           # Anti Money Laundering
 		'fraud',         # Fraud Detection
