@@ -73,6 +73,7 @@ CAPABILITY_META = {
 		'payments',      # Digital Payments
 		'cards',         # Digital Cards
 		'wallets',       # Digital Wallets
+		'mobile',        # Mobile Banking
 		'neobanking',    # Neo Banking
 		'lending',       # Digital Lending
 		'bnpl',          # Buy Now Pay Later

@@ -1,0 +1,2425 @@
+{
+  "app": {
+    "description": "Mobile Banking package-backed APG capability",
+    "entity_count": 12,
+    "name": "fintech_mobile",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "fintech_mobile": {
+      "configuration": {
+        "account_links": {
+          "provider_reference_required": true,
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ],
+          "supported_types": [
+            "deposit",
+            "wallet",
+            "card",
+            "loan",
+            "savings",
+            "bnpl",
+            "agency_float"
+          ]
+        },
+        "adapters": {
+          "agency": "fintech_agency",
+          "aml": "fintech_aml",
+          "audit": "audl",
+          "auth": "auth",
+          "bnpl": "fintech_bnpl",
+          "cards": "fintech_cards",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "lending": "fintech_lending",
+          "neobanking": "fintech_neobanking",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "mobile_ops_reviewer",
+            "device_risk_reviewer",
+            "mobile_payments_reviewer",
+            "mobile_service_reviewer",
+            "mobile_fraud_reviewer",
+            "mobile_compliance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "airtime": {
+          "operator_reference_required": true,
+          "phone_reference_required": true
+        },
+        "auth_factors": {
+          "device_required": true,
+          "strength_reference_required": true,
+          "supported_types": [
+            "passcode",
+            "biometric",
+            "device_binding",
+            "otp",
+            "hardware_key"
+          ]
+        },
+        "bills": {
+          "biller_reference_required": true,
+          "payment_reference_required": true
+        },
+        "customers": {
+          "aml_required": true,
+          "consent_required": true,
+          "fraud_required": true,
+          "kyc_required": true,
+          "supported_countries": [
+            "KE",
+            "UG",
+            "TZ",
+            "RW",
+            "GH",
+            "NG",
+            "ZA",
+            "GB",
+            "US",
+            "AE"
+          ]
+        },
+        "devices": {
+          "attestation_required": true,
+          "risk_tier_required": true,
+          "supported_platforms": [
+            "ios",
+            "android",
+            "web",
+            "ussd",
+            "sms"
+          ]
+        },
+        "fraud_events": {
+          "evidence_required": true,
+          "high_severity_requires_approval": true,
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "governance": {
+          "audit_mobile_events": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "notifications": {
+          "consent_required": true,
+          "supported_channels": [
+            "push",
+            "sms",
+            "email",
+            "in_app",
+            "ussd"
+          ]
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_airtime_events": true,
+          "emit_auth_events": true,
+          "emit_bill_events": true,
+          "emit_customer_events": true,
+          "emit_device_events": true,
+          "emit_fraud_events": true,
+          "emit_link_events": true,
+          "emit_notification_events": true,
+          "emit_payment_events": true,
+          "emit_program_events": true,
+          "emit_service_events": true,
+          "event_stream": "apg.fintech.mobile.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "payments": {
+          "high_value_threshold": 100000,
+          "human_approval_required_for_high_value": true,
+          "positive_amount_required": true,
+          "risk_reference_required": true,
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ],
+          "supported_types": [
+            "peer_transfer",
+            "merchant_payment",
+            "bill_payment",
+            "airtime",
+            "loan_repayment",
+            "savings_transfer",
+            "card_payment",
+            "wallet_cash_out"
+          ]
+        },
+        "programs": {
+          "owner_required": true,
+          "supported_countries": [
+            "KE",
+            "UG",
+            "TZ",
+            "RW",
+            "GH",
+            "NG",
+            "ZA",
+            "GB",
+            "US",
+            "AE"
+          ],
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ],
+          "supported_platforms": [
+            "ios",
+            "android",
+            "web",
+            "ussd",
+            "sms"
+          ]
+        },
+        "service_requests": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_reasons": [
+            "account_access",
+            "device_change",
+            "payment_dispute",
+            "card_issue",
+            "loan_question",
+            "bnpl_question",
+            "fraud_report",
+            "profile_update"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_mobile_control"
+        },
+        "ui": {
+          "enable_account_links": true,
+          "enable_agents": true,
+          "enable_airtime": true,
+          "enable_auth_factors": true,
+          "enable_bills": true,
+          "enable_customers": true,
+          "enable_dashboard": true,
+          "enable_devices": true,
+          "enable_fraud_events": true,
+          "enable_notifications": true,
+          "enable_payments": true,
+          "enable_programs": true,
+          "enable_service_requests": true
+        }
+      },
+      "name": "Mobile Banking",
+      "provides": [
+        "mobile_banking_program_governance",
+        "mobile_customer_enrollment",
+        "trusted_device_lifecycle",
+        "mobile_authentication_factor_workflow",
+        "mobile_account_linking",
+        "mobile_payment_workflow",
+        "mobile_bill_payment_workflow",
+        "mobile_airtime_workflow",
+        "mobile_service_request_workflow",
+        "mobile_notification_workflow",
+        "mobile_fraud_event_workflow",
+        "mobile_banking_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_cards",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "fintech_neobanking",
+        "fintech_lending",
+        "fintech_bnpl",
+        "fintech_agency"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "Mobile banking operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "description": "Mobile banking writes require policy evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "policy_evidence_required",
+              "required_action": "attach_policy_evidence"
+            },
+            "name": "mobile_write_requires_policy"
+          },
+          {
+            "condition": {
+              "operation": "register_program",
+              "owner_present": false
+            },
+            "description": "Programs require owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "program_owner_required",
+              "required_action": "assign_program_owner"
+            },
+            "name": "program_owner_required"
+          },
+          {
+            "condition": {
+              "country_supported": false,
+              "operation": "register_program"
+            },
+            "description": "Program country must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "program_country_not_supported",
+              "required_action": "select_supported_country"
+            },
+            "name": "program_country_supported"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "register_program"
+            },
+            "description": "Program currency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "program_currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "program_currency_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_program",
+              "platforms_valid": false
+            },
+            "description": "Program platforms must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "program_platforms_invalid",
+              "required_action": "select_supported_platforms"
+            },
+            "name": "program_platforms_valid"
+          },
+          {
+            "condition": {
+              "customer_present": false,
+              "operation": "enroll_customer"
+            },
+            "description": "Customers require reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_reference_required",
+              "required_action": "attach_customer_reference"
+            },
+            "name": "customer_reference_required"
+          },
+          {
+            "condition": {
+              "country_supported": false,
+              "operation": "enroll_customer"
+            },
+            "description": "Customer country must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_country_not_supported",
+              "required_action": "select_supported_country"
+            },
+            "name": "customer_country_supported"
+          },
+          {
+            "condition": {
+              "kyc_present": false,
+              "operation": "enroll_customer"
+            },
+            "description": "Customers require KYC evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_kyc_required",
+              "required_action": "attach_kyc_profile"
+            },
+            "name": "customer_kyc_required"
+          },
+          {
+            "condition": {
+              "consent_present": false,
+              "operation": "enroll_customer"
+            },
+            "description": "Customers require consent.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_consent_required",
+              "required_action": "capture_consent"
+            },
+            "name": "customer_consent_required"
+          },
+          {
+            "condition": {
+              "aml_present": false,
+              "operation": "enroll_customer"
+            },
+            "description": "Customers require AML evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_aml_required",
+              "required_action": "attach_aml_evidence"
+            },
+            "name": "customer_aml_required"
+          },
+          {
+            "condition": {
+              "fraud_present": false,
+              "operation": "enroll_customer"
+            },
+            "description": "Customers require fraud evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_fraud_required",
+              "required_action": "attach_fraud_evidence"
+            },
+            "name": "customer_fraud_required"
+          },
+          {
+            "condition": {
+              "customer_present": false,
+              "operation": "bind_device"
+            },
+            "description": "Devices require customer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "device_customer_required",
+              "required_action": "select_customer"
+            },
+            "name": "device_customer_required"
+          },
+          {
+            "condition": {
+              "operation": "bind_device",
+              "platform_supported": false
+            },
+            "description": "Device platform must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "device_platform_not_supported",
+              "required_action": "select_supported_platform"
+            },
+            "name": "device_platform_supported"
+          },
+          {
+            "condition": {
+              "fingerprint_present": false,
+              "operation": "bind_device"
+            },
+            "description": "Devices require fingerprint.",
+            "effect": {
+              "decision": "deny",
+              "reason": "device_fingerprint_required",
+              "required_action": "attach_device_fingerprint"
+            },
+            "name": "device_fingerprint_required"
+          },
+          {
+            "condition": {
+              "attestation_present": false,
+              "operation": "bind_device"
+            },
+            "description": "Devices require attestation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "device_attestation_required",
+              "required_action": "attach_attestation"
+            },
+            "name": "device_attestation_required"
+          },
+          {
+            "condition": {
+              "operation": "bind_device",
+              "risk_tier_present": false
+            },
+            "description": "Devices require risk tier.",
+            "effect": {
+              "decision": "deny",
+              "reason": "device_risk_tier_required",
+              "required_action": "assign_risk_tier"
+            },
+            "name": "device_risk_tier_required"
+          },
+          {
+            "condition": {
+              "customer_present": false,
+              "operation": "register_auth_factor"
+            },
+            "description": "Auth factors require customer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "auth_customer_required",
+              "required_action": "select_customer"
+            },
+            "name": "auth_customer_required"
+          },
+          {
+            "condition": {
+              "device_present": false,
+              "operation": "register_auth_factor"
+            },
+            "description": "Auth factors require device.",
+            "effect": {
+              "decision": "deny",
+              "reason": "auth_device_required",
+              "required_action": "select_device"
+            },
+            "name": "auth_device_required"
+          },
+          {
+            "condition": {
+              "factor_type_supported": false,
+              "operation": "register_auth_factor"
+            },
+            "description": "Auth factor type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "auth_factor_type_not_supported",
+              "required_action": "select_supported_factor"
+            },
+            "name": "auth_factor_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_auth_factor",
+              "strength_reference_present": false
+            },
+            "description": "Auth factors require strength reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "auth_strength_reference_required",
+              "required_action": "attach_strength_reference"
+            },
+            "name": "auth_strength_required"
+          },
+          {
+            "condition": {
+              "customer_present": false,
+              "operation": "link_account"
+            },
+            "description": "Account links require customer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "link_customer_required",
+              "required_action": "select_customer"
+            },
+            "name": "link_customer_required"
+          },
+          {
+            "condition": {
+              "link_type_supported": false,
+              "operation": "link_account"
+            },
+            "description": "Account link type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "account_link_type_not_supported",
+              "required_action": "select_supported_link_type"
+            },
+            "name": "link_type_supported"
+          },
+          {
+            "condition": {
+              "account_reference_present": false,
+              "operation": "link_account"
+            },
+            "description": "Account links require account reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "account_reference_required",
+              "required_action": "attach_account_reference"
+            },
+            "name": "link_reference_required"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "link_account"
+            },
+            "description": "Account link currency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "account_link_currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "link_currency_supported"
+          },
+          {
+            "condition": {
+              "operation": "link_account",
+              "provider_reference_present": false
+            },
+            "description": "Account links require provider reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "provider_reference_required",
+              "required_action": "attach_provider_reference"
+            },
+            "name": "link_provider_reference_required"
+          },
+          {
+            "condition": {
+              "customer_present": false,
+              "operation": "initiate_payment"
+            },
+            "description": "Payments require customer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_customer_required",
+              "required_action": "select_customer"
+            },
+            "name": "payment_customer_required"
+          },
+          {
+            "condition": {
+              "device_present": false,
+              "operation": "initiate_payment"
+            },
+            "description": "Payments require trusted device.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_device_required",
+              "required_action": "select_device"
+            },
+            "name": "payment_device_required"
+          },
+          {
+            "condition": {
+              "account_link_present": false,
+              "operation": "initiate_payment"
+            },
+            "description": "Payments require account link.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_account_link_required",
+              "required_action": "select_account_link"
+            },
+            "name": "payment_link_required"
+          },
+          {
+            "condition": {
+              "operation": "initiate_payment",
+              "payment_type_supported": false
+            },
+            "description": "Payment type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_type_not_supported",
+              "required_action": "select_supported_payment_type"
+            },
+            "name": "payment_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "initiate_payment",
+              "positive_amount": false
+            },
+            "description": "Payment amount must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_payment_amount_required",
+              "required_action": "set_positive_amount"
+            },
+            "name": "payment_amount_positive"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "initiate_payment"
+            },
+            "description": "Payment currency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "payment_currency_supported"
+          },
+          {
+            "condition": {
+              "currency_matches_link": false,
+              "operation": "initiate_payment"
+            },
+            "description": "Payment currency must match account link.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_link_currency_mismatch",
+              "required_action": "use_link_currency"
+            },
+            "name": "payment_currency_matches_link"
+          },
+          {
+            "condition": {
+              "operation": "initiate_payment",
+              "recipient_present": false
+            },
+            "description": "Payments require recipient.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_recipient_required",
+              "required_action": "attach_recipient"
+            },
+            "name": "payment_recipient_required"
+          },
+          {
+            "condition": {
+              "operation": "initiate_payment",
+              "risk_reference_present": false
+            },
+            "description": "Payments require risk reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_risk_reference_required",
+              "required_action": "attach_risk_reference"
+            },
+            "name": "payment_risk_reference_required"
+          },
+          {
+            "condition": {
+              "high_value": true,
+              "human_approval_recorded": false,
+              "operation": "initiate_payment"
+            },
+            "description": "High-value payments require approval.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "payment_approval_required",
+              "required_action": "record_payment_approval"
+            },
+            "name": "high_value_payment_requires_approval"
+          },
+          {
+            "condition": {
+              "biller_reference_present": false,
+              "operation": "record_bill_payment"
+            },
+            "description": "Bill payments require biller reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "biller_reference_required",
+              "required_action": "attach_biller_reference"
+            },
+            "name": "bill_payment_reference_required"
+          },
+          {
+            "condition": {
+              "operation": "record_bill_payment",
+              "payment_present": false
+            },
+            "description": "Bill payments require payment.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bill_payment_required",
+              "required_action": "select_payment"
+            },
+            "name": "bill_payment_payment_required"
+          },
+          {
+            "condition": {
+              "operation": "record_bill_payment",
+              "payment_type_matches": false
+            },
+            "description": "Bill payment records require a bill-payment transaction.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bill_payment_type_required",
+              "required_action": "use_bill_payment_transaction"
+            },
+            "name": "bill_payment_type_required"
+          },
+          {
+            "condition": {
+              "operation": "purchase_airtime",
+              "operator_reference_present": false
+            },
+            "description": "Airtime purchases require operator.",
+            "effect": {
+              "decision": "deny",
+              "reason": "airtime_operator_required",
+              "required_action": "attach_operator_reference"
+            },
+            "name": "airtime_operator_required"
+          },
+          {
+            "condition": {
+              "operation": "purchase_airtime",
+              "phone_reference_present": false
+            },
+            "description": "Airtime purchases require phone reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "airtime_phone_required",
+              "required_action": "attach_phone_reference"
+            },
+            "name": "airtime_phone_required"
+          },
+          {
+            "condition": {
+              "operation": "purchase_airtime",
+              "payment_present": false
+            },
+            "description": "Airtime purchases require payment.",
+            "effect": {
+              "decision": "deny",
+              "reason": "airtime_payment_required",
+              "required_action": "select_payment"
+            },
+            "name": "airtime_payment_required"
+          },
+          {
+            "condition": {
+              "operation": "purchase_airtime",
+              "payment_type_matches": false
+            },
+            "description": "Airtime records require an airtime transaction.",
+            "effect": {
+              "decision": "deny",
+              "reason": "airtime_payment_type_required",
+              "required_action": "use_airtime_transaction"
+            },
+            "name": "airtime_payment_type_required"
+          },
+          {
+            "condition": {
+              "customer_present": false,
+              "operation": "open_service_request"
+            },
+            "description": "Service requests require customer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "service_customer_required",
+              "required_action": "select_customer"
+            },
+            "name": "service_customer_required"
+          },
+          {
+            "condition": {
+              "operation": "open_service_request",
+              "service_reason_supported": false
+            },
+            "description": "Service reason must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "service_reason_not_supported",
+              "required_action": "select_supported_reason"
+            },
+            "name": "service_reason_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "open_service_request"
+            },
+            "description": "Service requests require evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "service_evidence_required",
+              "required_action": "attach_service_evidence"
+            },
+            "name": "service_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "open_service_request",
+              "reviewer_present": false
+            },
+            "description": "Service requests require reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "service_reviewer_required",
+              "required_action": "assign_reviewer"
+            },
+            "name": "service_reviewer_required"
+          },
+          {
+            "condition": {
+              "customer_present": false,
+              "operation": "set_notification_preference"
+            },
+            "description": "Notification preferences require customer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "notification_customer_required",
+              "required_action": "select_customer"
+            },
+            "name": "notification_customer_required"
+          },
+          {
+            "condition": {
+              "notification_channel_supported": false,
+              "operation": "set_notification_preference"
+            },
+            "description": "Notification channel must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "notification_channel_not_supported",
+              "required_action": "select_supported_channel"
+            },
+            "name": "notification_channel_supported"
+          },
+          {
+            "condition": {
+              "consent_present": false,
+              "operation": "set_notification_preference"
+            },
+            "description": "Notification preference requires consent.",
+            "effect": {
+              "decision": "deny",
+              "reason": "notification_consent_required",
+              "required_action": "capture_notification_consent"
+            },
+            "name": "notification_consent_required"
+          },
+          {
+            "condition": {
+              "customer_present": false,
+              "operation": "record_fraud_event"
+            },
+            "description": "Fraud events require customer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "fraud_customer_required",
+              "required_action": "select_customer"
+            },
+            "name": "fraud_customer_required"
+          },
+          {
+            "condition": {
+              "operation": "record_fraud_event",
+              "severity_supported": false
+            },
+            "description": "Fraud severity must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "fraud_severity_not_supported",
+              "required_action": "select_supported_severity"
+            },
+            "name": "fraud_severity_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_fraud_event"
+            },
+            "description": "Fraud events require evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "fraud_evidence_required",
+              "required_action": "attach_fraud_evidence"
+            },
+            "name": "fraud_evidence_required"
+          },
+          {
+            "condition": {
+              "high_severity": true,
+              "human_approval_recorded": false,
+              "operation": "record_fraud_event"
+            },
+            "description": "High-severity fraud events require approval.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "fraud_approval_required",
+              "required_action": "record_fraud_approval"
+            },
+            "name": "high_severity_fraud_requires_approval"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "mobile_batch"
+            },
+            "description": "Mobile batches require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_mobile_batch_to_bytewax"
+            },
+            "name": "mobile_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_mobile_agent"
+            },
+            "description": "Mobile agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "mobile_agent_runtime_not_supported",
+              "required_action": "select_supported_runtime"
+            },
+            "name": "mobile_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_mobile_agent"
+            },
+            "description": "Mobile agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "mobile_agent_role_not_supported",
+              "required_action": "select_supported_role"
+            },
+            "name": "mobile_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "mobile_agent_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged mobile-agent actions require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_mobile_agent_action_requires_human_approval"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "Mobile banking operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "description": "Mobile banking writes require policy evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "policy_evidence_required",
+            "required_action": "attach_policy_evidence"
+          },
+          "name": "mobile_write_requires_policy"
+        },
+        {
+          "condition": {
+            "operation": "register_program",
+            "owner_present": false
+          },
+          "description": "Programs require owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "program_owner_required",
+            "required_action": "assign_program_owner"
+          },
+          "name": "program_owner_required"
+        },
+        {
+          "condition": {
+            "country_supported": false,
+            "operation": "register_program"
+          },
+          "description": "Program country must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "program_country_not_supported",
+            "required_action": "select_supported_country"
+          },
+          "name": "program_country_supported"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "register_program"
+          },
+          "description": "Program currency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "program_currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "program_currency_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_program",
+            "platforms_valid": false
+          },
+          "description": "Program platforms must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "program_platforms_invalid",
+            "required_action": "select_supported_platforms"
+          },
+          "name": "program_platforms_valid"
+        },
+        {
+          "condition": {
+            "customer_present": false,
+            "operation": "enroll_customer"
+          },
+          "description": "Customers require reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_reference_required",
+            "required_action": "attach_customer_reference"
+          },
+          "name": "customer_reference_required"
+        },
+        {
+          "condition": {
+            "country_supported": false,
+            "operation": "enroll_customer"
+          },
+          "description": "Customer country must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_country_not_supported",
+            "required_action": "select_supported_country"
+          },
+          "name": "customer_country_supported"
+        },
+        {
+          "condition": {
+            "kyc_present": false,
+            "operation": "enroll_customer"
+          },
+          "description": "Customers require KYC evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_kyc_required",
+            "required_action": "attach_kyc_profile"
+          },
+          "name": "customer_kyc_required"
+        },
+        {
+          "condition": {
+            "consent_present": false,
+            "operation": "enroll_customer"
+          },
+          "description": "Customers require consent.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_consent_required",
+            "required_action": "capture_consent"
+          },
+          "name": "customer_consent_required"
+        },
+        {
+          "condition": {
+            "aml_present": false,
+            "operation": "enroll_customer"
+          },
+          "description": "Customers require AML evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_aml_required",
+            "required_action": "attach_aml_evidence"
+          },
+          "name": "customer_aml_required"
+        },
+        {
+          "condition": {
+            "fraud_present": false,
+            "operation": "enroll_customer"
+          },
+          "description": "Customers require fraud evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_fraud_required",
+            "required_action": "attach_fraud_evidence"
+          },
+          "name": "customer_fraud_required"
+        },
+        {
+          "condition": {
+            "customer_present": false,
+            "operation": "bind_device"
+          },
+          "description": "Devices require customer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "device_customer_required",
+            "required_action": "select_customer"
+          },
+          "name": "device_customer_required"
+        },
+        {
+          "condition": {
+            "operation": "bind_device",
+            "platform_supported": false
+          },
+          "description": "Device platform must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "device_platform_not_supported",
+            "required_action": "select_supported_platform"
+          },
+          "name": "device_platform_supported"
+        },
+        {
+          "condition": {
+            "fingerprint_present": false,
+            "operation": "bind_device"
+          },
+          "description": "Devices require fingerprint.",
+          "effect": {
+            "decision": "deny",
+            "reason": "device_fingerprint_required",
+            "required_action": "attach_device_fingerprint"
+          },
+          "name": "device_fingerprint_required"
+        },
+        {
+          "condition": {
+            "attestation_present": false,
+            "operation": "bind_device"
+          },
+          "description": "Devices require attestation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "device_attestation_required",
+            "required_action": "attach_attestation"
+          },
+          "name": "device_attestation_required"
+        },
+        {
+          "condition": {
+            "operation": "bind_device",
+            "risk_tier_present": false
+          },
+          "description": "Devices require risk tier.",
+          "effect": {
+            "decision": "deny",
+            "reason": "device_risk_tier_required",
+            "required_action": "assign_risk_tier"
+          },
+          "name": "device_risk_tier_required"
+        },
+        {
+          "condition": {
+            "customer_present": false,
+            "operation": "register_auth_factor"
+          },
+          "description": "Auth factors require customer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "auth_customer_required",
+            "required_action": "select_customer"
+          },
+          "name": "auth_customer_required"
+        },
+        {
+          "condition": {
+            "device_present": false,
+            "operation": "register_auth_factor"
+          },
+          "description": "Auth factors require device.",
+          "effect": {
+            "decision": "deny",
+            "reason": "auth_device_required",
+            "required_action": "select_device"
+          },
+          "name": "auth_device_required"
+        },
+        {
+          "condition": {
+            "factor_type_supported": false,
+            "operation": "register_auth_factor"
+          },
+          "description": "Auth factor type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "auth_factor_type_not_supported",
+            "required_action": "select_supported_factor"
+          },
+          "name": "auth_factor_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_auth_factor",
+            "strength_reference_present": false
+          },
+          "description": "Auth factors require strength reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "auth_strength_reference_required",
+            "required_action": "attach_strength_reference"
+          },
+          "name": "auth_strength_required"
+        },
+        {
+          "condition": {
+            "customer_present": false,
+            "operation": "link_account"
+          },
+          "description": "Account links require customer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "link_customer_required",
+            "required_action": "select_customer"
+          },
+          "name": "link_customer_required"
+        },
+        {
+          "condition": {
+            "link_type_supported": false,
+            "operation": "link_account"
+          },
+          "description": "Account link type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "account_link_type_not_supported",
+            "required_action": "select_supported_link_type"
+          },
+          "name": "link_type_supported"
+        },
+        {
+          "condition": {
+            "account_reference_present": false,
+            "operation": "link_account"
+          },
+          "description": "Account links require account reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "account_reference_required",
+            "required_action": "attach_account_reference"
+          },
+          "name": "link_reference_required"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "link_account"
+          },
+          "description": "Account link currency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "account_link_currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "link_currency_supported"
+        },
+        {
+          "condition": {
+            "operation": "link_account",
+            "provider_reference_present": false
+          },
+          "description": "Account links require provider reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "provider_reference_required",
+            "required_action": "attach_provider_reference"
+          },
+          "name": "link_provider_reference_required"
+        },
+        {
+          "condition": {
+            "customer_present": false,
+            "operation": "initiate_payment"
+          },
+          "description": "Payments require customer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_customer_required",
+            "required_action": "select_customer"
+          },
+          "name": "payment_customer_required"
+        },
+        {
+          "condition": {
+            "device_present": false,
+            "operation": "initiate_payment"
+          },
+          "description": "Payments require trusted device.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_device_required",
+            "required_action": "select_device"
+          },
+          "name": "payment_device_required"
+        },
+        {
+          "condition": {
+            "account_link_present": false,
+            "operation": "initiate_payment"
+          },
+          "description": "Payments require account link.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_account_link_required",
+            "required_action": "select_account_link"
+          },
+          "name": "payment_link_required"
+        },
+        {
+          "condition": {
+            "operation": "initiate_payment",
+            "payment_type_supported": false
+          },
+          "description": "Payment type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_type_not_supported",
+            "required_action": "select_supported_payment_type"
+          },
+          "name": "payment_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "initiate_payment",
+            "positive_amount": false
+          },
+          "description": "Payment amount must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_payment_amount_required",
+            "required_action": "set_positive_amount"
+          },
+          "name": "payment_amount_positive"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "initiate_payment"
+          },
+          "description": "Payment currency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "payment_currency_supported"
+        },
+        {
+          "condition": {
+            "currency_matches_link": false,
+            "operation": "initiate_payment"
+          },
+          "description": "Payment currency must match account link.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_link_currency_mismatch",
+            "required_action": "use_link_currency"
+          },
+          "name": "payment_currency_matches_link"
+        },
+        {
+          "condition": {
+            "operation": "initiate_payment",
+            "recipient_present": false
+          },
+          "description": "Payments require recipient.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_recipient_required",
+            "required_action": "attach_recipient"
+          },
+          "name": "payment_recipient_required"
+        },
+        {
+          "condition": {
+            "operation": "initiate_payment",
+            "risk_reference_present": false
+          },
+          "description": "Payments require risk reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_risk_reference_required",
+            "required_action": "attach_risk_reference"
+          },
+          "name": "payment_risk_reference_required"
+        },
+        {
+          "condition": {
+            "high_value": true,
+            "human_approval_recorded": false,
+            "operation": "initiate_payment"
+          },
+          "description": "High-value payments require approval.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "payment_approval_required",
+            "required_action": "record_payment_approval"
+          },
+          "name": "high_value_payment_requires_approval"
+        },
+        {
+          "condition": {
+            "biller_reference_present": false,
+            "operation": "record_bill_payment"
+          },
+          "description": "Bill payments require biller reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "biller_reference_required",
+            "required_action": "attach_biller_reference"
+          },
+          "name": "bill_payment_reference_required"
+        },
+        {
+          "condition": {
+            "operation": "record_bill_payment",
+            "payment_present": false
+          },
+          "description": "Bill payments require payment.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bill_payment_required",
+            "required_action": "select_payment"
+          },
+          "name": "bill_payment_payment_required"
+        },
+        {
+          "condition": {
+            "operation": "record_bill_payment",
+            "payment_type_matches": false
+          },
+          "description": "Bill payment records require a bill-payment transaction.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bill_payment_type_required",
+            "required_action": "use_bill_payment_transaction"
+          },
+          "name": "bill_payment_type_required"
+        },
+        {
+          "condition": {
+            "operation": "purchase_airtime",
+            "operator_reference_present": false
+          },
+          "description": "Airtime purchases require operator.",
+          "effect": {
+            "decision": "deny",
+            "reason": "airtime_operator_required",
+            "required_action": "attach_operator_reference"
+          },
+          "name": "airtime_operator_required"
+        },
+        {
+          "condition": {
+            "operation": "purchase_airtime",
+            "phone_reference_present": false
+          },
+          "description": "Airtime purchases require phone reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "airtime_phone_required",
+            "required_action": "attach_phone_reference"
+          },
+          "name": "airtime_phone_required"
+        },
+        {
+          "condition": {
+            "operation": "purchase_airtime",
+            "payment_present": false
+          },
+          "description": "Airtime purchases require payment.",
+          "effect": {
+            "decision": "deny",
+            "reason": "airtime_payment_required",
+            "required_action": "select_payment"
+          },
+          "name": "airtime_payment_required"
+        },
+        {
+          "condition": {
+            "operation": "purchase_airtime",
+            "payment_type_matches": false
+          },
+          "description": "Airtime records require an airtime transaction.",
+          "effect": {
+            "decision": "deny",
+            "reason": "airtime_payment_type_required",
+            "required_action": "use_airtime_transaction"
+          },
+          "name": "airtime_payment_type_required"
+        },
+        {
+          "condition": {
+            "customer_present": false,
+            "operation": "open_service_request"
+          },
+          "description": "Service requests require customer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "service_customer_required",
+            "required_action": "select_customer"
+          },
+          "name": "service_customer_required"
+        },
+        {
+          "condition": {
+            "operation": "open_service_request",
+            "service_reason_supported": false
+          },
+          "description": "Service reason must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "service_reason_not_supported",
+            "required_action": "select_supported_reason"
+          },
+          "name": "service_reason_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "open_service_request"
+          },
+          "description": "Service requests require evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "service_evidence_required",
+            "required_action": "attach_service_evidence"
+          },
+          "name": "service_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "open_service_request",
+            "reviewer_present": false
+          },
+          "description": "Service requests require reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "service_reviewer_required",
+            "required_action": "assign_reviewer"
+          },
+          "name": "service_reviewer_required"
+        },
+        {
+          "condition": {
+            "customer_present": false,
+            "operation": "set_notification_preference"
+          },
+          "description": "Notification preferences require customer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "notification_customer_required",
+            "required_action": "select_customer"
+          },
+          "name": "notification_customer_required"
+        },
+        {
+          "condition": {
+            "notification_channel_supported": false,
+            "operation": "set_notification_preference"
+          },
+          "description": "Notification channel must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "notification_channel_not_supported",
+            "required_action": "select_supported_channel"
+          },
+          "name": "notification_channel_supported"
+        },
+        {
+          "condition": {
+            "consent_present": false,
+            "operation": "set_notification_preference"
+          },
+          "description": "Notification preference requires consent.",
+          "effect": {
+            "decision": "deny",
+            "reason": "notification_consent_required",
+            "required_action": "capture_notification_consent"
+          },
+          "name": "notification_consent_required"
+        },
+        {
+          "condition": {
+            "customer_present": false,
+            "operation": "record_fraud_event"
+          },
+          "description": "Fraud events require customer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "fraud_customer_required",
+            "required_action": "select_customer"
+          },
+          "name": "fraud_customer_required"
+        },
+        {
+          "condition": {
+            "operation": "record_fraud_event",
+            "severity_supported": false
+          },
+          "description": "Fraud severity must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "fraud_severity_not_supported",
+            "required_action": "select_supported_severity"
+          },
+          "name": "fraud_severity_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_fraud_event"
+          },
+          "description": "Fraud events require evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "fraud_evidence_required",
+            "required_action": "attach_fraud_evidence"
+          },
+          "name": "fraud_evidence_required"
+        },
+        {
+          "condition": {
+            "high_severity": true,
+            "human_approval_recorded": false,
+            "operation": "record_fraud_event"
+          },
+          "description": "High-severity fraud events require approval.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "fraud_approval_required",
+            "required_action": "record_fraud_approval"
+          },
+          "name": "high_severity_fraud_requires_approval"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "mobile_batch"
+          },
+          "description": "Mobile batches require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_mobile_batch_to_bytewax"
+          },
+          "name": "mobile_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_mobile_agent"
+          },
+          "description": "Mobile agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "mobile_agent_runtime_not_supported",
+            "required_action": "select_supported_runtime"
+          },
+          "name": "mobile_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_mobile_agent"
+          },
+          "description": "Mobile agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "mobile_agent_role_not_supported",
+            "required_action": "select_supported_role"
+          },
+          "name": "mobile_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "mobile_agent_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged mobile-agent actions require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_mobile_agent_action_requires_human_approval"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "account_links": {
+          "component": "AccountLinkConsole",
+          "permission": "fintech_mobile:accounts",
+          "route": "/fintech-mobile/account-links"
+        },
+        "agents": {
+          "component": "MobileBankingAgentWorkbench",
+          "permission": "fintech_mobile:admin",
+          "route": "/fintech-mobile/agents"
+        },
+        "airtime": {
+          "component": "AirtimeWorkbench",
+          "permission": "fintech_mobile:airtime",
+          "route": "/fintech-mobile/airtime"
+        },
+        "auth_factors": {
+          "component": "AuthFactorConsole",
+          "permission": "fintech_mobile:auth",
+          "route": "/fintech-mobile/auth-factors"
+        },
+        "bills": {
+          "component": "BillPaymentWorkbench",
+          "permission": "fintech_mobile:bills",
+          "route": "/fintech-mobile/bills"
+        },
+        "customers": {
+          "component": "MobileCustomerWorkbench",
+          "permission": "fintech_mobile:customers",
+          "route": "/fintech-mobile/customers"
+        },
+        "dashboard": {
+          "component": "MobileBankingDashboard",
+          "permission": "fintech_mobile:view",
+          "route": "/fintech-mobile/dashboard"
+        },
+        "devices": {
+          "component": "TrustedDeviceConsole",
+          "permission": "fintech_mobile:devices",
+          "route": "/fintech-mobile/devices"
+        },
+        "fraud_events": {
+          "component": "MobileFraudEventConsole",
+          "permission": "fintech_mobile:fraud",
+          "route": "/fintech-mobile/fraud-events"
+        },
+        "notifications": {
+          "component": "NotificationPreferenceConsole",
+          "permission": "fintech_mobile:notifications",
+          "route": "/fintech-mobile/notifications"
+        },
+        "payments": {
+          "component": "MobilePaymentConsole",
+          "permission": "fintech_mobile:payments",
+          "route": "/fintech-mobile/payments"
+        },
+        "programs": {
+          "component": "MobileProgramConsole",
+          "permission": "fintech_mobile:manage_programs",
+          "route": "/fintech-mobile/programs"
+        },
+        "service_requests": {
+          "component": "MobileServiceWorkbench",
+          "permission": "fintech_mobile:service",
+          "route": "/fintech-mobile/service-requests"
+        },
+        "settings": {
+          "component": "MobileBankingSettings",
+          "permission": "fintech_mobile:admin",
+          "route": "/fintech-mobile/settings"
+        }
+      },
+      "streaming": {
+        "events": [
+          "mobile_program_registered",
+          "mobile_customer_enrolled",
+          "trusted_device_bound",
+          "auth_factor_registered",
+          "account_linked",
+          "mobile_payment_initiated",
+          "bill_payment_recorded",
+          "airtime_purchased",
+          "service_request_opened",
+          "notification_preference_set",
+          "fraud_event_recorded",
+          "mobile_agent_registered"
+        ],
+        "guardrails": [
+          "mobile_batch_requires_bytewax",
+          "privileged_mobile_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.fintech.mobile.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "account_links": {
+            "icon": "link",
+            "status_indicator": "link-chip"
+          },
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "airtime": {
+            "icon": "radio-tower",
+            "status_indicator": "airtime-chip"
+          },
+          "auth_factors": {
+            "icon": "key-round",
+            "status_indicator": "auth-chip"
+          },
+          "bills": {
+            "icon": "receipt",
+            "status_indicator": "bill-chip"
+          },
+          "customers": {
+            "icon": "user-check",
+            "status_indicator": "customer-chip"
+          },
+          "devices": {
+            "icon": "shield-check",
+            "status_indicator": "device-chip"
+          },
+          "fraud_events": {
+            "icon": "shield-alert",
+            "status_indicator": "fraud-chip"
+          },
+          "notifications": {
+            "icon": "bell",
+            "status_indicator": "notification-chip"
+          },
+          "payments": {
+            "icon": "send",
+            "status_indicator": "payment-chip"
+          },
+          "programs": {
+            "icon": "smartphone",
+            "status_indicator": "program-chip"
+          },
+          "service_requests": {
+            "icon": "life-buoy",
+            "status_indicator": "service-chip"
+          }
+        },
+        "name": "fintech_mobile_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#16A34A",
+          "color.danger": "#B91C1C",
+          "color.primary": "#0284C7",
+          "color.success": "#15803D",
+          "color.warning": "#B45309",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/fintech-mobile/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "MobileBankingDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/fintech-mobile/dashboard",
+            "permission": "fintech_mobile:view"
+          },
+          {
+            "component": "MobileProgramConsole",
+            "name": "programs",
+            "nav_group": "Programs",
+            "path": "/fintech-mobile/programs",
+            "permission": "fintech_mobile:manage_programs"
+          },
+          {
+            "component": "MobileCustomerWorkbench",
+            "name": "customers",
+            "nav_group": "Customers",
+            "path": "/fintech-mobile/customers",
+            "permission": "fintech_mobile:customers"
+          },
+          {
+            "component": "TrustedDeviceConsole",
+            "name": "devices",
+            "nav_group": "Security",
+            "path": "/fintech-mobile/devices",
+            "permission": "fintech_mobile:devices"
+          },
+          {
+            "component": "AuthFactorConsole",
+            "name": "auth_factors",
+            "nav_group": "Security",
+            "path": "/fintech-mobile/auth-factors",
+            "permission": "fintech_mobile:auth"
+          },
+          {
+            "component": "AccountLinkConsole",
+            "name": "account_links",
+            "nav_group": "Accounts",
+            "path": "/fintech-mobile/account-links",
+            "permission": "fintech_mobile:accounts"
+          },
+          {
+            "component": "MobilePaymentConsole",
+            "name": "payments",
+            "nav_group": "Payments",
+            "path": "/fintech-mobile/payments",
+            "permission": "fintech_mobile:payments"
+          },
+          {
+            "component": "BillPaymentWorkbench",
+            "name": "bills",
+            "nav_group": "Payments",
+            "path": "/fintech-mobile/bills",
+            "permission": "fintech_mobile:bills"
+          },
+          {
+            "component": "AirtimeWorkbench",
+            "name": "airtime",
+            "nav_group": "Payments",
+            "path": "/fintech-mobile/airtime",
+            "permission": "fintech_mobile:airtime"
+          },
+          {
+            "component": "MobileServiceWorkbench",
+            "name": "service_requests",
+            "nav_group": "Servicing",
+            "path": "/fintech-mobile/service-requests",
+            "permission": "fintech_mobile:service"
+          },
+          {
+            "component": "NotificationPreferenceConsole",
+            "name": "notifications",
+            "nav_group": "Engagement",
+            "path": "/fintech-mobile/notifications",
+            "permission": "fintech_mobile:notifications"
+          },
+          {
+            "component": "MobileFraudEventConsole",
+            "name": "fraud_events",
+            "nav_group": "Risk",
+            "path": "/fintech-mobile/fraud-events",
+            "permission": "fintech_mobile:fraud"
+          },
+          {
+            "component": "MobileBankingAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/fintech-mobile/agents",
+            "permission": "fintech_mobile:admin"
+          },
+          {
+            "component": "MobileBankingSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/fintech-mobile/settings",
+            "permission": "fintech_mobile:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "mobile_review": {
+        "roles": [
+          "mobile_ops_reviewer",
+          "device_risk_reviewer",
+          "mobile_payments_reviewer",
+          "mobile_service_reviewer",
+          "mobile_fraud_reviewer",
+          "mobile_compliance_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "fintech_mobile": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_cards",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "fintech_neobanking",
+        "fintech_lending",
+        "fintech_bnpl",
+        "fintech_agency"
+      ]
+    }
+  },
+  "contracts": {
+    "fintech_mobile": {
+      "configuration": {
+        "account_links": {
+          "provider_reference_required": true,
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ],
+          "supported_types": [
+            "deposit",
+            "wallet",
+            "card",
+            "loan",
+            "savings",
+            "bnpl",
+            "agency_float"
+          ]
+        },
+        "adapters": {
+          "agency": "fintech_agency",
+          "aml": "fintech_aml",
+          "audit": "audl",
+          "auth": "auth",
+          "bnpl": "fintech_bnpl",
+          "cards": "fintech_cards",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "lending": "fintech_lending",
+          "neobanking": "fintech_neobanking",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "mobile_ops_reviewer",
+            "device_risk_reviewer",
+            "mobile_payments_reviewer",
+            "mobile_service_reviewer",
+            "mobile_fraud_reviewer",
+            "mobile_compliance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "airtime": {
+          "operator_reference_required": true,
+          "phone_reference_required": true
+        },
+        "auth_factors": {
+          "device_required": true,
+          "strength_reference_required": true,
+          "supported_types": [
+            "passcode",
+            "biometric",
+            "device_binding",
+            "otp",
+            "hardware_key"
+          ]
+        },
+        "bills": {
+          "biller_reference_required": true,
+          "payment_reference_required": true
+        },
+        "customers": {
+          "aml_required": true,
+          "consent_required": true,
+          "fraud_required": true,
+          "kyc_required": true,
+          "supported_countries": [
+            "KE",
+            "UG",
+            "TZ",
+            "RW",
+            "GH",
+            "NG",
+            "ZA",
+            "GB",
+            "US",
+            "AE"
+          ]
+        },
+        "devices": {
+          "attestation_required": true,
+          "risk_tier_required": true,
+          "supported_platforms": [
+            "ios",
+            "android",
+            "web",
+            "ussd",
+            "sms"
+          ]
+        },
+        "fraud_events": {
+          "evidence_required": true,
+          "high_severity_requires_approval": true,
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "governance": {
+          "audit_mobile_events": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "notifications": {
+          "consent_required": true,
+          "supported_channels": [
+            "push",
+            "sms",
+            "email",
+            "in_app",
+            "ussd"
+          ]
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_airtime_events": true,
+          "emit_auth_events": true,
+          "emit_bill_events": true,
+          "emit_customer_events": true,
+          "emit_device_events": true,
+          "emit_fraud_events": true,
+          "emit_link_events": true,
+          "emit_notification_events": true,
+          "emit_payment_events": true,
+          "emit_program_events": true,
+          "emit_service_events": true,
+          "event_stream": "apg.fintech.mobile.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "payments": {
+          "high_value_threshold": 100000,
+          "human_approval_required_for_high_value": true,
+          "positive_amount_required": true,
+          "risk_reference_required": true,
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ],
+          "supported_types": [
+            "peer_transfer",
+            "merchant_payment",
+            "bill_payment",
+            "airtime",
+            "loan_repayment",
+            "savings_transfer",
+            "card_payment",
+            "wallet_cash_out"
+          ]
+        },
+        "programs": {
+          "owner_required": true,
+          "supported_countries": [
+            "KE",
+            "UG",
+            "TZ",
+            "RW",
+            "GH",
+            "NG",
+            "ZA",
+            "GB",
+            "US",
+            "AE"
+          ],
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ],
+          "supported_platforms": [
+            "ios",
+            "android",
+            "web",
+            "ussd",
+            "sms"
+          ]
+        },
+        "service_requests": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_reasons": [
+            "account_access",
+            "device_change",
+            "payment_dispute",
+            "card_issue",
+            "loan_question",
+            "bnpl_question",
+            "fraud_report",
+            "profile_update"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_mobile_control"
+        },
+        "ui": {
+          "enable_account_links": true,
+          "enable_agents": true,
+          "enable_airtime": true,
+          "enable_auth_factors": true,
+          "enable_bills": true,
+          "enable_customers": true,
+          "enable_dashboard": true,
+          "enable_devices": true,
+          "enable_fraud_events": true,
+          "enable_notifications": true,
+          "enable_payments": true,
+          "enable_programs": true,
+          "enable_service_requests": true
+        }
+      },
+      "id": "fintech_mobile",
+      "provides": [
+        "mobile_banking_program_governance",
+        "mobile_customer_enrollment",
+        "trusted_device_lifecycle",
+        "mobile_authentication_factor_workflow",
+        "mobile_account_linking",
+        "mobile_payment_workflow",
+        "mobile_bill_payment_workflow",
+        "mobile_airtime_workflow",
+        "mobile_service_request_workflow",
+        "mobile_notification_workflow",
+        "mobile_fraud_event_workflow",
+        "mobile_banking_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_cards",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "fintech_neobanking",
+        "fintech_lending",
+        "fintech_bnpl",
+        "fintech_agency"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 15,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "fintech_mobile": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}

@@ -27165,3 +27165,91 @@ Known gaps:
   cash-in-transit settlement, field-force mobile apps, regulator filing, durable
   Bytewax topology, or performance/load checks during this battery-conscious
   slice.
+
+## 2026-06-01 - FinTech Mobile Banking executable capability
+
+- Promoted `capabilities/fintech/mobile` from a placeholder package into a
+  first-class APG capability with `README.md`, `SPECIFICATION.md`, `PLAN.md`,
+  `cap_spec.md`, contract, models, service, API helpers, view models, app
+  entrypoint, semantic/package/release evidence, and focused tests.
+- Added tenant-scoped mobile program governance, customer enrollment, trusted
+  device binding, authentication-factor registration, account/wallet/card link
+  lifecycle, mobile payment initiation, bill payments, airtime purchases,
+  service requests, notification preferences, fraud events, dashboard summaries,
+  Bytewax batch validation, and provider-neutral mobile-banking agent
+  registration.
+- Added deterministic mobile guardrails for tenant context, write policy,
+  program owner/country/currency/platform support, customer reference/country/
+  KYC/consent/AML/fraud evidence, device customer/platform/fingerprint/
+  attestation/risk-tier evidence, auth factor customer/device/type/strength
+  evidence, account-link customer/type/reference/currency/provider evidence,
+  payment customer/device/account-link/type/amount/currency/link-currency/
+  recipient/risk/high-value approval controls, biller and airtime evidence,
+  service request reason/reviewer/evidence controls, notification channel/
+  consent controls, fraud severity/evidence/high-severity approval controls,
+  Bytewax lifecycle events, supported AI-agent runtimes/roles, and
+  privileged-agent approval.
+- Added `mobile_runtime.py` helpers for normalized codes, countries, currencies,
+  amounts, device fingerprint hashes, fraud severity classification, and payment
+  direction.
+- Updated fintech capability metadata so `mobile` is listed as an implemented
+  sub-capability.
+- Removed the empty `_Mobile_Banking` marker file and refreshed
+  `semantic_model.json`, `package_manifest.json`, and `release_report.json`.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/fintech/mobile/__init__.py capabilities/fintech/mobile/capability_contract.py capabilities/fintech/mobile/models.py capabilities/fintech/mobile/mobile_runtime.py capabilities/fintech/mobile/service.py capabilities/fintech/mobile/api.py capabilities/fintech/mobile/views.py capabilities/fintech/mobile/app.py capabilities/fintech/mobile/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/fintech/mobile/tests/test_package_contract.py`
+  passed with 6 tests.
+- `./.venv/bin/python capabilities/fintech/mobile/app.py` passed with
+  `self_test()` status `ok`.
+- `./.venv/bin/apg capabilities inspect fintech_mobile --json` passed with 58
+  rules, 14 routes, Bytewax streaming, and provider-neutral mobile-banking agent
+  runtimes.
+- `./.venv/bin/apg capabilities publish-plan capabilities/fintech/mobile --json`
+  passed with side-effect-free publish evidence and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/fintech/mobile --json`
+  passed with one domain-specific fintech mobile implementation, 0 baseline
+  markers, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/fintech/mobile --json`
+  passed with one complete lifecycle record, 58 rules, 14 routes, 11 theme
+  tokens, and 0 warnings/errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 121 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 121 operable contracts, 121 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/fintech/mobile`, `capabilities/fintech/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed mobile program, customer, device, authentication factor, account
+  link, payment, bill, airtime, service request, notification, fraud event, and
+  AI-agent lifecycle paths so rule evaluation happens before state mutation.
+- Tightened bill-payment and airtime guardrails during review so bill records
+  require a `bill_payment` transaction and airtime records require an `airtime`
+  transaction.
+- Reviewed trusted-device and authentication-factor guardrails so device
+  attestation, fingerprint, risk tier, factor type, and strength evidence are
+  enforced before mobile access is expanded.
+- Reviewed first-class mobile-banking agent behavior so Codex, Claude Code,
+  OpenCode, and Pi runtimes remain provider-neutral and privileged actions
+  require human approval.
+- Kept live app stores, push/SMS/USSD gateways, device-attestation providers,
+  core banking posting, card-network actions, regulator filing, and durable
+  Bytewax workers behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live app-store release
+  automation, push gateway delivery, SMS/USSD gateway delivery,
+  device-attestation providers, core banking posting, card-network actions,
+  regulator filing, durable Bytewax topology, or performance/load checks during
+  this battery-conscious slice.
