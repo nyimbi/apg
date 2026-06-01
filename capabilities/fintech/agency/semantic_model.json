@@ -1,0 +1,2692 @@
+{
+  "app": {
+    "description": "Agency Banking package-backed APG capability",
+    "entity_count": 11,
+    "name": "fintech_agency",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "fintech_agency": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "audit": "audl",
+          "auth": "auth",
+          "cards": "fintech_cards",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "lending": "fintech_lending",
+          "neobanking": "fintech_neobanking",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "remittance": "fintech_remittance",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "background_check_required": true,
+          "human_approval_required_for_privileged_actions": true,
+          "identity_check_required": true,
+          "supported_roles": [
+            "agency_ops_reviewer",
+            "liquidity_reviewer",
+            "field_supervisor",
+            "agency_compliance_reviewer",
+            "agency_dispute_reviewer",
+            "commission_reviewer",
+            "fraud_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ],
+          "training_required": true
+        },
+        "cash_movements": {
+          "approval_required_for_high_value": true,
+          "custodian_required": true,
+          "high_value_threshold": 100000,
+          "supported_types": [
+            "float_topup",
+            "cash_pickup",
+            "cash_drop",
+            "vault_rebalance",
+            "emergency_liquidity"
+          ]
+        },
+        "commissions": {
+          "payment_reference_required": true,
+          "positive_amount_required": true,
+          "reconciliation_required": true
+        },
+        "customers": {
+          "aml_required": true,
+          "consent_required": true,
+          "fraud_required": true,
+          "kyc_required": true,
+          "supported_tiers": [
+            "tier_1",
+            "tier_2",
+            "tier_3"
+          ]
+        },
+        "disputes": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_reasons": [
+            "cash_shortage",
+            "duplicate_transaction",
+            "customer_denial",
+            "failed_reversal",
+            "agent_error",
+            "fraud_suspected",
+            "service_quality"
+          ]
+        },
+        "float_accounts": {
+          "ledger_reference_required": true,
+          "minimum_opening_balance": 0,
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ]
+        },
+        "governance": {
+          "audit_agency_events": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_cash_movement_events": true,
+          "emit_commission_events": true,
+          "emit_customer_events": true,
+          "emit_dispute_events": true,
+          "emit_float_events": true,
+          "emit_outlet_events": true,
+          "emit_program_events": true,
+          "emit_supervision_events": true,
+          "emit_transaction_events": true,
+          "event_stream": "apg.fintech.agency.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "outlets": {
+          "license_required": true,
+          "location_required": true,
+          "minimum_initial_float": 500,
+          "security_plan_required": true,
+          "supported_types": [
+            "retail_shop",
+            "pharmacy",
+            "supermarket",
+            "petrol_station",
+            "mobile_money_agent",
+            "post_office",
+            "cooperative",
+            "microfinance",
+            "community_bank",
+            "mobile_agent"
+          ]
+        },
+        "programs": {
+          "owner_required": true,
+          "supported_countries": [
+            "KE",
+            "UG",
+            "TZ",
+            "RW",
+            "GH",
+            "NG",
+            "ZA",
+            "GB",
+            "US",
+            "AE"
+          ],
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ],
+          "supported_services": [
+            "cash_in",
+            "cash_out",
+            "money_transfer",
+            "bill_payment",
+            "airtime_topup",
+            "loan_disbursement",
+            "loan_collection",
+            "account_opening",
+            "balance_inquiry",
+            "mini_statement",
+            "card_services",
+            "insurance",
+            "savings_products",
+            "government_payments"
+          ],
+          "supported_settlement_models": [
+            "real_time",
+            "batch_hourly",
+            "batch_daily",
+            "bilateral",
+            "central_switch"
+          ]
+        },
+        "supervision": {
+          "evidence_required": true,
+          "remediation_plan_required_for_findings": true,
+          "supported_outcomes": [
+            "passed",
+            "remediation_required",
+            "suspended",
+            "closed"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_agency_control"
+        },
+        "transactions": {
+          "daily_limit": 200000,
+          "high_value_threshold": 100000,
+          "risk_reference_required": true,
+          "supported_channels": [
+            "pos_terminal",
+            "mobile_app",
+            "ussd",
+            "sms",
+            "web_portal",
+            "tablet",
+            "feature_phone",
+            "api"
+          ],
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ],
+          "supported_services": [
+            "cash_in",
+            "cash_out",
+            "money_transfer",
+            "bill_payment",
+            "airtime_topup",
+            "loan_disbursement",
+            "loan_collection",
+            "account_opening",
+            "balance_inquiry",
+            "mini_statement",
+            "card_services",
+            "insurance",
+            "savings_products",
+            "government_payments"
+          ],
+          "supported_statuses": [
+            "accepted",
+            "posted",
+            "reversed",
+            "held"
+          ]
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_ai_agents": true,
+          "enable_cash_movements": true,
+          "enable_commissions": true,
+          "enable_customers": true,
+          "enable_dashboard": true,
+          "enable_disputes": true,
+          "enable_float_accounts": true,
+          "enable_outlets": true,
+          "enable_programs": true,
+          "enable_supervision": true,
+          "enable_transactions": true
+        }
+      },
+      "name": "Agency Banking",
+      "provides": [
+        "agency_program_governance",
+        "agency_outlet_lifecycle",
+        "agency_agent_accreditation",
+        "agency_float_management",
+        "agency_customer_workflow",
+        "agency_transaction_workflow",
+        "agency_cash_movement_workflow",
+        "agency_commission_settlement_workflow",
+        "agency_dispute_workflow",
+        "agency_supervision_workflow",
+        "agency_ai_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_cards",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "fintech_remittance",
+        "fintech_neobanking",
+        "fintech_lending"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "Agency banking operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "description": "Agency banking writes require policy evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "policy_evidence_required",
+              "required_action": "attach_policy_evidence"
+            },
+            "name": "agency_write_requires_policy"
+          },
+          {
+            "condition": {
+              "operation": "register_program",
+              "owner_present": false
+            },
+            "description": "Programs require owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "program_owner_required",
+              "required_action": "assign_program_owner"
+            },
+            "name": "program_owner_required"
+          },
+          {
+            "condition": {
+              "country_supported": false,
+              "operation": "register_program"
+            },
+            "description": "Program country must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "program_country_not_supported",
+              "required_action": "select_supported_country"
+            },
+            "name": "program_country_supported"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "register_program"
+            },
+            "description": "Program currency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "program_currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "program_currency_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_program",
+              "settlement_model_supported": false
+            },
+            "description": "Program settlement model must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "settlement_model_not_supported",
+              "required_action": "select_supported_settlement_model"
+            },
+            "name": "program_settlement_model_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_program",
+              "services_valid": false
+            },
+            "description": "Programs require at least one supported service.",
+            "effect": {
+              "decision": "deny",
+              "reason": "program_services_invalid",
+              "required_action": "select_supported_services"
+            },
+            "name": "program_services_required"
+          },
+          {
+            "condition": {
+              "operation": "onboard_outlet",
+              "program_present": false
+            },
+            "description": "Outlets require program.",
+            "effect": {
+              "decision": "deny",
+              "reason": "outlet_program_required",
+              "required_action": "select_program"
+            },
+            "name": "outlet_program_required"
+          },
+          {
+            "condition": {
+              "operation": "onboard_outlet",
+              "outlet_type_supported": false
+            },
+            "description": "Outlet type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "outlet_type_not_supported",
+              "required_action": "select_supported_outlet_type"
+            },
+            "name": "outlet_type_supported"
+          },
+          {
+            "condition": {
+              "country_supported": false,
+              "operation": "onboard_outlet"
+            },
+            "description": "Outlet country must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "outlet_country_not_supported",
+              "required_action": "select_supported_country"
+            },
+            "name": "outlet_country_supported"
+          },
+          {
+            "condition": {
+              "license_present": false,
+              "operation": "onboard_outlet"
+            },
+            "description": "Outlets require license evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "outlet_license_required",
+              "required_action": "attach_license"
+            },
+            "name": "outlet_license_required"
+          },
+          {
+            "condition": {
+              "location_present": false,
+              "operation": "onboard_outlet"
+            },
+            "description": "Outlets require location evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "outlet_location_required",
+              "required_action": "attach_location"
+            },
+            "name": "outlet_location_required"
+          },
+          {
+            "condition": {
+              "operation": "onboard_outlet",
+              "security_plan_present": false
+            },
+            "description": "Outlets require security plan.",
+            "effect": {
+              "decision": "deny",
+              "reason": "outlet_security_plan_required",
+              "required_action": "attach_security_plan"
+            },
+            "name": "outlet_security_required"
+          },
+          {
+            "condition": {
+              "channel_supported": false,
+              "operation": "onboard_outlet"
+            },
+            "description": "Outlet channel must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "outlet_channel_not_supported",
+              "required_action": "select_supported_channel"
+            },
+            "name": "outlet_channel_supported"
+          },
+          {
+            "condition": {
+              "initial_float_valid": false,
+              "operation": "onboard_outlet"
+            },
+            "description": "Outlets require minimum initial float.",
+            "effect": {
+              "decision": "deny",
+              "reason": "initial_float_below_minimum",
+              "required_action": "increase_initial_float"
+            },
+            "name": "outlet_initial_float_valid"
+          },
+          {
+            "condition": {
+              "operation": "accredit_agent",
+              "outlet_present": false
+            },
+            "description": "Agents require outlet.",
+            "effect": {
+              "decision": "deny",
+              "reason": "agent_outlet_required",
+              "required_action": "select_outlet"
+            },
+            "name": "agent_outlet_required"
+          },
+          {
+            "condition": {
+              "identity_present": false,
+              "operation": "accredit_agent"
+            },
+            "description": "Agents require identity evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "agent_identity_required",
+              "required_action": "attach_identity_check"
+            },
+            "name": "agent_identity_required"
+          },
+          {
+            "condition": {
+              "operation": "accredit_agent",
+              "training_present": false
+            },
+            "description": "Agents require training evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "agent_training_required",
+              "required_action": "attach_training_evidence"
+            },
+            "name": "agent_training_required"
+          },
+          {
+            "condition": {
+              "background_check_present": false,
+              "operation": "accredit_agent"
+            },
+            "description": "Agents require background check.",
+            "effect": {
+              "decision": "deny",
+              "reason": "agent_background_check_required",
+              "required_action": "attach_background_check"
+            },
+            "name": "agent_background_required"
+          },
+          {
+            "condition": {
+              "operation": "open_float_account",
+              "outlet_present": false
+            },
+            "description": "Float accounts require outlet.",
+            "effect": {
+              "decision": "deny",
+              "reason": "float_outlet_required",
+              "required_action": "select_outlet"
+            },
+            "name": "float_outlet_required"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "open_float_account"
+            },
+            "description": "Float currency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "float_currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "float_currency_supported"
+          },
+          {
+            "condition": {
+              "balance_non_negative": false,
+              "operation": "open_float_account"
+            },
+            "description": "Opening balance cannot be negative.",
+            "effect": {
+              "decision": "deny",
+              "reason": "float_balance_negative",
+              "required_action": "set_non_negative_balance"
+            },
+            "name": "float_balance_non_negative"
+          },
+          {
+            "condition": {
+              "ledger_reference_present": false,
+              "operation": "open_float_account"
+            },
+            "description": "Float account requires ledger reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "float_ledger_reference_required",
+              "required_action": "attach_ledger_reference"
+            },
+            "name": "float_ledger_reference_required"
+          },
+          {
+            "condition": {
+              "customer_present": false,
+              "operation": "onboard_customer"
+            },
+            "description": "Agency customers require customer reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_reference_required",
+              "required_action": "attach_customer_reference"
+            },
+            "name": "customer_reference_required"
+          },
+          {
+            "condition": {
+              "customer_tier_supported": false,
+              "operation": "onboard_customer"
+            },
+            "description": "Customer tier must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_tier_not_supported",
+              "required_action": "select_supported_customer_tier"
+            },
+            "name": "customer_tier_supported"
+          },
+          {
+            "condition": {
+              "kyc_present": false,
+              "operation": "onboard_customer"
+            },
+            "description": "Customers require KYC evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_kyc_required",
+              "required_action": "attach_kyc_profile"
+            },
+            "name": "customer_kyc_required"
+          },
+          {
+            "condition": {
+              "consent_present": false,
+              "operation": "onboard_customer"
+            },
+            "description": "Customers require consent.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_consent_required",
+              "required_action": "capture_consent"
+            },
+            "name": "customer_consent_required"
+          },
+          {
+            "condition": {
+              "aml_present": false,
+              "operation": "onboard_customer"
+            },
+            "description": "Customers require AML evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_aml_required",
+              "required_action": "attach_aml_evidence"
+            },
+            "name": "customer_aml_required"
+          },
+          {
+            "condition": {
+              "fraud_present": false,
+              "operation": "onboard_customer"
+            },
+            "description": "Customers require fraud evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_fraud_required",
+              "required_action": "attach_fraud_evidence"
+            },
+            "name": "customer_fraud_required"
+          },
+          {
+            "condition": {
+              "operation": "record_transaction",
+              "outlet_present": false
+            },
+            "description": "Transactions require outlet.",
+            "effect": {
+              "decision": "deny",
+              "reason": "transaction_outlet_required",
+              "required_action": "select_outlet"
+            },
+            "name": "transaction_outlet_required"
+          },
+          {
+            "condition": {
+              "agent_present": false,
+              "operation": "record_transaction"
+            },
+            "description": "Transactions require accredited agent.",
+            "effect": {
+              "decision": "deny",
+              "reason": "transaction_agent_required",
+              "required_action": "select_agent"
+            },
+            "name": "transaction_agent_required"
+          },
+          {
+            "condition": {
+              "customer_present": false,
+              "operation": "record_transaction"
+            },
+            "description": "Transactions require customer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "transaction_customer_required",
+              "required_action": "select_customer"
+            },
+            "name": "transaction_customer_required"
+          },
+          {
+            "condition": {
+              "float_account_present": false,
+              "operation": "record_transaction"
+            },
+            "description": "Transactions require float account.",
+            "effect": {
+              "decision": "deny",
+              "reason": "transaction_float_account_required",
+              "required_action": "select_float_account"
+            },
+            "name": "transaction_float_required"
+          },
+          {
+            "condition": {
+              "operation": "record_transaction",
+              "service_supported": false
+            },
+            "description": "Transaction service must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "transaction_service_not_supported",
+              "required_action": "select_supported_service"
+            },
+            "name": "transaction_service_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_transaction",
+              "service_allowed_by_program": false
+            },
+            "description": "Transaction service must be enabled by the outlet program.",
+            "effect": {
+              "decision": "deny",
+              "reason": "transaction_service_not_enabled",
+              "required_action": "enable_service_on_program"
+            },
+            "name": "transaction_service_allowed_by_program"
+          },
+          {
+            "condition": {
+              "channel_supported": false,
+              "operation": "record_transaction"
+            },
+            "description": "Transaction channel must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "transaction_channel_not_supported",
+              "required_action": "select_supported_channel"
+            },
+            "name": "transaction_channel_supported"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "record_transaction"
+            },
+            "description": "Transaction currency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "transaction_currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "transaction_currency_supported"
+          },
+          {
+            "condition": {
+              "currency_matches_float": false,
+              "operation": "record_transaction"
+            },
+            "description": "Transaction currency must match the float account.",
+            "effect": {
+              "decision": "deny",
+              "reason": "transaction_float_currency_mismatch",
+              "required_action": "use_float_account_currency"
+            },
+            "name": "transaction_currency_matches_float"
+          },
+          {
+            "condition": {
+              "operation": "record_transaction",
+              "positive_amount": false
+            },
+            "description": "Transaction amount must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_transaction_amount_required",
+              "required_action": "set_positive_amount"
+            },
+            "name": "transaction_amount_positive"
+          },
+          {
+            "condition": {
+              "operation": "record_transaction",
+              "within_limit": false
+            },
+            "description": "Transaction amount must be within limit.",
+            "effect": {
+              "decision": "deny",
+              "reason": "transaction_limit_exceeded",
+              "required_action": "split_or_review_transaction"
+            },
+            "name": "transaction_limit_valid"
+          },
+          {
+            "condition": {
+              "float_sufficient": false,
+              "operation": "record_transaction"
+            },
+            "description": "Cash-out transactions require sufficient float.",
+            "effect": {
+              "decision": "deny",
+              "reason": "insufficient_agent_float",
+              "required_action": "rebalance_float"
+            },
+            "name": "transaction_float_sufficient"
+          },
+          {
+            "condition": {
+              "customer_reference_present": false,
+              "operation": "record_transaction"
+            },
+            "description": "Transactions require customer reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "transaction_customer_reference_required",
+              "required_action": "attach_customer_reference"
+            },
+            "name": "transaction_reference_required"
+          },
+          {
+            "condition": {
+              "operation": "record_transaction",
+              "risk_reference_present": false
+            },
+            "description": "Transactions require risk reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "transaction_risk_reference_required",
+              "required_action": "attach_risk_reference"
+            },
+            "name": "transaction_risk_reference_required"
+          },
+          {
+            "condition": {
+              "high_value": true,
+              "human_approval_recorded": false,
+              "operation": "record_transaction"
+            },
+            "description": "High-value transactions require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "transaction_approval_required",
+              "required_action": "record_transaction_approval"
+            },
+            "name": "high_value_transaction_requires_approval"
+          },
+          {
+            "condition": {
+              "operation": "record_cash_movement",
+              "outlet_present": false
+            },
+            "description": "Cash movements require outlet.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cash_movement_outlet_required",
+              "required_action": "select_outlet"
+            },
+            "name": "cash_movement_outlet_required"
+          },
+          {
+            "condition": {
+              "movement_type_supported": false,
+              "operation": "record_cash_movement"
+            },
+            "description": "Cash movement type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cash_movement_type_not_supported",
+              "required_action": "select_supported_type"
+            },
+            "name": "cash_movement_type_supported"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "record_cash_movement"
+            },
+            "description": "Cash movement currency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cash_movement_currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "cash_movement_currency_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_cash_movement",
+              "positive_amount": false
+            },
+            "description": "Cash movement amount must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cash_movement_amount_required",
+              "required_action": "set_positive_amount"
+            },
+            "name": "cash_movement_amount_positive"
+          },
+          {
+            "condition": {
+              "custodian_present": false,
+              "operation": "record_cash_movement"
+            },
+            "description": "Cash movements require custodian.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cash_movement_custodian_required",
+              "required_action": "assign_custodian"
+            },
+            "name": "cash_movement_custodian_required"
+          },
+          {
+            "condition": {
+              "high_value": true,
+              "human_approval_recorded": false,
+              "operation": "record_cash_movement"
+            },
+            "description": "High-value cash movements require approval.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "cash_movement_approval_required",
+              "required_action": "record_cash_movement_approval"
+            },
+            "name": "high_value_cash_movement_requires_approval"
+          },
+          {
+            "condition": {
+              "operation": "settle_commission",
+              "outlet_present": false
+            },
+            "description": "Commission settlement requires outlet.",
+            "effect": {
+              "decision": "deny",
+              "reason": "commission_outlet_required",
+              "required_action": "select_outlet"
+            },
+            "name": "commission_outlet_required"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "settle_commission"
+            },
+            "description": "Commission currency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "commission_currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "commission_currency_supported"
+          },
+          {
+            "condition": {
+              "operation": "settle_commission",
+              "positive_amount": false
+            },
+            "description": "Commission amount must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "commission_amount_required",
+              "required_action": "set_positive_amount"
+            },
+            "name": "commission_amount_positive"
+          },
+          {
+            "condition": {
+              "operation": "settle_commission",
+              "reconciliation_present": false
+            },
+            "description": "Commission requires reconciliation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "commission_reconciliation_required",
+              "required_action": "attach_reconciliation"
+            },
+            "name": "commission_reconciliation_required"
+          },
+          {
+            "condition": {
+              "operation": "settle_commission",
+              "payment_reference_present": false
+            },
+            "description": "Commission requires payment reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "commission_payment_reference_required",
+              "required_action": "attach_payment_reference"
+            },
+            "name": "commission_payment_reference_required"
+          },
+          {
+            "condition": {
+              "operation": "open_dispute",
+              "transaction_present": false
+            },
+            "description": "Disputes require transaction.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dispute_transaction_required",
+              "required_action": "select_transaction"
+            },
+            "name": "dispute_transaction_required"
+          },
+          {
+            "condition": {
+              "dispute_reason_supported": false,
+              "operation": "open_dispute"
+            },
+            "description": "Dispute reason must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dispute_reason_not_supported",
+              "required_action": "select_supported_reason"
+            },
+            "name": "dispute_reason_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "open_dispute"
+            },
+            "description": "Disputes require evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dispute_evidence_required",
+              "required_action": "attach_dispute_evidence"
+            },
+            "name": "dispute_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "open_dispute",
+              "reviewer_present": false
+            },
+            "description": "Disputes require reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dispute_reviewer_required",
+              "required_action": "assign_reviewer"
+            },
+            "name": "dispute_reviewer_required"
+          },
+          {
+            "condition": {
+              "operation": "record_supervision_visit",
+              "outlet_present": false
+            },
+            "description": "Supervision requires outlet.",
+            "effect": {
+              "decision": "deny",
+              "reason": "supervision_outlet_required",
+              "required_action": "select_outlet"
+            },
+            "name": "supervision_outlet_required"
+          },
+          {
+            "condition": {
+              "operation": "record_supervision_visit",
+              "supervisor_present": false
+            },
+            "description": "Supervision requires supervisor.",
+            "effect": {
+              "decision": "deny",
+              "reason": "supervision_supervisor_required",
+              "required_action": "assign_supervisor"
+            },
+            "name": "supervision_supervisor_required"
+          },
+          {
+            "condition": {
+              "operation": "record_supervision_visit",
+              "outcome_supported": false
+            },
+            "description": "Supervision outcome must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "supervision_outcome_not_supported",
+              "required_action": "select_supported_outcome"
+            },
+            "name": "supervision_outcome_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_supervision_visit"
+            },
+            "description": "Supervision requires evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "supervision_evidence_required",
+              "required_action": "attach_supervision_evidence"
+            },
+            "name": "supervision_evidence_required"
+          },
+          {
+            "condition": {
+              "findings_present": true,
+              "operation": "record_supervision_visit",
+              "remediation_plan_present": false
+            },
+            "description": "Findings require remediation plan.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "remediation_plan_required",
+              "required_action": "attach_remediation_plan"
+            },
+            "name": "supervision_findings_require_remediation"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "agency_batch"
+            },
+            "description": "Agency batches require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_agency_batch_to_bytewax"
+            },
+            "name": "agency_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_agency_ai_agent"
+            },
+            "description": "Agency AI agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "agency_agent_runtime_not_supported",
+              "required_action": "select_supported_runtime"
+            },
+            "name": "agency_ai_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_agency_ai_agent"
+            },
+            "description": "Agency AI agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "agency_agent_role_not_supported",
+              "required_action": "select_supported_role"
+            },
+            "name": "agency_ai_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "agency_agent_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged agency-agent actions require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_agency_agent_action_requires_human_approval"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "Agency banking operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "description": "Agency banking writes require policy evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "policy_evidence_required",
+            "required_action": "attach_policy_evidence"
+          },
+          "name": "agency_write_requires_policy"
+        },
+        {
+          "condition": {
+            "operation": "register_program",
+            "owner_present": false
+          },
+          "description": "Programs require owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "program_owner_required",
+            "required_action": "assign_program_owner"
+          },
+          "name": "program_owner_required"
+        },
+        {
+          "condition": {
+            "country_supported": false,
+            "operation": "register_program"
+          },
+          "description": "Program country must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "program_country_not_supported",
+            "required_action": "select_supported_country"
+          },
+          "name": "program_country_supported"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "register_program"
+          },
+          "description": "Program currency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "program_currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "program_currency_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_program",
+            "settlement_model_supported": false
+          },
+          "description": "Program settlement model must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "settlement_model_not_supported",
+            "required_action": "select_supported_settlement_model"
+          },
+          "name": "program_settlement_model_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_program",
+            "services_valid": false
+          },
+          "description": "Programs require at least one supported service.",
+          "effect": {
+            "decision": "deny",
+            "reason": "program_services_invalid",
+            "required_action": "select_supported_services"
+          },
+          "name": "program_services_required"
+        },
+        {
+          "condition": {
+            "operation": "onboard_outlet",
+            "program_present": false
+          },
+          "description": "Outlets require program.",
+          "effect": {
+            "decision": "deny",
+            "reason": "outlet_program_required",
+            "required_action": "select_program"
+          },
+          "name": "outlet_program_required"
+        },
+        {
+          "condition": {
+            "operation": "onboard_outlet",
+            "outlet_type_supported": false
+          },
+          "description": "Outlet type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "outlet_type_not_supported",
+            "required_action": "select_supported_outlet_type"
+          },
+          "name": "outlet_type_supported"
+        },
+        {
+          "condition": {
+            "country_supported": false,
+            "operation": "onboard_outlet"
+          },
+          "description": "Outlet country must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "outlet_country_not_supported",
+            "required_action": "select_supported_country"
+          },
+          "name": "outlet_country_supported"
+        },
+        {
+          "condition": {
+            "license_present": false,
+            "operation": "onboard_outlet"
+          },
+          "description": "Outlets require license evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "outlet_license_required",
+            "required_action": "attach_license"
+          },
+          "name": "outlet_license_required"
+        },
+        {
+          "condition": {
+            "location_present": false,
+            "operation": "onboard_outlet"
+          },
+          "description": "Outlets require location evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "outlet_location_required",
+            "required_action": "attach_location"
+          },
+          "name": "outlet_location_required"
+        },
+        {
+          "condition": {
+            "operation": "onboard_outlet",
+            "security_plan_present": false
+          },
+          "description": "Outlets require security plan.",
+          "effect": {
+            "decision": "deny",
+            "reason": "outlet_security_plan_required",
+            "required_action": "attach_security_plan"
+          },
+          "name": "outlet_security_required"
+        },
+        {
+          "condition": {
+            "channel_supported": false,
+            "operation": "onboard_outlet"
+          },
+          "description": "Outlet channel must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "outlet_channel_not_supported",
+            "required_action": "select_supported_channel"
+          },
+          "name": "outlet_channel_supported"
+        },
+        {
+          "condition": {
+            "initial_float_valid": false,
+            "operation": "onboard_outlet"
+          },
+          "description": "Outlets require minimum initial float.",
+          "effect": {
+            "decision": "deny",
+            "reason": "initial_float_below_minimum",
+            "required_action": "increase_initial_float"
+          },
+          "name": "outlet_initial_float_valid"
+        },
+        {
+          "condition": {
+            "operation": "accredit_agent",
+            "outlet_present": false
+          },
+          "description": "Agents require outlet.",
+          "effect": {
+            "decision": "deny",
+            "reason": "agent_outlet_required",
+            "required_action": "select_outlet"
+          },
+          "name": "agent_outlet_required"
+        },
+        {
+          "condition": {
+            "identity_present": false,
+            "operation": "accredit_agent"
+          },
+          "description": "Agents require identity evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "agent_identity_required",
+            "required_action": "attach_identity_check"
+          },
+          "name": "agent_identity_required"
+        },
+        {
+          "condition": {
+            "operation": "accredit_agent",
+            "training_present": false
+          },
+          "description": "Agents require training evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "agent_training_required",
+            "required_action": "attach_training_evidence"
+          },
+          "name": "agent_training_required"
+        },
+        {
+          "condition": {
+            "background_check_present": false,
+            "operation": "accredit_agent"
+          },
+          "description": "Agents require background check.",
+          "effect": {
+            "decision": "deny",
+            "reason": "agent_background_check_required",
+            "required_action": "attach_background_check"
+          },
+          "name": "agent_background_required"
+        },
+        {
+          "condition": {
+            "operation": "open_float_account",
+            "outlet_present": false
+          },
+          "description": "Float accounts require outlet.",
+          "effect": {
+            "decision": "deny",
+            "reason": "float_outlet_required",
+            "required_action": "select_outlet"
+          },
+          "name": "float_outlet_required"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "open_float_account"
+          },
+          "description": "Float currency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "float_currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "float_currency_supported"
+        },
+        {
+          "condition": {
+            "balance_non_negative": false,
+            "operation": "open_float_account"
+          },
+          "description": "Opening balance cannot be negative.",
+          "effect": {
+            "decision": "deny",
+            "reason": "float_balance_negative",
+            "required_action": "set_non_negative_balance"
+          },
+          "name": "float_balance_non_negative"
+        },
+        {
+          "condition": {
+            "ledger_reference_present": false,
+            "operation": "open_float_account"
+          },
+          "description": "Float account requires ledger reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "float_ledger_reference_required",
+            "required_action": "attach_ledger_reference"
+          },
+          "name": "float_ledger_reference_required"
+        },
+        {
+          "condition": {
+            "customer_present": false,
+            "operation": "onboard_customer"
+          },
+          "description": "Agency customers require customer reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_reference_required",
+            "required_action": "attach_customer_reference"
+          },
+          "name": "customer_reference_required"
+        },
+        {
+          "condition": {
+            "customer_tier_supported": false,
+            "operation": "onboard_customer"
+          },
+          "description": "Customer tier must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_tier_not_supported",
+            "required_action": "select_supported_customer_tier"
+          },
+          "name": "customer_tier_supported"
+        },
+        {
+          "condition": {
+            "kyc_present": false,
+            "operation": "onboard_customer"
+          },
+          "description": "Customers require KYC evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_kyc_required",
+            "required_action": "attach_kyc_profile"
+          },
+          "name": "customer_kyc_required"
+        },
+        {
+          "condition": {
+            "consent_present": false,
+            "operation": "onboard_customer"
+          },
+          "description": "Customers require consent.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_consent_required",
+            "required_action": "capture_consent"
+          },
+          "name": "customer_consent_required"
+        },
+        {
+          "condition": {
+            "aml_present": false,
+            "operation": "onboard_customer"
+          },
+          "description": "Customers require AML evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_aml_required",
+            "required_action": "attach_aml_evidence"
+          },
+          "name": "customer_aml_required"
+        },
+        {
+          "condition": {
+            "fraud_present": false,
+            "operation": "onboard_customer"
+          },
+          "description": "Customers require fraud evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_fraud_required",
+            "required_action": "attach_fraud_evidence"
+          },
+          "name": "customer_fraud_required"
+        },
+        {
+          "condition": {
+            "operation": "record_transaction",
+            "outlet_present": false
+          },
+          "description": "Transactions require outlet.",
+          "effect": {
+            "decision": "deny",
+            "reason": "transaction_outlet_required",
+            "required_action": "select_outlet"
+          },
+          "name": "transaction_outlet_required"
+        },
+        {
+          "condition": {
+            "agent_present": false,
+            "operation": "record_transaction"
+          },
+          "description": "Transactions require accredited agent.",
+          "effect": {
+            "decision": "deny",
+            "reason": "transaction_agent_required",
+            "required_action": "select_agent"
+          },
+          "name": "transaction_agent_required"
+        },
+        {
+          "condition": {
+            "customer_present": false,
+            "operation": "record_transaction"
+          },
+          "description": "Transactions require customer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "transaction_customer_required",
+            "required_action": "select_customer"
+          },
+          "name": "transaction_customer_required"
+        },
+        {
+          "condition": {
+            "float_account_present": false,
+            "operation": "record_transaction"
+          },
+          "description": "Transactions require float account.",
+          "effect": {
+            "decision": "deny",
+            "reason": "transaction_float_account_required",
+            "required_action": "select_float_account"
+          },
+          "name": "transaction_float_required"
+        },
+        {
+          "condition": {
+            "operation": "record_transaction",
+            "service_supported": false
+          },
+          "description": "Transaction service must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "transaction_service_not_supported",
+            "required_action": "select_supported_service"
+          },
+          "name": "transaction_service_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_transaction",
+            "service_allowed_by_program": false
+          },
+          "description": "Transaction service must be enabled by the outlet program.",
+          "effect": {
+            "decision": "deny",
+            "reason": "transaction_service_not_enabled",
+            "required_action": "enable_service_on_program"
+          },
+          "name": "transaction_service_allowed_by_program"
+        },
+        {
+          "condition": {
+            "channel_supported": false,
+            "operation": "record_transaction"
+          },
+          "description": "Transaction channel must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "transaction_channel_not_supported",
+            "required_action": "select_supported_channel"
+          },
+          "name": "transaction_channel_supported"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "record_transaction"
+          },
+          "description": "Transaction currency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "transaction_currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "transaction_currency_supported"
+        },
+        {
+          "condition": {
+            "currency_matches_float": false,
+            "operation": "record_transaction"
+          },
+          "description": "Transaction currency must match the float account.",
+          "effect": {
+            "decision": "deny",
+            "reason": "transaction_float_currency_mismatch",
+            "required_action": "use_float_account_currency"
+          },
+          "name": "transaction_currency_matches_float"
+        },
+        {
+          "condition": {
+            "operation": "record_transaction",
+            "positive_amount": false
+          },
+          "description": "Transaction amount must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_transaction_amount_required",
+            "required_action": "set_positive_amount"
+          },
+          "name": "transaction_amount_positive"
+        },
+        {
+          "condition": {
+            "operation": "record_transaction",
+            "within_limit": false
+          },
+          "description": "Transaction amount must be within limit.",
+          "effect": {
+            "decision": "deny",
+            "reason": "transaction_limit_exceeded",
+            "required_action": "split_or_review_transaction"
+          },
+          "name": "transaction_limit_valid"
+        },
+        {
+          "condition": {
+            "float_sufficient": false,
+            "operation": "record_transaction"
+          },
+          "description": "Cash-out transactions require sufficient float.",
+          "effect": {
+            "decision": "deny",
+            "reason": "insufficient_agent_float",
+            "required_action": "rebalance_float"
+          },
+          "name": "transaction_float_sufficient"
+        },
+        {
+          "condition": {
+            "customer_reference_present": false,
+            "operation": "record_transaction"
+          },
+          "description": "Transactions require customer reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "transaction_customer_reference_required",
+            "required_action": "attach_customer_reference"
+          },
+          "name": "transaction_reference_required"
+        },
+        {
+          "condition": {
+            "operation": "record_transaction",
+            "risk_reference_present": false
+          },
+          "description": "Transactions require risk reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "transaction_risk_reference_required",
+            "required_action": "attach_risk_reference"
+          },
+          "name": "transaction_risk_reference_required"
+        },
+        {
+          "condition": {
+            "high_value": true,
+            "human_approval_recorded": false,
+            "operation": "record_transaction"
+          },
+          "description": "High-value transactions require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "transaction_approval_required",
+            "required_action": "record_transaction_approval"
+          },
+          "name": "high_value_transaction_requires_approval"
+        },
+        {
+          "condition": {
+            "operation": "record_cash_movement",
+            "outlet_present": false
+          },
+          "description": "Cash movements require outlet.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cash_movement_outlet_required",
+            "required_action": "select_outlet"
+          },
+          "name": "cash_movement_outlet_required"
+        },
+        {
+          "condition": {
+            "movement_type_supported": false,
+            "operation": "record_cash_movement"
+          },
+          "description": "Cash movement type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cash_movement_type_not_supported",
+            "required_action": "select_supported_type"
+          },
+          "name": "cash_movement_type_supported"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "record_cash_movement"
+          },
+          "description": "Cash movement currency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cash_movement_currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "cash_movement_currency_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_cash_movement",
+            "positive_amount": false
+          },
+          "description": "Cash movement amount must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cash_movement_amount_required",
+            "required_action": "set_positive_amount"
+          },
+          "name": "cash_movement_amount_positive"
+        },
+        {
+          "condition": {
+            "custodian_present": false,
+            "operation": "record_cash_movement"
+          },
+          "description": "Cash movements require custodian.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cash_movement_custodian_required",
+            "required_action": "assign_custodian"
+          },
+          "name": "cash_movement_custodian_required"
+        },
+        {
+          "condition": {
+            "high_value": true,
+            "human_approval_recorded": false,
+            "operation": "record_cash_movement"
+          },
+          "description": "High-value cash movements require approval.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "cash_movement_approval_required",
+            "required_action": "record_cash_movement_approval"
+          },
+          "name": "high_value_cash_movement_requires_approval"
+        },
+        {
+          "condition": {
+            "operation": "settle_commission",
+            "outlet_present": false
+          },
+          "description": "Commission settlement requires outlet.",
+          "effect": {
+            "decision": "deny",
+            "reason": "commission_outlet_required",
+            "required_action": "select_outlet"
+          },
+          "name": "commission_outlet_required"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "settle_commission"
+          },
+          "description": "Commission currency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "commission_currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "commission_currency_supported"
+        },
+        {
+          "condition": {
+            "operation": "settle_commission",
+            "positive_amount": false
+          },
+          "description": "Commission amount must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "commission_amount_required",
+            "required_action": "set_positive_amount"
+          },
+          "name": "commission_amount_positive"
+        },
+        {
+          "condition": {
+            "operation": "settle_commission",
+            "reconciliation_present": false
+          },
+          "description": "Commission requires reconciliation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "commission_reconciliation_required",
+            "required_action": "attach_reconciliation"
+          },
+          "name": "commission_reconciliation_required"
+        },
+        {
+          "condition": {
+            "operation": "settle_commission",
+            "payment_reference_present": false
+          },
+          "description": "Commission requires payment reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "commission_payment_reference_required",
+            "required_action": "attach_payment_reference"
+          },
+          "name": "commission_payment_reference_required"
+        },
+        {
+          "condition": {
+            "operation": "open_dispute",
+            "transaction_present": false
+          },
+          "description": "Disputes require transaction.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dispute_transaction_required",
+            "required_action": "select_transaction"
+          },
+          "name": "dispute_transaction_required"
+        },
+        {
+          "condition": {
+            "dispute_reason_supported": false,
+            "operation": "open_dispute"
+          },
+          "description": "Dispute reason must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dispute_reason_not_supported",
+            "required_action": "select_supported_reason"
+          },
+          "name": "dispute_reason_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "open_dispute"
+          },
+          "description": "Disputes require evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dispute_evidence_required",
+            "required_action": "attach_dispute_evidence"
+          },
+          "name": "dispute_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "open_dispute",
+            "reviewer_present": false
+          },
+          "description": "Disputes require reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dispute_reviewer_required",
+            "required_action": "assign_reviewer"
+          },
+          "name": "dispute_reviewer_required"
+        },
+        {
+          "condition": {
+            "operation": "record_supervision_visit",
+            "outlet_present": false
+          },
+          "description": "Supervision requires outlet.",
+          "effect": {
+            "decision": "deny",
+            "reason": "supervision_outlet_required",
+            "required_action": "select_outlet"
+          },
+          "name": "supervision_outlet_required"
+        },
+        {
+          "condition": {
+            "operation": "record_supervision_visit",
+            "supervisor_present": false
+          },
+          "description": "Supervision requires supervisor.",
+          "effect": {
+            "decision": "deny",
+            "reason": "supervision_supervisor_required",
+            "required_action": "assign_supervisor"
+          },
+          "name": "supervision_supervisor_required"
+        },
+        {
+          "condition": {
+            "operation": "record_supervision_visit",
+            "outcome_supported": false
+          },
+          "description": "Supervision outcome must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "supervision_outcome_not_supported",
+            "required_action": "select_supported_outcome"
+          },
+          "name": "supervision_outcome_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_supervision_visit"
+          },
+          "description": "Supervision requires evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "supervision_evidence_required",
+            "required_action": "attach_supervision_evidence"
+          },
+          "name": "supervision_evidence_required"
+        },
+        {
+          "condition": {
+            "findings_present": true,
+            "operation": "record_supervision_visit",
+            "remediation_plan_present": false
+          },
+          "description": "Findings require remediation plan.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "remediation_plan_required",
+            "required_action": "attach_remediation_plan"
+          },
+          "name": "supervision_findings_require_remediation"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "agency_batch"
+          },
+          "description": "Agency batches require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_agency_batch_to_bytewax"
+          },
+          "name": "agency_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_agency_ai_agent"
+          },
+          "description": "Agency AI agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "agency_agent_runtime_not_supported",
+            "required_action": "select_supported_runtime"
+          },
+          "name": "agency_ai_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_agency_ai_agent"
+          },
+          "description": "Agency AI agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "agency_agent_role_not_supported",
+            "required_action": "select_supported_role"
+          },
+          "name": "agency_ai_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "agency_agent_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged agency-agent actions require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_agency_agent_action_requires_human_approval"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "agents": {
+          "component": "AccreditedAgentConsole",
+          "permission": "fintech_agency:manage_agents",
+          "route": "/fintech-agency/agents"
+        },
+        "ai_agents": {
+          "component": "AgencyAIAgentWorkbench",
+          "permission": "fintech_agency:admin",
+          "route": "/fintech-agency/ai-agents"
+        },
+        "cash_movements": {
+          "component": "CashMovementWorkbench",
+          "permission": "fintech_agency:liquidity",
+          "route": "/fintech-agency/cash-movements"
+        },
+        "commissions": {
+          "component": "CommissionSettlementWorkbench",
+          "permission": "fintech_agency:commissions",
+          "route": "/fintech-agency/commissions"
+        },
+        "customers": {
+          "component": "AgencyCustomerWorkbench",
+          "permission": "fintech_agency:customers",
+          "route": "/fintech-agency/customers"
+        },
+        "dashboard": {
+          "component": "AgencyDashboard",
+          "permission": "fintech_agency:view",
+          "route": "/fintech-agency/dashboard"
+        },
+        "disputes": {
+          "component": "AgencyDisputeWorkbench",
+          "permission": "fintech_agency:disputes",
+          "route": "/fintech-agency/disputes"
+        },
+        "float_accounts": {
+          "component": "FloatAccountConsole",
+          "permission": "fintech_agency:float",
+          "route": "/fintech-agency/float-accounts"
+        },
+        "outlets": {
+          "component": "AgencyOutletWorkbench",
+          "permission": "fintech_agency:manage_outlets",
+          "route": "/fintech-agency/outlets"
+        },
+        "programs": {
+          "component": "AgencyProgramConsole",
+          "permission": "fintech_agency:manage_programs",
+          "route": "/fintech-agency/programs"
+        },
+        "settings": {
+          "component": "AgencySettings",
+          "permission": "fintech_agency:admin",
+          "route": "/fintech-agency/settings"
+        },
+        "supervision": {
+          "component": "SupervisionVisitConsole",
+          "permission": "fintech_agency:supervision",
+          "route": "/fintech-agency/supervision"
+        },
+        "transactions": {
+          "component": "AgencyTransactionConsole",
+          "permission": "fintech_agency:transactions",
+          "route": "/fintech-agency/transactions"
+        }
+      },
+      "streaming": {
+        "events": [
+          "agency_program_registered",
+          "agency_outlet_onboarded",
+          "agency_agent_accredited",
+          "float_account_opened",
+          "agency_customer_onboarded",
+          "agency_transaction_recorded",
+          "cash_movement_recorded",
+          "commission_settlement_recorded",
+          "agency_dispute_opened",
+          "supervision_visit_recorded",
+          "agency_ai_agent_registered"
+        ],
+        "guardrails": [
+          "agency_batch_requires_bytewax",
+          "privileged_agency_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.fintech.agency.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "agents": {
+            "icon": "badge-check",
+            "status_indicator": "agent-chip"
+          },
+          "ai_agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "cash_movements": {
+            "icon": "truck",
+            "status_indicator": "cash-chip"
+          },
+          "commissions": {
+            "icon": "percent",
+            "status_indicator": "commission-chip"
+          },
+          "disputes": {
+            "icon": "circle-alert",
+            "status_indicator": "dispute-chip"
+          },
+          "float_accounts": {
+            "icon": "wallet",
+            "status_indicator": "float-chip"
+          },
+          "outlets": {
+            "icon": "store",
+            "status_indicator": "outlet-chip"
+          },
+          "programs": {
+            "icon": "network",
+            "status_indicator": "program-chip"
+          },
+          "supervision": {
+            "icon": "clipboard-check",
+            "status_indicator": "supervision-chip"
+          },
+          "transactions": {
+            "icon": "receipt",
+            "status_indicator": "transaction-chip"
+          }
+        },
+        "name": "fintech_agency_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#2563EB",
+          "color.danger": "#B91C1C",
+          "color.primary": "#047857",
+          "color.success": "#15803D",
+          "color.warning": "#B45309",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/fintech-agency/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "AgencyDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/fintech-agency/dashboard",
+            "permission": "fintech_agency:view"
+          },
+          {
+            "component": "AgencyProgramConsole",
+            "name": "programs",
+            "nav_group": "Programs",
+            "path": "/fintech-agency/programs",
+            "permission": "fintech_agency:manage_programs"
+          },
+          {
+            "component": "AgencyOutletWorkbench",
+            "name": "outlets",
+            "nav_group": "Network",
+            "path": "/fintech-agency/outlets",
+            "permission": "fintech_agency:manage_outlets"
+          },
+          {
+            "component": "AccreditedAgentConsole",
+            "name": "agents",
+            "nav_group": "Network",
+            "path": "/fintech-agency/agents",
+            "permission": "fintech_agency:manage_agents"
+          },
+          {
+            "component": "FloatAccountConsole",
+            "name": "float_accounts",
+            "nav_group": "Liquidity",
+            "path": "/fintech-agency/float-accounts",
+            "permission": "fintech_agency:float"
+          },
+          {
+            "component": "AgencyCustomerWorkbench",
+            "name": "customers",
+            "nav_group": "Customers",
+            "path": "/fintech-agency/customers",
+            "permission": "fintech_agency:customers"
+          },
+          {
+            "component": "AgencyTransactionConsole",
+            "name": "transactions",
+            "nav_group": "Transactions",
+            "path": "/fintech-agency/transactions",
+            "permission": "fintech_agency:transactions"
+          },
+          {
+            "component": "CashMovementWorkbench",
+            "name": "cash_movements",
+            "nav_group": "Liquidity",
+            "path": "/fintech-agency/cash-movements",
+            "permission": "fintech_agency:liquidity"
+          },
+          {
+            "component": "CommissionSettlementWorkbench",
+            "name": "commissions",
+            "nav_group": "Settlement",
+            "path": "/fintech-agency/commissions",
+            "permission": "fintech_agency:commissions"
+          },
+          {
+            "component": "AgencyDisputeWorkbench",
+            "name": "disputes",
+            "nav_group": "Servicing",
+            "path": "/fintech-agency/disputes",
+            "permission": "fintech_agency:disputes"
+          },
+          {
+            "component": "SupervisionVisitConsole",
+            "name": "supervision",
+            "nav_group": "Field Control",
+            "path": "/fintech-agency/supervision",
+            "permission": "fintech_agency:supervision"
+          },
+          {
+            "component": "AgencyAIAgentWorkbench",
+            "name": "ai_agents",
+            "nav_group": "Automation",
+            "path": "/fintech-agency/ai-agents",
+            "permission": "fintech_agency:admin"
+          },
+          {
+            "component": "AgencySettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/fintech-agency/settings",
+            "permission": "fintech_agency:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "agency_review": {
+        "roles": [
+          "agency_ops_reviewer",
+          "liquidity_reviewer",
+          "field_supervisor",
+          "agency_compliance_reviewer",
+          "agency_dispute_reviewer",
+          "commission_reviewer",
+          "fraud_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "fintech_agency": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_cards",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "fintech_remittance",
+        "fintech_neobanking",
+        "fintech_lending"
+      ]
+    }
+  },
+  "contracts": {
+    "fintech_agency": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "audit": "audl",
+          "auth": "auth",
+          "cards": "fintech_cards",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "lending": "fintech_lending",
+          "neobanking": "fintech_neobanking",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "remittance": "fintech_remittance",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "background_check_required": true,
+          "human_approval_required_for_privileged_actions": true,
+          "identity_check_required": true,
+          "supported_roles": [
+            "agency_ops_reviewer",
+            "liquidity_reviewer",
+            "field_supervisor",
+            "agency_compliance_reviewer",
+            "agency_dispute_reviewer",
+            "commission_reviewer",
+            "fraud_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ],
+          "training_required": true
+        },
+        "cash_movements": {
+          "approval_required_for_high_value": true,
+          "custodian_required": true,
+          "high_value_threshold": 100000,
+          "supported_types": [
+            "float_topup",
+            "cash_pickup",
+            "cash_drop",
+            "vault_rebalance",
+            "emergency_liquidity"
+          ]
+        },
+        "commissions": {
+          "payment_reference_required": true,
+          "positive_amount_required": true,
+          "reconciliation_required": true
+        },
+        "customers": {
+          "aml_required": true,
+          "consent_required": true,
+          "fraud_required": true,
+          "kyc_required": true,
+          "supported_tiers": [
+            "tier_1",
+            "tier_2",
+            "tier_3"
+          ]
+        },
+        "disputes": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_reasons": [
+            "cash_shortage",
+            "duplicate_transaction",
+            "customer_denial",
+            "failed_reversal",
+            "agent_error",
+            "fraud_suspected",
+            "service_quality"
+          ]
+        },
+        "float_accounts": {
+          "ledger_reference_required": true,
+          "minimum_opening_balance": 0,
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ]
+        },
+        "governance": {
+          "audit_agency_events": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_cash_movement_events": true,
+          "emit_commission_events": true,
+          "emit_customer_events": true,
+          "emit_dispute_events": true,
+          "emit_float_events": true,
+          "emit_outlet_events": true,
+          "emit_program_events": true,
+          "emit_supervision_events": true,
+          "emit_transaction_events": true,
+          "event_stream": "apg.fintech.agency.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "outlets": {
+          "license_required": true,
+          "location_required": true,
+          "minimum_initial_float": 500,
+          "security_plan_required": true,
+          "supported_types": [
+            "retail_shop",
+            "pharmacy",
+            "supermarket",
+            "petrol_station",
+            "mobile_money_agent",
+            "post_office",
+            "cooperative",
+            "microfinance",
+            "community_bank",
+            "mobile_agent"
+          ]
+        },
+        "programs": {
+          "owner_required": true,
+          "supported_countries": [
+            "KE",
+            "UG",
+            "TZ",
+            "RW",
+            "GH",
+            "NG",
+            "ZA",
+            "GB",
+            "US",
+            "AE"
+          ],
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ],
+          "supported_services": [
+            "cash_in",
+            "cash_out",
+            "money_transfer",
+            "bill_payment",
+            "airtime_topup",
+            "loan_disbursement",
+            "loan_collection",
+            "account_opening",
+            "balance_inquiry",
+            "mini_statement",
+            "card_services",
+            "insurance",
+            "savings_products",
+            "government_payments"
+          ],
+          "supported_settlement_models": [
+            "real_time",
+            "batch_hourly",
+            "batch_daily",
+            "bilateral",
+            "central_switch"
+          ]
+        },
+        "supervision": {
+          "evidence_required": true,
+          "remediation_plan_required_for_findings": true,
+          "supported_outcomes": [
+            "passed",
+            "remediation_required",
+            "suspended",
+            "closed"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_agency_control"
+        },
+        "transactions": {
+          "daily_limit": 200000,
+          "high_value_threshold": 100000,
+          "risk_reference_required": true,
+          "supported_channels": [
+            "pos_terminal",
+            "mobile_app",
+            "ussd",
+            "sms",
+            "web_portal",
+            "tablet",
+            "feature_phone",
+            "api"
+          ],
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ],
+          "supported_services": [
+            "cash_in",
+            "cash_out",
+            "money_transfer",
+            "bill_payment",
+            "airtime_topup",
+            "loan_disbursement",
+            "loan_collection",
+            "account_opening",
+            "balance_inquiry",
+            "mini_statement",
+            "card_services",
+            "insurance",
+            "savings_products",
+            "government_payments"
+          ],
+          "supported_statuses": [
+            "accepted",
+            "posted",
+            "reversed",
+            "held"
+          ]
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_ai_agents": true,
+          "enable_cash_movements": true,
+          "enable_commissions": true,
+          "enable_customers": true,
+          "enable_dashboard": true,
+          "enable_disputes": true,
+          "enable_float_accounts": true,
+          "enable_outlets": true,
+          "enable_programs": true,
+          "enable_supervision": true,
+          "enable_transactions": true
+        }
+      },
+      "id": "fintech_agency",
+      "provides": [
+        "agency_program_governance",
+        "agency_outlet_lifecycle",
+        "agency_agent_accreditation",
+        "agency_float_management",
+        "agency_customer_workflow",
+        "agency_transaction_workflow",
+        "agency_cash_movement_workflow",
+        "agency_commission_settlement_workflow",
+        "agency_dispute_workflow",
+        "agency_supervision_workflow",
+        "agency_ai_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_cards",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "fintech_remittance",
+        "fintech_neobanking",
+        "fintech_lending"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 14,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "fintech_agency": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}

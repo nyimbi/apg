@@ -27079,3 +27079,89 @@ Known gaps:
   refund, live merchant settlement files, collection provider integration,
   regulator filing, durable Bytewax topology, or performance/load checks during
   this battery-conscious slice.
+
+## 2026-06-01 - FinTech Agency Banking executable capability
+
+- Promoted `capabilities/fintech/agency` from a placeholder package into a
+  first-class APG capability with `README.md`, `SPECIFICATION.md`, `PLAN.md`,
+  `cap_spec.md`, contract, models, service, API helpers, view models, app
+  entrypoint, semantic/package/release evidence, and focused tests.
+- Added tenant-scoped agency program governance, outlet onboarding, accredited
+  agent management, float accounts, simplified customer onboarding, agency
+  transactions, cash movements, commission settlements, disputes, field
+  supervision, dashboard summaries, Bytewax batch validation, and
+  provider-neutral agency AI-agent registration.
+- Added deterministic agency guardrails for tenant context, write policy,
+  program owner/country/currency/settlement model/service catalog, outlet
+  program/type/country/license/location/security/channel/initial-float evidence,
+  agent identity/training/background-check evidence, float account outlet/
+  currency/balance/ledger evidence, customer reference/tier/KYC/consent/AML/
+  fraud evidence, transaction outlet/agent/customer/float/service/channel/
+  currency/amount/limit/float/reference/risk/high-value approval controls, cash
+  movement type/amount/custodian/high-value approval controls, commission
+  amount/reconciliation/payment evidence, dispute transaction/reason/reviewer/
+  evidence controls, supervision outcome/evidence/remediation controls, Bytewax
+  lifecycle events, supported AI-agent runtimes/roles, and privileged-agent
+  approval.
+- Added `agency_runtime.py` helpers for normalized codes, countries, currencies,
+  amounts, service direction, float deltas, and commission estimates.
+- Updated fintech capability metadata so `agency` is listed as an implemented
+  sub-capability.
+- Removed the empty `_Agency_Banking` marker file and refreshed
+  `semantic_model.json`, `package_manifest.json`, and `release_report.json`.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/fintech/agency/__init__.py capabilities/fintech/agency/capability_contract.py capabilities/fintech/agency/models.py capabilities/fintech/agency/agency_runtime.py capabilities/fintech/agency/service.py capabilities/fintech/agency/api.py capabilities/fintech/agency/views.py capabilities/fintech/agency/app.py capabilities/fintech/agency/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/fintech/agency/tests/test_package_contract.py`
+  passed with 6 tests.
+- `./.venv/bin/python capabilities/fintech/agency/app.py` passed with
+  `self_test()` status `ok`.
+- `./.venv/bin/apg capabilities inspect fintech_agency --json` passed with 68
+  rules, 13 routes, Bytewax streaming, and provider-neutral agency AI-agent
+  runtimes.
+- `./.venv/bin/apg capabilities publish-plan capabilities/fintech/agency --json`
+  passed with side-effect-free publish evidence and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/fintech/agency --json`
+  passed with one domain-specific fintech agency implementation, 0 baseline
+  markers, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/fintech/agency --json`
+  passed with one complete lifecycle record, 68 rules, 13 routes, 11 theme
+  tokens, and 0 warnings/errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 120 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 120 operable contracts, 120 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/fintech/agency`, `capabilities/fintech/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed agency program, outlet, agent, float account, customer, transaction,
+  cash movement, commission, dispute, supervision, and AI-agent lifecycle paths
+  so rule evaluation happens before state mutation.
+- Tightened transaction guardrails during review so service selection must be
+  enabled by the outlet program and transaction currency must match the float
+  account currency before float balances change.
+- Tightened cash movement, commission, and supervision guardrails so currencies
+  are supported and supervision visits require a supervisor.
+- Reviewed first-class agency AI-agent behavior so Codex, Claude Code, OpenCode,
+  and Pi runtimes remain provider-neutral and privileged actions require human
+  approval.
+- Kept live POS estates, core banking ledgers, mobile-money operators,
+  cash-in-transit partners, field-force mobile apps, regulator filing, and
+  durable Bytewax workers behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live POS/device
+  management, live cash vault posting, mobile-money operator flows,
+  cash-in-transit settlement, field-force mobile apps, regulator filing, durable
+  Bytewax topology, or performance/load checks during this battery-conscious
+  slice.

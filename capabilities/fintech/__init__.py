@@ -76,6 +76,7 @@ CAPABILITY_META = {
 		'neobanking',    # Neo Banking
 		'lending',       # Digital Lending
 		'bnpl',          # Buy Now Pay Later
+		'agency',        # Agency Banking
 		'remittance',    # Cross-Border Remittance
 		'kyc',           # Know Your Customer
 		'aml',           # Anti Money Laundering
