@@ -1,11 +1,6 @@
-"""
-fraud FinTech Capability
+"""APG Fraud Detection executable capability."""
 
-Placeholder for fraud financial technology capability.
-To be implemented as part of the comprehensive APG FinTech platform.
-"""
+from .capability_contract import CAPABILITY_ID, CAPABILITY_NAME, CAPABILITY_VERSION, get_capability_contract
+from .service import FraudDetectionService
 
-# Placeholder implementation
-__version__ = "1.0.0"
-__status__ = "Development"
-
+__all__ = ["CAPABILITY_ID", "CAPABILITY_NAME", "CAPABILITY_VERSION", "FraudDetectionService", "get_capability_contract"]

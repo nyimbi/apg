@@ -26589,3 +26589,80 @@ Known gaps:
   adverse-media feeds, live regulator SAR/STR submission, durable Bytewax
   topology, entity-resolution graph analytics, ML training, or performance/load
   checks during this battery-conscious slice.
+
+### 2026-06-01 13:53 EAT
+
+Fintech Fraud Detection executable capability slice:
+
+- Promoted `capabilities/fintech/fraud` from a placeholder package into a
+  first-class APG capability with `README.md`, `SPECIFICATION.md`, `PLAN.md`,
+  `cap_spec.md`, contract, models, service, API helpers, view models, app
+  entrypoint, semantic/package/release evidence, and focused tests.
+- Added tenant-scoped fraud signal scoring, recommended intervention
+  decisioning, fraud decision capture, case investigation workflow, case
+  resolution, dashboard summaries, Bytewax batch validation, and
+  provider-neutral fraud-agent registration.
+- Added deterministic fraud guardrails for tenant context, write policy,
+  subject references, supported signal types/channels, source references, KYC
+  linkage, money-bearing amount/currency, risk score range, high-risk review,
+  velocity review, device anomaly review, geography anomaly review, AML alert
+  review, account-takeover review, chargeback evidence, supported decisions,
+  step-up challenge evidence, hold/block reasons and human approval, case
+  evidence, case investigator, case resolution, Bytewax lifecycle events,
+  supported AI-agent runtimes/roles, and privileged-agent approval.
+- Added `fraud_runtime.py` domain helpers for normalized codes, currency
+  values, monetary amounts, risk bands, fraud indicators, and recommended
+  decisions.
+- Updated fintech capability metadata so `fraud` is listed as an implemented
+  sub-capability.
+- Removed the empty `_Fraud_Detection` marker file and refreshed
+  `semantic_model.json`, `package_manifest.json`, and `release_report.json`.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/fintech/fraud/__init__.py capabilities/fintech/fraud/capability_contract.py capabilities/fintech/fraud/models.py capabilities/fintech/fraud/fraud_runtime.py capabilities/fintech/fraud/service.py capabilities/fintech/fraud/api.py capabilities/fintech/fraud/views.py capabilities/fintech/fraud/app.py capabilities/fintech/fraud/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/fintech/fraud/tests/test_package_contract.py`
+  passed with 6 tests.
+- `./.venv/bin/python capabilities/fintech/fraud/app.py` passed with
+  `self_test()` status `ok`.
+- `./.venv/bin/apg capabilities inspect fintech_fraud --json` passed with 33
+  rules, 8 routes, Bytewax streaming, and provider-neutral fraud-agent
+  runtimes.
+- `./.venv/bin/apg capabilities publish-plan capabilities/fintech/fraud --json`
+  passed with side-effect-free publish evidence and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/fintech/fraud --json`
+  passed with one domain-specific fintech fraud implementation, 0 baseline
+  markers, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/fintech/fraud --json`
+  passed with one complete lifecycle record, 33 rules, 8 routes, 11 theme
+  tokens, and 0 warnings/errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 114 operable contracts, 114 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+
+Code review:
+
+- Reviewed signal-scoring guardrails so tenant, policy, subject, source, KYC,
+  amount/currency, score range, and review/evidence indicators are enforced
+  before local state changes.
+- Reviewed intervention guardrails so step-up, hold, and block decisions carry
+  challenge evidence, reason, and human approval where required.
+- Reviewed case guardrails so investigations require supported case types,
+  investigator assignment, evidence, disposition, and reviewer evidence before
+  resolution.
+- Reviewed first-class fraud-agent behavior so Codex, Claude Code, OpenCode,
+  and Pi runtimes are provider-neutral and privileged actions require human
+  approval.
+- Kept live device fingerprinting, behavioral biometrics, card-network
+  chargeback submission, fraud model inference/training, graph analytics,
+  payment rails, wallets, KYC/AML systems, audit sinks, notifications, key
+  management, and durable Bytewax workers behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live fraud model
+  inference, live device fingerprinting, live behavioral biometrics, live
+  card-network chargeback submission, durable Bytewax topology,
+  cross-institution graph analytics, or performance/load checks during this
+  battery-conscious slice.

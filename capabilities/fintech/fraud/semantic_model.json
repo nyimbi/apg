@@ -1,0 +1,1426 @@
+{
+  "app": {
+    "description": "Fraud Detection package-backed APG capability",
+    "entity_count": 4,
+    "name": "fintech_fraud",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "fintech_fraud": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "fraud_ops_reviewer",
+            "transaction_risk_analyst",
+            "chargeback_reviewer",
+            "device_risk_reviewer",
+            "case_investigator"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "cases": {
+          "evidence_required": true,
+          "investigator_required": true,
+          "resolution_requires_disposition": true,
+          "supported_types": [
+            "transaction_fraud",
+            "account_takeover",
+            "synthetic_identity",
+            "mule_account",
+            "chargeback_abuse",
+            "device_fraud"
+          ]
+        },
+        "decisions": {
+          "challenge_required_for_step_up": true,
+          "human_approval_required_for_hold_or_block": true,
+          "reason_required_for_hold_or_block": true,
+          "supported_decisions": [
+            "approve",
+            "step_up",
+            "hold",
+            "block",
+            "review"
+          ]
+        },
+        "governance": {
+          "audit_fraud_events": true,
+          "human_approval_required_for_high_impact_actions": true,
+          "kyc_link_required": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "indicators": {
+          "account_takeover_requires_review": true,
+          "aml_alert_requires_review": true,
+          "chargeback_requires_evidence": true,
+          "device_anomaly_requires_review": true,
+          "geo_anomaly_requires_review": true,
+          "velocity_requires_review": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_case_events": true,
+          "emit_decision_events": true,
+          "emit_signal_events": true,
+          "event_stream": "apg.fintech.fraud.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "scoring": {
+          "block_threshold": 90,
+          "hold_threshold": 75,
+          "max_score": 100,
+          "min_score": 0,
+          "review_threshold": 45,
+          "step_up_threshold": 60
+        },
+        "signals": {
+          "kyc_link_required": true,
+          "money_required_for_transaction_signals": true,
+          "source_reference_required": true,
+          "supported_channels": [
+            "api",
+            "mobile",
+            "web",
+            "pos",
+            "atm",
+            "agent",
+            "batch"
+          ],
+          "supported_types": [
+            "payment",
+            "wallet_transfer",
+            "card_not_present",
+            "account_login",
+            "device_change",
+            "refund",
+            "chargeback",
+            "agent_review"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_fraud_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_cases": true,
+          "enable_chargebacks": true,
+          "enable_dashboard": true,
+          "enable_decisions": true,
+          "enable_devices": true,
+          "enable_signals": true
+        }
+      },
+      "name": "Fraud Detection",
+      "provides": [
+        "fraud_signal_scoring",
+        "transaction_risk_decisioning",
+        "account_takeover_detection",
+        "device_risk_detection",
+        "chargeback_evidence_workflow",
+        "fraud_case_management",
+        "fraud_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_kyc",
+        "fintech_aml"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "Fraud operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "description": "Fraud writes require policy evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "fraud_policy_required",
+              "required_action": "attach_fraud_policy"
+            },
+            "name": "fraud_write_requires_policy"
+          },
+          {
+            "condition": {
+              "operation": "score_signal",
+              "subject_present": false
+            },
+            "description": "Fraud signals require subject reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "fraud_subject_required",
+              "required_action": "attach_subject_reference"
+            },
+            "name": "signal_subject_required"
+          },
+          {
+            "condition": {
+              "operation": "score_signal",
+              "signal_type_supported": false
+            },
+            "description": "Fraud signal type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "fraud_signal_type_not_supported",
+              "required_action": "select_supported_signal_type"
+            },
+            "name": "signal_type_supported"
+          },
+          {
+            "condition": {
+              "channel_supported": false,
+              "operation": "score_signal"
+            },
+            "description": "Fraud signal channel must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "fraud_channel_not_supported",
+              "required_action": "select_supported_channel"
+            },
+            "name": "signal_channel_supported"
+          },
+          {
+            "condition": {
+              "operation": "score_signal",
+              "source_reference_present": false
+            },
+            "description": "Fraud signals require source reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_reference_required",
+              "required_action": "attach_source_reference"
+            },
+            "name": "signal_source_required"
+          },
+          {
+            "condition": {
+              "kyc_link_present": false,
+              "operation": "score_signal"
+            },
+            "description": "Fraud signals require linked KYC profile evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "kyc_link_required",
+              "required_action": "attach_kyc_profile"
+            },
+            "name": "signal_requires_kyc_link"
+          },
+          {
+            "condition": {
+              "money_signal": true,
+              "operation": "score_signal",
+              "positive_amount": false
+            },
+            "description": "Money-bearing fraud signals require a positive amount.",
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_amount_required",
+              "required_action": "set_positive_amount"
+            },
+            "name": "money_amount_positive"
+          },
+          {
+            "condition": {
+              "currency_present": false,
+              "money_signal": true,
+              "operation": "score_signal"
+            },
+            "description": "Money-bearing fraud signals require currency.",
+            "effect": {
+              "decision": "deny",
+              "reason": "currency_required",
+              "required_action": "set_currency"
+            },
+            "name": "money_currency_required"
+          },
+          {
+            "condition": {
+              "operation": "score_signal",
+              "risk_score_out_of_range": true
+            },
+            "description": "Fraud risk score must be between 0 and 100.",
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_score_out_of_range",
+              "required_action": "set_valid_risk_score"
+            },
+            "name": "risk_score_range"
+          },
+          {
+            "condition": {
+              "high_risk_score": true,
+              "operation": "score_signal",
+              "review_recorded": false
+            },
+            "description": "High fraud risk scores require review evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "high_fraud_risk_review_required",
+              "required_action": "review_high_risk_signal"
+            },
+            "name": "high_risk_score_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "score_signal",
+              "review_recorded": false,
+              "velocity_indicator": true
+            },
+            "description": "Velocity indicators require fraud review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "velocity_review_required",
+              "required_action": "review_velocity_pattern"
+            },
+            "name": "velocity_requires_review"
+          },
+          {
+            "condition": {
+              "device_anomaly": true,
+              "operation": "score_signal",
+              "review_recorded": false
+            },
+            "description": "Device anomalies require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "device_review_required",
+              "required_action": "review_device_signal"
+            },
+            "name": "device_anomaly_requires_review"
+          },
+          {
+            "condition": {
+              "geo_anomaly": true,
+              "operation": "score_signal",
+              "review_recorded": false
+            },
+            "description": "Geography anomalies require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "geo_review_required",
+              "required_action": "review_geo_signal"
+            },
+            "name": "geo_anomaly_requires_review"
+          },
+          {
+            "condition": {
+              "aml_alert_present": true,
+              "operation": "score_signal",
+              "review_recorded": false
+            },
+            "description": "Fraud signals linked to AML alerts require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "aml_alert_review_required",
+              "required_action": "review_aml_link"
+            },
+            "name": "aml_alert_requires_review"
+          },
+          {
+            "condition": {
+              "account_takeover_indicator": true,
+              "operation": "score_signal",
+              "review_recorded": false
+            },
+            "description": "Account takeover indicators require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "account_takeover_review_required",
+              "required_action": "review_account_takeover_signal"
+            },
+            "name": "account_takeover_requires_review"
+          },
+          {
+            "condition": {
+              "chargeback_signal": true,
+              "evidence_present": false,
+              "operation": "score_signal"
+            },
+            "description": "Chargeback fraud signals require evidence references.",
+            "effect": {
+              "decision": "deny",
+              "reason": "chargeback_evidence_required",
+              "required_action": "attach_chargeback_evidence"
+            },
+            "name": "chargeback_requires_evidence"
+          },
+          {
+            "condition": {
+              "operation": "record_decision",
+              "signal_present": false
+            },
+            "description": "Fraud decisions require an existing signal.",
+            "effect": {
+              "decision": "deny",
+              "reason": "fraud_signal_required",
+              "required_action": "select_signal"
+            },
+            "name": "decision_signal_required"
+          },
+          {
+            "condition": {
+              "decision_supported": false,
+              "operation": "record_decision"
+            },
+            "description": "Fraud decision must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "fraud_decision_not_supported",
+              "required_action": "select_supported_decision"
+            },
+            "name": "decision_supported"
+          },
+          {
+            "condition": {
+              "challenge_present": false,
+              "operation": "record_decision",
+              "step_up_decision": true
+            },
+            "description": "Step-up decisions require auth challenge evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "challenge_reference_required",
+              "required_action": "attach_challenge_reference"
+            },
+            "name": "step_up_requires_challenge"
+          },
+          {
+            "condition": {
+              "hold_or_block": true,
+              "operation": "record_decision",
+              "reason_present": false
+            },
+            "description": "Hold or block decisions require reason.",
+            "effect": {
+              "decision": "deny",
+              "reason": "decision_reason_required",
+              "required_action": "record_decision_reason"
+            },
+            "name": "hold_or_block_requires_reason"
+          },
+          {
+            "condition": {
+              "hold_or_block": true,
+              "human_approval_recorded": false,
+              "operation": "record_decision"
+            },
+            "description": "Hold or block decisions require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "hold_or_block_requires_human_approval"
+          },
+          {
+            "condition": {
+              "operation": "open_case",
+              "signal_present": false
+            },
+            "description": "Fraud cases require a signal reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "fraud_signal_required",
+              "required_action": "select_signal"
+            },
+            "name": "case_signal_required"
+          },
+          {
+            "condition": {
+              "case_type_supported": false,
+              "operation": "open_case"
+            },
+            "description": "Fraud case type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "fraud_case_type_not_supported",
+              "required_action": "select_supported_case_type"
+            },
+            "name": "case_type_supported"
+          },
+          {
+            "condition": {
+              "investigator_present": false,
+              "operation": "open_case"
+            },
+            "description": "Fraud cases require an investigator.",
+            "effect": {
+              "decision": "deny",
+              "reason": "case_investigator_required",
+              "required_action": "assign_investigator"
+            },
+            "name": "case_investigator_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "open_case"
+            },
+            "description": "Fraud cases require evidence references.",
+            "effect": {
+              "decision": "deny",
+              "reason": "case_evidence_required",
+              "required_action": "attach_case_evidence"
+            },
+            "name": "case_evidence_required"
+          },
+          {
+            "condition": {
+              "disposition_present": false,
+              "operation": "resolve_case"
+            },
+            "description": "Resolving fraud cases requires disposition.",
+            "effect": {
+              "decision": "deny",
+              "reason": "case_disposition_required",
+              "required_action": "record_case_disposition"
+            },
+            "name": "case_resolution_requires_disposition"
+          },
+          {
+            "condition": {
+              "operation": "resolve_case",
+              "reviewer_present": false
+            },
+            "description": "Resolving fraud cases requires reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "case_reviewer_required",
+              "required_action": "assign_case_reviewer"
+            },
+            "name": "case_resolution_requires_reviewer"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "fraud_batch"
+            },
+            "description": "Fraud batches require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_fraud_batch_to_bytewax"
+            },
+            "name": "fraud_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "fraud_event"
+            },
+            "description": "Fraud events require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_fraud_event_to_bytewax"
+            },
+            "name": "fraud_event_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_fraud_agent"
+            },
+            "description": "Fraud agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "fraud_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "fraud_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_fraud_agent"
+            },
+            "description": "Fraud agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "fraud_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "fraud_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "fraud_agent_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged fraud-agent actions require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_fraud_agent_action_requires_human_approval"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "Fraud operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "description": "Fraud writes require policy evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "fraud_policy_required",
+            "required_action": "attach_fraud_policy"
+          },
+          "name": "fraud_write_requires_policy"
+        },
+        {
+          "condition": {
+            "operation": "score_signal",
+            "subject_present": false
+          },
+          "description": "Fraud signals require subject reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "fraud_subject_required",
+            "required_action": "attach_subject_reference"
+          },
+          "name": "signal_subject_required"
+        },
+        {
+          "condition": {
+            "operation": "score_signal",
+            "signal_type_supported": false
+          },
+          "description": "Fraud signal type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "fraud_signal_type_not_supported",
+            "required_action": "select_supported_signal_type"
+          },
+          "name": "signal_type_supported"
+        },
+        {
+          "condition": {
+            "channel_supported": false,
+            "operation": "score_signal"
+          },
+          "description": "Fraud signal channel must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "fraud_channel_not_supported",
+            "required_action": "select_supported_channel"
+          },
+          "name": "signal_channel_supported"
+        },
+        {
+          "condition": {
+            "operation": "score_signal",
+            "source_reference_present": false
+          },
+          "description": "Fraud signals require source reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_reference_required",
+            "required_action": "attach_source_reference"
+          },
+          "name": "signal_source_required"
+        },
+        {
+          "condition": {
+            "kyc_link_present": false,
+            "operation": "score_signal"
+          },
+          "description": "Fraud signals require linked KYC profile evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "kyc_link_required",
+            "required_action": "attach_kyc_profile"
+          },
+          "name": "signal_requires_kyc_link"
+        },
+        {
+          "condition": {
+            "money_signal": true,
+            "operation": "score_signal",
+            "positive_amount": false
+          },
+          "description": "Money-bearing fraud signals require a positive amount.",
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_amount_required",
+            "required_action": "set_positive_amount"
+          },
+          "name": "money_amount_positive"
+        },
+        {
+          "condition": {
+            "currency_present": false,
+            "money_signal": true,
+            "operation": "score_signal"
+          },
+          "description": "Money-bearing fraud signals require currency.",
+          "effect": {
+            "decision": "deny",
+            "reason": "currency_required",
+            "required_action": "set_currency"
+          },
+          "name": "money_currency_required"
+        },
+        {
+          "condition": {
+            "operation": "score_signal",
+            "risk_score_out_of_range": true
+          },
+          "description": "Fraud risk score must be between 0 and 100.",
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_score_out_of_range",
+            "required_action": "set_valid_risk_score"
+          },
+          "name": "risk_score_range"
+        },
+        {
+          "condition": {
+            "high_risk_score": true,
+            "operation": "score_signal",
+            "review_recorded": false
+          },
+          "description": "High fraud risk scores require review evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "high_fraud_risk_review_required",
+            "required_action": "review_high_risk_signal"
+          },
+          "name": "high_risk_score_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "score_signal",
+            "review_recorded": false,
+            "velocity_indicator": true
+          },
+          "description": "Velocity indicators require fraud review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "velocity_review_required",
+            "required_action": "review_velocity_pattern"
+          },
+          "name": "velocity_requires_review"
+        },
+        {
+          "condition": {
+            "device_anomaly": true,
+            "operation": "score_signal",
+            "review_recorded": false
+          },
+          "description": "Device anomalies require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "device_review_required",
+            "required_action": "review_device_signal"
+          },
+          "name": "device_anomaly_requires_review"
+        },
+        {
+          "condition": {
+            "geo_anomaly": true,
+            "operation": "score_signal",
+            "review_recorded": false
+          },
+          "description": "Geography anomalies require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "geo_review_required",
+            "required_action": "review_geo_signal"
+          },
+          "name": "geo_anomaly_requires_review"
+        },
+        {
+          "condition": {
+            "aml_alert_present": true,
+            "operation": "score_signal",
+            "review_recorded": false
+          },
+          "description": "Fraud signals linked to AML alerts require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "aml_alert_review_required",
+            "required_action": "review_aml_link"
+          },
+          "name": "aml_alert_requires_review"
+        },
+        {
+          "condition": {
+            "account_takeover_indicator": true,
+            "operation": "score_signal",
+            "review_recorded": false
+          },
+          "description": "Account takeover indicators require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "account_takeover_review_required",
+            "required_action": "review_account_takeover_signal"
+          },
+          "name": "account_takeover_requires_review"
+        },
+        {
+          "condition": {
+            "chargeback_signal": true,
+            "evidence_present": false,
+            "operation": "score_signal"
+          },
+          "description": "Chargeback fraud signals require evidence references.",
+          "effect": {
+            "decision": "deny",
+            "reason": "chargeback_evidence_required",
+            "required_action": "attach_chargeback_evidence"
+          },
+          "name": "chargeback_requires_evidence"
+        },
+        {
+          "condition": {
+            "operation": "record_decision",
+            "signal_present": false
+          },
+          "description": "Fraud decisions require an existing signal.",
+          "effect": {
+            "decision": "deny",
+            "reason": "fraud_signal_required",
+            "required_action": "select_signal"
+          },
+          "name": "decision_signal_required"
+        },
+        {
+          "condition": {
+            "decision_supported": false,
+            "operation": "record_decision"
+          },
+          "description": "Fraud decision must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "fraud_decision_not_supported",
+            "required_action": "select_supported_decision"
+          },
+          "name": "decision_supported"
+        },
+        {
+          "condition": {
+            "challenge_present": false,
+            "operation": "record_decision",
+            "step_up_decision": true
+          },
+          "description": "Step-up decisions require auth challenge evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "challenge_reference_required",
+            "required_action": "attach_challenge_reference"
+          },
+          "name": "step_up_requires_challenge"
+        },
+        {
+          "condition": {
+            "hold_or_block": true,
+            "operation": "record_decision",
+            "reason_present": false
+          },
+          "description": "Hold or block decisions require reason.",
+          "effect": {
+            "decision": "deny",
+            "reason": "decision_reason_required",
+            "required_action": "record_decision_reason"
+          },
+          "name": "hold_or_block_requires_reason"
+        },
+        {
+          "condition": {
+            "hold_or_block": true,
+            "human_approval_recorded": false,
+            "operation": "record_decision"
+          },
+          "description": "Hold or block decisions require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "hold_or_block_requires_human_approval"
+        },
+        {
+          "condition": {
+            "operation": "open_case",
+            "signal_present": false
+          },
+          "description": "Fraud cases require a signal reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "fraud_signal_required",
+            "required_action": "select_signal"
+          },
+          "name": "case_signal_required"
+        },
+        {
+          "condition": {
+            "case_type_supported": false,
+            "operation": "open_case"
+          },
+          "description": "Fraud case type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "fraud_case_type_not_supported",
+            "required_action": "select_supported_case_type"
+          },
+          "name": "case_type_supported"
+        },
+        {
+          "condition": {
+            "investigator_present": false,
+            "operation": "open_case"
+          },
+          "description": "Fraud cases require an investigator.",
+          "effect": {
+            "decision": "deny",
+            "reason": "case_investigator_required",
+            "required_action": "assign_investigator"
+          },
+          "name": "case_investigator_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "open_case"
+          },
+          "description": "Fraud cases require evidence references.",
+          "effect": {
+            "decision": "deny",
+            "reason": "case_evidence_required",
+            "required_action": "attach_case_evidence"
+          },
+          "name": "case_evidence_required"
+        },
+        {
+          "condition": {
+            "disposition_present": false,
+            "operation": "resolve_case"
+          },
+          "description": "Resolving fraud cases requires disposition.",
+          "effect": {
+            "decision": "deny",
+            "reason": "case_disposition_required",
+            "required_action": "record_case_disposition"
+          },
+          "name": "case_resolution_requires_disposition"
+        },
+        {
+          "condition": {
+            "operation": "resolve_case",
+            "reviewer_present": false
+          },
+          "description": "Resolving fraud cases requires reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "case_reviewer_required",
+            "required_action": "assign_case_reviewer"
+          },
+          "name": "case_resolution_requires_reviewer"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "fraud_batch"
+          },
+          "description": "Fraud batches require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_fraud_batch_to_bytewax"
+          },
+          "name": "fraud_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "fraud_event"
+          },
+          "description": "Fraud events require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_fraud_event_to_bytewax"
+          },
+          "name": "fraud_event_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_fraud_agent"
+          },
+          "description": "Fraud agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "fraud_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "fraud_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_fraud_agent"
+          },
+          "description": "Fraud agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "fraud_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "fraud_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "fraud_agent_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged fraud-agent actions require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_fraud_agent_action_requires_human_approval"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "agents": {
+          "component": "FraudAgentWorkbench",
+          "permission": "fintech_fraud:admin",
+          "route": "/fintech-fraud/agents"
+        },
+        "cases": {
+          "component": "FraudCaseWorkbench",
+          "permission": "fintech_fraud:investigate",
+          "route": "/fintech-fraud/cases"
+        },
+        "chargebacks": {
+          "component": "FraudChargebackEvidence",
+          "permission": "fintech_fraud:chargebacks",
+          "route": "/fintech-fraud/chargebacks"
+        },
+        "dashboard": {
+          "component": "FraudDashboard",
+          "permission": "fintech_fraud:view",
+          "route": "/fintech-fraud/dashboard"
+        },
+        "decisions": {
+          "component": "FraudDecisionConsole",
+          "permission": "fintech_fraud:decide",
+          "route": "/fintech-fraud/decisions"
+        },
+        "devices": {
+          "component": "FraudDeviceConsole",
+          "permission": "fintech_fraud:devices",
+          "route": "/fintech-fraud/devices"
+        },
+        "settings": {
+          "component": "FraudSettings",
+          "permission": "fintech_fraud:admin",
+          "route": "/fintech-fraud/settings"
+        },
+        "signals": {
+          "component": "FraudSignalQueue",
+          "permission": "fintech_fraud:score",
+          "route": "/fintech-fraud/signals"
+        }
+      },
+      "streaming": {
+        "events": [
+          "fraud_signal_scored",
+          "fraud_decision_recorded",
+          "fraud_case_opened",
+          "fraud_case_resolved",
+          "fraud_agent_registered"
+        ],
+        "guardrails": [
+          "fraud_batch_requires_bytewax",
+          "fraud_event_requires_bytewax",
+          "privileged_fraud_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.fintech.fraud.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "cases": {
+            "icon": "folder-search",
+            "status_indicator": "case-status-chip"
+          },
+          "chargebacks": {
+            "icon": "receipt-text",
+            "status_indicator": "evidence-chip"
+          },
+          "decisions": {
+            "icon": "shield-check",
+            "status_indicator": "decision-chip"
+          },
+          "devices": {
+            "icon": "smartphone",
+            "status_indicator": "device-risk-chip"
+          },
+          "signals": {
+            "icon": "radar",
+            "status_indicator": "fraud-score-chip"
+          }
+        },
+        "name": "fintech_fraud_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#7C3AED",
+          "color.danger": "#B91C1C",
+          "color.primary": "#1F3A5F",
+          "color.success": "#15803D",
+          "color.warning": "#B45309",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/fintech-fraud/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "FraudDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/fintech-fraud/dashboard",
+            "permission": "fintech_fraud:view"
+          },
+          {
+            "component": "FraudSignalQueue",
+            "name": "signals",
+            "nav_group": "Signals",
+            "path": "/fintech-fraud/signals",
+            "permission": "fintech_fraud:score"
+          },
+          {
+            "component": "FraudDecisionConsole",
+            "name": "decisions",
+            "nav_group": "Decisions",
+            "path": "/fintech-fraud/decisions",
+            "permission": "fintech_fraud:decide"
+          },
+          {
+            "component": "FraudCaseWorkbench",
+            "name": "cases",
+            "nav_group": "Cases",
+            "path": "/fintech-fraud/cases",
+            "permission": "fintech_fraud:investigate"
+          },
+          {
+            "component": "FraudChargebackEvidence",
+            "name": "chargebacks",
+            "nav_group": "Evidence",
+            "path": "/fintech-fraud/chargebacks",
+            "permission": "fintech_fraud:chargebacks"
+          },
+          {
+            "component": "FraudDeviceConsole",
+            "name": "devices",
+            "nav_group": "Signals",
+            "path": "/fintech-fraud/devices",
+            "permission": "fintech_fraud:devices"
+          },
+          {
+            "component": "FraudAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/fintech-fraud/agents",
+            "permission": "fintech_fraud:admin"
+          },
+          {
+            "component": "FraudSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/fintech-fraud/settings",
+            "permission": "fintech_fraud:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "fraud_review": {
+        "roles": [
+          "fraud_ops_reviewer",
+          "transaction_risk_analyst",
+          "chargeback_reviewer",
+          "device_risk_reviewer",
+          "case_investigator"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "fintech_fraud": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_kyc",
+        "fintech_aml"
+      ]
+    }
+  },
+  "contracts": {
+    "fintech_fraud": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "fraud_ops_reviewer",
+            "transaction_risk_analyst",
+            "chargeback_reviewer",
+            "device_risk_reviewer",
+            "case_investigator"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "cases": {
+          "evidence_required": true,
+          "investigator_required": true,
+          "resolution_requires_disposition": true,
+          "supported_types": [
+            "transaction_fraud",
+            "account_takeover",
+            "synthetic_identity",
+            "mule_account",
+            "chargeback_abuse",
+            "device_fraud"
+          ]
+        },
+        "decisions": {
+          "challenge_required_for_step_up": true,
+          "human_approval_required_for_hold_or_block": true,
+          "reason_required_for_hold_or_block": true,
+          "supported_decisions": [
+            "approve",
+            "step_up",
+            "hold",
+            "block",
+            "review"
+          ]
+        },
+        "governance": {
+          "audit_fraud_events": true,
+          "human_approval_required_for_high_impact_actions": true,
+          "kyc_link_required": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "indicators": {
+          "account_takeover_requires_review": true,
+          "aml_alert_requires_review": true,
+          "chargeback_requires_evidence": true,
+          "device_anomaly_requires_review": true,
+          "geo_anomaly_requires_review": true,
+          "velocity_requires_review": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_case_events": true,
+          "emit_decision_events": true,
+          "emit_signal_events": true,
+          "event_stream": "apg.fintech.fraud.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "scoring": {
+          "block_threshold": 90,
+          "hold_threshold": 75,
+          "max_score": 100,
+          "min_score": 0,
+          "review_threshold": 45,
+          "step_up_threshold": 60
+        },
+        "signals": {
+          "kyc_link_required": true,
+          "money_required_for_transaction_signals": true,
+          "source_reference_required": true,
+          "supported_channels": [
+            "api",
+            "mobile",
+            "web",
+            "pos",
+            "atm",
+            "agent",
+            "batch"
+          ],
+          "supported_types": [
+            "payment",
+            "wallet_transfer",
+            "card_not_present",
+            "account_login",
+            "device_change",
+            "refund",
+            "chargeback",
+            "agent_review"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_fraud_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_cases": true,
+          "enable_chargebacks": true,
+          "enable_dashboard": true,
+          "enable_decisions": true,
+          "enable_devices": true,
+          "enable_signals": true
+        }
+      },
+      "id": "fintech_fraud",
+      "provides": [
+        "fraud_signal_scoring",
+        "transaction_risk_decisioning",
+        "account_takeover_detection",
+        "device_risk_detection",
+        "chargeback_evidence_workflow",
+        "fraud_case_management",
+        "fraud_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_kyc",
+        "fintech_aml"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 9,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "fintech_fraud": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}
