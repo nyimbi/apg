@@ -67,6 +67,7 @@ CAPABILITY_META = {
 		'socint',      # Social Media Intelligence
 		'darkweb',     # Dark Web Monitoring
 		'radio',       # Radio Intelligence Listener
+		'surveillance', # Digital Surveillance
 	],
 	'security_requirements': {
 		'classification_handling': True,

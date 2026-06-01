@@ -1,0 +1,2534 @@
+{
+  "app": {
+    "description": "Digital Surveillance package-backed APG capability",
+    "entity_count": 11,
+    "name": "intel_surveillance",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "intel_surveillance": {
+      "configuration": {
+        "adapters": {
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "geospatial": "geos",
+          "graph": "grph",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "rag": "ragn",
+          "vision": "cvsn"
+        },
+        "agents": {
+          "covert_scope_denied": true,
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "authority_reviewer",
+            "program_planner",
+            "asset_steward",
+            "sensor_steward",
+            "alert_analyst",
+            "dissemination_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "alerts": {
+          "analyst_required": true,
+          "confidence_required": true,
+          "evidence_required": true,
+          "observation_required": true,
+          "supported_alert_types": [
+            "intrusion",
+            "tamper",
+            "policy_violation",
+            "anomalous_behavior",
+            "safety_incident",
+            "perimeter_event",
+            "device_compromise",
+            "data_exposure"
+          ],
+          "supported_risk_levels": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "assets": {
+          "authority_required": true,
+          "evidence_required": true,
+          "owner_required": true,
+          "privacy_review_required": true,
+          "supported_asset_types": [
+            "facility",
+            "endpoint",
+            "account",
+            "device",
+            "vehicle",
+            "public_area",
+            "network_segment",
+            "cloud_resource"
+          ]
+        },
+        "authorities": {
+          "approver_required": true,
+          "evidence_required": true,
+          "expiry_required": true,
+          "supported_authority_types": [
+            "legal_mandate",
+            "consent",
+            "security_monitoring_authority",
+            "incident_response_authority",
+            "partner_authority",
+            "public_safety_authority"
+          ],
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ]
+        },
+        "dissemination": {
+          "approval_required": true,
+          "assessment_required": true,
+          "audience_required": true,
+          "evidence_required": true,
+          "release_marking_required": true
+        },
+        "governance": {
+          "audit_events": true,
+          "biometric_identification_denied": true,
+          "bypass_denied": true,
+          "covert_tracking_denied": true,
+          "credential_capture_denied": true,
+          "exfiltration_denied": true,
+          "lawful_authority_required": true,
+          "policy_attached_for_writes": true,
+          "privacy_review_required": true,
+          "require_tenant_context": true,
+          "spyware_denied": true,
+          "stalking_denied": true
+        },
+        "observability": {
+          "event_stream": "apg.intel.surveillance.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "observations": {
+          "confidence_required": true,
+          "content_fingerprint_required": true,
+          "evidence_required": true,
+          "observed_at_required": true,
+          "program_required": true,
+          "sensor_required": true,
+          "supported_observation_types": [
+            "motion",
+            "access_event",
+            "endpoint_event",
+            "network_event",
+            "location_event",
+            "anomaly",
+            "policy_violation",
+            "safety_event"
+          ]
+        },
+        "programs": {
+          "authority_required": true,
+          "evidence_required": true,
+          "supported_priorities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "supported_program_types": [
+            "asset_protection",
+            "facility_monitoring",
+            "endpoint_monitoring",
+            "fraud_monitoring",
+            "public_safety",
+            "incident_watch",
+            "compliance_monitoring",
+            "executive_protection"
+          ]
+        },
+        "referrals": {
+          "approval_required": true,
+          "assessment_required": true,
+          "evidence_required": true,
+          "recipient_required": true,
+          "supported_types": [
+            "incident_response",
+            "legal_review",
+            "public_safety_notice",
+            "compliance_review",
+            "partner_notice",
+            "maintenance_ticket"
+          ]
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "risk_assessments": {
+          "alert_required": true,
+          "analyst_required": true,
+          "confidence_required": true,
+          "evidence_required": true,
+          "supported_assessment_types": [
+            "physical_security",
+            "cyber_security",
+            "privacy",
+            "safety",
+            "compliance",
+            "insider_risk"
+          ],
+          "supported_risk_levels": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "sensors": {
+          "asset_required": true,
+          "calibration_required": true,
+          "custodian_required": true,
+          "evidence_required": true,
+          "supported_sensor_types": [
+            "camera",
+            "edr",
+            "network_sensor",
+            "access_control",
+            "location_beacon",
+            "telemetry_feed",
+            "partner_feed",
+            "log_stream"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "intel_surveillance_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_alerts": true,
+          "enable_assets": true,
+          "enable_authorities": true,
+          "enable_dashboard": true,
+          "enable_dissemination": true,
+          "enable_observations": true,
+          "enable_programs": true,
+          "enable_referrals": true,
+          "enable_reviews": true,
+          "enable_risk": true,
+          "enable_sensors": true
+        }
+      },
+      "name": "Digital Surveillance",
+      "provides": [
+        "surveillance_authority_workflow",
+        "surveillance_program_workflow",
+        "surveillance_asset_workflow",
+        "surveillance_sensor_workflow",
+        "surveillance_observation_workflow",
+        "surveillance_alert_workflow",
+        "surveillance_risk_workflow",
+        "surveillance_referral_workflow",
+        "surveillance_dissemination_workflow",
+        "surveillance_review_workflow",
+        "surveillance_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "cvsn",
+        "grph",
+        "ragn",
+        "geos"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "surveillance_policy_required",
+              "required_action": "attach_surveillance_policy"
+            },
+            "name": "surveillance_write_requires_policy"
+          },
+          {
+            "condition": {
+              "authority_type_supported": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_type_not_supported",
+              "required_action": "select_supported_authority_type"
+            },
+            "name": "authority_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_authority",
+              "scope_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_scope_required",
+              "required_action": "attach_scope_reference"
+            },
+            "name": "authority_scope_required"
+          },
+          {
+            "condition": {
+              "classification_supported": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "classification_not_supported",
+              "required_action": "select_supported_classification"
+            },
+            "name": "authority_classification_supported"
+          },
+          {
+            "condition": {
+              "approver_present": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_approver_required",
+              "required_action": "record_approver"
+            },
+            "name": "authority_approver_required"
+          },
+          {
+            "condition": {
+              "expiry_present": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_expiry_required",
+              "required_action": "set_expiry"
+            },
+            "name": "authority_expiry_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_evidence_required",
+              "required_action": "attach_authority_evidence"
+            },
+            "name": "authority_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_program",
+              "program_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "program_type_not_supported",
+              "required_action": "select_supported_program_type"
+            },
+            "name": "program_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_program",
+              "program_name_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "program_name_required",
+              "required_action": "name_program"
+            },
+            "name": "program_name_required"
+          },
+          {
+            "condition": {
+              "operation": "record_program",
+              "priority_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "program_priority_not_supported",
+              "required_action": "select_supported_priority"
+            },
+            "name": "program_priority_supported"
+          },
+          {
+            "condition": {
+              "authority_present": false,
+              "operation": "record_program"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "lawful_authority_required",
+              "required_action": "select_authority"
+            },
+            "name": "program_authority_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_program"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "program_evidence_required",
+              "required_action": "attach_program_evidence"
+            },
+            "name": "program_evidence_required"
+          },
+          {
+            "condition": {
+              "asset_type_supported": false,
+              "operation": "record_asset"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "asset_type_not_supported",
+              "required_action": "select_supported_asset_type"
+            },
+            "name": "asset_type_supported"
+          },
+          {
+            "condition": {
+              "asset_reference_present": false,
+              "operation": "record_asset"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "asset_reference_required",
+              "required_action": "attach_asset_reference"
+            },
+            "name": "asset_reference_required"
+          },
+          {
+            "condition": {
+              "operation": "record_asset",
+              "owner_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "asset_owner_required",
+              "required_action": "assign_asset_owner"
+            },
+            "name": "asset_owner_required"
+          },
+          {
+            "condition": {
+              "authority_present": false,
+              "operation": "record_asset"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "lawful_authority_required",
+              "required_action": "select_authority"
+            },
+            "name": "asset_authority_required"
+          },
+          {
+            "condition": {
+              "operation": "record_asset",
+              "privacy_review_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "privacy_review_required",
+              "required_action": "record_privacy_review"
+            },
+            "name": "asset_privacy_review_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_asset"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "asset_evidence_required",
+              "required_action": "attach_asset_evidence"
+            },
+            "name": "asset_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "register_sensor",
+              "sensor_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "sensor_type_not_supported",
+              "required_action": "select_supported_sensor_type"
+            },
+            "name": "sensor_type_supported"
+          },
+          {
+            "condition": {
+              "asset_present": false,
+              "operation": "register_sensor"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "asset_required",
+              "required_action": "select_asset"
+            },
+            "name": "sensor_asset_required"
+          },
+          {
+            "condition": {
+              "operation": "register_sensor",
+              "sensor_reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "sensor_reference_required",
+              "required_action": "attach_sensor_reference"
+            },
+            "name": "sensor_reference_required"
+          },
+          {
+            "condition": {
+              "custodian_present": false,
+              "operation": "register_sensor"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "sensor_custodian_required",
+              "required_action": "assign_sensor_custodian"
+            },
+            "name": "sensor_custodian_required"
+          },
+          {
+            "condition": {
+              "calibration_present": false,
+              "operation": "register_sensor"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "sensor_calibration_required",
+              "required_action": "attach_calibration_reference"
+            },
+            "name": "sensor_calibration_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "register_sensor"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "sensor_evidence_required",
+              "required_action": "attach_sensor_evidence"
+            },
+            "name": "sensor_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_observation",
+              "program_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "program_required",
+              "required_action": "select_program"
+            },
+            "name": "observation_program_required"
+          },
+          {
+            "condition": {
+              "operation": "record_observation",
+              "sensor_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "sensor_required",
+              "required_action": "select_sensor"
+            },
+            "name": "observation_sensor_required"
+          },
+          {
+            "condition": {
+              "operation": "record_observation",
+              "program_sensor_authority_match": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_mismatch",
+              "required_action": "align_program_sensor_authority"
+            },
+            "name": "observation_program_sensor_authority_match"
+          },
+          {
+            "condition": {
+              "observation_type_supported": false,
+              "operation": "record_observation"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "observation_type_not_supported",
+              "required_action": "select_supported_observation_type"
+            },
+            "name": "observation_type_supported"
+          },
+          {
+            "condition": {
+              "observation_reference_present": false,
+              "operation": "record_observation"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "observation_reference_required",
+              "required_action": "attach_observation_reference"
+            },
+            "name": "observation_reference_required"
+          },
+          {
+            "condition": {
+              "fingerprint_present": false,
+              "operation": "record_observation"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "content_fingerprint_required",
+              "required_action": "record_content_fingerprint"
+            },
+            "name": "observation_fingerprint_required"
+          },
+          {
+            "condition": {
+              "observed_at_present": false,
+              "operation": "record_observation"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "observed_at_required",
+              "required_action": "record_observed_at"
+            },
+            "name": "observation_observed_at_required"
+          },
+          {
+            "condition": {
+              "confidence_valid": false,
+              "operation": "record_observation"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "confidence_score_invalid",
+              "required_action": "set_confidence_0_to_1"
+            },
+            "name": "observation_confidence_valid"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_observation"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "observation_evidence_required",
+              "required_action": "attach_observation_evidence"
+            },
+            "name": "observation_evidence_required"
+          },
+          {
+            "condition": {
+              "observation_present": false,
+              "operation": "record_alert"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "observation_required",
+              "required_action": "select_observation"
+            },
+            "name": "alert_observation_required"
+          },
+          {
+            "condition": {
+              "alert_type_supported": false,
+              "operation": "record_alert"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "alert_type_not_supported",
+              "required_action": "select_supported_alert_type"
+            },
+            "name": "alert_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_alert",
+              "risk_level_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_level_not_supported",
+              "required_action": "select_supported_risk_level"
+            },
+            "name": "alert_risk_supported"
+          },
+          {
+            "condition": {
+              "confidence_valid": false,
+              "operation": "record_alert"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "confidence_score_invalid",
+              "required_action": "set_confidence_0_to_1"
+            },
+            "name": "alert_confidence_valid"
+          },
+          {
+            "condition": {
+              "analyst_present": false,
+              "operation": "record_alert"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "analyst_required",
+              "required_action": "assign_analyst"
+            },
+            "name": "alert_analyst_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_alert"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "alert_evidence_required",
+              "required_action": "attach_alert_evidence"
+            },
+            "name": "alert_evidence_required"
+          },
+          {
+            "condition": {
+              "alert_present": false,
+              "operation": "record_risk"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "alert_required",
+              "required_action": "select_alert"
+            },
+            "name": "risk_alert_required"
+          },
+          {
+            "condition": {
+              "assessment_type_supported": false,
+              "operation": "record_risk"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "assessment_type_not_supported",
+              "required_action": "select_supported_assessment_type"
+            },
+            "name": "risk_assessment_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_risk",
+              "risk_level_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_level_not_supported",
+              "required_action": "select_supported_risk_level"
+            },
+            "name": "risk_level_supported"
+          },
+          {
+            "condition": {
+              "confidence_valid": false,
+              "operation": "record_risk"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "confidence_score_invalid",
+              "required_action": "set_confidence_0_to_1"
+            },
+            "name": "risk_confidence_valid"
+          },
+          {
+            "condition": {
+              "analyst_present": false,
+              "operation": "record_risk"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "analyst_required",
+              "required_action": "assign_analyst"
+            },
+            "name": "risk_analyst_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_risk"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_evidence_required",
+              "required_action": "attach_risk_evidence"
+            },
+            "name": "risk_evidence_required"
+          },
+          {
+            "condition": {
+              "assessment_present": false,
+              "operation": "record_referral"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "assessment_required",
+              "required_action": "select_assessment"
+            },
+            "name": "referral_assessment_required"
+          },
+          {
+            "condition": {
+              "operation": "record_referral",
+              "referral_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "referral_type_not_supported",
+              "required_action": "select_supported_referral_type"
+            },
+            "name": "referral_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_referral",
+              "recipient_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "recipient_required",
+              "required_action": "select_recipient"
+            },
+            "name": "referral_recipient_required"
+          },
+          {
+            "condition": {
+              "approval_present": false,
+              "operation": "record_referral"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "referral_approval_required",
+              "required_action": "attach_referral_approval"
+            },
+            "name": "referral_approval_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_referral"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "referral_evidence_required",
+              "required_action": "attach_referral_evidence"
+            },
+            "name": "referral_evidence_required"
+          },
+          {
+            "condition": {
+              "assessment_present": false,
+              "operation": "record_dissemination"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "assessment_required",
+              "required_action": "select_assessment"
+            },
+            "name": "dissemination_assessment_required"
+          },
+          {
+            "condition": {
+              "audience_present": false,
+              "operation": "record_dissemination"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "audience_required",
+              "required_action": "select_audience"
+            },
+            "name": "dissemination_audience_required"
+          },
+          {
+            "condition": {
+              "operation": "record_dissemination",
+              "release_marking_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "release_marking_required",
+              "required_action": "set_release_marking"
+            },
+            "name": "dissemination_release_required"
+          },
+          {
+            "condition": {
+              "approval_present": false,
+              "operation": "record_dissemination"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "dissemination_approval_required",
+              "required_action": "attach_release_approval"
+            },
+            "name": "dissemination_approval_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_dissemination"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "dissemination_evidence_required",
+              "required_action": "attach_dissemination_evidence"
+            },
+            "name": "dissemination_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "status_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_status_not_supported",
+              "required_action": "select_supported_status"
+            },
+            "name": "review_status_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "reviewer_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "reviewer_required",
+              "required_action": "assign_reviewer"
+            },
+            "name": "review_reviewer_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_review"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_evidence_required",
+              "required_action": "attach_review_evidence"
+            },
+            "name": "review_evidence_required"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "surveillance_batch"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_surveillance_batch_to_bytewax"
+            },
+            "name": "surveillance_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_surveillance_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "surveillance_agent_runtime_not_supported",
+              "required_action": "select_supported_runtime"
+            },
+            "name": "surveillance_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_surveillance_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "surveillance_agent_role_not_supported",
+              "required_action": "select_supported_role"
+            },
+            "name": "surveillance_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "surveillance_agent_action",
+              "privileged_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_surveillance_agent_action_requires_human_approval"
+          },
+          {
+            "condition": {
+              "covert_tracking_scope": true,
+              "operation": "surveillance_agent_action"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "covert_tracking_scope_denied",
+              "required_action": "remove_covert_tracking_scope"
+            },
+            "name": "covert_tracking_action_denied"
+          },
+          {
+            "condition": {
+              "operation": "surveillance_agent_action",
+              "stalking_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "stalking_scope_denied",
+              "required_action": "remove_stalking_scope"
+            },
+            "name": "stalking_action_denied"
+          },
+          {
+            "condition": {
+              "operation": "surveillance_agent_action",
+              "spyware_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "spyware_scope_denied",
+              "required_action": "remove_spyware_scope"
+            },
+            "name": "spyware_action_denied"
+          },
+          {
+            "condition": {
+              "credential_capture_scope": true,
+              "operation": "surveillance_agent_action"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "credential_capture_scope_denied",
+              "required_action": "remove_credential_capture_scope"
+            },
+            "name": "credential_capture_action_denied"
+          },
+          {
+            "condition": {
+              "bypass_scope": true,
+              "operation": "surveillance_agent_action"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "bypass_scope_denied",
+              "required_action": "remove_bypass_scope"
+            },
+            "name": "bypass_action_denied"
+          },
+          {
+            "condition": {
+              "biometric_identification_scope": true,
+              "operation": "surveillance_agent_action"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "biometric_identification_scope_denied",
+              "required_action": "remove_biometric_identification_scope"
+            },
+            "name": "biometric_identification_action_denied"
+          },
+          {
+            "condition": {
+              "exfiltration_scope": true,
+              "operation": "surveillance_agent_action"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "exfiltration_scope_denied",
+              "required_action": "remove_exfiltration_scope"
+            },
+            "name": "exfiltration_action_denied"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "surveillance_policy_required",
+            "required_action": "attach_surveillance_policy"
+          },
+          "name": "surveillance_write_requires_policy"
+        },
+        {
+          "condition": {
+            "authority_type_supported": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_type_not_supported",
+            "required_action": "select_supported_authority_type"
+          },
+          "name": "authority_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_authority",
+            "scope_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_scope_required",
+            "required_action": "attach_scope_reference"
+          },
+          "name": "authority_scope_required"
+        },
+        {
+          "condition": {
+            "classification_supported": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "classification_not_supported",
+            "required_action": "select_supported_classification"
+          },
+          "name": "authority_classification_supported"
+        },
+        {
+          "condition": {
+            "approver_present": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_approver_required",
+            "required_action": "record_approver"
+          },
+          "name": "authority_approver_required"
+        },
+        {
+          "condition": {
+            "expiry_present": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_expiry_required",
+            "required_action": "set_expiry"
+          },
+          "name": "authority_expiry_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_evidence_required",
+            "required_action": "attach_authority_evidence"
+          },
+          "name": "authority_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_program",
+            "program_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "program_type_not_supported",
+            "required_action": "select_supported_program_type"
+          },
+          "name": "program_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_program",
+            "program_name_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "program_name_required",
+            "required_action": "name_program"
+          },
+          "name": "program_name_required"
+        },
+        {
+          "condition": {
+            "operation": "record_program",
+            "priority_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "program_priority_not_supported",
+            "required_action": "select_supported_priority"
+          },
+          "name": "program_priority_supported"
+        },
+        {
+          "condition": {
+            "authority_present": false,
+            "operation": "record_program"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "lawful_authority_required",
+            "required_action": "select_authority"
+          },
+          "name": "program_authority_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_program"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "program_evidence_required",
+            "required_action": "attach_program_evidence"
+          },
+          "name": "program_evidence_required"
+        },
+        {
+          "condition": {
+            "asset_type_supported": false,
+            "operation": "record_asset"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "asset_type_not_supported",
+            "required_action": "select_supported_asset_type"
+          },
+          "name": "asset_type_supported"
+        },
+        {
+          "condition": {
+            "asset_reference_present": false,
+            "operation": "record_asset"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "asset_reference_required",
+            "required_action": "attach_asset_reference"
+          },
+          "name": "asset_reference_required"
+        },
+        {
+          "condition": {
+            "operation": "record_asset",
+            "owner_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "asset_owner_required",
+            "required_action": "assign_asset_owner"
+          },
+          "name": "asset_owner_required"
+        },
+        {
+          "condition": {
+            "authority_present": false,
+            "operation": "record_asset"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "lawful_authority_required",
+            "required_action": "select_authority"
+          },
+          "name": "asset_authority_required"
+        },
+        {
+          "condition": {
+            "operation": "record_asset",
+            "privacy_review_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "privacy_review_required",
+            "required_action": "record_privacy_review"
+          },
+          "name": "asset_privacy_review_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_asset"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "asset_evidence_required",
+            "required_action": "attach_asset_evidence"
+          },
+          "name": "asset_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "register_sensor",
+            "sensor_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "sensor_type_not_supported",
+            "required_action": "select_supported_sensor_type"
+          },
+          "name": "sensor_type_supported"
+        },
+        {
+          "condition": {
+            "asset_present": false,
+            "operation": "register_sensor"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "asset_required",
+            "required_action": "select_asset"
+          },
+          "name": "sensor_asset_required"
+        },
+        {
+          "condition": {
+            "operation": "register_sensor",
+            "sensor_reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "sensor_reference_required",
+            "required_action": "attach_sensor_reference"
+          },
+          "name": "sensor_reference_required"
+        },
+        {
+          "condition": {
+            "custodian_present": false,
+            "operation": "register_sensor"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "sensor_custodian_required",
+            "required_action": "assign_sensor_custodian"
+          },
+          "name": "sensor_custodian_required"
+        },
+        {
+          "condition": {
+            "calibration_present": false,
+            "operation": "register_sensor"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "sensor_calibration_required",
+            "required_action": "attach_calibration_reference"
+          },
+          "name": "sensor_calibration_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "register_sensor"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "sensor_evidence_required",
+            "required_action": "attach_sensor_evidence"
+          },
+          "name": "sensor_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_observation",
+            "program_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "program_required",
+            "required_action": "select_program"
+          },
+          "name": "observation_program_required"
+        },
+        {
+          "condition": {
+            "operation": "record_observation",
+            "sensor_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "sensor_required",
+            "required_action": "select_sensor"
+          },
+          "name": "observation_sensor_required"
+        },
+        {
+          "condition": {
+            "operation": "record_observation",
+            "program_sensor_authority_match": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_mismatch",
+            "required_action": "align_program_sensor_authority"
+          },
+          "name": "observation_program_sensor_authority_match"
+        },
+        {
+          "condition": {
+            "observation_type_supported": false,
+            "operation": "record_observation"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "observation_type_not_supported",
+            "required_action": "select_supported_observation_type"
+          },
+          "name": "observation_type_supported"
+        },
+        {
+          "condition": {
+            "observation_reference_present": false,
+            "operation": "record_observation"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "observation_reference_required",
+            "required_action": "attach_observation_reference"
+          },
+          "name": "observation_reference_required"
+        },
+        {
+          "condition": {
+            "fingerprint_present": false,
+            "operation": "record_observation"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "content_fingerprint_required",
+            "required_action": "record_content_fingerprint"
+          },
+          "name": "observation_fingerprint_required"
+        },
+        {
+          "condition": {
+            "observed_at_present": false,
+            "operation": "record_observation"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "observed_at_required",
+            "required_action": "record_observed_at"
+          },
+          "name": "observation_observed_at_required"
+        },
+        {
+          "condition": {
+            "confidence_valid": false,
+            "operation": "record_observation"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "confidence_score_invalid",
+            "required_action": "set_confidence_0_to_1"
+          },
+          "name": "observation_confidence_valid"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_observation"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "observation_evidence_required",
+            "required_action": "attach_observation_evidence"
+          },
+          "name": "observation_evidence_required"
+        },
+        {
+          "condition": {
+            "observation_present": false,
+            "operation": "record_alert"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "observation_required",
+            "required_action": "select_observation"
+          },
+          "name": "alert_observation_required"
+        },
+        {
+          "condition": {
+            "alert_type_supported": false,
+            "operation": "record_alert"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "alert_type_not_supported",
+            "required_action": "select_supported_alert_type"
+          },
+          "name": "alert_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_alert",
+            "risk_level_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_level_not_supported",
+            "required_action": "select_supported_risk_level"
+          },
+          "name": "alert_risk_supported"
+        },
+        {
+          "condition": {
+            "confidence_valid": false,
+            "operation": "record_alert"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "confidence_score_invalid",
+            "required_action": "set_confidence_0_to_1"
+          },
+          "name": "alert_confidence_valid"
+        },
+        {
+          "condition": {
+            "analyst_present": false,
+            "operation": "record_alert"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "analyst_required",
+            "required_action": "assign_analyst"
+          },
+          "name": "alert_analyst_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_alert"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "alert_evidence_required",
+            "required_action": "attach_alert_evidence"
+          },
+          "name": "alert_evidence_required"
+        },
+        {
+          "condition": {
+            "alert_present": false,
+            "operation": "record_risk"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "alert_required",
+            "required_action": "select_alert"
+          },
+          "name": "risk_alert_required"
+        },
+        {
+          "condition": {
+            "assessment_type_supported": false,
+            "operation": "record_risk"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "assessment_type_not_supported",
+            "required_action": "select_supported_assessment_type"
+          },
+          "name": "risk_assessment_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_risk",
+            "risk_level_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_level_not_supported",
+            "required_action": "select_supported_risk_level"
+          },
+          "name": "risk_level_supported"
+        },
+        {
+          "condition": {
+            "confidence_valid": false,
+            "operation": "record_risk"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "confidence_score_invalid",
+            "required_action": "set_confidence_0_to_1"
+          },
+          "name": "risk_confidence_valid"
+        },
+        {
+          "condition": {
+            "analyst_present": false,
+            "operation": "record_risk"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "analyst_required",
+            "required_action": "assign_analyst"
+          },
+          "name": "risk_analyst_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_risk"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_evidence_required",
+            "required_action": "attach_risk_evidence"
+          },
+          "name": "risk_evidence_required"
+        },
+        {
+          "condition": {
+            "assessment_present": false,
+            "operation": "record_referral"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "assessment_required",
+            "required_action": "select_assessment"
+          },
+          "name": "referral_assessment_required"
+        },
+        {
+          "condition": {
+            "operation": "record_referral",
+            "referral_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "referral_type_not_supported",
+            "required_action": "select_supported_referral_type"
+          },
+          "name": "referral_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_referral",
+            "recipient_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "recipient_required",
+            "required_action": "select_recipient"
+          },
+          "name": "referral_recipient_required"
+        },
+        {
+          "condition": {
+            "approval_present": false,
+            "operation": "record_referral"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "referral_approval_required",
+            "required_action": "attach_referral_approval"
+          },
+          "name": "referral_approval_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_referral"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "referral_evidence_required",
+            "required_action": "attach_referral_evidence"
+          },
+          "name": "referral_evidence_required"
+        },
+        {
+          "condition": {
+            "assessment_present": false,
+            "operation": "record_dissemination"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "assessment_required",
+            "required_action": "select_assessment"
+          },
+          "name": "dissemination_assessment_required"
+        },
+        {
+          "condition": {
+            "audience_present": false,
+            "operation": "record_dissemination"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "audience_required",
+            "required_action": "select_audience"
+          },
+          "name": "dissemination_audience_required"
+        },
+        {
+          "condition": {
+            "operation": "record_dissemination",
+            "release_marking_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "release_marking_required",
+            "required_action": "set_release_marking"
+          },
+          "name": "dissemination_release_required"
+        },
+        {
+          "condition": {
+            "approval_present": false,
+            "operation": "record_dissemination"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "dissemination_approval_required",
+            "required_action": "attach_release_approval"
+          },
+          "name": "dissemination_approval_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_dissemination"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "dissemination_evidence_required",
+            "required_action": "attach_dissemination_evidence"
+          },
+          "name": "dissemination_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "status_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_status_not_supported",
+            "required_action": "select_supported_status"
+          },
+          "name": "review_status_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "reviewer_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "reviewer_required",
+            "required_action": "assign_reviewer"
+          },
+          "name": "review_reviewer_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_review"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_evidence_required",
+            "required_action": "attach_review_evidence"
+          },
+          "name": "review_evidence_required"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "surveillance_batch"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_surveillance_batch_to_bytewax"
+          },
+          "name": "surveillance_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_surveillance_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "surveillance_agent_runtime_not_supported",
+            "required_action": "select_supported_runtime"
+          },
+          "name": "surveillance_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_surveillance_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "surveillance_agent_role_not_supported",
+            "required_action": "select_supported_role"
+          },
+          "name": "surveillance_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "surveillance_agent_action",
+            "privileged_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_surveillance_agent_action_requires_human_approval"
+        },
+        {
+          "condition": {
+            "covert_tracking_scope": true,
+            "operation": "surveillance_agent_action"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "covert_tracking_scope_denied",
+            "required_action": "remove_covert_tracking_scope"
+          },
+          "name": "covert_tracking_action_denied"
+        },
+        {
+          "condition": {
+            "operation": "surveillance_agent_action",
+            "stalking_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "stalking_scope_denied",
+            "required_action": "remove_stalking_scope"
+          },
+          "name": "stalking_action_denied"
+        },
+        {
+          "condition": {
+            "operation": "surveillance_agent_action",
+            "spyware_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "spyware_scope_denied",
+            "required_action": "remove_spyware_scope"
+          },
+          "name": "spyware_action_denied"
+        },
+        {
+          "condition": {
+            "credential_capture_scope": true,
+            "operation": "surveillance_agent_action"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "credential_capture_scope_denied",
+            "required_action": "remove_credential_capture_scope"
+          },
+          "name": "credential_capture_action_denied"
+        },
+        {
+          "condition": {
+            "bypass_scope": true,
+            "operation": "surveillance_agent_action"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "bypass_scope_denied",
+            "required_action": "remove_bypass_scope"
+          },
+          "name": "bypass_action_denied"
+        },
+        {
+          "condition": {
+            "biometric_identification_scope": true,
+            "operation": "surveillance_agent_action"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "biometric_identification_scope_denied",
+            "required_action": "remove_biometric_identification_scope"
+          },
+          "name": "biometric_identification_action_denied"
+        },
+        {
+          "condition": {
+            "exfiltration_scope": true,
+            "operation": "surveillance_agent_action"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "exfiltration_scope_denied",
+            "required_action": "remove_exfiltration_scope"
+          },
+          "name": "exfiltration_action_denied"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "agents": {
+          "component": "SurveillanceAgentWorkbench",
+          "permission": "intel_surveillance:admin",
+          "route": "/intel-surveillance/agents"
+        },
+        "alerts": {
+          "component": "SurveillanceAlertWorkbench",
+          "permission": "intel_surveillance:alerts",
+          "route": "/intel-surveillance/alerts"
+        },
+        "assets": {
+          "component": "MonitoredAssetRegistry",
+          "permission": "intel_surveillance:assets",
+          "route": "/intel-surveillance/assets"
+        },
+        "authorities": {
+          "component": "SurveillanceAuthorityConsole",
+          "permission": "intel_surveillance:authorities",
+          "route": "/intel-surveillance/authorities"
+        },
+        "dashboard": {
+          "component": "SurveillanceDashboard",
+          "permission": "intel_surveillance:view",
+          "route": "/intel-surveillance/dashboard"
+        },
+        "dissemination": {
+          "component": "SurveillanceDisseminationConsole",
+          "permission": "intel_surveillance:dissemination",
+          "route": "/intel-surveillance/dissemination"
+        },
+        "observations": {
+          "component": "SurveillanceObservationLedger",
+          "permission": "intel_surveillance:observations",
+          "route": "/intel-surveillance/observations"
+        },
+        "programs": {
+          "component": "SurveillanceProgramPlanner",
+          "permission": "intel_surveillance:programs",
+          "route": "/intel-surveillance/programs"
+        },
+        "referrals": {
+          "component": "SurveillanceReferralConsole",
+          "permission": "intel_surveillance:referrals",
+          "route": "/intel-surveillance/referrals"
+        },
+        "reviews": {
+          "component": "SurveillanceReviewConsole",
+          "permission": "intel_surveillance:reviews",
+          "route": "/intel-surveillance/reviews"
+        },
+        "risk": {
+          "component": "SurveillanceRiskWorkbench",
+          "permission": "intel_surveillance:risk",
+          "route": "/intel-surveillance/risk"
+        },
+        "sensors": {
+          "component": "SurveillanceSensorRegistry",
+          "permission": "intel_surveillance:sensors",
+          "route": "/intel-surveillance/sensors"
+        },
+        "settings": {
+          "component": "SurveillanceSettings",
+          "permission": "intel_surveillance:admin",
+          "route": "/intel-surveillance/settings"
+        }
+      },
+      "streaming": {
+        "events": [
+          "surveillance_authority_recorded",
+          "surveillance_program_recorded",
+          "surveillance_asset_recorded",
+          "surveillance_sensor_registered",
+          "surveillance_observation_recorded",
+          "surveillance_alert_recorded",
+          "surveillance_risk_recorded",
+          "surveillance_referral_recorded",
+          "surveillance_dissemination_recorded",
+          "surveillance_review_recorded",
+          "surveillance_agent_registered"
+        ],
+        "guardrails": [
+          "surveillance_batch_requires_bytewax",
+          "privileged_surveillance_agent_action_requires_human_approval",
+          "covert_tracking_action_denied",
+          "stalking_action_denied",
+          "spyware_action_denied",
+          "credential_capture_action_denied",
+          "bypass_action_denied",
+          "biometric_identification_action_denied",
+          "exfiltration_action_denied"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.intel.surveillance.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "alerts": {
+            "icon": "bell-ring",
+            "status_indicator": "alert-chip"
+          },
+          "assets": {
+            "icon": "boxes",
+            "status_indicator": "asset-chip"
+          },
+          "authorities": {
+            "icon": "shield-check",
+            "status_indicator": "authority-chip"
+          },
+          "dissemination": {
+            "icon": "send",
+            "status_indicator": "release-chip"
+          },
+          "observations": {
+            "icon": "activity",
+            "status_indicator": "evidence-chip"
+          },
+          "programs": {
+            "icon": "target",
+            "status_indicator": "priority-chip"
+          },
+          "referrals": {
+            "icon": "file-output",
+            "status_indicator": "referral-chip"
+          },
+          "reviews": {
+            "icon": "clipboard-check",
+            "status_indicator": "review-chip"
+          },
+          "risk": {
+            "icon": "shield-alert",
+            "status_indicator": "risk-chip"
+          },
+          "sensors": {
+            "icon": "cctv",
+            "status_indicator": "sensor-chip"
+          }
+        },
+        "name": "intel_surveillance_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#0369A1",
+          "color.danger": "#B91C1C",
+          "color.primary": "#0F766E",
+          "color.success": "#166534",
+          "color.warning": "#A16207",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/intel-surveillance/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "SurveillanceDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/intel-surveillance/dashboard",
+            "permission": "intel_surveillance:view"
+          },
+          {
+            "component": "SurveillanceAuthorityConsole",
+            "name": "authorities",
+            "nav_group": "Governance",
+            "path": "/intel-surveillance/authorities",
+            "permission": "intel_surveillance:authorities"
+          },
+          {
+            "component": "SurveillanceProgramPlanner",
+            "name": "programs",
+            "nav_group": "Planning",
+            "path": "/intel-surveillance/programs",
+            "permission": "intel_surveillance:programs"
+          },
+          {
+            "component": "MonitoredAssetRegistry",
+            "name": "assets",
+            "nav_group": "Assets",
+            "path": "/intel-surveillance/assets",
+            "permission": "intel_surveillance:assets"
+          },
+          {
+            "component": "SurveillanceSensorRegistry",
+            "name": "sensors",
+            "nav_group": "Collection",
+            "path": "/intel-surveillance/sensors",
+            "permission": "intel_surveillance:sensors"
+          },
+          {
+            "component": "SurveillanceObservationLedger",
+            "name": "observations",
+            "nav_group": "Collection",
+            "path": "/intel-surveillance/observations",
+            "permission": "intel_surveillance:observations"
+          },
+          {
+            "component": "SurveillanceAlertWorkbench",
+            "name": "alerts",
+            "nav_group": "Analysis",
+            "path": "/intel-surveillance/alerts",
+            "permission": "intel_surveillance:alerts"
+          },
+          {
+            "component": "SurveillanceRiskWorkbench",
+            "name": "risk",
+            "nav_group": "Analysis",
+            "path": "/intel-surveillance/risk",
+            "permission": "intel_surveillance:risk"
+          },
+          {
+            "component": "SurveillanceReferralConsole",
+            "name": "referrals",
+            "nav_group": "Release",
+            "path": "/intel-surveillance/referrals",
+            "permission": "intel_surveillance:referrals"
+          },
+          {
+            "component": "SurveillanceDisseminationConsole",
+            "name": "dissemination",
+            "nav_group": "Release",
+            "path": "/intel-surveillance/dissemination",
+            "permission": "intel_surveillance:dissemination"
+          },
+          {
+            "component": "SurveillanceReviewConsole",
+            "name": "reviews",
+            "nav_group": "Governance",
+            "path": "/intel-surveillance/reviews",
+            "permission": "intel_surveillance:reviews"
+          },
+          {
+            "component": "SurveillanceAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/intel-surveillance/agents",
+            "permission": "intel_surveillance:admin"
+          },
+          {
+            "component": "SurveillanceSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/intel-surveillance/settings",
+            "permission": "intel_surveillance:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "surveillance_operations": {
+        "roles": [
+          "authority_reviewer",
+          "program_planner",
+          "asset_steward",
+          "sensor_steward",
+          "alert_analyst",
+          "dissemination_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "intel_surveillance": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "cvsn",
+        "grph",
+        "ragn",
+        "geos"
+      ]
+    }
+  },
+  "contracts": {
+    "intel_surveillance": {
+      "configuration": {
+        "adapters": {
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "geospatial": "geos",
+          "graph": "grph",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "rag": "ragn",
+          "vision": "cvsn"
+        },
+        "agents": {
+          "covert_scope_denied": true,
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "authority_reviewer",
+            "program_planner",
+            "asset_steward",
+            "sensor_steward",
+            "alert_analyst",
+            "dissemination_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "alerts": {
+          "analyst_required": true,
+          "confidence_required": true,
+          "evidence_required": true,
+          "observation_required": true,
+          "supported_alert_types": [
+            "intrusion",
+            "tamper",
+            "policy_violation",
+            "anomalous_behavior",
+            "safety_incident",
+            "perimeter_event",
+            "device_compromise",
+            "data_exposure"
+          ],
+          "supported_risk_levels": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "assets": {
+          "authority_required": true,
+          "evidence_required": true,
+          "owner_required": true,
+          "privacy_review_required": true,
+          "supported_asset_types": [
+            "facility",
+            "endpoint",
+            "account",
+            "device",
+            "vehicle",
+            "public_area",
+            "network_segment",
+            "cloud_resource"
+          ]
+        },
+        "authorities": {
+          "approver_required": true,
+          "evidence_required": true,
+          "expiry_required": true,
+          "supported_authority_types": [
+            "legal_mandate",
+            "consent",
+            "security_monitoring_authority",
+            "incident_response_authority",
+            "partner_authority",
+            "public_safety_authority"
+          ],
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ]
+        },
+        "dissemination": {
+          "approval_required": true,
+          "assessment_required": true,
+          "audience_required": true,
+          "evidence_required": true,
+          "release_marking_required": true
+        },
+        "governance": {
+          "audit_events": true,
+          "biometric_identification_denied": true,
+          "bypass_denied": true,
+          "covert_tracking_denied": true,
+          "credential_capture_denied": true,
+          "exfiltration_denied": true,
+          "lawful_authority_required": true,
+          "policy_attached_for_writes": true,
+          "privacy_review_required": true,
+          "require_tenant_context": true,
+          "spyware_denied": true,
+          "stalking_denied": true
+        },
+        "observability": {
+          "event_stream": "apg.intel.surveillance.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "observations": {
+          "confidence_required": true,
+          "content_fingerprint_required": true,
+          "evidence_required": true,
+          "observed_at_required": true,
+          "program_required": true,
+          "sensor_required": true,
+          "supported_observation_types": [
+            "motion",
+            "access_event",
+            "endpoint_event",
+            "network_event",
+            "location_event",
+            "anomaly",
+            "policy_violation",
+            "safety_event"
+          ]
+        },
+        "programs": {
+          "authority_required": true,
+          "evidence_required": true,
+          "supported_priorities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "supported_program_types": [
+            "asset_protection",
+            "facility_monitoring",
+            "endpoint_monitoring",
+            "fraud_monitoring",
+            "public_safety",
+            "incident_watch",
+            "compliance_monitoring",
+            "executive_protection"
+          ]
+        },
+        "referrals": {
+          "approval_required": true,
+          "assessment_required": true,
+          "evidence_required": true,
+          "recipient_required": true,
+          "supported_types": [
+            "incident_response",
+            "legal_review",
+            "public_safety_notice",
+            "compliance_review",
+            "partner_notice",
+            "maintenance_ticket"
+          ]
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "risk_assessments": {
+          "alert_required": true,
+          "analyst_required": true,
+          "confidence_required": true,
+          "evidence_required": true,
+          "supported_assessment_types": [
+            "physical_security",
+            "cyber_security",
+            "privacy",
+            "safety",
+            "compliance",
+            "insider_risk"
+          ],
+          "supported_risk_levels": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "sensors": {
+          "asset_required": true,
+          "calibration_required": true,
+          "custodian_required": true,
+          "evidence_required": true,
+          "supported_sensor_types": [
+            "camera",
+            "edr",
+            "network_sensor",
+            "access_control",
+            "location_beacon",
+            "telemetry_feed",
+            "partner_feed",
+            "log_stream"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "intel_surveillance_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_alerts": true,
+          "enable_assets": true,
+          "enable_authorities": true,
+          "enable_dashboard": true,
+          "enable_dissemination": true,
+          "enable_observations": true,
+          "enable_programs": true,
+          "enable_referrals": true,
+          "enable_reviews": true,
+          "enable_risk": true,
+          "enable_sensors": true
+        }
+      },
+      "id": "intel_surveillance",
+      "provides": [
+        "surveillance_authority_workflow",
+        "surveillance_program_workflow",
+        "surveillance_asset_workflow",
+        "surveillance_sensor_workflow",
+        "surveillance_observation_workflow",
+        "surveillance_alert_workflow",
+        "surveillance_risk_workflow",
+        "surveillance_referral_workflow",
+        "surveillance_dissemination_workflow",
+        "surveillance_review_workflow",
+        "surveillance_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "cvsn",
+        "grph",
+        "ragn",
+        "geos"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 8,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "intel_surveillance": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}

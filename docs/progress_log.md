@@ -29385,3 +29385,113 @@ Known gaps:
   protected-communication interception, dissemination delivery, durable
   Bytewax topology, or performance/load checks during this battery-conscious
   slice.
+
+## 2026-06-01 - Intel Digital Surveillance executable capability
+
+Slice goal: replace the `capabilities/intel/surveillance` placeholder with a
+package-backed, executable APG capability for lawful defensive digital
+surveillance that can be composed into generated applications.
+
+Implemented:
+
+- Added `capabilities/intel/surveillance/SPECIFICATION.md` defining lawful
+  authority, surveillance programs, monitored assets, approved sensors,
+  observations, alerts, risk assessments, referrals, dissemination, reviews,
+  UI/theming, AI agents, lifecycle semantics, rule guardrails, and adapter
+  boundaries.
+- Added `PLAN.md`, `README.md`, `cap_spec.md`, `package_manifest.json`,
+  `release_report.json`, and generated `semantic_model.json`.
+- Replaced the placeholder `__init__.py` with executable package exports and
+  removed the empty `_Digital_Surveillance` marker.
+- Added domain models for authorities, programs, monitored assets, sensors,
+  observations, alerts, risk assessments, referrals, dissemination, reviews,
+  and surveillance agents.
+- Added a deterministic capability contract with tenant-safe configuration, 70
+  rules, 13 UI routes, compact theme tokens, Bytewax lifecycle metadata, and
+  provider-neutral AI-agent runtimes: `codex`, `claude_code`, `opencode`, and
+  `pi`.
+- Added the `DigitalSurveillanceService` executable runtime with tenant-keyed
+  state, rule-before-mutation enforcement, Bytewax audit events, privacy review
+  requirements, sensor calibration evidence, program/sensor authority
+  alignment, observation fingerprint/confidence evidence, alert and risk
+  validation, referral and dissemination approvals, review evidence, batch
+  validation, and AI-agent action guardrails.
+- Added API helpers, dashboard/console/agent view models, and a publishable
+  `app.py` entrypoint with self-test, component manifest, and semantic-model
+  generation.
+- Added focused package tests for contract shape, rule-engine denial paths,
+  full digital-surveillance lifecycle execution, tenant isolation, guardrail
+  rejection, API helpers, view models, and app entrypoint.
+- Updated `capabilities/intel/__init__.py` so `surveillance` is listed as an
+  implemented sub-capability.
+- Updated `capabilities/README.md` so the catalog snapshot reports 145 valid
+  contracts, 145 domain-specific packages, 145 strict complete package artifact
+  sets, and 11 Intel packages.
+
+Focused verification:
+
+- Generated `capabilities/intel/surveillance/semantic_model.json` from
+  `app.semantic_model()`.
+- `./.venv/bin/python -m py_compile
+  capabilities/intel/surveillance/__init__.py
+  capabilities/intel/surveillance/capability_contract.py
+  capabilities/intel/surveillance/models.py
+  capabilities/intel/surveillance/surveillance_runtime.py
+  capabilities/intel/surveillance/service.py
+  capabilities/intel/surveillance/api.py
+  capabilities/intel/surveillance/views.py
+  capabilities/intel/surveillance/app.py
+  capabilities/intel/surveillance/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/intel/surveillance/tests/test_package_contract.py` passed with
+  7 tests.
+- `./.venv/bin/python capabilities/intel/surveillance/app.py` passed self-test
+  with `passed: true` and `status: ok`.
+- `./.venv/bin/apg capabilities inspect intel_surveillance --json` passed with
+  70 rules, 13 UI routes, theme `intel_surveillance_control`, shell
+  `apg_python`, and Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/intel/surveillance --json` passed with `side_effect_free: true`
+  and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/intel/surveillance --json` passed with 1 domain-specific
+  capability, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/intel/surveillance --json` passed with 1 complete lifecycle, 70
+  rules, 13 UI routes, 11 theme tokens, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 145 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 145 operable contracts, 145 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/intel/surveillance`, `capabilities/intel/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed authority, program, asset, sensor, observation, alert, risk,
+  referral, dissemination, review, Bytewax batch, and AI-agent lifecycle paths
+  so rule evaluation happens before state mutation.
+- Confirmed service state is keyed by tenant plus record ID and covered by a
+  regression test with shared authority/program IDs across tenants.
+- Tightened digital-surveillance semantics around lawful authority, privacy
+  review, calibrated sensors, asset/program authority alignment, observation
+  fingerprinting, confidence validation, analyst evidence, approval gates,
+  tenant isolation, and privileged or prohibited AI-agent actions.
+- Kept live camera, endpoint, network, access-control, location, telemetry,
+  partner-feed, Computer Vision, biometric, geospatial, notification,
+  case-management, dissemination, and durable Bytewax integrations behind
+  adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live camera feeds,
+  endpoint telemetry, network sensors, access-control feeds, location telemetry,
+  biometric integrations, Computer Vision pipelines, geospatial projections,
+  notification delivery, case-management writes, dissemination delivery, durable
+  Bytewax topology, or performance/load checks during this battery-conscious
+  slice.

@@ -1,0 +1,24 @@
+{
+  "evidence": {
+    "contracts": {
+      "capability_contract": {
+        "display_name": "Digital Surveillance",
+        "errors": []
+      }
+    },
+    "self_test": {
+      "capability": "intel_surveillance",
+      "passed": true,
+      "status": "ok"
+    },
+    "semantic_model": {
+      "capability": "intel_surveillance",
+      "format": "apg.semantic-model.v1"
+    }
+  },
+  "format": "apg.release-report.v1",
+  "ok": true,
+  "package": "intel_surveillance",
+  "source": "capability_contract.py",
+  "target": "python"
+}
