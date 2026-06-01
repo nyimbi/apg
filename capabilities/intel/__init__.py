@@ -72,6 +72,7 @@ CAPABILITY_META = {
 		'fusion',      # Intelligence Fusion
 		'analytics',   # Intelligence Analytics
 		'correlation', # Data Correlation
+		'prediction',  # Predictive Intelligence
 	],
 	'security_requirements': {
 		'classification_handling': True,

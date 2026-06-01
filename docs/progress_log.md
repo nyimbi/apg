@@ -29926,3 +29926,118 @@ Known gaps:
   storage backends, notification delivery, case-management writes, referral
   delivery, durable Bytewax topology, or performance/load checks during this
   battery-conscious slice.
+
+## 2026-06-01 - Intel Prediction executable package
+
+Implemented and reviewed `capabilities/intel/prediction` as a complete
+executable APG package for governed, evidence-backed predictive intelligence.
+
+What changed:
+
+- Replaced the placeholder marker with an executable package exporting
+  `PredictiveIntelligenceService`, `IntelPredictionService`, and
+  `get_capability_contract`.
+- Added a detailed `SPECIFICATION.md`, `PLAN.md`, `README.md`, and
+  `cap_spec.md` defining the lawful authority, workspace, scenario, indicator,
+  model, forecast, projection, warning, recommendation, review, Bytewax
+  lifecycle, AI-agent, UI, theme, and adapter-boundary model.
+- Added `capability_contract.py` with 68 deterministic rules, 13 UI routes,
+  compact `intel_prediction_control` theme tokens, APG dependencies, Bytewax
+  lifecycle metadata, and provider-neutral AI-agent runtimes for `codex`,
+  `claude_code`, `opencode`, and `pi`.
+- Added in-memory domain models and a tenant-scoped service for authority
+  records, prediction workspaces, scenarios, indicators, validated models,
+  forecasts, projections, approved warnings, approved recommendations, reviews,
+  Bytewax batch validation, and AI-agent guardrails.
+- Added API helpers, dashboard/console/agent view models, and a publishable
+  `app.py` entrypoint with self-test, component manifest, and semantic-model
+  generation.
+- Added package manifest, release evidence, generated semantic model, and
+  focused tests for contract shape, rule-engine denial paths, full prediction
+  lifecycle execution, tenant isolation, guardrail rejection, API helpers, view
+  models, and app entrypoint.
+- Updated `capabilities/intel/__init__.py` so `prediction` is listed as an
+  implemented sub-capability.
+- Updated `capabilities/README.md` so the catalog snapshot reports 150 valid
+  contracts, 150 domain-specific packages, 150 strict complete package artifact
+  sets, and 16 Intel packages.
+
+Focused verification:
+
+- Generated `capabilities/intel/prediction/semantic_model.json` from
+  `app.semantic_model()`.
+- `./.venv/bin/python -m py_compile
+  capabilities/intel/prediction/__init__.py
+  capabilities/intel/prediction/capability_contract.py
+  capabilities/intel/prediction/models.py
+  capabilities/intel/prediction/prediction_runtime.py
+  capabilities/intel/prediction/service.py
+  capabilities/intel/prediction/api.py
+  capabilities/intel/prediction/views.py
+  capabilities/intel/prediction/app.py
+  capabilities/intel/prediction/tests/test_package_contract.py` passed.
+- `./.venv/bin/python capabilities/intel/prediction/app.py` passed self-test
+  with `passed: true` and `status: ok`.
+- `./.venv/bin/python -m json.tool
+  capabilities/intel/prediction/package_manifest.json` passed.
+- `./.venv/bin/python -m json.tool
+  capabilities/intel/prediction/release_report.json` passed.
+- `./.venv/bin/python -m json.tool
+  capabilities/intel/prediction/semantic_model.json` passed.
+- `./.venv/bin/pytest -q
+  capabilities/intel/prediction/tests/test_package_contract.py` passed with 7
+  tests.
+- `./.venv/bin/apg capabilities inspect intel_prediction --json` passed with
+  68 rules, 13 UI routes, theme `intel_prediction_control`, shell
+  `apg_python`, and Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/intel/prediction --json` passed with `side_effect_free: true`
+  and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/intel/prediction --json` passed with 1 domain-specific
+  capability, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/intel/prediction --json` passed with 1 complete lifecycle, 0
+  warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 150 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 150 operable contracts, 150 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/intel/prediction`, `capabilities/intel/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed authority, workspace, scenario, indicator, model, forecast,
+  projection, warning, recommendation, review, Bytewax batch, and AI-agent
+  lifecycle paths so rule evaluation happens before state mutation.
+- Confirmed service state is keyed by tenant plus record ID and covered by a
+  regression test with shared authority/workspace IDs across tenants.
+- Confirmed scenarios require existing tenant workspaces, supported horizons,
+  owners, and evidence before indicators, models, forecasts, or projections can
+  be recorded.
+- Confirmed model validation, forecast confidence, projection probability,
+  warning approval, recommendation approval, and review evidence are enforced
+  before mutation.
+- Tightened AI-agent registration during review so name and operational scope
+  are required alongside supported runtime and role validation.
+- Confirmed AI-agent actions deny unsupported automated decisions, hallucinated
+  forecasts, privacy bypass, unapproved model deployment, autonomous warnings,
+  autonomous recommendations, and privileged scopes without human approval.
+- Kept live forecasting engines, model execution, feature stores, model
+  registries, scenario simulation, graph writes, RAG indexing, dashboard
+  rendering, notification delivery, and durable Bytewax workers behind adapter
+  boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live forecasting
+  engines, feature stores, model registries, scenario simulation, model
+  execution engines, graph writes, RAG indexing, dashboard rendering,
+  notification delivery, durable Bytewax topology, or performance/load checks
+  during this battery-conscious slice.

@@ -1,0 +1,25 @@
+{
+  "evidence": {
+    "contracts": {
+      "capability_contract": {
+        "display_name": "Predictive Intelligence",
+        "errors": []
+      }
+    },
+    "self_test": {
+      "capability": "intel_prediction",
+      "passed": true,
+      "status": "ok"
+    },
+    "semantic_model": {
+      "capability": "intel_prediction",
+      "format": "apg.semantic-model.v1"
+    }
+  },
+  "format": "apg.release-report.v1",
+  "ok": true,
+  "package": "intel_prediction",
+  "source": "capability_contract.py",
+  "target": "python"
+}
+

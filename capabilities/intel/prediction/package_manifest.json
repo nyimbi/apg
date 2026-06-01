@@ -1,0 +1,25 @@
+{
+  "base_target": "python",
+  "display_name": "Predictive Intelligence",
+  "format": "apg.package-manifest.v1",
+  "generated_artifacts": [
+    "__init__.py",
+    "cap_spec.md",
+    "capability_contract.py",
+    "models.py",
+    "prediction_runtime.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py",
+    "semantic_model.json",
+    "release_report.json"
+  ],
+  "name": "intel_prediction",
+  "profile": "capability",
+  "profile_artifacts": [
+    "package_manifest.json"
+  ],
+  "version": "1.1.0"
+}
+
