@@ -28872,3 +28872,95 @@ Known gaps:
   extraction, geocoding, routing, dissemination delivery, GraphRAG projection,
   durable Bytewax topology, or performance/load checks during this
   battery-conscious slice.
+
+## 2026-06-01 - Intel Cyber Intelligence executable capability
+
+- Promoted `capabilities/intel/cybint` from placeholder into a first-class
+  executable APG capability with README, specification, plan, capability spec,
+  package manifest, release evidence, focused tests, and code-review notes.
+- Added lawful authority, indicator, sighting, enrichment, threat profile, risk
+  assessment, incident link, dissemination, review, Bytewax batch validation,
+  dashboard summary, and provider-neutral CYBINT agent workflows.
+- Added deterministic guardrails for tenant context, write policy, lawful
+  authority, indicator type/value/TLP/confidence/evidence, sighting source and
+  severity, enrichment provider/confidence, profile classification, risk
+  level, incident response priority, release approval, Bytewax lifecycle
+  events, supported AI-agent runtimes and roles, privileged AI-agent approval,
+  and denial of offensive or exploit automation scope.
+- Added compact UI/view models and theme tokens for dashboards, authorities,
+  indicators, sightings, enrichment, profiles, risk, incidents, dissemination,
+  reviews, agents, and settings.
+- Updated intelligence capability metadata so `cybint` is listed as an
+  implemented sub-capability.
+- Updated `capabilities/README.md` so the catalog snapshot reports 140 valid
+  contracts, 140 domain-specific packages, 140 strict complete package artifact
+  sets, and 6 Intel packages.
+- Removed the empty `_Cyber_Intelligence` marker file and added a generated
+  `semantic_model.json` from the executable application.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/intel/cybint/__init__.py
+  capabilities/intel/cybint/capability_contract.py
+  capabilities/intel/cybint/models.py
+  capabilities/intel/cybint/cybint_runtime.py
+  capabilities/intel/cybint/service.py
+  capabilities/intel/cybint/api.py
+  capabilities/intel/cybint/views.py
+  capabilities/intel/cybint/app.py
+  capabilities/intel/cybint/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/intel/cybint/tests/test_package_contract.py` passed with 7
+  tests.
+- `./.venv/bin/python capabilities/intel/cybint/app.py` passed self-test with
+  `passed: true` and `status: ok`.
+- `./.venv/bin/apg capabilities inspect intel_cybint --json` passed with 55
+  rules, 12 UI routes, theme `intel_cybint_control`, shell `apg_python`, and
+  Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/intel/cybint --json` passed with `side_effect_free: true` and 0
+  warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/intel/cybint --json` passed with 1 domain-specific capability,
+  0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/intel/cybint --json` passed with 1 complete lifecycle, 55
+  rules, 12 UI routes, 11 theme tokens, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 140 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 140 operable contracts, 140 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/intel/cybint`, `capabilities/intel/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed authority, indicator, sighting, enrichment, profile, risk, incident
+  link, dissemination, review, Bytewax batch, and AI-agent lifecycle paths so
+  rule evaluation happens before state mutation.
+- Confirmed service state is keyed by tenant plus record ID and covered by a
+  regression test with shared authority/indicator IDs across tenants.
+- Tightened CYBINT semantics around defensive authority, TLP, confidence,
+  source evidence, enrichment provider evidence, incident linkage, release
+  approval, tenant-keyed state isolation, and privileged or prohibited
+  AI-agent actions.
+- Kept exploit development, payload generation, intrusion tooling,
+  vulnerability exploitation, credential collection, command-and-control, live
+  SIEM/EDR/SOAR integrations, malware sandboxes, vulnerability scanners,
+  ticketing systems, asset inventories, blocklist deployment, containment
+  execution, storage backends, GraphRAG projections, dissemination delivery,
+  and durable Bytewax workers behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live SIEM/EDR/SOAR
+  integrations, malware sandboxes, vulnerability scanners, ticketing systems,
+  asset inventories, blocklist deployment, containment execution, storage
+  backends, GraphRAG projections, dissemination delivery, durable Bytewax
+  topology, or performance/load checks during this battery-conscious slice.

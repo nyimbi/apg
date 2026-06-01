@@ -62,6 +62,7 @@ CAPABILITY_META = {
 		'sigint',      # Signals Intelligence
 		'humint',      # Human Intelligence
 		'geoint',      # Geospatial Intelligence
+		'cybint',      # Cyber Intelligence
 		'radio',       # Radio Intelligence Listener
 	],
 	'security_requirements': {
