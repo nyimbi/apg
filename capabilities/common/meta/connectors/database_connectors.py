@@ -8,11 +8,20 @@ Copyright: © 2025 Datacraft
 """
 
 import asyncio
-import asyncpg
-import aiomysql
-import pymongo
+try:
+	import asyncpg
+except ImportError:  # pragma: no cover - optional live PostgreSQL driver.
+	asyncpg = None
+try:
+	import aiomysql
+except ImportError:  # pragma: no cover - optional live MySQL driver.
+	aiomysql = None
+try:
+	import pymongo
+except ImportError:  # pragma: no cover - optional live MongoDB driver.
+	pymongo = None
 from datetime import datetime
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Set
 import json
 
 from .base_connector import (
@@ -803,9 +812,6 @@ class MongoDBConnector(BaseConnector):
 			return DataType.UNKNOWN
 
 
-# Additional database connectors can be implemented following the same pattern
-# For now, we'll create placeholder connectors that can be extended
-
 class SnowflakeConnector(BaseConnector):
 	"""Placeholder for Snowflake connector - to be implemented"""
 	
@@ -1131,179 +1137,301 @@ class SnowflakeConnector(BaseConnector):
 			return DataType.UNKNOWN
 
 
-# Additional Database Connectors - Placeholder Implementations
+# Additional database connectors with dependency-light metadata fixtures.
 
-class OracleConnector(BaseConnector):
+class FixtureBackedDatabaseConnector(BaseConnector):
+	"""Executable database connector for offline catalog metadata fixtures."""
+
+	vendor_display_name = "database"
+	default_schema = "PUBLIC"
+	type_aliases: Dict[str, DataType] = {}
+
+	def __init__(self, config: ConnectorConfig):
+		super().__init__(config)
+		self.connector_type = ConnectorType.DATABASE
+
+	async def connect(self) -> bool:
+		"""Connect to configured metadata fixtures."""
+		self.is_connected = True
+		return True
+
+	async def disconnect(self):
+		"""Disconnect from metadata fixtures."""
+		self.is_connected = False
+
+	async def test_connection(self) -> Dict[str, Any]:
+		"""Test metadata-backed connector availability."""
+		await self.connect()
+		asset_count = len(self._asset_specs())
+		await self.disconnect()
+		return {
+			"status": "success",
+			"database_type": self.source_system,
+			"mode": "metadata_fixture",
+			"asset_count": asset_count,
+			"message": f"{self.vendor_display_name} metadata connector ready"
+		}
+
+	async def discover_assets(self) -> DiscoveryResult:
+		"""Discover all configured metadata fixture assets."""
+		result = DiscoveryResult(self.connector_type, self.source_system)
+		await self.connect()
+		try:
+			for spec in self._asset_specs():
+				asset = self._build_asset(spec)
+				if not should_include_asset(asset.name, self.config.include_patterns, self.config.exclude_patterns):
+					continue
+				asset.estimated_quality_score = self._estimate_quality_score(asset)
+				result.add_asset(asset)
+			if not result.assets:
+				result.add_warning(
+					f"No {self.source_system} metadata fixtures configured; discovery completed with an empty catalog"
+				)
+		except Exception as exc:
+			result.add_error(f"{self.vendor_display_name} fixture discovery failed: {exc}")
+		finally:
+			await self.disconnect()
+			result.complete_discovery()
+		return result
+
+	async def get_asset_schema(self, asset_name: str) -> Optional[AssetMetadata]:
+		"""Get detailed schema for a configured metadata fixture asset."""
+		target = asset_name.lower()
+		for spec in self._asset_specs():
+			asset = self._build_asset(spec)
+			names = {asset.name.lower(), (asset.full_name or "").lower()}
+			if target in names:
+				asset.estimated_quality_score = self._estimate_quality_score(asset)
+				return asset
+		return None
+
+	async def sample_asset_data(self, asset_name: str, limit: int = 100) -> List[Dict[str, Any]]:
+		"""Return configured sample records for an asset."""
+		limit = max(0, min(limit, self.config.max_sample_rows))
+		samples = self._sample_records(asset_name)
+		return [dict(row) for row in samples[:limit]]
+
+	def _asset_specs(self) -> List[Dict[str, Any]]:
+		"""Return normalized asset fixture specifications."""
+		params = self.config.additional_params or {}
+		raw_assets = (
+			params.get("offline_catalog")
+			or params.get("catalog_assets")
+			or params.get("assets")
+			or []
+		)
+		if isinstance(raw_assets, dict):
+			raw_assets = raw_assets.get("assets", [])
+		normalized = []
+		for item in raw_assets:
+			if isinstance(item, str):
+				normalized.append({"name": item})
+			elif isinstance(item, dict):
+				normalized.append(dict(item))
+		return normalized
+
+	def _sample_records(self, asset_name: str) -> List[Dict[str, Any]]:
+		"""Return fixture records keyed by asset name or full name."""
+		params = self.config.additional_params or {}
+		target = asset_name.lower()
+		for spec in self._asset_specs():
+			asset = self._build_asset(spec)
+			if target in {asset.name.lower(), (asset.full_name or "").lower()}:
+				return list(spec.get("sample_data") or spec.get("sample_rows") or [])
+		sample_data = params.get("sample_data") or params.get("sample_records") or {}
+		if isinstance(sample_data, dict):
+			for key, rows in sample_data.items():
+				if key.lower() == target and isinstance(rows, list):
+					return rows
+		return []
+
+	def _build_asset(self, spec: Dict[str, Any]) -> AssetMetadata:
+		"""Build an AssetMetadata object from a fixture spec."""
+		name = str(spec.get("name") or spec.get("table_name") or spec.get("asset_name") or "asset")
+		schema_name = str(spec.get("schema_name") or spec.get("schema") or self.config.schema or self.default_schema)
+		full_name = str(spec.get("full_name") or f"{schema_name}.{name}")
+		columns = [self._build_column(column) for column in spec.get("columns", [])]
+		asset = AssetMetadata(
+			name=name,
+			asset_type=str(spec.get("asset_type") or spec.get("type") or "table"),
+			source_system=self.source_system,
+			schema_name=schema_name,
+			full_name=full_name,
+			description=spec.get("description") or f"{self.vendor_display_name} metadata fixture asset",
+			columns=columns,
+			column_count=len(columns),
+			row_count=spec.get("row_count"),
+			size_bytes=spec.get("size_bytes"),
+			properties={
+				"database": spec.get("database") or self.config.database,
+				"schema": schema_name,
+				"metadata_mode": "fixture",
+				"source_system": self.source_system,
+				**dict(spec.get("properties") or {})
+			},
+			tags=list(spec.get("tags") or []),
+			owner=spec.get("owner"),
+			location=spec.get("location") or self.config.connection_string,
+		)
+		return asset
+
+	def _build_column(self, spec: Dict[str, Any]) -> ColumnMetadata:
+		"""Build ColumnMetadata from a fixture column spec."""
+		column = ColumnMetadata(
+			name=str(spec.get("name") or spec.get("column_name") or "column"),
+			data_type=self._map_fixture_type(spec.get("data_type") or spec.get("type") or "unknown"),
+			is_nullable=bool(spec.get("is_nullable", spec.get("nullable", True))),
+			is_primary_key=bool(spec.get("is_primary_key", spec.get("primary_key", False))),
+			is_foreign_key=bool(spec.get("is_foreign_key", spec.get("foreign_key", False))),
+			foreign_key_table=spec.get("foreign_key_table"),
+			foreign_key_column=spec.get("foreign_key_column"),
+			max_length=spec.get("max_length"),
+			precision=spec.get("precision"),
+			scale=spec.get("scale"),
+			default_value=spec.get("default_value"),
+			description=spec.get("description"),
+			sample_values=list(spec.get("sample_values") or []),
+			classification_hints=list(spec.get("classification_hints") or []),
+			contains_pii=bool(spec.get("contains_pii", False)),
+			contains_phi=bool(spec.get("contains_phi", False)),
+			properties=dict(spec.get("properties") or {}),
+		)
+		if not column.classification_hints:
+			column.classification_hints = self._get_classification_hints(column.name, [str(v) for v in column.sample_values])
+		if not column.contains_pii:
+			column.contains_pii = self._detect_pii(column.name, [str(v) for v in column.sample_values])
+		if not column.contains_phi:
+			column.contains_phi = self._detect_phi(column.name, [str(v) for v in column.sample_values])
+		return column
+
+	def _map_fixture_type(self, raw_type: Any) -> DataType:
+		"""Map vendor fixture types to standard metadata types."""
+		if isinstance(raw_type, DataType):
+			return raw_type
+		type_value = str(raw_type or "unknown").lower()
+		if type_value in {item.value for item in DataType}:
+			return DataType(type_value)
+		for pattern, data_type in self.type_aliases.items():
+			if pattern == type_value:
+				return data_type
+		for pattern, data_type in sorted(self.type_aliases.items(), key=lambda item: len(item[0]), reverse=True):
+			if pattern in type_value:
+				return data_type
+		if any(item in type_value for item in ("char", "text", "string", "clob", "uuid", "uniqueidentifier")):
+			return DataType.STRING
+		if any(item in type_value for item in ("int", "number", "numeric", "decimal", "float", "double", "real")):
+			return DataType.FLOAT if any(item in type_value for item in ("number", "numeric", "decimal", "float", "double", "real")) else DataType.INTEGER
+		if any(item in type_value for item in ("bool", "bit")):
+			return DataType.BOOLEAN
+		if "timestamp" in type_value or "datetime" in type_value:
+			return DataType.DATETIME
+		if "date" in type_value:
+			return DataType.DATE
+		if any(item in type_value for item in ("json", "record", "struct", "object", "xml")):
+			return DataType.JSON
+		if any(item in type_value for item in ("array", "list", "set")):
+			return DataType.ARRAY
+		if any(item in type_value for item in ("binary", "blob", "bytes", "raw")):
+			return DataType.BINARY
+		return DataType.UNKNOWN
+
+class OracleConnector(FixtureBackedDatabaseConnector):
 	"""Oracle database metadata discovery connector"""
-	
+	vendor_display_name = "Oracle"
+	default_schema = "APP"
+	type_aliases = {
+		"varchar": DataType.STRING,
+		"char": DataType.STRING,
+		"clob": DataType.STRING,
+		"number": DataType.FLOAT,
+		"binary_float": DataType.FLOAT,
+		"binary_double": DataType.FLOAT,
+		"date": DataType.DATE,
+		"timestamp": DataType.DATETIME,
+		"blob": DataType.BINARY,
+		"raw": DataType.BINARY,
+	}
+
 	def __init__(self, config: ConnectorConfig):
 		super().__init__(config)
-		self.connector_type = ConnectorType.DATABASE
 		self.source_system = "oracle"
-	
-	async def connect(self) -> bool:
-		"""Connect to Oracle database"""
-		try:
-			# Would use cx_Oracle or oracledb in real implementation
-			await self._log_error("Oracle connector not fully implemented yet")
-			return False
-		except Exception as e:
-			await self._log_error(f"Oracle connection failed: {str(e)}")
-			return False
-	
-	async def disconnect(self):
-		"""Disconnect from Oracle"""
-		self.is_connected = False
-	
-	async def test_connection(self) -> Dict[str, Any]:
-		"""Test Oracle connection"""
-		return {"status": "error", "message": "Oracle connector not implemented"}
-	
-	async def discover_assets(self) -> DiscoveryResult:
-		"""Discover Oracle database assets"""
-		result = DiscoveryResult(self.connector_type, self.source_system)
-		result.add_error("Oracle connector not fully implemented")
-		result.complete_discovery()
-		return result
-	
-	async def get_asset_schema(self, asset_name: str) -> Optional[AssetMetadata]:
-		"""Get Oracle asset schema"""
-		await self._log_error("Oracle connector not implemented")
-		return None
-	
-	async def sample_asset_data(self, asset_name: str, limit: int = 100) -> List[Dict[str, Any]]:
-		"""Sample Oracle asset data"""
-		await self._log_error("Oracle connector not implemented")
-		return []
 
 
-class SQLServerConnector(BaseConnector):
+class SQLServerConnector(FixtureBackedDatabaseConnector):
 	"""SQL Server database metadata discovery connector"""
+	vendor_display_name = "SQL Server"
+	default_schema = "dbo"
+	type_aliases = {
+		"nvarchar": DataType.STRING,
+		"varchar": DataType.STRING,
+		"nchar": DataType.STRING,
+		"text": DataType.STRING,
+		"bigint": DataType.INTEGER,
+		"smallint": DataType.INTEGER,
+		"tinyint": DataType.INTEGER,
+		"int": DataType.INTEGER,
+		"decimal": DataType.FLOAT,
+		"numeric": DataType.FLOAT,
+		"money": DataType.FLOAT,
+		"float": DataType.FLOAT,
+		"real": DataType.FLOAT,
+		"bit": DataType.BOOLEAN,
+		"datetime": DataType.DATETIME,
+		"date": DataType.DATE,
+		"uniqueidentifier": DataType.STRING,
+		"xml": DataType.JSON,
+		"binary": DataType.BINARY,
+		"varbinary": DataType.BINARY,
+	}
 	
 	def __init__(self, config: ConnectorConfig):
 		super().__init__(config)
-		self.connector_type = ConnectorType.DATABASE
 		self.source_system = "sqlserver"
-	
-	async def connect(self) -> bool:
-		"""Connect to SQL Server database"""
-		try:
-			# Would use pyodbc or aioodbc in real implementation
-			await self._log_error("SQL Server connector not fully implemented yet")
-			return False
-		except Exception as e:
-			await self._log_error(f"SQL Server connection failed: {str(e)}")
-			return False
-	
-	async def disconnect(self):
-		"""Disconnect from SQL Server"""
-		self.is_connected = False
-	
-	async def test_connection(self) -> Dict[str, Any]:
-		"""Test SQL Server connection"""
-		return {"status": "error", "message": "SQL Server connector not implemented"}
-	
-	async def discover_assets(self) -> DiscoveryResult:
-		"""Discover SQL Server database assets"""
-		result = DiscoveryResult(self.connector_type, self.source_system)
-		result.add_error("SQL Server connector not fully implemented")
-		result.complete_discovery()
-		return result
-	
-	async def get_asset_schema(self, asset_name: str) -> Optional[AssetMetadata]:
-		"""Get SQL Server asset schema"""
-		await self._log_error("SQL Server connector not implemented")
-		return None
-	
-	async def sample_asset_data(self, asset_name: str, limit: int = 100) -> List[Dict[str, Any]]:
-		"""Sample SQL Server asset data"""
-		await self._log_error("SQL Server connector not implemented")
-		return []
 
 
-class RedisConnector(BaseConnector):
+class RedisConnector(FixtureBackedDatabaseConnector):
 	"""Redis NoSQL database metadata discovery connector"""
+	vendor_display_name = "Redis"
+	default_schema = "db0"
+	type_aliases = {
+		"string": DataType.STRING,
+		"hash": DataType.JSON,
+		"stream": DataType.JSON,
+		"json": DataType.JSON,
+		"list": DataType.ARRAY,
+		"set": DataType.ARRAY,
+		"zset": DataType.ARRAY,
+		"bytes": DataType.BINARY,
+	}
 	
 	def __init__(self, config: ConnectorConfig):
 		super().__init__(config)
-		self.connector_type = ConnectorType.DATABASE
 		self.source_system = "redis"
-	
-	async def connect(self) -> bool:
-		"""Connect to Redis database"""
-		try:
-			# Would use aioredis in real implementation
-			await self._log_error("Redis connector not fully implemented yet")
-			return False
-		except Exception as e:
-			await self._log_error(f"Redis connection failed: {str(e)}")
-			return False
-	
-	async def disconnect(self):
-		"""Disconnect from Redis"""
-		self.is_connected = False
-	
-	async def test_connection(self) -> Dict[str, Any]:
-		"""Test Redis connection"""
-		return {"status": "error", "message": "Redis connector not implemented"}
-	
-	async def discover_assets(self) -> DiscoveryResult:
-		"""Discover Redis database assets"""
-		result = DiscoveryResult(self.connector_type, self.source_system)
-		result.add_error("Redis connector not fully implemented")
-		result.complete_discovery()
-		return result
-	
-	async def get_asset_schema(self, asset_name: str) -> Optional[AssetMetadata]:
-		"""Get Redis asset schema"""
-		await self._log_error("Redis connector not implemented")
-		return None
-	
-	async def sample_asset_data(self, asset_name: str, limit: int = 100) -> List[Dict[str, Any]]:
-		"""Sample Redis asset data"""
-		await self._log_error("Redis connector not implemented")
-		return []
 
 
-class BigQueryConnector(BaseConnector):
+class BigQueryConnector(FixtureBackedDatabaseConnector):
 	"""Google BigQuery metadata discovery connector"""
+	vendor_display_name = "BigQuery"
+	default_schema = "dataset"
+	type_aliases = {
+		"string": DataType.STRING,
+		"int64": DataType.INTEGER,
+		"integer": DataType.INTEGER,
+		"float64": DataType.FLOAT,
+		"numeric": DataType.FLOAT,
+		"bignumeric": DataType.FLOAT,
+		"bool": DataType.BOOLEAN,
+		"boolean": DataType.BOOLEAN,
+		"date": DataType.DATE,
+		"datetime": DataType.DATETIME,
+		"timestamp": DataType.TIMESTAMP,
+		"record": DataType.JSON,
+		"struct": DataType.JSON,
+		"array": DataType.ARRAY,
+		"bytes": DataType.BINARY,
+		"geography": DataType.STRING,
+	}
 	
 	def __init__(self, config: ConnectorConfig):
 		super().__init__(config)
-		self.connector_type = ConnectorType.DATABASE
 		self.source_system = "bigquery"
-	
-	async def connect(self) -> bool:
-		"""Connect to BigQuery"""
-		try:
-			# Would use google-cloud-bigquery in real implementation
-			await self._log_error("BigQuery connector not fully implemented yet")
-			return False
-		except Exception as e:
-			await self._log_error(f"BigQuery connection failed: {str(e)}")
-			return False
-	
-	async def disconnect(self):
-		"""Disconnect from BigQuery"""
-		self.is_connected = False
-	
-	async def test_connection(self) -> Dict[str, Any]:
-		"""Test BigQuery connection"""
-		return {"status": "error", "message": "BigQuery connector not implemented"}
-	
-	async def discover_assets(self) -> DiscoveryResult:
-		"""Discover BigQuery assets"""
-		result = DiscoveryResult(self.connector_type, self.source_system)
-		result.add_error("BigQuery connector not fully implemented")
-		result.complete_discovery()
-		return result
-	
-	async def get_asset_schema(self, asset_name: str) -> Optional[AssetMetadata]:
-		"""Get BigQuery asset schema"""
-		await self._log_error("BigQuery connector not implemented")
-		return None
-	
-	async def sample_asset_data(self, asset_name: str, limit: int = 100) -> List[Dict[str, Any]]:
-		"""Sample BigQuery asset data"""
-		await self._log_error("BigQuery connector not implemented")
-		return []

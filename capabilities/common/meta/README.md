@@ -23,6 +23,9 @@ Bytewax event streams behind the same contract.
   APIs, streams, reports, dashboards, models, pipelines, and glossary terms.
 - Approved discovery scheduling for databases, files, APIs, streams, ML
   systems, and external catalogs.
+- Dependency-light metadata fixture discovery for Oracle, SQL Server, Redis,
+  and BigQuery so generated applications can compose catalog screens and
+  governance flows before live vendor drivers are installed.
 - Classification evidence with confidence, sensitivity labels, and steward
   review.
 - Lineage capture between registered source and target assets.
@@ -177,6 +180,43 @@ assert batch.status == "accepted"
 
 The packet does not require a particular web framework. Generated APG targets
 can render these models in their own UI shells.
+
+## Database Connector Fixtures
+
+Generated applications can use metadata-backed database connectors when live
+database drivers are unavailable. The Oracle, SQL Server, Redis, and BigQuery
+connectors accept `additional_params["offline_catalog"]` assets and expose the
+same `test_connection()`, `discover_assets()`, `get_asset_schema()`, and
+`sample_asset_data()` methods as live connectors.
+
+```python
+from capabilities.common.meta.connectors.base_connector import ConnectorConfig
+from capabilities.common.meta.connectors.database_connectors import BigQueryConnector
+
+connector = BigQueryConnector(ConnectorConfig(
+    connection_string="bigquery://offline",
+    database="analytics",
+    additional_params={
+        "offline_catalog": [{
+            "name": "customers",
+            "schema": "mart",
+            "columns": [
+                {"name": "customer_id", "data_type": "INT64", "primary_key": True},
+                {"name": "email", "data_type": "STRING", "sample_values": ["owner@example.com"]},
+            ],
+            "sample_data": [{"customer_id": 1, "email": "owner@example.com"}],
+        }]
+    },
+))
+
+assets = await connector.discover_assets()
+schema = await connector.get_asset_schema("mart.customers")
+samples = await connector.sample_asset_data("mart.customers", 1)
+```
+
+This fixture mode is intentionally explicit. Production adapters can replace it
+with live `oracledb`, `aioodbc`, Redis, or Google BigQuery clients later
+without changing generated-app catalog workflows.
 
 ## Guardrail Summary
 

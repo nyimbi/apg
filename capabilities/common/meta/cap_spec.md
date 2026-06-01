@@ -28,6 +28,11 @@ control plane. Reviewable records expose `policy_decision`, `matched_rules`,
 `review_reasons`, and `review_evidence`, and generated UI models can compose
 pending-review queues without replaying rule evaluation.
 
+The database connector surface also includes executable fixture-backed Oracle,
+SQL Server, Redis, and BigQuery connectors. These connectors import without live
+vendor drivers and support connection checks, asset discovery, schema lookup,
+and sample data reads from configured metadata fixtures.
+
 ## Lifecycle
 
 1. Register asset.
@@ -106,6 +111,8 @@ can connect those systems behind the same contract:
 
 - metadata store persistence
 - discovery connector execution
+- fixture-backed Oracle, SQL Server, Redis, and BigQuery catalog metadata for
+  generated apps
 - classification engines
 - lineage graph traversal
 - search indexes

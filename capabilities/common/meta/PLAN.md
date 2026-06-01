@@ -57,6 +57,9 @@ persistence adapters are attached.
 - Add `view_models.py` for route-level UI state.
 - Add pending-review queue composition for dashboard, catalog-agent roster, and
   settings surfaces.
+- Add dependency-light metadata fixture discovery for Oracle, SQL Server,
+  Redis, and BigQuery connectors so generated applications can compose catalog
+  workflows before live vendor drivers are installed.
 - Replace static semantic JSON with contract-derived `app.py` output.
 - Refresh `semantic_model.json`, `release_report.json`, and package manifest.
 
@@ -73,6 +76,7 @@ persistence adapters are attached.
 - Run battery-conscious proof only:
   - `py_compile` for META packet files.
   - focused META pytest files.
+  - focused database connector fixture tests.
   - APG implementation audit for `capabilities/common/meta`.
   - APG publish plan for `capabilities/common/meta`.
   - stale-marker search over current packet artifacts.
@@ -88,5 +92,7 @@ persistence adapters are attached.
 - Add live adapter tests for discovery, classification, lineage, search,
   metadata store, auth, audit, MDM, ETL, connector, monitoring, and notification
   integration.
+- Replace fixture-backed Oracle, SQL Server, Redis, and BigQuery connectors with
+  live driver adapters where deployments provide credentials and dependencies.
 - Add rendered UI shells after generated-application targets stabilize.
 - Add performance and concurrency benchmarks when running on AC power.

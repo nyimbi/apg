@@ -25244,6 +25244,62 @@ Known gaps:
 - Existing SQLAlchemy and Pydantic deprecation warnings surfaced by focused
   tests remain outside this slice.
 
+### 2026-06-01 11:52 EAT
+
+META database connector fixture slice:
+
+- Replaced Oracle, SQL Server, Redis, and BigQuery connector "not implemented"
+  paths with executable metadata-fixture connectors.
+- Added a shared fixture-backed database connector base that supports
+  `test_connection()`, `discover_assets()`, `get_asset_schema()`, and
+  `sample_asset_data()` from configured `offline_catalog` metadata.
+- Added vendor type mapping for Oracle, SQL Server, Redis, and BigQuery fixture
+  schemas, including PII hints inherited from the base connector profiler.
+- Tightened fixture type alias matching so longer vendor types such as BigQuery
+  `DATETIME` keep their intended precision instead of being downgraded by a
+  shorter substring alias.
+- Made optional live database driver imports dependency-light so generated apps
+  can import database connectors without installing every vendor driver.
+- Made `connectors/__init__.py` tolerate missing optional file/API/ML connector
+  dependencies while keeping database connectors importable.
+- Added focused regression coverage for all four fixture-backed database
+  connectors and empty-catalog operability.
+- Updated META `README.md`, `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md`
+  to document the generated-app database connector fixture baseline.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/meta/connectors/__init__.py capabilities/common/meta/connectors/base_connector.py capabilities/common/meta/connectors/database_connectors.py capabilities/common/meta/test_capability_contract.py capabilities/common/meta/tests/test_package_contract.py capabilities/common/meta/tests/test_database_connectors.py capabilities/common/meta/app.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/meta/test_capability_contract.py capabilities/common/meta/tests/test_package_contract.py capabilities/common/meta/tests/test_database_connectors.py`
+  passed with 15 tests and 10 pre-existing SQLAlchemy/Pydantic deprecation
+  warnings from imported shared modules.
+- `./.venv/bin/python capabilities/common/meta/app.py` passed with
+  `self_test()` status `ok`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/meta --json`
+  passed with one domain-specific META implementation, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/meta --json`
+  passed and showed side-effect-free publish evidence, Bytewax streaming,
+  first-class catalog-agent metadata, 27 rules, 15 routes, and no warnings.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/common/meta --json`
+  passed with one complete lifecycle record, 27 rules, 15 routes, and 0
+  warnings/errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 109 operable contracts, 109 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Focused stale-marker scan for replaced database connector paths returned no
+  vendor-specific not-implemented phrases or placeholder implementation
+  markers.
+- `git diff --check -- capabilities/common/meta docs/progress_log.md` passed.
+
+Known gaps:
+
+- Live Oracle, SQL Server, Redis, and BigQuery network drivers remain adapter
+  work; this slice proves dependency-light generated-app metadata behavior.
+- Full repository tests, rendered UI checks, live Bytewax topology, and
+  performance/load checks remain outside this battery-conscious slice.
+
 ### 2026-06-01 10:39 EAT
 
 IMEX review-evidence lifecycle slice:

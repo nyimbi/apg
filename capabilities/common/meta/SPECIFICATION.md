@@ -69,6 +69,11 @@ of hidden inside service code.
 - Deny unapproved connectors.
 - Route stale or unreviewed schedules to review.
 - Record discovery results as asset IDs.
+- Provide dependency-light metadata fixture connectors for Oracle, SQL Server,
+  Redis, and BigQuery so generated applications can discover configured assets,
+  inspect schemas, and sample records without requiring live vendor drivers.
+- Keep live vendor driver execution behind adapter boundaries while preserving
+  the same connector method contract.
 
 ### Classification
 
@@ -189,6 +194,8 @@ Production adapters may provide:
 
 - Durable metadata store persistence.
 - Connector execution and schema extraction.
+- Live Oracle, SQL Server, Redis, and BigQuery drivers replacing fixture-backed
+  metadata catalogs.
 - AI or deterministic classification.
 - Lineage graph persistence and traversal.
 - Search index updates and query execution.
@@ -202,6 +209,8 @@ contract.
 ## Non-Goals For This Packet
 
 - Running live discovery connectors.
+- Requiring Oracle, SQL Server, Redis, or BigQuery vendor drivers for
+  generated-app fixture discovery.
 - Embedding Codex, Claude Code, opencode, Pi, or any other agent runtime
   client directly in META.
 - Training or serving AI classification models.
@@ -222,6 +231,9 @@ contract.
 - `service.py` registers catalog agents, preserves pending-review catalog-agent
   evidence, and validates Bytewax lifecycle batches using deterministic
   guardrails.
+- Oracle, SQL Server, Redis, and BigQuery connectors import without optional
+  vendor drivers and execute metadata fixture discovery, schema lookup, and
+  sampling.
 - Denied non-Bytewax lifecycle batches persist evidence before
   `PermissionError`.
 - `view_models.py` exposes generated-application view models.

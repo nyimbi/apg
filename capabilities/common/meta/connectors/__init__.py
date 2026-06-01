@@ -18,25 +18,34 @@ from .database_connectors import (
 	SnowflakeConnector,
 	BigQueryConnector
 )
-from .file_connectors import (
-	CSVConnector,
-	JSONConnector,
-	ParquetConnector,
-	AvroConnector,
-	S3Connector,
-	GCSConnector
-)
-from .api_connectors import (
-	RESTAPIConnector,
-	GraphQLConnector,
-	BytewaxConnector
-)
-from .ml_connectors import (
-	MLflowConnector,
-	KubeflowConnector,
-	SageMakerConnector,
-	JupyterConnector
-)
+try:
+	from .file_connectors import (
+		CSVConnector,
+		JSONConnector,
+		ParquetConnector,
+		AvroConnector,
+		S3Connector,
+		GCSConnector
+	)
+except ImportError:  # pragma: no cover - optional file connector dependencies.
+	CSVConnector = JSONConnector = ParquetConnector = AvroConnector = S3Connector = GCSConnector = None
+try:
+	from .api_connectors import (
+		RESTAPIConnector,
+		GraphQLConnector,
+		BytewaxConnector
+	)
+except ImportError:  # pragma: no cover - optional API connector dependencies.
+	RESTAPIConnector = GraphQLConnector = BytewaxConnector = None
+try:
+	from .ml_connectors import (
+		MLflowConnector,
+		KubeflowConnector,
+		SageMakerConnector,
+		JupyterConnector
+	)
+except ImportError:  # pragma: no cover - optional ML connector dependencies.
+	MLflowConnector = KubeflowConnector = SageMakerConnector = JupyterConnector = None
 from .connector_registry import ConnectorRegistry
 
 __all__ = [
