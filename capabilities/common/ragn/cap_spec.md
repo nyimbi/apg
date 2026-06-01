@@ -12,6 +12,13 @@ first-class RAG agents, Bytewax lifecycle batches, UI view models,
 deterministic guardrails, visual theming, and generated Python package
 evidence.
 
+Review-required lifecycle outcomes are durable capability data. Large ingests,
+large retrieval windows, low-confidence retrievals, answers generated from
+pending-review context, long conversations, and privileged RAG-agent
+registrations are persisted as `pending_review` records with policy decisions,
+matched rules, review reasons, and audit evidence. Denied outcomes remain
+hard-blocking.
+
 Authoritative companion documents:
 
 - `README.md` explains how to use RAGN in generated applications.

@@ -18,6 +18,62 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ### 2026-06-01 00:00 EAT
 
+RAGN review-evidence lifecycle packet:
+
+- Extended RAGN records, RAG-agent records, lifecycle batches, and audit events
+  with durable policy evidence fields: decision, matched rules, review reasons,
+  and audit evidence.
+- Changed review-required large document ingests, low-confidence retrievals,
+  answers generated from pending-review context, long conversations, and
+  privileged RAG-agent registrations to persist `pending_review` records while
+  keeping true deny outcomes hard-blocking.
+- Added pending-review queues to RAGN dashboard, document, retrieval,
+  generation, conversation, curation, governance, API, package, and semantic
+  model surfaces.
+- Updated focused RAGN tests so review-required lifecycle outcomes prove
+  durable evidence instead of transient exceptions.
+- Updated RAGN README, specification, plan, and capability pointer to document
+  the review queue lifecycle and deny/review distinction.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for RAGN modules and tests passed.
+- `./.venv/bin/pytest -q capabilities/common/ragn/test_capability_contract.py
+  capabilities/common/ragn/tests/test_package_contract.py` passed with 9 tests
+  and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.ragn import app; ..."`
+  passed package self-test.
+- `./.venv/bin/python -m json.tool capabilities/common/ragn/semantic_model.json`
+  passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/ragn --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, and no warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/ragn --json`
+  passed with no warnings and side-effect-free publish planning.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/common/ragn --json` passed with complete lifecycle evidence.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed with 109 operable contracts/packages and no warnings or errors.
+- Service smoke executed knowledge base -> large-ingest document ->
+  low-confidence retrieval -> pending-context answer and printed
+  `pending_review pending_review pending_review 3`.
+- RAGN stale-marker scan returned no TODO/FIXME/placeholder/stub/baseline or
+  Kafka markers across the edited RAGN packet.
+- `git diff --check -- capabilities/common/ragn docs/progress_log.md` passed.
+- Inline code review found no blocking issues; residual risks remain around
+  live vector stores, rendered UI, durable stores, external agent clients, live
+  Bytewax topology, and retrieval/generation quality evaluation.
+
+Known gaps:
+
+- Full repository tests, rendered browser UI checks, live vector stores,
+  durable Bytewax topology, external Codex/Claude Code/OpenCode/Pi clients,
+  SRCH/NLPC/AICR/CONF/AUDL live adapters, load checks, migration checks,
+  model-provider calls, and retrieval/generation quality benchmarks still need
+  later verification outside this battery-conscious slice.
+
+### 2026-06-01 00:00 EAT
+
 KNGR review-evidence lifecycle packet:
 
 - Extended knowledge source, entity, relationship, enrichment, reasoning,

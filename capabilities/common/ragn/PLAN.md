@@ -13,6 +13,8 @@
   the heavier production adapter surface.
 - Replace stale static package evidence with metadata derived from the current
   contract.
+- Persist review-required lifecycle outcomes as durable `pending_review`
+  evidence while preserving hard failures for denied outcomes.
 
 ## Build Plan
 
@@ -44,6 +46,9 @@
      roster and lifecycle batch monitor models.
    - Replace `__init__.py` registration metadata with current contract-derived
      composition data.
+   - Add pending-review queues for large ingests, low-confidence retrievals,
+     answers generated from pending context, long conversations, privileged
+     RAG-agent registrations, and their policy evidence.
 
 4. Refresh package evidence:
    - Make `app.py` derive semantic metadata from the current contract.

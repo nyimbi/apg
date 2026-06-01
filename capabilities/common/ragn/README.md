@@ -23,7 +23,8 @@ Bytewax event streams.
 - Retrieval records with query, knowledge base, document evidence, context
   confidence, result window, restricted-source filtering, and review gates.
 - Answer generation records with retrieved context, citations, model policy,
-  prompt-injection and unsafe-answer guardrails, and audit events.
+  prompt-injection and unsafe-answer guardrails, pending-context review gates,
+  and audit events.
 - Conversation-turn records with user identity, conversation id, answer linkage,
   turn-count review, and audit events.
 - Citation validation for source, document, and chunk evidence.
@@ -37,6 +38,9 @@ Bytewax event streams.
   documents, retrieval, generation, conversations, citations, curation,
   governance, agent roster, lifecycle batch monitor, audit, and settings
   screens.
+- Durable review evidence on review-required outcomes: `pending_review`
+  status, `decision`, `matched_rules`, `review_reasons`, and
+  `audit_evidence`. True deny outcomes still fail immediately.
 
 ## Runtime Surfaces
 
@@ -62,7 +66,7 @@ Bytewax event streams.
 7. Register provider-neutral RAG agents with bounded roles and scopes.
 8. Validate RAG lifecycle batches through Bytewax-first processor contracts.
 9. Inspect dashboard summaries, evidence trails, governance rules, agent review
-   queues, lifecycle batches, and audit events.
+   queues, lifecycle batches, pending review queues, and audit events.
 
 ## Example
 
@@ -129,12 +133,14 @@ classification, retrieval query, retrieval knowledge base, restricted-source
 access filters, generation query, retrieved context, citations, external model
 policy, conversation id, user id, citation evidence, curator, curation decision,
 curation evidence, Bytewax batch mutation, tenant isolation, or audit evidence
-for state changes. It requires review for large ingestion batches, large
-retrieval windows, low-confidence context, long conversations, and privileged
-RAG-agent registrations without recorded human approval. It rejects unsupported
-agent runtimes, unsupported agent roles, missing agent scope, missing owner,
-missing purpose, missing machine-contribution disclosure, non-Bytewax lifecycle
-streams, and unsupported lifecycle operations.
+for state changes. It persists pending-review records, rather than discarding
+the operation as a transient exception, for large ingestion batches, large
+retrieval windows, low-confidence context, answers generated from pending
+context, long conversations, and privileged RAG-agent registrations without
+recorded human approval. It rejects unsupported agent runtimes, unsupported
+agent roles, missing agent scope, missing owner, missing purpose, missing
+machine-contribution disclosure, non-Bytewax lifecycle streams, and unsupported
+lifecycle operations.
 
 ## Composition
 

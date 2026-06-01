@@ -69,9 +69,17 @@ def semantic_model() -> dict[str, Any]:
 					"large_ingest": "RagnRecord",
 					"low_context_confidence": "RagnRecord",
 					"large_retrieval_window": "RagnRecord",
+					"pending_context_generation": "RagnRecord",
 					"long_conversation": "RagnRecord",
 					"answer_curation": "RagnRecord",
 					"rag_agent": "RAGAgentRecord",
+				},
+				"review_evidence": {
+					"pending_status": "pending_review",
+					"decision_field": "decision",
+					"matched_rules_field": "matched_rules",
+					"review_reasons_field": "review_reasons",
+					"audit_evidence_field": "audit_evidence",
 				},
 				"rag_lifecycle": {
 					"knowledge_base": "RagnRecord",

@@ -130,8 +130,10 @@ def test_registration_includes_full_capability_contract():
 	assert registration["streaming"]["required_processor"] == "bytewax"
 	assert registration["capabilities"]["grounded_generation"]
 	assert registration["capabilities"]["rag_agent_composition"]
+	assert registration["capabilities"]["review_evidence"]
 	assert registration["endpoints"]["audit"] == "/ragn/api/v1/audit"
 	assert registration["endpoints"]["agents"] == "/ragn/api/v1/agents"
+	assert registration["endpoints"]["pending_reviews"] == "/ragn/api/v1/pending-reviews"
 	assert "ragn:query" in registration["permissions"]
 	assert "ragn:audit" in registration["permissions"]
 
@@ -291,6 +293,22 @@ def test_ragn_service_enforces_policy_guardrails():
 		content_hash="sha256:restricted",
 		classification="restricted",
 	)
+	large_document = service.ingest_document(
+		document_id="doc-large-batch",
+		tenant_id="tenant-rag",
+		knowledge_base_id=kb["id"],
+		title="Large batch policy",
+		source_uri="manual://large-batch",
+		content_hash="sha256:large-batch",
+		classification="internal",
+		document_count=1200,
+		review_recorded=False,
+	)
+	assert large_document["status"] == "pending_review"
+	assert large_document["decision"] == "require_review"
+	assert large_document["matched_rules"] == ["large_ingest_requires_review"]
+	assert large_document["review_reasons"] == ["large_ingest_review_required"]
+	assert large_document["audit_evidence"]["required_actions"] == ["record_ingest_review"]
 
 	with pytest.raises(PermissionError, match="access_filter_required"):
 		service.retrieve_context(
@@ -304,16 +322,33 @@ def test_ragn_service_enforces_policy_guardrails():
 			access_filter_applied=False,
 		)
 
-	with pytest.raises(PermissionError, match="low_context_confidence_review_required"):
-		service.retrieve_context(
-			retrieval_id="ret-low",
-			tenant_id="tenant-rag",
-			knowledge_base_id=kb["id"],
-			query="low?",
-			document_ids=[document["id"]],
-			context_confidence=0.4,
-			review_recorded=False,
-		)
+	pending_retrieval = service.retrieve_context(
+		retrieval_id="ret-low",
+		tenant_id="tenant-rag",
+		knowledge_base_id=kb["id"],
+		query="low?",
+		document_ids=[document["id"]],
+		context_confidence=0.4,
+		review_recorded=False,
+	)
+	assert pending_retrieval["status"] == "pending_review"
+	assert pending_retrieval["decision"] == "require_review"
+	assert "low_context_confidence_requires_review" in pending_retrieval["matched_rules"]
+	assert pending_retrieval["review_reasons"] == ["low_context_confidence_review_required"]
+
+	pending_answer = service.generate_answer(
+		answer_id="ans-pending-context",
+		tenant_id="tenant-rag",
+		retrieval_id=pending_retrieval["id"],
+		query="low?",
+		answer_text="Answer from context that still needs grounding review.",
+		citations=[{"source_id": "manual", "document_id": document["id"], "chunk_id": "chunk-pending"}],
+		review_recorded=False,
+	)
+	assert pending_answer["status"] == "pending_review"
+	assert pending_answer["decision"] == "require_review"
+	assert pending_answer["matched_rules"] == ["generation_from_pending_context_requires_review"]
+	assert pending_answer["review_reasons"] == ["pending_context_generation_review_required"]
 
 	retrieval = service.retrieve_context(
 		retrieval_id="ret-reviewed",
@@ -347,6 +382,27 @@ def test_ragn_service_enforces_policy_guardrails():
 			model_policy_attached=False,
 		)
 
+	answer = service.generate_answer(
+		answer_id="ans-reviewed",
+		tenant_id="tenant-rag",
+		retrieval_id=retrieval["id"],
+		query="low?",
+		answer_text="Reviewed answer.",
+		citations=[{"source_id": "manual", "document_id": document["id"], "chunk_id": "chunk-2"}],
+	)
+	long_turn = service.record_turn(
+		turn_id="turn-long",
+		tenant_id="tenant-rag",
+		conversation_id="conv-long",
+		user_id="user-1",
+		query="low?",
+		answer_id=answer["id"],
+		turn_count=101,
+		review_recorded=False,
+	)
+	assert long_turn["status"] == "pending_review"
+	assert long_turn["matched_rules"] == ["conversation_turn_limit_requires_review"]
+
 	with pytest.raises(PermissionError, match="unsupported_rag_agent_runtime"):
 		service.register_rag_agent(
 			agent_id="agent-unsupported",
@@ -372,6 +428,14 @@ def test_ragn_service_enforces_policy_guardrails():
 		human_approval_required=False,
 	)
 	assert pending_agent["status"] == "pending_review"
+	assert pending_agent["decision"] == "require_review"
+	assert pending_agent["review_reasons"] == ["rag_agent_human_approval_required"]
+	assert service.dashboard_summary("tenant-rag")["pending_review_count"] >= 4
+	assert document_model(service, "tenant-rag")["pending_review"][0]["id"] == "doc-large-batch"
+	assert retrieval_model(service, "tenant-rag")["pending_review"][0]["id"] == "ret-low"
+	assert generation_model(service, "tenant-rag")["pending_review"][0]["id"] == "ans-pending-context"
+	assert conversation_model(service, "tenant-rag")["pending_review"][0]["id"] == "turn-long"
+	assert governance_model(service, "tenant-rag")["pending_reviews"]
 
 	with pytest.raises(ValueError, match="ragn_lifecycle_batch_empty"):
 		service.validate_ragn_lifecycle_batch("tenant-rag", "bytewax", 0)
@@ -381,3 +445,4 @@ def test_ragn_service_enforces_policy_guardrails():
 
 	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
 		service.validate_ragn_lifecycle_batch("tenant-rag", "legacy_queue", 1, "rag_agent_batch")
+	assert service.list_lifecycle_batches("tenant-rag")[-1]["status"] == "denied"

@@ -27,6 +27,7 @@ def dashboard_model(service: RagnService | None = None, tenant_id: str = "defaul
 		"curations": service.list_curations(tenant_id),
 		"rag_agents": service.list_rag_agents(tenant_id),
 		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"agents": contract["agents"],
@@ -45,45 +46,70 @@ def studio_model(service: RagnService, tenant_id: str = "default") -> dict[str, 
 
 
 def knowledge_base_model(service: RagnService, tenant_id: str = "default") -> dict[str, object]:
+	documents = service.list_documents(tenant_id)
 	return {
 		"tenant_id": tenant_id,
 		"knowledge_bases": service.list_knowledge_bases(tenant_id),
-		"documents": service.list_documents(tenant_id),
+		"documents": documents,
+		"pending_review": [
+			item for item in documents
+			if item["status"] == "pending_review"
+		],
 	}
 
 
 def document_model(service: RagnService, tenant_id: str = "default") -> dict[str, object]:
+	documents = service.list_documents(tenant_id)
 	return {
 		"tenant_id": tenant_id,
-		"documents": service.list_documents(tenant_id),
+		"documents": documents,
 		"restricted_documents": [
-			document for document in service.list_documents(tenant_id)
+			document for document in documents
 			if document["metadata"].get("classification") == "restricted"
+		],
+		"pending_review": [
+			document for document in documents
+			if document["status"] == "pending_review"
 		],
 	}
 
 
 def retrieval_model(service: RagnService, tenant_id: str = "default") -> dict[str, object]:
+	retrievals = service.list_retrievals(tenant_id)
 	return {
 		"tenant_id": tenant_id,
-		"retrievals": service.list_retrievals(tenant_id),
+		"retrievals": retrievals,
 		"documents": service.list_documents(tenant_id),
+		"pending_review": [
+			retrieval for retrieval in retrievals
+			if retrieval["status"] == "pending_review"
+		],
 	}
 
 
 def generation_model(service: RagnService, tenant_id: str = "default") -> dict[str, object]:
+	answers = service.list_answers(tenant_id)
 	return {
 		"tenant_id": tenant_id,
-		"answers": service.list_answers(tenant_id),
+		"answers": answers,
 		"retrievals": service.list_retrievals(tenant_id),
+		"pending_review": [
+			answer for answer in answers
+			if answer["status"] == "pending_review"
+		],
 	}
 
 
 def conversation_model(service: RagnService, tenant_id: str = "default") -> dict[str, object]:
+	turns = service.list_conversations(tenant_id)
 	return {
 		"tenant_id": tenant_id,
-		"conversation_turns": service.list_conversations(tenant_id),
+		"conversation_turns": turns,
 		"answers": service.list_answers(tenant_id),
+		"pending_review": [
+			turn for turn in turns
+			if turn["status"] == "pending_review"
+		],
 	}
 
 
@@ -97,10 +123,15 @@ def citation_model(service: RagnService, tenant_id: str = "default") -> dict[str
 
 
 def curation_model(service: RagnService, tenant_id: str = "default") -> dict[str, object]:
+	answers = service.list_answers(tenant_id)
 	return {
 		"tenant_id": tenant_id,
-		"answers": service.list_answers(tenant_id),
+		"answers": answers,
 		"curations": service.list_curations(tenant_id),
+		"pending_review": [
+			answer for answer in answers
+			if answer["status"] == "pending_review"
+		],
 	}
 
 
@@ -113,6 +144,7 @@ def governance_model(service: RagnService, tenant_id: str = "default") -> dict[s
 		"streaming": contract["streaming"],
 		"rag_agents": service.list_rag_agents(tenant_id),
 		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"configuration": contract["configuration"],
 	}

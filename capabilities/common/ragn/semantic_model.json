@@ -129,6 +129,7 @@
         "large_retrieval_window": "RagnRecord",
         "long_conversation": "RagnRecord",
         "low_context_confidence": "RagnRecord",
+        "pending_context_generation": "RagnRecord",
         "rag_agent": "RAGAgentRecord"
       },
       "business_rules": [],
@@ -349,6 +350,13 @@
         "conf",
         "audl"
       ],
+      "review_evidence": {
+        "audit_evidence_field": "audit_evidence",
+        "decision_field": "decision",
+        "matched_rules_field": "matched_rules",
+        "pending_status": "pending_review",
+        "review_reasons_field": "review_reasons"
+      },
       "rule_engine": {
         "rules": [
           {
@@ -677,6 +685,20 @@
               "required_action": "block_answer"
             },
             "name": "unsafe_generation_requires_block"
+          },
+          {
+            "condition": {
+              "operation": "generate_answer",
+              "review_recorded": false,
+              "upstream_review_pending": true
+            },
+            "description": "Answers generated from pending-review retrieval context remain in review until grounding is approved.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "pending_context_generation_review_required",
+              "required_action": "review_generated_answer_grounding"
+            },
+            "name": "generation_from_pending_context_requires_review"
           },
           {
             "condition": {
@@ -1269,6 +1291,20 @@
             "required_action": "block_answer"
           },
           "name": "unsafe_generation_requires_block"
+        },
+        {
+          "condition": {
+            "operation": "generate_answer",
+            "review_recorded": false,
+            "upstream_review_pending": true
+          },
+          "description": "Answers generated from pending-review retrieval context remain in review until grounding is approved.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "pending_context_generation_review_required",
+            "required_action": "review_generated_answer_grounding"
+          },
+          "name": "generation_from_pending_context_requires_review"
         },
         {
           "condition": {
@@ -2428,6 +2464,20 @@
         "required_action": "attach_model_policy"
       },
       "name": "external_model_requires_policy"
+    },
+    "generation_from_pending_context_requires_review": {
+      "condition": {
+        "operation": "generate_answer",
+        "review_recorded": false,
+        "upstream_review_pending": true
+      },
+      "description": "Answers generated from pending-review retrieval context remain in review until grounding is approved.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "pending_context_generation_review_required",
+        "required_action": "review_generated_answer_grounding"
+      },
+      "name": "generation_from_pending_context_requires_review"
     },
     "generation_requires_answer_text": {
       "condition": {

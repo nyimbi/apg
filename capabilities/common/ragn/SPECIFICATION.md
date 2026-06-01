@@ -20,7 +20,7 @@ RAGN must provide:
   state, and audit events.
 - Answer generation records with retrieval context, query, answer text,
   citations, model location, model policy, prompt-injection checks,
-  unsafe-answer checks, and audit events.
+  unsafe-answer checks, pending-context review state, and audit events.
 - Conversation-turn records with conversation id, user id, answer linkage,
   turn count, review state, and audit events.
 - Citation validation requiring source, document, and chunk identifiers.
@@ -34,6 +34,8 @@ RAGN must provide:
 - Dashboard summaries, aggregate package listings, route metadata, and
   generated-app view models.
 - Deterministic rule evaluation for lifecycle and safety guardrails.
+- Durable review-evidence fields for review-required records: decision,
+  matched rules, review reasons, and audit evidence.
 - Theme tokens and named UI components for generated RAGN screens.
 - Package evidence through `semantic_model.json`, `package_manifest.json`, and
   `release_report.json`.
@@ -84,7 +86,8 @@ actions. Rules cover:
 - Retrieval query, knowledge base, result window, restricted-source filter, and
   low-context-confidence review.
 - Generation query, context, citations, external model policy,
-  prompt-injection blocking, and unsafe-answer blocking.
+  prompt-injection blocking, unsafe-answer blocking, and pending-context
+  generation review.
 - Conversation id, user id, and long-conversation review.
 - Citation source, document, and chunk identifiers.
 - Curation curator, decision, and evidence.
@@ -117,6 +120,12 @@ RAGN exposes route metadata and view-model helpers for:
 Generated UIs should prioritize dense operational screens: source and answer
 evidence, confidence, review queues, retrieval diagnostics, citation stacks,
 conversation traces, governance rules, and audit timelines.
+
+Review-required outcomes must remain inspectable in those screens. Large
+ingests, large retrieval windows, low-confidence retrievals, answers generated
+from pending-review context, long conversations, and privileged RAG-agent
+registrations are stored with `pending_review` status and policy evidence.
+Deny outcomes remain hard-blocking and should be reported as policy failures.
 
 ## Adapter Boundaries
 

@@ -20,6 +20,10 @@ class RagnRecord:
 	kind: str
 	status: str
 	metadata: dict[str, Any] = field(default_factory=dict)
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now_iso)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -29,6 +33,10 @@ class RagnRecord:
 			"kind": self.kind,
 			"status": self.status,
 			"metadata": dict(self.metadata),
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"created_at": self.created_at,
 		}
 
@@ -48,6 +56,10 @@ class RAGAgentRecord:
 	contribution_disclosed: bool
 	human_approval_required: bool
 	status: str = "active"
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now_iso)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -64,6 +76,10 @@ class RAGAgentRecord:
 			"contribution_disclosed": self.contribution_disclosed,
 			"human_approval_required": self.human_approval_required,
 			"status": self.status,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"created_at": self.created_at,
 		}
 
@@ -80,6 +96,8 @@ class RagnLifecycleBatchRecord:
 	accepted: bool
 	decision: str
 	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	required_processor: str = "bytewax"
 	status: str = "accepted"
 	created_at: str = field(default_factory=utc_now_iso)
@@ -95,6 +113,8 @@ class RagnLifecycleBatchRecord:
 			"accepted": self.accepted,
 			"decision": self.decision,
 			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"required_processor": self.required_processor,
 			"status": self.status,
 			"created_at": self.created_at,
@@ -145,7 +165,7 @@ class RagnService:
 			"source_attribution_present": bool(source_attribution),
 			"review_recorded": bool(review_recorded),
 		})
-		self._raise_if_review_required(result, review_recorded)
+		self._raise_if_denied(result)
 		record = RagnRecord(
 			id=knowledge_base_id,
 			tenant_id=tenant_id,
@@ -157,6 +177,7 @@ class RagnService:
 				"source_attribution": source_attribution,
 				"classification": classification,
 			},
+			**self._policy_fields(result, review_recorded),
 		)
 		self._knowledge_bases[knowledge_base_id] = record
 		self._audit(tenant_id, knowledge_base_id, "knowledge_base_created", owner, result)
@@ -187,19 +208,21 @@ class RagnService:
 			"document_count": document_count,
 			"review_recorded": bool(review_recorded),
 		})
-		self._raise_if_review_required(result, review_recorded)
+		self._raise_if_denied(result)
 		record = RagnRecord(
 			id=document_id,
 			tenant_id=tenant_id,
 			kind="document",
-			status="indexed",
+			status=self._status_after_review(result, "indexed"),
 			metadata={
 				"knowledge_base_id": knowledge_base_id,
 				"title": title,
 				"source_uri": source_uri,
 				"content_hash": content_hash,
 				"classification": classification,
+				"document_count": document_count,
 			},
+			**self._policy_fields(result, review_recorded),
 		)
 		self._documents[document_id] = record
 		self._audit(tenant_id, document_id, "document_ingested", knowledge_base_id, result)
@@ -233,12 +256,12 @@ class RagnService:
 			"context_confidence": confidence,
 			"review_recorded": bool(review_recorded),
 		})
-		self._raise_if_review_required(result, review_recorded)
+		self._raise_if_denied(result)
 		record = RagnRecord(
 			id=retrieval_id,
 			tenant_id=tenant_id,
 			kind="retrieval",
-			status="reviewed" if review_recorded else "active",
+			status=self._status_after_review(result, "reviewed" if review_recorded else "active"),
 			metadata={
 				"knowledge_base_id": knowledge_base_id,
 				"query": query,
@@ -246,7 +269,9 @@ class RagnService:
 				"context_confidence": confidence,
 				"result_window": result_window,
 				"source_classification": source_classification,
+				"access_filter_applied": bool(access_filter_applied),
 			},
+			**self._policy_fields(result, review_recorded),
 		)
 		self._retrievals[retrieval_id] = record
 		self._audit(tenant_id, retrieval_id, "context_retrieved", knowledge_base_id, result)
@@ -278,9 +303,10 @@ class RagnService:
 			"model_policy_attached": bool(model_policy_attached),
 			"prompt_injection_detected": bool(prompt_injection_detected),
 			"unsafe_answer_detected": bool(unsafe_answer_detected),
+			"upstream_review_pending": retrieval.status == "pending_review",
 			"review_recorded": bool(review_recorded),
 		})
-		self._raise_if_review_required(result, review_recorded)
+		self._raise_if_denied(result)
 		for citation in citations:
 			self.attach_citation(
 				citation_id=f"{answer_id}:{citation.get('chunk_id', len(self._audit_events))}",
@@ -293,7 +319,7 @@ class RagnService:
 			id=answer_id,
 			tenant_id=tenant_id,
 			kind="answer",
-			status="generated",
+			status=self._status_after_review(result, "generated"),
 			metadata={
 				"retrieval_id": retrieval_id,
 				"query": query,
@@ -301,6 +327,7 @@ class RagnService:
 				"citation_count": len(citations),
 				"model_location": model_location,
 			},
+			**self._policy_fields(result, review_recorded),
 		)
 		self._answers[answer_id] = record
 		self._audit(tenant_id, answer_id, "answer_generated", retrieval_id, result)
@@ -326,13 +353,14 @@ class RagnService:
 			"turn_count": turn_count,
 			"review_recorded": bool(review_recorded),
 		})
-		self._raise_if_review_required(result, review_recorded)
+		self._raise_if_denied(result)
 		record = RagnRecord(
 			id=turn_id,
 			tenant_id=tenant_id,
 			kind="conversation_turn",
-			status="recorded",
+			status=self._status_after_review(result, "recorded"),
 			metadata={"conversation_id": conversation_id, "user_id": user_id, "query": query, "answer_id": answer_id, "turn_count": turn_count},
+			**self._policy_fields(result, review_recorded),
 		)
 		self._conversations[turn_id] = record
 		self._audit(tenant_id, turn_id, "conversation_turn_recorded", user_id, result)
@@ -353,6 +381,7 @@ class RagnService:
 			kind="citation",
 			status="attached",
 			metadata={"source_id": source_id, "document_id": document_id, "chunk_id": chunk_id},
+			**self._policy_fields(result),
 		)
 		self._audit(tenant_id, citation_id, "citation_attached", document_id, result)
 		return record.to_dict()
@@ -373,6 +402,7 @@ class RagnService:
 			kind="curation",
 			status=decision,
 			metadata={"answer_id": answer_id, "curator": curator, "decision": decision, "evidence": evidence},
+			**self._policy_fields(result),
 		)
 		self._curations[curation_id] = record
 		self._audit(tenant_id, curation_id, "answer_curated", curator, result)
@@ -434,6 +464,7 @@ class RagnService:
 			contribution_disclosed=bool(contribution_disclosed),
 			human_approval_required=bool(human_approval_required),
 			status=status,
+			**self._policy_fields(result, human_approval_required),
 		)
 		self._rag_agents[self._tenant_record_key(tenant_id, record.id)] = record
 		self._audit(tenant_id, record.id, "rag_agent_registered", owner, result)
@@ -469,6 +500,8 @@ class RagnService:
 			accepted=accepted,
 			decision=result["decision"],
 			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=tuple(self._review_reasons(result)),
+			audit_evidence=self._audit_evidence(result),
 			status="accepted" if accepted else "denied",
 		)
 		self._lifecycle_batches[self._tenant_record_key(tenant_id, record.id)] = record
@@ -507,10 +540,26 @@ class RagnService:
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events, tenant_id)
 
+	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return [
+			item
+			for item in (
+				self.list_documents(tenant_id)
+				+ self.list_retrievals(tenant_id)
+				+ self.list_answers(tenant_id)
+				+ self.list_conversations(tenant_id)
+				+ self.list_curations(tenant_id)
+				+ self.list_rag_agents(tenant_id)
+				+ self.list_lifecycle_batches(tenant_id)
+			)
+			if item["status"] == "pending_review"
+		]
+
 	def dashboard_summary(self, tenant_id: str | None = "default") -> dict[str, Any]:
 		kbs = self.list_knowledge_bases(tenant_id)
 		documents = self.list_documents(tenant_id)
 		answers = self.list_answers(tenant_id)
+		pending_reviews = self.list_pending_reviews(tenant_id)
 		return {
 			"tenant_id": tenant_id,
 			"knowledge_base_count": len(kbs),
@@ -520,6 +569,11 @@ class RagnService:
 			"conversation_turn_count": len(self.list_conversations(tenant_id)),
 			"curation_count": len(self.list_curations(tenant_id)),
 			"rag_agent_count": len(self.list_rag_agents(tenant_id)),
+			"pending_review_count": len(pending_reviews),
+			"pending_document_review_count": len([item for item in documents if item["status"] == "pending_review"]),
+			"pending_retrieval_review_count": len([item for item in self.list_retrievals(tenant_id) if item["status"] == "pending_review"]),
+			"pending_answer_review_count": len([item for item in answers if item["status"] == "pending_review"]),
+			"pending_conversation_review_count": len([item for item in self.list_conversations(tenant_id) if item["status"] == "pending_review"]),
 			"pending_agent_review_count": len([item for item in self.list_rag_agents(tenant_id) if item["status"] == "pending_review"]),
 			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
 			"denied_lifecycle_batch_count": len([item for item in self.list_lifecycle_batches(tenant_id) if item["status"] == "denied"]),
@@ -539,6 +593,7 @@ class RagnService:
 			"curations": self.list_curations(tenant_id),
 			"rag_agents": self.list_rag_agents(tenant_id),
 			"lifecycle_batches": self.list_lifecycle_batches(tenant_id),
+			"pending_reviews": self.list_pending_reviews(tenant_id),
 			"audit_events": self.list_audit_events(tenant_id),
 			"summary": self.dashboard_summary(tenant_id),
 		}
@@ -547,10 +602,29 @@ class RagnService:
 		if result["decision"] == "deny":
 			raise PermissionError(", ".join(self._reasons(result)) or "ragn_policy_blocked")
 
-	def _raise_if_review_required(self, result: dict[str, Any], review_recorded: bool) -> None:
-		self._raise_if_denied(result)
-		if result["decision"] == "require_review" and not review_recorded:
-			raise PermissionError(", ".join(self._reasons(result)) or "ragn_review_required")
+	def _status_after_review(self, result: dict[str, Any], accepted_status: str) -> str:
+		if result["decision"] == "require_review":
+			return "pending_review"
+		return accepted_status
+
+	def _policy_fields(self, result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+		return {
+			"decision": result["decision"],
+			"matched_rules": tuple(result["matched_rules"]),
+			"review_reasons": tuple(self._review_reasons(result)),
+			"audit_evidence": self._audit_evidence(result, review_recorded),
+		}
+
+	def _audit_evidence(self, result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+		return {
+			"required_actions": [
+				action["required_action"]
+				for action in result.get("actions", ())
+				if action.get("required_action")
+			],
+			"reasons": list(self._reasons(result)),
+			"review_recorded": bool(review_recorded),
+		}
 
 	def _require_record(self, records: dict[str, RagnRecord], record_id: str, tenant_id: str, reason: str) -> RagnRecord:
 		record = records.get(record_id)
@@ -565,7 +639,14 @@ class RagnService:
 			tenant_id=tenant_id,
 			kind="audit_event",
 			status=result["decision"],
-			metadata={"subject_id": subject_id, "event_type": event_type, "actor": actor, "reasons": self._reasons(result)},
+			metadata={
+				"subject_id": subject_id,
+				"event_type": event_type,
+				"actor": actor,
+				"reasons": self._reasons(result),
+				"matched_rules": tuple(result["matched_rules"]),
+			},
+			**self._policy_fields(result),
 		)
 
 	def _list(self, records: dict[str, Any], tenant_id: str | None = None) -> list[dict[str, Any]]:
@@ -576,6 +657,11 @@ class RagnService:
 
 	def _reasons(self, result: dict[str, Any]) -> tuple[str, ...]:
 		return tuple(action.get("reason", "ragn_policy_blocked") for action in result.get("actions", ()))
+
+	def _review_reasons(self, result: dict[str, Any]) -> tuple[str, ...]:
+		if result["decision"] != "require_review":
+			return ()
+		return self._reasons(result)
 
 	def _tenant_record_key(self, tenant_id: str, record_id: str) -> str:
 		return f"{tenant_id}:{record_id}"
