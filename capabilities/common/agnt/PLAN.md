@@ -15,10 +15,13 @@ invoke fast-changing providers.
 
 Deliver a focused lifecycle packet:
 
+- persist review-required runtime approvals and side-effecting execution runs
+  with matched rules, review reasons, and audit evidence;
 - add an `AgentExecutionRun` runtime model;
 - add contract rules requiring requester identity, trace sink, and human
   approval for side-effecting runs;
 - expose run recording and listing from service and API helpers;
+- expose pending-review queues from service, API helpers, and view models;
 - surface runs in dashboard, governance evidence, analytics, audit trail, and a
   dedicated run-console view model;
 - keep run records provider-neutral by storing plan snapshots and trace sink
@@ -80,5 +83,7 @@ Deliver a focused lifecycle packet:
   side-effect approval evidence when side effects are requested.
 - Execution run records store plan snapshots and audit events without invoking
   live provider adapters.
+- Runtime approval and side-effect run records preserve review evidence after
+  the human decision is recorded.
 - Provider SDKs and live execution remain adapter boundaries, not package
   dependencies.

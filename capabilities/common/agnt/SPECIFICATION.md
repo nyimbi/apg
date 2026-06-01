@@ -52,6 +52,11 @@ AGNT owns these records:
 - `AgentAuditEvent`: tenant-scoped evidence for runtime, agent, team, plan,
   run, and approval lifecycle changes.
 
+Review-required AGNT outcomes are durable. Pending external runtime approvals
+and side-effecting execution runs expose policy evidence fields:
+`policy_decision` or `decision`, `matched_rules`, `review_reasons`, and
+`audit_evidence`.
+
 ## Lifecycle
 
 The primary lifecycle is:
@@ -67,8 +72,10 @@ The primary lifecycle is:
 7. Record provider-neutral execution runs with requester identity, trace sink,
    side-effect approval evidence, status, and a plan snapshot before adapters
    invoke external providers.
-8. Validate Bytewax-backed batch agent mutation metadata.
-9. Expose operational view models for registry, team builder, runtime manager,
+8. Preserve side-effecting runs without human approval as `pending_review`
+   records that generated applications can route to approval queues.
+9. Validate Bytewax-backed batch agent mutation metadata.
+10. Expose operational view models for registry, team builder, runtime manager,
    approval queue, execution trace, execution-run console, audit trail,
    analytics, settings, and governance evidence.
 
@@ -112,7 +119,8 @@ The contract rules are executable guardrails:
 
 Service methods must enforce these rules. Requesting approval is allowed for
 an external runtime; using or registering that runtime is blocked until
-approval.
+approval. Review-required paths preserve matched rules, review reasons, and
+required actions so generated applications can inspect why approval is needed.
 
 ## UI And Theme
 

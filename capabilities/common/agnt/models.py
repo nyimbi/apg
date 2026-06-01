@@ -150,6 +150,10 @@ class AgentExecutionRun:
 	status: str = "planned"
 	side_effects_requested: bool = False
 	human_approval_recorded: bool = False
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	plan_snapshot: dict[str, Any] = field(default_factory=dict)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -164,6 +168,10 @@ class AgentExecutionRun:
 			"status": self.status,
 			"side_effects_requested": self.side_effects_requested,
 			"human_approval_recorded": self.human_approval_recorded,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"plan_snapshot": dict(self.plan_snapshot),
 		}
 
@@ -182,6 +190,10 @@ class RuntimeApprovalRequest:
 	capabilities: tuple[str, ...] = ()
 	cost_limit: float | None = None
 	decision: str = "pending"
+	policy_decision: str = "require_review"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	reviewer: str | None = None
 	notes: str | None = None
 
@@ -197,6 +209,10 @@ class RuntimeApprovalRequest:
 			"capabilities": list(self.capabilities),
 			"cost_limit": self.cost_limit,
 			"decision": self.decision,
+			"policy_decision": self.policy_decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"reviewer": self.reviewer,
 			"notes": self.notes,
 		}
@@ -212,6 +228,10 @@ class AgentAuditEvent:
 	subject_id: str
 	message: str
 	evidence: dict[str, Any] = field(default_factory=dict)
+	policy_decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 
 	def to_dict(self) -> dict[str, Any]:
 		return {
@@ -221,4 +241,8 @@ class AgentAuditEvent:
 			"subject_id": self.subject_id,
 			"message": self.message,
 			"evidence": dict(self.evidence),
+			"policy_decision": self.policy_decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 		}

@@ -46,3 +46,4 @@ def test_package_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "agnt" in model["capabilities"]
+	assert model["capabilities"]["agnt"]["review_evidence"]["durable_status"] == "pending_review"

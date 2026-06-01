@@ -23,6 +23,7 @@ def dashboard_model(
 		"execution_runs": service.list_execution_runs(tenant_id),
 		"runtimes": service.list_runtimes(tenant_id),
 		"runtime_approvals": service.list_runtime_approvals(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"routes": capability_routes(tenant_id),
 		"streaming": contract["streaming"],
@@ -63,6 +64,10 @@ def runtime_approval_queue_model(
 			request for request in service.list_runtime_approvals(tenant_id)
 			if request["decision"] == "pending"
 		],
+		"pending_reviews": [
+			request for request in service.list_pending_reviews(tenant_id)
+			if request.get("runtime_name")
+		],
 		"decided_requests": [
 			request for request in service.list_runtime_approvals(tenant_id)
 			if request["decision"] != "pending"
@@ -81,6 +86,7 @@ def governance_evidence_model(
 		"summary": service.composition_summary(tenant_id),
 		"runtime_approvals": service.list_runtime_approvals(tenant_id),
 		"execution_runs": service.list_execution_runs(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 	}
 
@@ -115,6 +121,7 @@ def analytics_model(
 		"agents_per_team": _safe_ratio(summary["agent_count"], summary["team_count"]),
 		"approval_density": _safe_ratio(summary["runtime_approval_count"], summary["runtime_count"]),
 		"runs_per_team": _safe_ratio(summary["execution_run_count"], summary["team_count"]),
+		"pending_review_count": summary["pending_review_count"],
 		"audit_events_per_agent": _safe_ratio(summary["audit_event_count"], summary["agent_count"]),
 	}
 
@@ -146,6 +153,10 @@ def execution_run_console_model(
 	service = service or AgntService()
 	return {
 		"execution_runs": service.list_execution_runs(tenant_id),
+		"pending_reviews": [
+			run for run in service.list_execution_runs(tenant_id)
+			if run["status"] == "pending_review"
+		],
 		"actions": ["record_run", "review_side_effects", "attach_trace"],
 		"required_fields": ["team_id", "objective", "requested_by", "trace_sink"],
 		"status_values": ["planned", "running", "completed", "failed", "cancelled"],

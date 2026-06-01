@@ -52,7 +52,9 @@ def test_registration_includes_full_agent_capability_contract():
 	assert "runtime_adapters" in registration["capabilities"]
 	assert "runtime_approval_governance" in registration["capabilities"]
 	assert "execution_runs" in registration["capabilities"]
+	assert "review_evidence" in registration["capabilities"]
 	assert registration["ui_components"]["runs"] == "/agnt/runs"
+	assert registration["endpoints"]["pending_reviews"] == "/agnt/api/v1/pending-reviews"
 
 
 def test_service_registers_agents_teams_and_execution_plans():
@@ -125,17 +127,16 @@ def test_service_records_governed_execution_runs():
 			requested_by="platform-owner",
 			trace_sink="",
 		)
-	with pytest.raises(PermissionError, match="execution_side_effect_approval_required"):
-		service.record_execution_run(
-			run_id="run-side-effect",
-			tenant_id="tenant-agnt-run",
-			team_id="run-team",
-			objective="Push changes.",
-			requested_by="platform-owner",
-			trace_sink="audl",
-			side_effects_requested=True,
-			human_approval_recorded=False,
-		)
+	pending_run = service.record_execution_run(
+		run_id="run-side-effect",
+		tenant_id="tenant-agnt-run",
+		team_id="run-team",
+		objective="Push changes.",
+		requested_by="platform-owner",
+		trace_sink="audl",
+		side_effects_requested=True,
+		human_approval_recorded=False,
+	)
 
 	run = service.record_execution_run(
 		run_id="run-1",
@@ -153,9 +154,17 @@ def test_service_records_governed_execution_runs():
 
 	assert run["plan_snapshot"]["runtime_assignments"] == {"runner": "codex"}
 	assert run["trace_sink"] == "audl"
+	assert pending_run["status"] == "pending_review"
+	assert pending_run["decision"] == "require_review"
+	assert pending_run["matched_rules"] == ["execution_side_effect_requires_human_approval"]
+	assert pending_run["review_reasons"] == ["execution_side_effect_approval_required"]
+	assert pending_run["audit_evidence"]["required_actions"] == ["record_human_execution_approval"]
+	assert console["pending_reviews"][0]["id"] == "run-side-effect"
 	assert console["execution_runs"][0]["id"] == "run-1"
-	assert evidence["summary"]["execution_run_count"] == 1
-	assert analytics["runs_per_team"] == 1.0
+	assert evidence["summary"]["execution_run_count"] == 2
+	assert evidence["summary"]["pending_execution_run_review_count"] == 1
+	assert evidence["pending_reviews"][0]["id"] == "run-side-effect"
+	assert analytics["runs_per_team"] == 2.0
 	assert "execution_run_recorded" in {event["event_type"] for event in evidence["audit_events"]}
 
 
@@ -217,7 +226,12 @@ def test_external_runtime_approval_lifecycle_enables_new_provider():
 	queue = views.runtime_approval_queue_model(service, "tenant-agnt")
 
 	assert request["decision"] == "pending"
+	assert request["policy_decision"] == "require_review"
+	assert request["matched_rules"] == ["external_runtime_requires_approval"]
+	assert request["review_reasons"] == ["external_runtime_approval_required"]
+	assert request["audit_evidence"]["required_actions"] == ["review_external_runtime"]
 	assert queue["pending_requests"][0]["runtime_name"] == "future_agent"
+	assert queue["pending_reviews"][0]["id"] == "runtime-request-1"
 
 	with pytest.raises(PermissionError, match="external_runtime_approval_required"):
 		service.register_runtime(
@@ -259,8 +273,10 @@ def test_external_runtime_approval_lifecycle_enables_new_provider():
 	evidence = views.governance_evidence_model(service, "tenant-agnt")
 
 	assert decision["decision"] == "approved"
+	assert decision["review_reasons"] == ["external_runtime_approval_required"]
 	assert plan["runtime_assignments"] == {"future-builder": "future_agent"}
 	assert evidence["summary"]["runtime_approval_count"] == 1
+	assert evidence["summary"]["pending_review_count"] == 0
 	assert {event["event_type"] for event in evidence["audit_events"]} >= {
 		"runtime_approval_requested",
 		"runtime_approval_decided",
@@ -310,6 +326,7 @@ def test_runtime_approval_blocks_missing_sandbox_rejections_and_tenant_mismatch(
 	)
 
 	assert decision["decision"] == "rejected"
+	assert decision["audit_evidence"]["reasons"] == ["external_runtime_approval_required"]
 	assert "rejected_agent" not in {runtime["name"] for runtime in service.list_runtimes()}
 
 
@@ -426,3 +443,4 @@ def test_api_helpers_expose_execution_run_lifecycle():
 
 	assert run["requested_by"] == "api-owner"
 	assert api.list_execution_runs(tenant_id)[0]["id"] == "api-run-1"
+	assert api.list_pending_reviews(tenant_id) == []

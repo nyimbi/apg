@@ -16,6 +16,68 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-06-01 05:33 EAT
+
+AGNT review-evidence lifecycle packet:
+
+- Extended runtime approval, execution run, and audit event records with
+  durable policy evidence fields: policy decision or decision, matched rules,
+  review reasons, and audit evidence.
+- Changed side-effecting execution runs without human approval to persist
+  `pending_review` records while keeping hard deny paths for missing requester,
+  missing trace sink, unsafe runtime registration, tenant violations, and
+  non-Bytewax batch metadata.
+- Added pending-review queues to AGNT dashboard, runtime approval queue,
+  execution-run console, governance evidence, analytics, API helper,
+  registration, package, and semantic model surfaces.
+- Preserved external runtime approval evidence across approve/reject decisions
+  so generated applications can show why Codex, Claude Code, OpenCode, Pi, or
+  future runtime providers required review.
+- Updated focused AGNT tests and package contract tests to prove durable
+  runtime and execution-run review evidence.
+- Updated AGNT README, specification, plan, and capability pointer to document
+  the review queue lifecycle and deny/review distinction.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for AGNT modules and tests passed.
+- `./.venv/bin/pytest -q capabilities/common/agnt/test_capability_contract.py
+  capabilities/common/agnt/tests/test_package_contract.py` passed with 14
+  tests and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.agnt import app; ..."`
+  passed package self-test.
+- `./.venv/bin/python -m json.tool
+  capabilities/common/agnt/semantic_model.json` passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/agnt --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/agnt --strict --json` passed with no warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/agnt --json`
+  passed with no warnings and side-effect-free publish planning.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/common/agnt --json` passed with complete lifecycle evidence and
+  22 rules.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed with 109 operable contracts/packages and no warnings or errors.
+- Service smoke executed runtime approval -> agent -> team -> side-effecting
+  execution run and printed `pending require_review pending_review 2`.
+- AGNT stale-marker scan returned no TODO/FIXME/placeholder/stub/baseline,
+  Kafka, or not-implemented markers across the edited AGNT packet.
+- `git diff --check -- capabilities/common/agnt docs/progress_log.md` passed.
+- Inline code review found no blocking issues; residual risks remain around
+  rendered UI, live provider adapters, durable Bytewax topology, external agent
+  CLI clients, approval workflow integration, and execution quality evaluation.
+
+Known gaps:
+
+- Full repository tests, rendered browser UI checks, live Codex/Claude
+  Code/OpenCode/Pi adapters, live shell/browser/IDE tool execution, durable
+  memory/vector stores, billing providers, live Bytewax workers, live
+  AICR/SBOX/AUDL/WFLO adapters, load checks, migrations, and agent execution
+  quality benchmarks still need later verification outside this
+  battery-conscious slice.
+
 ### 2026-06-01 05:23 EAT
 
 AICR review-evidence lifecycle packet:

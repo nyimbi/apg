@@ -12,7 +12,7 @@ AGNT lets applications register approved agent runtimes, request approval for
 new external runtimes, declare agents with model/tool/prompt/memory/IO
 contracts, compose tenant-owned teams, validate handoff graphs, build
 deterministic execution plans, record governed execution runs, and preserve
-audit evidence.
+review and audit evidence.
 
 The package does not invoke provider CLIs or SDKs. Codex, Claude Code,
 OpenCode, Pi, local shell/browser/IDE tools, memory stores, billing providers,
@@ -45,8 +45,10 @@ capability packet.
 6. Build deterministic execution plans for concrete objectives.
 7. Record execution runs with requester identity, trace sink, status,
    side-effect approval evidence, and plan snapshot.
-8. Validate Bytewax-backed batch agent mutation metadata.
-9. Compose AGNT screens, rules, theme, state, and Bytewax lifecycle metadata
+8. Persist runtime and execution-run review queues with matched rules, review
+   reasons, and required actions.
+9. Validate Bytewax-backed batch agent mutation metadata.
+10. Compose AGNT screens, rules, theme, state, and Bytewax lifecycle metadata
    into larger generated APG applications.
 
 ## Guardrails
@@ -72,6 +74,12 @@ adapter invokes a provider. The run stores a plan snapshot, requester, trace
 sink, status, and side-effect approval state. This lets APG compose Codex,
 Claude Code, OpenCode, Pi, local agents, or future providers without binding
 the core package to one changing SDK or CLI.
+
+Side-effecting runs without human approval are stored as `pending_review`
+records with `decision`, `matched_rules`, `review_reasons`, and
+`audit_evidence`. Runtime approval requests preserve the same policy evidence
+with `policy_decision` so generated applications can render approval queues
+without re-evaluating rules.
 
 ## Bytewax Composition
 

@@ -106,6 +106,21 @@
         "sbox",
         "audl"
       ],
+      "review_evidence": {
+        "deny_behavior": "PermissionError for hard deny decisions only",
+        "durable_status": "pending_review",
+        "pending_queues": [
+          "runtime_approvals",
+          "execution_runs"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "decision",
+          "matched_rules",
+          "review_reasons",
+          "audit_evidence"
+        ]
+      },
       "rule_engine": {
         "rules": [
           {
@@ -1017,7 +1032,22 @@
         "aicr",
         "sbox",
         "audl"
-      ]
+      ],
+      "review_evidence": {
+        "deny_behavior": "PermissionError for hard deny decisions only",
+        "durable_status": "pending_review",
+        "pending_queues": [
+          "runtime_approvals",
+          "execution_runs"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "decision",
+          "matched_rules",
+          "review_reasons",
+          "audit_evidence"
+        ]
+      }
     }
   },
   "deployment": {

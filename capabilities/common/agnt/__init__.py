@@ -52,10 +52,11 @@ def register_capability() -> dict[str, Any]:
 			"handoff_graphs": "Validate agent-to-agent flow edges before execution",
 			"execution_plans": "Build deterministic execution plans with runtime assignments, handoffs, cost limits, and approval evidence",
 			"execution_runs": "Record provider-neutral execution run requests with trace sinks and side-effect approval evidence",
+			"review_evidence": "Persist review-required runtime approvals and side-effecting execution runs with policy evidence",
 			"capability_rules": "Evaluate deterministic agent-composition governance rules",
 			"visual_theming": "Apply AI-agent operations theme tokens and components"
 		},
-		"endpoints": {"agents": "/agnt/api/v1/agents", "teams": "/agnt/api/v1/teams", "runtimes": "/agnt/api/v1/runtimes", "runtime_approvals": "/agnt/api/v1/runtime-approvals", "executions": "/agnt/api/v1/executions", "runs": "/agnt/api/v1/runs", "memory": "/agnt/api/v1/memory", "audit": "/agnt/api/v1/audit"},
+		"endpoints": {"agents": "/agnt/api/v1/agents", "teams": "/agnt/api/v1/teams", "runtimes": "/agnt/api/v1/runtimes", "runtime_approvals": "/agnt/api/v1/runtime-approvals", "pending_reviews": "/agnt/api/v1/pending-reviews", "executions": "/agnt/api/v1/executions", "runs": "/agnt/api/v1/runs", "memory": "/agnt/api/v1/memory", "audit": "/agnt/api/v1/audit"},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],

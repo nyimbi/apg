@@ -108,6 +108,16 @@ class AgntService:
 			raise ValueError("runtime_name is required")
 		if not requested_by:
 			raise ValueError("requested_by is required")
+		review_result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_runtime",
+			"runtime_registered": True,
+			"workspace_runtime": workspace_runtime,
+			"sandbox_policy_attached": bool(sandbox_policy),
+			"external_runtime": True,
+			"approval_recorded": False,
+			"cost_limit_present": True,
+		})
 		request = RuntimeApprovalRequest(
 			id=request_id,
 			tenant_id=tenant_id,
@@ -118,6 +128,10 @@ class AgntService:
 			sandbox_policy=sandbox_policy,
 			capabilities=tuple(capabilities or ()),
 			cost_limit=cost_limit,
+			policy_decision=review_result["decision"],
+			matched_rules=list(review_result["matched_rules"]),
+			review_reasons=self._review_reasons(review_result),
+			audit_evidence=self._audit_evidence(review_result),
 		)
 		key = self._key(tenant_id, request_id)
 		if key in self._runtime_approvals:
@@ -129,6 +143,7 @@ class AgntService:
 			subject_id=request_id,
 			message=f"Requested approval for external runtime {runtime_name}.",
 			evidence={"runtime_name": runtime_name, "requested_by": requested_by},
+			policy_result=review_result,
 		)
 		return request.to_dict()
 
@@ -159,6 +174,10 @@ class AgntService:
 			capabilities=request.capabilities,
 			cost_limit=request.cost_limit,
 			decision=decision,
+			policy_decision=request.policy_decision,
+			matched_rules=list(request.matched_rules),
+			review_reasons=list(request.review_reasons),
+			audit_evidence=dict(request.audit_evidence),
 			reviewer=reviewer,
 			notes=notes,
 		)
@@ -181,6 +200,17 @@ class AgntService:
 			subject_id=request_id,
 			message=f"Runtime approval {request_id} was {decision}.",
 			evidence={"runtime_name": request.runtime_name, "reviewer": reviewer},
+			policy_result={
+				"decision": request.policy_decision,
+				"matched_rules": list(request.matched_rules),
+				"actions": [
+					{"reason": reason, "required_action": action}
+					for reason, action in zip(
+						request.audit_evidence.get("reasons", []),
+						request.audit_evidence.get("required_actions", []),
+					)
+				],
+			},
 		)
 		return decided.to_dict()
 
@@ -346,7 +376,7 @@ class AgntService:
 		human_approval_recorded: bool = False,
 		status: str = "planned",
 	) -> dict[str, Any]:
-		self._enforce_execution_run_policy(
+		result = self._enforce_execution_run_policy(
 			tenant_id=tenant_id,
 			requester_present=bool(requested_by),
 			trace_sink_present=bool(trace_sink),
@@ -367,9 +397,13 @@ class AgntService:
 			objective=objective,
 			requested_by=requested_by,
 			trace_sink=trace_sink,
-			status=status,
+			status="pending_review" if result["decision"] == "require_review" else status,
 			side_effects_requested=side_effects_requested,
 			human_approval_recorded=human_approval_recorded,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._review_reasons(result),
+			audit_evidence=self._audit_evidence(result, human_approval_recorded),
 			plan_snapshot=plan,
 		)
 		self._execution_runs[key] = run
@@ -386,6 +420,7 @@ class AgntService:
 				"side_effects_requested": side_effects_requested,
 				"human_approval_recorded": human_approval_recorded,
 			},
+			policy_result=result,
 		)
 		return run.to_dict()
 
@@ -395,8 +430,19 @@ class AgntService:
 			runs = [run for run in runs if run.tenant_id == tenant_id]
 		return [run.to_dict() for run in sorted(runs, key=lambda item: item.id)]
 
+	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return [
+			item
+			for item in (
+				self.list_runtime_approvals(tenant_id)
+				+ self.list_execution_runs(tenant_id)
+			)
+			if item.get("decision") == "pending" or item.get("status") == "pending_review"
+		]
+
 	def composition_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		contract = self.describe(tenant_id)
+		pending_reviews = self.list_pending_reviews(tenant_id)
 		return {
 			"capability": contract["capability"],
 			"display_name": contract["display_name"],
@@ -406,6 +452,15 @@ class AgntService:
 			"execution_run_count": len(self.list_execution_runs(tenant_id)),
 			"runtime_count": len(self.list_runtimes(tenant_id)),
 			"runtime_approval_count": len(self.list_runtime_approvals(tenant_id)),
+			"pending_review_count": len(pending_reviews),
+			"pending_runtime_review_count": len([
+				request for request in self.list_runtime_approvals(tenant_id)
+				if request["decision"] == "pending"
+			]),
+			"pending_execution_run_review_count": len([
+				run for run in self.list_execution_runs(tenant_id)
+				if run["status"] == "pending_review"
+			]),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 			"routes": contract["ui"]["routes"],
 			"theme": contract["theme"],
@@ -483,7 +538,7 @@ class AgntService:
 		trace_sink_present: bool,
 		side_effects_requested: bool,
 		human_approval_recorded: bool,
-	) -> None:
+	) -> dict[str, Any]:
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
 			"operation": "record_execution_run",
@@ -492,7 +547,9 @@ class AgntService:
 			"side_effects_requested": side_effects_requested,
 			"human_approval_recorded": human_approval_recorded,
 		})
-		_raise_if_blocked(result)
+		if result["decision"] == "deny":
+			_raise_if_blocked(result)
+		return result
 
 	def _enforce_team_policy(
 		self,
@@ -565,7 +622,9 @@ class AgntService:
 		subject_id: str,
 		message: str,
 		evidence: dict[str, Any] | None = None,
+		policy_result: dict[str, Any] | None = None,
 	) -> None:
+		policy_result = policy_result or {"decision": "allow", "matched_rules": [], "actions": []}
 		self._events.append(
 			AgentAuditEvent(
 				id=f"agnt-event-{len(self._events) + 1}",
@@ -574,8 +633,34 @@ class AgntService:
 				subject_id=subject_id,
 				message=message,
 				evidence=dict(evidence or {}),
+				policy_decision=policy_result["decision"],
+				matched_rules=list(policy_result["matched_rules"]),
+				review_reasons=self._review_reasons(policy_result),
+				audit_evidence=self._audit_evidence(policy_result),
 			)
 		)
+
+	def _review_reasons(self, result: dict[str, Any]) -> list[str]:
+		if result["decision"] != "require_review":
+			return []
+		return [
+			action.get("reason", "agent_composition_review_required")
+			for action in result.get("actions", [])
+		]
+
+	def _audit_evidence(self, result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+		return {
+			"required_actions": [
+				action["required_action"]
+				for action in result.get("actions", [])
+				if action.get("required_action")
+			],
+			"reasons": [
+				action.get("reason", "agent_composition_policy_blocked")
+				for action in result.get("actions", [])
+			],
+			"review_recorded": bool(review_recorded),
+		}
 
 
 def _default_runtimes() -> tuple[AgentRuntime, ...]:

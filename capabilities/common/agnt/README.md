@@ -26,6 +26,8 @@ handoffs, and tenant boundaries.
   handoff targets, approval evidence, and estimated cost limits.
 - Provider-neutral execution run records with requester identity, trace sink,
   side-effect approval evidence, status, and plan snapshots.
+- Durable review evidence for pending runtime approvals and side-effecting
+  execution runs, including matched rules, review reasons, and audit evidence.
 - Tenant-safe runtime, agent, team, approval, and event stores.
 - Bytewax lifecycle stream metadata for batch agent mutation and generated app
   composition.
@@ -123,6 +125,24 @@ run = service.record_execution_run(
 assert run["plan_snapshot"]["team_id"] == team["id"]
 ```
 
+Side-effecting runs without recorded human approval are accepted as
+`pending_review` records instead of invoking a provider adapter:
+
+```python
+pending = service.record_execution_run(
+    run_id="delivery-run-review",
+    tenant_id="tenant-a",
+    team_id=team["id"],
+    objective="Push generated changes.",
+    requested_by="platform-owner",
+    trace_sink="audl",
+    side_effects_requested=True,
+)
+
+assert pending["status"] == "pending_review"
+assert pending["review_reasons"] == ["execution_side_effect_approval_required"]
+```
+
 ## Composition Contract
 
 `get_capability_contract()` returns the executable APG contract:
@@ -139,6 +159,10 @@ assert run["plan_snapshot"]["team_id"] == team["id"]
 - `theme`: AI-agent operations tokens and component metadata.
 - `streaming`: Bytewax processor, topic, state collections, lifecycle events,
   and batch mutation guardrail.
+
+Generated applications can call `list_pending_reviews()` or use dashboard,
+approval queue, run console, governance, and analytics view models to compose
+runtime and execution-run review queues without losing policy context.
 
 ## Verification
 
