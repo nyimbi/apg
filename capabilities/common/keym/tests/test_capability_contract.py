@@ -63,6 +63,16 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["agents"]["first_class"] is True
 	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
 	assert contract["streaming"]["engine"] == "bytewax"
+	assert "review_evidence" in contract["provides"]
+	assert contract["review_evidence"]["pending_queues"] == [
+		"operations",
+		"export_approvals",
+		"rotation_exceptions",
+		"rotations",
+		"key_agents",
+		"key_lifecycle_batches",
+	]
+	assert "policy_decision" in contract["review_evidence"]["policy_fields"]
 
 
 def test_rule_engine_enforces_key_governance_guardrails():
@@ -129,7 +139,8 @@ def test_rule_engine_enforces_key_governance_guardrails():
 def test_rule_engine_enforces_review_and_rotation_guardrails(context, reason):
 	result = evaluate_capability_rules(context)
 
-	assert result["decision"] == "deny"
+	expected_decision = "require_review" if reason == "key_agent_privileged_role_requires_human_approval" else "deny"
+	assert result["decision"] == expected_decision
 	assert result["actions"][0]["reason"] == reason
 
 
@@ -146,6 +157,7 @@ def test_registration_includes_full_capability_contract():
 	assert registration["ui_components"]["agents"] == "/keym/agents"
 	assert registration["agents"]["first_class"] is True
 	assert registration["streaming"]["engine"] == "bytewax"
+	assert registration["review_evidence"]["deny_behavior"] == "Denied key lifecycle batches persist evidence before PermissionError"
 	assert "secu" in registration["dependencies"]
 	assert "keym.approve_export" in registration["permissions"]
 	assert "keym.respond_compromise" in registration["permissions"]

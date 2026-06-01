@@ -61,6 +61,7 @@ def semantic_model() -> dict[str, Any]:
 				"screens": routes,
 				"theme": contract["theme"],
 				"agents": contract["agents"],
+				"review_evidence": contract["review_evidence"],
 				"runtime": {
 					"api": "api.py",
 					"entrypoint": "app.py",
@@ -88,6 +89,7 @@ def semantic_model() -> dict[str, Any]:
 				"requires": contract["requires"],
 				"agents": contract["agents"],
 				"streaming": contract["streaming"],
+				"review_evidence": contract["review_evidence"],
 			}
 		},
 		"rules": {
@@ -180,6 +182,10 @@ def self_test() -> dict[str, Any]:
 		errors.append("KEYM semantic model streaming manifest is stale")
 	if not agents.get("first_class"):
 		errors.append("KEYM semantic model agent manifest is stale")
+	if "review_evidence" not in model.get("capabilities", {}).get("keym", {}).get("provides", []):
+		errors.append("KEYM review evidence provide is missing")
+	if "review_evidence" not in model.get("capabilities", {}).get("keym", {}):
+		errors.append("KEYM durable review evidence is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

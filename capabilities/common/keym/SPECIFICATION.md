@@ -30,7 +30,16 @@ and package evidence.
   compromise-response, or HSM attestation workflows.
 - **Key lifecycle stream**: the Bytewax-backed event stream that must carry
   grouped key lifecycle mutations into generated APG applications.
+- **Key lifecycle batch evidence**: accepted or denied batch validation record
+  for grouped KEYM lifecycle mutations.
 - **Audit event**: package evidence for key lifecycle and guardrail events.
+
+Reviewable records expose a consistent evidence shape:
+
+- `policy_decision`
+- `matched_rules`
+- `review_reasons`
+- `review_evidence`
 
 ## Functional Requirements
 
@@ -49,9 +58,10 @@ and package evidence.
    `opencode`, or `pi`.
 10. Key agents must declare supported KEYM roles, owner, purpose, operating
     scope, and contribution disclosure.
-11. Privileged key-agent roles must require human approval.
-12. Key lifecycle batch mutations must use Bytewax and be rejected when routed
-    through any other stream engine.
+11. Privileged key-agent roles without human approval must be retained as
+    `pending_review` evidence.
+12. Key lifecycle batch mutations must use Bytewax; denied non-Bytewax
+    validations must persist evidence before raising.
 13. API helpers and UI view models must expose the package lifecycle state for
    generated APG applications.
 14. `app.py`, `semantic_model.json`, `release_report.json`, and
@@ -80,8 +90,10 @@ it with first-class key-agent composition:
 - schedule and complete rotations with evidence;
 - mark compromised keys and enforce fail-closed use denial;
 - register key agents with runtime, role, owner, purpose, scope, disclosure, and
-  privileged human-approval evidence;
+  privileged human-approval or pending-review evidence;
 - validate Bytewax key lifecycle batches before accepting grouped mutation work;
+- compose pending operation, export approval, rotation exception, rotation,
+  key-agent, and lifecycle batch reviews for generated governance consoles;
 - expose inventory, approvals, rotations, compromise, key-agent roster, audit,
   streaming metadata, and analytics view models with contract-derived semantic
   evidence.

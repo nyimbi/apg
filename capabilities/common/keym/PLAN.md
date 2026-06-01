@@ -6,7 +6,8 @@ Build one coherent lifecycle and guardrail packet for Key Management:
 tenant-managed key records, key operation decisions, export approval,
 rotation exception review, rotation completion evidence, compromise response,
 first-class key-agent composition, Bytewax lifecycle stream enforcement, UI view
-models, rule/contract evidence, tests, and publish proof.
+models, durable review evidence, rule/contract evidence, tests, and publish
+proof.
 
 ## Steps
 
@@ -16,10 +17,11 @@ models, rule/contract evidence, tests, and publish proof.
    streaming metadata, deterministic agent/stream guardrails, route metadata,
    and theme components.
 3. Extend `KeymService` with `KeymAgentRecord`, agent registration, agent
-   listing, Bytewax lifecycle batch validation, dashboard counts, and audit
-   evidence.
+   listing, durable review evidence, Bytewax lifecycle batch validation,
+   pending-review queues, dashboard counts, and audit evidence.
 4. Extend `api.py` and `view_models.py` to expose key-agent registration,
-   key-agent rosters, streaming metadata, and posture evidence.
+   key-agent rosters, streaming metadata, pending reviews, lifecycle batch
+   evidence, and posture evidence.
 5. Extend `app.py` and generated semantic evidence with contract-derived
    `provides`, `requires`, `agents`, `streaming`, dependency graph edges, and
    self-test staleness checks.
@@ -41,7 +43,8 @@ models, rule/contract evidence, tests, and publish proof.
 - Do not reactivate compromised keys without explicit rotation evidence.
 - Do not allow AI agents to operate without owner, purpose, scope, and
   contribution disclosure.
-- Do not allow privileged key-agent roles without explicit human approval.
-- Do not accept key lifecycle batch mutations from broker-specific queue or any non-Bytewax
-  stream.
+- Preserve privileged key-agent roles without explicit human approval as
+  pending-review evidence.
+- Do not accept key lifecycle batch mutations from broker-specific queue or any
+  non-Bytewax stream; preserve denied routing evidence before raising.
 - Keep live HSM/KMS/vault/blockchain/AI integrations behind adapters.

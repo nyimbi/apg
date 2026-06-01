@@ -425,14 +425,14 @@ def default_rules() -> list[CapabilityRule]:
 		),
 		CapabilityRule(
 			name="key_agent_privileged_role_requires_human_approval",
-			description="Privileged key-management agent roles require human approval.",
+			description="Privileged key-management agent roles require human approval evidence or review.",
 			condition={
 				"operation": "register_key_agent",
 				"key_agent_privileged_role": True,
 				"human_approval_required": False
 			},
 			effect={
-				"decision": "deny",
+				"decision": "require_review",
 				"reason": "key_agent_privileged_role_requires_human_approval",
 				"required_action": "require_human_key_approval"
 			}
@@ -541,7 +541,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "keym",
 		"display_name": "Key Management",
-		"provides": ["keym_operations", "key_lifecycle_governance", "key_agent_composition"],
+		"provides": ["keym_operations", "key_lifecycle_governance", "key_agent_composition", "review_evidence"],
 		"requires": ["conf", "auth", "audl", "mten", "secu"],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
@@ -556,7 +556,32 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"components": theme.components
 		},
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest()
+		"streaming": streaming_manifest(),
+		"review_evidence": {
+			"durable_statuses": [
+				"pending",
+				"pending_review",
+				"review_required",
+				"scheduled",
+				"denied",
+				"allowed",
+				"approved",
+				"rejected",
+				"completed",
+				"accepted",
+				"compromised",
+			],
+			"policy_fields": ["policy_decision", "matched_rules", "review_reasons", "review_evidence"],
+			"pending_queues": [
+				"operations",
+				"export_approvals",
+				"rotation_exceptions",
+				"rotations",
+				"key_agents",
+				"key_lifecycle_batches",
+			],
+			"deny_behavior": "Denied key lifecycle batches persist evidence before PermissionError",
+		}
 	}
 
 

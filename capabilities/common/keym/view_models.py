@@ -26,8 +26,11 @@ def dashboard_model(service: KeymService | None = None, tenant_id: str = "defaul
 		"rotation_exceptions": service.list_rotation_exceptions(tenant_id),
 		"rotations": service.list_rotations(tenant_id),
 		"key_agents": service.list_key_agents(tenant_id),
+		"key_lifecycle_batches": service.list_key_lifecycle_batches(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"theme": contract["theme"],
 	}
 
@@ -121,6 +124,10 @@ def key_agents_model(service: KeymService | None = None, tenant_id: str = "defau
 		"route": "/keym/agents",
 		"tenant_id": tenant_id,
 		"key_agents": service.list_key_agents(tenant_id),
+		"pending_reviews": [
+			agent for agent in service.list_key_agents(tenant_id)
+			if agent["status"] == "pending_review"
+		],
 		"supported_runtimes": agents["supported_runtimes"],
 		"supported_roles": agents["supported_roles"],
 		"privileged_roles": agents["privileged_roles"],
@@ -146,5 +153,6 @@ def settings_model(tenant_id: str = "default") -> dict[str, object]:
 		"configuration": contract["configuration"],
 		"agents": contract["agents"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"theme": contract["theme"],
 	}

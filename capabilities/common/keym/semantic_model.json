@@ -199,7 +199,8 @@
       "provides": [
         "keym_operations",
         "key_lifecycle_governance",
-        "key_agent_composition"
+        "key_agent_composition",
+        "review_evidence"
       ],
       "requires": [
         "conf",
@@ -208,6 +209,36 @@
         "mten",
         "secu"
       ],
+      "review_evidence": {
+        "deny_behavior": "Denied key lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "pending",
+          "pending_review",
+          "review_required",
+          "scheduled",
+          "denied",
+          "allowed",
+          "approved",
+          "rejected",
+          "completed",
+          "accepted",
+          "compromised"
+        ],
+        "pending_queues": [
+          "operations",
+          "export_approvals",
+          "rotation_exceptions",
+          "rotations",
+          "key_agents",
+          "key_lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "review_evidence"
+        ]
+      },
       "rule_engine": {
         "rules": [
           {
@@ -395,9 +426,9 @@
               "key_agent_privileged_role": true,
               "operation": "register_key_agent"
             },
-            "description": "Privileged key-management agent roles require human approval.",
+            "description": "Privileged key-management agent roles require human approval evidence or review.",
             "effect": {
-              "decision": "deny",
+              "decision": "require_review",
               "reason": "key_agent_privileged_role_requires_human_approval",
               "required_action": "require_human_key_approval"
             },
@@ -605,9 +636,9 @@
             "key_agent_privileged_role": true,
             "operation": "register_key_agent"
           },
-          "description": "Privileged key-management agent roles require human approval.",
+          "description": "Privileged key-management agent roles require human approval evidence or review.",
           "effect": {
-            "decision": "deny",
+            "decision": "require_review",
             "reason": "key_agent_privileged_role_requires_human_approval",
             "required_action": "require_human_key_approval"
           },
@@ -1080,7 +1111,8 @@
       "provides": [
         "keym_operations",
         "key_lifecycle_governance",
-        "key_agent_composition"
+        "key_agent_composition",
+        "review_evidence"
       ],
       "requires": [
         "conf",
@@ -1089,6 +1121,36 @@
         "mten",
         "secu"
       ],
+      "review_evidence": {
+        "deny_behavior": "Denied key lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "pending",
+          "pending_review",
+          "review_required",
+          "scheduled",
+          "denied",
+          "allowed",
+          "approved",
+          "rejected",
+          "completed",
+          "accepted",
+          "compromised"
+        ],
+        "pending_queues": [
+          "operations",
+          "export_approvals",
+          "rotation_exceptions",
+          "rotations",
+          "key_agents",
+          "key_lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "review_evidence"
+        ]
+      },
       "streaming": {
         "engine": "bytewax",
         "events": [
@@ -1227,9 +1289,9 @@
         "key_agent_privileged_role": true,
         "operation": "register_key_agent"
       },
-      "description": "Privileged key-management agent roles require human approval.",
+      "description": "Privileged key-management agent roles require human approval evidence or review.",
       "effect": {
-        "decision": "deny",
+        "decision": "require_review",
         "reason": "key_agent_privileged_role_requires_human_approval",
         "required_action": "require_human_key_approval"
       },

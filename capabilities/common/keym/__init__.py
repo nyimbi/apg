@@ -218,6 +218,7 @@ def register_capability() -> Dict[str, Any]:
 			"compromise_response": "Block compromised keys until rotation evidence is recorded",
 			"key_agent_composition": "Register accountable AI agents for key governance workflows",
 			"bytewax_lifecycle_streaming": "Require Bytewax for key lifecycle batch mutations",
+			"review_evidence": "Compose pending operation, export, rotation, agent, and lifecycle batch review evidence",
 			"audit_and_compliance": "Expose immutable key access audit and compliance surfaces",
 			"capability_rules": "Evaluate deterministic key-governance rules",
 			"visual_theming": "Apply vault-console theme tokens and components"
@@ -242,6 +243,7 @@ def register_capability() -> Dict[str, Any]:
 		"theme": contract["theme"],
 		"agents": contract["agents"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"permissions": CAPABILITY_METADATA["composition"]["permissions"]
 	}
 

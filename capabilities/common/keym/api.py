@@ -69,12 +69,15 @@ def capability_status(tenant_id: str = "default") -> Dict[str, Any]:
 		"key_count": summary["key_count"],
 		"operation_count": summary["operation_count"],
 		"key_agent_count": summary["key_agent_count"],
+		"pending_key_agent_review_count": summary["pending_key_agent_review_count"],
+		"key_lifecycle_batch_count": summary["key_lifecycle_batch_count"],
 		"denied_operation_count": summary["denied_operation_count"],
 		"review_required_count": summary["review_required_count"],
 		"pending_export_approval_count": summary["pending_export_approval_count"],
 		"pending_rotation_exception_count": summary["pending_rotation_exception_count"],
 		"scheduled_rotation_count": summary["scheduled_rotation_count"],
 		"compromised_key_count": summary["compromised_key_count"],
+		"pending_review_count": summary["pending_review_count"],
 	}
 
 
@@ -194,6 +197,14 @@ def validate_key_lifecycle_batch(payload: Dict[str, Any]) -> Dict[str, Any]:
 	)
 
 
+def list_key_lifecycle_batches(tenant_id: str | None = None) -> list[Dict[str, Any]]:
+	return SERVICE.list_key_lifecycle_batches(tenant_id)
+
+
+def list_pending_reviews(tenant_id: str | None = None) -> list[Dict[str, Any]]:
+	return SERVICE.list_pending_reviews(tenant_id)
+
+
 def create_record(payload: Dict[str, Any]) -> Dict[str, Any]:
 	return SERVICE.create_record(
 		record_id=str(payload["id"]),
@@ -215,6 +226,8 @@ def list_key_posture(tenant_id: str = "default") -> Dict[str, Any]:
 		"rotation_exceptions": SERVICE.list_rotation_exceptions(tenant_id),
 		"rotations": SERVICE.list_rotations(tenant_id),
 		"key_agents": SERVICE.list_key_agents(tenant_id),
+		"key_lifecycle_batches": SERVICE.list_key_lifecycle_batches(tenant_id),
+		"pending_reviews": SERVICE.list_pending_reviews(tenant_id),
 		"audit_events": SERVICE.list_audit_events(tenant_id),
 		"summary": SERVICE.dashboard_summary(tenant_id),
 	}

@@ -16,6 +16,66 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-06-01 07:52 EAT
+
+KEYM durable review-evidence packet:
+
+- Extended review-required operations, export approvals, rotation exceptions,
+  key rotations, privileged key agents, key lifecycle batch evidence, and key
+  audit events with durable policy evidence: policy decision, matched rules,
+  review reasons, and review evidence.
+- Added contract-level `review_evidence` metadata and exposed it through
+  registration metadata, API helpers, view models, semantic model, package
+  tests, and app self-test.
+- Preserved privileged key agents without human approval as `pending_review`
+  records instead of discarding registration evidence.
+- Preserved denied non-Bytewax key lifecycle batch validations as `denied`
+  evidence before raising `PermissionError`.
+- Added pending-review queue composition for operations, export approvals,
+  rotation exceptions, rotations, key agents, and key lifecycle batches.
+- Kept KEYM key agents provider-neutral for Codex, Claude Code, OpenCode, Pi,
+  and future key-governance runtimes while retaining human approval controls
+  for privileged roles and Bytewax-first lifecycle processing.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for KEYM package init, models,
+  service, API helpers, contract, app, view models, and focused tests passed.
+- `./.venv/bin/pytest -q capabilities/common/keym/tests/test_capability_contract.py
+  capabilities/common/keym/tests/test_package_contract.py` passed with 14 tests
+  and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.keym import app; ..."`
+  passed package self-test.
+- `./.venv/bin/python -m json.tool
+  capabilities/common/keym/semantic_model.json` passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/keym --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/keym --strict --json` passed with no warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/keym --json`
+  passed with no warnings and side-effect-free publish planning.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/common/keym --json` passed with complete lifecycle evidence and
+  16 rules.
+- KEYM stale-marker scan returned no TODO/FIXME/stub/placeholder, Kafka,
+  materialized-baseline, contract-only, or not-implemented markers across the
+  edited KEYM packet.
+- Service smoke executed overdue key operation review evidence, rotation
+  exception approval evidence, privileged key-agent review evidence, accepted
+  Bytewax batch evidence, and denied non-Bytewax batch persistence, printing
+  `require_review allow pending_review require_review accepted denied
+  bytewax_key_stream_required 1`.
+
+Known gaps:
+
+- Full repository tests, rendered key-management UI, live HSM/KMS/vault/cloud
+  key-store providers, blockchain audit ledgers, AI lifecycle engines,
+  security-intelligence engines, SIEM, SOAR, DLP, GRC, monitoring,
+  notification providers, live Bytewax workers, production persistence and
+  migrations, and load checks still need later verification outside this
+  battery-conscious slice.
+
 ### 2026-06-01 07:44 EAT
 
 ENCR durable review-evidence packet:

@@ -37,6 +37,8 @@ def test_contract_shape_is_valid():
 	assert len(contract["rule_engine"]["rules"]) >= 14
 	assert contract["agents"]["first_class"] is True
 	assert contract["streaming"]["engine"] == "bytewax"
+	assert "review_evidence" in contract["provides"]
+	assert contract["review_evidence"]["pending_queues"]
 	assert contract["theme"]["tokens"]["border.radius"]
 
 
@@ -64,6 +66,8 @@ def test_app_entrypoint_is_publishable():
 	assert capability["approvals"]["key_agent"] == "KeymAgentRecord"
 	assert capability["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
 	assert capability["streaming"]["engine"] == "bytewax"
+	assert "review_evidence" in capability["provides"]
+	assert capability["review_evidence"]["pending_queues"]
 
 
 def test_key_lifecycle_records_export_rotation_compromise_and_audit_state():
@@ -140,20 +144,28 @@ def test_key_lifecycle_records_export_rotation_compromise_and_audit_state():
 
 	assert use_allowed["status"] == "allowed"
 	assert export_denied["status"] == "denied"
+	assert export_denied["policy_decision"] == "deny"
 	assert approved["status"] == "approved"
+	assert approved["policy_decision"] == "allow"
 	assert export_allowed["status"] == "allowed"
 	assert overdue["status"] == "review_required"
+	assert overdue["policy_decision"] == "require_review"
 	assert exception_approved["status"] == "approved"
+	assert exception_approved["policy_decision"] == "allow"
 	assert overdue_allowed["status"] == "allowed"
 	assert completed["status"] == "completed"
+	assert completed["policy_decision"] == "allow"
 	assert compromised["status"] == "compromised"
 	assert compromised_denied["status"] == "denied"
 	assert agent["runtime"] == "opencode"
 	assert agent["role"] == "compromise_responder"
 	assert batch["event_stream"] == "bytewax"
 	assert batch["accepted"] is True
+	assert batch["status"] == "accepted"
 	assert summary["key_count"] == 2
 	assert summary["key_agent_count"] == 1
+	assert summary["key_lifecycle_batch_count"] == 1
+	assert summary["pending_review_count"] == 0
 	assert summary["compromised_key_count"] == 1
 	assert {event["event_type"] for event in service.list_audit_events("tenant-a")} >= {
 		"managed_key_created",
@@ -218,19 +230,27 @@ def test_keym_guardrails_fail_closed():
 	destroyed_denied = service.evaluate_key_operation("tenant-a", "destroyed-use", destroyed["id"], "use_key")
 	with pytest.raises(PermissionError, match="key_destroyed"):
 		service.schedule_rotation("tenant-a", "destroyed-rotation", destroyed["id"], "secops", "Replacement required.")
-	with pytest.raises(PermissionError, match="key_agent_privileged_role_requires_human_approval"):
-		service.register_key_agent(
-			"tenant-a",
-			"agent-denied",
-			"Agent Denied",
-			"codex",
-			"export_reviewer",
-			"wrapped export review",
-			"secops",
-			"review key export approvals",
-		)
+	review_agent = service.register_key_agent(
+		"tenant-a",
+		"agent-denied",
+		"Agent Denied",
+		"codex",
+		"export_reviewer",
+		"wrapped export review",
+		"secops",
+		"review key export approvals",
+	)
+	assert review_agent["status"] == "pending_review"
+	assert review_agent["policy_decision"] == "require_review"
+	assert review_agent["review_reasons"] == ["key_agent_privileged_role_requires_human_approval"]
 	with pytest.raises(PermissionError, match="bytewax_key_stream_required"):
 		service.validate_key_lifecycle_batch("tenant-a", "legacy_queue", 1)
+	denied_batch = [
+		item for item in service.list_key_lifecycle_batches("tenant-a")
+		if item["status"] == "denied"
+	][0]
+	assert denied_batch["policy_decision"] == "deny"
+	assert denied_batch["review_reasons"] == ["bytewax_key_stream_required"]
 	with pytest.raises(ValueError, match="key_lifecycle_batch_empty"):
 		service.validate_key_lifecycle_batch("tenant-a", "bytewax", 0)
 
@@ -328,12 +348,17 @@ def test_api_and_view_models_expose_key_posture_surfaces():
 
 	assert status["key_count"] == 1
 	assert status["key_agent_count"] == 1
+	assert status["key_lifecycle_batch_count"] == 1
 	assert status["compromised_key_count"] == 1
 	assert posture["summary"]["operation_count"] == 1
 	assert posture["key_agents"][0]["id"] == agent["id"]
+	assert posture["key_lifecycle_batches"][0]["status"] == "accepted"
+	assert posture["pending_reviews"] == []
 	assert batch["required_processor"] == "bytewax"
+	assert batch["status"] == "accepted"
 	assert dashboard["summary"]["key_count"] == 1
 	assert dashboard["streaming"]["engine"] == "bytewax"
+	assert dashboard["review_evidence"]["deny_behavior"] == "Denied key lifecycle batches persist evidence before PermissionError"
 	assert inventory["key_classes"][-1] == "wrapping"
 	assert lifecycle["rotations"][0]["status"] == "completed"
 	assert export_approvals["export_approvals"][0]["status"] == "approved"
@@ -343,7 +368,9 @@ def test_api_and_view_models_expose_key_posture_surfaces():
 	assert audit["events"]
 	assert analytics["summary"]["compromised_key_count"] == 1
 	assert agents["key_agents"][0]["runtime"] == "claude_code"
+	assert agents["pending_reviews"] == []
 	assert "export_reviewer" in agents["privileged_roles"]
 	assert settings["agents"]["first_class"] is True
 	assert settings["streaming"]["lifecycle_stream"] == "keym.lifecycle"
+	assert settings["review_evidence"]["pending_queues"]
 	assert settings["theme"]["name"] == "keym_vault_console"

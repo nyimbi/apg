@@ -94,6 +94,9 @@ class KeyOperationRecord:
 	status: str
 	matched_rules: list[str]
 	required_actions: list[str]
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=_utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -111,6 +114,10 @@ class ExportApprovalRecord:
 	decision: str = ""
 	reviewer: str = ""
 	notes: str = ""
+	policy_decision: str = "require_review"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=lambda: ["export_approval_review_required"])
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=_utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -128,6 +135,10 @@ class RotationExceptionRecord:
 	decision: str = ""
 	reviewer: str = ""
 	notes: str = ""
+	policy_decision: str = "require_review"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=lambda: ["rotation_exception_review_required"])
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=_utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -144,6 +155,10 @@ class KeyRotationRecord:
 	status: str = "scheduled"
 	actor: str = ""
 	evidence: str = ""
+	policy_decision: str = "require_review"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=lambda: ["key_rotation_review_required"])
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=_utc_now)
 	completed_at: str = ""
 
@@ -160,6 +175,10 @@ class KeymAuditEventRecord:
 	message: str
 	actor: str
 	severity: str = "info"
+	policy_decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=_utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -180,7 +199,29 @@ class KeymAgentRecord:
 	human_approval_required: bool
 	policy_ref: str | None = None
 	status: str = "active"
+	policy_decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	registered_at: str = field(default_factory=_utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass(slots=True)
+class KeyLifecycleBatchRecord:
+	id: str
+	tenant_id: str
+	event_stream: str
+	mutation_count: int
+	status: str = "accepted"
+	processor: str = "bytewax"
+	policy_decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
+	created_at: str = field(default_factory=_utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
 		return asdict(self)
@@ -210,6 +251,7 @@ class KeymService:
 		self.rotations: dict[str, KeyRotationRecord] = {}
 		self.audit_events: dict[str, KeymAuditEventRecord] = {}
 		self.key_agents: dict[str, KeymAgentRecord] = {}
+		self.key_lifecycle_batches: dict[str, KeyLifecycleBatchRecord] = {}
 
 	def describe(self, tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 		return self._get_contract(tenant_id, overrides)
@@ -311,10 +353,21 @@ class KeymService:
 			status=status,
 			matched_rules=list(result["matched_rules"]),
 			required_actions=_required_actions(result),
+			policy_decision=result["decision"],
+			review_reasons=self._reasons(result),
+			review_evidence=self._review_evidence(result),
 		)
 		self.operations[record.id] = record
 		severity = "high" if status == "denied" else "medium" if status == "review_required" else "info"
-		self._record_event(tenant_id, f"key_operation_{status}", record.id, f"Key operation {status}: {operation_name}", key.owner, severity)
+		self._record_event(
+			tenant_id,
+			f"key_operation_{status}",
+			record.id,
+			f"Key operation {status}: {operation_name}",
+			key.owner,
+			severity,
+			policy_result=result,
+		)
 		return record.to_dict()
 
 	def request_export_approval(
@@ -336,15 +389,28 @@ class KeymService:
 		record_id = _stable_id("keym_export_approval", tenant_id, approval_id)
 		if record_id in self.export_approvals:
 			raise ValueError(f"export_approval_already_exists:{approval_id}")
+		policy_result = _review_result("export_approval_review_required", "review_key_export")
 		record = ExportApprovalRecord(
 			id=record_id,
 			tenant_id=tenant_id,
 			key_id=key.id,
 			requested_by=str(requested_by).strip(),
 			reason=str(reason).strip(),
+			policy_decision=policy_result["decision"],
+			matched_rules=list(policy_result["matched_rules"]),
+			review_reasons=self._reasons(policy_result),
+			review_evidence=self._review_evidence(policy_result),
 		)
 		self.export_approvals[record.id] = record
-		self._record_event(tenant_id, "export_approval_requested", record.id, f"Export approval requested: {key.name}", requested_by, "medium")
+		self._record_event(
+			tenant_id,
+			"export_approval_requested",
+			record.id,
+			f"Export approval requested: {key.name}",
+			requested_by,
+			"medium",
+			policy_result=policy_result,
+		)
 		return record.to_dict()
 
 	def decide_export_approval(
@@ -356,7 +422,7 @@ class KeymService:
 		notes: str,
 	) -> dict[str, Any]:
 		record = self._get_export_approval(tenant_id, approval_id)
-		self._decide_review_record(
+		result = self._decide_review_record(
 			record,
 			operation="decide_export_approval",
 			reviewer=reviewer,
@@ -364,7 +430,15 @@ class KeymService:
 			notes=notes,
 			self_review_reason="independent_export_reviewer_required",
 		)
-		self._record_event(tenant_id, "export_approval_decided", record.id, f"Export approval {decision}: {record.key_id}", reviewer, "medium")
+		self._record_event(
+			tenant_id,
+			"export_approval_decided",
+			record.id,
+			f"Export approval {decision}: {record.key_id}",
+			reviewer,
+			"medium",
+			policy_result=result,
+		)
 		return record.to_dict()
 
 	def request_rotation_exception(
@@ -388,15 +462,28 @@ class KeymService:
 		record_id = _stable_id("keym_rotation_exception", tenant_id, exception_id)
 		if record_id in self.rotation_exceptions:
 			raise ValueError(f"rotation_exception_already_exists:{exception_id}")
+		policy_result = _review_result("rotation_exception_review_required", "review_rotation_exception")
 		record = RotationExceptionRecord(
 			id=record_id,
 			tenant_id=tenant_id,
 			key_id=key.id,
 			requested_by=str(requested_by).strip(),
 			reason=str(reason).strip(),
+			policy_decision=policy_result["decision"],
+			matched_rules=list(policy_result["matched_rules"]),
+			review_reasons=self._reasons(policy_result),
+			review_evidence=self._review_evidence(policy_result),
 		)
 		self.rotation_exceptions[record.id] = record
-		self._record_event(tenant_id, "rotation_exception_requested", record.id, f"Rotation exception requested: {key.name}", requested_by, "medium")
+		self._record_event(
+			tenant_id,
+			"rotation_exception_requested",
+			record.id,
+			f"Rotation exception requested: {key.name}",
+			requested_by,
+			"medium",
+			policy_result=policy_result,
+		)
 		return record.to_dict()
 
 	def decide_rotation_exception(
@@ -408,7 +495,7 @@ class KeymService:
 		notes: str,
 	) -> dict[str, Any]:
 		record = self._get_rotation_exception(tenant_id, exception_id)
-		self._decide_review_record(
+		result = self._decide_review_record(
 			record,
 			operation="decide_rotation_exception",
 			reviewer=reviewer,
@@ -416,7 +503,23 @@ class KeymService:
 			notes=notes,
 			self_review_reason="independent_rotation_exception_reviewer_required",
 		)
-		self._record_event(tenant_id, "rotation_exception_decided", record.id, f"Rotation exception {decision}: {record.key_id}", reviewer, "medium")
+		if record.status == "approved":
+			for operation_record in self.operations.values():
+				if operation_record.tenant_id == tenant_id and operation_record.key_id == record.key_id and operation_record.status == "review_required":
+					operation_record.status = "allowed"
+					operation_record.decision = "allow"
+					operation_record.policy_decision = "allow"
+					operation_record.required_actions = []
+					operation_record.review_evidence = self._review_evidence(result, review_recorded=True)
+		self._record_event(
+			tenant_id,
+			"rotation_exception_decided",
+			record.id,
+			f"Rotation exception {decision}: {record.key_id}",
+			reviewer,
+			"medium",
+			policy_result=result,
+		)
 		return record.to_dict()
 
 	def schedule_rotation(
@@ -440,15 +543,28 @@ class KeymService:
 		record_id = _stable_id("keym_rotation", tenant_id, rotation_id)
 		if record_id in self.rotations:
 			raise ValueError(f"key_rotation_already_exists:{rotation_id}")
+		policy_result = _review_result("key_rotation_review_required", "complete_key_rotation_with_evidence")
 		record = KeyRotationRecord(
 			id=record_id,
 			tenant_id=tenant_id,
 			key_id=key.id,
 			requested_by=str(requested_by).strip(),
 			reason=str(reason).strip(),
+			policy_decision=policy_result["decision"],
+			matched_rules=list(policy_result["matched_rules"]),
+			review_reasons=self._reasons(policy_result),
+			review_evidence=self._review_evidence(policy_result),
 		)
 		self.rotations[record.id] = record
-		self._record_event(tenant_id, "key_rotation_scheduled", record.id, f"Key rotation scheduled: {key.name}", requested_by, "medium")
+		self._record_event(
+			tenant_id,
+			"key_rotation_scheduled",
+			record.id,
+			f"Key rotation scheduled: {key.name}",
+			requested_by,
+			"medium",
+			policy_result=policy_result,
+		)
 		return record.to_dict()
 
 	def complete_rotation(self, tenant_id: str, rotation_id: str, actor: str, evidence: str) -> dict[str, Any]:
@@ -470,10 +586,22 @@ class KeymService:
 		record.actor = str(actor).strip()
 		record.evidence = str(evidence).strip()
 		record.completed_at = _utc_now()
+		record.policy_decision = result["decision"]
+		record.matched_rules = list(result["matched_rules"])
+		record.review_reasons = self._reasons(result)
+		record.review_evidence = self._review_evidence(result, review_recorded=True)
 		key.status = "active"
 		key.rotation_age_days = 0
 		key.last_rotated_at = record.completed_at
-		self._record_event(tenant_id, "key_rotation_completed", record.id, f"Key rotation completed: {key.name}", actor, "medium")
+		self._record_event(
+			tenant_id,
+			"key_rotation_completed",
+			record.id,
+			f"Key rotation completed: {key.name}",
+			actor,
+			"medium",
+			policy_result=result,
+		)
 		return record.to_dict()
 
 	def mark_key_compromised(self, tenant_id: str, key_id: str, actor: str, evidence: str) -> dict[str, Any]:
@@ -539,29 +667,66 @@ class KeymService:
 			contribution_disclosed=True,
 			human_approval_required=bool(human_approval_required),
 			policy_ref=str(policy_ref).strip() if policy_ref else None,
+			status="pending_review" if result["decision"] == "require_review" else "active",
+			policy_decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._reasons(result),
+			review_evidence=self._review_evidence(result, review_recorded=bool(human_approval_required)),
 		)
 		self.key_agents[record.id] = record
-		self._record_event(tenant_id, "key_agent_registered", record.id, f"Key agent registered: {record.name}", owner, "medium")
+		self._record_event(
+			tenant_id,
+			"key_agent_registered",
+			record.id,
+			f"Key agent registered: {record.name}",
+			owner,
+			"medium",
+			policy_result=result,
+		)
 		return record.to_dict()
 
 	def validate_key_lifecycle_batch(self, tenant_id: str, event_stream: str, mutation_count: int) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
+		if mutation_count < 1:
+			raise ValueError("key_lifecycle_batch_empty")
 		stream = self._normalize_agent_token(event_stream)
 		result = self.evaluate({
 			"operation": "validate_key_lifecycle_batch",
 			"event_stream": stream,
 		})
+		record = KeyLifecycleBatchRecord(
+			id=_stable_id("keym_batch", tenant_id, stream, len(self.key_lifecycle_batches)),
+			tenant_id=tenant_id,
+			event_stream=stream,
+			mutation_count=int(mutation_count),
+			status="denied" if result["decision"] == "deny" else "accepted",
+			policy_decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._reasons(result),
+			review_evidence=self._review_evidence(result),
+		)
+		self.key_lifecycle_batches[record.id] = record
+		self._record_event(
+			tenant_id,
+			"key_lifecycle_batch_validated",
+			record.id,
+			f"Key lifecycle batch {record.status}: {stream}",
+			"system",
+			"medium" if record.status == "denied" else "info",
+			policy_result=result,
+		)
 		if result["decision"] == "deny":
 			raise PermissionError(self._first_reason(result))
-		if mutation_count < 1:
-			raise ValueError("key_lifecycle_batch_empty")
-		return {
+		payload = record.to_dict()
+		payload.update({
 			"tenant_id": tenant_id,
 			"event_stream": stream,
 			"mutation_count": int(mutation_count),
 			"accepted": True,
 			"required_processor": "bytewax",
-		}
+			"rule_result": result,
+		})
+		return payload
 
 	def create_record(self, record_id: str, tenant_id: str, metadata: dict[str, Any] | None = None, status: str = "active") -> dict[str, Any]:
 		metadata = dict(metadata or {})
@@ -602,6 +767,24 @@ class KeymService:
 	def list_key_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.key_agents, tenant_id)
 
+	def list_key_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.key_lifecycle_batches, tenant_id)
+
+	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		items = (
+			self.list_operations(tenant_id)
+			+ self.list_export_approvals(tenant_id)
+			+ self.list_rotation_exceptions(tenant_id)
+			+ self.list_rotations(tenant_id)
+			+ self.list_key_agents(tenant_id)
+			+ self.list_key_lifecycle_batches(tenant_id)
+		)
+		return [
+			item
+			for item in items
+			if item.get("status") in {"pending", "pending_review", "review_required", "scheduled"}
+		]
+
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		operations = self.list_operations(tenant_id)
 		return {
@@ -609,12 +792,16 @@ class KeymService:
 			"key_count": len(self.list_keys(tenant_id)),
 			"operation_count": len(operations),
 			"key_agent_count": len(self.list_key_agents(tenant_id)),
+			"pending_key_agent_review_count": sum(1 for item in self.list_key_agents(tenant_id) if item["status"] == "pending_review"),
+			"key_lifecycle_batch_count": len(self.list_key_lifecycle_batches(tenant_id)),
+			"denied_key_lifecycle_batch_count": sum(1 for item in self.list_key_lifecycle_batches(tenant_id) if item["status"] == "denied"),
 			"denied_operation_count": sum(1 for item in operations if item["status"] == "denied"),
 			"review_required_count": sum(1 for item in operations if item["status"] == "review_required"),
 			"pending_export_approval_count": sum(1 for item in self.list_export_approvals(tenant_id) if item["status"] == "pending"),
 			"pending_rotation_exception_count": sum(1 for item in self.list_rotation_exceptions(tenant_id) if item["status"] == "pending"),
 			"scheduled_rotation_count": sum(1 for item in self.list_rotations(tenant_id) if item["status"] == "scheduled"),
 			"compromised_key_count": sum(1 for item in self.list_keys(tenant_id) if item["status"] == "compromised"),
+			"pending_review_count": len(self.list_pending_reviews(tenant_id)),
 			"recent_events": self.list_audit_events(tenant_id)[-5:],
 		}
 
@@ -652,7 +839,7 @@ class KeymService:
 	def _rotation_exception_approved(self, tenant_id: str, key_id: str) -> bool:
 		return any(item.tenant_id == tenant_id and item.key_id == key_id and item.status == "approved" for item in self.rotation_exceptions.values())
 
-	def _decide_review_record(self, record: Any, operation: str, reviewer: str, decision: str, notes: str, self_review_reason: str) -> None:
+	def _decide_review_record(self, record: Any, operation: str, reviewer: str, decision: str, notes: str, self_review_reason: str) -> dict[str, Any]:
 		if record.status != "pending":
 			raise ValueError("review_already_decided")
 		decision_value = str(decision or "").strip().lower()
@@ -677,8 +864,23 @@ class KeymService:
 		record.decision = decision_value
 		record.reviewer = reviewer_value
 		record.notes = notes_value
+		record.policy_decision = result["decision"]
+		record.matched_rules = list(result["matched_rules"])
+		record.review_reasons = self._reasons(result)
+		record.review_evidence = self._review_evidence(result, review_recorded=True)
+		return result
 
-	def _record_event(self, tenant_id: str, event_type: str, subject_id: str, message: str, actor: str, severity: str = "info") -> dict[str, Any]:
+	def _record_event(
+		self,
+		tenant_id: str,
+		event_type: str,
+		subject_id: str,
+		message: str,
+		actor: str,
+		severity: str = "info",
+		policy_result: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		policy_result = policy_result or _allow_result()
 		record = KeymAuditEventRecord(
 			id=_stable_id("keym_event", tenant_id, event_type, subject_id, len(self.audit_events)),
 			tenant_id=tenant_id,
@@ -687,6 +889,10 @@ class KeymService:
 			message=message,
 			actor=actor,
 			severity=severity,
+			policy_decision=policy_result["decision"],
+			matched_rules=list(policy_result["matched_rules"]),
+			review_reasons=self._reasons(policy_result),
+			review_evidence=self._review_evidence(policy_result),
 		)
 		self.audit_events[record.id] = record
 		return record.to_dict()
@@ -697,6 +903,24 @@ class KeymService:
 				return str(action["reason"])
 		return "key_operation_denied"
 
+	def _reasons(self, result: dict[str, Any]) -> list[str]:
+		return [
+			str(action["reason"])
+			for action in result.get("actions", [])
+			if action.get("reason")
+		]
+
+	def _review_evidence(self, result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+		return {
+			"required_actions": [
+				str(action.get("required_action"))
+				for action in result.get("actions", [])
+				if action.get("required_action")
+			],
+			"reasons": self._reasons(result),
+			"review_recorded": bool(review_recorded),
+		}
+
 	def _normalize_agent_token(self, value: str) -> str:
 		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
 
@@ -705,6 +929,18 @@ class KeymService:
 		if tenant_id is not None:
 			items = [item for item in items if item["tenant_id"] == tenant_id]
 		return sorted(items, key=lambda item: item["id"])
+
+
+def _allow_result() -> dict[str, Any]:
+	return {"decision": "allow", "matched_rules": [], "actions": []}
+
+
+def _review_result(reason: str, required_action: str) -> dict[str, Any]:
+	return {
+		"decision": "require_review",
+		"matched_rules": [],
+		"actions": [{"reason": reason, "required_action": required_action}],
+	}
 
 
 class KeyManagementService:

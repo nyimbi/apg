@@ -23,6 +23,9 @@ evidence, compromise response, UI view models, and package proof.
   recorded.
 - First-class key-agent composition for policy, lifecycle, custody, export,
   rotation-exception, compromise-response, and HSM-attestation review.
+- Durable review evidence for review-required operations, export approvals,
+  rotation exceptions, key rotations, privileged key agents, denied lifecycle
+  batches, and audit events.
 - Bytewax lifecycle stream enforcement for grouped key mutations.
 - API helpers and UI view models for generated applications.
 - Contract, theme, semantic model, and release evidence for APG composition
@@ -119,6 +122,28 @@ batch = service.validate_key_lifecycle_batch(
 )
 ```
 
+## Durable Review Evidence
+
+KEYM preserves review state for generated key-governance consoles.
+Review-required operations, export approvals, rotation exceptions, scheduled
+rotations, privileged key-agent registrations, lifecycle batch validations, and
+audit events carry the same evidence fields:
+
+- `policy_decision`;
+- `matched_rules`;
+- `review_reasons`;
+- `review_evidence`.
+
+Generated applications can compose the active review queue:
+
+```python
+pending = service.list_pending_reviews("tenant-a")
+```
+
+Denied non-Bytewax lifecycle batches are stored through
+`list_key_lifecycle_batches()` before `PermissionError` is raised, so
+operators can see and remediate routing violations.
+
 ## API Helpers
 
 `api.py` exposes:
@@ -135,6 +160,8 @@ batch = service.validate_key_lifecycle_batch(
 - `mark_key_compromised`
 - `register_key_agent`
 - `validate_key_lifecycle_batch`
+- `list_key_lifecycle_batches`
+- `list_pending_reviews`
 - `list_key_posture`
 
 ## UI View Models
@@ -165,7 +192,8 @@ roles are `key_policy_reviewer`, `key_lifecycle_reviewer`,
 
 Every key agent must declare owner, purpose, scope, and contribution
 disclosure. The service rejects unsupported runtimes, unsupported roles, missing
-scope, missing disclosure, and privileged registrations without human approval.
+scope, and missing disclosure. Privileged registrations without human approval
+are retained as `pending_review` evidence.
 
 ## Adapter Boundaries
 
