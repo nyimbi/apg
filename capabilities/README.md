@@ -23,18 +23,18 @@ Use the local CLI as the source of truth:
 
 ## Current Registry Snapshot
 
-The current registry exposes 109 valid capability contracts. The latest focused
+The current registry exposes 111 valid capability contracts. The latest focused
 implementation audit reports:
 
-- 109 domain-specific capability packages;
+- 111 domain-specific capability packages;
 - 0 materialized-baseline packages;
 - 0 mixed-implementation packages;
 - 0 contract-only packages;
 - 0 blocking implementation gaps;
 - 0 implementation-audit warnings.
 
-The strict package-artifact operability audit also currently reports 109
-operable contracts, 109 complete package artifact sets, 0 package gaps, 0
+The strict package-artifact operability audit also currently reports 111
+operable contracts, 111 complete package artifact sets, 0 package gaps, 0
 warnings, and 0 errors.
 
 Category coverage:
@@ -50,7 +50,7 @@ Category coverage:
 | `crm` | 1 | Customer relationship management analytics. |
 | `eam` | 1 | Enterprise asset management. |
 | `ecd` | 1 | ESG and sustainability management. |
-| `fintech` | 1 | Fintech gateway services. |
+| `fintech` | 3 | Fintech gateway, digital payments, and digital wallet services. |
 | `int` | 1 | Integration API management. |
 | `intel` | 1 | Intelligence crawler services. |
 | `pde` | 1 | Product information management. |

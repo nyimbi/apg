@@ -26370,3 +26370,77 @@ Known gaps:
   authorization/capture/refund/payout flows, live ledger/cash-management/AR
   posting, durable Bytewax topology, or performance/load checks during this
   battery-conscious slice.
+
+### 2026-06-01 13:02 EAT
+
+Fintech Digital Wallets executable capability slice:
+
+- Promoted `capabilities/fintech/wallets` from an empty package into a
+  first-class APG capability with `README.md`, `SPECIFICATION.md`, `PLAN.md`,
+  `cap_spec.md`, contract, models, service, API helpers, view models, app
+  entrypoint, semantic/package/release evidence, and focused tests.
+- Added tenant-scoped wallet lifecycle behavior for consumer, merchant, agent,
+  escrow, and treasury wallets across USD, EUR, GBP, KES, ZAR, NGN, GHS, UGX,
+  and TZS.
+- Added wallet instruments, stored-value ledger entries, credits, debits,
+  wallet-to-wallet transfers, balance holds, hold releases, dashboard
+  summaries, Bytewax batch validation, and provider-neutral wallet-agent
+  registration.
+- Added deterministic wallet guardrails for tenant context, write policy,
+  wallet owner/type/currency, instrument wallet/type/token/verification,
+  positive credits/debits/holds/releases, available-balance checks,
+  distinct-wallet transfers, cross-currency transfer denial, transfer limit
+  review, hold balance checks, over-release denial, Bytewax lifecycle events,
+  supported AI-agent runtimes and roles, and privileged-agent human approval.
+- Added `wallets_runtime.py` domain helpers for Decimal amount normalization,
+  normalized codes, and single-transfer limit decisions.
+- Updated fintech capability metadata so `wallets` is listed as an implemented
+  sub-capability.
+- Removed the empty `_Digital_Wallets` marker file and refreshed
+  `semantic_model.json`, `package_manifest.json`, and `release_report.json`.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/fintech/wallets/__init__.py capabilities/fintech/wallets/capability_contract.py capabilities/fintech/wallets/models.py capabilities/fintech/wallets/wallets_runtime.py capabilities/fintech/wallets/service.py capabilities/fintech/wallets/api.py capabilities/fintech/wallets/views.py capabilities/fintech/wallets/app.py capabilities/fintech/wallets/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/fintech/wallets/tests/test_package_contract.py`
+  passed with 6 tests.
+- `./.venv/bin/python capabilities/fintech/wallets/app.py` passed with
+  `self_test()` status `ok`.
+- `./.venv/bin/apg capabilities inspect fintech_wallets --json` passed with 24
+  rules, 8 routes, Bytewax streaming, and provider-neutral wallet-agent
+  runtimes.
+- `./.venv/bin/apg capabilities publish-plan capabilities/fintech/wallets --json`
+  passed with side-effect-free publish evidence and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/fintech/wallets --json`
+  passed with one domain-specific fintech wallets implementation, 0 baseline
+  markers, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/fintech/wallets --json`
+  passed with one complete lifecycle record, 24 rules, 8 routes, 11 theme
+  tokens, and 0 warnings/errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 111 operable contracts, 111 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Focused stale-marker scan returned only the intentional Bytewax-not-Kafka
+  documentation line in the edited wallets README.
+
+Code review:
+
+- Reviewed wallet money paths to keep all balances, holds, and ledger amounts
+  as `Decimal` text rather than floats.
+- Reviewed available-balance behavior so holds reduce spendable funds without
+  changing stored value.
+- Reviewed transfer, high-limit, same-wallet, cross-currency, hold/release,
+  non-Bytewax batch, unsupported agent runtime/role, and privileged-agent
+  approval guardrails.
+- Reviewed UI/theme metadata for APG Python screens and compact 8px visual
+  tokens.
+- Kept live banks, mobile-money providers, card networks, payment providers,
+  WALT core, Digital Payments, ledgers, audit sinks, notifications, key
+  management, and durable Bytewax workers behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live bank/mobile-money
+  or card provider flows, live ledger posting, durable Bytewax topology, or
+  performance/load checks during this battery-conscious slice.

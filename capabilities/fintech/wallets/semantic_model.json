@@ -1,0 +1,1118 @@
+{
+  "app": {
+    "description": "Digital Wallets package-backed APG capability",
+    "entity_count": 5,
+    "name": "fintech_wallets",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "fintech_wallets": {
+      "configuration": {
+        "adapters": {
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "gateway": "fintech_gateway",
+          "keys": "keym",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "wallet_core": "walt"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "wallet_ops_reviewer",
+            "risk_reviewer",
+            "limits_reviewer",
+            "settlement_reviewer",
+            "dispute_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "governance": {
+          "audit_financial_events": true,
+          "customer_consent_required": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "instruments": {
+          "supported_types": [
+            "bank_account",
+            "card",
+            "mobile_money",
+            "wallet",
+            "voucher"
+          ],
+          "token_reference_required": true,
+          "verified_instrument_required": true
+        },
+        "ledger": {
+          "double_entry_required": true,
+          "hold_balance_required": true,
+          "idempotency_required": true
+        },
+        "limits": {
+          "daily_debit_limit_minor": 500000,
+          "review_required_for_limit_override": true,
+          "single_transfer_limit_minor": 250000
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_ledger_events": true,
+          "emit_limit_events": true,
+          "emit_wallet_events": true,
+          "event_stream": "apg.fintech.wallets.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_wallets_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_dashboard": true,
+          "enable_holds": true,
+          "enable_instruments": true,
+          "enable_ledger": true,
+          "enable_limits": true,
+          "enable_wallets": true
+        },
+        "wallets": {
+          "negative_balance_blocked": true,
+          "owner_required": true,
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ],
+          "supported_types": [
+            "consumer",
+            "merchant",
+            "agent",
+            "escrow",
+            "treasury"
+          ]
+        }
+      },
+      "name": "Digital Wallets",
+      "provides": [
+        "wallet_lifecycle",
+        "stored_value_ledger",
+        "wallet_instrument_registry",
+        "wallet_transfer_workflow",
+        "wallet_hold_workflow",
+        "wallet_limit_governance",
+        "wallet_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "walt",
+        "fintech_payments",
+        "fintech_gateway",
+        "keym"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "Wallet operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "description": "Wallet writes require policy evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "wallet_policy_required",
+              "required_action": "attach_wallet_policy"
+            },
+            "name": "wallet_write_requires_policy"
+          },
+          {
+            "condition": {
+              "operation": "open_wallet",
+              "owner_present": false
+            },
+            "description": "Wallets require an owner reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "wallet_owner_required",
+              "required_action": "attach_owner_reference"
+            },
+            "name": "wallet_owner_required"
+          },
+          {
+            "condition": {
+              "operation": "open_wallet",
+              "wallet_type_supported": false
+            },
+            "description": "Wallet type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "wallet_type_not_supported",
+              "required_action": "select_supported_wallet_type"
+            },
+            "name": "wallet_type_supported"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "open_wallet"
+            },
+            "description": "Wallet currency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "wallet_currency_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_instrument",
+              "wallet_present": false
+            },
+            "description": "Wallet instruments require an existing wallet.",
+            "effect": {
+              "decision": "deny",
+              "reason": "wallet_required",
+              "required_action": "select_wallet"
+            },
+            "name": "instrument_wallet_required"
+          },
+          {
+            "condition": {
+              "instrument_type_supported": false,
+              "operation": "register_instrument"
+            },
+            "description": "Wallet instrument type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "instrument_type_not_supported",
+              "required_action": "select_supported_instrument_type"
+            },
+            "name": "instrument_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_instrument",
+              "token_reference_present": false
+            },
+            "description": "Wallet instruments require token reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "instrument_token_required",
+              "required_action": "attach_token_reference"
+            },
+            "name": "instrument_token_required"
+          },
+          {
+            "condition": {
+              "operation": "register_instrument",
+              "verified": false
+            },
+            "description": "Wallet instruments require verification evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "instrument_verification_required",
+              "required_action": "verify_instrument"
+            },
+            "name": "instrument_verification_required"
+          },
+          {
+            "condition": {
+              "amount_lte": 0,
+              "operation": "credit_wallet"
+            },
+            "description": "Wallet credits require positive amounts.",
+            "effect": {
+              "decision": "deny",
+              "reason": "credit_amount_positive_required",
+              "required_action": "set_positive_amount"
+            },
+            "name": "credit_amount_positive"
+          },
+          {
+            "condition": {
+              "amount_lte": 0,
+              "operation": "debit_wallet"
+            },
+            "description": "Wallet debits require positive amounts.",
+            "effect": {
+              "decision": "deny",
+              "reason": "debit_amount_positive_required",
+              "required_action": "set_positive_amount"
+            },
+            "name": "debit_amount_positive"
+          },
+          {
+            "condition": {
+              "insufficient_available_balance": true,
+              "operation": "debit_wallet"
+            },
+            "description": "Wallet debits cannot create negative available balance.",
+            "effect": {
+              "decision": "deny",
+              "reason": "insufficient_available_balance",
+              "required_action": "fund_wallet_or_reduce_amount"
+            },
+            "name": "debit_blocks_negative_balance"
+          },
+          {
+            "condition": {
+              "operation": "transfer",
+              "same_wallet": true
+            },
+            "description": "Wallet transfers require distinct wallets.",
+            "effect": {
+              "decision": "deny",
+              "reason": "distinct_wallets_required",
+              "required_action": "select_different_wallets"
+            },
+            "name": "transfer_requires_distinct_wallets"
+          },
+          {
+            "condition": {
+              "currency_mismatch": true,
+              "operation": "transfer"
+            },
+            "description": "Wallet transfers require matching wallet currencies.",
+            "effect": {
+              "decision": "deny",
+              "reason": "wallet_currency_mismatch",
+              "required_action": "route_through_fx_or_select_matching_wallet"
+            },
+            "name": "transfer_requires_matching_currency"
+          },
+          {
+            "condition": {
+              "limit_exceeded": true,
+              "operation": "transfer",
+              "review_recorded": false
+            },
+            "description": "Large wallet transfers require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "wallet_limit_review_required",
+              "required_action": "record_limit_review"
+            },
+            "name": "transfer_limit_requires_review"
+          },
+          {
+            "condition": {
+              "amount_lte": 0,
+              "operation": "place_hold"
+            },
+            "description": "Wallet holds require positive amounts.",
+            "effect": {
+              "decision": "deny",
+              "reason": "hold_amount_positive_required",
+              "required_action": "set_positive_hold_amount"
+            },
+            "name": "hold_amount_positive"
+          },
+          {
+            "condition": {
+              "insufficient_available_balance": true,
+              "operation": "place_hold"
+            },
+            "description": "Wallet holds cannot exceed available balance.",
+            "effect": {
+              "decision": "deny",
+              "reason": "hold_exceeds_available_balance",
+              "required_action": "reduce_hold_amount"
+            },
+            "name": "hold_blocks_negative_available"
+          },
+          {
+            "condition": {
+              "amount_lte": 0,
+              "operation": "release_hold"
+            },
+            "description": "Wallet hold releases require positive amounts.",
+            "effect": {
+              "decision": "deny",
+              "reason": "hold_release_amount_positive_required",
+              "required_action": "set_positive_release_amount"
+            },
+            "name": "hold_release_amount_positive"
+          },
+          {
+            "condition": {
+              "operation": "release_hold",
+              "release_exceeds_held_balance": true
+            },
+            "description": "Wallet hold releases cannot exceed held balance.",
+            "effect": {
+              "decision": "deny",
+              "reason": "hold_release_exceeds_held_balance",
+              "required_action": "reduce_release_amount"
+            },
+            "name": "hold_release_blocks_overrelease"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "wallet_batch"
+            },
+            "description": "Wallet batches require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_wallet_batch_to_bytewax"
+            },
+            "name": "wallet_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "wallet_event"
+            },
+            "description": "Wallet events require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_wallet_event_to_bytewax"
+            },
+            "name": "wallet_event_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_wallet_agent"
+            },
+            "description": "Wallet agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "wallet_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "wallet_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_wallet_agent"
+            },
+            "description": "Wallet agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "wallet_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "wallet_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "wallet_agent_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged wallet-agent actions require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_wallet_agent_action_requires_human_approval"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "Wallet operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "description": "Wallet writes require policy evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "wallet_policy_required",
+            "required_action": "attach_wallet_policy"
+          },
+          "name": "wallet_write_requires_policy"
+        },
+        {
+          "condition": {
+            "operation": "open_wallet",
+            "owner_present": false
+          },
+          "description": "Wallets require an owner reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "wallet_owner_required",
+            "required_action": "attach_owner_reference"
+          },
+          "name": "wallet_owner_required"
+        },
+        {
+          "condition": {
+            "operation": "open_wallet",
+            "wallet_type_supported": false
+          },
+          "description": "Wallet type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "wallet_type_not_supported",
+            "required_action": "select_supported_wallet_type"
+          },
+          "name": "wallet_type_supported"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "open_wallet"
+          },
+          "description": "Wallet currency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "wallet_currency_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_instrument",
+            "wallet_present": false
+          },
+          "description": "Wallet instruments require an existing wallet.",
+          "effect": {
+            "decision": "deny",
+            "reason": "wallet_required",
+            "required_action": "select_wallet"
+          },
+          "name": "instrument_wallet_required"
+        },
+        {
+          "condition": {
+            "instrument_type_supported": false,
+            "operation": "register_instrument"
+          },
+          "description": "Wallet instrument type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "instrument_type_not_supported",
+            "required_action": "select_supported_instrument_type"
+          },
+          "name": "instrument_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_instrument",
+            "token_reference_present": false
+          },
+          "description": "Wallet instruments require token reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "instrument_token_required",
+            "required_action": "attach_token_reference"
+          },
+          "name": "instrument_token_required"
+        },
+        {
+          "condition": {
+            "operation": "register_instrument",
+            "verified": false
+          },
+          "description": "Wallet instruments require verification evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "instrument_verification_required",
+            "required_action": "verify_instrument"
+          },
+          "name": "instrument_verification_required"
+        },
+        {
+          "condition": {
+            "amount_lte": 0,
+            "operation": "credit_wallet"
+          },
+          "description": "Wallet credits require positive amounts.",
+          "effect": {
+            "decision": "deny",
+            "reason": "credit_amount_positive_required",
+            "required_action": "set_positive_amount"
+          },
+          "name": "credit_amount_positive"
+        },
+        {
+          "condition": {
+            "amount_lte": 0,
+            "operation": "debit_wallet"
+          },
+          "description": "Wallet debits require positive amounts.",
+          "effect": {
+            "decision": "deny",
+            "reason": "debit_amount_positive_required",
+            "required_action": "set_positive_amount"
+          },
+          "name": "debit_amount_positive"
+        },
+        {
+          "condition": {
+            "insufficient_available_balance": true,
+            "operation": "debit_wallet"
+          },
+          "description": "Wallet debits cannot create negative available balance.",
+          "effect": {
+            "decision": "deny",
+            "reason": "insufficient_available_balance",
+            "required_action": "fund_wallet_or_reduce_amount"
+          },
+          "name": "debit_blocks_negative_balance"
+        },
+        {
+          "condition": {
+            "operation": "transfer",
+            "same_wallet": true
+          },
+          "description": "Wallet transfers require distinct wallets.",
+          "effect": {
+            "decision": "deny",
+            "reason": "distinct_wallets_required",
+            "required_action": "select_different_wallets"
+          },
+          "name": "transfer_requires_distinct_wallets"
+        },
+        {
+          "condition": {
+            "currency_mismatch": true,
+            "operation": "transfer"
+          },
+          "description": "Wallet transfers require matching wallet currencies.",
+          "effect": {
+            "decision": "deny",
+            "reason": "wallet_currency_mismatch",
+            "required_action": "route_through_fx_or_select_matching_wallet"
+          },
+          "name": "transfer_requires_matching_currency"
+        },
+        {
+          "condition": {
+            "limit_exceeded": true,
+            "operation": "transfer",
+            "review_recorded": false
+          },
+          "description": "Large wallet transfers require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "wallet_limit_review_required",
+            "required_action": "record_limit_review"
+          },
+          "name": "transfer_limit_requires_review"
+        },
+        {
+          "condition": {
+            "amount_lte": 0,
+            "operation": "place_hold"
+          },
+          "description": "Wallet holds require positive amounts.",
+          "effect": {
+            "decision": "deny",
+            "reason": "hold_amount_positive_required",
+            "required_action": "set_positive_hold_amount"
+          },
+          "name": "hold_amount_positive"
+        },
+        {
+          "condition": {
+            "insufficient_available_balance": true,
+            "operation": "place_hold"
+          },
+          "description": "Wallet holds cannot exceed available balance.",
+          "effect": {
+            "decision": "deny",
+            "reason": "hold_exceeds_available_balance",
+            "required_action": "reduce_hold_amount"
+          },
+          "name": "hold_blocks_negative_available"
+        },
+        {
+          "condition": {
+            "amount_lte": 0,
+            "operation": "release_hold"
+          },
+          "description": "Wallet hold releases require positive amounts.",
+          "effect": {
+            "decision": "deny",
+            "reason": "hold_release_amount_positive_required",
+            "required_action": "set_positive_release_amount"
+          },
+          "name": "hold_release_amount_positive"
+        },
+        {
+          "condition": {
+            "operation": "release_hold",
+            "release_exceeds_held_balance": true
+          },
+          "description": "Wallet hold releases cannot exceed held balance.",
+          "effect": {
+            "decision": "deny",
+            "reason": "hold_release_exceeds_held_balance",
+            "required_action": "reduce_release_amount"
+          },
+          "name": "hold_release_blocks_overrelease"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "wallet_batch"
+          },
+          "description": "Wallet batches require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_wallet_batch_to_bytewax"
+          },
+          "name": "wallet_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "wallet_event"
+          },
+          "description": "Wallet events require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_wallet_event_to_bytewax"
+          },
+          "name": "wallet_event_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_wallet_agent"
+          },
+          "description": "Wallet agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "wallet_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "wallet_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_wallet_agent"
+          },
+          "description": "Wallet agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "wallet_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "wallet_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "wallet_agent_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged wallet-agent actions require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_wallet_agent_action_requires_human_approval"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "agents": {
+          "component": "WalletAgentWorkbench",
+          "permission": "fintech_wallets:admin",
+          "route": "/fintech-wallets/agents"
+        },
+        "dashboard": {
+          "component": "WalletsDashboard",
+          "permission": "fintech_wallets:view",
+          "route": "/fintech-wallets/dashboard"
+        },
+        "holds": {
+          "component": "WalletHoldConsole",
+          "permission": "fintech_wallets:operate",
+          "route": "/fintech-wallets/holds"
+        },
+        "instruments": {
+          "component": "WalletInstrumentVault",
+          "permission": "fintech_wallets:manage_instruments",
+          "route": "/fintech-wallets/instruments"
+        },
+        "ledger": {
+          "component": "WalletLedger",
+          "permission": "fintech_wallets:view_ledger",
+          "route": "/fintech-wallets/ledger"
+        },
+        "limits": {
+          "component": "WalletLimitConsole",
+          "permission": "fintech_wallets:govern_limits",
+          "route": "/fintech-wallets/limits"
+        },
+        "settings": {
+          "component": "WalletSettings",
+          "permission": "fintech_wallets:admin",
+          "route": "/fintech-wallets/settings"
+        },
+        "wallets": {
+          "component": "WalletWorkbench",
+          "permission": "fintech_wallets:manage_wallets",
+          "route": "/fintech-wallets/wallets"
+        }
+      },
+      "streaming": {
+        "events": [
+          "wallet_opened",
+          "wallet_instrument_registered",
+          "wallet_credited",
+          "wallet_debited",
+          "wallet_transfer_posted",
+          "wallet_hold_placed",
+          "wallet_hold_released",
+          "wallet_limit_updated",
+          "wallet_agent_registered"
+        ],
+        "guardrails": [
+          "wallet_batch_requires_bytewax",
+          "wallet_event_requires_bytewax",
+          "privileged_wallet_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.fintech.wallets.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "agents": {
+            "status_style": "agent-chip",
+            "visual": "review-lane"
+          },
+          "holds": {
+            "status_style": "reserve-chip",
+            "visual": "hold-lane"
+          },
+          "instruments": {
+            "icon": "credit-card",
+            "status_indicator": "verified-chip"
+          },
+          "ledger": {
+            "status_style": "entry-chip",
+            "visual": "ledger-grid"
+          },
+          "limits": {
+            "status_style": "threshold-chip",
+            "visual": "limit-band"
+          },
+          "wallets": {
+            "icon": "wallet",
+            "status_indicator": "balance-pill"
+          }
+        },
+        "name": "fintech_wallets_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#0F766E",
+          "color.danger": "#B42318",
+          "color.primary": "#1E3A5F",
+          "color.success": "#15803D",
+          "color.warning": "#A16207",
+          "density": "compact",
+          "surface.canvas": "#F7F9FC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#172033",
+          "text.secondary": "#52606D"
+        }
+      },
+      "ui": {
+        "api_prefix": "/fintech-wallets/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "WalletsDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/fintech-wallets/dashboard",
+            "permission": "fintech_wallets:view"
+          },
+          {
+            "component": "WalletWorkbench",
+            "name": "wallets",
+            "nav_group": "Wallets",
+            "path": "/fintech-wallets/wallets",
+            "permission": "fintech_wallets:manage_wallets"
+          },
+          {
+            "component": "WalletInstrumentVault",
+            "name": "instruments",
+            "nav_group": "Wallets",
+            "path": "/fintech-wallets/instruments",
+            "permission": "fintech_wallets:manage_instruments"
+          },
+          {
+            "component": "WalletLedger",
+            "name": "ledger",
+            "nav_group": "Ledger",
+            "path": "/fintech-wallets/ledger",
+            "permission": "fintech_wallets:view_ledger"
+          },
+          {
+            "component": "WalletLimitConsole",
+            "name": "limits",
+            "nav_group": "Governance",
+            "path": "/fintech-wallets/limits",
+            "permission": "fintech_wallets:govern_limits"
+          },
+          {
+            "component": "WalletHoldConsole",
+            "name": "holds",
+            "nav_group": "Operations",
+            "path": "/fintech-wallets/holds",
+            "permission": "fintech_wallets:operate"
+          },
+          {
+            "component": "WalletAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/fintech-wallets/agents",
+            "permission": "fintech_wallets:admin"
+          },
+          {
+            "component": "WalletSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/fintech-wallets/settings",
+            "permission": "fintech_wallets:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "wallet_operations_review": {
+        "roles": [
+          "wallet_ops_reviewer",
+          "risk_reviewer",
+          "limits_reviewer",
+          "settlement_reviewer",
+          "dispute_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "fintech_wallets": [
+        "auth",
+        "audl",
+        "ntfy",
+        "walt",
+        "fintech_payments",
+        "fintech_gateway",
+        "keym"
+      ]
+    }
+  },
+  "contracts": {
+    "fintech_wallets": {
+      "configuration": {
+        "adapters": {
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "gateway": "fintech_gateway",
+          "keys": "keym",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "wallet_core": "walt"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "wallet_ops_reviewer",
+            "risk_reviewer",
+            "limits_reviewer",
+            "settlement_reviewer",
+            "dispute_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "governance": {
+          "audit_financial_events": true,
+          "customer_consent_required": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "instruments": {
+          "supported_types": [
+            "bank_account",
+            "card",
+            "mobile_money",
+            "wallet",
+            "voucher"
+          ],
+          "token_reference_required": true,
+          "verified_instrument_required": true
+        },
+        "ledger": {
+          "double_entry_required": true,
+          "hold_balance_required": true,
+          "idempotency_required": true
+        },
+        "limits": {
+          "daily_debit_limit_minor": 500000,
+          "review_required_for_limit_override": true,
+          "single_transfer_limit_minor": 250000
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_ledger_events": true,
+          "emit_limit_events": true,
+          "emit_wallet_events": true,
+          "event_stream": "apg.fintech.wallets.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_wallets_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_dashboard": true,
+          "enable_holds": true,
+          "enable_instruments": true,
+          "enable_ledger": true,
+          "enable_limits": true,
+          "enable_wallets": true
+        },
+        "wallets": {
+          "negative_balance_blocked": true,
+          "owner_required": true,
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ],
+          "supported_types": [
+            "consumer",
+            "merchant",
+            "agent",
+            "escrow",
+            "treasury"
+          ]
+        }
+      },
+      "id": "fintech_wallets",
+      "provides": [
+        "wallet_lifecycle",
+        "stored_value_ledger",
+        "wallet_instrument_registry",
+        "wallet_transfer_workflow",
+        "wallet_hold_workflow",
+        "wallet_limit_governance",
+        "wallet_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "walt",
+        "fintech_payments",
+        "fintech_gateway",
+        "keym"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 7,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "fintech_wallets": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}

@@ -1,11 +1,6 @@
-"""
-wallets FinTech Capability
+"""APG Digital Wallets capability package."""
 
-Placeholder for wallets financial technology capability.
-To be implemented as part of the comprehensive APG FinTech platform.
-"""
+from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .service import DigitalWalletsService, FintechWalletsService
 
-# Placeholder implementation
-__version__ = "1.0.0"
-__status__ = "Development"
-
+__all__ = ["DigitalWalletsService", "FintechWalletsService", "evaluate_capability_rules", "get_capability_contract"]
