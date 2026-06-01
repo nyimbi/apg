@@ -73,6 +73,7 @@ CAPABILITY_META = {
 		'payments',      # Digital Payments
 		'cards',         # Digital Cards
 		'wallets',       # Digital Wallets
+		'lending',       # Digital Lending
 		'remittance',    # Cross-Border Remittance
 		'kyc',           # Know Your Customer
 		'aml',           # Anti Money Laundering

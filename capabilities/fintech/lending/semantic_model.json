@@ -1,0 +1,2172 @@
+{
+  "app": {
+    "description": "Digital Lending package-backed APG capability",
+    "entity_count": 9,
+    "name": "fintech_lending",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "fintech_lending": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "audit": "audl",
+          "auth": "auth",
+          "cards": "fintech_cards",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "remittance": "fintech_remittance",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "lending_ops_reviewer",
+            "underwriting_reviewer",
+            "credit_risk_reviewer",
+            "collections_reviewer",
+            "compliance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "applications": {
+          "affordability_required": true,
+          "aml_required": true,
+          "bank_statement_required": true,
+          "card_evidence_supported": true,
+          "fraud_required": true,
+          "high_amount_threshold": 100000,
+          "remittance_evidence_supported": true,
+          "supported_purposes": [
+            "working_capital",
+            "inventory",
+            "asset_purchase",
+            "education",
+            "medical",
+            "home_improvement",
+            "emergency",
+            "refinance"
+          ]
+        },
+        "borrowers": {
+          "consent_required": true,
+          "income_evidence_required": true,
+          "kyc_required": true,
+          "supported_countries": [
+            "KE",
+            "UG",
+            "TZ",
+            "RW",
+            "GH",
+            "NG",
+            "ZA",
+            "GB",
+            "US",
+            "AE"
+          ]
+        },
+        "collections": {
+          "contact_policy_required": true,
+          "reviewer_required": true,
+          "supported_reasons": [
+            "missed_payment",
+            "promise_broken",
+            "hardship",
+            "fraud_review",
+            "restructure_request"
+          ]
+        },
+        "disbursements": {
+          "funding_account_required": true,
+          "human_approval_required": true,
+          "supported_rails": [
+            "payment_account",
+            "wallet",
+            "card",
+            "bank_transfer"
+          ]
+        },
+        "governance": {
+          "audit_lending_events": true,
+          "borrower_consent_required": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_application_events": true,
+          "emit_borrower_events": true,
+          "emit_collection_events": true,
+          "emit_disbursement_events": true,
+          "emit_offer_events": true,
+          "emit_product_events": true,
+          "emit_repayment_events": true,
+          "emit_underwriting_events": true,
+          "event_stream": "apg.fintech.lending.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "offers": {
+          "apr_required": true,
+          "borrower_acceptance_required": true,
+          "expiry_required": true,
+          "supported_statuses": [
+            "issued",
+            "accepted",
+            "expired",
+            "withdrawn"
+          ]
+        },
+        "products": {
+          "max_amount": 1000000,
+          "max_nominal_rate": 0.75,
+          "max_term_days": 3650,
+          "min_term_days": 7,
+          "owner_required": true,
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ],
+          "supported_repayment_frequencies": [
+            "weekly",
+            "biweekly",
+            "monthly",
+            "quarterly"
+          ],
+          "supported_types": [
+            "term_loan",
+            "revolving_credit",
+            "invoice_finance",
+            "asset_finance",
+            "salary_advance",
+            "merchant_cash_advance"
+          ]
+        },
+        "repayments": {
+          "due_date_required": true,
+          "positive_due_amount_required": true,
+          "supported_frequencies": [
+            "weekly",
+            "biweekly",
+            "monthly",
+            "quarterly"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_lending_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_applications": true,
+          "enable_borrowers": true,
+          "enable_collections": true,
+          "enable_dashboard": true,
+          "enable_disbursements": true,
+          "enable_offers": true,
+          "enable_products": true,
+          "enable_repayments": true,
+          "enable_underwriting": true
+        },
+        "underwriting": {
+          "adverse_reason_required_for_declines": true,
+          "human_approval_required_for_final_decision": true,
+          "max_score": 1000,
+          "min_score": 0,
+          "supported_decisions": [
+            "approve",
+            "decline",
+            "refer",
+            "counteroffer"
+          ]
+        }
+      },
+      "name": "Digital Lending",
+      "provides": [
+        "loan_product_governance",
+        "borrower_lifecycle",
+        "credit_application_workflow",
+        "underwriting_decisioning",
+        "loan_offer_workflow",
+        "disbursement_control",
+        "repayment_schedule_workflow",
+        "collections_workflow",
+        "lending_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_cards",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "fintech_remittance"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "Lending operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "description": "Lending writes require policy evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "lending_policy_required",
+              "required_action": "attach_lending_policy"
+            },
+            "name": "lending_write_requires_policy"
+          },
+          {
+            "condition": {
+              "operation": "register_product",
+              "owner_present": false
+            },
+            "description": "Loan products require owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "loan_product_owner_required",
+              "required_action": "assign_product_owner"
+            },
+            "name": "loan_product_owner_required"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "register_product"
+            },
+            "description": "Loan product currency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "lending_currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "loan_product_currency_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_product",
+              "product_type_supported": false
+            },
+            "description": "Loan product type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "loan_product_type_not_supported",
+              "required_action": "select_supported_product_type"
+            },
+            "name": "loan_product_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_product",
+              "term_valid": false
+            },
+            "description": "Loan product term must be valid.",
+            "effect": {
+              "decision": "deny",
+              "reason": "loan_product_term_invalid",
+              "required_action": "set_supported_term"
+            },
+            "name": "loan_product_term_valid"
+          },
+          {
+            "condition": {
+              "operation": "register_product",
+              "rate_valid": false
+            },
+            "description": "Loan product rate must be within policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "loan_product_rate_invalid",
+              "required_action": "set_policy_rate"
+            },
+            "name": "loan_product_rate_valid"
+          },
+          {
+            "condition": {
+              "amount_limits_valid": false,
+              "operation": "register_product"
+            },
+            "description": "Loan product amount limits must be valid.",
+            "effect": {
+              "decision": "deny",
+              "reason": "loan_product_amount_limits_invalid",
+              "required_action": "set_amount_limits"
+            },
+            "name": "loan_product_amount_limits_valid"
+          },
+          {
+            "condition": {
+              "operation": "register_product",
+              "repayment_frequency_supported": false
+            },
+            "description": "Repayment frequency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "repayment_frequency_not_supported",
+              "required_action": "select_supported_frequency"
+            },
+            "name": "loan_product_repayment_frequency_supported"
+          },
+          {
+            "condition": {
+              "customer_present": false,
+              "operation": "onboard_borrower"
+            },
+            "description": "Borrowers require customer reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "borrower_customer_required",
+              "required_action": "attach_customer_reference"
+            },
+            "name": "borrower_customer_required"
+          },
+          {
+            "condition": {
+              "kyc_present": false,
+              "operation": "onboard_borrower"
+            },
+            "description": "Borrowers require KYC evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "borrower_kyc_required",
+              "required_action": "attach_kyc_profile"
+            },
+            "name": "borrower_kyc_required"
+          },
+          {
+            "condition": {
+              "country_supported": false,
+              "operation": "onboard_borrower"
+            },
+            "description": "Borrower country must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "borrower_country_not_supported",
+              "required_action": "select_supported_country"
+            },
+            "name": "borrower_country_supported"
+          },
+          {
+            "condition": {
+              "income_evidence_present": false,
+              "operation": "onboard_borrower"
+            },
+            "description": "Borrowers require income evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "income_evidence_required",
+              "required_action": "attach_income_evidence"
+            },
+            "name": "borrower_income_evidence_required"
+          },
+          {
+            "condition": {
+              "consent_present": false,
+              "operation": "onboard_borrower"
+            },
+            "description": "Borrowers require lending consent evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "borrower_consent_required",
+              "required_action": "attach_borrower_consent"
+            },
+            "name": "borrower_consent_required"
+          },
+          {
+            "condition": {
+              "borrower_present": false,
+              "operation": "submit_application"
+            },
+            "description": "Applications require borrower.",
+            "effect": {
+              "decision": "deny",
+              "reason": "borrower_required",
+              "required_action": "select_borrower"
+            },
+            "name": "application_borrower_required"
+          },
+          {
+            "condition": {
+              "operation": "submit_application",
+              "product_present": false
+            },
+            "description": "Applications require loan product.",
+            "effect": {
+              "decision": "deny",
+              "reason": "loan_product_required",
+              "required_action": "select_loan_product"
+            },
+            "name": "application_product_required"
+          },
+          {
+            "condition": {
+              "operation": "submit_application",
+              "positive_amount": false
+            },
+            "description": "Application amount must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_amount_required",
+              "required_action": "set_positive_amount"
+            },
+            "name": "application_amount_positive"
+          },
+          {
+            "condition": {
+              "amount_within_limits": false,
+              "operation": "submit_application"
+            },
+            "description": "Application amount must fit product limits.",
+            "effect": {
+              "decision": "deny",
+              "reason": "application_amount_outside_limits",
+              "required_action": "adjust_requested_amount"
+            },
+            "name": "application_amount_within_limits"
+          },
+          {
+            "condition": {
+              "operation": "submit_application",
+              "purpose_supported": false
+            },
+            "description": "Application purpose must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "application_purpose_not_supported",
+              "required_action": "select_supported_purpose"
+            },
+            "name": "application_purpose_supported"
+          },
+          {
+            "condition": {
+              "affordability_present": false,
+              "operation": "submit_application"
+            },
+            "description": "Applications require affordability evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "affordability_evidence_required",
+              "required_action": "attach_affordability_evidence"
+            },
+            "name": "application_affordability_required"
+          },
+          {
+            "condition": {
+              "bank_statement_present": false,
+              "operation": "submit_application"
+            },
+            "description": "Applications require bank-statement evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bank_statement_evidence_required",
+              "required_action": "attach_bank_statement_evidence"
+            },
+            "name": "application_bank_statement_required"
+          },
+          {
+            "condition": {
+              "aml_present": false,
+              "operation": "submit_application"
+            },
+            "description": "Applications require AML evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "aml_evidence_required",
+              "required_action": "attach_aml_evidence"
+            },
+            "name": "application_aml_required"
+          },
+          {
+            "condition": {
+              "fraud_present": false,
+              "operation": "submit_application"
+            },
+            "description": "Applications require fraud evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "fraud_evidence_required",
+              "required_action": "attach_fraud_evidence"
+            },
+            "name": "application_fraud_required"
+          },
+          {
+            "condition": {
+              "operation": "submit_application",
+              "remittance_or_card_evidence_present": false
+            },
+            "description": "Credit files require remittance or card behavior evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "behavior_evidence_review_required",
+              "required_action": "record_behavior_evidence_review"
+            },
+            "name": "application_remittance_or_card_evidence_required"
+          },
+          {
+            "condition": {
+              "high_amount": true,
+              "human_review_recorded": false,
+              "operation": "submit_application"
+            },
+            "description": "High amount applications require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "high_amount_application_review_required",
+              "required_action": "record_credit_committee_review"
+            },
+            "name": "high_amount_application_requires_review"
+          },
+          {
+            "condition": {
+              "application_present": false,
+              "operation": "record_underwriting"
+            },
+            "description": "Underwriting requires application.",
+            "effect": {
+              "decision": "deny",
+              "reason": "application_required",
+              "required_action": "select_application"
+            },
+            "name": "underwriting_application_required"
+          },
+          {
+            "condition": {
+              "operation": "record_underwriting",
+              "score_in_range": false
+            },
+            "description": "Underwriting score must be in range.",
+            "effect": {
+              "decision": "deny",
+              "reason": "underwriting_score_out_of_range",
+              "required_action": "set_valid_score"
+            },
+            "name": "underwriting_score_in_range"
+          },
+          {
+            "condition": {
+              "decision_supported": false,
+              "operation": "record_underwriting"
+            },
+            "description": "Underwriting decision must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "underwriting_decision_not_supported",
+              "required_action": "select_supported_decision"
+            },
+            "name": "underwriting_decision_supported"
+          },
+          {
+            "condition": {
+              "decision_evidence_present": false,
+              "operation": "record_underwriting"
+            },
+            "description": "Underwriting decisions require evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "underwriting_evidence_required",
+              "required_action": "attach_underwriting_evidence"
+            },
+            "name": "underwriting_decision_evidence_required"
+          },
+          {
+            "condition": {
+              "adverse_decision": true,
+              "adverse_reason_present": false,
+              "operation": "record_underwriting"
+            },
+            "description": "Declines require adverse-action reason.",
+            "effect": {
+              "decision": "deny",
+              "reason": "adverse_reason_required",
+              "required_action": "record_adverse_action_reason"
+            },
+            "name": "underwriting_adverse_reason_required"
+          },
+          {
+            "condition": {
+              "final_decision": true,
+              "human_approval_recorded": false,
+              "operation": "record_underwriting"
+            },
+            "description": "Approve or decline decisions require human approval.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "underwriting_approval_required",
+              "required_action": "record_underwriting_approval"
+            },
+            "name": "underwriting_final_decision_requires_approval"
+          },
+          {
+            "condition": {
+              "application_present": false,
+              "operation": "issue_offer"
+            },
+            "description": "Offers require application.",
+            "effect": {
+              "decision": "deny",
+              "reason": "application_required",
+              "required_action": "select_application"
+            },
+            "name": "offer_application_required"
+          },
+          {
+            "condition": {
+              "operation": "issue_offer",
+              "underwriting_present": false
+            },
+            "description": "Offers require underwriting decision.",
+            "effect": {
+              "decision": "deny",
+              "reason": "underwriting_decision_required",
+              "required_action": "attach_underwriting_decision"
+            },
+            "name": "offer_underwriting_required"
+          },
+          {
+            "condition": {
+              "apr_valid": false,
+              "operation": "issue_offer"
+            },
+            "description": "Offer APR must be valid.",
+            "effect": {
+              "decision": "deny",
+              "reason": "offer_apr_invalid",
+              "required_action": "set_valid_apr"
+            },
+            "name": "offer_apr_valid"
+          },
+          {
+            "condition": {
+              "operation": "issue_offer",
+              "term_valid": false
+            },
+            "description": "Offer term must be valid.",
+            "effect": {
+              "decision": "deny",
+              "reason": "offer_term_invalid",
+              "required_action": "set_valid_term"
+            },
+            "name": "offer_term_valid"
+          },
+          {
+            "condition": {
+              "offer_status_supported": false,
+              "operation": "issue_offer"
+            },
+            "description": "Offer status must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "offer_status_not_supported",
+              "required_action": "select_supported_offer_status"
+            },
+            "name": "offer_status_supported"
+          },
+          {
+            "condition": {
+              "expiry_present": false,
+              "operation": "issue_offer"
+            },
+            "description": "Offers require expiry.",
+            "effect": {
+              "decision": "deny",
+              "reason": "offer_expiry_required",
+              "required_action": "set_offer_expiry"
+            },
+            "name": "offer_expiry_required"
+          },
+          {
+            "condition": {
+              "accepted_offer": true,
+              "borrower_acceptance_present": false,
+              "operation": "issue_offer"
+            },
+            "description": "Accepted offers require borrower acceptance evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "borrower_acceptance_required",
+              "required_action": "attach_borrower_acceptance"
+            },
+            "name": "offer_acceptance_required"
+          },
+          {
+            "condition": {
+              "offer_present": false,
+              "operation": "record_disbursement"
+            },
+            "description": "Disbursements require accepted offer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "accepted_offer_required",
+              "required_action": "select_accepted_offer"
+            },
+            "name": "disbursement_offer_required"
+          },
+          {
+            "condition": {
+              "funding_account_present": false,
+              "operation": "record_disbursement"
+            },
+            "description": "Disbursements require funding account.",
+            "effect": {
+              "decision": "deny",
+              "reason": "funding_account_required",
+              "required_action": "attach_funding_account"
+            },
+            "name": "disbursement_funding_account_required"
+          },
+          {
+            "condition": {
+              "operation": "record_disbursement",
+              "rail_supported": false
+            },
+            "description": "Disbursement rail must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "disbursement_rail_not_supported",
+              "required_action": "select_supported_disbursement_rail"
+            },
+            "name": "disbursement_rail_supported"
+          },
+          {
+            "condition": {
+              "destination_present": false,
+              "operation": "record_disbursement"
+            },
+            "description": "Disbursements require payment, wallet, card, or bank destination.",
+            "effect": {
+              "decision": "deny",
+              "reason": "disbursement_destination_required",
+              "required_action": "attach_disbursement_destination"
+            },
+            "name": "disbursement_destination_required"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "record_disbursement"
+            },
+            "description": "Disbursement requires human approval.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "disbursement_approval_required",
+              "required_action": "record_disbursement_approval"
+            },
+            "name": "disbursement_requires_human_approval"
+          },
+          {
+            "condition": {
+              "offer_present": false,
+              "operation": "schedule_repayment"
+            },
+            "description": "Repayment schedules require offer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "loan_offer_required",
+              "required_action": "select_loan_offer"
+            },
+            "name": "repayment_offer_required"
+          },
+          {
+            "condition": {
+              "operation": "schedule_repayment",
+              "positive_due_amount": false
+            },
+            "description": "Repayment due amount must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_due_amount_required",
+              "required_action": "set_positive_due_amount"
+            },
+            "name": "repayment_due_amount_positive"
+          },
+          {
+            "condition": {
+              "due_date_present": false,
+              "operation": "schedule_repayment"
+            },
+            "description": "Repayment schedules require due date.",
+            "effect": {
+              "decision": "deny",
+              "reason": "due_date_required",
+              "required_action": "set_due_date"
+            },
+            "name": "repayment_due_date_required"
+          },
+          {
+            "condition": {
+              "operation": "schedule_repayment",
+              "repayment_frequency_supported": false
+            },
+            "description": "Repayment frequency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "repayment_frequency_not_supported",
+              "required_action": "select_supported_frequency"
+            },
+            "name": "repayment_frequency_supported"
+          },
+          {
+            "condition": {
+              "operation": "open_collection_case",
+              "overdue_account_present": false
+            },
+            "description": "Collection cases require overdue account.",
+            "effect": {
+              "decision": "deny",
+              "reason": "overdue_account_required",
+              "required_action": "attach_overdue_account"
+            },
+            "name": "collection_overdue_account_required"
+          },
+          {
+            "condition": {
+              "collection_reason_supported": false,
+              "operation": "open_collection_case"
+            },
+            "description": "Collection reason must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "collection_reason_not_supported",
+              "required_action": "select_supported_collection_reason"
+            },
+            "name": "collection_reason_supported"
+          },
+          {
+            "condition": {
+              "operation": "open_collection_case",
+              "reviewer_present": false
+            },
+            "description": "Collection cases require reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "collection_reviewer_required",
+              "required_action": "assign_collection_reviewer"
+            },
+            "name": "collection_reviewer_required"
+          },
+          {
+            "condition": {
+              "contact_policy_present": false,
+              "operation": "open_collection_case"
+            },
+            "description": "Collection cases require contact policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "contact_policy_required",
+              "required_action": "attach_contact_policy"
+            },
+            "name": "collection_contact_policy_required"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "lending_batch"
+            },
+            "description": "Lending batches require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_lending_batch_to_bytewax"
+            },
+            "name": "lending_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_lending_agent"
+            },
+            "description": "Lending agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "lending_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "lending_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_lending_agent"
+            },
+            "description": "Lending agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "lending_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "lending_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "lending_agent_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged lending-agent actions require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_lending_agent_action_requires_human_approval"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "Lending operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "description": "Lending writes require policy evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "lending_policy_required",
+            "required_action": "attach_lending_policy"
+          },
+          "name": "lending_write_requires_policy"
+        },
+        {
+          "condition": {
+            "operation": "register_product",
+            "owner_present": false
+          },
+          "description": "Loan products require owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "loan_product_owner_required",
+            "required_action": "assign_product_owner"
+          },
+          "name": "loan_product_owner_required"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "register_product"
+          },
+          "description": "Loan product currency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "lending_currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "loan_product_currency_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_product",
+            "product_type_supported": false
+          },
+          "description": "Loan product type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "loan_product_type_not_supported",
+            "required_action": "select_supported_product_type"
+          },
+          "name": "loan_product_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_product",
+            "term_valid": false
+          },
+          "description": "Loan product term must be valid.",
+          "effect": {
+            "decision": "deny",
+            "reason": "loan_product_term_invalid",
+            "required_action": "set_supported_term"
+          },
+          "name": "loan_product_term_valid"
+        },
+        {
+          "condition": {
+            "operation": "register_product",
+            "rate_valid": false
+          },
+          "description": "Loan product rate must be within policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "loan_product_rate_invalid",
+            "required_action": "set_policy_rate"
+          },
+          "name": "loan_product_rate_valid"
+        },
+        {
+          "condition": {
+            "amount_limits_valid": false,
+            "operation": "register_product"
+          },
+          "description": "Loan product amount limits must be valid.",
+          "effect": {
+            "decision": "deny",
+            "reason": "loan_product_amount_limits_invalid",
+            "required_action": "set_amount_limits"
+          },
+          "name": "loan_product_amount_limits_valid"
+        },
+        {
+          "condition": {
+            "operation": "register_product",
+            "repayment_frequency_supported": false
+          },
+          "description": "Repayment frequency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "repayment_frequency_not_supported",
+            "required_action": "select_supported_frequency"
+          },
+          "name": "loan_product_repayment_frequency_supported"
+        },
+        {
+          "condition": {
+            "customer_present": false,
+            "operation": "onboard_borrower"
+          },
+          "description": "Borrowers require customer reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "borrower_customer_required",
+            "required_action": "attach_customer_reference"
+          },
+          "name": "borrower_customer_required"
+        },
+        {
+          "condition": {
+            "kyc_present": false,
+            "operation": "onboard_borrower"
+          },
+          "description": "Borrowers require KYC evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "borrower_kyc_required",
+            "required_action": "attach_kyc_profile"
+          },
+          "name": "borrower_kyc_required"
+        },
+        {
+          "condition": {
+            "country_supported": false,
+            "operation": "onboard_borrower"
+          },
+          "description": "Borrower country must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "borrower_country_not_supported",
+            "required_action": "select_supported_country"
+          },
+          "name": "borrower_country_supported"
+        },
+        {
+          "condition": {
+            "income_evidence_present": false,
+            "operation": "onboard_borrower"
+          },
+          "description": "Borrowers require income evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "income_evidence_required",
+            "required_action": "attach_income_evidence"
+          },
+          "name": "borrower_income_evidence_required"
+        },
+        {
+          "condition": {
+            "consent_present": false,
+            "operation": "onboard_borrower"
+          },
+          "description": "Borrowers require lending consent evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "borrower_consent_required",
+            "required_action": "attach_borrower_consent"
+          },
+          "name": "borrower_consent_required"
+        },
+        {
+          "condition": {
+            "borrower_present": false,
+            "operation": "submit_application"
+          },
+          "description": "Applications require borrower.",
+          "effect": {
+            "decision": "deny",
+            "reason": "borrower_required",
+            "required_action": "select_borrower"
+          },
+          "name": "application_borrower_required"
+        },
+        {
+          "condition": {
+            "operation": "submit_application",
+            "product_present": false
+          },
+          "description": "Applications require loan product.",
+          "effect": {
+            "decision": "deny",
+            "reason": "loan_product_required",
+            "required_action": "select_loan_product"
+          },
+          "name": "application_product_required"
+        },
+        {
+          "condition": {
+            "operation": "submit_application",
+            "positive_amount": false
+          },
+          "description": "Application amount must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_amount_required",
+            "required_action": "set_positive_amount"
+          },
+          "name": "application_amount_positive"
+        },
+        {
+          "condition": {
+            "amount_within_limits": false,
+            "operation": "submit_application"
+          },
+          "description": "Application amount must fit product limits.",
+          "effect": {
+            "decision": "deny",
+            "reason": "application_amount_outside_limits",
+            "required_action": "adjust_requested_amount"
+          },
+          "name": "application_amount_within_limits"
+        },
+        {
+          "condition": {
+            "operation": "submit_application",
+            "purpose_supported": false
+          },
+          "description": "Application purpose must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "application_purpose_not_supported",
+            "required_action": "select_supported_purpose"
+          },
+          "name": "application_purpose_supported"
+        },
+        {
+          "condition": {
+            "affordability_present": false,
+            "operation": "submit_application"
+          },
+          "description": "Applications require affordability evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "affordability_evidence_required",
+            "required_action": "attach_affordability_evidence"
+          },
+          "name": "application_affordability_required"
+        },
+        {
+          "condition": {
+            "bank_statement_present": false,
+            "operation": "submit_application"
+          },
+          "description": "Applications require bank-statement evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bank_statement_evidence_required",
+            "required_action": "attach_bank_statement_evidence"
+          },
+          "name": "application_bank_statement_required"
+        },
+        {
+          "condition": {
+            "aml_present": false,
+            "operation": "submit_application"
+          },
+          "description": "Applications require AML evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "aml_evidence_required",
+            "required_action": "attach_aml_evidence"
+          },
+          "name": "application_aml_required"
+        },
+        {
+          "condition": {
+            "fraud_present": false,
+            "operation": "submit_application"
+          },
+          "description": "Applications require fraud evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "fraud_evidence_required",
+            "required_action": "attach_fraud_evidence"
+          },
+          "name": "application_fraud_required"
+        },
+        {
+          "condition": {
+            "operation": "submit_application",
+            "remittance_or_card_evidence_present": false
+          },
+          "description": "Credit files require remittance or card behavior evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "behavior_evidence_review_required",
+            "required_action": "record_behavior_evidence_review"
+          },
+          "name": "application_remittance_or_card_evidence_required"
+        },
+        {
+          "condition": {
+            "high_amount": true,
+            "human_review_recorded": false,
+            "operation": "submit_application"
+          },
+          "description": "High amount applications require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "high_amount_application_review_required",
+            "required_action": "record_credit_committee_review"
+          },
+          "name": "high_amount_application_requires_review"
+        },
+        {
+          "condition": {
+            "application_present": false,
+            "operation": "record_underwriting"
+          },
+          "description": "Underwriting requires application.",
+          "effect": {
+            "decision": "deny",
+            "reason": "application_required",
+            "required_action": "select_application"
+          },
+          "name": "underwriting_application_required"
+        },
+        {
+          "condition": {
+            "operation": "record_underwriting",
+            "score_in_range": false
+          },
+          "description": "Underwriting score must be in range.",
+          "effect": {
+            "decision": "deny",
+            "reason": "underwriting_score_out_of_range",
+            "required_action": "set_valid_score"
+          },
+          "name": "underwriting_score_in_range"
+        },
+        {
+          "condition": {
+            "decision_supported": false,
+            "operation": "record_underwriting"
+          },
+          "description": "Underwriting decision must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "underwriting_decision_not_supported",
+            "required_action": "select_supported_decision"
+          },
+          "name": "underwriting_decision_supported"
+        },
+        {
+          "condition": {
+            "decision_evidence_present": false,
+            "operation": "record_underwriting"
+          },
+          "description": "Underwriting decisions require evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "underwriting_evidence_required",
+            "required_action": "attach_underwriting_evidence"
+          },
+          "name": "underwriting_decision_evidence_required"
+        },
+        {
+          "condition": {
+            "adverse_decision": true,
+            "adverse_reason_present": false,
+            "operation": "record_underwriting"
+          },
+          "description": "Declines require adverse-action reason.",
+          "effect": {
+            "decision": "deny",
+            "reason": "adverse_reason_required",
+            "required_action": "record_adverse_action_reason"
+          },
+          "name": "underwriting_adverse_reason_required"
+        },
+        {
+          "condition": {
+            "final_decision": true,
+            "human_approval_recorded": false,
+            "operation": "record_underwriting"
+          },
+          "description": "Approve or decline decisions require human approval.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "underwriting_approval_required",
+            "required_action": "record_underwriting_approval"
+          },
+          "name": "underwriting_final_decision_requires_approval"
+        },
+        {
+          "condition": {
+            "application_present": false,
+            "operation": "issue_offer"
+          },
+          "description": "Offers require application.",
+          "effect": {
+            "decision": "deny",
+            "reason": "application_required",
+            "required_action": "select_application"
+          },
+          "name": "offer_application_required"
+        },
+        {
+          "condition": {
+            "operation": "issue_offer",
+            "underwriting_present": false
+          },
+          "description": "Offers require underwriting decision.",
+          "effect": {
+            "decision": "deny",
+            "reason": "underwriting_decision_required",
+            "required_action": "attach_underwriting_decision"
+          },
+          "name": "offer_underwriting_required"
+        },
+        {
+          "condition": {
+            "apr_valid": false,
+            "operation": "issue_offer"
+          },
+          "description": "Offer APR must be valid.",
+          "effect": {
+            "decision": "deny",
+            "reason": "offer_apr_invalid",
+            "required_action": "set_valid_apr"
+          },
+          "name": "offer_apr_valid"
+        },
+        {
+          "condition": {
+            "operation": "issue_offer",
+            "term_valid": false
+          },
+          "description": "Offer term must be valid.",
+          "effect": {
+            "decision": "deny",
+            "reason": "offer_term_invalid",
+            "required_action": "set_valid_term"
+          },
+          "name": "offer_term_valid"
+        },
+        {
+          "condition": {
+            "offer_status_supported": false,
+            "operation": "issue_offer"
+          },
+          "description": "Offer status must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "offer_status_not_supported",
+            "required_action": "select_supported_offer_status"
+          },
+          "name": "offer_status_supported"
+        },
+        {
+          "condition": {
+            "expiry_present": false,
+            "operation": "issue_offer"
+          },
+          "description": "Offers require expiry.",
+          "effect": {
+            "decision": "deny",
+            "reason": "offer_expiry_required",
+            "required_action": "set_offer_expiry"
+          },
+          "name": "offer_expiry_required"
+        },
+        {
+          "condition": {
+            "accepted_offer": true,
+            "borrower_acceptance_present": false,
+            "operation": "issue_offer"
+          },
+          "description": "Accepted offers require borrower acceptance evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "borrower_acceptance_required",
+            "required_action": "attach_borrower_acceptance"
+          },
+          "name": "offer_acceptance_required"
+        },
+        {
+          "condition": {
+            "offer_present": false,
+            "operation": "record_disbursement"
+          },
+          "description": "Disbursements require accepted offer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "accepted_offer_required",
+            "required_action": "select_accepted_offer"
+          },
+          "name": "disbursement_offer_required"
+        },
+        {
+          "condition": {
+            "funding_account_present": false,
+            "operation": "record_disbursement"
+          },
+          "description": "Disbursements require funding account.",
+          "effect": {
+            "decision": "deny",
+            "reason": "funding_account_required",
+            "required_action": "attach_funding_account"
+          },
+          "name": "disbursement_funding_account_required"
+        },
+        {
+          "condition": {
+            "operation": "record_disbursement",
+            "rail_supported": false
+          },
+          "description": "Disbursement rail must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "disbursement_rail_not_supported",
+            "required_action": "select_supported_disbursement_rail"
+          },
+          "name": "disbursement_rail_supported"
+        },
+        {
+          "condition": {
+            "destination_present": false,
+            "operation": "record_disbursement"
+          },
+          "description": "Disbursements require payment, wallet, card, or bank destination.",
+          "effect": {
+            "decision": "deny",
+            "reason": "disbursement_destination_required",
+            "required_action": "attach_disbursement_destination"
+          },
+          "name": "disbursement_destination_required"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "record_disbursement"
+          },
+          "description": "Disbursement requires human approval.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "disbursement_approval_required",
+            "required_action": "record_disbursement_approval"
+          },
+          "name": "disbursement_requires_human_approval"
+        },
+        {
+          "condition": {
+            "offer_present": false,
+            "operation": "schedule_repayment"
+          },
+          "description": "Repayment schedules require offer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "loan_offer_required",
+            "required_action": "select_loan_offer"
+          },
+          "name": "repayment_offer_required"
+        },
+        {
+          "condition": {
+            "operation": "schedule_repayment",
+            "positive_due_amount": false
+          },
+          "description": "Repayment due amount must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_due_amount_required",
+            "required_action": "set_positive_due_amount"
+          },
+          "name": "repayment_due_amount_positive"
+        },
+        {
+          "condition": {
+            "due_date_present": false,
+            "operation": "schedule_repayment"
+          },
+          "description": "Repayment schedules require due date.",
+          "effect": {
+            "decision": "deny",
+            "reason": "due_date_required",
+            "required_action": "set_due_date"
+          },
+          "name": "repayment_due_date_required"
+        },
+        {
+          "condition": {
+            "operation": "schedule_repayment",
+            "repayment_frequency_supported": false
+          },
+          "description": "Repayment frequency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "repayment_frequency_not_supported",
+            "required_action": "select_supported_frequency"
+          },
+          "name": "repayment_frequency_supported"
+        },
+        {
+          "condition": {
+            "operation": "open_collection_case",
+            "overdue_account_present": false
+          },
+          "description": "Collection cases require overdue account.",
+          "effect": {
+            "decision": "deny",
+            "reason": "overdue_account_required",
+            "required_action": "attach_overdue_account"
+          },
+          "name": "collection_overdue_account_required"
+        },
+        {
+          "condition": {
+            "collection_reason_supported": false,
+            "operation": "open_collection_case"
+          },
+          "description": "Collection reason must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "collection_reason_not_supported",
+            "required_action": "select_supported_collection_reason"
+          },
+          "name": "collection_reason_supported"
+        },
+        {
+          "condition": {
+            "operation": "open_collection_case",
+            "reviewer_present": false
+          },
+          "description": "Collection cases require reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "collection_reviewer_required",
+            "required_action": "assign_collection_reviewer"
+          },
+          "name": "collection_reviewer_required"
+        },
+        {
+          "condition": {
+            "contact_policy_present": false,
+            "operation": "open_collection_case"
+          },
+          "description": "Collection cases require contact policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "contact_policy_required",
+            "required_action": "attach_contact_policy"
+          },
+          "name": "collection_contact_policy_required"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "lending_batch"
+          },
+          "description": "Lending batches require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_lending_batch_to_bytewax"
+          },
+          "name": "lending_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_lending_agent"
+          },
+          "description": "Lending agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "lending_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "lending_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_lending_agent"
+          },
+          "description": "Lending agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "lending_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "lending_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "lending_agent_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged lending-agent actions require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_lending_agent_action_requires_human_approval"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "agents": {
+          "component": "LendingAgentWorkbench",
+          "permission": "fintech_lending:admin",
+          "route": "/fintech-lending/agents"
+        },
+        "applications": {
+          "component": "ApplicationWorkbench",
+          "permission": "fintech_lending:submit",
+          "route": "/fintech-lending/applications"
+        },
+        "borrowers": {
+          "component": "BorrowerWorkbench",
+          "permission": "fintech_lending:manage_borrowers",
+          "route": "/fintech-lending/borrowers"
+        },
+        "collections": {
+          "component": "CollectionsWorkbench",
+          "permission": "fintech_lending:collections",
+          "route": "/fintech-lending/collections"
+        },
+        "dashboard": {
+          "component": "LendingDashboard",
+          "permission": "fintech_lending:view",
+          "route": "/fintech-lending/dashboard"
+        },
+        "disbursements": {
+          "component": "DisbursementConsole",
+          "permission": "fintech_lending:disburse",
+          "route": "/fintech-lending/disbursements"
+        },
+        "offers": {
+          "component": "LoanOfferWorkbench",
+          "permission": "fintech_lending:offer",
+          "route": "/fintech-lending/offers"
+        },
+        "products": {
+          "component": "LoanProductConsole",
+          "permission": "fintech_lending:manage_products",
+          "route": "/fintech-lending/products"
+        },
+        "repayments": {
+          "component": "RepaymentScheduleWorkbench",
+          "permission": "fintech_lending:repayments",
+          "route": "/fintech-lending/repayments"
+        },
+        "settings": {
+          "component": "LendingSettings",
+          "permission": "fintech_lending:admin",
+          "route": "/fintech-lending/settings"
+        },
+        "underwriting": {
+          "component": "UnderwritingConsole",
+          "permission": "fintech_lending:underwrite",
+          "route": "/fintech-lending/underwriting"
+        }
+      },
+      "streaming": {
+        "events": [
+          "loan_product_registered",
+          "borrower_onboarded",
+          "loan_application_submitted",
+          "underwriting_recorded",
+          "loan_offer_issued",
+          "loan_disbursement_recorded",
+          "repayment_schedule_created",
+          "collection_case_opened",
+          "lending_agent_registered"
+        ],
+        "guardrails": [
+          "lending_batch_requires_bytewax",
+          "privileged_lending_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.fintech.lending.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "applications": {
+            "icon": "file-check-2",
+            "status_indicator": "application-chip"
+          },
+          "collections": {
+            "icon": "phone-call",
+            "status_indicator": "collection-chip"
+          },
+          "offers": {
+            "icon": "badge-dollar-sign",
+            "status_indicator": "offer-chip"
+          },
+          "products": {
+            "icon": "landmark",
+            "status_indicator": "product-chip"
+          },
+          "repayments": {
+            "icon": "calendar-clock",
+            "status_indicator": "repayment-chip"
+          },
+          "underwriting": {
+            "icon": "scale",
+            "status_indicator": "decision-chip"
+          }
+        },
+        "name": "fintech_lending_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#7C3AED",
+          "color.danger": "#B91C1C",
+          "color.primary": "#0F766E",
+          "color.success": "#15803D",
+          "color.warning": "#B45309",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/fintech-lending/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "LendingDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/fintech-lending/dashboard",
+            "permission": "fintech_lending:view"
+          },
+          {
+            "component": "LoanProductConsole",
+            "name": "products",
+            "nav_group": "Products",
+            "path": "/fintech-lending/products",
+            "permission": "fintech_lending:manage_products"
+          },
+          {
+            "component": "BorrowerWorkbench",
+            "name": "borrowers",
+            "nav_group": "Borrowers",
+            "path": "/fintech-lending/borrowers",
+            "permission": "fintech_lending:manage_borrowers"
+          },
+          {
+            "component": "ApplicationWorkbench",
+            "name": "applications",
+            "nav_group": "Applications",
+            "path": "/fintech-lending/applications",
+            "permission": "fintech_lending:submit"
+          },
+          {
+            "component": "UnderwritingConsole",
+            "name": "underwriting",
+            "nav_group": "Risk",
+            "path": "/fintech-lending/underwriting",
+            "permission": "fintech_lending:underwrite"
+          },
+          {
+            "component": "LoanOfferWorkbench",
+            "name": "offers",
+            "nav_group": "Offers",
+            "path": "/fintech-lending/offers",
+            "permission": "fintech_lending:offer"
+          },
+          {
+            "component": "DisbursementConsole",
+            "name": "disbursements",
+            "nav_group": "Funding",
+            "path": "/fintech-lending/disbursements",
+            "permission": "fintech_lending:disburse"
+          },
+          {
+            "component": "RepaymentScheduleWorkbench",
+            "name": "repayments",
+            "nav_group": "Servicing",
+            "path": "/fintech-lending/repayments",
+            "permission": "fintech_lending:repayments"
+          },
+          {
+            "component": "CollectionsWorkbench",
+            "name": "collections",
+            "nav_group": "Servicing",
+            "path": "/fintech-lending/collections",
+            "permission": "fintech_lending:collections"
+          },
+          {
+            "component": "LendingAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/fintech-lending/agents",
+            "permission": "fintech_lending:admin"
+          },
+          {
+            "component": "LendingSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/fintech-lending/settings",
+            "permission": "fintech_lending:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "lending_review": {
+        "roles": [
+          "lending_ops_reviewer",
+          "underwriting_reviewer",
+          "credit_risk_reviewer",
+          "collections_reviewer",
+          "compliance_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "fintech_lending": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_cards",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "fintech_remittance"
+      ]
+    }
+  },
+  "contracts": {
+    "fintech_lending": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "audit": "audl",
+          "auth": "auth",
+          "cards": "fintech_cards",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "remittance": "fintech_remittance",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "lending_ops_reviewer",
+            "underwriting_reviewer",
+            "credit_risk_reviewer",
+            "collections_reviewer",
+            "compliance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "applications": {
+          "affordability_required": true,
+          "aml_required": true,
+          "bank_statement_required": true,
+          "card_evidence_supported": true,
+          "fraud_required": true,
+          "high_amount_threshold": 100000,
+          "remittance_evidence_supported": true,
+          "supported_purposes": [
+            "working_capital",
+            "inventory",
+            "asset_purchase",
+            "education",
+            "medical",
+            "home_improvement",
+            "emergency",
+            "refinance"
+          ]
+        },
+        "borrowers": {
+          "consent_required": true,
+          "income_evidence_required": true,
+          "kyc_required": true,
+          "supported_countries": [
+            "KE",
+            "UG",
+            "TZ",
+            "RW",
+            "GH",
+            "NG",
+            "ZA",
+            "GB",
+            "US",
+            "AE"
+          ]
+        },
+        "collections": {
+          "contact_policy_required": true,
+          "reviewer_required": true,
+          "supported_reasons": [
+            "missed_payment",
+            "promise_broken",
+            "hardship",
+            "fraud_review",
+            "restructure_request"
+          ]
+        },
+        "disbursements": {
+          "funding_account_required": true,
+          "human_approval_required": true,
+          "supported_rails": [
+            "payment_account",
+            "wallet",
+            "card",
+            "bank_transfer"
+          ]
+        },
+        "governance": {
+          "audit_lending_events": true,
+          "borrower_consent_required": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_application_events": true,
+          "emit_borrower_events": true,
+          "emit_collection_events": true,
+          "emit_disbursement_events": true,
+          "emit_offer_events": true,
+          "emit_product_events": true,
+          "emit_repayment_events": true,
+          "emit_underwriting_events": true,
+          "event_stream": "apg.fintech.lending.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "offers": {
+          "apr_required": true,
+          "borrower_acceptance_required": true,
+          "expiry_required": true,
+          "supported_statuses": [
+            "issued",
+            "accepted",
+            "expired",
+            "withdrawn"
+          ]
+        },
+        "products": {
+          "max_amount": 1000000,
+          "max_nominal_rate": 0.75,
+          "max_term_days": 3650,
+          "min_term_days": 7,
+          "owner_required": true,
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ],
+          "supported_repayment_frequencies": [
+            "weekly",
+            "biweekly",
+            "monthly",
+            "quarterly"
+          ],
+          "supported_types": [
+            "term_loan",
+            "revolving_credit",
+            "invoice_finance",
+            "asset_finance",
+            "salary_advance",
+            "merchant_cash_advance"
+          ]
+        },
+        "repayments": {
+          "due_date_required": true,
+          "positive_due_amount_required": true,
+          "supported_frequencies": [
+            "weekly",
+            "biweekly",
+            "monthly",
+            "quarterly"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_lending_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_applications": true,
+          "enable_borrowers": true,
+          "enable_collections": true,
+          "enable_dashboard": true,
+          "enable_disbursements": true,
+          "enable_offers": true,
+          "enable_products": true,
+          "enable_repayments": true,
+          "enable_underwriting": true
+        },
+        "underwriting": {
+          "adverse_reason_required_for_declines": true,
+          "human_approval_required_for_final_decision": true,
+          "max_score": 1000,
+          "min_score": 0,
+          "supported_decisions": [
+            "approve",
+            "decline",
+            "refer",
+            "counteroffer"
+          ]
+        }
+      },
+      "id": "fintech_lending",
+      "provides": [
+        "loan_product_governance",
+        "borrower_lifecycle",
+        "credit_application_workflow",
+        "underwriting_decisioning",
+        "loan_offer_workflow",
+        "disbursement_control",
+        "repayment_schedule_workflow",
+        "collections_workflow",
+        "lending_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_cards",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "fintech_remittance"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 12,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "fintech_lending": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}

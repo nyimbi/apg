@@ -26822,3 +26822,93 @@ Known gaps:
   3DS, embossing/personalization, PCI DSS production-zone checks, live network
   chargeback submission, clearing-file reconciliation, durable Bytewax topology,
   or performance/load checks during this battery-conscious slice.
+
+### 2026-06-01 14:47 EAT
+
+Fintech Digital Lending executable capability slice:
+
+- Promoted `capabilities/fintech/lending` from a placeholder package into a
+  first-class APG capability with `README.md`, `SPECIFICATION.md`, `PLAN.md`,
+  `cap_spec.md`, contract, models, service, API helpers, view models, app
+  entrypoint, semantic/package/release evidence, and focused tests.
+- Added tenant-scoped loan product governance, borrower onboarding, credit
+  application intake, underwriting decisions, loan offers, disbursement
+  controls, repayment schedules, collections cases, dashboard summaries,
+  Bytewax batch validation, and provider-neutral lending-agent registration.
+- Added deterministic lending guardrails for tenant context, write policy,
+  product owner/type/currency/term/rate/amount/frequency controls, borrower
+  customer/KYC/country/income/consent evidence, application amount/purpose/
+  affordability/bank-statement/AML/fraud/behavior evidence, high-amount review,
+  underwriting score/decision/evidence/adverse-action/approval evidence, offer
+  application/underwriting/APR/term/expiry/acceptance evidence, disbursement
+  accepted-offer/funding/rail/destination/approval evidence, repayment due
+  amount/date/frequency evidence, collection overdue account/reason/reviewer/
+  contact-policy evidence, Bytewax lifecycle events, supported AI-agent
+  runtimes/roles, and privileged-agent approval.
+- Added `lending_runtime.py` domain helpers for normalized codes, countries,
+  currencies, amounts, rates, scores, installment estimation, and underwriting
+  decision categorization.
+- Updated fintech capability metadata so `lending` is listed as an implemented
+  sub-capability.
+- Removed the empty `_Digital_Lending` marker file and refreshed
+  `semantic_model.json`, `package_manifest.json`, and `release_report.json`.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/fintech/lending/__init__.py capabilities/fintech/lending/capability_contract.py capabilities/fintech/lending/models.py capabilities/fintech/lending/lending_runtime.py capabilities/fintech/lending/service.py capabilities/fintech/lending/api.py capabilities/fintech/lending/views.py capabilities/fintech/lending/app.py capabilities/fintech/lending/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/fintech/lending/tests/test_package_contract.py`
+  passed with 6 tests.
+- `./.venv/bin/python capabilities/fintech/lending/app.py` passed with
+  `self_test()` status `ok`.
+- `./.venv/bin/apg capabilities inspect fintech_lending --json` passed with 55
+  rules, 11 routes, Bytewax streaming, and provider-neutral lending-agent
+  runtimes.
+- `./.venv/bin/apg capabilities publish-plan capabilities/fintech/lending --json`
+  passed with side-effect-free publish evidence and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/fintech/lending --json`
+  passed with one domain-specific fintech lending implementation, 0 baseline
+  markers, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/fintech/lending --json`
+  passed with one complete lifecycle record, 55 rules, 11 routes, 11 theme
+  tokens, and 0 warnings/errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 117 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 117 operable contracts, 117 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/fintech/lending`, `capabilities/fintech/__init__.py`, and
+  `capabilities/README.md`, with only the intentional catalog
+  `materialized-baseline` status wording retained in the top-level capability
+  README.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed lending product and borrower guardrails so owner, type, currency,
+  term, rate, amount limits, repayment frequency, customer, KYC, country,
+  income, consent, tenant, and policy evidence are enforced before local state
+  changes.
+- Reviewed application and underwriting guardrails so affordability,
+  bank-statement, AML, fraud, card/remittance behavior, score, supported
+  decision, evidence, adverse-action reason, and final-decision approval gates
+  are enforced before credit records are written.
+- Reviewed offer, disbursement, repayment, collection, batch, and first-class
+  lending-agent behavior so borrower acceptance, accepted-offer state, funding
+  account, destination, approval, due date, contact policy, Bytewax routing,
+  Codex, Claude Code, OpenCode, and Pi runtime support remain explicit.
+- Kept live credit bureaus, bank-statement analyzers, affordability providers,
+  loan-management systems, disbursement rails, collection agencies, audit
+  sinks, notifications, key management, regulator filing, and durable Bytewax
+  workers behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live credit-bureau
+  pulls, live bank-statement analysis, live affordability providers, live
+  disbursement rails, loan-management-system integration, collections agency
+  integration, regulator filing, durable Bytewax topology, or performance/load
+  checks during this battery-conscious slice.

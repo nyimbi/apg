@@ -1,11 +1,12 @@
-"""
-lending FinTech Capability
+"""APG Digital Lending executable capability package."""
 
-Placeholder for lending financial technology capability.
-To be implemented as part of the comprehensive APG FinTech platform.
-"""
+from .capability_contract import CAPABILITY_ID, CAPABILITY_NAME, get_capability_contract
+from .service import DigitalLendingService, LendingService
 
-# Placeholder implementation
-__version__ = "1.0.0"
-__status__ = "Development"
-
+__all__ = [
+	"CAPABILITY_ID",
+	"CAPABILITY_NAME",
+	"DigitalLendingService",
+	"LendingService",
+	"get_capability_contract",
+]
