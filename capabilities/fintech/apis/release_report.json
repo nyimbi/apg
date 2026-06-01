@@ -1,0 +1,24 @@
+{
+  "evidence": {
+    "contracts": {
+      "capability_contract": {
+        "display_name": "Banking APIs",
+        "errors": []
+      }
+    },
+    "self_test": {
+      "capability": "fintech_apis",
+      "passed": true,
+      "status": "ok"
+    },
+    "semantic_model": {
+      "capability": "fintech_apis",
+      "format": "apg.semantic-model.v1"
+    }
+  },
+  "format": "apg.release-report.v1",
+  "ok": true,
+  "package": "fintech_apis",
+  "source": "capability_contract.py",
+  "target": "python"
+}

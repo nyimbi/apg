@@ -27253,3 +27253,91 @@ Known gaps:
   device-attestation providers, core banking posting, card-network actions,
   regulator filing, durable Bytewax topology, or performance/load checks during
   this battery-conscious slice.
+
+## 2026-06-01 - FinTech Banking APIs executable capability
+
+- Promoted `capabilities/fintech/apis` from a placeholder package into a
+  first-class APG capability with `README.md`, `SPECIFICATION.md`, `PLAN.md`,
+  `cap_spec.md`, contract, models, service, API helpers, view models, app
+  entrypoint, semantic/package/release evidence, and focused tests.
+- Added tenant-scoped API product governance, developer onboarding, developer
+  application registration, consent grants, API client credential issuance,
+  endpoint policies, webhook subscriptions, API call audit, rate-limit buckets,
+  SLA incidents, dashboard summaries, Bytewax batch validation, and
+  provider-neutral banking API agent registration.
+- Added deterministic Banking API guardrails for tenant context, write policy,
+  product owner/type/environment/scopes, developer KYB/security/risk evidence,
+  application developer/environment/redirect/terms evidence, consent
+  application/customer/scopes/expiry evidence, client application/auth-flow/key/
+  scope evidence, endpoint product/route/scope/throttle/risk policies, webhook
+  application/event/endpoint/signing-secret evidence, API call client/product/
+  endpoint/rate-limit/risk/high-volume review controls, rate-limit client/limit
+  controls, SLA severity/owner/evidence/critical approval controls, Bytewax
+  lifecycle events, supported AI-agent runtimes/roles, and privileged-agent
+  approval.
+- Added `apis_runtime.py` helpers for normalized codes and scopes, URLs, public
+  client ids, rate-limit decisions, and incident severity classification.
+- Updated fintech capability metadata so `apis` is listed as an implemented
+  sub-capability.
+- Removed the empty `_Banking_APIs` marker file and refreshed
+  `semantic_model.json`, `package_manifest.json`, and `release_report.json`.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/fintech/apis/__init__.py
+  capabilities/fintech/apis/capability_contract.py
+  capabilities/fintech/apis/models.py capabilities/fintech/apis/apis_runtime.py
+  capabilities/fintech/apis/service.py capabilities/fintech/apis/api.py
+  capabilities/fintech/apis/views.py capabilities/fintech/apis/app.py
+  capabilities/fintech/apis/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/fintech/apis/tests/test_package_contract.py`
+  passed with 6 tests.
+- `./.venv/bin/python capabilities/fintech/apis/app.py` passed self-test with
+  `passed: true` and `status: ok`.
+- `./.venv/bin/apg capabilities inspect fintech_apis --json` passed with 48
+  rules, 13 UI routes, theme `fintech_apis_control`, shell `apg_python`, and
+  Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan capabilities/fintech/apis --json`
+  passed with `side_effect_free: true`, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/fintech/apis --json` passed with 1 domain-specific capability,
+  0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/fintech/apis --json` passed with 1 complete lifecycle, 48 rules,
+  13 UI routes, 11 theme tokens, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 122 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 122 operable contracts, 122 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/fintech/apis`, `capabilities/fintech/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed Banking API product, developer, application, consent, client,
+  endpoint, webhook, call audit, rate-limit, SLA incident, and AI-agent
+  lifecycle paths so rule evaluation happens before state mutation.
+- Tightened API client issuance so requested client scopes must be covered by
+  an active tenant/application consent grant before credentials are created.
+- Tightened API call audit so the selected endpoint policy must belong to the
+  selected API product before calls decrement rate limits or enter the audit
+  ledger.
+- Reviewed provider-neutral Banking API agent behavior so Codex, Claude Code,
+  OpenCode, and Pi runtimes remain first-class configuration choices and
+  privileged actions require human approval.
+- Kept live API gateways, OAuth consent screens, mTLS certificate validation,
+  webhook delivery workers, developer portal hosting, regulator filing, and
+  durable Bytewax workers behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live gateway
+  deployment, live OAuth/consent screens, mTLS certificate validation, webhook
+  delivery/retry workers, developer portal hosting, regulator filing, durable
+  Bytewax topology, or performance/load checks during this battery-conscious
+  slice.

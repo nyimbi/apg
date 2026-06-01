@@ -74,6 +74,7 @@ CAPABILITY_META = {
 		'cards',         # Digital Cards
 		'wallets',       # Digital Wallets
 		'mobile',        # Mobile Banking
+		'apis',          # Banking APIs
 		'neobanking',    # Neo Banking
 		'lending',       # Digital Lending
 		'bnpl',          # Buy Now Pay Later

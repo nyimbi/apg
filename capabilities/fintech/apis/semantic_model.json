@@ -1,0 +1,2010 @@
+{
+  "app": {
+    "description": "Banking APIs package-backed APG capability",
+    "entity_count": 11,
+    "name": "fintech_apis",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "fintech_apis": {
+      "configuration": {
+        "adapters": {
+          "agency": "fintech_agency",
+          "aml": "fintech_aml",
+          "audit": "audl",
+          "auth": "auth",
+          "bnpl": "fintech_bnpl",
+          "cards": "fintech_cards",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "lending": "fintech_lending",
+          "mobile": "fintech_mobile",
+          "neobanking": "fintech_neobanking",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "api_ops_reviewer",
+            "consent_reviewer",
+            "developer_risk_reviewer",
+            "rate_limit_reviewer",
+            "webhook_reviewer",
+            "incident_reviewer",
+            "api_compliance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "applications": {
+          "redirect_uri_required": true,
+          "supported_environments": [
+            "sandbox",
+            "pilot",
+            "production"
+          ],
+          "terms_required": true
+        },
+        "calls": {
+          "high_volume_threshold": 10000,
+          "rate_limit_enforced": true,
+          "risk_reference_required": true
+        },
+        "clients": {
+          "key_reference_required": true,
+          "scope_required": true,
+          "supported_auth_flows": [
+            "oauth2_auth_code",
+            "client_credentials",
+            "mtls",
+            "signed_request",
+            "device_code"
+          ]
+        },
+        "consents": {
+          "customer_reference_required": true,
+          "expiry_required": true,
+          "scope_required": true
+        },
+        "developers": {
+          "kyb_required": true,
+          "risk_clearance_required": true,
+          "security_review_required": true
+        },
+        "endpoints": {
+          "risk_policy_required": true,
+          "route_required": true,
+          "scope_required": true,
+          "throttle_policy_required": true
+        },
+        "governance": {
+          "audit_api_events": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "incidents": {
+          "evidence_required": true,
+          "owner_required": true,
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_application_events": true,
+          "emit_call_events": true,
+          "emit_client_events": true,
+          "emit_consent_events": true,
+          "emit_developer_events": true,
+          "emit_endpoint_events": true,
+          "emit_incident_events": true,
+          "emit_product_events": true,
+          "emit_rate_limit_events": true,
+          "emit_webhook_events": true,
+          "event_stream": "apg.fintech.apis.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "products": {
+          "owner_required": true,
+          "scope_required": true,
+          "supported_environments": [
+            "sandbox",
+            "pilot",
+            "production"
+          ],
+          "supported_products": [
+            "accounts",
+            "balances",
+            "transactions",
+            "payments",
+            "cards",
+            "wallets",
+            "loans",
+            "bnpl",
+            "agency",
+            "customer_identity",
+            "statements",
+            "webhooks"
+          ]
+        },
+        "rate_limits": {
+          "burst_limit": 5000,
+          "default_limit": 1000,
+          "window_seconds": 60
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_apis_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_applications": true,
+          "enable_calls": true,
+          "enable_clients": true,
+          "enable_consents": true,
+          "enable_dashboard": true,
+          "enable_developers": true,
+          "enable_endpoints": true,
+          "enable_incidents": true,
+          "enable_products": true,
+          "enable_rate_limits": true,
+          "enable_webhooks": true
+        },
+        "webhooks": {
+          "endpoint_required": true,
+          "signing_secret_required": true,
+          "supported_events": [
+            "account_updated",
+            "transaction_posted",
+            "payment_status",
+            "card_event",
+            "wallet_event",
+            "loan_event",
+            "bnpl_event",
+            "agency_event",
+            "fraud_alert",
+            "consent_revoked"
+          ]
+        }
+      },
+      "name": "Banking APIs",
+      "provides": [
+        "banking_api_product_governance",
+        "developer_onboarding_workflow",
+        "developer_application_workflow",
+        "banking_consent_workflow",
+        "api_client_credential_workflow",
+        "api_endpoint_policy_workflow",
+        "webhook_subscription_workflow",
+        "api_call_audit_workflow",
+        "api_rate_limit_workflow",
+        "api_sla_incident_workflow",
+        "banking_api_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_cards",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "fintech_neobanking",
+        "fintech_lending",
+        "fintech_bnpl",
+        "fintech_agency",
+        "fintech_mobile"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "Banking API operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "description": "Banking API writes require policy evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "policy_evidence_required",
+              "required_action": "attach_policy_evidence"
+            },
+            "name": "apis_write_requires_policy"
+          },
+          {
+            "condition": {
+              "operation": "register_api_product",
+              "owner_present": false
+            },
+            "description": "API products require owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "product_owner_required",
+              "required_action": "assign_product_owner"
+            },
+            "name": "product_owner_required"
+          },
+          {
+            "condition": {
+              "operation": "register_api_product",
+              "product_type_supported": false
+            },
+            "description": "API product type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_product_type_not_supported",
+              "required_action": "select_supported_product"
+            },
+            "name": "product_type_supported"
+          },
+          {
+            "condition": {
+              "environment_supported": false,
+              "operation": "register_api_product"
+            },
+            "description": "API product environment must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_environment_not_supported",
+              "required_action": "select_supported_environment"
+            },
+            "name": "product_environment_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_api_product",
+              "scopes_present": false
+            },
+            "description": "API products require scopes.",
+            "effect": {
+              "decision": "deny",
+              "reason": "product_scopes_required",
+              "required_action": "attach_scopes"
+            },
+            "name": "product_scopes_required"
+          },
+          {
+            "condition": {
+              "kyb_present": false,
+              "operation": "onboard_developer"
+            },
+            "description": "Developers require KYB evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "developer_kyb_required",
+              "required_action": "attach_kyb_evidence"
+            },
+            "name": "developer_kyb_required"
+          },
+          {
+            "condition": {
+              "operation": "onboard_developer",
+              "security_review_present": false
+            },
+            "description": "Developers require security review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "developer_security_review_required",
+              "required_action": "attach_security_review"
+            },
+            "name": "developer_security_required"
+          },
+          {
+            "condition": {
+              "operation": "onboard_developer",
+              "risk_clearance_present": false
+            },
+            "description": "Developers require risk clearance.",
+            "effect": {
+              "decision": "deny",
+              "reason": "developer_risk_clearance_required",
+              "required_action": "attach_risk_clearance"
+            },
+            "name": "developer_risk_required"
+          },
+          {
+            "condition": {
+              "developer_present": false,
+              "operation": "register_application"
+            },
+            "description": "Applications require developer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "application_developer_required",
+              "required_action": "select_developer"
+            },
+            "name": "application_developer_required"
+          },
+          {
+            "condition": {
+              "environment_supported": false,
+              "operation": "register_application"
+            },
+            "description": "Application environment must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "application_environment_not_supported",
+              "required_action": "select_supported_environment"
+            },
+            "name": "application_environment_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_application",
+              "redirect_uri_present": false
+            },
+            "description": "Applications require redirect URI.",
+            "effect": {
+              "decision": "deny",
+              "reason": "redirect_uri_required",
+              "required_action": "attach_redirect_uri"
+            },
+            "name": "application_redirect_required"
+          },
+          {
+            "condition": {
+              "operation": "register_application",
+              "terms_present": false
+            },
+            "description": "Applications require terms evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "application_terms_required",
+              "required_action": "attach_terms"
+            },
+            "name": "application_terms_required"
+          },
+          {
+            "condition": {
+              "application_present": false,
+              "operation": "create_consent_grant"
+            },
+            "description": "Consents require application.",
+            "effect": {
+              "decision": "deny",
+              "reason": "consent_application_required",
+              "required_action": "select_application"
+            },
+            "name": "consent_application_required"
+          },
+          {
+            "condition": {
+              "customer_present": false,
+              "operation": "create_consent_grant"
+            },
+            "description": "Consents require customer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "consent_customer_required",
+              "required_action": "attach_customer_reference"
+            },
+            "name": "consent_customer_required"
+          },
+          {
+            "condition": {
+              "operation": "create_consent_grant",
+              "scopes_present": false
+            },
+            "description": "Consents require scopes.",
+            "effect": {
+              "decision": "deny",
+              "reason": "consent_scopes_required",
+              "required_action": "attach_scopes"
+            },
+            "name": "consent_scopes_required"
+          },
+          {
+            "condition": {
+              "expiry_present": false,
+              "operation": "create_consent_grant"
+            },
+            "description": "Consents require expiry.",
+            "effect": {
+              "decision": "deny",
+              "reason": "consent_expiry_required",
+              "required_action": "attach_expiry"
+            },
+            "name": "consent_expiry_required"
+          },
+          {
+            "condition": {
+              "application_present": false,
+              "operation": "issue_api_client"
+            },
+            "description": "API clients require application.",
+            "effect": {
+              "decision": "deny",
+              "reason": "client_application_required",
+              "required_action": "select_application"
+            },
+            "name": "client_application_required"
+          },
+          {
+            "condition": {
+              "auth_flow_supported": false,
+              "operation": "issue_api_client"
+            },
+            "description": "API client auth flow must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "client_auth_flow_not_supported",
+              "required_action": "select_supported_auth_flow"
+            },
+            "name": "client_auth_flow_supported"
+          },
+          {
+            "condition": {
+              "key_reference_present": false,
+              "operation": "issue_api_client"
+            },
+            "description": "API clients require key reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "client_key_reference_required",
+              "required_action": "attach_key_reference"
+            },
+            "name": "client_key_required"
+          },
+          {
+            "condition": {
+              "operation": "issue_api_client",
+              "scopes_present": false
+            },
+            "description": "API clients require scopes.",
+            "effect": {
+              "decision": "deny",
+              "reason": "client_scopes_required",
+              "required_action": "attach_scopes"
+            },
+            "name": "client_scopes_required"
+          },
+          {
+            "condition": {
+              "operation": "issue_api_client",
+              "scopes_allowed_by_consent": false
+            },
+            "description": "API client scopes must be covered by active consent.",
+            "effect": {
+              "decision": "deny",
+              "reason": "client_scopes_not_consented",
+              "required_action": "capture_matching_consent"
+            },
+            "name": "client_scopes_allowed_by_consent"
+          },
+          {
+            "condition": {
+              "operation": "publish_endpoint_policy",
+              "product_present": false
+            },
+            "description": "Endpoint policies require product.",
+            "effect": {
+              "decision": "deny",
+              "reason": "endpoint_product_required",
+              "required_action": "select_product"
+            },
+            "name": "endpoint_product_required"
+          },
+          {
+            "condition": {
+              "operation": "publish_endpoint_policy",
+              "route_present": false
+            },
+            "description": "Endpoint policies require route.",
+            "effect": {
+              "decision": "deny",
+              "reason": "endpoint_route_required",
+              "required_action": "attach_route"
+            },
+            "name": "endpoint_route_required"
+          },
+          {
+            "condition": {
+              "operation": "publish_endpoint_policy",
+              "scope_present": false
+            },
+            "description": "Endpoint policies require scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "endpoint_scope_required",
+              "required_action": "attach_scope"
+            },
+            "name": "endpoint_scope_required"
+          },
+          {
+            "condition": {
+              "operation": "publish_endpoint_policy",
+              "throttle_policy_present": false
+            },
+            "description": "Endpoint policies require throttle policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "endpoint_throttle_required",
+              "required_action": "attach_throttle_policy"
+            },
+            "name": "endpoint_throttle_required"
+          },
+          {
+            "condition": {
+              "operation": "publish_endpoint_policy",
+              "risk_policy_present": false
+            },
+            "description": "Endpoint policies require risk policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "endpoint_risk_policy_required",
+              "required_action": "attach_risk_policy"
+            },
+            "name": "endpoint_risk_required"
+          },
+          {
+            "condition": {
+              "application_present": false,
+              "operation": "subscribe_webhook"
+            },
+            "description": "Webhooks require application.",
+            "effect": {
+              "decision": "deny",
+              "reason": "webhook_application_required",
+              "required_action": "select_application"
+            },
+            "name": "webhook_application_required"
+          },
+          {
+            "condition": {
+              "event_supported": false,
+              "operation": "subscribe_webhook"
+            },
+            "description": "Webhook event must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "webhook_event_not_supported",
+              "required_action": "select_supported_event"
+            },
+            "name": "webhook_event_supported"
+          },
+          {
+            "condition": {
+              "endpoint_present": false,
+              "operation": "subscribe_webhook"
+            },
+            "description": "Webhooks require endpoint.",
+            "effect": {
+              "decision": "deny",
+              "reason": "webhook_endpoint_required",
+              "required_action": "attach_endpoint"
+            },
+            "name": "webhook_endpoint_required"
+          },
+          {
+            "condition": {
+              "operation": "subscribe_webhook",
+              "signing_secret_present": false
+            },
+            "description": "Webhooks require signing secret.",
+            "effect": {
+              "decision": "deny",
+              "reason": "webhook_signing_secret_required",
+              "required_action": "attach_signing_secret"
+            },
+            "name": "webhook_signing_secret_required"
+          },
+          {
+            "condition": {
+              "client_present": false,
+              "operation": "record_api_call"
+            },
+            "description": "API calls require client.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_call_client_required",
+              "required_action": "select_client"
+            },
+            "name": "api_call_client_required"
+          },
+          {
+            "condition": {
+              "operation": "record_api_call",
+              "product_present": false
+            },
+            "description": "API calls require product.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_call_product_required",
+              "required_action": "select_product"
+            },
+            "name": "api_call_product_required"
+          },
+          {
+            "condition": {
+              "endpoint_present": false,
+              "operation": "record_api_call"
+            },
+            "description": "API calls require endpoint policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_call_endpoint_required",
+              "required_action": "select_endpoint"
+            },
+            "name": "api_call_endpoint_required"
+          },
+          {
+            "condition": {
+              "endpoint_matches_product": false,
+              "operation": "record_api_call"
+            },
+            "description": "API call endpoint must belong to the selected product.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_call_endpoint_product_mismatch",
+              "required_action": "select_product_endpoint"
+            },
+            "name": "api_call_endpoint_matches_product"
+          },
+          {
+            "condition": {
+              "operation": "record_api_call",
+              "rate_limit_allowed": false
+            },
+            "description": "API calls must be within rate limit.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_rate_limit_exceeded",
+              "required_action": "throttle_client"
+            },
+            "name": "api_call_rate_limit_allowed"
+          },
+          {
+            "condition": {
+              "operation": "record_api_call",
+              "risk_reference_present": false
+            },
+            "description": "API calls require risk reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_call_risk_reference_required",
+              "required_action": "attach_risk_reference"
+            },
+            "name": "api_call_risk_reference_required"
+          },
+          {
+            "condition": {
+              "high_volume": true,
+              "human_approval_recorded": false,
+              "operation": "record_api_call"
+            },
+            "description": "High-volume call batches require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "api_call_review_required",
+              "required_action": "record_call_review"
+            },
+            "name": "high_volume_api_call_requires_review"
+          },
+          {
+            "condition": {
+              "client_present": false,
+              "operation": "update_rate_limit"
+            },
+            "description": "Rate limit buckets require client.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rate_limit_client_required",
+              "required_action": "select_client"
+            },
+            "name": "rate_limit_client_required"
+          },
+          {
+            "condition": {
+              "operation": "update_rate_limit",
+              "positive_limit": false
+            },
+            "description": "Rate limits must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_rate_limit_required",
+              "required_action": "set_positive_limit"
+            },
+            "name": "rate_limit_positive"
+          },
+          {
+            "condition": {
+              "operation": "open_sla_incident",
+              "severity_supported": false
+            },
+            "description": "Incident severity must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "incident_severity_not_supported",
+              "required_action": "select_supported_severity"
+            },
+            "name": "incident_severity_supported"
+          },
+          {
+            "condition": {
+              "operation": "open_sla_incident",
+              "owner_present": false
+            },
+            "description": "Incidents require owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "incident_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "incident_owner_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "open_sla_incident"
+            },
+            "description": "Incidents require evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "incident_evidence_required",
+              "required_action": "attach_incident_evidence"
+            },
+            "name": "incident_evidence_required"
+          },
+          {
+            "condition": {
+              "critical_severity": true,
+              "human_approval_recorded": false,
+              "operation": "open_sla_incident"
+            },
+            "description": "Critical incidents require approval.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "incident_approval_required",
+              "required_action": "record_incident_approval"
+            },
+            "name": "critical_incident_requires_approval"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "apis_batch"
+            },
+            "description": "Banking API batches require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_api_batch_to_bytewax"
+            },
+            "name": "apis_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_api_agent"
+            },
+            "description": "Banking API agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_agent_runtime_not_supported",
+              "required_action": "select_supported_runtime"
+            },
+            "name": "api_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_api_agent"
+            },
+            "description": "Banking API agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_agent_role_not_supported",
+              "required_action": "select_supported_role"
+            },
+            "name": "api_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "api_agent_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged API-agent actions require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_api_agent_action_requires_human_approval"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "Banking API operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "description": "Banking API writes require policy evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "policy_evidence_required",
+            "required_action": "attach_policy_evidence"
+          },
+          "name": "apis_write_requires_policy"
+        },
+        {
+          "condition": {
+            "operation": "register_api_product",
+            "owner_present": false
+          },
+          "description": "API products require owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "product_owner_required",
+            "required_action": "assign_product_owner"
+          },
+          "name": "product_owner_required"
+        },
+        {
+          "condition": {
+            "operation": "register_api_product",
+            "product_type_supported": false
+          },
+          "description": "API product type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_product_type_not_supported",
+            "required_action": "select_supported_product"
+          },
+          "name": "product_type_supported"
+        },
+        {
+          "condition": {
+            "environment_supported": false,
+            "operation": "register_api_product"
+          },
+          "description": "API product environment must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_environment_not_supported",
+            "required_action": "select_supported_environment"
+          },
+          "name": "product_environment_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_api_product",
+            "scopes_present": false
+          },
+          "description": "API products require scopes.",
+          "effect": {
+            "decision": "deny",
+            "reason": "product_scopes_required",
+            "required_action": "attach_scopes"
+          },
+          "name": "product_scopes_required"
+        },
+        {
+          "condition": {
+            "kyb_present": false,
+            "operation": "onboard_developer"
+          },
+          "description": "Developers require KYB evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "developer_kyb_required",
+            "required_action": "attach_kyb_evidence"
+          },
+          "name": "developer_kyb_required"
+        },
+        {
+          "condition": {
+            "operation": "onboard_developer",
+            "security_review_present": false
+          },
+          "description": "Developers require security review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "developer_security_review_required",
+            "required_action": "attach_security_review"
+          },
+          "name": "developer_security_required"
+        },
+        {
+          "condition": {
+            "operation": "onboard_developer",
+            "risk_clearance_present": false
+          },
+          "description": "Developers require risk clearance.",
+          "effect": {
+            "decision": "deny",
+            "reason": "developer_risk_clearance_required",
+            "required_action": "attach_risk_clearance"
+          },
+          "name": "developer_risk_required"
+        },
+        {
+          "condition": {
+            "developer_present": false,
+            "operation": "register_application"
+          },
+          "description": "Applications require developer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "application_developer_required",
+            "required_action": "select_developer"
+          },
+          "name": "application_developer_required"
+        },
+        {
+          "condition": {
+            "environment_supported": false,
+            "operation": "register_application"
+          },
+          "description": "Application environment must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "application_environment_not_supported",
+            "required_action": "select_supported_environment"
+          },
+          "name": "application_environment_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_application",
+            "redirect_uri_present": false
+          },
+          "description": "Applications require redirect URI.",
+          "effect": {
+            "decision": "deny",
+            "reason": "redirect_uri_required",
+            "required_action": "attach_redirect_uri"
+          },
+          "name": "application_redirect_required"
+        },
+        {
+          "condition": {
+            "operation": "register_application",
+            "terms_present": false
+          },
+          "description": "Applications require terms evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "application_terms_required",
+            "required_action": "attach_terms"
+          },
+          "name": "application_terms_required"
+        },
+        {
+          "condition": {
+            "application_present": false,
+            "operation": "create_consent_grant"
+          },
+          "description": "Consents require application.",
+          "effect": {
+            "decision": "deny",
+            "reason": "consent_application_required",
+            "required_action": "select_application"
+          },
+          "name": "consent_application_required"
+        },
+        {
+          "condition": {
+            "customer_present": false,
+            "operation": "create_consent_grant"
+          },
+          "description": "Consents require customer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "consent_customer_required",
+            "required_action": "attach_customer_reference"
+          },
+          "name": "consent_customer_required"
+        },
+        {
+          "condition": {
+            "operation": "create_consent_grant",
+            "scopes_present": false
+          },
+          "description": "Consents require scopes.",
+          "effect": {
+            "decision": "deny",
+            "reason": "consent_scopes_required",
+            "required_action": "attach_scopes"
+          },
+          "name": "consent_scopes_required"
+        },
+        {
+          "condition": {
+            "expiry_present": false,
+            "operation": "create_consent_grant"
+          },
+          "description": "Consents require expiry.",
+          "effect": {
+            "decision": "deny",
+            "reason": "consent_expiry_required",
+            "required_action": "attach_expiry"
+          },
+          "name": "consent_expiry_required"
+        },
+        {
+          "condition": {
+            "application_present": false,
+            "operation": "issue_api_client"
+          },
+          "description": "API clients require application.",
+          "effect": {
+            "decision": "deny",
+            "reason": "client_application_required",
+            "required_action": "select_application"
+          },
+          "name": "client_application_required"
+        },
+        {
+          "condition": {
+            "auth_flow_supported": false,
+            "operation": "issue_api_client"
+          },
+          "description": "API client auth flow must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "client_auth_flow_not_supported",
+            "required_action": "select_supported_auth_flow"
+          },
+          "name": "client_auth_flow_supported"
+        },
+        {
+          "condition": {
+            "key_reference_present": false,
+            "operation": "issue_api_client"
+          },
+          "description": "API clients require key reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "client_key_reference_required",
+            "required_action": "attach_key_reference"
+          },
+          "name": "client_key_required"
+        },
+        {
+          "condition": {
+            "operation": "issue_api_client",
+            "scopes_present": false
+          },
+          "description": "API clients require scopes.",
+          "effect": {
+            "decision": "deny",
+            "reason": "client_scopes_required",
+            "required_action": "attach_scopes"
+          },
+          "name": "client_scopes_required"
+        },
+        {
+          "condition": {
+            "operation": "issue_api_client",
+            "scopes_allowed_by_consent": false
+          },
+          "description": "API client scopes must be covered by active consent.",
+          "effect": {
+            "decision": "deny",
+            "reason": "client_scopes_not_consented",
+            "required_action": "capture_matching_consent"
+          },
+          "name": "client_scopes_allowed_by_consent"
+        },
+        {
+          "condition": {
+            "operation": "publish_endpoint_policy",
+            "product_present": false
+          },
+          "description": "Endpoint policies require product.",
+          "effect": {
+            "decision": "deny",
+            "reason": "endpoint_product_required",
+            "required_action": "select_product"
+          },
+          "name": "endpoint_product_required"
+        },
+        {
+          "condition": {
+            "operation": "publish_endpoint_policy",
+            "route_present": false
+          },
+          "description": "Endpoint policies require route.",
+          "effect": {
+            "decision": "deny",
+            "reason": "endpoint_route_required",
+            "required_action": "attach_route"
+          },
+          "name": "endpoint_route_required"
+        },
+        {
+          "condition": {
+            "operation": "publish_endpoint_policy",
+            "scope_present": false
+          },
+          "description": "Endpoint policies require scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "endpoint_scope_required",
+            "required_action": "attach_scope"
+          },
+          "name": "endpoint_scope_required"
+        },
+        {
+          "condition": {
+            "operation": "publish_endpoint_policy",
+            "throttle_policy_present": false
+          },
+          "description": "Endpoint policies require throttle policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "endpoint_throttle_required",
+            "required_action": "attach_throttle_policy"
+          },
+          "name": "endpoint_throttle_required"
+        },
+        {
+          "condition": {
+            "operation": "publish_endpoint_policy",
+            "risk_policy_present": false
+          },
+          "description": "Endpoint policies require risk policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "endpoint_risk_policy_required",
+            "required_action": "attach_risk_policy"
+          },
+          "name": "endpoint_risk_required"
+        },
+        {
+          "condition": {
+            "application_present": false,
+            "operation": "subscribe_webhook"
+          },
+          "description": "Webhooks require application.",
+          "effect": {
+            "decision": "deny",
+            "reason": "webhook_application_required",
+            "required_action": "select_application"
+          },
+          "name": "webhook_application_required"
+        },
+        {
+          "condition": {
+            "event_supported": false,
+            "operation": "subscribe_webhook"
+          },
+          "description": "Webhook event must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "webhook_event_not_supported",
+            "required_action": "select_supported_event"
+          },
+          "name": "webhook_event_supported"
+        },
+        {
+          "condition": {
+            "endpoint_present": false,
+            "operation": "subscribe_webhook"
+          },
+          "description": "Webhooks require endpoint.",
+          "effect": {
+            "decision": "deny",
+            "reason": "webhook_endpoint_required",
+            "required_action": "attach_endpoint"
+          },
+          "name": "webhook_endpoint_required"
+        },
+        {
+          "condition": {
+            "operation": "subscribe_webhook",
+            "signing_secret_present": false
+          },
+          "description": "Webhooks require signing secret.",
+          "effect": {
+            "decision": "deny",
+            "reason": "webhook_signing_secret_required",
+            "required_action": "attach_signing_secret"
+          },
+          "name": "webhook_signing_secret_required"
+        },
+        {
+          "condition": {
+            "client_present": false,
+            "operation": "record_api_call"
+          },
+          "description": "API calls require client.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_call_client_required",
+            "required_action": "select_client"
+          },
+          "name": "api_call_client_required"
+        },
+        {
+          "condition": {
+            "operation": "record_api_call",
+            "product_present": false
+          },
+          "description": "API calls require product.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_call_product_required",
+            "required_action": "select_product"
+          },
+          "name": "api_call_product_required"
+        },
+        {
+          "condition": {
+            "endpoint_present": false,
+            "operation": "record_api_call"
+          },
+          "description": "API calls require endpoint policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_call_endpoint_required",
+            "required_action": "select_endpoint"
+          },
+          "name": "api_call_endpoint_required"
+        },
+        {
+          "condition": {
+            "endpoint_matches_product": false,
+            "operation": "record_api_call"
+          },
+          "description": "API call endpoint must belong to the selected product.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_call_endpoint_product_mismatch",
+            "required_action": "select_product_endpoint"
+          },
+          "name": "api_call_endpoint_matches_product"
+        },
+        {
+          "condition": {
+            "operation": "record_api_call",
+            "rate_limit_allowed": false
+          },
+          "description": "API calls must be within rate limit.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_rate_limit_exceeded",
+            "required_action": "throttle_client"
+          },
+          "name": "api_call_rate_limit_allowed"
+        },
+        {
+          "condition": {
+            "operation": "record_api_call",
+            "risk_reference_present": false
+          },
+          "description": "API calls require risk reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_call_risk_reference_required",
+            "required_action": "attach_risk_reference"
+          },
+          "name": "api_call_risk_reference_required"
+        },
+        {
+          "condition": {
+            "high_volume": true,
+            "human_approval_recorded": false,
+            "operation": "record_api_call"
+          },
+          "description": "High-volume call batches require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "api_call_review_required",
+            "required_action": "record_call_review"
+          },
+          "name": "high_volume_api_call_requires_review"
+        },
+        {
+          "condition": {
+            "client_present": false,
+            "operation": "update_rate_limit"
+          },
+          "description": "Rate limit buckets require client.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rate_limit_client_required",
+            "required_action": "select_client"
+          },
+          "name": "rate_limit_client_required"
+        },
+        {
+          "condition": {
+            "operation": "update_rate_limit",
+            "positive_limit": false
+          },
+          "description": "Rate limits must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_rate_limit_required",
+            "required_action": "set_positive_limit"
+          },
+          "name": "rate_limit_positive"
+        },
+        {
+          "condition": {
+            "operation": "open_sla_incident",
+            "severity_supported": false
+          },
+          "description": "Incident severity must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "incident_severity_not_supported",
+            "required_action": "select_supported_severity"
+          },
+          "name": "incident_severity_supported"
+        },
+        {
+          "condition": {
+            "operation": "open_sla_incident",
+            "owner_present": false
+          },
+          "description": "Incidents require owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "incident_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "incident_owner_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "open_sla_incident"
+          },
+          "description": "Incidents require evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "incident_evidence_required",
+            "required_action": "attach_incident_evidence"
+          },
+          "name": "incident_evidence_required"
+        },
+        {
+          "condition": {
+            "critical_severity": true,
+            "human_approval_recorded": false,
+            "operation": "open_sla_incident"
+          },
+          "description": "Critical incidents require approval.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "incident_approval_required",
+            "required_action": "record_incident_approval"
+          },
+          "name": "critical_incident_requires_approval"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "apis_batch"
+          },
+          "description": "Banking API batches require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_api_batch_to_bytewax"
+          },
+          "name": "apis_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_api_agent"
+          },
+          "description": "Banking API agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_agent_runtime_not_supported",
+            "required_action": "select_supported_runtime"
+          },
+          "name": "api_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_api_agent"
+          },
+          "description": "Banking API agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_agent_role_not_supported",
+            "required_action": "select_supported_role"
+          },
+          "name": "api_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "api_agent_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged API-agent actions require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_api_agent_action_requires_human_approval"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "agents": {
+          "component": "BankingAPIAgentWorkbench",
+          "permission": "fintech_apis:admin",
+          "route": "/fintech-apis/agents"
+        },
+        "applications": {
+          "component": "ApplicationConsole",
+          "permission": "fintech_apis:applications",
+          "route": "/fintech-apis/applications"
+        },
+        "calls": {
+          "component": "APICallAuditConsole",
+          "permission": "fintech_apis:calls",
+          "route": "/fintech-apis/calls"
+        },
+        "clients": {
+          "component": "APIClientConsole",
+          "permission": "fintech_apis:clients",
+          "route": "/fintech-apis/clients"
+        },
+        "consents": {
+          "component": "ConsentWorkbench",
+          "permission": "fintech_apis:consents",
+          "route": "/fintech-apis/consents"
+        },
+        "dashboard": {
+          "component": "BankingAPIDashboard",
+          "permission": "fintech_apis:view",
+          "route": "/fintech-apis/dashboard"
+        },
+        "developers": {
+          "component": "DeveloperConsole",
+          "permission": "fintech_apis:developers",
+          "route": "/fintech-apis/developers"
+        },
+        "endpoints": {
+          "component": "EndpointPolicyConsole",
+          "permission": "fintech_apis:endpoints",
+          "route": "/fintech-apis/endpoints"
+        },
+        "incidents": {
+          "component": "SLAIncidentWorkbench",
+          "permission": "fintech_apis:incidents",
+          "route": "/fintech-apis/incidents"
+        },
+        "products": {
+          "component": "APIProductConsole",
+          "permission": "fintech_apis:products",
+          "route": "/fintech-apis/products"
+        },
+        "rate_limits": {
+          "component": "RateLimitConsole",
+          "permission": "fintech_apis:rate_limits",
+          "route": "/fintech-apis/rate-limits"
+        },
+        "settings": {
+          "component": "BankingAPISettings",
+          "permission": "fintech_apis:admin",
+          "route": "/fintech-apis/settings"
+        },
+        "webhooks": {
+          "component": "WebhookConsole",
+          "permission": "fintech_apis:webhooks",
+          "route": "/fintech-apis/webhooks"
+        }
+      },
+      "streaming": {
+        "events": [
+          "api_product_registered",
+          "developer_onboarded",
+          "developer_application_registered",
+          "consent_grant_created",
+          "api_client_issued",
+          "endpoint_policy_published",
+          "webhook_subscribed",
+          "api_call_recorded",
+          "rate_limit_updated",
+          "sla_incident_opened",
+          "api_agent_registered"
+        ],
+        "guardrails": [
+          "apis_batch_requires_bytewax",
+          "privileged_api_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.fintech.apis.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "applications": {
+            "icon": "app-window",
+            "status_indicator": "app-chip"
+          },
+          "calls": {
+            "icon": "activity",
+            "status_indicator": "call-chip"
+          },
+          "clients": {
+            "icon": "key-round",
+            "status_indicator": "client-chip"
+          },
+          "consents": {
+            "icon": "file-check",
+            "status_indicator": "consent-chip"
+          },
+          "developers": {
+            "icon": "building-2",
+            "status_indicator": "developer-chip"
+          },
+          "endpoints": {
+            "icon": "route",
+            "status_indicator": "endpoint-chip"
+          },
+          "incidents": {
+            "icon": "sirens",
+            "status_indicator": "incident-chip"
+          },
+          "products": {
+            "icon": "box",
+            "status_indicator": "product-chip"
+          },
+          "rate_limits": {
+            "icon": "gauge",
+            "status_indicator": "limit-chip"
+          },
+          "webhooks": {
+            "icon": "webhook",
+            "status_indicator": "webhook-chip"
+          }
+        },
+        "name": "fintech_apis_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#0F766E",
+          "color.danger": "#B91C1C",
+          "color.primary": "#1D4ED8",
+          "color.success": "#15803D",
+          "color.warning": "#B45309",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/fintech-apis/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "BankingAPIDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/fintech-apis/dashboard",
+            "permission": "fintech_apis:view"
+          },
+          {
+            "component": "APIProductConsole",
+            "name": "products",
+            "nav_group": "Products",
+            "path": "/fintech-apis/products",
+            "permission": "fintech_apis:products"
+          },
+          {
+            "component": "DeveloperConsole",
+            "name": "developers",
+            "nav_group": "Developers",
+            "path": "/fintech-apis/developers",
+            "permission": "fintech_apis:developers"
+          },
+          {
+            "component": "ApplicationConsole",
+            "name": "applications",
+            "nav_group": "Developers",
+            "path": "/fintech-apis/applications",
+            "permission": "fintech_apis:applications"
+          },
+          {
+            "component": "ConsentWorkbench",
+            "name": "consents",
+            "nav_group": "Consent",
+            "path": "/fintech-apis/consents",
+            "permission": "fintech_apis:consents"
+          },
+          {
+            "component": "APIClientConsole",
+            "name": "clients",
+            "nav_group": "Security",
+            "path": "/fintech-apis/clients",
+            "permission": "fintech_apis:clients"
+          },
+          {
+            "component": "EndpointPolicyConsole",
+            "name": "endpoints",
+            "nav_group": "Gateway",
+            "path": "/fintech-apis/endpoints",
+            "permission": "fintech_apis:endpoints"
+          },
+          {
+            "component": "WebhookConsole",
+            "name": "webhooks",
+            "nav_group": "Gateway",
+            "path": "/fintech-apis/webhooks",
+            "permission": "fintech_apis:webhooks"
+          },
+          {
+            "component": "APICallAuditConsole",
+            "name": "calls",
+            "nav_group": "Operations",
+            "path": "/fintech-apis/calls",
+            "permission": "fintech_apis:calls"
+          },
+          {
+            "component": "RateLimitConsole",
+            "name": "rate_limits",
+            "nav_group": "Operations",
+            "path": "/fintech-apis/rate-limits",
+            "permission": "fintech_apis:rate_limits"
+          },
+          {
+            "component": "SLAIncidentWorkbench",
+            "name": "incidents",
+            "nav_group": "Operations",
+            "path": "/fintech-apis/incidents",
+            "permission": "fintech_apis:incidents"
+          },
+          {
+            "component": "BankingAPIAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/fintech-apis/agents",
+            "permission": "fintech_apis:admin"
+          },
+          {
+            "component": "BankingAPISettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/fintech-apis/settings",
+            "permission": "fintech_apis:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "api_review": {
+        "roles": [
+          "api_ops_reviewer",
+          "consent_reviewer",
+          "developer_risk_reviewer",
+          "rate_limit_reviewer",
+          "webhook_reviewer",
+          "incident_reviewer",
+          "api_compliance_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "fintech_apis": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_cards",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "fintech_neobanking",
+        "fintech_lending",
+        "fintech_bnpl",
+        "fintech_agency",
+        "fintech_mobile"
+      ]
+    }
+  },
+  "contracts": {
+    "fintech_apis": {
+      "configuration": {
+        "adapters": {
+          "agency": "fintech_agency",
+          "aml": "fintech_aml",
+          "audit": "audl",
+          "auth": "auth",
+          "bnpl": "fintech_bnpl",
+          "cards": "fintech_cards",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "lending": "fintech_lending",
+          "mobile": "fintech_mobile",
+          "neobanking": "fintech_neobanking",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "api_ops_reviewer",
+            "consent_reviewer",
+            "developer_risk_reviewer",
+            "rate_limit_reviewer",
+            "webhook_reviewer",
+            "incident_reviewer",
+            "api_compliance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "applications": {
+          "redirect_uri_required": true,
+          "supported_environments": [
+            "sandbox",
+            "pilot",
+            "production"
+          ],
+          "terms_required": true
+        },
+        "calls": {
+          "high_volume_threshold": 10000,
+          "rate_limit_enforced": true,
+          "risk_reference_required": true
+        },
+        "clients": {
+          "key_reference_required": true,
+          "scope_required": true,
+          "supported_auth_flows": [
+            "oauth2_auth_code",
+            "client_credentials",
+            "mtls",
+            "signed_request",
+            "device_code"
+          ]
+        },
+        "consents": {
+          "customer_reference_required": true,
+          "expiry_required": true,
+          "scope_required": true
+        },
+        "developers": {
+          "kyb_required": true,
+          "risk_clearance_required": true,
+          "security_review_required": true
+        },
+        "endpoints": {
+          "risk_policy_required": true,
+          "route_required": true,
+          "scope_required": true,
+          "throttle_policy_required": true
+        },
+        "governance": {
+          "audit_api_events": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "incidents": {
+          "evidence_required": true,
+          "owner_required": true,
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_application_events": true,
+          "emit_call_events": true,
+          "emit_client_events": true,
+          "emit_consent_events": true,
+          "emit_developer_events": true,
+          "emit_endpoint_events": true,
+          "emit_incident_events": true,
+          "emit_product_events": true,
+          "emit_rate_limit_events": true,
+          "emit_webhook_events": true,
+          "event_stream": "apg.fintech.apis.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "products": {
+          "owner_required": true,
+          "scope_required": true,
+          "supported_environments": [
+            "sandbox",
+            "pilot",
+            "production"
+          ],
+          "supported_products": [
+            "accounts",
+            "balances",
+            "transactions",
+            "payments",
+            "cards",
+            "wallets",
+            "loans",
+            "bnpl",
+            "agency",
+            "customer_identity",
+            "statements",
+            "webhooks"
+          ]
+        },
+        "rate_limits": {
+          "burst_limit": 5000,
+          "default_limit": 1000,
+          "window_seconds": 60
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_apis_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_applications": true,
+          "enable_calls": true,
+          "enable_clients": true,
+          "enable_consents": true,
+          "enable_dashboard": true,
+          "enable_developers": true,
+          "enable_endpoints": true,
+          "enable_incidents": true,
+          "enable_products": true,
+          "enable_rate_limits": true,
+          "enable_webhooks": true
+        },
+        "webhooks": {
+          "endpoint_required": true,
+          "signing_secret_required": true,
+          "supported_events": [
+            "account_updated",
+            "transaction_posted",
+            "payment_status",
+            "card_event",
+            "wallet_event",
+            "loan_event",
+            "bnpl_event",
+            "agency_event",
+            "fraud_alert",
+            "consent_revoked"
+          ]
+        }
+      },
+      "id": "fintech_apis",
+      "provides": [
+        "banking_api_product_governance",
+        "developer_onboarding_workflow",
+        "developer_application_workflow",
+        "banking_consent_workflow",
+        "api_client_credential_workflow",
+        "api_endpoint_policy_workflow",
+        "webhook_subscription_workflow",
+        "api_call_audit_workflow",
+        "api_rate_limit_workflow",
+        "api_sla_incident_workflow",
+        "banking_api_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_cards",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "fintech_neobanking",
+        "fintech_lending",
+        "fintech_bnpl",
+        "fintech_agency",
+        "fintech_mobile"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 16,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "fintech_apis": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}
