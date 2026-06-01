@@ -1744,6 +1744,41 @@ class AiLifecycleBatchRecord:
 		}
 
 
+@dataclass
+class AiModelMetricRecord:
+	"""Model metric and drift-review evidence for AICR."""
+
+	metric_id: str
+	tenant_id: str
+	model_id: str
+	metric_name: str
+	value: float
+	recorded_by: str
+	drift_score: float = 0.0
+	drift_review_recorded: bool = False
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	status: str = "recorded"
+	created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"metric_id": self.metric_id,
+			"id": self.metric_id,
+			"tenant_id": self.tenant_id,
+			"model_id": self.model_id,
+			"metric_name": self.metric_name,
+			"value": self.value,
+			"recorded_by": self.recorded_by,
+			"drift_score": self.drift_score,
+			"drift_review_recorded": self.drift_review_recorded,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"status": self.status,
+			"created_at": self.created_at.isoformat(),
+		}
+
+
 class AicrService:
 	"""Dependency-light AI service governance facade for package composition."""
 
@@ -1751,6 +1786,7 @@ class AicrService:
 		self._services: dict[tuple[str, str], AICRServiceRecord] = {}
 		self._providers: dict[tuple[str, str], dict[str, Any]] = {}
 		self._models: dict[tuple[str, str], dict[str, Any]] = {}
+		self._model_metrics: dict[tuple[str, str], AiModelMetricRecord] = {}
 		self._workflows: dict[tuple[str, str], dict[str, Any]] = {}
 		self._agent_runtimes: dict[tuple[str, str], dict[str, Any]] = {}
 		self._ai_agents: dict[tuple[str, str], AiAgentRecord] = {}
@@ -1897,6 +1933,57 @@ class AicrService:
 		self._models[self._tenant_key(tenant_id, model_id)] = record
 		self._record_event(tenant_id, "model_evaluation_recorded", model_id, f"Recorded evaluation for {model_id}.", {"score": score, "evaluator": evaluator})
 		return dict(record)
+
+	def record_model_metric(
+		self,
+		tenant_id: str,
+		model_id: str,
+		metric_name: str,
+		value: float,
+		recorded_by: str,
+		drift_score: float = 0.0,
+		drift_review_recorded: bool = False,
+		metric_id: str | None = None,
+	) -> dict[str, Any]:
+		model_registered = self._tenant_key(tenant_id, model_id) in self._models
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "record_model_metric",
+			"model_registered": model_registered,
+			"metric_name_present": bool(str(metric_name or "").strip()),
+			"metric_recorder_present": bool(str(recorded_by or "").strip()),
+			"drift_score": float(drift_score),
+			"drift_review_recorded": bool(drift_review_recorded),
+		})
+		if result["decision"] == "deny":
+			_raise_if_blocked(result)
+		record = AiModelMetricRecord(
+			metric_id=metric_id or uuid7str(),
+			tenant_id=tenant_id,
+			model_id=model_id,
+			metric_name=str(metric_name).strip(),
+			value=float(value),
+			recorded_by=str(recorded_by).strip(),
+			drift_score=float(drift_score),
+			drift_review_recorded=bool(drift_review_recorded),
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			status="pending_review" if result["decision"] == "require_review" else "recorded",
+		)
+		self._model_metrics[self._tenant_key(tenant_id, record.metric_id)] = record
+		model = dict(self._models[self._tenant_key(tenant_id, model_id)])
+		model["latest_metric"] = record.to_dict()
+		if record.status == "pending_review":
+			model["status"] = "drift_review_required"
+		self._models[self._tenant_key(tenant_id, model_id)] = model
+		self._record_event(
+			tenant_id,
+			"model_metric_recorded",
+			model_id,
+			f"Recorded model metric {record.metric_name} for {model_id}.",
+			record.to_dict(),
+		)
+		return record.to_dict()
 
 	def promote_model(self, tenant_id: str, model_id: str, evaluation_recorded: bool | None = None) -> dict[str, Any]:
 		model = self._models.get(self._tenant_key(tenant_id, model_id))
@@ -2098,6 +2185,12 @@ class AicrService:
 			records = [record for record in records if record["tenant_id"] == tenant_id]
 		return [dict(record) for record in sorted(records, key=lambda item: item["id"])]
 
+	def list_model_metrics(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		records = list(self._model_metrics.values())
+		if tenant_id is not None:
+			records = [record for record in records if record.tenant_id == tenant_id]
+		return [record.to_dict() for record in sorted(records, key=lambda item: item.metric_id)]
+
 	def list_workflows(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		records = list(self._workflows.values())
 		if tenant_id is not None:
@@ -2259,6 +2352,11 @@ class AicrService:
 			"service_count": len(services),
 			"provider_count": len(self.list_providers(tenant_id)),
 			"model_count": len(self.list_models(tenant_id)),
+			"model_metric_count": len(self.list_model_metrics(tenant_id)),
+			"pending_model_metric_review_count": len([
+				metric for metric in self.list_model_metrics(tenant_id)
+				if metric["status"] == "pending_review"
+			]),
 			"workflow_count": len(self.list_workflows(tenant_id)),
 			"agent_runtime_count": len(self.list_agent_runtimes(tenant_id)),
 			"ai_agent_count": len(self.list_ai_agents(tenant_id)),

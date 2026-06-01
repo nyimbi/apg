@@ -1,43 +1,21 @@
 {
   "evidence": {
-    "agents": {
-      "first_class": true,
-      "role_count": 9,
-      "runtime_count": 4
-    },
     "contracts": {
       "capability_contract": {
         "display_name": "AI Core Framework",
         "errors": [],
-        "route_count": 14,
-        "rule_count": 38
+        "route_count": 15,
+        "rule_count": 41
       }
-    },
-    "runtime": {
-      "api": "api.py",
-      "entrypoint": "app.py",
-      "service": "service.py",
-      "views": "views.py"
     },
     "self_test": {
       "capability": "aicr",
-      "errors": [],
       "passed": true,
-      "routes": [
-        "/health",
-        "/self-test",
-        "/component.json",
-        "/semantic-model.json"
-      ],
       "status": "ok"
     },
     "semantic_model": {
       "capability": "aicr",
       "format": "apg.semantic-model.v1"
-    },
-    "streaming": {
-      "engine": "bytewax",
-      "required_processor": "bytewax"
     }
   },
   "format": "apg.release-report.v1",

@@ -12,6 +12,8 @@ tenant, policy, approval, audit, and observability guardrails.
   Code, OpenCode, Pi, Ollama, OpenAI, Anthropic, local, and HTTP providers.
 - Model catalog with provider linkage, policy metadata, modality, evaluation,
   promotion, and retirement guardrails.
+- Model metric and drift-review governance with registered-model,
+  metric-name, recorder, threshold, and pending-review evidence.
 - Governed inference requests with model policy checks, health checks,
   large-context review, high-risk approval, PII redaction, tool allowlists, and
   cross-tenant routing denial.
@@ -20,12 +22,12 @@ tenant, policy, approval, audit, and observability guardrails.
   contributors, including role, scope, owner, purpose, contribution disclosure,
   and privileged approval status.
 - Bytewax lifecycle batch validation for model, prompt, inference, evaluation,
-  safety, routing, and AI-agent mutation streams.
+  metric, safety, routing, and AI-agent mutation streams.
 - Governance events for service, provider, model, workflow, agent, approval,
   and inference lifecycle actions.
 - UI models for dashboards, service registry, provider registry, model catalog,
-  inference console, workflow designer, agent runtimes, governance, metrics,
-  audit, and settings.
+  model metric console, inference console, workflow designer, agent runtimes,
+  governance, metrics, audit, and settings.
 
 ## Main Files
 
@@ -71,6 +73,13 @@ service.register_model(
 	"text",
 	model_policy={"policy_id": "safe-generation"},
 )
+service.record_model_metric(
+	"tenant-a",
+	"reasoning-model",
+	"accuracy",
+	0.97,
+	"eval-owner",
+)
 approval = service.request_inference(
 	"request-1",
 	"tenant-a",
@@ -111,10 +120,12 @@ batch = service.validate_aicr_lifecycle_batch(
 AICR blocks missing tenant context, missing service owners, missing endpoints,
 unsupported provider types, missing provider credentials or egress policy,
 missing model owners, unregistered model providers, missing model policy,
-unsupported modalities, model promotion without evaluation, model retirement
-without impact review, inference without model policy, routing to unhealthy
-services, PII inference without redaction, tool calls without allowlists,
-cross-tenant routing, workflows without steps or registered services,
+unsupported modalities, model promotion without evaluation, model metrics
+without registered model/name/recorder evidence, drift above threshold without
+review evidence, model retirement without impact review, inference without
+model policy, routing to unhealthy services, PII inference without redaction,
+tool calls without allowlists, cross-tenant routing, workflows without steps or
+registered services,
 unsupported agent runtimes, first-class AI agents without supported runtime,
 supported role, scope, owner, purpose, or contribution disclosure, non-Bytewax
 lifecycle batches, and external agent actions without approval.

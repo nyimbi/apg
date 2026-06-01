@@ -30,20 +30,21 @@ control plane for generated applications.
 2. Register AI services.
 3. Register models.
 4. Record evaluations and promote models.
-5. Register workflows and agent runtimes.
-6. Register first-class AI agents with role, scope, owner, purpose, and
+5. Record model metrics and drift-review evidence.
+6. Register workflows and agent runtimes.
+7. Register first-class AI agents with role, scope, owner, purpose, and
    disclosure metadata.
-7. Validate lifecycle mutation batches through Bytewax.
-8. Request governed inference.
-9. Approve high-risk or large-context requests.
-10. Execute approved inference and record audit evidence.
+8. Validate lifecycle mutation batches through Bytewax.
+9. Request governed inference.
+10. Approve high-risk or large-context requests.
+11. Execute approved inference and record audit evidence.
 
 ## Guardrails
 
 The package currently exposes deterministic guardrails for tenant context,
 owners, endpoints, provider types, provider credentials, egress policy, model
-policy, modalities, evaluation, retirement review, service health,
-large-context review, high-risk approval, PII redaction, tool allowlists,
-cross-tenant routing, cost review, workflow composition, agent runtime policy,
+policy, modalities, evaluation, model metrics, drift review, retirement review,
+service health, large-context review, high-risk approval, PII redaction, tool
+allowlists, cross-tenant routing, cost review, workflow composition, agent runtime policy,
 first-class AI-agent metadata, Bytewax lifecycle processing, external agent
 actions, audit evidence, trace capture, and drift review.

@@ -24,6 +24,7 @@ def dashboard_model(
 		"records": service.list_records(tenant_id),
 		"providers": service.list_providers(tenant_id),
 		"models": service.list_models(tenant_id),
+		"model_metrics": service.list_model_metrics(tenant_id),
 		"workflows": service.list_workflows(tenant_id),
 		"agent_runtimes": service.list_agent_runtimes(tenant_id),
 		"ai_agents": service.list_ai_agents(tenant_id),
@@ -71,7 +72,24 @@ def model_catalog_model(
 	return {
 		"models": service.list_models(tenant_id),
 		"providers": service.list_providers(tenant_id),
+		"model_metrics": service.list_model_metrics(tenant_id),
 		"supported_modalities": contract["configuration"]["models"]["supported_modalities"],
+	}
+
+
+def model_metric_console_model(
+	service: AicrService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or AicrService()
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"models": service.list_models(tenant_id),
+		"model_metrics": service.list_model_metrics(tenant_id),
+		"drift_threshold": contract["configuration"]["models"]["drift_threshold"],
+		"required_fields": ["model_id", "metric_name", "value", "recorded_by"],
+		"actions": ["record_metric", "record_drift_review"],
 	}
 
 
@@ -99,6 +117,7 @@ def governance_center_model(
 	return {
 		"summary": service.governance_summary(tenant_id),
 		"models": service.list_models(tenant_id),
+		"model_metrics": service.list_model_metrics(tenant_id),
 		"workflows": service.list_workflows(tenant_id),
 		"agent_runtimes": service.list_agent_runtimes(tenant_id),
 		"ai_agents": service.list_ai_agents(tenant_id),
@@ -187,6 +206,8 @@ def metrics_model(
 		"service_count": summary["service_count"],
 		"provider_count": summary["provider_count"],
 		"model_count": summary["model_count"],
+		"model_metric_count": summary["model_metric_count"],
+		"pending_model_metric_review_count": summary["pending_model_metric_review_count"],
 		"workflow_count": summary["workflow_count"],
 		"agent_runtime_count": summary["agent_runtime_count"],
 		"ai_agent_count": summary["ai_agent_count"],

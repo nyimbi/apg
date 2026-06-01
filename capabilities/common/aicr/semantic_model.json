@@ -1,56 +1,5 @@
 {
-  "agents": {
-    "aicr_ai_governance": {
-      "adapter_contract": "provider_neutral_cli_or_api_adapter",
-      "first_class": true,
-      "guardrails": [
-        "supported_runtime",
-        "supported_role",
-        "explicit_scope",
-        "accountable_owner",
-        "declared_purpose",
-        "machine_contribution_disclosure",
-        "human_approval_for_privileged_roles"
-      ],
-      "privileged_roles": [
-        "model_reviewer",
-        "prompt_reviewer",
-        "inference_reviewer",
-        "safety_reviewer",
-        "evaluation_reviewer",
-        "routing_reviewer",
-        "tool_reviewer",
-        "cost_reviewer"
-      ],
-      "required_fields": [
-        "tenant_id",
-        "agent_id",
-        "name",
-        "runtime",
-        "role",
-        "scope",
-        "owner",
-        "purpose"
-      ],
-      "supported_roles": [
-        "model_reviewer",
-        "prompt_reviewer",
-        "inference_reviewer",
-        "safety_reviewer",
-        "evaluation_reviewer",
-        "routing_reviewer",
-        "tool_reviewer",
-        "cost_reviewer",
-        "model_steward"
-      ],
-      "supported_runtimes": [
-        "codex",
-        "claude_code",
-        "opencode",
-        "pi"
-      ]
-    }
-  },
+  "agents": {},
   "app": {
     "description": "AI Core Framework package-backed APG capability",
     "entity_count": 0,
@@ -59,18 +8,6 @@
   },
   "capabilities": {
     "aicr": {
-      "adapters": {
-        "agent_composition": "agnt",
-        "audit_sink": "audl",
-        "auth_provider": "auth",
-        "credential_vault": "keym",
-        "event_stream": "bytewax",
-        "generated_app_runtime": "service.AicrService",
-        "http_api": "api.app",
-        "metrics_sink": "moni",
-        "model_lifecycle": "mlcm",
-        "production_runtime": "service.AICoreService"
-      },
       "agents": {
         "adapter_contract": "provider_neutral_cli_or_api_adapter",
         "first_class": true,
@@ -122,24 +59,26 @@
         ]
       },
       "ai_control_lifecycle": {
-        "agent_runtime": "agent runtime record",
+        "adapter_contract": "provider_neutral_cli_or_api_adapter",
         "ai_agent": "AiAgentRecord",
-        "governance_event": "AICRGovernanceEvent",
-        "inference_approval": "AICRInferenceApproval",
-        "lifecycle_batch": "AiLifecycleBatchRecord",
-        "model": "model record",
-        "provider": "provider record",
-        "service": "AICRServiceRecord",
-        "workflow": "workflow record"
+        "first_class": true,
+        "guardrails": [
+          "supported_runtime",
+          "supported_role",
+          "explicit_scope",
+          "accountable_owner",
+          "declared_purpose",
+          "machine_contribution_disclosure",
+          "human_approval_for_privileged_roles"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
       },
-      "approvals": {
-        "agent_action": "AICRGovernanceEvent",
-        "ai_agent": "AiAgentRecord",
-        "context": "AICRInferenceApproval",
-        "cost": "AICRInferenceApproval",
-        "drift": "AICRGovernanceEvent",
-        "inference": "AICRInferenceApproval"
-      },
+      "approvals": {},
       "business_rules": [],
       "components": {},
       "configuration": {
@@ -222,7 +161,10 @@
           "tool_allowlist_required": true
         },
         "models": {
+          "drift_threshold": 0.2,
           "evaluation_required_before_promotion": true,
+          "metric_name_required": true,
+          "metric_recorder_required": true,
           "model_owner_required": true,
           "model_policy_required": true,
           "retirement_impact_review_required": true,
@@ -274,6 +216,7 @@
             "prompt_batch",
             "inference_batch",
             "evaluation_batch",
+            "metric_batch",
             "safety_batch",
             "routing_batch",
             "ai_agent_batch"
@@ -284,6 +227,7 @@
             "aicr.prompts",
             "aicr.inference",
             "aicr.evaluations",
+            "aicr.metrics",
             "aicr.safety",
             "aicr.routing",
             "aicr.agents"
@@ -328,6 +272,7 @@
       "provides": [
         "ai_core",
         "model_inference",
+        "model_metrics",
         "ai_agent_composition"
       ],
       "requires": [
@@ -507,6 +452,45 @@
               "required_action": "record_retirement_impact"
             },
             "name": "model_retirement_requires_impact_review"
+          },
+          {
+            "condition": {
+              "model_registered": false,
+              "operation": "record_model_metric"
+            },
+            "description": "Model metrics require a registered model.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_metric_registered_model_required",
+              "required_action": "register_model_before_metric"
+            },
+            "name": "model_metric_requires_registered_model"
+          },
+          {
+            "condition": {
+              "metric_name_present": false,
+              "operation": "record_model_metric"
+            },
+            "description": "Model metrics require a metric name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_metric_name_required",
+              "required_action": "declare_model_metric_name"
+            },
+            "name": "model_metric_requires_name"
+          },
+          {
+            "condition": {
+              "metric_recorder_present": false,
+              "operation": "record_model_metric"
+            },
+            "description": "Model metrics require recorder identity.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_metric_recorder_required",
+              "required_action": "declare_model_metric_recorder"
+            },
+            "name": "model_metric_requires_recorder"
           },
           {
             "condition": {
@@ -1018,6 +1002,45 @@
         },
         {
           "condition": {
+            "model_registered": false,
+            "operation": "record_model_metric"
+          },
+          "description": "Model metrics require a registered model.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_metric_registered_model_required",
+            "required_action": "register_model_before_metric"
+          },
+          "name": "model_metric_requires_registered_model"
+        },
+        {
+          "condition": {
+            "metric_name_present": false,
+            "operation": "record_model_metric"
+          },
+          "description": "Model metrics require a metric name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_metric_name_required",
+            "required_action": "declare_model_metric_name"
+          },
+          "name": "model_metric_requires_name"
+        },
+        {
+          "condition": {
+            "metric_recorder_present": false,
+            "operation": "record_model_metric"
+          },
+          "description": "Model metrics require recorder identity.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_metric_recorder_required",
+            "required_action": "declare_model_metric_recorder"
+          },
+          "name": "model_metric_requires_recorder"
+        },
+        {
+          "condition": {
             "model_policy_attached": false,
             "operation": "run_inference"
           },
@@ -1403,6 +1426,11 @@
           "permission": "aicr:view_metrics",
           "route": "/aicr/metrics"
         },
+        "model_metrics": {
+          "component": "ModelMetricConsole",
+          "permission": "aicr:govern",
+          "route": "/aicr/model-metrics"
+        },
         "models": {
           "component": "ModelCatalog",
           "permission": "aicr:view_models",
@@ -1438,6 +1466,7 @@
           "prompt_batch",
           "inference_batch",
           "evaluation_batch",
+          "metric_batch",
           "safety_batch",
           "routing_batch",
           "ai_agent_batch"
@@ -1448,6 +1477,7 @@
           "aicr.prompts",
           "aicr.inference",
           "aicr.evaluations",
+          "aicr.metrics",
           "aicr.safety",
           "aicr.routing",
           "aicr.agents"
@@ -1496,6 +1526,10 @@
             "icon": "box",
             "risk_style": "evaluation-band",
             "status_indicator": "lifecycle-pill"
+          },
+          "model_metric_console": {
+            "status_style": "drift-chip",
+            "visual": "metric-ledger"
           },
           "provider_registry_row": {
             "icon": "server-cog",
@@ -1553,6 +1587,13 @@
             "nav_group": "Runtime",
             "path": "/aicr/models",
             "permission": "aicr:view_models"
+          },
+          {
+            "component": "ModelMetricConsole",
+            "name": "model_metrics",
+            "nav_group": "Runtime",
+            "path": "/aicr/model-metrics",
+            "permission": "aicr:govern"
           },
           {
             "component": "InferenceConsole",
@@ -1635,28 +1676,7 @@
     }
   },
   "composition": {
-    "agent_teams": {
-      "aicr_ai_governance": {
-        "roles": [
-          "model_reviewer",
-          "prompt_reviewer",
-          "inference_reviewer",
-          "safety_reviewer",
-          "evaluation_reviewer",
-          "routing_reviewer",
-          "tool_reviewer",
-          "cost_reviewer",
-          "model_steward"
-        ],
-        "runtimes": [
-          "codex",
-          "claude_code",
-          "opencode",
-          "pi"
-        ],
-        "stream": "aicr.lifecycle"
-      }
-    },
+    "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
       "aicr": [
@@ -1669,56 +1689,6 @@
   },
   "contracts": {
     "aicr": {
-      "agents": {
-        "adapter_contract": "provider_neutral_cli_or_api_adapter",
-        "first_class": true,
-        "guardrails": [
-          "supported_runtime",
-          "supported_role",
-          "explicit_scope",
-          "accountable_owner",
-          "declared_purpose",
-          "machine_contribution_disclosure",
-          "human_approval_for_privileged_roles"
-        ],
-        "privileged_roles": [
-          "model_reviewer",
-          "prompt_reviewer",
-          "inference_reviewer",
-          "safety_reviewer",
-          "evaluation_reviewer",
-          "routing_reviewer",
-          "tool_reviewer",
-          "cost_reviewer"
-        ],
-        "required_fields": [
-          "tenant_id",
-          "agent_id",
-          "name",
-          "runtime",
-          "role",
-          "scope",
-          "owner",
-          "purpose"
-        ],
-        "supported_roles": [
-          "model_reviewer",
-          "prompt_reviewer",
-          "inference_reviewer",
-          "safety_reviewer",
-          "evaluation_reviewer",
-          "routing_reviewer",
-          "tool_reviewer",
-          "cost_reviewer",
-          "model_steward"
-        ],
-        "supported_runtimes": [
-          "codex",
-          "claude_code",
-          "opencode",
-          "pi"
-        ]
-      },
       "configuration": {
         "adapters": {
           "agent_composition": "agnt",
@@ -1799,7 +1769,10 @@
           "tool_allowlist_required": true
         },
         "models": {
+          "drift_threshold": 0.2,
           "evaluation_required_before_promotion": true,
+          "metric_name_required": true,
+          "metric_recorder_required": true,
           "model_owner_required": true,
           "model_policy_required": true,
           "retirement_impact_review_required": true,
@@ -1851,6 +1824,7 @@
             "prompt_batch",
             "inference_batch",
             "evaluation_batch",
+            "metric_batch",
             "safety_batch",
             "routing_batch",
             "ai_agent_batch"
@@ -1861,6 +1835,7 @@
             "aicr.prompts",
             "aicr.inference",
             "aicr.evaluations",
+            "aicr.metrics",
             "aicr.safety",
             "aicr.routing",
             "aicr.agents"
@@ -1900,6 +1875,7 @@
       "provides": [
         "ai_core",
         "model_inference",
+        "model_metrics",
         "ai_agent_composition"
       ],
       "requires": [
@@ -1907,32 +1883,7 @@
         "auth",
         "mqeb",
         "moni"
-      ],
-      "streaming": {
-        "broker_core_dependency_allowed": false,
-        "engine": "bytewax",
-        "lifecycle_stream": "aicr.lifecycle",
-        "required_operations": [
-          "model_batch",
-          "prompt_batch",
-          "inference_batch",
-          "evaluation_batch",
-          "safety_batch",
-          "routing_batch",
-          "ai_agent_batch"
-        ],
-        "required_processor": "bytewax",
-        "topics": [
-          "aicr.models",
-          "aicr.prompts",
-          "aicr.inference",
-          "aicr.evaluations",
-          "aicr.safety",
-          "aicr.routing",
-          "aicr.agents"
-        ],
-        "watermark": "event_time"
-      }
+      ]
     }
   },
   "deployment": {
@@ -1944,7 +1895,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 4,
       "kind": "capability",
       "nodes": 1
     },
@@ -2204,6 +2155,45 @@
         "required_action": "record_context_review"
       },
       "name": "large_context_requires_review"
+    },
+    "model_metric_requires_name": {
+      "condition": {
+        "metric_name_present": false,
+        "operation": "record_model_metric"
+      },
+      "description": "Model metrics require a metric name.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_metric_name_required",
+        "required_action": "declare_model_metric_name"
+      },
+      "name": "model_metric_requires_name"
+    },
+    "model_metric_requires_recorder": {
+      "condition": {
+        "metric_recorder_present": false,
+        "operation": "record_model_metric"
+      },
+      "description": "Model metrics require recorder identity.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_metric_recorder_required",
+        "required_action": "declare_model_metric_recorder"
+      },
+      "name": "model_metric_requires_recorder"
+    },
+    "model_metric_requires_registered_model": {
+      "condition": {
+        "model_registered": false,
+        "operation": "record_model_metric"
+      },
+      "description": "Model metrics require a registered model.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_metric_registered_model_required",
+        "required_action": "register_model_before_metric"
+      },
+      "name": "model_metric_requires_registered_model"
     },
     "model_promotion_requires_evaluation": {
       "condition": {

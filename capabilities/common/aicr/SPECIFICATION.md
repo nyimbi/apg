@@ -17,6 +17,8 @@ The executable packet covers:
 - AI provider registration with credential-vault and egress-policy controls.
 - Model registration with policy, provider linkage, modality, evaluation, and
   promotion state.
+- Model metric and drift-review evidence with registered-model, metric-name,
+  recorder, and review guardrails.
 - Governed inference requests and approval lifecycle.
 - Workflow registration over registered services.
 - Agent runtime registration for Codex, Claude Code, OpenCode, Pi, Ollama, and
@@ -44,15 +46,16 @@ Out of scope for this packet:
 2. Register a tenant-owned AI service.
 3. Register a model against the provider.
 4. Record model evaluation and promote the model when ready.
-5. Register workflows and agent runtimes.
-6. Register first-class AI agents that can contribute to or review AI-core
+5. Record model metrics and route high-drift signals into review evidence.
+6. Register workflows and agent runtimes.
+7. Register first-class AI agents that can contribute to or review AI-core
    state.
-7. Validate lifecycle mutation batches through the Bytewax stream contract.
-8. Request inference.
-9. Require review for high-risk or large-context requests.
-10. Approve or reject the request.
-11. Run approved inference through a deterministic local envelope.
-12. Record governance and audit events.
+8. Validate lifecycle mutation batches through the Bytewax stream contract.
+9. Request inference.
+10. Require review for high-risk or large-context requests.
+11. Approve or reject the request.
+12. Run approved inference through a deterministic local envelope.
+13. Record governance and audit events.
 
 ## Configuration
 
@@ -85,9 +88,10 @@ disclosure are blocked.
 
 AICR lifecycle mutation batches must use Bytewax as the required processor.
 The executable packet validates `model_batch`, `prompt_batch`,
-`inference_batch`, `evaluation_batch`, `safety_batch`, `routing_batch`, and
-`ai_agent_batch` operations. Non-Bytewax streams are denied and audited. Broker-specific queue
-is deliberately not a core requirement for this packet.
+`inference_batch`, `evaluation_batch`, `metric_batch`, `safety_batch`,
+`routing_batch`, and `ai_agent_batch` operations. Non-Bytewax streams are
+denied and audited. Broker-specific queue is deliberately not a core
+requirement for this packet.
 
 ## Rules
 
@@ -95,8 +99,9 @@ The deterministic rule engine includes guardrails for tenant context, service
 owners and endpoints, supported provider types, provider credentials, egress
 policy, model ownership, registered providers, model policy, supported
 modalities, evaluation before promotion, retirement impact review, model policy
-for inference, health-gated routing, large-context review, high-risk approval,
-PII redaction, tool allowlists, cross-tenant denial, cost review, workflow
+for inference, registered-model metric evidence, metric names, metric
+recorders, health-gated routing, large-context review, high-risk approval, PII
+redaction, tool allowlists, cross-tenant denial, cost review, workflow
 ownership and service binding, supported agent runtimes, agent tool policy,
 first-class AI-agent runtime, role, scope, owner, purpose, contribution
 disclosure, privileged approval status, Bytewax lifecycle processing, external
@@ -111,6 +116,7 @@ AICR exposes 14 generated-app UI routes:
 - Services
 - Providers
 - Models
+- Model Metrics
 - Inference
 - Workflows
 - Agent Runtimes
@@ -128,6 +134,8 @@ AICR exposes 14 generated-app UI routes:
 - Package publish plan reports no warnings.
 - Runtime can register providers, services, models, workflows, and agent
   runtimes.
+- Runtime can record model metrics and route drift above threshold into review
+  evidence.
 - Runtime can register first-class AI agents and validate Bytewax lifecycle
   batches.
 - Runtime blocks unsafe missing-evidence paths.

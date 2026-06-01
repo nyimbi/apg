@@ -36,7 +36,7 @@ def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
 	assert len(contract["rule_engine"]["rules"]) >= 38
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "service.AicrService"
-	assert contract["provides"] == ["ai_core", "model_inference", "ai_agent_composition"]
+	assert contract["provides"] == ["ai_core", "model_inference", "model_metrics", "ai_agent_composition"]
 	assert contract["requires"] == ["conf", "auth", "mqeb", "moni"]
 	assert contract["agents"]["first_class"] is True
 	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
@@ -47,6 +47,7 @@ def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
 		"services",
 		"providers",
 		"models",
+		"model_metrics",
 		"inference",
 		"workflows",
 		"agent_runtimes",
@@ -62,6 +63,7 @@ def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "agent_runtime_card" in contract["theme"]["components"]
 	assert "ai_agent_roster" in contract["theme"]["components"]
+	assert "model_metric_console" in contract["theme"]["components"]
 	assert "bytewax_lifecycle_panel" in contract["theme"]["components"]
 
 
@@ -128,6 +130,26 @@ def test_rule_engine_enforces_first_class_agent_and_bytewax_guardrails():
 	assert batch_result["matched_rules"] == ["bytewax_aicr_stream_required"]
 
 
+def test_rule_engine_enforces_model_metric_guardrails():
+	metric_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "record_model_metric",
+		"model_registered": False,
+		"metric_name_present": False,
+		"metric_recorder_present": False,
+		"drift_score": 0.4,
+		"drift_review_recorded": False,
+	})
+
+	assert metric_result["decision"] == "deny"
+	assert set(metric_result["matched_rules"]) == {
+		"model_metric_requires_registered_model",
+		"model_metric_requires_name",
+		"model_metric_requires_recorder",
+		"drift_review_required",
+	}
+
+
 def test_registration_includes_full_capability_contract():
 	registration = register_capability()
 
@@ -138,6 +160,7 @@ def test_registration_includes_full_capability_contract():
 	assert registration["theme"]["name"] == "aicr_ai_control_console"
 	assert registration["ui_components"]["services"] == "/aicr/services"
 	assert "inference_approval_governance" in registration["capabilities"]
+	assert "model_metric_governance" in registration["capabilities"]
 	assert "agent_runtime_registry" in registration["capabilities"]
 	assert "ai_agent_composition" in registration["capabilities"]
 	assert registration["agents"]["first_class"] is True
@@ -176,6 +199,7 @@ def test_service_registers_provider_model_workflow_and_agent_runtime():
 		model_policy={"policy_id": "safe-gen"},
 	)
 	evaluated = service.record_model_evaluation("tenant-ai", "reasoning-model", 0.97, "eval-owner")
+	metric = service.record_model_metric("tenant-ai", "reasoning-model", "accuracy", 0.97, "eval-owner")
 	promoted = service.promote_model("tenant-ai", "reasoning-model")
 	workflow = service.create_workflow("support-flow", "tenant-ai", "Support Flow", "workflow-owner", ["llm-router"], risk="high")
 	agent = service.register_agent_runtime("codex-runtime", "tenant-ai", "Codex Runtime", "codex", "agent-owner", "policy://tools")
@@ -191,6 +215,7 @@ def test_service_registers_provider_model_workflow_and_agent_runtime():
 	)
 	batch = service.validate_aicr_lifecycle_batch("tenant-ai", "bytewax", 3, "ai_agent_batch", "agent-batch-1")
 	models = views.model_catalog_model(service, "tenant-ai")
+	metrics = views.model_metric_console_model(service, "tenant-ai")
 	agents = views.agent_runtime_console_model(service, "tenant-ai")
 	roster = views.ai_agent_roster_model(service, "tenant-ai")
 	lifecycle = views.lifecycle_batch_model(service, "tenant-ai")
@@ -198,6 +223,7 @@ def test_service_registers_provider_model_workflow_and_agent_runtime():
 	assert provider["provider_type"] == "codex"
 	assert model["status"] == "registered"
 	assert evaluated["evaluation_recorded"] is True
+	assert metric["status"] == "recorded"
 	assert promoted["status"] == "promoted"
 	assert workflow["service_ids"] == ["llm-router"]
 	assert agent["runtime_type"] == "codex"
@@ -205,11 +231,13 @@ def test_service_registers_provider_model_workflow_and_agent_runtime():
 	assert ai_agent["status"] == "active"
 	assert batch["accepted"] is True
 	assert models["models"][0]["id"] == "reasoning-model"
+	assert metrics["model_metrics"][0]["metric_name"] == "accuracy"
 	assert agents["agent_runtimes"][0]["id"] == "codex-runtime"
 	assert roster["agents"][0]["id"] == "codex-reviewer"
 	assert lifecycle["batches"][0]["id"] == "agent-batch-1"
 	assert service.governance_summary("tenant-ai")["agent_runtime_count"] == 1
 	assert service.governance_summary("tenant-ai")["ai_agent_count"] == 1
+	assert service.governance_summary("tenant-ai")["model_metric_count"] == 1
 	assert service.governance_summary("tenant-ai")["lifecycle_batch_count"] == 1
 
 
@@ -224,6 +252,8 @@ def test_service_blocks_provider_model_workflow_and_agent_guardrail_gaps():
 		service.register_model("model", "tenant-ai", "Model", "missing", "ai-owner", "text", model_policy={"policy_id": "safe"})
 	with pytest.raises(PermissionError, match="unsupported_model_modality"):
 		service.register_model("model", "tenant-ai", "Model", "local", "ai-owner", "quantum", model_policy={"policy_id": "safe"})
+	with pytest.raises(PermissionError, match="model_metric_registered_model_required"):
+		service.record_model_metric("tenant-ai", "missing", "accuracy", 0.91, "eval-owner")
 	service.register_ai_service("svc", "tenant-ai", "Service", "ai-owner", model_policy={"policy_id": "safe"})
 	with pytest.raises(PermissionError, match="workflow_service_bindings_required"):
 		service.create_workflow("wf", "tenant-ai", "Workflow", "owner", ["missing"])
@@ -255,6 +285,45 @@ def test_privileged_ai_agent_without_human_approval_is_pending_review():
 
 	assert agent["status"] == "pending_review"
 	assert service.governance_summary("tenant-ai")["ai_agent_count"] == 1
+
+
+def test_model_metric_drift_review_lifecycle():
+	service = AicrService()
+	service.register_provider("local", "tenant-ai", "Local", "local", "ai-owner", external=False)
+	service.register_model("drift-model", "tenant-ai", "Drift Model", "local", "ai-owner", "text", model_policy={"policy_id": "safe"})
+
+	with pytest.raises(PermissionError, match="model_metric_name_required"):
+		service.record_model_metric("tenant-ai", "drift-model", "", 0.88, "eval-owner")
+	with pytest.raises(PermissionError, match="model_metric_recorder_required"):
+		service.record_model_metric("tenant-ai", "drift-model", "accuracy", 0.88, "")
+
+	pending = service.record_model_metric(
+		"tenant-ai",
+		"drift-model",
+		"population_stability_index",
+		0.31,
+		"eval-owner",
+		drift_score=0.31,
+	)
+	reviewed = service.record_model_metric(
+		"tenant-ai",
+		"drift-model",
+		"population_stability_index",
+		0.18,
+		"eval-owner",
+		drift_score=0.18,
+		drift_review_recorded=True,
+	)
+	console = views.model_metric_console_model(service, "tenant-ai")
+	governance = views.governance_center_model(service, "tenant-ai")
+
+	assert pending["status"] == "pending_review"
+	assert pending["matched_rules"] == ["drift_review_required"]
+	assert service.list_models("tenant-ai")[0]["status"] == "drift_review_required"
+	assert reviewed["status"] == "recorded"
+	assert console["drift_threshold"] == 0.2
+	assert governance["summary"]["pending_model_metric_review_count"] == 1
+	assert {event["event_type"] for event in governance["audit_events"]} >= {"model_metric_recorded"}
 
 
 def test_service_runs_high_risk_inference_approval_lifecycle():
@@ -475,3 +544,34 @@ def test_api_helpers_expose_first_class_ai_agents_and_lifecycle_batches():
 	assert batch["accepted"] is True
 	assert api_helpers.list_ai_agents("tenant-api-agent")[0]["id"] == "api-agent"
 	assert api_helpers.list_lifecycle_batches("tenant-api-agent")[0]["id"] == "api-batch"
+
+
+def test_api_helpers_expose_model_metric_lifecycle():
+	provider = api_helpers.register_provider({
+		"id": "api-local-provider",
+		"tenant_id": "tenant-api-metric",
+		"name": "API Local Provider",
+		"provider_type": "local",
+		"owner": "api-owner",
+		"external": False,
+	})
+	model = api_helpers.register_model({
+		"id": "api-model",
+		"tenant_id": provider["tenant_id"],
+		"name": "API Model",
+		"provider_id": provider["id"],
+		"owner": "api-owner",
+		"modality": "text",
+		"model_policy": {"policy_id": "api-safe"},
+	})
+	metric = api_helpers.record_model_metric({
+		"id": "api-metric",
+		"tenant_id": model["tenant_id"],
+		"model_id": model["id"],
+		"metric_name": "accuracy",
+		"value": 0.94,
+		"recorded_by": "api-evaluator",
+	})
+
+	assert metric["id"] == "api-metric"
+	assert api_helpers.list_model_metrics(model["tenant_id"])[0]["metric_name"] == "accuracy"

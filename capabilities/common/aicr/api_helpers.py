@@ -90,6 +90,20 @@ def register_model(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def record_model_metric(payload: dict[str, Any]) -> dict[str, Any]:
+	"""Record a model metric and drift-review signal from an API-shaped payload."""
+	return SERVICE.record_model_metric(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		model_id=str(payload["model_id"]),
+		metric_name=str(payload.get("metric_name") or ""),
+		value=float(payload.get("value") or 0.0),
+		recorded_by=str(payload.get("recorded_by") or ""),
+		drift_score=float(payload.get("drift_score") or 0.0),
+		drift_review_recorded=bool(payload.get("drift_review_recorded", False)),
+		metric_id=str(payload["id"]) if payload.get("id") else None,
+	)
+
+
 def create_workflow(payload: dict[str, Any]) -> dict[str, Any]:
 	"""Create an AI workflow from an API-shaped payload."""
 	return SERVICE.create_workflow(
@@ -149,6 +163,10 @@ def list_models(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_models(tenant_id)
 
 
+def list_model_metrics(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_model_metrics(tenant_id)
+
+
 def list_workflows(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_workflows(tenant_id)
 
@@ -184,12 +202,14 @@ __all__ = [
 	"list_ai_services",
 	"register_provider",
 	"register_model",
+	"record_model_metric",
 	"create_workflow",
 	"register_agent_runtime",
 	"register_ai_agent",
 	"validate_aicr_lifecycle_batch",
 	"list_providers",
 	"list_models",
+	"list_model_metrics",
 	"list_workflows",
 	"list_agent_runtimes",
 	"list_ai_agents",

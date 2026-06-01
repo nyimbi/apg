@@ -23555,3 +23555,73 @@ Known gaps:
   this battery-conscious capability slice.
 - Existing SQLAlchemy and Pydantic deprecation warnings surfaced by focused
   tests remain outside this slice.
+
+### 2026-06-01 03:06 EAT
+
+AICR model metric and drift-review lifecycle slice:
+
+- Added `AiModelMetricRecord` runtime evidence so AICR can record governed
+  model metrics against registered tenant models.
+- Added guardrails requiring a registered model, metric name, and recorder
+  identity before metric evidence can be accepted.
+- Wired the existing drift-review rule to model metric recording so drift
+  scores above the configured threshold become `pending_review` evidence and
+  mark the model `drift_review_required`.
+- Surfaced model metrics through API helpers, dashboard models, model catalog
+  context, governance center data, summary metrics, and a dedicated
+  `model_metric_console` view model.
+- Extended the AICR contract with `model_metrics` provides metadata, the
+  `/aicr/model-metrics` route, model metric theme metadata, the `metric_batch`
+  Bytewax operation, and the `aicr.metrics` stream topic.
+- Updated `SPECIFICATION.md`, `PLAN.md`, `README.md`, `cap_spec.md`,
+  `semantic_model.json`, `release_report.json`, and `app.py` so package
+  evidence matches the executable metric lifecycle.
+- Fixed the capability materializer so semantic package evidence uses each
+  capability contract's configured runtime adapters and preserves first-class
+  AI agent lifecycle metadata instead of dropping it during generation.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/aicr/__init__.py capabilities/common/aicr/capability_contract.py capabilities/common/aicr/service.py capabilities/common/aicr/api_helpers.py capabilities/common/aicr/views.py capabilities/common/aicr/app.py capabilities/common/aicr/test_capability_contract.py capabilities/common/aicr/tests/test_package_contract.py compiler/capability_materializer.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/aicr/test_capability_contract.py capabilities/common/aicr/tests/test_package_contract.py`
+  passed with 17 tests and 10 pre-existing dependency deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.aicr import app; r=app.self_test(); print(r); assert r['passed']"`
+  passed.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/aicr --json`
+  passed with one domain-specific AICR implementation, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/aicr --json`
+  passed and showed `model_metrics`, 41 rules, 15 routes, the metric route,
+  the `metric_batch` operation, and first-class AI agent lifecycle evidence.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/common/aicr --json`
+  passed with one complete lifecycle record, 41 rules, 15 routes, and 0
+  warnings/errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 109 operable contracts, 109 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- `./.venv/bin/apg tooling audit --json` passed all 21 tooling surfaces.
+- `git diff --check -- capabilities/common/aicr compiler/capability_materializer.py docs/progress_log.md`
+  passed.
+
+Code review:
+
+- Reviewed metric guardrail behavior: missing model, metric name, or recorder
+  identity denies recording before model evidence is mutated.
+- Reviewed drift behavior: drift above the configured `0.2` threshold produces
+  `pending_review` evidence, records matched rules, and updates model lifecycle
+  state without invoking live providers.
+- Reviewed tenant isolation: metric records are stored and listed by tenant key,
+  and model updates are constrained to the tenant-local model record.
+- Reviewed generated evidence: semantic models now retain configured runtime
+  adapter names plus first-class AI agent lifecycle metadata required by AICR.
+- Kept the lifecycle dependency-light and provider-neutral; live metrics sinks,
+  provider telemetry, and Bytewax execution remain adapter concerns.
+
+Known gaps:
+
+- Did not run the full repository test suite, rendered UI checks, live provider
+  adapters, durable metric sinks, live Bytewax topology, or performance/load
+  checks during this battery-conscious capability slice.
+- Existing SQLAlchemy and Pydantic deprecation warnings surfaced by focused
+  tests remain outside this slice.

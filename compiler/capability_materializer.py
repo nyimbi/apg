@@ -418,6 +418,23 @@ def _semantic_model_data(
 		}
 		for route in routes
 	}
+	adapters = contract.get("configuration", {}).get("adapters", {})
+	runtime = {
+		"entrypoint": "app.py",
+		"service": adapters.get("generated_app_runtime", "service.py"),
+		"api": adapters.get("api_helpers", "api.py"),
+		"views": adapters.get("view_models", "views.py"),
+	}
+	agents = contract.get("agents", {})
+	ai_control_lifecycle = {}
+	if agents.get("first_class") is True:
+		ai_control_lifecycle = {
+			"first_class": True,
+			"ai_agent": "AiAgentRecord",
+			"adapter_contract": agents.get("adapter_contract"),
+			"supported_runtimes": list(agents.get("supported_runtimes", [])),
+			"guardrails": list(agents.get("guardrails", [])),
+		}
 	return {
 		"format": "apg.semantic-model.v1",
 		"ok": True,
@@ -459,7 +476,9 @@ def _semantic_model_data(
 				"screens": screens,
 				"theme": contract["theme"],
 				"streaming": contract.get("streaming", {}),
-				"runtime": {"entrypoint": "app.py", "service": "service.py", "api": "api.py", "views": "views.py"},
+				"runtime": runtime,
+				"agents": agents,
+				"ai_control_lifecycle": ai_control_lifecycle,
 				"erp_modules": [_category(record.path)],
 				"components": {},
 				"business_rules": [],
