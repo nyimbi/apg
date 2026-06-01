@@ -1,0 +1,1657 @@
+{
+  "app": {
+    "description": "Digital Cards package-backed APG capability",
+    "entity_count": 7,
+    "name": "fintech_cards",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "fintech_cards": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "audit": "audl",
+          "auth": "auth",
+          "encryption": "encr",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "card_ops_reviewer",
+            "authorization_reviewer",
+            "token_reviewer",
+            "dispute_reviewer",
+            "issuer_processor_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "authorizations": {
+          "aml_result_required": true,
+          "fraud_decision_required": true,
+          "high_value_threshold": 100000,
+          "human_approval_required_for_high_impact": true,
+          "positive_amount_required": true,
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ],
+          "supported_merchant_categories": [
+            "grocery",
+            "fuel",
+            "travel",
+            "education",
+            "medical",
+            "commerce",
+            "cash",
+            "restricted"
+          ]
+        },
+        "cardholders": {
+          "customer_reference_required": true,
+          "kyc_required": true,
+          "supported_countries": [
+            "KE",
+            "UG",
+            "TZ",
+            "RW",
+            "GH",
+            "NG",
+            "ZA",
+            "GB",
+            "US",
+            "AE"
+          ]
+        },
+        "cards": {
+          "consent_required": true,
+          "funding_account_required": true,
+          "shipping_required_for_physical": true,
+          "supported_products": [
+            "debit",
+            "prepaid",
+            "expense",
+            "fleet",
+            "merchant"
+          ],
+          "supported_types": [
+            "virtual",
+            "physical"
+          ],
+          "wallet_required": true
+        },
+        "disputes": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_reasons": [
+            "fraud",
+            "duplicate",
+            "goods_not_received",
+            "service_not_provided",
+            "cash_not_dispensed",
+            "processing_error"
+          ]
+        },
+        "governance": {
+          "audit_card_events": true,
+          "customer_consent_required": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_authorization_events": true,
+          "emit_card_events": true,
+          "emit_dispute_events": true,
+          "emit_program_events": true,
+          "emit_token_events": true,
+          "event_stream": "apg.fintech.cards.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "programs": {
+          "bin_range_required": true,
+          "owner_required": true,
+          "settlement_account_required": true,
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_cards_control"
+        },
+        "tokens": {
+          "device_or_merchant_reference_required": true,
+          "key_domain_required": true,
+          "supported_types": [
+            "wallet",
+            "device",
+            "merchant",
+            "network"
+          ],
+          "token_reference_required": true
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_authorizations": true,
+          "enable_cardholders": true,
+          "enable_cards": true,
+          "enable_dashboard": true,
+          "enable_disputes": true,
+          "enable_programs": true,
+          "enable_tokens": true
+        }
+      },
+      "name": "Digital Cards",
+      "provides": [
+        "card_program_governance",
+        "cardholder_card_lifecycle",
+        "tokenized_card_credentialing",
+        "card_authorization_control",
+        "card_dispute_workflow",
+        "card_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "encr",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "Card operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "description": "Card writes require policy evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "card_policy_required",
+              "required_action": "attach_card_policy"
+            },
+            "name": "card_write_requires_policy"
+          },
+          {
+            "condition": {
+              "operation": "register_program",
+              "program_owner_present": false
+            },
+            "description": "Card programs require owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "program_owner_required",
+              "required_action": "assign_program_owner"
+            },
+            "name": "program_owner_required"
+          },
+          {
+            "condition": {
+              "bin_range_present": false,
+              "operation": "register_program"
+            },
+            "description": "Card programs require BIN range.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bin_range_required",
+              "required_action": "attach_bin_range"
+            },
+            "name": "program_bin_range_required"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "register_program"
+            },
+            "description": "Card program currency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "card_currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "program_currency_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_program",
+              "settlement_account_present": false
+            },
+            "description": "Card programs require settlement account.",
+            "effect": {
+              "decision": "deny",
+              "reason": "settlement_account_required",
+              "required_action": "attach_settlement_account"
+            },
+            "name": "program_settlement_required"
+          },
+          {
+            "condition": {
+              "customer_present": false,
+              "operation": "onboard_cardholder"
+            },
+            "description": "Cardholders require customer reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_reference_required",
+              "required_action": "attach_customer_reference"
+            },
+            "name": "cardholder_customer_required"
+          },
+          {
+            "condition": {
+              "kyc_present": false,
+              "operation": "onboard_cardholder"
+            },
+            "description": "Cardholders require KYC evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cardholder_kyc_required",
+              "required_action": "attach_kyc_profile"
+            },
+            "name": "cardholder_kyc_required"
+          },
+          {
+            "condition": {
+              "country_supported": false,
+              "operation": "onboard_cardholder"
+            },
+            "description": "Cardholder country must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cardholder_country_not_supported",
+              "required_action": "select_supported_country"
+            },
+            "name": "cardholder_country_supported"
+          },
+          {
+            "condition": {
+              "operation": "issue_card",
+              "program_present": false
+            },
+            "description": "Card issuance requires program.",
+            "effect": {
+              "decision": "deny",
+              "reason": "card_program_required",
+              "required_action": "select_card_program"
+            },
+            "name": "card_program_required"
+          },
+          {
+            "condition": {
+              "cardholder_present": false,
+              "operation": "issue_card"
+            },
+            "description": "Card issuance requires cardholder.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cardholder_required",
+              "required_action": "select_cardholder"
+            },
+            "name": "cardholder_required"
+          },
+          {
+            "condition": {
+              "card_type_supported": false,
+              "operation": "issue_card"
+            },
+            "description": "Card type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "card_type_not_supported",
+              "required_action": "select_supported_card_type"
+            },
+            "name": "card_type_supported"
+          },
+          {
+            "condition": {
+              "card_product_supported": false,
+              "operation": "issue_card"
+            },
+            "description": "Card product must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "card_product_not_supported",
+              "required_action": "select_supported_card_product"
+            },
+            "name": "card_product_supported"
+          },
+          {
+            "condition": {
+              "operation": "issue_card",
+              "wallet_present": false
+            },
+            "description": "Card issuance requires wallet reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "wallet_reference_required",
+              "required_action": "attach_wallet_reference"
+            },
+            "name": "wallet_reference_required"
+          },
+          {
+            "condition": {
+              "funding_account_present": false,
+              "operation": "issue_card"
+            },
+            "description": "Card issuance requires funding account.",
+            "effect": {
+              "decision": "deny",
+              "reason": "funding_account_required",
+              "required_action": "attach_funding_account"
+            },
+            "name": "funding_account_required"
+          },
+          {
+            "condition": {
+              "consent_present": false,
+              "operation": "issue_card"
+            },
+            "description": "Card issuance requires consent evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cardholder_consent_required",
+              "required_action": "attach_cardholder_consent"
+            },
+            "name": "card_consent_required"
+          },
+          {
+            "condition": {
+              "operation": "issue_card",
+              "physical_card": true,
+              "shipping_present": false
+            },
+            "description": "Physical card issuance requires shipping address.",
+            "effect": {
+              "decision": "deny",
+              "reason": "shipping_address_required",
+              "required_action": "attach_shipping_address"
+            },
+            "name": "physical_shipping_required"
+          },
+          {
+            "condition": {
+              "card_present": false,
+              "operation": "provision_token"
+            },
+            "description": "Token provisioning requires card.",
+            "effect": {
+              "decision": "deny",
+              "reason": "card_required",
+              "required_action": "select_card"
+            },
+            "name": "token_card_required"
+          },
+          {
+            "condition": {
+              "operation": "provision_token",
+              "token_type_supported": false
+            },
+            "description": "Token type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "token_type_not_supported",
+              "required_action": "select_supported_token_type"
+            },
+            "name": "token_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "provision_token",
+              "token_reference_present": false
+            },
+            "description": "Token provisioning requires token reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "token_reference_required",
+              "required_action": "attach_token_reference"
+            },
+            "name": "token_reference_required"
+          },
+          {
+            "condition": {
+              "key_domain_present": false,
+              "operation": "provision_token"
+            },
+            "description": "Token provisioning requires key domain.",
+            "effect": {
+              "decision": "deny",
+              "reason": "key_domain_required",
+              "required_action": "attach_key_domain"
+            },
+            "name": "token_key_domain_required"
+          },
+          {
+            "condition": {
+              "device_or_merchant_present": false,
+              "operation": "provision_token"
+            },
+            "description": "Token provisioning requires device or merchant reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "device_or_merchant_reference_required",
+              "required_action": "attach_device_or_merchant_reference"
+            },
+            "name": "token_device_or_merchant_required"
+          },
+          {
+            "condition": {
+              "card_present": false,
+              "operation": "authorize_transaction"
+            },
+            "description": "Authorization requires card.",
+            "effect": {
+              "decision": "deny",
+              "reason": "card_required",
+              "required_action": "select_card"
+            },
+            "name": "authorization_card_required"
+          },
+          {
+            "condition": {
+              "operation": "authorize_transaction",
+              "positive_amount": false
+            },
+            "description": "Authorization amount must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_amount_required",
+              "required_action": "set_positive_amount"
+            },
+            "name": "authorization_amount_positive"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "authorize_transaction"
+            },
+            "description": "Authorization currency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "card_currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "authorization_currency_supported"
+          },
+          {
+            "condition": {
+              "merchant_category_supported": false,
+              "operation": "authorize_transaction"
+            },
+            "description": "Merchant category must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "merchant_category_not_supported",
+              "required_action": "select_supported_merchant_category"
+            },
+            "name": "merchant_category_supported"
+          },
+          {
+            "condition": {
+              "fraud_decision_supported": false,
+              "operation": "authorize_transaction"
+            },
+            "description": "Fraud decision must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "fraud_decision_not_supported",
+              "required_action": "attach_supported_fraud_decision"
+            },
+            "name": "fraud_decision_supported"
+          },
+          {
+            "condition": {
+              "fraud_blocked": true,
+              "operation": "authorize_transaction"
+            },
+            "description": "Blocked fraud decisions deny authorization.",
+            "effect": {
+              "decision": "deny",
+              "reason": "fraud_blocked_authorization",
+              "required_action": "resolve_fraud_block"
+            },
+            "name": "fraud_block_denies_authorization"
+          },
+          {
+            "condition": {
+              "aml_result_supported": false,
+              "operation": "authorize_transaction"
+            },
+            "description": "AML result must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "aml_result_not_supported",
+              "required_action": "attach_supported_aml_result"
+            },
+            "name": "aml_result_supported"
+          },
+          {
+            "condition": {
+              "aml_blocked": true,
+              "operation": "authorize_transaction"
+            },
+            "description": "Blocked AML outcomes deny authorization.",
+            "effect": {
+              "decision": "deny",
+              "reason": "aml_blocked_authorization",
+              "required_action": "resolve_aml_block"
+            },
+            "name": "aml_block_denies_authorization"
+          },
+          {
+            "condition": {
+              "high_impact": true,
+              "human_approval_recorded": false,
+              "operation": "authorize_transaction"
+            },
+            "description": "High-impact authorizations require approval.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "authorization_approval_required",
+              "required_action": "record_authorization_approval"
+            },
+            "name": "high_impact_authorization_requires_approval"
+          },
+          {
+            "condition": {
+              "operation": "file_dispute",
+              "transaction_present": false
+            },
+            "description": "Disputes require transaction reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "transaction_reference_required",
+              "required_action": "attach_transaction_reference"
+            },
+            "name": "dispute_transaction_required"
+          },
+          {
+            "condition": {
+              "dispute_reason_supported": false,
+              "operation": "file_dispute"
+            },
+            "description": "Dispute reason must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dispute_reason_not_supported",
+              "required_action": "select_supported_dispute_reason"
+            },
+            "name": "dispute_reason_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "file_dispute"
+            },
+            "description": "Disputes require evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dispute_evidence_required",
+              "required_action": "attach_dispute_evidence"
+            },
+            "name": "dispute_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "file_dispute",
+              "reviewer_present": false
+            },
+            "description": "Disputes require reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dispute_reviewer_required",
+              "required_action": "assign_dispute_reviewer"
+            },
+            "name": "dispute_reviewer_required"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "card_batch"
+            },
+            "description": "Card batches require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_card_batch_to_bytewax"
+            },
+            "name": "card_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_card_agent"
+            },
+            "description": "Card agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "card_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "card_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_card_agent"
+            },
+            "description": "Card agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "card_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "card_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "card_agent_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged card-agent actions require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_card_agent_action_requires_human_approval"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "Card operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "description": "Card writes require policy evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "card_policy_required",
+            "required_action": "attach_card_policy"
+          },
+          "name": "card_write_requires_policy"
+        },
+        {
+          "condition": {
+            "operation": "register_program",
+            "program_owner_present": false
+          },
+          "description": "Card programs require owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "program_owner_required",
+            "required_action": "assign_program_owner"
+          },
+          "name": "program_owner_required"
+        },
+        {
+          "condition": {
+            "bin_range_present": false,
+            "operation": "register_program"
+          },
+          "description": "Card programs require BIN range.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bin_range_required",
+            "required_action": "attach_bin_range"
+          },
+          "name": "program_bin_range_required"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "register_program"
+          },
+          "description": "Card program currency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "card_currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "program_currency_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_program",
+            "settlement_account_present": false
+          },
+          "description": "Card programs require settlement account.",
+          "effect": {
+            "decision": "deny",
+            "reason": "settlement_account_required",
+            "required_action": "attach_settlement_account"
+          },
+          "name": "program_settlement_required"
+        },
+        {
+          "condition": {
+            "customer_present": false,
+            "operation": "onboard_cardholder"
+          },
+          "description": "Cardholders require customer reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_reference_required",
+            "required_action": "attach_customer_reference"
+          },
+          "name": "cardholder_customer_required"
+        },
+        {
+          "condition": {
+            "kyc_present": false,
+            "operation": "onboard_cardholder"
+          },
+          "description": "Cardholders require KYC evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cardholder_kyc_required",
+            "required_action": "attach_kyc_profile"
+          },
+          "name": "cardholder_kyc_required"
+        },
+        {
+          "condition": {
+            "country_supported": false,
+            "operation": "onboard_cardholder"
+          },
+          "description": "Cardholder country must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cardholder_country_not_supported",
+            "required_action": "select_supported_country"
+          },
+          "name": "cardholder_country_supported"
+        },
+        {
+          "condition": {
+            "operation": "issue_card",
+            "program_present": false
+          },
+          "description": "Card issuance requires program.",
+          "effect": {
+            "decision": "deny",
+            "reason": "card_program_required",
+            "required_action": "select_card_program"
+          },
+          "name": "card_program_required"
+        },
+        {
+          "condition": {
+            "cardholder_present": false,
+            "operation": "issue_card"
+          },
+          "description": "Card issuance requires cardholder.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cardholder_required",
+            "required_action": "select_cardholder"
+          },
+          "name": "cardholder_required"
+        },
+        {
+          "condition": {
+            "card_type_supported": false,
+            "operation": "issue_card"
+          },
+          "description": "Card type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "card_type_not_supported",
+            "required_action": "select_supported_card_type"
+          },
+          "name": "card_type_supported"
+        },
+        {
+          "condition": {
+            "card_product_supported": false,
+            "operation": "issue_card"
+          },
+          "description": "Card product must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "card_product_not_supported",
+            "required_action": "select_supported_card_product"
+          },
+          "name": "card_product_supported"
+        },
+        {
+          "condition": {
+            "operation": "issue_card",
+            "wallet_present": false
+          },
+          "description": "Card issuance requires wallet reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "wallet_reference_required",
+            "required_action": "attach_wallet_reference"
+          },
+          "name": "wallet_reference_required"
+        },
+        {
+          "condition": {
+            "funding_account_present": false,
+            "operation": "issue_card"
+          },
+          "description": "Card issuance requires funding account.",
+          "effect": {
+            "decision": "deny",
+            "reason": "funding_account_required",
+            "required_action": "attach_funding_account"
+          },
+          "name": "funding_account_required"
+        },
+        {
+          "condition": {
+            "consent_present": false,
+            "operation": "issue_card"
+          },
+          "description": "Card issuance requires consent evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cardholder_consent_required",
+            "required_action": "attach_cardholder_consent"
+          },
+          "name": "card_consent_required"
+        },
+        {
+          "condition": {
+            "operation": "issue_card",
+            "physical_card": true,
+            "shipping_present": false
+          },
+          "description": "Physical card issuance requires shipping address.",
+          "effect": {
+            "decision": "deny",
+            "reason": "shipping_address_required",
+            "required_action": "attach_shipping_address"
+          },
+          "name": "physical_shipping_required"
+        },
+        {
+          "condition": {
+            "card_present": false,
+            "operation": "provision_token"
+          },
+          "description": "Token provisioning requires card.",
+          "effect": {
+            "decision": "deny",
+            "reason": "card_required",
+            "required_action": "select_card"
+          },
+          "name": "token_card_required"
+        },
+        {
+          "condition": {
+            "operation": "provision_token",
+            "token_type_supported": false
+          },
+          "description": "Token type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "token_type_not_supported",
+            "required_action": "select_supported_token_type"
+          },
+          "name": "token_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "provision_token",
+            "token_reference_present": false
+          },
+          "description": "Token provisioning requires token reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "token_reference_required",
+            "required_action": "attach_token_reference"
+          },
+          "name": "token_reference_required"
+        },
+        {
+          "condition": {
+            "key_domain_present": false,
+            "operation": "provision_token"
+          },
+          "description": "Token provisioning requires key domain.",
+          "effect": {
+            "decision": "deny",
+            "reason": "key_domain_required",
+            "required_action": "attach_key_domain"
+          },
+          "name": "token_key_domain_required"
+        },
+        {
+          "condition": {
+            "device_or_merchant_present": false,
+            "operation": "provision_token"
+          },
+          "description": "Token provisioning requires device or merchant reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "device_or_merchant_reference_required",
+            "required_action": "attach_device_or_merchant_reference"
+          },
+          "name": "token_device_or_merchant_required"
+        },
+        {
+          "condition": {
+            "card_present": false,
+            "operation": "authorize_transaction"
+          },
+          "description": "Authorization requires card.",
+          "effect": {
+            "decision": "deny",
+            "reason": "card_required",
+            "required_action": "select_card"
+          },
+          "name": "authorization_card_required"
+        },
+        {
+          "condition": {
+            "operation": "authorize_transaction",
+            "positive_amount": false
+          },
+          "description": "Authorization amount must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_amount_required",
+            "required_action": "set_positive_amount"
+          },
+          "name": "authorization_amount_positive"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "authorize_transaction"
+          },
+          "description": "Authorization currency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "card_currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "authorization_currency_supported"
+        },
+        {
+          "condition": {
+            "merchant_category_supported": false,
+            "operation": "authorize_transaction"
+          },
+          "description": "Merchant category must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "merchant_category_not_supported",
+            "required_action": "select_supported_merchant_category"
+          },
+          "name": "merchant_category_supported"
+        },
+        {
+          "condition": {
+            "fraud_decision_supported": false,
+            "operation": "authorize_transaction"
+          },
+          "description": "Fraud decision must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "fraud_decision_not_supported",
+            "required_action": "attach_supported_fraud_decision"
+          },
+          "name": "fraud_decision_supported"
+        },
+        {
+          "condition": {
+            "fraud_blocked": true,
+            "operation": "authorize_transaction"
+          },
+          "description": "Blocked fraud decisions deny authorization.",
+          "effect": {
+            "decision": "deny",
+            "reason": "fraud_blocked_authorization",
+            "required_action": "resolve_fraud_block"
+          },
+          "name": "fraud_block_denies_authorization"
+        },
+        {
+          "condition": {
+            "aml_result_supported": false,
+            "operation": "authorize_transaction"
+          },
+          "description": "AML result must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "aml_result_not_supported",
+            "required_action": "attach_supported_aml_result"
+          },
+          "name": "aml_result_supported"
+        },
+        {
+          "condition": {
+            "aml_blocked": true,
+            "operation": "authorize_transaction"
+          },
+          "description": "Blocked AML outcomes deny authorization.",
+          "effect": {
+            "decision": "deny",
+            "reason": "aml_blocked_authorization",
+            "required_action": "resolve_aml_block"
+          },
+          "name": "aml_block_denies_authorization"
+        },
+        {
+          "condition": {
+            "high_impact": true,
+            "human_approval_recorded": false,
+            "operation": "authorize_transaction"
+          },
+          "description": "High-impact authorizations require approval.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "authorization_approval_required",
+            "required_action": "record_authorization_approval"
+          },
+          "name": "high_impact_authorization_requires_approval"
+        },
+        {
+          "condition": {
+            "operation": "file_dispute",
+            "transaction_present": false
+          },
+          "description": "Disputes require transaction reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "transaction_reference_required",
+            "required_action": "attach_transaction_reference"
+          },
+          "name": "dispute_transaction_required"
+        },
+        {
+          "condition": {
+            "dispute_reason_supported": false,
+            "operation": "file_dispute"
+          },
+          "description": "Dispute reason must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dispute_reason_not_supported",
+            "required_action": "select_supported_dispute_reason"
+          },
+          "name": "dispute_reason_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "file_dispute"
+          },
+          "description": "Disputes require evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dispute_evidence_required",
+            "required_action": "attach_dispute_evidence"
+          },
+          "name": "dispute_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "file_dispute",
+            "reviewer_present": false
+          },
+          "description": "Disputes require reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dispute_reviewer_required",
+            "required_action": "assign_dispute_reviewer"
+          },
+          "name": "dispute_reviewer_required"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "card_batch"
+          },
+          "description": "Card batches require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_card_batch_to_bytewax"
+          },
+          "name": "card_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_card_agent"
+          },
+          "description": "Card agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "card_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "card_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_card_agent"
+          },
+          "description": "Card agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "card_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "card_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "card_agent_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged card-agent actions require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_card_agent_action_requires_human_approval"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "agents": {
+          "component": "CardAgentWorkbench",
+          "permission": "fintech_cards:admin",
+          "route": "/fintech-cards/agents"
+        },
+        "authorizations": {
+          "component": "AuthorizationConsole",
+          "permission": "fintech_cards:authorize",
+          "route": "/fintech-cards/authorizations"
+        },
+        "cardholders": {
+          "component": "CardholderWorkbench",
+          "permission": "fintech_cards:manage_cardholders",
+          "route": "/fintech-cards/cardholders"
+        },
+        "cards": {
+          "component": "CardWorkbench",
+          "permission": "fintech_cards:issue",
+          "route": "/fintech-cards/cards"
+        },
+        "dashboard": {
+          "component": "CardsDashboard",
+          "permission": "fintech_cards:view",
+          "route": "/fintech-cards/dashboard"
+        },
+        "disputes": {
+          "component": "CardDisputeWorkbench",
+          "permission": "fintech_cards:dispute",
+          "route": "/fintech-cards/disputes"
+        },
+        "programs": {
+          "component": "CardProgramConsole",
+          "permission": "fintech_cards:manage_programs",
+          "route": "/fintech-cards/programs"
+        },
+        "settings": {
+          "component": "CardSettings",
+          "permission": "fintech_cards:admin",
+          "route": "/fintech-cards/settings"
+        },
+        "tokens": {
+          "component": "CardTokenConsole",
+          "permission": "fintech_cards:tokenize",
+          "route": "/fintech-cards/tokens"
+        }
+      },
+      "streaming": {
+        "events": [
+          "card_program_registered",
+          "cardholder_onboarded",
+          "card_issued",
+          "card_token_provisioned",
+          "card_authorization_decided",
+          "card_dispute_filed",
+          "card_agent_registered"
+        ],
+        "guardrails": [
+          "card_batch_requires_bytewax",
+          "privileged_card_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.fintech.cards.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "authorizations": {
+            "icon": "shield-check",
+            "status_indicator": "auth-chip"
+          },
+          "cards": {
+            "icon": "credit-card",
+            "status_indicator": "card-status-chip"
+          },
+          "disputes": {
+            "icon": "receipt-text",
+            "status_indicator": "dispute-chip"
+          },
+          "programs": {
+            "icon": "badge-credit-card",
+            "status_indicator": "program-chip"
+          },
+          "tokens": {
+            "icon": "key-round",
+            "status_indicator": "token-chip"
+          }
+        },
+        "name": "fintech_cards_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#0F766E",
+          "color.danger": "#B91C1C",
+          "color.primary": "#1D4ED8",
+          "color.success": "#15803D",
+          "color.warning": "#B45309",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/fintech-cards/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "CardsDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/fintech-cards/dashboard",
+            "permission": "fintech_cards:view"
+          },
+          {
+            "component": "CardProgramConsole",
+            "name": "programs",
+            "nav_group": "Programs",
+            "path": "/fintech-cards/programs",
+            "permission": "fintech_cards:manage_programs"
+          },
+          {
+            "component": "CardholderWorkbench",
+            "name": "cardholders",
+            "nav_group": "Cards",
+            "path": "/fintech-cards/cardholders",
+            "permission": "fintech_cards:manage_cardholders"
+          },
+          {
+            "component": "CardWorkbench",
+            "name": "cards",
+            "nav_group": "Cards",
+            "path": "/fintech-cards/cards",
+            "permission": "fintech_cards:issue"
+          },
+          {
+            "component": "CardTokenConsole",
+            "name": "tokens",
+            "nav_group": "Tokens",
+            "path": "/fintech-cards/tokens",
+            "permission": "fintech_cards:tokenize"
+          },
+          {
+            "component": "AuthorizationConsole",
+            "name": "authorizations",
+            "nav_group": "Controls",
+            "path": "/fintech-cards/authorizations",
+            "permission": "fintech_cards:authorize"
+          },
+          {
+            "component": "CardDisputeWorkbench",
+            "name": "disputes",
+            "nav_group": "Exceptions",
+            "path": "/fintech-cards/disputes",
+            "permission": "fintech_cards:dispute"
+          },
+          {
+            "component": "CardAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/fintech-cards/agents",
+            "permission": "fintech_cards:admin"
+          },
+          {
+            "component": "CardSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/fintech-cards/settings",
+            "permission": "fintech_cards:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "card_review": {
+        "roles": [
+          "card_ops_reviewer",
+          "authorization_reviewer",
+          "token_reviewer",
+          "dispute_reviewer",
+          "issuer_processor_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "fintech_cards": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "encr",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud"
+      ]
+    }
+  },
+  "contracts": {
+    "fintech_cards": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "audit": "audl",
+          "auth": "auth",
+          "encryption": "encr",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "card_ops_reviewer",
+            "authorization_reviewer",
+            "token_reviewer",
+            "dispute_reviewer",
+            "issuer_processor_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "authorizations": {
+          "aml_result_required": true,
+          "fraud_decision_required": true,
+          "high_value_threshold": 100000,
+          "human_approval_required_for_high_impact": true,
+          "positive_amount_required": true,
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ],
+          "supported_merchant_categories": [
+            "grocery",
+            "fuel",
+            "travel",
+            "education",
+            "medical",
+            "commerce",
+            "cash",
+            "restricted"
+          ]
+        },
+        "cardholders": {
+          "customer_reference_required": true,
+          "kyc_required": true,
+          "supported_countries": [
+            "KE",
+            "UG",
+            "TZ",
+            "RW",
+            "GH",
+            "NG",
+            "ZA",
+            "GB",
+            "US",
+            "AE"
+          ]
+        },
+        "cards": {
+          "consent_required": true,
+          "funding_account_required": true,
+          "shipping_required_for_physical": true,
+          "supported_products": [
+            "debit",
+            "prepaid",
+            "expense",
+            "fleet",
+            "merchant"
+          ],
+          "supported_types": [
+            "virtual",
+            "physical"
+          ],
+          "wallet_required": true
+        },
+        "disputes": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_reasons": [
+            "fraud",
+            "duplicate",
+            "goods_not_received",
+            "service_not_provided",
+            "cash_not_dispensed",
+            "processing_error"
+          ]
+        },
+        "governance": {
+          "audit_card_events": true,
+          "customer_consent_required": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_authorization_events": true,
+          "emit_card_events": true,
+          "emit_dispute_events": true,
+          "emit_program_events": true,
+          "emit_token_events": true,
+          "event_stream": "apg.fintech.cards.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "programs": {
+          "bin_range_required": true,
+          "owner_required": true,
+          "settlement_account_required": true,
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_cards_control"
+        },
+        "tokens": {
+          "device_or_merchant_reference_required": true,
+          "key_domain_required": true,
+          "supported_types": [
+            "wallet",
+            "device",
+            "merchant",
+            "network"
+          ],
+          "token_reference_required": true
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_authorizations": true,
+          "enable_cardholders": true,
+          "enable_cards": true,
+          "enable_dashboard": true,
+          "enable_disputes": true,
+          "enable_programs": true,
+          "enable_tokens": true
+        }
+      },
+      "id": "fintech_cards",
+      "provides": [
+        "card_program_governance",
+        "cardholder_card_lifecycle",
+        "tokenized_card_credentialing",
+        "card_authorization_control",
+        "card_dispute_workflow",
+        "card_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "encr",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 11,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "fintech_cards": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}

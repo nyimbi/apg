@@ -26744,3 +26744,81 @@ Known gaps:
   sanctions/PEP/adverse-media feeds, regulator filing, durable Bytewax
   topology, treasury reconciliation, travel-rule adapters, or performance/load
   checks during this battery-conscious slice.
+
+### 2026-06-01 14:12 EAT
+
+Fintech Digital Cards executable capability slice:
+
+- Promoted `capabilities/fintech/cards` from a placeholder package into a
+  first-class APG capability with `README.md`, `SPECIFICATION.md`, `PLAN.md`,
+  `cap_spec.md`, contract, models, service, API helpers, view models, app
+  entrypoint, semantic/package/release evidence, and focused tests.
+- Added tenant-scoped card program governance, cardholder onboarding, virtual
+  and physical card issuance, card token provisioning, authorization decisions,
+  dispute filing, dashboard summaries, Bytewax batch validation, and
+  provider-neutral card-agent registration.
+- Added deterministic card guardrails for tenant context, write policy, program
+  owner/BIN/currency/settlement evidence, cardholder customer/KYC/country
+  evidence, card program/holder/type/product/wallet/funding/consent/shipping
+  evidence, token card/type/reference/key/device evidence, authorization
+  card/amount/currency/merchant/fraud/AML/high-impact approval evidence,
+  dispute transaction/reason/evidence/reviewer evidence, Bytewax lifecycle
+  events, supported AI-agent runtimes/roles, and privileged-agent approval.
+- Added `cards_runtime.py` domain helpers for normalized codes, countries,
+  currencies, amounts, PAN masking, and authorization decisions.
+- Updated fintech capability metadata so `cards` is listed as an implemented
+  sub-capability.
+- Removed the empty `_Digital_Cards` marker file and refreshed
+  `semantic_model.json`, `package_manifest.json`, and `release_report.json`.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/fintech/cards/__init__.py capabilities/fintech/cards/capability_contract.py capabilities/fintech/cards/models.py capabilities/fintech/cards/cards_runtime.py capabilities/fintech/cards/service.py capabilities/fintech/cards/api.py capabilities/fintech/cards/views.py capabilities/fintech/cards/app.py capabilities/fintech/cards/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/fintech/cards/tests/test_package_contract.py`
+  passed with 6 tests.
+- `./.venv/bin/python capabilities/fintech/cards/app.py` passed with
+  `self_test()` status `ok`.
+- `./.venv/bin/apg capabilities inspect fintech_cards --json` passed with 39
+  rules, 9 routes, Bytewax streaming, and provider-neutral card-agent runtimes.
+- `./.venv/bin/apg capabilities publish-plan capabilities/fintech/cards --json`
+  passed with side-effect-free publish evidence and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/fintech/cards --json`
+  passed with one domain-specific fintech cards implementation, 0 baseline
+  markers, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/fintech/cards --json`
+  passed with one complete lifecycle record, 39 rules, 9 routes, 11 theme
+  tokens, and 0 warnings/errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 116 operable contracts, 116 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+
+Code review:
+
+- Reviewed card-program guardrails so owner, BIN range, supported currency,
+  settlement account, tenant, and policy evidence are enforced before local
+  state changes.
+- Reviewed cardholder/card issuance guardrails so customer, KYC, issuing
+  country, program, cardholder, card type/product, wallet, funding, consent,
+  and physical-card shipping evidence are enforced before issuance.
+- Reviewed token and authorization guardrails so token references, key domains,
+  device/merchant references, card state, amount, currency, merchant category,
+  fraud decision, AML result, high-impact approvals, and blocked outcomes are
+  enforced before decisions are recorded.
+- Reviewed dispute and first-class card-agent behavior so disputes require
+  transaction, reason, evidence, and reviewer assignment, while Codex, Claude
+  Code, OpenCode, and Pi runtimes remain provider-neutral and privileged
+  actions require human approval.
+- Kept live issuer processors, card networks, token-service providers, 3DS,
+  embossing/personalization, PCI DSS production zones, network chargebacks,
+  clearing-file reconciliation, payment rails, wallet rails, KYC/AML/Fraud
+  providers, audit sinks, notifications, key management, encryption, and
+  durable Bytewax workers behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live issuer-processor
+  authorization, live card-network certification, token-service-provider flows,
+  3DS, embossing/personalization, PCI DSS production-zone checks, live network
+  chargeback submission, clearing-file reconciliation, durable Bytewax topology,
+  or performance/load checks during this battery-conscious slice.

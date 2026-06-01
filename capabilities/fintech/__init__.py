@@ -71,6 +71,7 @@ CAPABILITY_META = {
 	],
 	'implemented_subcapabilities': [
 		'payments',      # Digital Payments
+		'cards',         # Digital Cards
 		'wallets',       # Digital Wallets
 		'remittance',    # Cross-Border Remittance
 		'kyc',           # Know Your Customer
