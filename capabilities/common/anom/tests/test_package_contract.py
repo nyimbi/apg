@@ -61,6 +61,7 @@ def test_package_app_entrypoint_is_publishable():
 	assert model["composition"]["capability_dependencies"]["anom"] == ["pred", "aicr", "moni", "conf"]
 	assert model["composition"]["agent_teams"]["anom_signal_governance"]["stream"] == "anom.lifecycle"
 	assert model["capabilities"]["anom"]["anomaly_lifecycle"]["lifecycle_batch"] == "AnomLifecycleBatchRecord"
+	assert model["capabilities"]["anom"]["review_queues"]["signals"] == "AnomalySignal"
 	assert "audit" in model["capabilities"]["anom"]["screens"]
 	assert committed_model == model
 	assert set(committed_manifest["generated_artifacts"]) >= {

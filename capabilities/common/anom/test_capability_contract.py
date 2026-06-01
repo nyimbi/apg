@@ -234,7 +234,10 @@ def test_service_builds_baselines_detects_signals_and_tracks_investigations():
 	audit = views.audit_timeline_model(service, "tenant-signals")
 
 	assert baseline["history_points"] == 60
+	assert baseline["status"] == "active"
+	assert baseline["decision"] == "allow"
 	assert signal["severity"] == "critical"
+	assert signal["decision"] == "allow"
 	assert "recent deployment present in observation context" in signal["root_cause_hints"]
 	assert investigation["status"] == "closed"
 	assert investigation["closed_by"] == "sre-lead"
@@ -246,9 +249,17 @@ def test_service_builds_baselines_detects_signals_and_tracks_investigations():
 	assert batch["status"] == "accepted"
 	assert summary["critical_or_high_count"] == 1
 	assert summary["investigation_count"] == 1
+	assert summary["pending_source_review_count"] == 0
+	assert summary["pending_baseline_review_count"] == 0
+	assert summary["pending_signal_review_count"] == 0
+	assert summary["pending_feedback_review_count"] == 0
 	assert summary["anomaly_agent_count"] == 1
 	assert summary["lifecycle_batch_count"] == 1
 	assert dashboard["summary"]["signal_count"] == 1
+	assert dashboard["pending_reviews"]["sources"] == []
+	assert dashboard["pending_reviews"]["baselines"] == []
+	assert dashboard["pending_reviews"]["signals"] == []
+	assert dashboard["pending_reviews"]["feedback"] == []
 	assert dashboard["anomaly_agents"][0]["id"] == "anomaly-agent-1"
 	assert dashboard["lifecycle_batches"][0]["id"] == "anom-batch-001"
 	assert source_registry["sources"][0]["id"] == "api_latency"
@@ -301,6 +312,18 @@ def test_service_blocks_invalid_detection_and_tuning_flows():
 		kind="metric",
 		owner="platform",
 	)
+	unknown_source = service.register_source(
+		source_id="unknown-kind",
+		tenant_id="tenant-signals",
+		name="Unknown Source",
+		kind="legacy_counter",
+		owner="platform",
+	)
+
+	assert unknown_source["status"] == "pending_review"
+	assert unknown_source["decision"] == "require_review"
+	assert unknown_source["matched_rules"] == ["source_kind_requires_review"]
+	assert unknown_source["review_reasons"] == ["source_kind_review_required"]
 
 	with pytest.raises(PermissionError, match="source_owner_required"):
 		service.register_source(
@@ -360,6 +383,19 @@ def test_service_blocks_invalid_detection_and_tuning_flows():
 			sensitivity="medium",
 		)
 
+	unknown_sensitivity = service.create_baseline(
+		baseline_id="unknown-sensitivity",
+		tenant_id="tenant-signals",
+		source_id="errors",
+		metric="error_rate",
+		values=[1.0 + (index % 3) for index in range(60)],
+		sensitivity="extreme",
+	)
+	assert unknown_sensitivity["status"] == "pending_review"
+	assert unknown_sensitivity["decision"] == "require_review"
+	assert unknown_sensitivity["matched_rules"] == ["baseline_sensitivity_requires_review"]
+	assert unknown_sensitivity["review_reasons"] == ["baseline_sensitivity_review_required"]
+
 	service.create_baseline(
 		baseline_id="errors_baseline",
 		tenant_id="tenant-signals",
@@ -389,12 +425,15 @@ def test_service_blocks_invalid_detection_and_tuning_flows():
 		owner="sre-lead",
 	)
 
-	with pytest.raises(PermissionError, match="high_anomaly_triage_required"):
-		service.create_record(
-			record_id="high-without-triage",
-			tenant_id="tenant-signals",
-			metadata={"severity": "high", "owner": "sre-lead"},
-		)
+	untriaged = service.create_record(
+		record_id="high-without-triage",
+		tenant_id="tenant-signals",
+		metadata={"severity": "high", "owner": "sre-lead"},
+	)
+	assert untriaged["status"] == "pending_review"
+	assert untriaged["decision"] == "require_review"
+	assert untriaged["matched_rules"] == ["high_anomaly_requires_triage"]
+	assert untriaged["review_reasons"] == ["high_anomaly_triage_required"]
 
 	triaged = service.create_record(
 		record_id="high-with-triage",
@@ -403,14 +442,33 @@ def test_service_blocks_invalid_detection_and_tuning_flows():
 	)
 	assert triaged["severity"] == "high"
 
-	with pytest.raises(PermissionError, match="tuning_review_required"):
-		service.record_feedback(
-			feedback_id="fp-1",
-			tenant_id="tenant-signals",
-			signal_id=signal["id"],
-			label="false_positive",
-			reviewer="sre-lead",
-		)
+	review_feedback = service.record_feedback(
+		feedback_id="fp-1",
+		tenant_id="tenant-signals",
+		signal_id=signal["id"],
+		label="false_positive",
+		reviewer="sre-lead",
+	)
+	assert review_feedback["status"] == "pending_review"
+	assert review_feedback["decision"] == "require_review"
+	assert review_feedback["matched_rules"] == ["high_false_positive_rate_requires_tuning"]
+	assert review_feedback["review_reasons"] == ["tuning_review_required"]
+
+	summary = service.signal_summary("tenant-signals")
+	source_view = views.source_registry_model(service, "tenant-signals")
+	baseline_view = views.baseline_console_model(service, "tenant-signals")
+	signal_view = views.signal_board_model(service, "tenant-signals")
+	feedback_view = views.feedback_review_model(service, "tenant-signals")
+	quality_view = views.quality_model(service, "tenant-signals")
+	assert summary["pending_source_review_count"] == 1
+	assert summary["pending_baseline_review_count"] == 1
+	assert summary["pending_signal_review_count"] == 1
+	assert summary["pending_feedback_review_count"] == 1
+	assert source_view["pending_review"][0]["id"] == "unknown-kind"
+	assert baseline_view["pending_review"][0]["id"] == "unknown-sensitivity"
+	assert signal_view["pending_review"][0]["id"] == "high-without-triage"
+	assert feedback_view["pending_review"][0]["id"] == "fp-1"
+	assert quality_view["pending_feedback_review"][0]["id"] == "fp-1"
 
 	with pytest.raises(PermissionError, match="baseline_reset_approval_required"):
 		service.reset_baseline(

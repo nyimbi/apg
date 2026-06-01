@@ -23907,3 +23907,75 @@ Known gaps:
   this battery-conscious capability slice.
 - Existing SQLAlchemy and Pydantic deprecation warnings surfaced by focused
   tests remain outside this slice.
+
+### 2026-06-01 03:57 EAT
+
+ANOM review-evidence lifecycle slice:
+
+- Added durable pending-review evidence for monitoring sources, baselines,
+  anomaly signals, and detection feedback. True denial guardrails still block
+  invalid state, while review-required outcomes now retain deterministic
+  matched rules and review reasons.
+- Extended ANOM source, baseline, signal, and feedback records with `status`,
+  `decision`, `matched_rules`, and `review_reasons` where needed.
+- Updated source registration, baseline creation, detection/manual signal
+  recording, and feedback recording so unknown source kinds, unknown
+  sensitivity values, untriaged high signals, unknown feedback labels, and
+  untuned high false-positive rates become auditable review queues.
+- Surfaced pending review queues through dashboard, source registry, baseline
+  console, signal board, feedback review, and quality view models.
+- Updated ANOM `README.md`, `SPECIFICATION.md`, `PLAN.md`, `cap_spec.md`, and
+  semantic model evidence to document and expose review queues.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/anom/__init__.py capabilities/common/anom/capability_contract.py capabilities/common/anom/models.py capabilities/common/anom/anomaly_engine.py capabilities/common/anom/service.py capabilities/common/anom/api.py capabilities/common/anom/views.py capabilities/common/anom/app.py capabilities/common/anom/test_capability_contract.py capabilities/common/anom/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/anom/test_capability_contract.py capabilities/common/anom/tests/test_package_contract.py`
+  passed with 11 tests and 10 pre-existing SQLAlchemy/Pydantic deprecation
+  warnings from imported shared modules.
+- `./.venv/bin/python -c "from capabilities.common.anom import app; r=app.self_test(); print(r); assert r['passed']"`
+  passed.
+- `./.venv/bin/python -m json.tool capabilities/common/anom/semantic_model.json`
+  passed.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/anom --json`
+  passed with one domain-specific ANOM implementation, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/anom --json`
+  passed and showed 39 rules, 14 routes, Bytewax streaming, first-class
+  anomaly-agent evidence, side-effect-free publish evidence, and no warnings.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/common/anom --json`
+  passed with one complete lifecycle record, 39 rules, 14 routes, and 0
+  warnings/errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 109 operable contracts, 109 complete packages, 0
+  package gaps, 0 warnings, and 0 errors.
+- Focused stale-marker scan over touched ANOM source, docs, tests, and package
+  evidence returned no primary-slice stale markers.
+- `git diff --check -- capabilities/common/anom docs/progress_log.md` passed.
+
+Code review:
+
+- Reviewed denial behavior: missing tenant/source/name/owner/kind, missing
+  baseline source/metric/history/sensitivity, missing detection source/baseline
+  metric/value, critical signal without owner, missing investigation closure
+  evidence, missing feedback reviewer, baseline reset without approval, and
+  non-Bytewax lifecycle batches still fail before accepting state.
+- Reviewed review behavior: source, baseline, signal, and feedback
+  review-required outcomes now keep matched rules and review reasons on domain
+  records and audit events.
+- Reviewed investigation behavior: pending-review high signals are not
+  auto-opened as investigations until review/triage evidence exists.
+- Reviewed UI surfacing: route-specific view models expose stored pending
+  review queues without re-evaluating historical observations or feedback.
+- Kept live monitoring providers, PRED/AICR/MONI integrations, alert
+  dispatchers, metrics/cache sinks, and Bytewax execution behind adapters.
+
+Known gaps:
+
+- Did not run the full repository test suite, rendered UI checks, live
+  monitoring providers, live PRED/AICR/MONI integrations, live alert
+  dispatchers, durable metrics/cache sinks, live Bytewax topology, or
+  performance/load checks during this battery-conscious capability slice.
+- Existing SQLAlchemy and Pydantic deprecation warnings surfaced by focused
+  tests remain outside this slice.

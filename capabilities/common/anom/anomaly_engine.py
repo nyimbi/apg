@@ -27,6 +27,10 @@ class AnomalyDetectionEngine:
 		metric: str,
 		values: list[float] | tuple[float, ...],
 		sensitivity: str = "medium",
+		status: str = "active",
+		decision: str = "allow",
+		matched_rules: tuple[str, ...] = (),
+		review_reasons: tuple[str, ...] = (),
 	) -> BaselineProfile:
 		center = mean(values)
 		spread = max(pstdev(values), MINIMUM_STDEV)
@@ -39,6 +43,10 @@ class AnomalyDetectionEngine:
 			stdev=float(spread),
 			history_points=len(values),
 			sensitivity=sensitivity,
+			status=status,
+			decision=decision,
+			matched_rules=matched_rules,
+			review_reasons=review_reasons,
 		)
 
 	def score_observation(

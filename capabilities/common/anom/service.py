@@ -63,7 +63,8 @@ class AnomService:
 			"source_kind_present": bool(kind),
 			"source_kind_known": kind in self.describe(tenant_id)["configuration"]["sources"]["allowed_kinds"],
 		})
-		_raise_if_blocked(result)
+		_raise_if_denied(result)
+		status = "pending_review" if result["decision"] == "require_review" else "active"
 		source = MonitoringSource(
 			id=source_id,
 			tenant_id=tenant_id,
@@ -71,6 +72,10 @@ class AnomService:
 			kind=kind,
 			owner=owner,
 			labels=dict(labels or {}),
+			status=status,
+			decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=_review_reasons(result),
 		)
 		self._sources[self._tenant_key(tenant_id, source_id)] = source
 		self._record_event(
@@ -78,7 +83,13 @@ class AnomService:
 			event_type="monitoring_source_registered",
 			subject_id=source_id,
 			message=f"Registered monitoring source {name}.",
-			evidence={"kind": kind, "owner": owner},
+			evidence={
+				"kind": kind,
+				"owner": owner,
+				"decision": result["decision"],
+				"matched_rules": list(result["matched_rules"]),
+				"reasons": list(_review_reasons(result)),
+			},
 		)
 		return source.to_dict()
 
@@ -98,7 +109,7 @@ class AnomService:
 		sensitivity: str = "",
 	) -> dict[str, Any]:
 		source_present = self._tenant_key(tenant_id, source_id) in self._sources
-		self._enforce_baseline_policy(
+		result = self._enforce_baseline_policy(
 			tenant_id=tenant_id,
 			source_present=source_present,
 			metric_present=bool(metric),
@@ -106,6 +117,7 @@ class AnomService:
 			sensitivity=sensitivity,
 		)
 		source = self._get_source(tenant_id, source_id)
+		status = "pending_review" if result["decision"] == "require_review" else "active"
 		baseline = self._engine.build_baseline(
 			baseline_id=baseline_id,
 			tenant_id=tenant_id,
@@ -113,6 +125,10 @@ class AnomService:
 			metric=metric,
 			values=values,
 			sensitivity=sensitivity,
+			status=status,
+			decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=_review_reasons(result),
 		)
 		self._baselines[self._tenant_key(tenant_id, baseline_id)] = baseline
 		self._record_event(
@@ -120,7 +136,14 @@ class AnomService:
 			event_type="baseline_created",
 			subject_id=baseline_id,
 			message=f"Created baseline {baseline_id}.",
-			evidence={"source_id": source.id, "metric": metric, "history_points": len(values)},
+			evidence={
+				"source_id": source.id,
+				"metric": metric,
+				"history_points": len(values),
+				"decision": result["decision"],
+				"matched_rules": list(result["matched_rules"]),
+				"reasons": list(_review_reasons(result)),
+			},
 		)
 		return baseline.to_dict()
 
@@ -192,8 +215,12 @@ class AnomService:
 		)
 		scored = self._engine.score_observation(baseline, observation)
 		severity = str(scored["severity"])
-		self._enforce_signal_policy(tenant_id, severity, bool(owner), triage_recorded=bool(triage_recorded))
+		result = self._enforce_signal_policy(tenant_id, severity, bool(owner), triage_recorded=bool(triage_recorded))
 		self._observations[self._tenant_key(tenant_id, observation.id)] = observation
+		if result["decision"] == "require_review":
+			status = "pending_review"
+		else:
+			status = "open" if scored["anomalous"] else "normal"
 		signal = AnomalySignal(
 			id=detection_id,
 			tenant_id=tenant_id,
@@ -202,8 +229,11 @@ class AnomService:
 			observation_id=observation.id,
 			score=float(scored["score"]),
 			severity=severity,
-			status="open" if scored["anomalous"] else "normal",
+			status=status,
 			root_cause_hints=tuple(scored["root_cause_hints"]),
+			decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=_review_reasons(result),
 		)
 		self._signals[self._tenant_key(tenant_id, detection_id)] = signal
 		self._record_event(
@@ -214,13 +244,16 @@ class AnomService:
 			evidence={
 				"source_id": source.id,
 				"baseline_id": baseline.id,
-					"metric": metric,
-					"score": scored["score"],
-					"owner_assigned": bool(owner),
-					"triage_recorded": bool(triage_recorded),
-				},
-			)
-		if owner and scored["anomalous"]:
+				"metric": metric,
+				"score": scored["score"],
+				"owner_assigned": bool(owner),
+				"triage_recorded": bool(triage_recorded),
+				"decision": result["decision"],
+				"matched_rules": list(result["matched_rules"]),
+				"reasons": list(_review_reasons(result)),
+			},
+		)
+		if owner and scored["anomalous"] and status != "pending_review":
 			self.open_investigation(
 				investigation_id=f"investigate:{detection_id}",
 				tenant_id=tenant_id,
@@ -251,12 +284,13 @@ class AnomService:
 	) -> dict[str, Any]:
 		"""Compatibility helper that records a manual anomaly signal."""
 		metadata = dict(metadata or {})
-		self._enforce_signal_policy(
+		result = self._enforce_signal_policy(
 			tenant_id,
 			str(metadata.get("severity") or "medium"),
 			bool(metadata.get("owner")),
 			triage_recorded=bool(metadata.get("triage_recorded", False)),
 		)
+		record_status = "pending_review" if result["decision"] == "require_review" else status
 		signal = AnomalySignal(
 			id=record_id,
 			tenant_id=tenant_id,
@@ -265,8 +299,11 @@ class AnomService:
 			observation_id=str(metadata.get("observation_id") or "manual"),
 			score=float(metadata.get("score", 0.0)),
 			severity=str(metadata.get("severity") or "medium"),
-			status=status,
+			status=record_status,
 			root_cause_hints=tuple(metadata.get("root_cause_hints") or ()),
+			decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=_review_reasons(result),
 		)
 		self._signals[self._tenant_key(tenant_id, record_id)] = signal
 		self._record_event(
@@ -274,7 +311,13 @@ class AnomService:
 			event_type="manual_signal_recorded",
 			subject_id=record_id,
 			message=f"Recorded manual anomaly signal {record_id}.",
-			evidence={"severity": signal.severity, "status": status},
+			evidence={
+				"severity": signal.severity,
+				"status": record_status,
+				"decision": result["decision"],
+				"matched_rules": list(result["matched_rules"]),
+				"reasons": list(_review_reasons(result)),
+			},
 		)
 		return signal.to_dict()
 
@@ -372,7 +415,7 @@ class AnomService:
 		projected_feedback = [item.to_dict() for item in self._feedback.values() if item.tenant_id == tenant_id]
 		projected_feedback.append({"label": label})
 		false_positive_rate = self._engine.false_positive_rate(projected_feedback)
-		self._enforce_feedback_policy(
+		result = self._enforce_feedback_policy(
 			tenant_id=tenant_id,
 			signal_present=signal_present,
 			label=label,
@@ -388,6 +431,10 @@ class AnomService:
 			label=label,
 			reviewer=reviewer,
 			notes=notes,
+			status="pending_review" if result["decision"] == "require_review" else "recorded",
+			decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=_review_reasons(result),
 		)
 		self._feedback[self._tenant_key(tenant_id, feedback_id)] = feedback
 		self._record_event(
@@ -395,7 +442,14 @@ class AnomService:
 			event_type="feedback_recorded",
 			subject_id=feedback_id,
 			message=f"Recorded {label} feedback for {signal.id}.",
-			evidence={"signal_id": signal.id, "reviewer": reviewer, "false_positive_rate": false_positive_rate},
+			evidence={
+				"signal_id": signal.id,
+				"reviewer": reviewer,
+				"false_positive_rate": false_positive_rate,
+				"decision": result["decision"],
+				"matched_rules": list(result["matched_rules"]),
+				"reasons": list(_review_reasons(result)),
+			},
 		)
 		return feedback.to_dict()
 
@@ -528,13 +582,19 @@ class AnomService:
 	def signal_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		signals = self.list_signals(tenant_id)
 		feedback = self.list_feedback(tenant_id)
+		sources = self.list_sources(tenant_id)
+		baselines = self.list_baselines(tenant_id)
 		return {
 			"tenant_id": tenant_id,
-			"source_count": len(self.list_sources(tenant_id)),
-			"baseline_count": len(self.list_baselines(tenant_id)),
+			"source_count": len(sources),
+			"baseline_count": len(baselines),
 			"signal_count": len(signals),
 			"investigation_count": len(self.list_investigations(tenant_id)),
 			"feedback_count": len(feedback),
+			"pending_source_review_count": len([item for item in sources if item["status"] == "pending_review"]),
+			"pending_baseline_review_count": len([item for item in baselines if item["status"] == "pending_review"]),
+			"pending_signal_review_count": len([item for item in signals if item["status"] == "pending_review"]),
+			"pending_feedback_review_count": len([item for item in feedback if item["status"] == "pending_review"]),
 			"anomaly_agent_count": len(self.list_anomaly_agents(tenant_id)),
 			"pending_agent_review_count": len([item for item in self.list_anomaly_agents(tenant_id) if item["status"] == "pending_review"]),
 			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
@@ -643,7 +703,7 @@ class AnomService:
 		metric_present: bool,
 		history_points: int,
 		sensitivity: str,
-	) -> None:
+	) -> dict[str, Any]:
 		allowed = self.describe(tenant_id)["configuration"]["detection"]["allowed_sensitivities"]
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
@@ -654,7 +714,8 @@ class AnomService:
 			"sensitivity_present": bool(sensitivity),
 			"sensitivity_known": sensitivity in allowed,
 		})
-		_raise_if_blocked(result)
+		_raise_if_denied(result)
+		return result
 
 	def _enforce_signal_policy(
 		self,
@@ -662,7 +723,7 @@ class AnomService:
 		severity: str,
 		owner_assigned: bool,
 		triage_recorded: bool,
-	) -> None:
+	) -> dict[str, Any]:
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
 			"operation": "detect",
@@ -670,7 +731,8 @@ class AnomService:
 			"owner_assigned": owner_assigned,
 			"triage_recorded": triage_recorded,
 		})
-		_raise_if_blocked(result)
+		_raise_if_denied(result)
+		return result
 
 	def _enforce_reset_policy(self, tenant_id: str, approval_recorded: bool) -> None:
 		result = self.evaluate({
@@ -688,7 +750,7 @@ class AnomService:
 		reviewer: str,
 		false_positive_rate: float,
 		tuning_review_recorded: bool,
-	) -> None:
+	) -> dict[str, Any]:
 		allowed = self.describe(tenant_id)["configuration"]["feedback"]["allowed_labels"]
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
@@ -700,7 +762,8 @@ class AnomService:
 			"false_positive_rate": false_positive_rate,
 			"tuning_review_recorded": tuning_review_recorded,
 		})
-		_raise_if_blocked(result)
+		_raise_if_denied(result)
+		return result
 
 
 def _raise_if_blocked(result: dict[str, Any]) -> None:
@@ -715,6 +778,14 @@ def _raise_if_blocked(result: dict[str, Any]) -> None:
 def _raise_if_denied(result: dict[str, Any]) -> None:
 	if result["decision"] == "deny":
 		raise PermissionError(", ".join(_reasons(result)) or "anomaly_policy_blocked")
+
+
+def _review_reasons(result: dict[str, Any]) -> tuple[str, ...]:
+	return tuple(
+		action.get("reason", "anomaly_review_required")
+		for action in result["actions"]
+		if action.get("decision") == "require_review"
+	)
 
 
 def _reasons(result: dict[str, Any]) -> tuple[str, ...]:

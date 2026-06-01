@@ -9,17 +9,18 @@ evidence through deterministic guardrails.
 
 ## What It Provides
 
-- Monitoring source registration with tenant, name, kind, owner, labels, and
-  audit evidence.
+- Monitoring source registration with tenant, name, kind, owner, labels, audit
+  evidence, and pending-review state for unfamiliar source kinds.
 - Baseline creation with source linkage, metric, sensitivity, minimum history
-  checks, and reset approval governance.
+  checks, reset approval governance, and pending-review evidence for
+  unfamiliar sensitivity values.
 - Observation scoring through deterministic anomaly thresholds and root-cause
   hints.
 - Signal records with severity, status, source, baseline, observation, score,
   and tenant isolation.
 - Investigation workflows with owner assignment and closure evidence.
 - Feedback capture with reviewer, label, false-positive-rate checks, and tuning
-  review enforcement.
+  review queues.
 - First-class AI anomaly-agent composition for `codex`, `claude_code`,
   `opencode`, and `pi`, with role, scope, owner, purpose, contribution
   disclosure, and privileged-role review guardrails.
@@ -27,7 +28,7 @@ evidence through deterministic guardrails.
   investigation, feedback, alert, and anomaly-agent mutations.
 - UI view models for dashboard, sources, baselines, detector, signals,
   investigations, alerts, rules, feedback, quality, agents, lifecycle batches,
-  audit, and settings.
+  audit, settings, and pending-review queues.
 - Adapter configuration for PRED, AICR, MONI, WFLO, NTFY, HLTH, CONF, AUTH,
   AUDL, CACH, and Bytewax event streaming.
 
@@ -101,6 +102,20 @@ closed = service.close_investigation(
 )
 ```
 
+Review-required outcomes are persisted as data, not discarded exceptions:
+
+```python
+pending_source = service.register_source(
+	"legacy_counter",
+	"tenant-a",
+	"Legacy Counter",
+	kind="legacy-counter",
+	owner="platform",
+)
+assert pending_source["status"] == "pending_review"
+assert pending_source["review_reasons"] == ["source_kind_review_required"]
+```
+
 ## Guardrails
 
 ANOM blocks missing tenant context, sources without name/owner/kind, baselines
@@ -111,7 +126,10 @@ evidence, feedback without signal/reviewer/label, baseline reset without
 approval, non-Bytewax batch detection streams, alert dispatch without
 notification adapter, and state changes without audit evidence. ANOM requires
 review for unknown source kinds, unknown sensitivity values, high-severity
-triage, unknown feedback labels, and high false-positive rates.
+triage, unknown feedback labels, and high false-positive rates. Review-required
+source, baseline, signal, feedback, and privileged agent outcomes are persisted
+as `pending_review` records with matched rules and review reasons so generated
+applications can surface governance queues without replaying detection work.
 AI anomaly-agent guardrails also block unsupported runtimes, unsupported roles,
 missing scope, missing owner, missing purpose, missing machine-contribution
 disclosure, and route privileged roles through pending human review when

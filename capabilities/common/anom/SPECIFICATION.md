@@ -19,6 +19,8 @@ This packet establishes the executable baseline for ANOM:
 - Provider-neutral AI anomaly agents as executable state with runtime, role,
   scope, owner, purpose, disclosure, human-review status, and audit evidence.
 - Bytewax-only lifecycle batch validation for anomaly mutations.
+- Durable review-required source, baseline, signal, and feedback outcomes as
+  pending-review records with matched rules and review reasons.
 - Package evidence that can be published and self-tested from the current
   executable contract.
 - Focused tests for the contract, lifecycle, guardrails, view models, and
@@ -41,14 +43,16 @@ This packet establishes the executable baseline for ANOM:
 
 - Register monitoring sources with tenant, name, kind, owner, and labels.
 - Deny missing tenant, name, owner, or kind.
-- Require review for unknown source kinds.
+- Persist unknown source kinds as pending-review sources with deterministic
+  matched-rule and reason evidence.
 
 ### Baseline Lifecycle
 
 - Create baselines from tenant-scoped sources, metric names, historical values,
   and sensitivity.
 - Deny missing source, metric, sufficient history, or sensitivity.
-- Require review for unknown sensitivity values.
+- Persist unknown sensitivity values as pending-review baselines with
+  deterministic matched-rule and reason evidence.
 - Reset baselines only with approval evidence.
 
 ### Detection Lifecycle
@@ -57,7 +61,8 @@ This packet establishes the executable baseline for ANOM:
   thresholds and sensitivity.
 - Deny missing source, baseline, metric, or observed value.
 - Deny critical anomaly acceptance without an investigation owner.
-- Require triage review for high-severity anomalies without evidence.
+- Persist high-severity anomalies without triage evidence as pending-review
+  signals instead of opening investigations automatically.
 - Deny cross-tenant source or baseline use.
 
 ### Investigation Lifecycle
@@ -72,9 +77,9 @@ This packet establishes the executable baseline for ANOM:
 
 - Record feedback against anomaly signals with reviewer, label, and notes.
 - Deny missing signal, reviewer, or label.
-- Require review for unknown labels.
-- Require tuning review when false-positive rate exceeds the configured
-  threshold.
+- Persist unknown labels as pending-review feedback.
+- Persist feedback as pending-review when false-positive rate exceeds the
+  configured threshold and tuning review has not been recorded.
 
 ### AI Agent Lifecycle
 
@@ -107,6 +112,8 @@ This packet establishes the executable baseline for ANOM:
   investigations, alerts, rules, feedback, quality, agents, lifecycle batches,
   audit, and settings.
 - Provide route-specific view models.
+- Expose pending-review queues for source, baseline, signal, feedback, and
+  anomaly-agent governance.
 - Publish signal-console theme tokens and component hints.
 
 ### Adapters
@@ -136,8 +143,9 @@ stable.
 - `AnomService` executes source, baseline, detection, investigation, feedback,
   reset, anomaly-agent, lifecycle-batch, list, summary, audit, and APG record
   compatibility flows.
-- Guardrail tests prove denied or review-required cases fail before invalid
-  state is accepted.
+- Guardrail tests prove denied cases fail before invalid state is accepted, and
+  review-required cases persist as pending-review records with matched rules and
+  review reasons.
 - `app.self_test()` passes and fails if route, rule, Bytewax, or runtime
   evidence becomes stale.
 - Package JSON evidence can be regenerated from `app.semantic_model()` and

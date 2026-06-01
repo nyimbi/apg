@@ -16,6 +16,9 @@
 - Keep `AnomService` as the generated-app runtime.
 - Harden source, baseline, detection, investigation, feedback, reset, and audit
   guardrails where the expanded contract needs executable evidence.
+- Persist review-required source, baseline, signal, and feedback outcomes as
+  pending-review records with matched rules and review reasons while preserving
+  hard denial behavior for invalid state.
 - Implement anomaly-agent registration, lifecycle-batch validation, tenant
   isolation, summary counts, and audit events.
 - Keep deterministic helpers in `anomaly_engine.py` so generated applications
@@ -26,6 +29,9 @@
 - Extend route-specific view models for dashboard, sources, baselines, detector,
   signals, investigations, alerts, rules, feedback, quality, agents, lifecycle
   batches, audit, and settings.
+- Surface pending-review queues in dashboard, source, baseline, signal,
+  feedback, and quality models so generated screens can compose governance
+  workflows without re-evaluating source events.
 - Ensure view models import only the contract and dependency-light runtime.
 
 ## Phase 4 - Package Evidence
@@ -38,8 +44,9 @@
 
 ## Phase 5 - Review and Verification
 
-- Expand focused tests for contract shape, guardrails, runtime lifecycle, UI
-  models, committed package evidence, and APG record compatibility.
+- Expand focused tests for contract shape, deny guardrails, pending-review
+  lifecycle evidence, runtime lifecycle, UI models, committed package evidence,
+  and APG record compatibility.
 - Run only ANOM py-compile, focused pytest, package self-test, implementation
   audit, publish plan, stale-marker scan, and whitespace check.
 - Record verification in `docs/progress_log.md`.

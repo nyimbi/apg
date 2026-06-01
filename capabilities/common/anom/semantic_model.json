@@ -322,6 +322,13 @@
         "moni",
         "conf"
       ],
+      "review_queues": {
+        "anomaly_agents": "AnomalyAgentRecord",
+        "baselines": "BaselineProfile",
+        "feedback": "DetectionFeedback",
+        "signals": "AnomalySignal",
+        "sources": "MonitoringSource"
+      },
       "rule_engine": {
         "rules": [
           {

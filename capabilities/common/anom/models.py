@@ -16,6 +16,10 @@ class MonitoringSource:
 	kind: str = "metric"
 	owner: str = "operations"
 	labels: dict[str, Any] = field(default_factory=dict)
+	status: str = "active"
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
 
 	def to_dict(self) -> dict[str, Any]:
 		return {
@@ -25,6 +29,10 @@ class MonitoringSource:
 			"kind": self.kind,
 			"owner": self.owner,
 			"labels": dict(self.labels),
+			"status": self.status,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
 		}
 
 
@@ -41,6 +49,9 @@ class BaselineProfile:
 	history_points: int
 	sensitivity: str = "medium"
 	status: str = "active"
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
 
 	def to_dict(self) -> dict[str, Any]:
 		return {
@@ -53,6 +64,9 @@ class BaselineProfile:
 			"history_points": self.history_points,
 			"sensitivity": self.sensitivity,
 			"status": self.status,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
 		}
 
 
@@ -93,6 +107,9 @@ class AnomalySignal:
 	severity: str
 	status: str = "open"
 	root_cause_hints: tuple[str, ...] = ()
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
 
 	def to_dict(self) -> dict[str, Any]:
 		return {
@@ -105,6 +122,9 @@ class AnomalySignal:
 			"severity": self.severity,
 			"status": self.status,
 			"root_cause_hints": list(self.root_cause_hints),
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
 		}
 
 
@@ -144,6 +164,10 @@ class DetectionFeedback:
 	label: str
 	reviewer: str
 	notes: str = ""
+	status: str = "recorded"
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
 
 	def to_dict(self) -> dict[str, Any]:
 		return {
@@ -153,6 +177,10 @@ class DetectionFeedback:
 			"label": self.label,
 			"reviewer": self.reviewer,
 			"notes": self.notes,
+			"status": self.status,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
 		}
 
 

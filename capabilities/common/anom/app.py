@@ -70,6 +70,13 @@ def semantic_model() -> dict[str, Any]:
 					"feedback_tuning": "DetectionFeedback",
 					"anomaly_agent": "AnomalyAgentRecord",
 				},
+				"review_queues": {
+					"sources": "MonitoringSource",
+					"baselines": "BaselineProfile",
+					"signals": "AnomalySignal",
+					"feedback": "DetectionFeedback",
+					"anomaly_agents": "AnomalyAgentRecord",
+				},
 				"anomaly_lifecycle": {
 					"source": "MonitoringSource",
 					"baseline": "BaselineProfile",
