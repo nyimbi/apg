@@ -29056,3 +29056,110 @@ Known gaps:
   bank feeds, case-management writes, storage backends, GraphRAG projections,
   dissemination delivery, durable Bytewax topology, or performance/load checks
   during this battery-conscious slice.
+
+## 2026-06-01 - Intel Social Media Intelligence executable capability
+
+Slice goal: replace the `capabilities/intel/socint` placeholder with a
+package-backed, executable APG capability for lawful public or authorized
+social-media intelligence that can be composed into generated applications.
+
+Implemented:
+
+- Added `capabilities/intel/socint/SPECIFICATION.md` defining lawful authority,
+  topics, sources, post evidence, signals, influence assessments, network
+  assessments, referrals, dissemination, reviews, UI/theming, AI agents,
+  lifecycle semantics, rule guardrails, and adapter boundaries.
+- Added `PLAN.md`, `README.md`, `cap_spec.md`, `package_manifest.json`,
+  `release_report.json`, and generated `semantic_model.json`.
+- Replaced the placeholder `__init__.py` with executable package exports and
+  removed the empty `_Social_Media_Intelligence` marker.
+- Added domain models for authorities, topics, sources, posts, signals,
+  influence assessments, network assessments, referrals, dissemination,
+  reviews, and SOCINT agents.
+- Added a deterministic capability contract with tenant-safe configuration, 67
+  rules, 13 UI routes, compact theme tokens, Bytewax lifecycle metadata, and
+  provider-neutral AI-agent runtimes: `codex`, `claude_code`, `opencode`, and
+  `pi`.
+- Added the `SocialMediaIntelligenceService` executable runtime with
+  tenant-keyed state, rule-before-mutation enforcement, Bytewax audit events,
+  topic/source authority alignment, post fingerprint/confidence evidence,
+  signal and assessment validation, referral and dissemination approvals,
+  review evidence, batch validation, and AI-agent action guardrails.
+- Added API helpers, dashboard/console/agent view models, and a publishable
+  `app.py` entrypoint with self-test, component manifest, and semantic-model
+  generation.
+- Added focused package tests for contract shape, rule-engine denial paths,
+  full SOCINT lifecycle execution, tenant isolation, guardrail rejection, API
+  helpers, view models, and app entrypoint.
+- Updated `capabilities/intel/__init__.py` so `socint` is listed as an
+  implemented sub-capability.
+- Updated `capabilities/README.md` so the catalog snapshot reports 142 valid
+  contracts, 142 domain-specific packages, 142 strict complete package artifact
+  sets, and 8 Intel packages.
+
+Focused verification:
+
+- Generated `capabilities/intel/socint/semantic_model.json` from
+  `app.semantic_model()`.
+- `./.venv/bin/python -m py_compile
+  capabilities/intel/socint/__init__.py
+  capabilities/intel/socint/capability_contract.py
+  capabilities/intel/socint/models.py
+  capabilities/intel/socint/socint_runtime.py
+  capabilities/intel/socint/service.py
+  capabilities/intel/socint/api.py
+  capabilities/intel/socint/views.py
+  capabilities/intel/socint/app.py
+  capabilities/intel/socint/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/intel/socint/tests/test_package_contract.py` passed with 7
+  tests.
+- `./.venv/bin/python capabilities/intel/socint/app.py` passed self-test with
+  `passed: true` and `status: ok`.
+- `./.venv/bin/apg capabilities inspect intel_socint --json` passed with 67
+  rules, 13 UI routes, theme `intel_socint_control`, shell `apg_python`, and
+  Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/intel/socint --json` passed with `side_effect_free: true` and 0
+  warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/intel/socint --json` passed with 1 domain-specific capability,
+  0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/intel/socint --json` passed with 1 complete lifecycle, 67
+  rules, 13 UI routes, 11 theme tokens, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 142 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 142 operable contracts, 142 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/intel/socint`, `capabilities/intel/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed authority, topic, source, post, signal, influence, network,
+  referral, dissemination, review, Bytewax batch, and AI-agent lifecycle paths
+  so rule evaluation happens before state mutation.
+- Confirmed service state is keyed by tenant plus record ID and covered by a
+  regression test with shared authority/topic IDs across tenants.
+- Tightened SOCINT semantics around lawful authority, source terms review,
+  public or authorized scope, topic/source authority alignment, content
+  fingerprinting, confidence validation, analyst evidence, approval gates,
+  tenant isolation, and privileged or prohibited AI-agent actions.
+- Kept live social platform APIs, login/cookie collection, scraping, evasion,
+  account automation, direct messaging, takedown actions, identity resolution,
+  large-scale search/storage, GraphRAG projections, dissemination delivery, and
+  durable Bytewax workers behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live social platform
+  APIs, login/cookie collection, scraping, evasion, account automation, direct
+  messaging, takedown actions, identity resolution, large-scale search/storage,
+  GraphRAG projections, dissemination delivery, durable Bytewax topology, or
+  performance/load checks during this battery-conscious slice.

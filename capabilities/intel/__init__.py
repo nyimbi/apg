@@ -64,6 +64,7 @@ CAPABILITY_META = {
 		'geoint',      # Geospatial Intelligence
 		'cybint',      # Cyber Intelligence
 		'finint',      # Financial Intelligence
+		'socint',      # Social Media Intelligence
 		'radio',       # Radio Intelligence Listener
 	],
 	'security_requirements': {
