@@ -61,6 +61,7 @@ CAPABILITY_META = {
 		'osint',       # Open Source Intelligence
 		'sigint',      # Signals Intelligence
 		'humint',      # Human Intelligence
+		'geoint',      # Geospatial Intelligence
 		'radio',       # Radio Intelligence Listener
 	],
 	'security_requirements': {

@@ -28779,3 +28779,96 @@ Known gaps:
   security, identity protection infrastructure, partner case systems, storage
   backends, GraphRAG projections, dissemination delivery, durable Bytewax
   topology, or performance/load checks during this battery-conscious slice.
+
+## 2026-06-01 - Intel Geospatial Intelligence executable capability
+
+- Promoted `capabilities/intel/geoint` from placeholder into a first-class
+  executable APG capability with README, specification, plan, capability spec,
+  package manifest, release evidence, focused tests, and code-review notes.
+- Added lawful authority, area-of-interest, imagery/geospatial source,
+  collection plan, observation, feature, change detection, assessment,
+  dissemination, review, Bytewax batch validation, dashboard summary, and
+  provider-neutral GEOINT agent workflows.
+- Added deterministic guardrails for tenant context, write policy, lawful
+  authority, area/source authority matching, geometry references, retention,
+  geospatial accuracy, feature confidence, change severity, evidence, release
+  approval, Bytewax lifecycle events, supported AI-agent runtimes and roles,
+  privileged AI-agent approval, and denial of targeting or harmful geospatial
+  automation scope.
+- Added compact UI/view models and theme tokens for dashboards, authorities,
+  areas, sources, collection plans, observations, features, changes,
+  assessments, dissemination, reviews, agents, and settings.
+- Updated intelligence capability metadata so `geoint` is listed as an
+  implemented sub-capability.
+- Updated `capabilities/README.md` so the catalog snapshot reports 139 valid
+  contracts, 139 domain-specific packages, 139 strict complete package artifact
+  sets, and 5 Intel packages.
+- Removed the empty `_Geospatial_Intelligence` marker file and added a
+  generated `semantic_model.json` from the executable application.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/intel/geoint/__init__.py
+  capabilities/intel/geoint/capability_contract.py
+  capabilities/intel/geoint/models.py
+  capabilities/intel/geoint/geoint_runtime.py
+  capabilities/intel/geoint/service.py
+  capabilities/intel/geoint/api.py
+  capabilities/intel/geoint/views.py
+  capabilities/intel/geoint/app.py
+  capabilities/intel/geoint/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/intel/geoint/tests/test_package_contract.py` passed with 7
+  tests.
+- `./.venv/bin/python capabilities/intel/geoint/app.py` passed self-test with
+  `passed: true` and `status: ok`.
+- `./.venv/bin/apg capabilities inspect intel_geoint --json` passed with 64
+  rules, 13 UI routes, theme `intel_geoint_control`, shell `apg_python`, and
+  Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/intel/geoint --json` passed with `side_effect_free: true` and 0
+  warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/intel/geoint --json` passed with 1 domain-specific capability,
+  0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/intel/geoint --json` passed with 1 complete lifecycle, 64
+  rules, 13 UI routes, 11 theme tokens, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 139 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 139 operable contracts, 139 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/intel/geoint`, `capabilities/intel/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed authority, area, source, collection plan, observation, feature,
+  change, assessment, dissemination, review, Bytewax batch, and AI-agent
+  lifecycle paths so rule evaluation happens before state mutation.
+- Confirmed service state is keyed by tenant plus record ID and covered by a
+  regression test with shared authority/area IDs across tenants.
+- Tightened GEOINT semantics around lawful authority, area/source authority
+  relationships, geometry evidence, retention, geospatial accuracy, confidence
+  bounds, release approval, tenant-keyed state isolation, and privileged or
+  prohibited AI-agent actions.
+- Kept live satellite/aerial tasking, sensor control, weapon targeting,
+  harmful operational planning, map tile rendering, GIS engines, large imagery
+  storage, computer vision extraction, geocoding, routing, dissemination
+  delivery, GraphRAG projections, and durable Bytewax workers behind adapter
+  boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live satellite/aerial
+  tasking, sensor control, weapon targeting, harmful operational planning, map
+  tile rendering, GIS engines, large imagery storage, computer vision
+  extraction, geocoding, routing, dissemination delivery, GraphRAG projection,
+  durable Bytewax topology, or performance/load checks during this
+  battery-conscious slice.

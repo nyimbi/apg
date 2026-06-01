@@ -1,0 +1,2355 @@
+{
+  "app": {
+    "description": "Geospatial Intelligence package-backed APG capability",
+    "entity_count": 11,
+    "name": "intel_geoint",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "intel_geoint": {
+      "configuration": {
+        "adapters": {
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "geospatial": "geos",
+          "graph": "grph",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "rag": "ragn"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "authority_reviewer",
+            "area_planner",
+            "imagery_triage",
+            "feature_analyst",
+            "change_analyst",
+            "dissemination_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "areas": {
+          "authority_required": true,
+          "evidence_required": true,
+          "geometry_required": true,
+          "owner_required": true,
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ]
+        },
+        "assessments": {
+          "analyst_required": true,
+          "change_required": true,
+          "evidence_required": true,
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ],
+          "supported_types": [
+            "site_summary",
+            "route_summary",
+            "infrastructure_report",
+            "activity_report",
+            "change_report",
+            "risk_assessment"
+          ]
+        },
+        "authorities": {
+          "approver_required": true,
+          "evidence_required": true,
+          "expiry_required": true,
+          "supported_authority_types": [
+            "mission_order",
+            "consent",
+            "partner_authority",
+            "legal_mandate",
+            "regulatory_authority"
+          ],
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ]
+        },
+        "changes": {
+          "analyst_required": true,
+          "confidence_required": true,
+          "evidence_required": true,
+          "feature_required": true,
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "supported_types": [
+            "new_feature",
+            "removed_feature",
+            "movement",
+            "construction",
+            "damage",
+            "activity_change",
+            "environmental_change"
+          ]
+        },
+        "collection_plans": {
+          "approval_required": true,
+          "area_required": true,
+          "authority_required": true,
+          "evidence_required": true,
+          "retention_positive": true,
+          "source_required": true,
+          "supported_modes": [
+            "catalog_query",
+            "scheduled_refresh",
+            "partner_feed",
+            "historical_import",
+            "manual_upload"
+          ]
+        },
+        "dissemination": {
+          "approval_required": true,
+          "assessment_required": true,
+          "audience_required": true,
+          "evidence_required": true,
+          "release_marking_required": true
+        },
+        "features": {
+          "analyst_required": true,
+          "confidence_required": true,
+          "evidence_required": true,
+          "geometry_required": true,
+          "observation_required": true,
+          "supported_types": [
+            "facility",
+            "route",
+            "boundary",
+            "terrain",
+            "infrastructure",
+            "maritime",
+            "aviation",
+            "environmental",
+            "event"
+          ]
+        },
+        "governance": {
+          "audit_events": true,
+          "lawful_authority_required": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "targeting_or_harmful_action_denied": true
+        },
+        "observability": {
+          "event_stream": "apg.intel.geoint.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "observations": {
+          "accuracy_required": true,
+          "captured_at_required": true,
+          "evidence_required": true,
+          "observation_reference_required": true,
+          "plan_required": true
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "sources": {
+          "authority_required": true,
+          "evidence_required": true,
+          "owner_required": true,
+          "supported_resolution_classes": [
+            "coarse",
+            "medium",
+            "high",
+            "very_high",
+            "metadata_only"
+          ],
+          "supported_sensor_types": [
+            "optical",
+            "sar",
+            "thermal",
+            "multispectral",
+            "hyperspectral",
+            "lidar",
+            "ais_adsb",
+            "manual_survey"
+          ],
+          "supported_source_types": [
+            "satellite_imagery",
+            "aerial_imagery",
+            "drone_imagery",
+            "public_map",
+            "partner_feed",
+            "field_survey",
+            "open_geodata"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "intel_geoint_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_areas": true,
+          "enable_assessments": true,
+          "enable_authorities": true,
+          "enable_changes": true,
+          "enable_collection_plans": true,
+          "enable_dashboard": true,
+          "enable_dissemination": true,
+          "enable_features": true,
+          "enable_observations": true,
+          "enable_reviews": true,
+          "enable_sources": true
+        }
+      },
+      "name": "Geospatial Intelligence",
+      "provides": [
+        "geoint_authority_workflow",
+        "geoint_area_workflow",
+        "geoint_source_workflow",
+        "geoint_collection_workflow",
+        "geoint_observation_workflow",
+        "geoint_feature_workflow",
+        "geoint_change_workflow",
+        "geoint_assessment_workflow",
+        "geoint_dissemination_workflow",
+        "geoint_review_workflow",
+        "geoint_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "grph",
+        "ragn",
+        "geos"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "geoint_policy_required",
+              "required_action": "attach_geoint_policy"
+            },
+            "name": "geoint_write_requires_policy"
+          },
+          {
+            "condition": {
+              "authority_type_supported": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_type_not_supported",
+              "required_action": "select_supported_authority_type"
+            },
+            "name": "authority_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_authority",
+              "scope_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_scope_required",
+              "required_action": "attach_scope_reference"
+            },
+            "name": "authority_scope_required"
+          },
+          {
+            "condition": {
+              "classification_supported": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "classification_not_supported",
+              "required_action": "select_supported_classification"
+            },
+            "name": "authority_classification_supported"
+          },
+          {
+            "condition": {
+              "approver_present": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_approver_required",
+              "required_action": "record_approver"
+            },
+            "name": "authority_approver_required"
+          },
+          {
+            "condition": {
+              "expiry_present": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_expiry_required",
+              "required_action": "set_expiry"
+            },
+            "name": "authority_expiry_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_evidence_required",
+              "required_action": "attach_authority_evidence"
+            },
+            "name": "authority_evidence_required"
+          },
+          {
+            "condition": {
+              "name_present": false,
+              "operation": "record_area"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "area_name_required",
+              "required_action": "name_area"
+            },
+            "name": "area_name_required"
+          },
+          {
+            "condition": {
+              "geometry_present": false,
+              "operation": "record_area"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "geometry_reference_required",
+              "required_action": "attach_geometry_reference"
+            },
+            "name": "area_geometry_required"
+          },
+          {
+            "condition": {
+              "classification_supported": false,
+              "operation": "record_area"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "classification_not_supported",
+              "required_action": "select_supported_classification"
+            },
+            "name": "area_classification_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_area",
+              "owner_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "area_owner_required",
+              "required_action": "assign_area_owner"
+            },
+            "name": "area_owner_required"
+          },
+          {
+            "condition": {
+              "authority_present": false,
+              "operation": "record_area"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "lawful_authority_required",
+              "required_action": "select_authority"
+            },
+            "name": "area_authority_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_area"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "area_evidence_required",
+              "required_action": "attach_area_evidence"
+            },
+            "name": "area_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "source_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_type_not_supported",
+              "required_action": "select_supported_source_type"
+            },
+            "name": "source_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "sensor_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "sensor_type_not_supported",
+              "required_action": "select_supported_sensor_type"
+            },
+            "name": "sensor_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "resolution_class_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "resolution_class_not_supported",
+              "required_action": "select_supported_resolution_class"
+            },
+            "name": "resolution_class_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "owner_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_owner_required",
+              "required_action": "assign_source_owner"
+            },
+            "name": "source_owner_required"
+          },
+          {
+            "condition": {
+              "authority_present": false,
+              "operation": "register_source"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "lawful_authority_required",
+              "required_action": "select_authority"
+            },
+            "name": "source_authority_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "register_source"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_evidence_required",
+              "required_action": "attach_source_evidence"
+            },
+            "name": "source_evidence_required"
+          },
+          {
+            "condition": {
+              "authority_present": false,
+              "operation": "record_collection_plan"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "lawful_authority_required",
+              "required_action": "select_authority"
+            },
+            "name": "plan_authority_required"
+          },
+          {
+            "condition": {
+              "area_present": false,
+              "operation": "record_collection_plan"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "area_required",
+              "required_action": "select_area"
+            },
+            "name": "plan_area_required"
+          },
+          {
+            "condition": {
+              "operation": "record_collection_plan",
+              "source_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_required",
+              "required_action": "select_source"
+            },
+            "name": "plan_source_required"
+          },
+          {
+            "condition": {
+              "area_authority_match": false,
+              "operation": "record_collection_plan"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "area_authority_mismatch",
+              "required_action": "select_area_for_authority"
+            },
+            "name": "plan_area_authority_match"
+          },
+          {
+            "condition": {
+              "operation": "record_collection_plan",
+              "source_authority_match": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_authority_mismatch",
+              "required_action": "select_source_for_authority"
+            },
+            "name": "plan_source_authority_match"
+          },
+          {
+            "condition": {
+              "collection_mode_supported": false,
+              "operation": "record_collection_plan"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "collection_mode_not_supported",
+              "required_action": "select_supported_collection_mode"
+            },
+            "name": "plan_mode_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_collection_plan",
+              "retention_days_positive": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "retention_days_invalid",
+              "required_action": "set_positive_retention_days"
+            },
+            "name": "plan_retention_positive"
+          },
+          {
+            "condition": {
+              "approval_present": false,
+              "operation": "record_collection_plan"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "collection_approval_required",
+              "required_action": "attach_collection_approval"
+            },
+            "name": "plan_approval_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_collection_plan"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "collection_plan_evidence_required",
+              "required_action": "attach_collection_plan_evidence"
+            },
+            "name": "plan_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_observation",
+              "plan_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "collection_plan_required",
+              "required_action": "select_collection_plan"
+            },
+            "name": "observation_plan_required"
+          },
+          {
+            "condition": {
+              "observation_reference_present": false,
+              "operation": "record_observation"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "observation_reference_required",
+              "required_action": "attach_observation_reference"
+            },
+            "name": "observation_reference_required"
+          },
+          {
+            "condition": {
+              "captured_at_present": false,
+              "operation": "record_observation"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "captured_at_required",
+              "required_action": "record_capture_time"
+            },
+            "name": "observation_captured_at_required"
+          },
+          {
+            "condition": {
+              "accuracy_valid": false,
+              "operation": "record_observation"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "geospatial_accuracy_score_invalid",
+              "required_action": "set_accuracy_0_to_1"
+            },
+            "name": "observation_accuracy_valid"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_observation"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "observation_evidence_required",
+              "required_action": "attach_observation_evidence"
+            },
+            "name": "observation_evidence_required"
+          },
+          {
+            "condition": {
+              "observation_present": false,
+              "operation": "record_feature"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "observation_required",
+              "required_action": "select_observation"
+            },
+            "name": "feature_observation_required"
+          },
+          {
+            "condition": {
+              "feature_type_supported": false,
+              "operation": "record_feature"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "feature_type_not_supported",
+              "required_action": "select_supported_feature_type"
+            },
+            "name": "feature_type_supported"
+          },
+          {
+            "condition": {
+              "geometry_present": false,
+              "operation": "record_feature"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "geometry_reference_required",
+              "required_action": "attach_feature_geometry"
+            },
+            "name": "feature_geometry_required"
+          },
+          {
+            "condition": {
+              "confidence_valid": false,
+              "operation": "record_feature"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "confidence_score_invalid",
+              "required_action": "set_confidence_0_to_1"
+            },
+            "name": "feature_confidence_valid"
+          },
+          {
+            "condition": {
+              "analyst_present": false,
+              "operation": "record_feature"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "analyst_required",
+              "required_action": "assign_analyst"
+            },
+            "name": "feature_analyst_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_feature"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "feature_evidence_required",
+              "required_action": "attach_feature_evidence"
+            },
+            "name": "feature_evidence_required"
+          },
+          {
+            "condition": {
+              "feature_present": false,
+              "operation": "record_change"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "feature_required",
+              "required_action": "select_feature"
+            },
+            "name": "change_feature_required"
+          },
+          {
+            "condition": {
+              "change_type_supported": false,
+              "operation": "record_change"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "change_type_not_supported",
+              "required_action": "select_supported_change_type"
+            },
+            "name": "change_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_change",
+              "severity_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "severity_not_supported",
+              "required_action": "select_supported_severity"
+            },
+            "name": "change_severity_supported"
+          },
+          {
+            "condition": {
+              "confidence_valid": false,
+              "operation": "record_change"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "confidence_score_invalid",
+              "required_action": "set_confidence_0_to_1"
+            },
+            "name": "change_confidence_valid"
+          },
+          {
+            "condition": {
+              "analyst_present": false,
+              "operation": "record_change"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "analyst_required",
+              "required_action": "assign_analyst"
+            },
+            "name": "change_analyst_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_change"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "change_evidence_required",
+              "required_action": "attach_change_evidence"
+            },
+            "name": "change_evidence_required"
+          },
+          {
+            "condition": {
+              "change_present": false,
+              "operation": "record_assessment"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "change_required",
+              "required_action": "select_change"
+            },
+            "name": "assessment_change_required"
+          },
+          {
+            "condition": {
+              "assessment_type_supported": false,
+              "operation": "record_assessment"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "assessment_type_not_supported",
+              "required_action": "select_supported_assessment_type"
+            },
+            "name": "assessment_type_supported"
+          },
+          {
+            "condition": {
+              "classification_supported": false,
+              "operation": "record_assessment"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "classification_not_supported",
+              "required_action": "select_supported_classification"
+            },
+            "name": "assessment_classification_supported"
+          },
+          {
+            "condition": {
+              "analyst_present": false,
+              "operation": "record_assessment"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "analyst_required",
+              "required_action": "assign_analyst"
+            },
+            "name": "assessment_analyst_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_assessment"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "assessment_evidence_required",
+              "required_action": "attach_assessment_evidence"
+            },
+            "name": "assessment_evidence_required"
+          },
+          {
+            "condition": {
+              "assessment_present": false,
+              "operation": "record_dissemination"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "assessment_required",
+              "required_action": "select_assessment"
+            },
+            "name": "dissemination_assessment_required"
+          },
+          {
+            "condition": {
+              "audience_present": false,
+              "operation": "record_dissemination"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "audience_required",
+              "required_action": "select_audience"
+            },
+            "name": "dissemination_audience_required"
+          },
+          {
+            "condition": {
+              "operation": "record_dissemination",
+              "release_marking_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "release_marking_required",
+              "required_action": "set_release_marking"
+            },
+            "name": "dissemination_release_required"
+          },
+          {
+            "condition": {
+              "approval_present": false,
+              "operation": "record_dissemination"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "dissemination_approval_required",
+              "required_action": "attach_release_approval"
+            },
+            "name": "dissemination_approval_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_dissemination"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "dissemination_evidence_required",
+              "required_action": "attach_dissemination_evidence"
+            },
+            "name": "dissemination_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "status_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_status_not_supported",
+              "required_action": "select_supported_status"
+            },
+            "name": "review_status_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "reviewer_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "reviewer_required",
+              "required_action": "assign_reviewer"
+            },
+            "name": "review_reviewer_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_review"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_evidence_required",
+              "required_action": "attach_review_evidence"
+            },
+            "name": "review_evidence_required"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "geoint_batch"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_geoint_batch_to_bytewax"
+            },
+            "name": "geoint_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_geoint_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "geoint_agent_runtime_not_supported",
+              "required_action": "select_supported_runtime"
+            },
+            "name": "geoint_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_geoint_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "geoint_agent_role_not_supported",
+              "required_action": "select_supported_role"
+            },
+            "name": "geoint_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "geoint_agent_action",
+              "privileged_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_geoint_agent_action_requires_human_approval"
+          },
+          {
+            "condition": {
+              "operation": "geoint_agent_action",
+              "targeting_or_harmful_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "targeting_or_harmful_scope_denied",
+              "required_action": "remove_targeting_scope"
+            },
+            "name": "targeting_geoint_action_denied"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "geoint_policy_required",
+            "required_action": "attach_geoint_policy"
+          },
+          "name": "geoint_write_requires_policy"
+        },
+        {
+          "condition": {
+            "authority_type_supported": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_type_not_supported",
+            "required_action": "select_supported_authority_type"
+          },
+          "name": "authority_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_authority",
+            "scope_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_scope_required",
+            "required_action": "attach_scope_reference"
+          },
+          "name": "authority_scope_required"
+        },
+        {
+          "condition": {
+            "classification_supported": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "classification_not_supported",
+            "required_action": "select_supported_classification"
+          },
+          "name": "authority_classification_supported"
+        },
+        {
+          "condition": {
+            "approver_present": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_approver_required",
+            "required_action": "record_approver"
+          },
+          "name": "authority_approver_required"
+        },
+        {
+          "condition": {
+            "expiry_present": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_expiry_required",
+            "required_action": "set_expiry"
+          },
+          "name": "authority_expiry_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_evidence_required",
+            "required_action": "attach_authority_evidence"
+          },
+          "name": "authority_evidence_required"
+        },
+        {
+          "condition": {
+            "name_present": false,
+            "operation": "record_area"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "area_name_required",
+            "required_action": "name_area"
+          },
+          "name": "area_name_required"
+        },
+        {
+          "condition": {
+            "geometry_present": false,
+            "operation": "record_area"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "geometry_reference_required",
+            "required_action": "attach_geometry_reference"
+          },
+          "name": "area_geometry_required"
+        },
+        {
+          "condition": {
+            "classification_supported": false,
+            "operation": "record_area"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "classification_not_supported",
+            "required_action": "select_supported_classification"
+          },
+          "name": "area_classification_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_area",
+            "owner_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "area_owner_required",
+            "required_action": "assign_area_owner"
+          },
+          "name": "area_owner_required"
+        },
+        {
+          "condition": {
+            "authority_present": false,
+            "operation": "record_area"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "lawful_authority_required",
+            "required_action": "select_authority"
+          },
+          "name": "area_authority_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_area"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "area_evidence_required",
+            "required_action": "attach_area_evidence"
+          },
+          "name": "area_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "source_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_type_not_supported",
+            "required_action": "select_supported_source_type"
+          },
+          "name": "source_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "sensor_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "sensor_type_not_supported",
+            "required_action": "select_supported_sensor_type"
+          },
+          "name": "sensor_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "resolution_class_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "resolution_class_not_supported",
+            "required_action": "select_supported_resolution_class"
+          },
+          "name": "resolution_class_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "owner_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_owner_required",
+            "required_action": "assign_source_owner"
+          },
+          "name": "source_owner_required"
+        },
+        {
+          "condition": {
+            "authority_present": false,
+            "operation": "register_source"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "lawful_authority_required",
+            "required_action": "select_authority"
+          },
+          "name": "source_authority_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "register_source"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_evidence_required",
+            "required_action": "attach_source_evidence"
+          },
+          "name": "source_evidence_required"
+        },
+        {
+          "condition": {
+            "authority_present": false,
+            "operation": "record_collection_plan"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "lawful_authority_required",
+            "required_action": "select_authority"
+          },
+          "name": "plan_authority_required"
+        },
+        {
+          "condition": {
+            "area_present": false,
+            "operation": "record_collection_plan"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "area_required",
+            "required_action": "select_area"
+          },
+          "name": "plan_area_required"
+        },
+        {
+          "condition": {
+            "operation": "record_collection_plan",
+            "source_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_required",
+            "required_action": "select_source"
+          },
+          "name": "plan_source_required"
+        },
+        {
+          "condition": {
+            "area_authority_match": false,
+            "operation": "record_collection_plan"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "area_authority_mismatch",
+            "required_action": "select_area_for_authority"
+          },
+          "name": "plan_area_authority_match"
+        },
+        {
+          "condition": {
+            "operation": "record_collection_plan",
+            "source_authority_match": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_authority_mismatch",
+            "required_action": "select_source_for_authority"
+          },
+          "name": "plan_source_authority_match"
+        },
+        {
+          "condition": {
+            "collection_mode_supported": false,
+            "operation": "record_collection_plan"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "collection_mode_not_supported",
+            "required_action": "select_supported_collection_mode"
+          },
+          "name": "plan_mode_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_collection_plan",
+            "retention_days_positive": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "retention_days_invalid",
+            "required_action": "set_positive_retention_days"
+          },
+          "name": "plan_retention_positive"
+        },
+        {
+          "condition": {
+            "approval_present": false,
+            "operation": "record_collection_plan"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "collection_approval_required",
+            "required_action": "attach_collection_approval"
+          },
+          "name": "plan_approval_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_collection_plan"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "collection_plan_evidence_required",
+            "required_action": "attach_collection_plan_evidence"
+          },
+          "name": "plan_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_observation",
+            "plan_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "collection_plan_required",
+            "required_action": "select_collection_plan"
+          },
+          "name": "observation_plan_required"
+        },
+        {
+          "condition": {
+            "observation_reference_present": false,
+            "operation": "record_observation"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "observation_reference_required",
+            "required_action": "attach_observation_reference"
+          },
+          "name": "observation_reference_required"
+        },
+        {
+          "condition": {
+            "captured_at_present": false,
+            "operation": "record_observation"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "captured_at_required",
+            "required_action": "record_capture_time"
+          },
+          "name": "observation_captured_at_required"
+        },
+        {
+          "condition": {
+            "accuracy_valid": false,
+            "operation": "record_observation"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "geospatial_accuracy_score_invalid",
+            "required_action": "set_accuracy_0_to_1"
+          },
+          "name": "observation_accuracy_valid"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_observation"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "observation_evidence_required",
+            "required_action": "attach_observation_evidence"
+          },
+          "name": "observation_evidence_required"
+        },
+        {
+          "condition": {
+            "observation_present": false,
+            "operation": "record_feature"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "observation_required",
+            "required_action": "select_observation"
+          },
+          "name": "feature_observation_required"
+        },
+        {
+          "condition": {
+            "feature_type_supported": false,
+            "operation": "record_feature"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "feature_type_not_supported",
+            "required_action": "select_supported_feature_type"
+          },
+          "name": "feature_type_supported"
+        },
+        {
+          "condition": {
+            "geometry_present": false,
+            "operation": "record_feature"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "geometry_reference_required",
+            "required_action": "attach_feature_geometry"
+          },
+          "name": "feature_geometry_required"
+        },
+        {
+          "condition": {
+            "confidence_valid": false,
+            "operation": "record_feature"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "confidence_score_invalid",
+            "required_action": "set_confidence_0_to_1"
+          },
+          "name": "feature_confidence_valid"
+        },
+        {
+          "condition": {
+            "analyst_present": false,
+            "operation": "record_feature"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "analyst_required",
+            "required_action": "assign_analyst"
+          },
+          "name": "feature_analyst_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_feature"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "feature_evidence_required",
+            "required_action": "attach_feature_evidence"
+          },
+          "name": "feature_evidence_required"
+        },
+        {
+          "condition": {
+            "feature_present": false,
+            "operation": "record_change"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "feature_required",
+            "required_action": "select_feature"
+          },
+          "name": "change_feature_required"
+        },
+        {
+          "condition": {
+            "change_type_supported": false,
+            "operation": "record_change"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "change_type_not_supported",
+            "required_action": "select_supported_change_type"
+          },
+          "name": "change_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_change",
+            "severity_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "severity_not_supported",
+            "required_action": "select_supported_severity"
+          },
+          "name": "change_severity_supported"
+        },
+        {
+          "condition": {
+            "confidence_valid": false,
+            "operation": "record_change"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "confidence_score_invalid",
+            "required_action": "set_confidence_0_to_1"
+          },
+          "name": "change_confidence_valid"
+        },
+        {
+          "condition": {
+            "analyst_present": false,
+            "operation": "record_change"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "analyst_required",
+            "required_action": "assign_analyst"
+          },
+          "name": "change_analyst_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_change"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "change_evidence_required",
+            "required_action": "attach_change_evidence"
+          },
+          "name": "change_evidence_required"
+        },
+        {
+          "condition": {
+            "change_present": false,
+            "operation": "record_assessment"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "change_required",
+            "required_action": "select_change"
+          },
+          "name": "assessment_change_required"
+        },
+        {
+          "condition": {
+            "assessment_type_supported": false,
+            "operation": "record_assessment"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "assessment_type_not_supported",
+            "required_action": "select_supported_assessment_type"
+          },
+          "name": "assessment_type_supported"
+        },
+        {
+          "condition": {
+            "classification_supported": false,
+            "operation": "record_assessment"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "classification_not_supported",
+            "required_action": "select_supported_classification"
+          },
+          "name": "assessment_classification_supported"
+        },
+        {
+          "condition": {
+            "analyst_present": false,
+            "operation": "record_assessment"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "analyst_required",
+            "required_action": "assign_analyst"
+          },
+          "name": "assessment_analyst_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_assessment"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "assessment_evidence_required",
+            "required_action": "attach_assessment_evidence"
+          },
+          "name": "assessment_evidence_required"
+        },
+        {
+          "condition": {
+            "assessment_present": false,
+            "operation": "record_dissemination"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "assessment_required",
+            "required_action": "select_assessment"
+          },
+          "name": "dissemination_assessment_required"
+        },
+        {
+          "condition": {
+            "audience_present": false,
+            "operation": "record_dissemination"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "audience_required",
+            "required_action": "select_audience"
+          },
+          "name": "dissemination_audience_required"
+        },
+        {
+          "condition": {
+            "operation": "record_dissemination",
+            "release_marking_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "release_marking_required",
+            "required_action": "set_release_marking"
+          },
+          "name": "dissemination_release_required"
+        },
+        {
+          "condition": {
+            "approval_present": false,
+            "operation": "record_dissemination"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "dissemination_approval_required",
+            "required_action": "attach_release_approval"
+          },
+          "name": "dissemination_approval_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_dissemination"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "dissemination_evidence_required",
+            "required_action": "attach_dissemination_evidence"
+          },
+          "name": "dissemination_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "status_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_status_not_supported",
+            "required_action": "select_supported_status"
+          },
+          "name": "review_status_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "reviewer_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "reviewer_required",
+            "required_action": "assign_reviewer"
+          },
+          "name": "review_reviewer_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_review"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_evidence_required",
+            "required_action": "attach_review_evidence"
+          },
+          "name": "review_evidence_required"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "geoint_batch"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_geoint_batch_to_bytewax"
+          },
+          "name": "geoint_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_geoint_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "geoint_agent_runtime_not_supported",
+            "required_action": "select_supported_runtime"
+          },
+          "name": "geoint_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_geoint_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "geoint_agent_role_not_supported",
+            "required_action": "select_supported_role"
+          },
+          "name": "geoint_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "geoint_agent_action",
+            "privileged_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_geoint_agent_action_requires_human_approval"
+        },
+        {
+          "condition": {
+            "operation": "geoint_agent_action",
+            "targeting_or_harmful_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "targeting_or_harmful_scope_denied",
+            "required_action": "remove_targeting_scope"
+          },
+          "name": "targeting_geoint_action_denied"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "agents": {
+          "component": "GEOINTAgentWorkbench",
+          "permission": "intel_geoint:admin",
+          "route": "/intel-geoint/agents"
+        },
+        "areas": {
+          "component": "AreaOfInterestRegistry",
+          "permission": "intel_geoint:areas",
+          "route": "/intel-geoint/areas"
+        },
+        "assessments": {
+          "component": "GeoAssessmentWorkbench",
+          "permission": "intel_geoint:assessments",
+          "route": "/intel-geoint/assessments"
+        },
+        "authorities": {
+          "component": "GeospatialAuthorityConsole",
+          "permission": "intel_geoint:authorities",
+          "route": "/intel-geoint/authorities"
+        },
+        "changes": {
+          "component": "ChangeDetectionWorkbench",
+          "permission": "intel_geoint:changes",
+          "route": "/intel-geoint/changes"
+        },
+        "collection_plans": {
+          "component": "GeoCollectionPlanner",
+          "permission": "intel_geoint:collection",
+          "route": "/intel-geoint/collection-plans"
+        },
+        "dashboard": {
+          "component": "GEOINTDashboard",
+          "permission": "intel_geoint:view",
+          "route": "/intel-geoint/dashboard"
+        },
+        "dissemination": {
+          "component": "GEOINTDisseminationConsole",
+          "permission": "intel_geoint:dissemination",
+          "route": "/intel-geoint/dissemination"
+        },
+        "features": {
+          "component": "GeoFeatureWorkbench",
+          "permission": "intel_geoint:features",
+          "route": "/intel-geoint/features"
+        },
+        "observations": {
+          "component": "GeoObservationLedger",
+          "permission": "intel_geoint:observations",
+          "route": "/intel-geoint/observations"
+        },
+        "reviews": {
+          "component": "GEOINTReviewConsole",
+          "permission": "intel_geoint:reviews",
+          "route": "/intel-geoint/reviews"
+        },
+        "settings": {
+          "component": "GEOINTSettings",
+          "permission": "intel_geoint:admin",
+          "route": "/intel-geoint/settings"
+        },
+        "sources": {
+          "component": "ImagerySourceRegistry",
+          "permission": "intel_geoint:sources",
+          "route": "/intel-geoint/sources"
+        }
+      },
+      "streaming": {
+        "events": [
+          "geoint_authority_recorded",
+          "geoint_area_recorded",
+          "geoint_source_registered",
+          "geoint_collection_plan_recorded",
+          "geoint_observation_recorded",
+          "geoint_feature_recorded",
+          "geoint_change_recorded",
+          "geoint_assessment_recorded",
+          "geoint_dissemination_recorded",
+          "geoint_review_recorded",
+          "geoint_agent_registered"
+        ],
+        "guardrails": [
+          "geoint_batch_requires_bytewax",
+          "privileged_geoint_agent_action_requires_human_approval",
+          "targeting_geoint_action_denied"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.intel.geoint.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "areas": {
+            "icon": "map",
+            "status_indicator": "classification-chip"
+          },
+          "assessments": {
+            "icon": "file-search",
+            "status_indicator": "classification-chip"
+          },
+          "authorities": {
+            "icon": "shield-check",
+            "status_indicator": "authority-chip"
+          },
+          "changes": {
+            "icon": "activity",
+            "status_indicator": "severity-chip"
+          },
+          "collection_plans": {
+            "icon": "calendar-clock",
+            "status_indicator": "plan-chip"
+          },
+          "dissemination": {
+            "icon": "send",
+            "status_indicator": "release-chip"
+          },
+          "features": {
+            "icon": "map-pin",
+            "status_indicator": "confidence-chip"
+          },
+          "observations": {
+            "icon": "scan-eye",
+            "status_indicator": "accuracy-chip"
+          },
+          "reviews": {
+            "icon": "clipboard-check",
+            "status_indicator": "review-chip"
+          },
+          "sources": {
+            "icon": "satellite",
+            "status_indicator": "source-chip"
+          }
+        },
+        "name": "intel_geoint_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#1D4ED8",
+          "color.danger": "#B91C1C",
+          "color.primary": "#22543D",
+          "color.success": "#166534",
+          "color.warning": "#A16207",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/intel-geoint/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "GEOINTDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/intel-geoint/dashboard",
+            "permission": "intel_geoint:view"
+          },
+          {
+            "component": "GeospatialAuthorityConsole",
+            "name": "authorities",
+            "nav_group": "Governance",
+            "path": "/intel-geoint/authorities",
+            "permission": "intel_geoint:authorities"
+          },
+          {
+            "component": "AreaOfInterestRegistry",
+            "name": "areas",
+            "nav_group": "Planning",
+            "path": "/intel-geoint/areas",
+            "permission": "intel_geoint:areas"
+          },
+          {
+            "component": "ImagerySourceRegistry",
+            "name": "sources",
+            "nav_group": "Collection",
+            "path": "/intel-geoint/sources",
+            "permission": "intel_geoint:sources"
+          },
+          {
+            "component": "GeoCollectionPlanner",
+            "name": "collection_plans",
+            "nav_group": "Collection",
+            "path": "/intel-geoint/collection-plans",
+            "permission": "intel_geoint:collection"
+          },
+          {
+            "component": "GeoObservationLedger",
+            "name": "observations",
+            "nav_group": "Processing",
+            "path": "/intel-geoint/observations",
+            "permission": "intel_geoint:observations"
+          },
+          {
+            "component": "GeoFeatureWorkbench",
+            "name": "features",
+            "nav_group": "Analysis",
+            "path": "/intel-geoint/features",
+            "permission": "intel_geoint:features"
+          },
+          {
+            "component": "ChangeDetectionWorkbench",
+            "name": "changes",
+            "nav_group": "Analysis",
+            "path": "/intel-geoint/changes",
+            "permission": "intel_geoint:changes"
+          },
+          {
+            "component": "GeoAssessmentWorkbench",
+            "name": "assessments",
+            "nav_group": "Analysis",
+            "path": "/intel-geoint/assessments",
+            "permission": "intel_geoint:assessments"
+          },
+          {
+            "component": "GEOINTDisseminationConsole",
+            "name": "dissemination",
+            "nav_group": "Release",
+            "path": "/intel-geoint/dissemination",
+            "permission": "intel_geoint:dissemination"
+          },
+          {
+            "component": "GEOINTReviewConsole",
+            "name": "reviews",
+            "nav_group": "Governance",
+            "path": "/intel-geoint/reviews",
+            "permission": "intel_geoint:reviews"
+          },
+          {
+            "component": "GEOINTAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/intel-geoint/agents",
+            "permission": "intel_geoint:admin"
+          },
+          {
+            "component": "GEOINTSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/intel-geoint/settings",
+            "permission": "intel_geoint:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "geoint_operations": {
+        "roles": [
+          "authority_reviewer",
+          "area_planner",
+          "imagery_triage",
+          "feature_analyst",
+          "change_analyst",
+          "dissemination_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "intel_geoint": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "grph",
+        "ragn",
+        "geos"
+      ]
+    }
+  },
+  "contracts": {
+    "intel_geoint": {
+      "configuration": {
+        "adapters": {
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "geospatial": "geos",
+          "graph": "grph",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "rag": "ragn"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "authority_reviewer",
+            "area_planner",
+            "imagery_triage",
+            "feature_analyst",
+            "change_analyst",
+            "dissemination_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "areas": {
+          "authority_required": true,
+          "evidence_required": true,
+          "geometry_required": true,
+          "owner_required": true,
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ]
+        },
+        "assessments": {
+          "analyst_required": true,
+          "change_required": true,
+          "evidence_required": true,
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ],
+          "supported_types": [
+            "site_summary",
+            "route_summary",
+            "infrastructure_report",
+            "activity_report",
+            "change_report",
+            "risk_assessment"
+          ]
+        },
+        "authorities": {
+          "approver_required": true,
+          "evidence_required": true,
+          "expiry_required": true,
+          "supported_authority_types": [
+            "mission_order",
+            "consent",
+            "partner_authority",
+            "legal_mandate",
+            "regulatory_authority"
+          ],
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ]
+        },
+        "changes": {
+          "analyst_required": true,
+          "confidence_required": true,
+          "evidence_required": true,
+          "feature_required": true,
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "supported_types": [
+            "new_feature",
+            "removed_feature",
+            "movement",
+            "construction",
+            "damage",
+            "activity_change",
+            "environmental_change"
+          ]
+        },
+        "collection_plans": {
+          "approval_required": true,
+          "area_required": true,
+          "authority_required": true,
+          "evidence_required": true,
+          "retention_positive": true,
+          "source_required": true,
+          "supported_modes": [
+            "catalog_query",
+            "scheduled_refresh",
+            "partner_feed",
+            "historical_import",
+            "manual_upload"
+          ]
+        },
+        "dissemination": {
+          "approval_required": true,
+          "assessment_required": true,
+          "audience_required": true,
+          "evidence_required": true,
+          "release_marking_required": true
+        },
+        "features": {
+          "analyst_required": true,
+          "confidence_required": true,
+          "evidence_required": true,
+          "geometry_required": true,
+          "observation_required": true,
+          "supported_types": [
+            "facility",
+            "route",
+            "boundary",
+            "terrain",
+            "infrastructure",
+            "maritime",
+            "aviation",
+            "environmental",
+            "event"
+          ]
+        },
+        "governance": {
+          "audit_events": true,
+          "lawful_authority_required": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "targeting_or_harmful_action_denied": true
+        },
+        "observability": {
+          "event_stream": "apg.intel.geoint.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "observations": {
+          "accuracy_required": true,
+          "captured_at_required": true,
+          "evidence_required": true,
+          "observation_reference_required": true,
+          "plan_required": true
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "sources": {
+          "authority_required": true,
+          "evidence_required": true,
+          "owner_required": true,
+          "supported_resolution_classes": [
+            "coarse",
+            "medium",
+            "high",
+            "very_high",
+            "metadata_only"
+          ],
+          "supported_sensor_types": [
+            "optical",
+            "sar",
+            "thermal",
+            "multispectral",
+            "hyperspectral",
+            "lidar",
+            "ais_adsb",
+            "manual_survey"
+          ],
+          "supported_source_types": [
+            "satellite_imagery",
+            "aerial_imagery",
+            "drone_imagery",
+            "public_map",
+            "partner_feed",
+            "field_survey",
+            "open_geodata"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "intel_geoint_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_areas": true,
+          "enable_assessments": true,
+          "enable_authorities": true,
+          "enable_changes": true,
+          "enable_collection_plans": true,
+          "enable_dashboard": true,
+          "enable_dissemination": true,
+          "enable_features": true,
+          "enable_observations": true,
+          "enable_reviews": true,
+          "enable_sources": true
+        }
+      },
+      "id": "intel_geoint",
+      "provides": [
+        "geoint_authority_workflow",
+        "geoint_area_workflow",
+        "geoint_source_workflow",
+        "geoint_collection_workflow",
+        "geoint_observation_workflow",
+        "geoint_feature_workflow",
+        "geoint_change_workflow",
+        "geoint_assessment_workflow",
+        "geoint_dissemination_workflow",
+        "geoint_review_workflow",
+        "geoint_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "grph",
+        "ragn",
+        "geos"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 7,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "intel_geoint": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}
