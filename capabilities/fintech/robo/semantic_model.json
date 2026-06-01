@@ -1,0 +1,1439 @@
+{
+  "app": {
+    "description": "Robo Advisory package-backed APG capability",
+    "entity_count": 9,
+    "name": "fintech_robo",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "fintech_robo": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "analytics": "bia",
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "market_data": "market_data",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "reporting": "fin_rpt",
+          "wealth": "fintech_wealth"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "robo_suitability_reviewer",
+            "model_portfolio_reviewer",
+            "recommendation_reviewer",
+            "drift_reviewer",
+            "tax_loss_reviewer",
+            "robo_compliance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "automation": {
+          "approved_recommendation_required": true,
+          "funding_source_required": true,
+          "supported_cadences": [
+            "one_time",
+            "weekly",
+            "monthly",
+            "quarterly"
+          ]
+        },
+        "drift": {
+          "analysis_required": true,
+          "threshold_bps": 500
+        },
+        "goals": {
+          "horizon_required": true,
+          "positive_target_required": true,
+          "supported_currencies": [
+            "USD",
+            "KES",
+            "EUR",
+            "GBP",
+            "NGN",
+            "GHS",
+            "ZAR"
+          ],
+          "supported_goal_types": [
+            "retirement",
+            "education",
+            "home",
+            "wealth_growth",
+            "income",
+            "emergency"
+          ]
+        },
+        "governance": {
+          "audit_events": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "models": {
+          "allocation_total_percent": 100,
+          "policy_required": true,
+          "supported_risk_profiles": [
+            "conservative",
+            "balanced",
+            "growth",
+            "aggressive"
+          ]
+        },
+        "observability": {
+          "event_stream": "apg.fintech.robo.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "profiles": {
+          "kyc_required": true,
+          "suitability_required": true,
+          "supported_risk_profiles": [
+            "conservative",
+            "balanced",
+            "growth",
+            "aggressive"
+          ]
+        },
+        "recommendations": {
+          "analysis_required": true,
+          "profile_goal_model_required": true
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes"
+          ]
+        },
+        "tax_loss": {
+          "positive_loss_required": true,
+          "tax_lot_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "robo_advisory_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_automation": true,
+          "enable_dashboard": true,
+          "enable_drift": true,
+          "enable_goals": true,
+          "enable_models": true,
+          "enable_profiles": true,
+          "enable_recommendations": true,
+          "enable_reviews": true,
+          "enable_tax_loss": true
+        }
+      },
+      "name": "Robo Advisory",
+      "provides": [
+        "robo_investor_profile_workflow",
+        "robo_goal_plan_workflow",
+        "robo_model_portfolio_workflow",
+        "robo_recommendation_workflow",
+        "robo_automation_workflow",
+        "robo_drift_workflow",
+        "robo_tax_loss_workflow",
+        "robo_review_workflow",
+        "robo_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_wealth",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "bia",
+        "fin_rpt"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "policy_evidence_required",
+              "required_action": "attach_policy_evidence"
+            },
+            "name": "robo_write_requires_policy"
+          },
+          {
+            "condition": {
+              "client_present": false,
+              "operation": "create_investor_profile"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "investor_client_required",
+              "required_action": "select_client"
+            },
+            "name": "profile_client_required"
+          },
+          {
+            "condition": {
+              "kyc_present": false,
+              "operation": "create_investor_profile"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "investor_kyc_required",
+              "required_action": "attach_kyc"
+            },
+            "name": "profile_kyc_required"
+          },
+          {
+            "condition": {
+              "operation": "create_investor_profile",
+              "suitability_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "investor_suitability_required",
+              "required_action": "attach_suitability"
+            },
+            "name": "profile_suitability_required"
+          },
+          {
+            "condition": {
+              "operation": "create_investor_profile",
+              "risk_profile_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_profile_not_supported",
+              "required_action": "select_supported_risk_profile"
+            },
+            "name": "profile_risk_supported"
+          },
+          {
+            "condition": {
+              "operation": "define_goal_plan",
+              "profile_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "goal_profile_required",
+              "required_action": "select_investor_profile"
+            },
+            "name": "goal_profile_required"
+          },
+          {
+            "condition": {
+              "goal_type_supported": false,
+              "operation": "define_goal_plan"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "goal_type_not_supported",
+              "required_action": "select_supported_goal"
+            },
+            "name": "goal_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "define_goal_plan",
+              "positive_target": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_goal_target_required",
+              "required_action": "set_positive_target"
+            },
+            "name": "goal_positive_target"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "define_goal_plan"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "goal_currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "goal_currency_supported"
+          },
+          {
+            "condition": {
+              "horizon_present": false,
+              "operation": "define_goal_plan"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "goal_horizon_required",
+              "required_action": "attach_horizon"
+            },
+            "name": "goal_horizon_required"
+          },
+          {
+            "condition": {
+              "operation": "publish_model_portfolio",
+              "risk_profile_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "model_risk_profile_not_supported",
+              "required_action": "select_supported_risk_profile"
+            },
+            "name": "model_risk_supported"
+          },
+          {
+            "condition": {
+              "allocation_totals_100": false,
+              "operation": "publish_model_portfolio"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "model_allocation_total_must_equal_100",
+              "required_action": "rebalance_model_allocation"
+            },
+            "name": "model_allocation_total"
+          },
+          {
+            "condition": {
+              "operation": "publish_model_portfolio",
+              "policy_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "model_policy_required",
+              "required_action": "attach_policy"
+            },
+            "name": "model_policy_required"
+          },
+          {
+            "condition": {
+              "operation": "generate_recommendation",
+              "profile_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "recommendation_profile_required",
+              "required_action": "select_profile"
+            },
+            "name": "recommendation_profile_required"
+          },
+          {
+            "condition": {
+              "goal_present": false,
+              "operation": "generate_recommendation"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "recommendation_goal_required",
+              "required_action": "select_goal"
+            },
+            "name": "recommendation_goal_required"
+          },
+          {
+            "condition": {
+              "model_present": false,
+              "operation": "generate_recommendation"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "recommendation_model_required",
+              "required_action": "select_model"
+            },
+            "name": "recommendation_model_required"
+          },
+          {
+            "condition": {
+              "analysis_present": false,
+              "operation": "generate_recommendation"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "recommendation_analysis_required",
+              "required_action": "attach_analysis"
+            },
+            "name": "recommendation_analysis_required"
+          },
+          {
+            "condition": {
+              "operation": "approve_recommendation",
+              "recommendation_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "recommendation_required",
+              "required_action": "select_recommendation"
+            },
+            "name": "recommendation_approval_required"
+          },
+          {
+            "condition": {
+              "operation": "approve_recommendation",
+              "reviewer_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "recommendation_reviewer_required",
+              "required_action": "assign_reviewer"
+            },
+            "name": "recommendation_reviewer_required"
+          },
+          {
+            "condition": {
+              "approved_recommendation_present": false,
+              "operation": "configure_automation_plan"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "approved_recommendation_required",
+              "required_action": "approve_recommendation"
+            },
+            "name": "automation_recommendation_required"
+          },
+          {
+            "condition": {
+              "cadence_supported": false,
+              "operation": "configure_automation_plan"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "automation_cadence_not_supported",
+              "required_action": "select_supported_cadence"
+            },
+            "name": "automation_cadence_supported"
+          },
+          {
+            "condition": {
+              "funding_source_present": false,
+              "operation": "configure_automation_plan"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "funding_source_required",
+              "required_action": "attach_funding_source"
+            },
+            "name": "automation_funding_source_required"
+          },
+          {
+            "condition": {
+              "operation": "record_drift",
+              "profile_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "drift_profile_required",
+              "required_action": "select_profile"
+            },
+            "name": "drift_profile_required"
+          },
+          {
+            "condition": {
+              "analysis_present": false,
+              "operation": "record_drift"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "drift_analysis_required",
+              "required_action": "attach_analysis"
+            },
+            "name": "drift_analysis_required"
+          },
+          {
+            "condition": {
+              "operation": "record_tax_loss_candidate",
+              "profile_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "tax_loss_profile_required",
+              "required_action": "select_profile"
+            },
+            "name": "tax_profile_required"
+          },
+          {
+            "condition": {
+              "operation": "record_tax_loss_candidate",
+              "tax_lot_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "tax_lot_required",
+              "required_action": "attach_tax_lot"
+            },
+            "name": "tax_lot_required"
+          },
+          {
+            "condition": {
+              "operation": "record_tax_loss_candidate",
+              "positive_loss": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_tax_loss_required",
+              "required_action": "set_positive_loss"
+            },
+            "name": "tax_positive_loss"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "status_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_status_not_supported",
+              "required_action": "select_supported_status"
+            },
+            "name": "review_status_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_review"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_evidence_required",
+              "required_action": "attach_review_evidence"
+            },
+            "name": "review_evidence_required"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "robo_batch"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_robo_batch_to_bytewax"
+            },
+            "name": "robo_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_robo_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "robo_agent_runtime_not_supported",
+              "required_action": "select_supported_runtime"
+            },
+            "name": "robo_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_robo_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "robo_agent_role_not_supported",
+              "required_action": "select_supported_role"
+            },
+            "name": "robo_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "robo_agent_action",
+              "privileged_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_robo_agent_action_requires_human_approval"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "policy_evidence_required",
+            "required_action": "attach_policy_evidence"
+          },
+          "name": "robo_write_requires_policy"
+        },
+        {
+          "condition": {
+            "client_present": false,
+            "operation": "create_investor_profile"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "investor_client_required",
+            "required_action": "select_client"
+          },
+          "name": "profile_client_required"
+        },
+        {
+          "condition": {
+            "kyc_present": false,
+            "operation": "create_investor_profile"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "investor_kyc_required",
+            "required_action": "attach_kyc"
+          },
+          "name": "profile_kyc_required"
+        },
+        {
+          "condition": {
+            "operation": "create_investor_profile",
+            "suitability_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "investor_suitability_required",
+            "required_action": "attach_suitability"
+          },
+          "name": "profile_suitability_required"
+        },
+        {
+          "condition": {
+            "operation": "create_investor_profile",
+            "risk_profile_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_profile_not_supported",
+            "required_action": "select_supported_risk_profile"
+          },
+          "name": "profile_risk_supported"
+        },
+        {
+          "condition": {
+            "operation": "define_goal_plan",
+            "profile_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "goal_profile_required",
+            "required_action": "select_investor_profile"
+          },
+          "name": "goal_profile_required"
+        },
+        {
+          "condition": {
+            "goal_type_supported": false,
+            "operation": "define_goal_plan"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "goal_type_not_supported",
+            "required_action": "select_supported_goal"
+          },
+          "name": "goal_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "define_goal_plan",
+            "positive_target": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_goal_target_required",
+            "required_action": "set_positive_target"
+          },
+          "name": "goal_positive_target"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "define_goal_plan"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "goal_currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "goal_currency_supported"
+        },
+        {
+          "condition": {
+            "horizon_present": false,
+            "operation": "define_goal_plan"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "goal_horizon_required",
+            "required_action": "attach_horizon"
+          },
+          "name": "goal_horizon_required"
+        },
+        {
+          "condition": {
+            "operation": "publish_model_portfolio",
+            "risk_profile_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "model_risk_profile_not_supported",
+            "required_action": "select_supported_risk_profile"
+          },
+          "name": "model_risk_supported"
+        },
+        {
+          "condition": {
+            "allocation_totals_100": false,
+            "operation": "publish_model_portfolio"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "model_allocation_total_must_equal_100",
+            "required_action": "rebalance_model_allocation"
+          },
+          "name": "model_allocation_total"
+        },
+        {
+          "condition": {
+            "operation": "publish_model_portfolio",
+            "policy_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "model_policy_required",
+            "required_action": "attach_policy"
+          },
+          "name": "model_policy_required"
+        },
+        {
+          "condition": {
+            "operation": "generate_recommendation",
+            "profile_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "recommendation_profile_required",
+            "required_action": "select_profile"
+          },
+          "name": "recommendation_profile_required"
+        },
+        {
+          "condition": {
+            "goal_present": false,
+            "operation": "generate_recommendation"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "recommendation_goal_required",
+            "required_action": "select_goal"
+          },
+          "name": "recommendation_goal_required"
+        },
+        {
+          "condition": {
+            "model_present": false,
+            "operation": "generate_recommendation"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "recommendation_model_required",
+            "required_action": "select_model"
+          },
+          "name": "recommendation_model_required"
+        },
+        {
+          "condition": {
+            "analysis_present": false,
+            "operation": "generate_recommendation"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "recommendation_analysis_required",
+            "required_action": "attach_analysis"
+          },
+          "name": "recommendation_analysis_required"
+        },
+        {
+          "condition": {
+            "operation": "approve_recommendation",
+            "recommendation_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "recommendation_required",
+            "required_action": "select_recommendation"
+          },
+          "name": "recommendation_approval_required"
+        },
+        {
+          "condition": {
+            "operation": "approve_recommendation",
+            "reviewer_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "recommendation_reviewer_required",
+            "required_action": "assign_reviewer"
+          },
+          "name": "recommendation_reviewer_required"
+        },
+        {
+          "condition": {
+            "approved_recommendation_present": false,
+            "operation": "configure_automation_plan"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "approved_recommendation_required",
+            "required_action": "approve_recommendation"
+          },
+          "name": "automation_recommendation_required"
+        },
+        {
+          "condition": {
+            "cadence_supported": false,
+            "operation": "configure_automation_plan"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "automation_cadence_not_supported",
+            "required_action": "select_supported_cadence"
+          },
+          "name": "automation_cadence_supported"
+        },
+        {
+          "condition": {
+            "funding_source_present": false,
+            "operation": "configure_automation_plan"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "funding_source_required",
+            "required_action": "attach_funding_source"
+          },
+          "name": "automation_funding_source_required"
+        },
+        {
+          "condition": {
+            "operation": "record_drift",
+            "profile_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "drift_profile_required",
+            "required_action": "select_profile"
+          },
+          "name": "drift_profile_required"
+        },
+        {
+          "condition": {
+            "analysis_present": false,
+            "operation": "record_drift"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "drift_analysis_required",
+            "required_action": "attach_analysis"
+          },
+          "name": "drift_analysis_required"
+        },
+        {
+          "condition": {
+            "operation": "record_tax_loss_candidate",
+            "profile_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "tax_loss_profile_required",
+            "required_action": "select_profile"
+          },
+          "name": "tax_profile_required"
+        },
+        {
+          "condition": {
+            "operation": "record_tax_loss_candidate",
+            "tax_lot_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "tax_lot_required",
+            "required_action": "attach_tax_lot"
+          },
+          "name": "tax_lot_required"
+        },
+        {
+          "condition": {
+            "operation": "record_tax_loss_candidate",
+            "positive_loss": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_tax_loss_required",
+            "required_action": "set_positive_loss"
+          },
+          "name": "tax_positive_loss"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "status_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_status_not_supported",
+            "required_action": "select_supported_status"
+          },
+          "name": "review_status_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_review"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_evidence_required",
+            "required_action": "attach_review_evidence"
+          },
+          "name": "review_evidence_required"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "robo_batch"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_robo_batch_to_bytewax"
+          },
+          "name": "robo_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_robo_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "robo_agent_runtime_not_supported",
+            "required_action": "select_supported_runtime"
+          },
+          "name": "robo_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_robo_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "robo_agent_role_not_supported",
+            "required_action": "select_supported_role"
+          },
+          "name": "robo_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "robo_agent_action",
+            "privileged_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_robo_agent_action_requires_human_approval"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "agents": {
+          "component": "RoboAgentWorkbench",
+          "permission": "fintech_robo:admin",
+          "route": "/fintech-robo/agents"
+        },
+        "automation": {
+          "component": "AutomationPlanConsole",
+          "permission": "fintech_robo:automation",
+          "route": "/fintech-robo/automation"
+        },
+        "dashboard": {
+          "component": "RoboAdvisoryDashboard",
+          "permission": "fintech_robo:view",
+          "route": "/fintech-robo/dashboard"
+        },
+        "drift": {
+          "component": "DriftMonitor",
+          "permission": "fintech_robo:drift",
+          "route": "/fintech-robo/drift"
+        },
+        "goals": {
+          "component": "GoalPlanConsole",
+          "permission": "fintech_robo:goals",
+          "route": "/fintech-robo/goals"
+        },
+        "models": {
+          "component": "ModelPortfolioConsole",
+          "permission": "fintech_robo:models",
+          "route": "/fintech-robo/models"
+        },
+        "profiles": {
+          "component": "InvestorProfileConsole",
+          "permission": "fintech_robo:profiles",
+          "route": "/fintech-robo/profiles"
+        },
+        "recommendations": {
+          "component": "RecommendationWorkbench",
+          "permission": "fintech_robo:recommendations",
+          "route": "/fintech-robo/recommendations"
+        },
+        "reviews": {
+          "component": "RoboReviewConsole",
+          "permission": "fintech_robo:reviews",
+          "route": "/fintech-robo/reviews"
+        },
+        "settings": {
+          "component": "RoboSettings",
+          "permission": "fintech_robo:admin",
+          "route": "/fintech-robo/settings"
+        },
+        "tax_loss": {
+          "component": "TaxLossWorkbench",
+          "permission": "fintech_robo:tax_loss",
+          "route": "/fintech-robo/tax-loss"
+        }
+      },
+      "streaming": {
+        "events": [
+          "investor_profile_created",
+          "goal_plan_defined",
+          "model_portfolio_published",
+          "recommendation_generated",
+          "recommendation_approved",
+          "automation_plan_configured",
+          "drift_recorded",
+          "tax_loss_candidate_recorded",
+          "robo_review_recorded",
+          "robo_agent_registered"
+        ],
+        "guardrails": [
+          "robo_batch_requires_bytewax",
+          "privileged_robo_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.fintech.robo.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "automation": {
+            "icon": "repeat",
+            "status_indicator": "automation-chip"
+          },
+          "drift": {
+            "icon": "activity",
+            "status_indicator": "drift-chip"
+          },
+          "goals": {
+            "icon": "target",
+            "status_indicator": "goal-chip"
+          },
+          "models": {
+            "icon": "pie-chart",
+            "status_indicator": "model-chip"
+          },
+          "profiles": {
+            "icon": "user-round-check",
+            "status_indicator": "profile-chip"
+          },
+          "recommendations": {
+            "icon": "sparkles",
+            "status_indicator": "recommendation-chip"
+          },
+          "reviews": {
+            "icon": "clipboard-check",
+            "status_indicator": "review-chip"
+          },
+          "tax_loss": {
+            "icon": "receipt",
+            "status_indicator": "tax-chip"
+          }
+        },
+        "name": "robo_advisory_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#7C3AED",
+          "color.danger": "#B91C1C",
+          "color.primary": "#155E75",
+          "color.success": "#15803D",
+          "color.warning": "#A16207",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/fintech-robo/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "RoboAdvisoryDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/fintech-robo/dashboard",
+            "permission": "fintech_robo:view"
+          },
+          {
+            "component": "InvestorProfileConsole",
+            "name": "profiles",
+            "nav_group": "Investors",
+            "path": "/fintech-robo/profiles",
+            "permission": "fintech_robo:profiles"
+          },
+          {
+            "component": "GoalPlanConsole",
+            "name": "goals",
+            "nav_group": "Investors",
+            "path": "/fintech-robo/goals",
+            "permission": "fintech_robo:goals"
+          },
+          {
+            "component": "ModelPortfolioConsole",
+            "name": "models",
+            "nav_group": "Models",
+            "path": "/fintech-robo/models",
+            "permission": "fintech_robo:models"
+          },
+          {
+            "component": "RecommendationWorkbench",
+            "name": "recommendations",
+            "nav_group": "Advice",
+            "path": "/fintech-robo/recommendations",
+            "permission": "fintech_robo:recommendations"
+          },
+          {
+            "component": "AutomationPlanConsole",
+            "name": "automation",
+            "nav_group": "Advice",
+            "path": "/fintech-robo/automation",
+            "permission": "fintech_robo:automation"
+          },
+          {
+            "component": "DriftMonitor",
+            "name": "drift",
+            "nav_group": "Operations",
+            "path": "/fintech-robo/drift",
+            "permission": "fintech_robo:drift"
+          },
+          {
+            "component": "TaxLossWorkbench",
+            "name": "tax_loss",
+            "nav_group": "Operations",
+            "path": "/fintech-robo/tax-loss",
+            "permission": "fintech_robo:tax_loss"
+          },
+          {
+            "component": "RoboReviewConsole",
+            "name": "reviews",
+            "nav_group": "Governance",
+            "path": "/fintech-robo/reviews",
+            "permission": "fintech_robo:reviews"
+          },
+          {
+            "component": "RoboAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/fintech-robo/agents",
+            "permission": "fintech_robo:admin"
+          },
+          {
+            "component": "RoboSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/fintech-robo/settings",
+            "permission": "fintech_robo:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "robo_review": {
+        "roles": [
+          "robo_suitability_reviewer",
+          "model_portfolio_reviewer",
+          "recommendation_reviewer",
+          "drift_reviewer",
+          "tax_loss_reviewer",
+          "robo_compliance_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "fintech_robo": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_wealth",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "bia",
+        "fin_rpt"
+      ]
+    }
+  },
+  "contracts": {
+    "fintech_robo": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "analytics": "bia",
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "market_data": "market_data",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "reporting": "fin_rpt",
+          "wealth": "fintech_wealth"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "robo_suitability_reviewer",
+            "model_portfolio_reviewer",
+            "recommendation_reviewer",
+            "drift_reviewer",
+            "tax_loss_reviewer",
+            "robo_compliance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "automation": {
+          "approved_recommendation_required": true,
+          "funding_source_required": true,
+          "supported_cadences": [
+            "one_time",
+            "weekly",
+            "monthly",
+            "quarterly"
+          ]
+        },
+        "drift": {
+          "analysis_required": true,
+          "threshold_bps": 500
+        },
+        "goals": {
+          "horizon_required": true,
+          "positive_target_required": true,
+          "supported_currencies": [
+            "USD",
+            "KES",
+            "EUR",
+            "GBP",
+            "NGN",
+            "GHS",
+            "ZAR"
+          ],
+          "supported_goal_types": [
+            "retirement",
+            "education",
+            "home",
+            "wealth_growth",
+            "income",
+            "emergency"
+          ]
+        },
+        "governance": {
+          "audit_events": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "models": {
+          "allocation_total_percent": 100,
+          "policy_required": true,
+          "supported_risk_profiles": [
+            "conservative",
+            "balanced",
+            "growth",
+            "aggressive"
+          ]
+        },
+        "observability": {
+          "event_stream": "apg.fintech.robo.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "profiles": {
+          "kyc_required": true,
+          "suitability_required": true,
+          "supported_risk_profiles": [
+            "conservative",
+            "balanced",
+            "growth",
+            "aggressive"
+          ]
+        },
+        "recommendations": {
+          "analysis_required": true,
+          "profile_goal_model_required": true
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes"
+          ]
+        },
+        "tax_loss": {
+          "positive_loss_required": true,
+          "tax_lot_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "robo_advisory_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_automation": true,
+          "enable_dashboard": true,
+          "enable_drift": true,
+          "enable_goals": true,
+          "enable_models": true,
+          "enable_profiles": true,
+          "enable_recommendations": true,
+          "enable_reviews": true,
+          "enable_tax_loss": true
+        }
+      },
+      "id": "fintech_robo",
+      "provides": [
+        "robo_investor_profile_workflow",
+        "robo_goal_plan_workflow",
+        "robo_model_portfolio_workflow",
+        "robo_recommendation_workflow",
+        "robo_automation_workflow",
+        "robo_drift_workflow",
+        "robo_tax_loss_workflow",
+        "robo_review_workflow",
+        "robo_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_wealth",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "bia",
+        "fin_rpt"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 11,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "fintech_robo": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}

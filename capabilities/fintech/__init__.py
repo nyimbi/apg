@@ -77,6 +77,7 @@ CAPABILITY_META = {
 		'apis',          # Banking APIs
 		'embedded',      # Embedded Finance
 		'wealth',        # Wealth Management
+		'robo',          # Robo Advisory
 		'neobanking',    # Neo Banking
 		'lending',       # Digital Lending
 		'bnpl',          # Buy Now Pay Later

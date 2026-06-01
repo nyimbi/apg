@@ -27513,3 +27513,86 @@ Known gaps:
   routing, live market-data ingestion, account aggregation, tax-lot accounting,
   billing collection, statement rendering, regulator filing, durable Bytewax
   topology, or performance/load checks during this battery-conscious slice.
+
+## 2026-06-01 - FinTech Robo Advisory executable capability
+
+- Promoted `capabilities/fintech/robo` from a placeholder package into a
+  first-class APG capability with `README.md`, `SPECIFICATION.md`, `PLAN.md`,
+  `cap_spec.md`, contract, models, service, API helpers, view models, app
+  entrypoint, semantic/package/release evidence, and focused tests.
+- Added investor profiles, goal plans, model portfolios, recommendation
+  packets, recommendation approval, automated investment plans, drift records,
+  tax-loss candidates, review records, dashboard summaries, Bytewax batch
+  validation, and provider-neutral robo advisory agent registration.
+- Added deterministic Robo Advisory guardrails for tenant context, write
+  policy, investor client/KYC/suitability/risk evidence, goal type/target/
+  currency/horizon controls, model allocation/policy controls, recommendation
+  profile/goal/model/analysis evidence, approved recommendation requirements
+  for automation, cadence/funding controls, drift analysis, tax-lot/loss
+  controls, review status/evidence, Bytewax lifecycle events, supported
+  AI-agent runtimes/roles, and privileged-agent approval.
+- Updated fintech capability metadata so `robo` is listed as an implemented
+  sub-capability.
+- Removed the empty `_Robo_Advisory` marker file and published
+  `semantic_model.json`, `package_manifest.json`, and `release_report.json`.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/fintech/robo/__init__.py
+  capabilities/fintech/robo/capability_contract.py
+  capabilities/fintech/robo/models.py capabilities/fintech/robo/robo_runtime.py
+  capabilities/fintech/robo/service.py capabilities/fintech/robo/api.py
+  capabilities/fintech/robo/views.py capabilities/fintech/robo/app.py
+  capabilities/fintech/robo/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/fintech/robo/tests/test_package_contract.py`
+  passed with 6 tests.
+- `./.venv/bin/python capabilities/fintech/robo/app.py` passed self-test with
+  `passed: true` and `status: ok`.
+- `./.venv/bin/apg capabilities inspect fintech_robo --json` passed with 34
+  rules, 11 UI routes, theme `robo_advisory_control`, shell `apg_python`, and
+  Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan capabilities/fintech/robo --json`
+  passed with `side_effect_free: true` and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/fintech/robo --json` passed with 1 domain-specific capability,
+  0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/fintech/robo --json` passed with 1 complete lifecycle, 34
+  rules, 11 UI routes, 11 theme tokens, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 125 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 125 operable contracts, 125 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/fintech/robo`, `capabilities/fintech/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed investor profile, goal, model portfolio, recommendation, approval,
+  automation, drift, tax-loss, review, and AI-agent lifecycle paths so rule
+  evaluation happens before state mutation.
+- Tightened model portfolio publishing so allocations must total 100 percent
+  and carry policy evidence before publication.
+- Reviewed recommendation and automation workflows so automation can only be
+  configured from an approved recommendation.
+- Reviewed drift and tax-loss workflows so analysis and tax-lot evidence are
+  required before records are accepted.
+- Reviewed provider-neutral robo advisory agent behavior so Codex, Claude Code,
+  OpenCode, and Pi runtimes remain first-class configuration choices and
+  privileged actions require human approval.
+- Kept live brokerage execution, market-data feeds, tax-lot accounting,
+  custody, statement generation, billing collection, regulator filing, and
+  durable Bytewax workers behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live brokerage
+  execution, market-data ingestion, official tax-lot accounting, custody
+  integrations, statement rendering, billing collection, regulator filing,
+  durable Bytewax topology, or performance/load checks during this
+  battery-conscious slice.
