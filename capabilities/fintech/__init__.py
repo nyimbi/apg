@@ -70,6 +70,7 @@ CAPABILITY_META = {
 		'defi',          # Decentralized Finance
 	],
 	'implemented_subcapabilities': [
+		'payments',      # Digital Payments
 		'tms',           # Treasury Management System (existing)
 		'gateway',       # Payment Gateway (existing)
 		'switch',        # Payment Switch (existing)
@@ -350,7 +351,7 @@ def validate_composition(subcapabilities: List[str]) -> Dict[str, Any]:
 	}
 
 def init_capability(appbuilder, subcapabilities: List[str] = None):
-	"""Initialize FinTech capability with Flask-AppBuilder"""
+	"""Initialize FinTech capability with the host application builder."""
 	if subcapabilities is None:
 		subcapabilities = get_implemented_subcapabilities()
 	

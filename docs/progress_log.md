@@ -26302,3 +26302,71 @@ Known gaps:
   slice.
 - Existing SQLAlchemy and Pydantic deprecation warnings surfaced by focused
   tests remain outside this slice.
+
+### 2026-06-01 12:45 EAT
+
+Fintech Digital Payments executable capability slice:
+
+- Promoted `capabilities/fintech/payments` from an empty placeholder package
+  into a first-class APG capability with `README.md`, `SPECIFICATION.md`,
+  `PLAN.md`, `cap_spec.md`, contract, models, service, API helpers, view
+  models, app entrypoint, semantic/package/release evidence, and focused tests.
+- Added tenant-scoped payment account, instrument, payment order, risk
+  screening, authorization, capture, refund, payout, settlement, dispute, batch,
+  summary, and payment-agent lifecycle behavior.
+- Added deterministic payment guardrails for tenant context, write policy,
+  supported currencies, supported instruments, token references, positive
+  amounts, high-risk review, blocked-risk authorization, high-value approval,
+  overcapture, overrefund, settlement variance review, dispute ownership,
+  Bytewax lifecycle batches, supported AI-agent runtimes and roles, and
+  privileged-agent human approval.
+- Added `payments_runtime.py` domain helpers for Decimal amount normalization,
+  high-value threshold decisions, and settlement-variance decisions.
+- Updated fintech capability metadata so `payments` is listed as an implemented
+  sub-capability.
+- Removed the empty `_Digital_Payments` marker file and refreshed
+  `semantic_model.json`, `package_manifest.json`, and `release_report.json`.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/fintech/payments/__init__.py capabilities/fintech/payments/capability_contract.py capabilities/fintech/payments/models.py capabilities/fintech/payments/payments_runtime.py capabilities/fintech/payments/service.py capabilities/fintech/payments/api.py capabilities/fintech/payments/views.py capabilities/fintech/payments/app.py capabilities/fintech/payments/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/fintech/payments/tests/test_package_contract.py`
+  passed with 6 tests.
+- `./.venv/bin/python capabilities/fintech/payments/app.py` passed with
+  `self_test()` status `ok`.
+- `./.venv/bin/apg capabilities inspect fintech_payments --json` passed with 27
+  rules, 9 routes, Bytewax streaming, and provider-neutral payment-agent
+  runtimes.
+- `./.venv/bin/apg capabilities publish-plan capabilities/fintech/payments --json`
+  passed with side-effect-free publish evidence and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/fintech/payments --json`
+  passed with one domain-specific fintech payments implementation, 0 baseline
+  markers, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/fintech/payments --json`
+  passed with one complete lifecycle record, 27 rules, 9 routes, 11 theme
+  tokens, and 0 warnings/errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 110 operable contracts, 110 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Focused stale-marker scan returned only intentional Bytewax-not-Kafka
+  documentation lines in the edited payments docs.
+
+Code review:
+
+- Reviewed money movement paths to keep amounts as `Decimal` text and avoid
+  float rounding in generated applications.
+- Reviewed lifecycle guardrails so high-risk, blocked-risk, high-value,
+  overcapture, overrefund, settlement variance, dispute ownership, and
+  non-Bytewax batch cases fail before state acceptance.
+- Reviewed UI/theme metadata for APG Python screens and compact 8px visual
+  tokens.
+- Kept live provider, vault, ledger, AUDL, NTFY, KEYM, ENCR, cash-management,
+  accounts-receivable, and Bytewax workers behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live payment provider
+  authorization/capture/refund/payout flows, live ledger/cash-management/AR
+  posting, durable Bytewax topology, or performance/load checks during this
+  battery-conscious slice.
