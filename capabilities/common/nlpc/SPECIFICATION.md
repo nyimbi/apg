@@ -62,6 +62,12 @@ applications quickly and replace internals behind stable contracts later.
 - Enforce task enablement, language support, PII redaction policy, generation
   safety policy, generation model policy, search index binding, translation
   language pair evidence, length budgets, and review requirements.
+- Preserve processing decisions, matched rules, and review reasons on each run
+  so low-confidence or budget-incomplete processing can be routed to human
+  review without rerunning NLP tasks.
+- Denial guardrails must stop processing before task execution; review-required
+  guardrails must create `pending_review` run evidence for generated-app
+  review queues.
 
 ### Pipeline Lifecycle
 
@@ -151,8 +157,8 @@ stable.
 - `NlpcService` executes document, processing, pipeline, model, annotation,
   lexicon, NLP-agent, lifecycle-batch, list, dashboard, and compatibility
   flows.
-- Guardrail tests prove denied or review-required cases fail before state is
-  accepted.
+- Guardrail tests prove denied cases fail before state is accepted and
+  review-required processing cases become pending review evidence.
 - `app.self_test()` passes and fails if route, rule, Bytewax, or runtime
   evidence becomes stale.
 - Package JSON evidence can be regenerated from `app.semantic_model()` and

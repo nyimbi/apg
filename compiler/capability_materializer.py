@@ -444,6 +444,20 @@ def _semantic_model_data(
 			"supported_runtimes": list(agents.get("supported_runtimes", [])),
 			"guardrails": list(agents.get("guardrails", [])),
 		}
+	nlp_lifecycle = {}
+	if "nlp_agent_composition" in provides:
+		nlp_lifecycle = {
+			"document": "NlpcDocument",
+			"processing_run": "NlpcProcessingRun",
+			"pipeline": "NlpcPipeline",
+			"model": "NlpcModelRegistration",
+			"annotation_project": "NlpcAnnotationProject",
+			"annotation": "NlpcAnnotation",
+			"lexicon": "NlpcLexicon",
+			"nlp_agent": "NlpAgentRecord",
+			"lifecycle_batch": "NlpcLifecycleBatchRecord",
+			"audit": "NlpcAuditEvent",
+		}
 	return {
 		"format": "apg.semantic-model.v1",
 		"ok": True,
@@ -489,6 +503,7 @@ def _semantic_model_data(
 				"agents": agents,
 				"ai_control_lifecycle": ai_control_lifecycle,
 				"model_lifecycle": model_lifecycle,
+				"nlp_lifecycle": nlp_lifecycle,
 				"erp_modules": [_category(record.path)],
 				"components": {},
 				"business_rules": [],
@@ -545,6 +560,7 @@ def _release_report_data(
 	record: CapabilityContractRecord,
 	contract: dict[str, Any],
 ) -> dict[str, Any]:
+	adapters = contract.get("configuration", {}).get("adapters", {})
 	return {
 		"format": "apg.release-report.v1",
 		"ok": True,
@@ -554,6 +570,12 @@ def _release_report_data(
 		"evidence": {
 			"self_test": {"passed": True, "status": "ok", "capability": record.capability_id},
 			"semantic_model": {"format": "apg.semantic-model.v1", "capability": record.capability_id},
+			"streaming": contract.get("streaming", {}),
+			"runtime": {
+				"generated_app_runtime": adapters.get("generated_app_runtime", "service.py"),
+				"api": adapters.get("api_helpers", adapters.get("http_api", "api.py")),
+				"views": adapters.get("view_models", "views.py"),
+			},
 			"contracts": {
 				"capability_contract": {
 					"errors": [],

@@ -1,10 +1,5 @@
 {
   "evidence": {
-    "agents": {
-      "first_class": true,
-      "role_count": 9,
-      "runtime_count": 4
-    },
     "contracts": {
       "capability_contract": {
         "display_name": "NLP Core",
@@ -15,21 +10,12 @@
     },
     "runtime": {
       "api": "api.py",
-      "entrypoint": "app.py",
       "generated_app_runtime": "nlpc_runtime.NlpcService",
-      "production_runtime": "service.NLPCService",
-      "views": "view_models.py"
+      "views": "views.py"
     },
     "self_test": {
       "capability": "nlpc",
-      "errors": [],
       "passed": true,
-      "routes": [
-        "/health",
-        "/self-test",
-        "/component.json",
-        "/semantic-model.json"
-      ],
       "status": "ok"
     },
     "semantic_model": {
@@ -37,8 +23,31 @@
       "format": "apg.semantic-model.v1"
     },
     "streaming": {
+      "broker_core_dependency_allowed": false,
       "engine": "bytewax",
-      "required_processor": "bytewax"
+      "lifecycle_stream": "nlpc.lifecycle",
+      "required_operations": [
+        "document_batch",
+        "processing_batch",
+        "pipeline_batch",
+        "annotation_batch",
+        "model_batch",
+        "lexicon_batch",
+        "language_registry_batch",
+        "nlp_agent_batch"
+      ],
+      "required_processor": "bytewax",
+      "topics": [
+        "nlpc.documents",
+        "nlpc.processing",
+        "nlpc.pipelines",
+        "nlpc.annotations",
+        "nlpc.models",
+        "nlpc.lexicons",
+        "nlpc.languages",
+        "nlpc.agents"
+      ],
+      "watermark": "event_time"
     }
   },
   "format": "apg.release-report.v1",

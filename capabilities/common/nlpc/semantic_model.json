@@ -1,54 +1,5 @@
 {
-  "agents": {
-    "nlpc_text_governance": {
-      "adapter_contract": "aicr_provider_neutral_agent_adapter",
-      "first_class": true,
-      "guardrails": [
-        "supported_runtime",
-        "supported_role",
-        "explicit_scope",
-        "accountable_owner",
-        "declared_purpose",
-        "machine_contribution_disclosure",
-        "human_approval_for_privileged_roles"
-      ],
-      "privileged_roles": [
-        "pii_reviewer",
-        "generation_safety_reviewer",
-        "annotation_reviewer",
-        "pipeline_reviewer",
-        "model_release_reviewer",
-        "semantic_search_reviewer"
-      ],
-      "required_fields": [
-        "tenant_id",
-        "agent_id",
-        "name",
-        "runtime",
-        "role",
-        "scope",
-        "owner",
-        "purpose"
-      ],
-      "supported_roles": [
-        "document_reviewer",
-        "language_reviewer",
-        "pii_reviewer",
-        "generation_safety_reviewer",
-        "annotation_reviewer",
-        "pipeline_reviewer",
-        "model_release_reviewer",
-        "semantic_search_reviewer",
-        "language_steward"
-      ],
-      "supported_runtimes": [
-        "codex",
-        "claude_code",
-        "opencode",
-        "pi"
-      ]
-    }
-  },
+  "agents": {},
   "app": {
     "description": "NLP Core package-backed APG capability",
     "entity_count": 0,
@@ -57,19 +8,6 @@
   },
   "capabilities": {
     "nlpc": {
-      "adapters": {
-        "ai_core": "aicr",
-        "audit_sink": "audl",
-        "auth_provider": "auth",
-        "configuration": "conf",
-        "event_stream": "bytewax",
-        "generated_app_runtime": "nlpc_runtime.NlpcService",
-        "http_api": "api.py",
-        "metrics_sink": "moni",
-        "model_lifecycle": "mlcm",
-        "production_runtime": "service.NLPCService",
-        "search_index": "srch"
-      },
       "agents": {
         "adapter_contract": "aicr_provider_neutral_agent_adapter",
         "first_class": true,
@@ -118,12 +56,27 @@
           "pi"
         ]
       },
-      "approvals": {
-        "annotation_review": "NlpcAnnotation",
-        "model_release": "NlpcModelRegistration",
-        "nlp_agent": "NlpAgentRecord",
-        "pipeline_registration": "NlpcPipeline"
+      "ai_control_lifecycle": {
+        "adapter_contract": "aicr_provider_neutral_agent_adapter",
+        "ai_agent": "AiAgentRecord",
+        "first_class": true,
+        "guardrails": [
+          "supported_runtime",
+          "supported_role",
+          "explicit_scope",
+          "accountable_owner",
+          "declared_purpose",
+          "machine_contribution_disclosure",
+          "human_approval_for_privileged_roles"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
       },
+      "approvals": {},
       "business_rules": [],
       "components": {},
       "configuration": {
@@ -352,6 +305,7 @@
       ],
       "i18n": {},
       "master_data": {},
+      "model_lifecycle": {},
       "name": "NLP Core",
       "nlp_lifecycle": {
         "annotation": "NlpcAnnotation",
@@ -1377,9 +1331,8 @@
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
-        "production_service": "service.NLPCService",
         "service": "nlpc_runtime.NlpcService",
-        "views": "view_models.py"
+        "views": "views.py"
       },
       "screens": {
         "agents": {
@@ -1682,28 +1635,7 @@
     }
   },
   "composition": {
-    "agent_teams": {
-      "nlpc_text_governance": {
-        "roles": [
-          "document_reviewer",
-          "language_reviewer",
-          "pii_reviewer",
-          "generation_safety_reviewer",
-          "annotation_reviewer",
-          "pipeline_reviewer",
-          "model_release_reviewer",
-          "semantic_search_reviewer",
-          "language_steward"
-        ],
-        "runtimes": [
-          "codex",
-          "claude_code",
-          "opencode",
-          "pi"
-        ],
-        "stream": "nlpc.lifecycle"
-      }
-    },
+    "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
       "nlpc": [
@@ -1715,54 +1647,6 @@
   },
   "contracts": {
     "nlpc": {
-      "agents": {
-        "adapter_contract": "aicr_provider_neutral_agent_adapter",
-        "first_class": true,
-        "guardrails": [
-          "supported_runtime",
-          "supported_role",
-          "explicit_scope",
-          "accountable_owner",
-          "declared_purpose",
-          "machine_contribution_disclosure",
-          "human_approval_for_privileged_roles"
-        ],
-        "privileged_roles": [
-          "pii_reviewer",
-          "generation_safety_reviewer",
-          "annotation_reviewer",
-          "pipeline_reviewer",
-          "model_release_reviewer",
-          "semantic_search_reviewer"
-        ],
-        "required_fields": [
-          "tenant_id",
-          "agent_id",
-          "name",
-          "runtime",
-          "role",
-          "scope",
-          "owner",
-          "purpose"
-        ],
-        "supported_roles": [
-          "document_reviewer",
-          "language_reviewer",
-          "pii_reviewer",
-          "generation_safety_reviewer",
-          "annotation_reviewer",
-          "pipeline_reviewer",
-          "model_release_reviewer",
-          "semantic_search_reviewer",
-          "language_steward"
-        ],
-        "supported_runtimes": [
-          "codex",
-          "claude_code",
-          "opencode",
-          "pi"
-        ]
-      },
       "configuration": {
         "adapters": {
           "ai_core": "aicr",
@@ -1994,34 +1878,7 @@
         "aicr",
         "mlcm",
         "conf"
-      ],
-      "streaming": {
-        "broker_core_dependency_allowed": false,
-        "engine": "bytewax",
-        "lifecycle_stream": "nlpc.lifecycle",
-        "required_operations": [
-          "document_batch",
-          "processing_batch",
-          "pipeline_batch",
-          "annotation_batch",
-          "model_batch",
-          "lexicon_batch",
-          "language_registry_batch",
-          "nlp_agent_batch"
-        ],
-        "required_processor": "bytewax",
-        "topics": [
-          "nlpc.documents",
-          "nlpc.processing",
-          "nlpc.pipelines",
-          "nlpc.annotations",
-          "nlpc.models",
-          "nlpc.lexicons",
-          "nlpc.languages",
-          "nlpc.agents"
-        ],
-        "watermark": "event_time"
-      }
+      ]
     }
   },
   "deployment": {
@@ -2033,7 +1890,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 3,
       "kind": "capability",
       "nodes": 1
     },
@@ -2553,9 +2410,7 @@
   },
   "security": {},
   "source_files": [
-    "capability_contract.py",
-    "nlpc_runtime.py",
-    "view_models.py"
+    "capability_contract.py"
   ],
   "symbols": {
     "capability.nlpc": {

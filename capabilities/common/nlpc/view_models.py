@@ -36,6 +36,10 @@ def processing_console_model(service: NlpcService | None = None, tenant_id: str 
 		"route": "/nlpc/process",
 		"documents": service.list_documents(tenant_id),
 		"processing_runs": service.list_processing_runs(tenant_id),
+		"pending_review": [
+			item for item in service.list_processing_runs(tenant_id)
+			if item["status"] == "pending_review"
+		],
 		"enabled_tasks": service.describe(tenant_id)["configuration"]["tasks"]["enabled"],
 		"required_policies": ["tenant", "language", "pii_redaction", "generation_safety", "model_policy"],
 	}
@@ -95,6 +99,10 @@ def review_console_model(service: NlpcService | None = None, tenant_id: str = "d
 		"low_confidence_runs": [
 			item for item in service.list_processing_runs(tenant_id)
 			if item["confidence_score"] < service.describe(tenant_id)["configuration"]["tasks"]["minimum_confidence_score"]
+		],
+		"pending_processing_reviews": [
+			item for item in service.list_processing_runs(tenant_id)
+			if item["status"] == "pending_review"
 		],
 		"low_consensus_annotations": [
 			item for item in service.list_annotations(tenant_id)

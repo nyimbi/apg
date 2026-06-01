@@ -12,7 +12,8 @@ evidence through a deterministic rule engine.
   audit evidence.
 - Processing runs for sentiment analysis, entity recognition, PII detection,
   summarization, semantic search, translation, classification, topic modeling,
-  keyword extraction, and governed text generation.
+  keyword extraction, and governed text generation, including pending-review
+  state for low-confidence or budget-incomplete output.
 - Pipeline registration with owner, model linkage, version metadata, enabled
   tasks, and policy checks.
 - NLP model registration and release with MLCM linkage, evaluation evidence,
@@ -99,6 +100,20 @@ service.validate_nlpc_lifecycle_batch(
 )
 ```
 
+Review-required processing is retained as executable state:
+
+```python
+pending = service.process_document(
+	"run-review",
+	"tenant-a",
+	document["id"],
+	"summarization",
+	length_budget_present=False,
+)
+assert pending["status"] == "pending_review"
+assert pending["matched_rules"] == ["summarization_requires_length_budget"]
+```
+
 ## Guardrails
 
 NLPC blocks missing tenant context, empty documents, oversized documents,
@@ -114,6 +129,9 @@ without guidelines, low annotation consensus without adjudication, lexicons
 without language, quality metrics without owner, cross-tenant processing, state
 changes without audit evidence, and language registries with fewer than 40
 African language codes.
+Review-required processing outcomes are not dropped. They are stored as
+`pending_review` runs with `decision`, `matched_rules`, and `review_reasons` so
+the processing console and human review console can route work immediately.
 Agent guardrails also block unsupported runtimes, unsupported roles, missing
 scope, missing owner, missing purpose, undisclosed machine contribution, and
 non-Bytewax lifecycle batches. Privileged NLP-agent roles without explicit

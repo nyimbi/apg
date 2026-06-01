@@ -18,6 +18,9 @@
   project, annotation, lexicon, NLP-agent, lifecycle-batch, and audit records.
 - Add deterministic NLP task behavior so applications are executable before
   external providers are wired.
+- Preserve processing guardrail decisions, matched rules, and review reasons so
+  low-confidence and budget-incomplete runs are routed into pending-review state
+  instead of being silently accepted or treated as hard denials.
 - Keep adapters explicit so AICR, MLCM, Bytewax, AUDL, AUTH, MONI, and SRCH can
   replace local behavior without changing the APG contract.
 
@@ -50,9 +53,9 @@
 
 ## Current Packet Focus
 
-The current coherent slice is NLP-agent composition and Bytewax lifecycle
-guardrails. It adds executable state for `NlpAgentRecord` and
-`NlpcLifecycleBatchRecord`, contract-level `agents` and `streaming` manifests,
-deterministic guardrails, roster and lifecycle view models, semantic-model
-evidence, and focused regression coverage while leaving live provider SDKs and
-Bytewax topology execution behind adapter boundaries.
+The current coherent slice is processing review governance. It keeps denial
+rules as pre-execution blocks, but records review-required processing outcomes
+as `pending_review` `NlpcProcessingRun` evidence with matched rules and review
+reasons. It updates review-console and processing-console view models, package
+semantic evidence, and focused regression coverage while leaving live provider
+SDKs and Bytewax topology execution behind adapter boundaries.

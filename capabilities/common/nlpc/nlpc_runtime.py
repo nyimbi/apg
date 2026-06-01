@@ -53,6 +53,9 @@ class NlpcProcessingRun:
 	confidence_score: float
 	results: dict[str, dict[str, Any]]
 	status: str = "completed"
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
 
 	def to_dict(self) -> dict[str, Any]:
 		return {
@@ -64,6 +67,9 @@ class NlpcProcessingRun:
 			"confidence_score": self.confidence_score,
 			"results": {key: dict(value) for key, value in self.results.items()},
 			"status": self.status,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
 		}
 
 
@@ -368,7 +374,7 @@ class NlpcService:
 			"language_known": bool(document.language),
 			"language_supported": document.language in self._supported_languages,
 		})
-		self._raise_if_blocked(combined)
+		self._raise_if_denied(combined)
 		for task in task_list:
 			preflight = self.evaluate({
 				"tenant_context_present": bool(tenant_id),
@@ -385,7 +391,7 @@ class NlpcService:
 				"length_budget_present": length_budget_present,
 			})
 			combined = self._combine(combined, preflight)
-			self._raise_if_blocked(combined)
+			self._raise_if_denied(combined)
 			confidence, result_data = self._run_task(document.content, task, document.language)
 			confidences.append(confidence)
 			postflight = self.evaluate({
@@ -395,7 +401,7 @@ class NlpcService:
 			})
 			combined = self._combine(combined, postflight)
 			result_map[task] = result_data
-		self._raise_if_blocked(combined)
+		self._raise_if_denied(combined)
 		run = NlpcProcessingRun(
 			id=run_id,
 			tenant_id=tenant_id,
@@ -404,6 +410,14 @@ class NlpcService:
 			language=document.language,
 			confidence_score=min(confidences),
 			results=result_map,
+			status="pending_review" if combined["decision"] == "require_review" else "completed",
+			decision=combined["decision"],
+			matched_rules=list(combined["matched_rules"]),
+			review_reasons=[
+				action.get("reason", "")
+				for action in combined.get("actions", [])
+				if action.get("decision") == "require_review" and action.get("reason")
+			],
 		)
 		self._processing_runs[run_id] = run
 		document.status = "processed"
@@ -736,6 +750,7 @@ class NlpcService:
 			"tenant_id": tenant_id,
 			"document_count": len(self.list_documents(tenant_id)),
 			"processing_run_count": len(self.list_processing_runs(tenant_id)),
+			"pending_processing_review_count": len([item for item in self.list_processing_runs(tenant_id) if item["status"] == "pending_review"]),
 			"pipeline_count": len(self.list_pipelines(tenant_id)),
 			"model_count": len(self.list_models(tenant_id)),
 			"released_model_count": len([item for item in self.list_models(tenant_id) if item["status"] == "released"]),

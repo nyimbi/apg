@@ -23697,3 +23697,74 @@ Known gaps:
   or performance/load checks during this battery-conscious capability slice.
 - Existing SQLAlchemy and Pydantic deprecation warnings surfaced by focused
   tests remain outside this slice.
+
+### 2026-06-01 03:27 EAT
+
+NLPC processing review lifecycle slice:
+
+- Added executable pending-review state for NLPC processing runs. Denial
+  guardrails still stop before task execution, while review-required outcomes
+  create `pending_review` run evidence.
+- Extended `NlpcProcessingRun` with `decision`, `matched_rules`, and
+  `review_reasons` so generated applications can build review queues without
+  replaying NLP tasks or the rule engine.
+- Updated `process_document()` so low-confidence results and missing
+  summarization length budgets are retained as auditable review evidence, while
+  PII, generation-policy, search-index, language, and task-denial rules still
+  block before `_run_task()` executes.
+- Surfaced pending review queues in the processing console and human review
+  console, and added `pending_processing_review_count` to dashboard summaries.
+- Updated `SPECIFICATION.md`, `PLAN.md`, `README.md`, and `cap_spec.md` to
+  describe processing review governance.
+- Extended the capability materializer so NLPC semantic evidence includes the
+  `nlp_lifecycle` runtime model map and release reports include streaming and
+  runtime evidence required by package contracts.
+- Regenerated NLPC `app.py`, `semantic_model.json`, and `release_report.json`.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/nlpc/__init__.py capabilities/common/nlpc/capability_contract.py capabilities/common/nlpc/nlpc_runtime.py capabilities/common/nlpc/view_models.py capabilities/common/nlpc/app.py capabilities/common/nlpc/test_capability_contract.py capabilities/common/nlpc/test_language_codes.py capabilities/common/nlpc/tests/test_package_contract.py compiler/capability_materializer.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/nlpc/test_capability_contract.py capabilities/common/nlpc/test_language_codes.py capabilities/common/nlpc/tests/test_package_contract.py`
+  passed with 11 tests and 10 pre-existing dependency deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.nlpc import app; r=app.self_test(); print(r); assert r['passed']"`
+  passed.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/nlpc --json`
+  passed with one domain-specific NLPC implementation, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/nlpc --json`
+  passed and showed 38 rules, 16 routes, Bytewax streaming, 40+ African
+  language codes, and first-class NLP agent evidence.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/common/nlpc --json`
+  passed with one complete lifecycle record, 38 rules, 16 routes, and 0
+  warnings/errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 109 operable contracts, 109 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- `./.venv/bin/apg tooling audit --json` passed all 21 tooling surfaces.
+- `git diff --check -- capabilities/common/nlpc compiler/capability_materializer.py docs/progress_log.md`
+  passed.
+
+Code review:
+
+- Reviewed preflight blocking: denied processing tasks still raise before task
+  execution, preserving the existing no-side-effect behavior covered by tests.
+- Reviewed review state: review-required runs store deterministic policy
+  evidence and remain tenant-scoped through the existing document/run stores.
+- Reviewed UI surfacing: processing and review view models expose pending
+  queues using service state rather than duplicate policy evaluation.
+- Reviewed generated evidence: semantic and release evidence now preserve
+  NLPC-specific lifecycle models, Bytewax streaming, and runtime adapter
+  metadata expected by package tests.
+- Kept the lifecycle dependency-light and provider-neutral; live NLP model
+  providers, semantic search engines, metrics sinks, and Bytewax execution
+  remain adapter concerns.
+
+Known gaps:
+
+- Did not run the full repository test suite, rendered UI checks, live NLP
+  providers, live semantic-search indexes, durable metrics sinks, live Bytewax
+  topology, or performance/load checks during this battery-conscious capability
+  slice.
+- Existing SQLAlchemy and Pydantic deprecation warnings surfaced by focused
+  tests remain outside this slice.

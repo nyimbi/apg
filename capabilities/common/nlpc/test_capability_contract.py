@@ -269,6 +269,7 @@ def test_nlpc_lifecycle_is_executable():
 		"tenant_id": "tenant-text",
 		"document_count": 1,
 		"processing_run_count": 1,
+		"pending_processing_review_count": 0,
 		"pipeline_count": 1,
 		"model_count": 1,
 		"released_model_count": 1,
@@ -321,6 +322,49 @@ def test_nlpc_lifecycle_is_executable():
 	assert lifecycle_batch_model(service, "tenant-text")["batches"][0]["id"] == "nlpc-batch-001"
 	assert governance_model(service, "tenant-text")["rules"]
 	assert audit_timeline_model(service, "tenant-text")["audit_events"]
+
+
+def test_processing_review_lifecycle_records_pending_review_runs():
+	service = NlpcService()
+	document = service.ingest_document(
+		"review-doc",
+		"tenant-review",
+		"Plain text for a deliberately uncertain result.",
+		"en",
+	)
+
+	def low_confidence_task(content: str, task: str, language: str) -> tuple[float, dict[str, object]]:
+		return 0.62, {"label": "uncertain"}
+
+	service._run_task = low_confidence_task  # type: ignore[method-assign]
+	run = service.process_document(
+		"review-run",
+		"tenant-review",
+		document["id"],
+		"sentiment_analysis",
+		human_review_recorded=False,
+	)
+	summary_review = service.process_document(
+		"summary-review-run",
+		"tenant-review",
+		document["id"],
+		"summarization",
+		length_budget_present=False,
+		human_review_recorded=True,
+	)
+	console = processing_console_model(service, "tenant-review")
+	review = review_console_model(service, "tenant-review")
+	summary = service.dashboard_summary("tenant-review")
+
+	assert run["status"] == "pending_review"
+	assert run["decision"] == "require_review"
+	assert run["matched_rules"] == ["low_confidence_requires_review"]
+	assert run["review_reasons"] == ["low_confidence_review_required"]
+	assert summary_review["status"] == "pending_review"
+	assert summary_review["matched_rules"] == ["summarization_requires_length_budget"]
+	assert summary["pending_processing_review_count"] == 2
+	assert {item["id"] for item in console["pending_review"]} == {"review-run", "summary-review-run"}
+	assert {item["id"] for item in review["pending_processing_reviews"]} == {"review-run", "summary-review-run"}
 
 
 def test_nlpc_service_enforces_policy_guardrails():
