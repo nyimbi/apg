@@ -580,10 +580,10 @@ def default_rules() -> list[CapabilityRule]:
 		),
 		CapabilityRule(
 			name="catalog_agent_privileged_role_requires_human_approval",
-			description="Privileged metadata catalog-agent roles require human approval.",
+			description="Privileged metadata catalog-agent roles require human approval evidence or review.",
 			condition={"operation": "register_catalog_agent", "privileged_agent_role": True, "human_approval_required": False},
 			effect={
-				"decision": "deny",
+				"decision": "require_review",
 				"reason": "catalog_agent_human_approval_required",
 				"required_action": "require_human_approval_for_agent"
 			}
@@ -688,7 +688,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "meta",
 		"display_name": "Metadata Management",
-		"provides": ["metadata_catalog_governance", "metadata_lifecycle", "catalog_agent_composition"],
+		"provides": ["metadata_catalog_governance", "metadata_lifecycle", "catalog_agent_composition", "review_evidence"],
 		"requires": ["mdm", "auth", "audl"],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
@@ -699,6 +699,41 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		"ui": ui_manifest(),
 		"agents": agent_manifest(),
 		"streaming": streaming_manifest(),
+		"review_evidence": {
+			"durable_statuses": [
+				"pending",
+				"pending_review",
+				"review_required",
+				"review_denied",
+				"denied",
+				"accepted",
+				"active",
+				"published",
+				"certified",
+				"retired",
+				"reviewed",
+				"scheduled",
+				"completed"
+			],
+			"policy_fields": [
+				"policy_decision",
+				"matched_rules",
+				"review_reasons",
+				"review_evidence"
+			],
+			"pending_queues": [
+				"assets",
+				"discovery_jobs",
+				"classifications",
+				"lineage",
+				"quality_assessments",
+				"certifications",
+				"glossary_terms",
+				"catalog_agents",
+				"lifecycle_batches"
+			],
+			"deny_behavior": "Denied META lifecycle batches persist evidence before PermissionError"
+		},
 		"theme": {
 			"name": theme.name,
 			"tokens": theme.tokens,

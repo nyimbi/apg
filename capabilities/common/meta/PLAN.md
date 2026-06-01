@@ -28,6 +28,8 @@ persistence adapters are attached.
   assets, review notes, supported catalog-agent runtimes, supported
   catalog-agent roles, agent scope, owner, purpose, machine contribution
   disclosure, privileged-role human approval, and Bytewax lifecycle batches.
+- Add contract-level `review_evidence` metadata for durable statuses, policy
+  fields, pending-review queues, and denied lifecycle-batch behavior.
 - Add UI routes for dashboard, catalog, discovery, lineage, classification,
   quality, certification, glossary, impact, search, audit, adapters, catalog
   agents, lifecycle batches, and settings.
@@ -42,11 +44,19 @@ persistence adapters are attached.
 - Implement catalog-agent records and lifecycle-batch records.
 - Ensure all lifecycle methods evaluate rules and preserve matched-rule
   evidence.
+- Persist `policy_decision`, `matched_rules`, `review_reasons`, and
+  `review_evidence` on reviewable lifecycle records and audit events.
+- Preserve otherwise valid privileged catalog agents without approval as
+  `pending_review` records instead of transient exceptions.
+- Persist denied non-Bytewax lifecycle batches as `denied` evidence before
+  raising `PermissionError`.
 
 ### 4. Composition Surfaces
 
 - Add generated-application API helper functions.
 - Add `view_models.py` for route-level UI state.
+- Add pending-review queue composition for dashboard, catalog-agent roster, and
+  settings surfaces.
 - Replace static semantic JSON with contract-derived `app.py` output.
 - Refresh `semantic_model.json`, `release_report.json`, and package manifest.
 

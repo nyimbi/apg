@@ -263,7 +263,8 @@ def register_capability() -> Dict[str, Any]:
 			"capability_rules": "Evaluate deterministic metadata governance rules",
 			"visual_theming": "Apply catalog-console theme tokens and components",
 			"catalog_agent_composition": "Register first-class metadata agents across Codex, Claude Code, opencode, Pi, and future runtime adapters",
-			"lifecycle_batch_validation": "Validate metadata lifecycle mutation batches against Bytewax-first stream rules"
+			"lifecycle_batch_validation": "Validate metadata lifecycle mutation batches against Bytewax-first stream rules",
+			"review_evidence": "Preserve policy decisions, matched rules, review reasons, and review evidence for generated stewardship queues"
 		},
 		"endpoints": {
 			"assets": "/meta/api/v1/assets",
@@ -282,6 +283,7 @@ def register_capability() -> Dict[str, Any]:
 		"ui_manifest": contract["ui"],
 		"agents": contract["agents"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"theme": contract["theme"],
 		"permissions": [
 			"meta:view",

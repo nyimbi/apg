@@ -131,6 +131,9 @@ class MetaAssetRecord:
 	lineage_available: bool = False
 	age_days: int = 0
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	tags: list[str] = field(default_factory=list)
 	metadata: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
@@ -151,6 +154,9 @@ class MetaDiscoveryJobRecord:
 	decision: str
 	status: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	discovered_asset_ids: list[str] = field(default_factory=list)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -171,6 +177,9 @@ class MetaClassificationRecord:
 	steward: str | None = None
 	review_notes: str | None = None
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 	reviewed_at: datetime | None = None
 
@@ -189,6 +198,9 @@ class MetaLineageRecord:
 	decision: str
 	status: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -205,6 +217,9 @@ class MetaQualityRecord:
 	decision: str
 	status: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -219,6 +234,9 @@ class MetaCertificationRecord:
 	decision: str
 	status: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	review_notes: str | None = None
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -236,6 +254,9 @@ class MetaGlossaryTermRecord:
 	decision: str = "allow"
 	status: str = "active"
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -254,6 +275,11 @@ class MetaCatalogAgentRecord:
 	contribution_disclosed: bool
 	human_approval_required: bool
 	status: str = "active"
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -268,6 +294,9 @@ class MetaLifecycleBatchRecord:
 	accepted: bool
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	required_processor: str = "bytewax"
 	status: str = "accepted"
 	created_at: datetime = field(default_factory=datetime.utcnow)
@@ -284,6 +313,9 @@ class MetaAuditEventRecord:
 	actor: str
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	details: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -330,7 +362,7 @@ class MetaService:
 			"created_at": datetime.utcnow().isoformat(),
 		}
 		self.records[f"{tenant_id}:{record_id}"] = record
-		self._audit(tenant_id, "record.created", record_id, "system", "allow", [], record)
+		self._audit(tenant_id, "record.created", record_id, "system", _allow_result(), record)
 		return record
 
 	def register_asset(
@@ -375,12 +407,15 @@ class MetaService:
 			status="draft" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
 			decision=decision["decision"],
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 			tags=list(tags or []),
 			metadata=dict(metadata or {}),
 			age_days=age_days,
 		)
 		self.assets[self._asset_key(tenant_id, record.asset_id)] = record
-		self._audit(tenant_id, "asset.registered", record.asset_id, record.owner or "system", decision["decision"], decision["matched_rules"], context)
+		self._audit(tenant_id, "asset.registered", record.asset_id, record.owner or "system", decision, context)
 		return record
 
 	def schedule_discovery(
@@ -413,9 +448,12 @@ class MetaService:
 			decision=decision["decision"],
 			status="scheduled" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 		)
 		self.discovery_jobs[record.job_id] = record
-		self._audit(tenant_id, "discovery.scheduled", record.job_id, record.source_system, decision["decision"], decision["matched_rules"], context)
+		self._audit(tenant_id, "discovery.scheduled", record.job_id, record.source_system, decision, context)
 		return record
 
 	def record_discovery_result(self, *, job_id: str, discovered_asset_ids: list[str]) -> MetaDiscoveryJobRecord:
@@ -426,7 +464,10 @@ class MetaService:
 			raise ValueError(f"Discovery job {job_id} is {record.status} and cannot record results")
 		record.discovered_asset_ids = list(discovered_asset_ids)
 		record.status = "completed"
-		self._audit(record.tenant_id, "discovery.completed", record.job_id, record.source_system, "allow", [], asdict(record))
+		record.policy_decision = "allow"
+		record.review_reasons = []
+		record.review_evidence = self._review_evidence(_allow_result(), review_recorded=True)
+		self._audit(record.tenant_id, "discovery.completed", record.job_id, record.source_system, _allow_result(), asdict(record))
 		return record
 
 	def classify_asset(
@@ -462,13 +503,16 @@ class MetaService:
 			status="accepted" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
 			steward_review_recorded=steward_review_recorded,
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision, steward_review_recorded),
 		)
 		self.classifications[record.classification_id] = record
 		if decision["decision"] == "allow":
 			asset.classification_id = record.classification_id
 			asset.sensitivity = "restricted" if label in self.describe(tenant_id)["configuration"]["classification"]["sensitive_labels"] else asset.sensitivity
 			asset.updated_at = datetime.utcnow()
-		self._audit(tenant_id, "asset.classified", asset.asset_id, "classifier", decision["decision"], decision["matched_rules"], context)
+		self._audit(tenant_id, "asset.classified", asset.asset_id, "classifier", decision, context)
 		return record
 
 	def review_classification(self, *, classification_id: str, steward: str, review_notes: str) -> MetaClassificationRecord:
@@ -487,8 +531,11 @@ class MetaService:
 		record.decision = "reviewed" if decision["decision"] == "allow" else decision["decision"]
 		record.status = "reviewed" if decision["decision"] == "allow" else "review_denied"
 		record.matched_rules = decision["matched_rules"]
+		record.policy_decision = decision["decision"]
+		record.review_reasons = self._reasons(decision)
+		record.review_evidence = self._review_evidence(decision, record.steward_review_recorded)
 		record.reviewed_at = datetime.utcnow()
-		self._audit(record.tenant_id, "classification.reviewed", record.classification_id, record.steward, record.decision, record.matched_rules, context)
+		self._audit(record.tenant_id, "classification.reviewed", record.classification_id, record.steward, decision, context)
 		return record
 
 	def capture_lineage(
@@ -522,12 +569,15 @@ class MetaService:
 			decision=decision["decision"],
 			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 		)
 		self.lineage[record.lineage_id] = record
 		if decision["decision"] == "allow":
 			self._require_asset(tenant_id, source_asset_id).lineage_available = True
 			self._require_asset(tenant_id, target_asset_id).lineage_available = True
-		self._audit(tenant_id, "lineage.captured", record.lineage_id, "system", decision["decision"], decision["matched_rules"], context)
+		self._audit(tenant_id, "lineage.captured", record.lineage_id, "system", decision, context)
 		return record
 
 	def assess_quality(
@@ -552,11 +602,14 @@ class MetaService:
 			assessor=self._require_text(assessor, "assessor"),
 			decision="allow",
 			status="accepted",
+			policy_decision="allow",
+			review_reasons=[],
+			review_evidence=self._review_evidence(_allow_result()),
 		)
 		self.quality_assessments[record.quality_id] = record
 		asset.quality_score = score
 		asset.updated_at = datetime.utcnow()
-		self._audit(tenant_id, "quality.assessed", asset.asset_id, record.assessor, "allow", [], asdict(record))
+		self._audit(tenant_id, "quality.assessed", asset.asset_id, record.assessor, _allow_result(), asdict(record))
 		return record
 
 	def request_certification(self, *, tenant_id: str, asset_id: str, requester: str, review_notes: str | None = None) -> MetaCertificationRecord:
@@ -580,13 +633,16 @@ class MetaService:
 			decision=decision["decision"],
 			status="certified" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision, bool(review_notes)),
 			review_notes=review_notes,
 		)
 		self.certifications[record.certification_id] = record
 		if decision["decision"] == "allow":
 			asset.status = "certified"
 			asset.updated_at = datetime.utcnow()
-		self._audit(tenant_id, "asset.certification_requested", asset.asset_id, record.requester, decision["decision"], decision["matched_rules"], context)
+		self._audit(tenant_id, "asset.certification_requested", asset.asset_id, record.requester, decision, context)
 		return record
 
 	def publish_asset(self, *, tenant_id: str, asset_id: str) -> MetaAssetRecord:
@@ -605,10 +661,13 @@ class MetaService:
 		decision = evaluate_capability_rules(context)
 		asset.decision = decision["decision"]
 		asset.matched_rules = decision["matched_rules"]
+		asset.policy_decision = decision["decision"]
+		asset.review_reasons = self._reasons(decision)
+		asset.review_evidence = self._review_evidence(decision)
 		if decision["decision"] == "allow":
 			asset.status = "published"
 		asset.updated_at = datetime.utcnow()
-		self._audit(tenant_id, "asset.publish_evaluated", asset.asset_id, asset.owner or "system", decision["decision"], decision["matched_rules"], context)
+		self._audit(tenant_id, "asset.publish_evaluated", asset.asset_id, asset.owner or "system", decision, context)
 		return asset
 
 	def register_glossary_term(
@@ -637,9 +696,12 @@ class MetaService:
 			decision=decision["decision"],
 			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 		)
 		self.glossary_terms[record.term_id] = record
-		self._audit(tenant_id, "glossary.term.registered", record.term_id, record.owner or "system", decision["decision"], decision["matched_rules"], context)
+		self._audit(tenant_id, "glossary.term.registered", record.term_id, record.owner or "system", decision, context)
 		return record
 
 	def retire_asset(self, *, tenant_id: str, asset_id: str, impact_analysis_present: bool, actor: str) -> MetaAssetRecord:
@@ -653,10 +715,13 @@ class MetaService:
 		decision = evaluate_capability_rules(context)
 		asset.decision = decision["decision"]
 		asset.matched_rules = decision["matched_rules"]
+		asset.policy_decision = decision["decision"]
+		asset.review_reasons = self._reasons(decision)
+		asset.review_evidence = self._review_evidence(decision)
 		if decision["decision"] == "allow":
 			asset.status = "retired"
 			asset.updated_at = datetime.utcnow()
-		self._audit(tenant_id, "asset.retired", asset.asset_id, self._require_text(actor, "actor"), decision["decision"], decision["matched_rules"], context)
+		self._audit(tenant_id, "asset.retired", asset.asset_id, self._require_text(actor, "actor"), decision, context)
 		return asset
 
 	def register_catalog_agent(
@@ -698,8 +763,7 @@ class MetaService:
 				"agent.registration_denied",
 				agent_id,
 				str(owner or "system").strip() or "system",
-				decision["decision"],
-				decision["matched_rules"],
+				decision,
 				context,
 			)
 			raise PermissionError(self._first_reason(decision))
@@ -717,9 +781,15 @@ class MetaService:
 			purpose=self._require_text(purpose, "purpose"),
 			contribution_disclosed=bool(contribution_disclosed),
 			human_approval_required=bool(human_approval_required),
+			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
+			decision=decision["decision"],
+			matched_rules=list(decision["matched_rules"]),
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision, bool(human_approval_required)),
 		)
 		self.catalog_agents[record_key] = record
-		self._audit(tenant_id, "agent.registered", agent_id, record.owner, "allow", decision["matched_rules"], asdict(record))
+		self._audit(tenant_id, "agent.registered", agent_id, record.owner, decision, asdict(record))
 		return record
 
 	def validate_meta_lifecycle_batch(
@@ -750,10 +820,13 @@ class MetaService:
 			accepted=accepted,
 			decision=decision["decision"],
 			matched_rules=list(decision["matched_rules"]),
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 			status="accepted" if accepted else "denied",
 		)
 		self.lifecycle_batches[record.batch_id] = record
-		self._audit(tenant_id, f"lifecycle_batch.{record.status}", stream_value, "meta", decision["decision"], decision["matched_rules"], asdict(record))
+		self._audit(tenant_id, f"lifecycle_batch.{record.status}", stream_value, "meta", decision, asdict(record))
 		if not accepted:
 			raise PermissionError(self._first_reason(decision))
 		return record
@@ -799,22 +872,74 @@ class MetaService:
 			"certified_asset_count": sum(1 for row in self.list_records(tenant_id, "assets") if row["status"] == "certified"),
 			"glossary_term_count": len(self.list_records(tenant_id, "glossary_terms")),
 			"catalog_agent_count": len(self.list_records(tenant_id, "catalog_agents")),
+			"pending_catalog_agent_review_count": sum(1 for row in self.list_records(tenant_id, "catalog_agents") if row["status"] == "pending_review"),
 			"lifecycle_batch_count": len(self.list_records(tenant_id, "lifecycle_batches")),
 			"denied_lifecycle_batch_count": sum(1 for row in self.list_records(tenant_id, "lifecycle_batches") if not row["accepted"]),
+			"pending_review_count": len(self.list_pending_reviews(tenant_id)),
 			"audit_event_count": len(self.list_records(tenant_id, "audit_events")),
 		}
 
-	def _audit(self, tenant_id: str, event_type: str, subject: str, actor: str, decision: str, matched_rules: list[str], details: dict[str, Any]) -> None:
+	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		"""Return all META records awaiting steward or human review."""
+		tenant_id = tenant_id or self.tenant_id
+		items = (
+			self.list_records(tenant_id, "assets")
+			+ self.list_records(tenant_id, "discovery_jobs")
+			+ self.list_records(tenant_id, "classifications")
+			+ self.list_records(tenant_id, "lineage")
+			+ self.list_records(tenant_id, "quality_assessments")
+			+ self.list_records(tenant_id, "certifications")
+			+ self.list_records(tenant_id, "glossary_terms")
+			+ self.list_records(tenant_id, "catalog_agents")
+			+ self.list_records(tenant_id, "lifecycle_batches")
+		)
+		return [
+			item
+			for item in items
+			if item.get("status") in {"pending", "pending_review", "review_required"}
+		]
+
+	def _audit(
+		self,
+		tenant_id: str,
+		event_type: str,
+		subject: str,
+		actor: str,
+		policy_result: dict[str, Any],
+		details: dict[str, Any],
+	) -> None:
+		policy_result = policy_result or _allow_result()
 		self.audit_events.append(MetaAuditEventRecord(
 			event_id=uuid7str(),
 			tenant_id=tenant_id,
 			event_type=event_type,
 			subject=subject,
 			actor=actor,
-			decision=decision,
-			matched_rules=list(matched_rules),
+			decision=policy_result["decision"],
+			matched_rules=list(policy_result["matched_rules"]),
+			policy_decision=policy_result["decision"],
+			review_reasons=self._reasons(policy_result),
+			review_evidence=self._review_evidence(policy_result),
 			details=details,
 		))
+
+	def _reasons(self, result: dict[str, Any]) -> list[str]:
+		return list(dict.fromkeys(
+			str(action["reason"])
+			for action in result.get("actions", [])
+			if action.get("reason")
+		))
+
+	def _review_evidence(self, result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+		return {
+			"required_actions": list(dict.fromkeys(
+				str(action.get("required_action"))
+				for action in result.get("actions", [])
+				if action.get("required_action")
+			)),
+			"reasons": self._reasons(result),
+			"review_recorded": bool(review_recorded),
+		}
 
 	def _supported_asset_types(self, tenant_id: str) -> set[str]:
 		return set(self.describe(tenant_id)["configuration"]["catalog"]["supported_asset_types"])
@@ -873,6 +998,10 @@ class MetaService:
 	@staticmethod
 	def _asset_key(tenant_id: str, asset_id: str) -> str:
 		return f"{tenant_id}:{asset_id}"
+
+
+def _allow_result() -> dict[str, Any]:
+	return {"decision": "allow", "matched_rules": [], "actions": []}
 
 
 class APGMetadataService:

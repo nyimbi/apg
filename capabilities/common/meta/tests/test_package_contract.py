@@ -29,10 +29,11 @@ def test_package_contract_shape_is_valid():
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "meta"
 	assert contract["display_name"] == "Metadata Management"
-	assert contract["provides"] == ["metadata_catalog_governance", "metadata_lifecycle", "catalog_agent_composition"]
+	assert contract["provides"] == ["metadata_catalog_governance", "metadata_lifecycle", "catalog_agent_composition", "review_evidence"]
 	assert contract["requires"] == ["mdm", "auth", "audl"]
 	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
 	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert "catalog_agents" in contract["review_evidence"]["pending_queues"]
 	assert len(contract["rule_engine"]["rules"]) >= 25
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"catalog",
@@ -68,5 +69,7 @@ def test_package_app_entrypoint_is_publishable():
 	assert model["capabilities"]["meta"]["approvals"]["certification"] == "MetaCertificationRecord"
 	assert model["capabilities"]["meta"]["approvals"]["catalog_agent"] == "MetaCatalogAgentRecord"
 	assert model["capabilities"]["meta"]["streaming"]["required_processor"] == "bytewax"
+	assert "catalog_agents" in model["capabilities"]["meta"]["review_evidence"]["pending_queues"]
 	assert "codex" in model["capabilities"]["meta"]["agents"]["catalog_agent_contract"]["supported_runtimes"]
+	assert model["contracts"]["meta"]["review_evidence"]["deny_behavior"].startswith("Denied META")
 	assert model["capabilities"]["meta"]["adapters"]["event_stream"] == "bytewax"

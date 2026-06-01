@@ -42,6 +42,9 @@ certification, stewardship, and publish gates when they are registered with
 runtime, role, scope, owner, purpose, and contribution disclosure metadata.
 Privileged catalog-agent roles must be human approved before they can influence
 classification, lineage, certification, or publication-sensitive decisions.
+Otherwise valid privileged catalog-agent registrations without approval must be
+preserved as `pending_review` evidence rather than discarded as transient
+exceptions.
 
 The contract starts with supported runtimes `codex`, `claude_code`,
 `opencode`, and `pi`. New runtimes must be added through the contract instead
@@ -114,6 +117,9 @@ of hidden inside service code.
   classification, lineage, certification, and publish-gate outcomes.
 - Persist catalog-agent records in the generated-app control plane for UI
   display and audit evidence.
+- Preserve otherwise valid privileged catalog agents without approval as
+  `pending_review` records with policy decision, matched rules, review reasons,
+  and review evidence.
 - Surface catalog-agent registration failures as matched guardrails.
 
 ### Bytewax Lifecycle Batches
@@ -122,6 +128,8 @@ of hidden inside service code.
 - Require lifecycle processors to declare the `bytewax` event stream.
 - Track batch status, mutation count, and matched guardrails for UI/runtime
   evidence.
+- Persist denied non-Bytewax lifecycle batches as `denied` records before
+  raising `PermissionError`.
 - Keep broker transports out of the core lifecycle contract; event brokers may
   exist behind adapters, but Bytewax is the required lifecycle processing
   engine for this packet.
@@ -132,6 +140,16 @@ of hidden inside service code.
   classification, quality, certification, glossary, impact analysis, search,
   audit, adapters, catalog agents, lifecycle batches, and settings.
 - Expose compact catalog-console theme tokens and component metadata.
+
+### Durable Review Evidence
+
+- Persist `policy_decision`, `matched_rules`, `review_reasons`, and
+  `review_evidence` on reviewable lifecycle records and audit events.
+- Expose pending-review queues for assets, discovery jobs, classifications,
+  lineage, quality assessments, certifications, glossary terms, catalog agents,
+  and lifecycle batches.
+- Expose review evidence through registration metadata, semantic model output,
+  API helpers, view models, settings, release evidence, and package tests.
 
 ## Guardrails
 
@@ -201,8 +219,11 @@ contract.
 - `capability_contract.py` exposes configuration, schema, rules, routes, and
   theme data.
 - `service.py` exposes `MetaService` lifecycle behavior and audit records.
-- `service.py` registers catalog agents and validates Bytewax lifecycle batches
-  using deterministic guardrails.
+- `service.py` registers catalog agents, preserves pending-review catalog-agent
+  evidence, and validates Bytewax lifecycle batches using deterministic
+  guardrails.
+- Denied non-Bytewax lifecycle batches persist evidence before
+  `PermissionError`.
 - `view_models.py` exposes generated-application view models.
 - `app.py` builds semantic model data from the live contract.
 - Focused tests prove guardrails, lifecycle behavior, view models,

@@ -43,7 +43,7 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"ui",
 		"theme"
 	]
-	assert contract["provides"] == ["metadata_catalog_governance", "metadata_lifecycle", "catalog_agent_composition"]
+	assert contract["provides"] == ["metadata_catalog_governance", "metadata_lifecycle", "catalog_agent_composition", "review_evidence"]
 	assert contract["requires"] == ["mdm", "auth", "audl"]
 	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
 	assert "classification_reviewer" in contract["agents"]["privileged_roles"]
@@ -73,6 +73,8 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert "catalog_agent_roster" in contract["theme"]["components"]
 	assert "bytewax_lifecycle_panel" in contract["theme"]["components"]
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert "catalog_agents" in contract["review_evidence"]["pending_queues"]
+	assert "policy_decision" in contract["review_evidence"]["policy_fields"]
 
 
 def test_rule_engine_enforces_metadata_governance_guardrails():
@@ -188,6 +190,8 @@ def test_meta_service_lifecycle_enforces_publication_and_classification_guardrai
 	blocked_publish_initial_rules = list(blocked_publish.matched_rules)
 	low_confidence_initial_status = low_confidence.status
 	low_confidence_initial_rules = list(low_confidence.matched_rules)
+	low_confidence_initial_policy = low_confidence.policy_decision
+	low_confidence_initial_reasons = list(low_confidence.review_reasons)
 	review = service.review_classification(
 		classification_id=low_confidence.classification_id,
 		steward="data-steward",
@@ -219,18 +223,16 @@ def test_meta_service_lifecycle_enforces_publication_and_classification_guardrai
 		tenant_id="tenant-catalog",
 		asset_id=asset.asset_id,
 	)
-	with pytest.raises(PermissionError, match="catalog_agent_human_approval_required"):
-		service.register_catalog_agent(
-			tenant_id="tenant-catalog",
-			agent_id="agent-denied",
-			name="Denied Classification Agent",
-			runtime="codex",
-			role="classification_reviewer",
-			scope="restricted classifications",
-			owner="metadata-office",
-			purpose="review sensitive classifications",
-		)
-	assert any(event.event_type == "agent.registration_denied" for event in service.audit_events)
+	review_agent = service.register_catalog_agent(
+		tenant_id="tenant-catalog",
+		agent_id="agent-review",
+		name="Review Classification Agent",
+		runtime="codex",
+		role="classification_reviewer",
+		scope="restricted classifications",
+		owner="metadata-office",
+		purpose="review sensitive classifications",
+	)
 	agent = service.register_catalog_agent(
 		tenant_id="tenant-catalog",
 		agent_id="agent-certify",
@@ -252,15 +254,23 @@ def test_meta_service_lifecycle_enforces_publication_and_classification_guardrai
 	assert low_confidence_initial_rules == ["low_classification_confidence_requires_review"]
 	assert blocked_publish_initial_status == "draft"
 	assert "publish_requires_quality_assessment" in blocked_publish_initial_rules
+	assert low_confidence_initial_policy == "require_review"
+	assert low_confidence_initial_reasons == ["classification_review_required"]
+	assert blocked_publish.policy_decision == "allow"
 	assert review.status == "reviewed"
 	assert quality.status == "accepted"
 	assert classification.status == "accepted"
 	assert published.status == "published"
+	assert review_agent.status == "pending_review"
+	assert review_agent.policy_decision == "require_review"
+	assert review_agent.review_reasons == ["catalog_agent_human_approval_required"]
 	assert agent.runtime == "claude_code"
 	assert agent.role == "certification_reviewer"
 	assert batch.accepted is True
 	assert batch.required_processor == "bytewax"
-	assert service.dashboard_summary("tenant-catalog")["catalog_agent_count"] == 1
+	assert service.dashboard_summary("tenant-catalog")["catalog_agent_count"] == 2
+	assert service.dashboard_summary("tenant-catalog")["pending_catalog_agent_review_count"] == 1
+	assert service.dashboard_summary("tenant-catalog")["pending_review_count"] == 1
 
 
 def test_meta_service_discovery_lineage_certification_and_retirement_guardrails():
@@ -322,6 +332,8 @@ def test_meta_service_discovery_lineage_certification_and_retirement_guardrails(
 
 	assert denied_discovery.status == "denied"
 	assert denied_discovery.matched_rules == ["discovery_requires_approved_connector"]
+	assert denied_discovery.policy_decision == "deny"
+	assert denied_discovery.review_reasons == ["connector_approval_required"]
 	with pytest.raises(ValueError, match="cannot record results"):
 		service.record_discovery_result(
 			job_id=denied_discovery.job_id,
@@ -329,8 +341,11 @@ def test_meta_service_discovery_lineage_certification_and_retirement_guardrails(
 		)
 	assert review_lineage.status == "pending_review"
 	assert review_lineage.matched_rules == ["lineage_depth_requires_review"]
+	assert review_lineage.policy_decision == "require_review"
+	assert review_lineage.review_reasons == ["lineage_depth_review_required"]
 	assert blocked_certification.status == "denied"
 	assert blocked_certification.matched_rules == ["certified_asset_requires_lineage"]
+	assert blocked_certification.policy_decision == "deny"
 	assert denied_retire.status != "retired"
 	assert denied_retire.matched_rules == ["retire_asset_requires_impact_analysis"]
 	with pytest.raises(PermissionError, match="unsupported_catalog_agent_runtime"):
@@ -350,6 +365,12 @@ def test_meta_service_discovery_lineage_certification_and_retirement_guardrails(
 			event_stream="legacy_broker",
 			mutation_count=1,
 		)
+	denied_batch = [
+		row for row in service.list_records("tenant-catalog", "lifecycle_batches")
+		if row["status"] == "denied"
+	][0]
+	assert denied_batch["policy_decision"] == "deny"
+	assert denied_batch["review_reasons"] == ["bytewax_meta_stream_required"]
 
 
 def test_meta_service_glossary_and_view_models_are_composable():
@@ -396,12 +417,15 @@ def test_meta_service_glossary_and_view_models_are_composable():
 
 	assert denied_term.status == "denied"
 	assert denied_term.matched_rules == ["glossary_term_requires_owner"]
+	assert denied_term.policy_decision == "deny"
 	assert approved_term.status == "active"
 	assert dashboard_model(service, "tenant-catalog")["summary"]["asset_count"] == 1
 	assert asset_catalog_model(service, "tenant-catalog")["columns"][0] == "asset_id"
 	assert classification_review_model(service, "tenant-catalog")["review_actions"] == ["accept", "correct", "defer"]
 	assert glossary_model(service, "tenant-catalog")["rows"][0]["term"] == "Customer"
 	assert catalog_agent_roster_model(service, "tenant-catalog")["rows"][0]["role"] == "glossary_reviewer"
+	assert catalog_agent_roster_model(service, "tenant-catalog")["pending_reviews"] == []
 	assert lifecycle_batch_model(service, "tenant-catalog")["streaming"]["required_processor"] == "bytewax"
 	assert adapter_health_model("tenant-catalog")["event_stream"] == "bytewax"
+	assert settings_model("tenant-catalog")["review_evidence"]["pending_queues"]
 	assert settings_model("tenant-catalog")["configuration"]["tenant_id"] == "tenant-catalog"

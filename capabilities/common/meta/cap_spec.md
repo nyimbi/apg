@@ -23,6 +23,11 @@ registered per tenant with supported runtime, role, scope, owner, purpose,
 machine-contribution disclosure, and human-approval metadata. Bytewax is the
 required lifecycle processing engine for this packet.
 
+The packet now preserves durable review evidence across the generated-app
+control plane. Reviewable records expose `policy_decision`, `matched_rules`,
+`review_reasons`, and `review_evidence`, and generated UI models can compose
+pending-review queues without replaying rule evaluation.
+
 ## Lifecycle
 
 1. Register asset.
@@ -62,8 +67,11 @@ The capability denies or routes decisions when:
 - Stale assets need freshness review before certification.
 - Catalog-agent runtime or role is unsupported.
 - Catalog-agent scope, owner, purpose, or contribution disclosure is missing.
-- Privileged catalog-agent roles are registered without human approval.
+- Privileged catalog-agent roles are registered without human approval; otherwise
+  valid registrations are preserved as `pending_review` evidence.
 - Lifecycle batches are submitted through anything other than Bytewax.
+  Non-Bytewax submissions persist `denied` evidence before raising
+  `PermissionError`.
 
 ## UI And Theme
 

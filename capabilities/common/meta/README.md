@@ -35,6 +35,9 @@ Bytewax event streams behind the same contract.
   and future APG-compatible runtimes.
 - Catalog-agent guardrails for supported roles, declared scope, owner, purpose,
   machine-contribution disclosure, and human approval for privileged roles.
+- Durable review evidence for review-required assets, discovery jobs,
+  classifications, lineage edges, quality assessments, certifications, glossary
+  terms, privileged catalog agents, denied lifecycle batches, and audit events.
 - Bytewax lifecycle batch validation for asset, discovery, classification,
   lineage, quality, certification, glossary, and catalog-agent streams.
 - Generated-application UI routes, view models, theme tokens, and adapter
@@ -58,6 +61,30 @@ Bytewax event streams behind the same contract.
 10. Manage glossary terms with accountable owners.
 11. Retire assets only after impact-analysis evidence exists.
 12. Preserve audit events for every lifecycle decision.
+
+## Durable Review Evidence
+
+META preserves policy evidence directly on lifecycle records so generated
+applications can build stewardship queues without replaying transient
+exceptions. Reviewable records include assets, discovery jobs, classifications,
+lineage edges, quality assessments, certifications, glossary terms, catalog
+agents, lifecycle batches, and audit events.
+
+Each governed record exposes:
+
+- `policy_decision`
+- `matched_rules`
+- `review_reasons`
+- `review_evidence`
+
+Privileged catalog agents without human approval are registered as
+`pending_review` records when their runtime, role, owner, scope, purpose, and
+contribution disclosure are otherwise valid. Invalid runtimes, unsupported
+roles, missing owner/scope/purpose, and missing contribution disclosure remain
+blocking denials.
+
+Denied non-Bytewax lifecycle batches are persisted as `denied` records before
+`PermissionError` is raised, giving operators durable evidence for remediation.
 
 ## Quick Use
 
@@ -172,7 +199,8 @@ META evaluates deterministic rules before lifecycle decisions. Key guardrails:
 - Catalog-agent runtime and role must be supported.
 - Catalog-agent scope, owner, purpose, and machine-contribution disclosure are
   required.
-- Privileged catalog-agent roles require human approval.
+- Privileged catalog-agent roles require human approval evidence or pending
+  review.
 - Lifecycle batch processing must use Bytewax.
 
 ## Adapter Boundaries

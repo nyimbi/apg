@@ -16,6 +16,69 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-06-01 09:02 EAT
+
+META durable review-evidence packet:
+
+- Extended review-required assets, discovery jobs, classifications, lineage
+  edges, quality assessments, certifications, glossary terms, privileged
+  catalog agents, lifecycle batch evidence, and audit events with durable
+  policy evidence: policy decision, matched rules, review reasons, and review
+  evidence.
+- Added contract-level `review_evidence` metadata and exposed it through
+  registration metadata, API helpers, view models, semantic model, release
+  evidence, package tests, and app self-test.
+- Preserved privileged catalog agents without human approval as
+  `pending_review` records instead of discarding registration evidence.
+- Preserved denied non-Bytewax META lifecycle batch validations as `denied`
+  evidence before raising `PermissionError`.
+- Added pending-review queue composition for assets, discovery jobs,
+  classifications, lineage, quality assessments, certifications, glossary
+  terms, catalog agents, and lifecycle batches.
+- Kept META catalog agents provider-neutral for Codex, Claude Code, OpenCode,
+  Pi, and future metadata-governance runtimes while retaining human approval
+  controls for privileged roles and Bytewax-first lifecycle processing.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for META package init, models,
+  service, API helpers, contract, app, view models, and focused tests passed.
+- `./.venv/bin/pytest -q capabilities/common/meta/test_capability_contract.py
+  capabilities/common/meta/tests/test_package_contract.py` passed with 9 tests
+  and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.meta import app; ..."`
+  passed package self-test.
+- `./.venv/bin/python -m json.tool
+  capabilities/common/meta/semantic_model.json` passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/meta --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/meta --strict --json` passed with no warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/meta --json`
+  passed with no warnings and side-effect-free publish planning.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/common/meta --json` passed with complete lifecycle evidence,
+  release evidence, review evidence, and 27 rules.
+- META stale-marker scan returned no TODO/FIXME/stub/placeholder, Kafka,
+  materialized-baseline, contract-only, or not-implemented markers across the
+  edited META packet.
+- Service smoke executed low-confidence classification review evidence,
+  approved publish evidence, privileged catalog-agent review evidence, accepted
+  Bytewax batch evidence, and denied non-Bytewax batch persistence, printing
+  `require_review allow pending_review require_review accepted denied
+  bytewax_meta_stream_required 2`.
+- `git diff --check -- capabilities/common/meta docs/progress_log.md` passed.
+
+Known gaps:
+
+- Full repository tests, rendered META UI, production database persistence and
+  migrations, live discovery, classification, lineage, search, metadata-store,
+  audit, auth, MDM, ETL, connector, monitoring, and notification adapters,
+  durable Bytewax workers and dataflows, benchmark/load checks, runtime SLO
+  validation, and live AI runtime adapters still need later validation outside
+  this battery-conscious slice.
+
 ### 2026-06-01 08:49 EAT
 
 MDM durable review-evidence packet:

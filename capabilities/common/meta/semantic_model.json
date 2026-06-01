@@ -304,13 +304,49 @@
       "provides": [
         "metadata_catalog_governance",
         "metadata_lifecycle",
-        "catalog_agent_composition"
+        "catalog_agent_composition",
+        "review_evidence"
       ],
       "requires": [
         "mdm",
         "auth",
         "audl"
       ],
+      "review_evidence": {
+        "deny_behavior": "Denied META lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "pending",
+          "pending_review",
+          "review_required",
+          "review_denied",
+          "denied",
+          "accepted",
+          "active",
+          "published",
+          "certified",
+          "retired",
+          "reviewed",
+          "scheduled",
+          "completed"
+        ],
+        "pending_queues": [
+          "assets",
+          "discovery_jobs",
+          "classifications",
+          "lineage",
+          "quality_assessments",
+          "certifications",
+          "glossary_terms",
+          "catalog_agents",
+          "lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "review_evidence"
+        ]
+      },
       "rule_engine": {
         "rules": [
           {
@@ -644,9 +680,9 @@
               "operation": "register_catalog_agent",
               "privileged_agent_role": true
             },
-            "description": "Privileged metadata catalog-agent roles require human approval.",
+            "description": "Privileged metadata catalog-agent roles require human approval evidence or review.",
             "effect": {
-              "decision": "deny",
+              "decision": "require_review",
               "reason": "catalog_agent_human_approval_required",
               "required_action": "require_human_approval_for_agent"
             },
@@ -1000,9 +1036,9 @@
             "operation": "register_catalog_agent",
             "privileged_agent_role": true
           },
-          "description": "Privileged metadata catalog-agent roles require human approval.",
+          "description": "Privileged metadata catalog-agent roles require human approval evidence or review.",
           "effect": {
-            "decision": "deny",
+            "decision": "require_review",
             "reason": "catalog_agent_human_approval_required",
             "required_action": "require_human_approval_for_agent"
           },
@@ -1564,13 +1600,49 @@
       "provides": [
         "metadata_catalog_governance",
         "metadata_lifecycle",
-        "catalog_agent_composition"
+        "catalog_agent_composition",
+        "review_evidence"
       ],
       "requires": [
         "mdm",
         "auth",
         "audl"
       ],
+      "review_evidence": {
+        "deny_behavior": "Denied META lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "pending",
+          "pending_review",
+          "review_required",
+          "review_denied",
+          "denied",
+          "accepted",
+          "active",
+          "published",
+          "certified",
+          "retired",
+          "reviewed",
+          "scheduled",
+          "completed"
+        ],
+        "pending_queues": [
+          "assets",
+          "discovery_jobs",
+          "classifications",
+          "lineage",
+          "quality_assessments",
+          "certifications",
+          "glossary_terms",
+          "catalog_agents",
+          "lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "review_evidence"
+        ]
+      },
       "streaming": {
         "broker_core_dependency_allowed": false,
         "engine": "bytewax",
@@ -1688,9 +1760,9 @@
         "operation": "register_catalog_agent",
         "privileged_agent_role": true
       },
-      "description": "Privileged metadata catalog-agent roles require human approval.",
+      "description": "Privileged metadata catalog-agent roles require human approval evidence or review.",
       "effect": {
-        "decision": "deny",
+        "decision": "require_review",
         "reason": "catalog_agent_human_approval_required",
         "required_action": "require_human_approval_for_agent"
       },
