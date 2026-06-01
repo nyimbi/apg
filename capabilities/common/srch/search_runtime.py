@@ -63,6 +63,9 @@ class SearchIndexRecord:
 	source_lineage_ref: str | None = None
 	embedding_index_ready: bool = False
 	document_count: int = 0
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
 	created_at: str = field(default_factory=utc_now)
 	updated_at: str = field(default_factory=utc_now)
 
@@ -79,8 +82,12 @@ class SearchDocumentRecord:
 	title: str
 	body: str
 	classification: str
+	status: str = "indexed"
 	facets: dict[str, str] = field(default_factory=dict)
 	metadata: dict[str, Any] = field(default_factory=dict)
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
 	indexed_at: str = field(default_factory=utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -99,8 +106,10 @@ class QueryRecord:
 	review_recorded: bool
 	status: str
 	result_count: int
+	decision: str = "allow"
 	required_actions: list[str] = field(default_factory=list)
 	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
 	created_at: str = field(default_factory=utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -157,6 +166,7 @@ class SearchAuditEventRecord:
 	message: str
 	actor: str
 	severity: str = "low"
+	evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now)
 
 	def to_dict(self) -> dict[str, Any]:

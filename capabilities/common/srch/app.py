@@ -70,6 +70,12 @@ def semantic_model() -> dict[str, Any]:
 					"restricted_index": "SearchIndexRecord",
 					"search_agent": "SearchAgentRecord",
 				},
+				"review_queues": {
+					"indices": "SearchIndexRecord",
+					"documents": "SearchDocumentRecord",
+					"queries": "QueryRecord",
+					"search_agents": "SearchAgentRecord",
+				},
 				"search_lifecycle": {
 					"index": "SearchIndexRecord",
 					"document": "SearchDocumentRecord",

@@ -16,14 +16,27 @@ def dashboard_model(
 ) -> dict[str, object]:
 	service = service or SrchService()
 	contract = service.describe(tenant_id)
+	indices = service.list_indices(tenant_id)
+	documents = service.list_documents(tenant_id)
+	queries = service.list_queries(tenant_id)
+	agents = service.list_search_agents(tenant_id)
 	return {
 		"capability": contract["capability"],
 		"display_name": contract["display_name"],
 		"tenant_id": tenant_id,
 		"routes": capability_routes(tenant_id),
 		"summary": service.dashboard_summary(tenant_id),
-		"search_agents": service.list_search_agents(tenant_id),
+		"indices": indices,
+		"documents": documents,
+		"queries": queries,
+		"search_agents": agents,
 		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
+		"pending_reviews": {
+			"indices": _pending_review(indices),
+			"documents": _pending_review(documents),
+			"queries": [item for item in queries if item["status"] == "review_required"],
+			"agents": _pending_review(agents),
+		},
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
 	}
@@ -48,10 +61,12 @@ def index_manager_model(
 	tenant_id: str = "default",
 ) -> dict[str, object]:
 	service = service or SrchService()
+	indices = service.list_indices(tenant_id)
 	return {
 		"route": "/srch/indices",
 		"tenant_id": tenant_id,
-		"indices": service.list_indices(tenant_id),
+		"indices": indices,
+		"pending_review": _pending_review(indices),
 		"classifications": ["public", "internal", "confidential", "restricted"],
 		"states": ["creating", "ready", "embedding_pending", "embedding_ready", "degraded", "retired"],
 	}
@@ -62,10 +77,12 @@ def document_indexer_model(
 	tenant_id: str = "default",
 ) -> dict[str, object]:
 	service = service or SrchService()
+	documents = service.list_documents(tenant_id)
 	return {
 		"route": "/srch/documents",
 		"tenant_id": tenant_id,
-		"documents": service.list_documents(tenant_id),
+		"documents": documents,
+		"pending_review": _pending_review(documents),
 		"lineage_required": True,
 	}
 
@@ -106,10 +123,12 @@ def analytics_model(
 	tenant_id: str = "default",
 ) -> dict[str, object]:
 	service = service or SrchService()
+	queries = service.list_queries(tenant_id)
 	return {
 		"route": "/srch/analytics",
 		"tenant_id": tenant_id,
-		"queries": service.list_queries(tenant_id),
+		"queries": queries,
+		"pending_review": [item for item in queries if item["status"] == "review_required"],
 		"summary": service.dashboard_summary(tenant_id),
 		"facets": service.facets(tenant_id),
 	}
@@ -235,3 +254,7 @@ def settings_model(tenant_id: str = "default") -> dict[str, object]:
 		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 	}
+
+
+def _pending_review(records: list[dict[str, object]]) -> list[dict[str, object]]:
+	return [item for item in records if item.get("status") == "pending_review"]

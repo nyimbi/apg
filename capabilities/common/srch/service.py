@@ -73,7 +73,11 @@ class SrchService:
 			"review_recorded": bool(review_recorded),
 		}
 		result = self.evaluate(context)
-		self._raise_if_blocked(result)
+		self._raise_if_denied(result)
+		if result["decision"] == "require_review":
+			status = "pending_review"
+		else:
+			status = "embedding_ready" if embedding_index_ready else "ready"
 		record = SearchIndexRecord(
 			id=stable_id("srch_index", tenant_id, name),
 			tenant_id=tenant_id,
@@ -83,10 +87,21 @@ class SrchService:
 			classification=normalize_classification(stored_classification),
 			source_lineage_ref=source_lineage_ref,
 			embedding_index_ready=bool(embedding_index_ready),
-			status="embedding_ready" if embedding_index_ready else "ready",
+			status=status,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=list(_review_reasons(result)),
 		)
 		self.indices[record.id] = record
-		self._record_event(tenant_id, "index_created", record.id, f"Search index created: {name}", owner)
+		self._record_event(
+			tenant_id,
+			"index_created",
+			record.id,
+			f"Search index created: {name}",
+			owner,
+			severity="medium" if status == "pending_review" else "low",
+			evidence=_rule_evidence(result),
+		)
 		return record.to_dict()
 
 	def mark_embedding_index_ready(
@@ -138,8 +153,9 @@ class SrchService:
 			"facet_keys_allowed": facet_keys <= allowed_facets,
 			"review_recorded": bool(review_recorded),
 		})
-		self._raise_if_blocked(result)
+		self._raise_if_denied(result)
 		assert index is not None
+		status = "pending_review" if result["decision"] == "require_review" else "indexed"
 		record = SearchDocumentRecord(
 			id=stable_id("srch_doc", tenant_id, index.id, document_id),
 			tenant_id=tenant_id,
@@ -148,13 +164,25 @@ class SrchService:
 			title=title,
 			body=body,
 			classification=normalize_classification(classification or index.classification),
+			status=status,
 			facets={str(key): str(value) for key, value in dict(facets or {}).items()},
 			metadata=dict(metadata or {}),
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=list(_review_reasons(result)),
 		)
 		self.documents[record.id] = record
 		index.document_count = len([item for item in self.documents.values() if item.index_id == index.id])
 		index.updated_at = utc_now()
-		self._record_event(tenant_id, "document_indexed", record.id, f"Document indexed: {title}", index.owner)
+		self._record_event(
+			tenant_id,
+			"document_indexed",
+			record.id,
+			f"Document indexed: {title}",
+			index.owner,
+			severity="medium" if status == "pending_review" else "low",
+			evidence=_rule_evidence(result),
+		)
 		return record.to_dict()
 
 	def bulk_index_documents(
@@ -217,7 +245,7 @@ class SrchService:
 			"result_window": int(result_window),
 			"review_recorded": bool(review_recorded),
 		})
-		self._raise_if_blocked(preflight)
+		self._raise_if_denied(preflight)
 		indices = [self._get_index(tenant_id, index_id) for index_id in index_ids]
 		if query_type_value in config["query"]["allowed_query_types"]:
 			normalized_query_type = normalize_query_type(query_type)
@@ -237,11 +265,12 @@ class SrchService:
 			"review_recorded": bool(review_recorded),
 		}
 		result = self.evaluate(context)
-		if result["decision"] == "deny":
-			self._record_query(tenant_id, query_text, normalized_query_type, indices, result_window, rbac_filter_applied, review_recorded, "denied", 0, result)
-			self._raise_policy(result)
+		combined = _combine_rule_results(preflight, result)
+		if combined["decision"] == "deny":
+			self._record_query(tenant_id, query_text, normalized_query_type, indices, result_window, rbac_filter_applied, review_recorded, "denied", 0, combined)
+			self._raise_policy(combined)
 		matches = self._search_documents(query_text, [index.id for index in indices], result_window, rbac_filter_applied)
-		status = "review_required" if result["decision"] == "require_review" else "completed"
+		status = "review_required" if combined["decision"] == "require_review" else "completed"
 		record = self._record_query(
 			tenant_id,
 			query_text,
@@ -252,7 +281,7 @@ class SrchService:
 			review_recorded,
 			status,
 			len(matches),
-			result,
+			combined,
 		)
 		return {
 			"query": record,
@@ -422,6 +451,9 @@ class SrchService:
 			"restricted_index_count": sum(1 for item in indices if item["classification"] == "restricted"),
 			"embedding_ready_count": sum(1 for item in indices if item["embedding_index_ready"]),
 			"query_count": len(queries),
+			"pending_index_review_count": sum(1 for item in indices if item["status"] == "pending_review"),
+			"pending_document_review_count": sum(1 for item in documents if item["status"] == "pending_review"),
+			"pending_query_review_count": sum(1 for item in queries if item["status"] == "review_required"),
 			"review_required_query_count": sum(1 for item in queries if item["status"] == "review_required"),
 			"denied_query_count": sum(1 for item in queries if item["status"] == "denied"),
 			"search_agent_count": len(self.list_search_agents(tenant_id)),
@@ -508,11 +540,21 @@ class SrchService:
 			review_recorded=bool(review_recorded),
 			status=status,
 			result_count=result_count,
+			decision=rule_result["decision"],
 			required_actions=search_required_actions(rule_result),
 			matched_rules=list(rule_result["matched_rules"]),
+			review_reasons=list(_review_reasons(rule_result)),
 		)
 		self.queries[record.id] = record
-		self._record_event(tenant_id, "query_recorded", record.id, f"Search query {status}: {query_text}", "query-api")
+		self._record_event(
+			tenant_id,
+			"query_recorded",
+			record.id,
+			f"Search query {status}: {query_text}",
+			"query-api",
+			severity="medium" if status in {"review_required", "denied"} else "low",
+			evidence=_rule_evidence(rule_result),
+		)
 		return record.to_dict()
 
 	def _record_event(
@@ -523,6 +565,7 @@ class SrchService:
 		message: str,
 		actor: str,
 		severity: str = "low",
+		evidence: dict[str, Any] | None = None,
 	) -> dict[str, Any]:
 		record = SearchAuditEventRecord(
 			id=stable_id("srch_event", tenant_id, event_type, subject_id, len(self.audit_events)),
@@ -532,6 +575,7 @@ class SrchService:
 			message=message,
 			actor=actor,
 			severity=severity,
+			evidence=dict(evidence or {}),
 		)
 		self.audit_events[record.id] = record
 		return record.to_dict()
@@ -548,3 +592,40 @@ class SrchService:
 
 def _normalize_token(value: str) -> str:
 	return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def _review_reasons(result: dict[str, Any]) -> tuple[str, ...]:
+	return tuple(
+		action.get("reason", "search_review_required")
+		for action in result.get("actions", [])
+		if action.get("decision") == "require_review"
+	)
+
+
+def _rule_evidence(result: dict[str, Any]) -> dict[str, Any]:
+	return {
+		"decision": result["decision"],
+		"matched_rules": list(result["matched_rules"]),
+		"reasons": list(_review_reasons(result)),
+	}
+
+
+def _combine_rule_results(*results: dict[str, Any]) -> dict[str, Any]:
+	decision = "allow"
+	matched_rules: list[str] = []
+	actions: list[dict[str, Any]] = []
+	context: dict[str, Any] = {}
+	for result in results:
+		matched_rules.extend(result.get("matched_rules", []))
+		actions.extend(result.get("actions", []))
+		context.update(result.get("context", {}))
+		if result.get("decision") == "deny":
+			decision = "deny"
+		elif result.get("decision") == "require_review" and decision != "deny":
+			decision = "require_review"
+	return {
+		"decision": decision,
+		"matched_rules": matched_rules,
+		"actions": actions,
+		"context": context,
+	}

@@ -61,6 +61,7 @@ def test_app_entrypoint_is_publishable():
 	assert model["composition"]["capability_dependencies"]["srch"] == ["etlp", "meta", "nlpc", "aicr", "conf"]
 	assert model["composition"]["agent_teams"]["srch_retrieval_governance"]["stream"] == "srch.lifecycle"
 	assert model["capabilities"]["srch"]["search_lifecycle"]["lifecycle_batch"] == "SrchLifecycleBatchRecord"
+	assert model["capabilities"]["srch"]["review_queues"]["queries"] == "QueryRecord"
 	assert "audit" in model["capabilities"]["srch"]["screens"]
 	assert committed_model == model
 	for generated_doc in ("README.md", "SPECIFICATION.md", "PLAN.md"):

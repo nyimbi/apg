@@ -16,6 +16,9 @@
 - Harden index, document, bulk, query, facet, audit, and APG record
   compatibility guardrails where the expanded contract needs executable
   evidence.
+- Persist review-required index, document, and query outcomes as
+  pending-review records with matched rules and review reasons while preserving
+  hard denial behavior for invalid state.
 - Implement search-agent registration, lifecycle-batch validation, tenant
   isolation, summary counts, and audit events.
 - Keep deterministic helpers in `search_runtime.py` so generated applications
@@ -26,6 +29,9 @@
 - Extend route-specific view models for dashboard, search, indices, documents,
   bulk indexing, facets, analytics, ranking, access review, governance, agents,
   lifecycle batches, audit, and settings.
+- Surface pending-review queues in dashboard, index, document, analytics, and
+  governance models so generated screens can compose search-governance
+  workflows without re-evaluating stored queries.
 - Ensure view models import only the contract and dependency-light runtime.
 
 ## Phase 4 - Package Evidence
@@ -38,8 +44,9 @@
 
 ## Phase 5 - Review and Verification
 
-- Expand focused tests for contract shape, guardrails, runtime lifecycle, UI
-  models, committed package evidence, and APG record compatibility.
+- Expand focused tests for contract shape, deny guardrails, pending-review
+  lifecycle evidence, runtime lifecycle, UI models, committed package evidence,
+  and APG record compatibility.
 - Run only SRCH py-compile, focused pytest, package self-test, implementation
   audit, publish plan, stale-marker scan, and whitespace check.
 - Record verification in `docs/progress_log.md`.

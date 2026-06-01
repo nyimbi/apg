@@ -19,6 +19,8 @@ This packet establishes the executable baseline for SRCH:
 - Provider-neutral AI search agents as executable state with runtime, role,
   scope, owner, purpose, disclosure, human-review status, and audit evidence.
 - Bytewax-only lifecycle batch validation for search mutations.
+- Durable review-required index, document, and query outcomes as
+  pending-review records with matched rules and review reasons.
 - Package evidence that can be published and self-tested from the current
   executable contract.
 - Focused tests for the contract, lifecycle, guardrails, view models, and
@@ -45,14 +47,16 @@ This packet establishes the executable baseline for SRCH:
   lineage, embedding readiness, and status.
 - Deny missing tenant, name, owner, content type, or classification.
 - Deny restricted indices without lineage.
-- Require review for unknown content types and classifications.
+- Persist unknown content types and classifications as pending-review indices
+  with deterministic matched-rule and reason evidence.
 
 ### Document Lifecycle
 
 - Index documents with tenant, index, document id, title, body, classification,
   facets, metadata, and source lineage.
 - Deny missing index, id, title, body, classification, or lineage.
-- Require review for facet keys outside the configured allowlist.
+- Persist facet keys outside the configured allowlist as pending-review
+  documents with deterministic matched-rule and reason evidence.
 
 ### Bulk Index Lifecycle
 
@@ -70,9 +74,10 @@ This packet establishes the executable baseline for SRCH:
 - Deny restricted-content queries without RBAC filtering.
 - Deny semantic and hybrid queries until all selected indices have embedding
   indexes ready.
-- Require review for large result windows and unknown query types.
-- Record query status, matched rules, required actions, result count, and audit
-  events.
+- Persist large result windows and unknown query types as review-required query
+  records.
+- Record query status, decision, matched rules, review reasons, required
+  actions, result count, and audit events.
 
 ### AI Agent Lifecycle
 
@@ -105,6 +110,8 @@ This packet establishes the executable baseline for SRCH:
   facets, analytics, ranking, access review, governance, agents, lifecycle
   batches, audit, and settings.
 - Provide route-specific view models.
+- Expose pending-review queues for index, document, query, and search-agent
+  governance.
 - Publish discovery-console theme tokens and component hints.
 
 ### Adapters
@@ -134,8 +141,9 @@ stable.
   adapter evidence, and theme component metadata.
 - `SrchService` executes index, document, bulk, query, facet, list, dashboard,
   search-agent, lifecycle-batch, audit, and APG record compatibility flows.
-- Guardrail tests prove denied or review-required cases fail before invalid
-  state is accepted.
+- Guardrail tests prove denied cases fail before invalid state is accepted, and
+  review-required cases persist as pending-review records with matched rules and
+  review reasons.
 - `app.self_test()` passes and fails if route, rule, Bytewax, or runtime
   evidence becomes stale.
 - Package JSON evidence can be regenerated from `app.semantic_model()` and

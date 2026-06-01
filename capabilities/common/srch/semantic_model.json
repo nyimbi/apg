@@ -318,6 +318,12 @@
         "aicr",
         "conf"
       ],
+      "review_queues": {
+        "documents": "SearchDocumentRecord",
+        "indices": "SearchIndexRecord",
+        "queries": "QueryRecord",
+        "search_agents": "SearchAgentRecord"
+      },
       "rule_engine": {
         "rules": [
           {

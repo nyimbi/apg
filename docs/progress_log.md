@@ -23979,3 +23979,76 @@ Known gaps:
   performance/load checks during this battery-conscious capability slice.
 - Existing SQLAlchemy and Pydantic deprecation warnings surfaced by focused
   tests remain outside this slice.
+
+### 2026-06-01 04:07 EAT
+
+SRCH review-evidence lifecycle slice:
+
+- Added durable pending-review evidence for search indices, indexed documents,
+  and query records. True denial guardrails still block invalid state, while
+  review-required outcomes now retain deterministic matched rules and review
+  reasons.
+- Extended SRCH index, document, query, and audit records with review evidence
+  fields where needed.
+- Updated index creation, document indexing, and query execution so unknown
+  content types, unknown classifications, unapproved facet keys, unknown query
+  types, and large result windows become auditable review queues.
+- Surfaced pending review queues through dashboard, index manager, document
+  indexer, analytics, and governance view models.
+- Updated SRCH `README.md`, `SPECIFICATION.md`, `PLAN.md`, `cap_spec.md`, and
+  semantic model evidence to document and expose review queues.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/srch/__init__.py capabilities/common/srch/capability_contract.py capabilities/common/srch/models.py capabilities/common/srch/search_runtime.py capabilities/common/srch/service.py capabilities/common/srch/api.py capabilities/common/srch/views.py capabilities/common/srch/app.py capabilities/common/srch/test_capability_contract.py capabilities/common/srch/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/srch/test_capability_contract.py capabilities/common/srch/tests/test_package_contract.py`
+  passed with 11 tests and 10 pre-existing SQLAlchemy/Pydantic deprecation
+  warnings from imported shared modules.
+- `./.venv/bin/python -c "from capabilities.common.srch import app; r=app.self_test(); print(r); assert r['passed']"`
+  passed.
+- `./.venv/bin/python -m json.tool capabilities/common/srch/semantic_model.json`
+  passed.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/srch --json`
+  passed with one domain-specific SRCH implementation, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/srch --json`
+  passed and showed 39 rules, 14 routes, Bytewax streaming, first-class
+  search-agent evidence, side-effect-free publish evidence, and no warnings.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/common/srch --json`
+  passed with one complete lifecycle record, 39 rules, 14 routes, and 0
+  warnings/errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 109 operable contracts, 109 complete packages, 0
+  package gaps, 0 warnings, and 0 errors.
+- Focused stale-marker scan over touched SRCH source, docs, tests, and package
+  evidence returned no primary-slice stale markers.
+- `git diff --check -- capabilities/common/srch docs/progress_log.md` passed.
+
+Code review:
+
+- Reviewed denial behavior: missing tenant context, index name/owner/content
+  type/classification, restricted index lineage, document index/id/title/body/
+  classification/lineage, empty bulk batches, missing bulk lineage, restricted
+  query RBAC filters, missing embedding indices, non-positive result windows,
+  and non-Bytewax lifecycle batches still fail before accepting state.
+- Reviewed review behavior: index, document, and query review-required
+  outcomes now keep decisions, matched rules, review reasons, and audit-event
+  evidence.
+- Reviewed query flow: preflight review rules and post-index access/embedding
+  rules are combined so unknown query types and large windows can both surface
+  in one query record.
+- Reviewed UI surfacing: route-specific view models expose stored pending
+  review queues without re-evaluating historical search operations.
+- Kept live OpenSearch/Elasticsearch/Solr/PostgreSQL FTS/vector providers,
+  ETLP/META/NLPC/AICR integrations, metrics/cache sinks, and Bytewax execution
+  behind adapters.
+
+Known gaps:
+
+- Did not run the full repository test suite, rendered UI checks, live search
+  providers, live vector stores, live ETLP/META/NLPC/AICR integrations,
+  durable metrics/cache sinks, live Bytewax topology, or performance/load
+  checks during this battery-conscious capability slice.
+- Existing SQLAlchemy and Pydantic deprecation warnings surfaced by focused
+  tests remain outside this slice.

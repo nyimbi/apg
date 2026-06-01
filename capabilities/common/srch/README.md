@@ -11,9 +11,11 @@ deterministic guardrails.
 
 - Search index creation with tenant, name, owner, content type,
   classification, source lineage, embedding readiness, status, and audit
-  evidence.
+  evidence, including pending-review state for unfamiliar content types and
+  classifications.
 - Document indexing with document id, title, body, classification, facets,
-  metadata, source lineage, and index document counts.
+  metadata, source lineage, pending-review facet evidence, and index document
+  counts.
 - Bulk indexing with document-count checks, lineage checks, and Bytewax adapter
   evidence.
 - Keyword, semantic, and hybrid query execution with RBAC filtering,
@@ -26,7 +28,7 @@ deterministic guardrails.
   facet, ranking, access-policy, and search-agent mutations.
 - UI view models for dashboard, search, indices, documents, bulk indexing,
   facets, analytics, ranking, access review, governance, agents, lifecycle
-  batches, audit, and settings.
+  batches, audit, settings, and pending-review queues.
 - Adapter configuration for ETLP, META, NLPC, AICR, AUTH, AUDL, CACH, MONI,
   and Bytewax event streaming.
 
@@ -94,6 +96,20 @@ batch = service.validate_srch_lifecycle_batch(
 )
 ```
 
+Review-required outcomes are persisted as data, not discarded exceptions:
+
+```python
+pending_index = service.create_index(
+	tenant_id="tenant-a",
+	name="custom-content",
+	owner="search-owner",
+	content_type="briefing",
+	classification="internal",
+)
+assert pending_index["status"] == "pending_review"
+assert pending_index["review_reasons"] == ["index_content_type_review_required"]
+```
+
 ## Guardrails
 
 SRCH blocks missing tenant context, indices without name/owner/content
@@ -105,6 +121,10 @@ non-positive result windows, cross-tenant search, non-Bytewax batch indexing,
 index retirement without review, and state changes without audit evidence. SRCH
 requires review for unknown content types, unknown classifications, large bulk
 batches, unknown query types, large result windows, and unapproved facet keys.
+Review-required index, document, query, and privileged search-agent outcomes
+are persisted as `pending_review` or `review_required` records with matched
+rules and review reasons so generated applications can surface governance
+queues without replaying indexing or retrieval work.
 AI search-agent guardrails also block unsupported runtimes, unsupported roles,
 missing scope, missing owner, missing purpose, missing machine-contribution
 disclosure, and route privileged roles through pending human review when

@@ -352,8 +352,11 @@ def test_search_guardrails_require_tenant_owner_lineage_rbac_embeddings_and_revi
 def test_search_review_evidence_unlocks_review_required_lifecycle_paths():
 	service = SrchService()
 
-	with pytest.raises(PermissionError, match="index_content_type_review_required"):
-		service.create_index("tenant-a", "custom-content", "owner", "briefing", "internal")
+	pending_type = service.create_index("tenant-a", "custom-content", "owner", "briefing", "internal")
+	assert pending_type["status"] == "pending_review"
+	assert pending_type["decision"] == "require_review"
+	assert pending_type["matched_rules"] == ["index_content_type_requires_review"]
+	assert pending_type["review_reasons"] == ["index_content_type_review_required"]
 	reviewed_type = service.create_index(
 		tenant_id="tenant-a",
 		name="reviewed-content",
@@ -366,6 +369,19 @@ def test_search_review_evidence_unlocks_review_required_lifecycle_paths():
 
 	with pytest.raises(PermissionError, match="restricted_index_lineage_required"):
 		service.create_index("tenant-a", "unknown-classification", "owner", "document", "regulated", review_recorded=True)
+	pending_classification = service.create_index(
+		tenant_id="tenant-a",
+		name="pending-classification",
+		owner="owner",
+		content_type="document",
+		classification="regulated",
+		source_lineage_ref="lineage://pending-classification",
+		embedding_index_ready=True,
+	)
+	assert pending_classification["status"] == "pending_review"
+	assert pending_classification["decision"] == "require_review"
+	assert pending_classification["matched_rules"] == ["index_classification_requires_review"]
+	assert pending_classification["review_reasons"] == ["index_classification_review_required"]
 	reviewed_classification = service.create_index(
 		tenant_id="tenant-a",
 		name="reviewed-classification",
@@ -378,16 +394,19 @@ def test_search_review_evidence_unlocks_review_required_lifecycle_paths():
 	)
 	assert reviewed_classification["classification"] == "restricted"
 
-	with pytest.raises(PermissionError, match="facet_key_review_required"):
-		service.index_document(
-			tenant_id="tenant-a",
-			index_id=reviewed_type["id"],
-			document_id="facet-review",
-			title="Facet review",
-			body="Custom facet review",
-			facets={"custom": "reviewed"},
-			source_lineage_ref="lineage://facet-review",
-		)
+	pending_document = service.index_document(
+		tenant_id="tenant-a",
+		index_id=reviewed_type["id"],
+		document_id="facet-review",
+		title="Facet review",
+		body="Custom facet review",
+		facets={"custom": "reviewed"},
+		source_lineage_ref="lineage://facet-review",
+	)
+	assert pending_document["status"] == "pending_review"
+	assert pending_document["decision"] == "require_review"
+	assert pending_document["matched_rules"] == ["facet_key_requires_allowlist"]
+	assert pending_document["review_reasons"] == ["facet_key_review_required"]
 	reviewed_document = service.index_document(
 		tenant_id="tenant-a",
 		index_id=reviewed_type["id"],
@@ -419,6 +438,37 @@ def test_search_review_evidence_unlocks_review_required_lifecycle_paths():
 	)
 	assert reviewed_query["query"]["status"] == "completed"
 	assert reviewed_query["query"]["query_type"] == "expansion"
+
+	pending_query = service.query(
+		tenant_id="tenant-a",
+		query_text="custom facet",
+		index_ids=[reviewed_type["id"]],
+		query_type="expansion",
+		rbac_filter_applied=True,
+	)
+	assert pending_query["query"]["status"] == "review_required"
+	assert pending_query["query"]["decision"] == "require_review"
+	assert pending_query["query"]["matched_rules"] == ["query_type_requires_review"]
+	assert pending_query["query"]["review_reasons"] == ["query_type_review_required"]
+
+	summary = service.dashboard_summary("tenant-a")
+	dashboard = views.dashboard_model(service, "tenant-a")
+	indices = views.index_manager_model(service, "tenant-a")
+	documents = views.document_indexer_model(service, "tenant-a")
+	analytics = views.analytics_model(service, "tenant-a")
+	assert summary["pending_index_review_count"] == 2
+	assert summary["pending_document_review_count"] == 1
+	assert summary["pending_query_review_count"] == 1
+	assert {item["id"] for item in dashboard["pending_reviews"]["indices"]} == {
+		pending_type["id"],
+		pending_classification["id"],
+	}
+	assert {item["id"] for item in indices["pending_review"]} == {
+		pending_type["id"],
+		pending_classification["id"],
+	}
+	assert documents["pending_review"][0]["id"] == pending_document["id"]
+	assert analytics["pending_review"][0]["id"] == pending_query["query"]["id"]
 
 
 def test_service_enforces_search_agent_and_lifecycle_guardrails():
