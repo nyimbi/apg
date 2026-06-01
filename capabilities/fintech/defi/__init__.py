@@ -1,11 +1,16 @@
-"""
-defi FinTech Capability
+"""APG Decentralized Finance executable capability package."""
 
-Placeholder for defi financial technology capability.
-To be implemented as part of the comprehensive APG FinTech platform.
-"""
+from .capability_contract import CAPABILITY_ID, CAPABILITY_NAME, CAPABILITY_VERSION, get_capability_contract
+from .service import DecentralizedFinanceService, FintechDeFiService
 
-# Placeholder implementation
-__version__ = "1.0.0"
-__status__ = "Development"
+__all__ = [
+	"CAPABILITY_ID",
+	"CAPABILITY_NAME",
+	"CAPABILITY_VERSION",
+	"DecentralizedFinanceService",
+	"FintechDeFiService",
+	"get_capability_contract",
+]
 
+__version__ = CAPABILITY_VERSION
+__status__ = "Executable"

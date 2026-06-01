@@ -95,6 +95,7 @@ CAPABILITY_META = {
 		'compliance',    # Compliance Automation
 		'blockchain',    # Blockchain Services
 		'crypto',        # Cryptocurrency
+		'defi',          # Decentralized Finance
 		'tms',           # Treasury Management System (existing)
 		'gateway',       # Payment Gateway (existing)
 		'switch',        # Payment Switch (existing)

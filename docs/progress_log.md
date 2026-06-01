@@ -28423,3 +28423,94 @@ Known gaps:
   private-key custody, chain RPC access, chain indexing, market-data feeds,
   durable Bytewax topology, or performance/load checks during this
   battery-conscious slice.
+
+## 2026-06-01 - FinTech Decentralized Finance executable capability
+
+- Promoted `capabilities/fintech/defi` from placeholder into a first-class
+  executable APG capability with README, specification, plan, capability spec,
+  package manifest, release evidence, focused tests, and code-review notes.
+- Added executable protocol registration, liquidity/position tracking, governed
+  action recording, yield strategy registration, reward accrual, governance
+  voting, risk assessment, review recording, Bytewax batch validation,
+  dashboard summary, and provider-neutral DeFi agent registration workflows.
+- Added deterministic guardrails for tenant context, write policy evidence,
+  protocol type/network/reference/owner/evidence/risk tier, position protocol/
+  account/asset pair/type/amount/collateral/health factor/evidence, action
+  protocol/position/type/amount/requester/approval/evidence/status, yield
+  strategy protocol/reference/target APY/max risk/owner/evidence, reward
+  position/type/asset/amount/evidence, governance protocol/proposal/vote/voter/
+  evidence, risk reference/tier/reviewer/evidence, review status/reviewer/
+  evidence, Bytewax lifecycle events, supported AI-agent runtimes/roles, and
+  privileged AI-agent approval.
+- Added compact UI/view models and theme tokens for dashboards, protocols,
+  positions, actions, yield strategies, rewards, governance, risk, reviews,
+  agents, and settings.
+- Updated fintech capability metadata so `defi` is listed as an implemented
+  sub-capability.
+- Updated `capabilities/README.md` so the catalog snapshot reports 135 valid
+  contracts, 135 domain-specific packages, 135 strict complete package artifact
+  sets, and 27 fintech packages.
+- Removed the empty `_Decentralized_Finance` marker file and added a generated
+  `semantic_model.json` from the executable application.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/fintech/defi/__init__.py
+  capabilities/fintech/defi/capability_contract.py
+  capabilities/fintech/defi/models.py
+  capabilities/fintech/defi/defi_runtime.py
+  capabilities/fintech/defi/service.py
+  capabilities/fintech/defi/api.py
+  capabilities/fintech/defi/views.py
+  capabilities/fintech/defi/app.py
+  capabilities/fintech/defi/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/fintech/defi/tests/test_package_contract.py` passed with 6
+  tests.
+- `./.venv/bin/python capabilities/fintech/defi/app.py` passed self-test with
+  `passed: true` and `status: ok`.
+- `./.venv/bin/apg capabilities inspect fintech_defi --json` passed with 52
+  rules, 11 UI routes, theme `fintech_defi_control`, shell `apg_python`, and
+  Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/fintech/defi --json` passed with `side_effect_free: true` and 0
+  warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/fintech/defi --json` passed with 1 domain-specific capability,
+  0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/fintech/defi --json` passed with 1 complete lifecycle, 52 rules,
+  11 UI routes, 11 theme tokens, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 135 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 135 operable contracts, 135 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/fintech/defi`, `capabilities/fintech/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed protocol, position, action, yield strategy, reward, governance, risk,
+  review, and AI-agent lifecycle paths so rule evaluation happens before state
+  mutation.
+- Tightened DeFi semantics around Blockchain Services and Cryptocurrency
+  Services composition, protocol evidence, action approval, health-factor
+  capture, governance vote evidence, and privileged AI-agent approval.
+- Kept live protocol RPC, transaction signing, private-key custody, oracle data
+  feeds, on-chain liquidation execution, bridge execution, governance
+  submission, MEV protection, and durable Bytewax workers behind adapter
+  boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live protocol RPC,
+  transaction signing, private-key custody, oracle data feeds, on-chain
+  liquidation execution, bridge execution, governance submission, MEV
+  protection, durable Bytewax topology, or performance/load checks during this
+  battery-conscious slice.
