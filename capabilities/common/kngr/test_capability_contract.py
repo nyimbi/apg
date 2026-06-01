@@ -294,17 +294,19 @@ def test_kngr_service_enforces_policy_guardrails():
 			confidence_score=1.0,
 		)
 
-	with pytest.raises(PermissionError, match="low_confidence_source_review_required"):
-		service.register_source(
-			source_id="src-low-confidence",
-			tenant_id="tenant-knowledge",
-			name="Low confidence",
-			source_uri="meta://low",
-			owner="steward",
-			evidence_refs=["meta:low"],
-			confidence_score=0.4,
-			review_recorded=False,
-		)
+	pending_source = service.register_source(
+		source_id="src-low-confidence",
+		tenant_id="tenant-knowledge",
+		name="Low confidence",
+		source_uri="meta://low",
+		owner="steward",
+		evidence_refs=["meta:low"],
+		confidence_score=0.4,
+		review_recorded=False,
+	)
+	assert pending_source["status"] == "pending_review"
+	assert pending_source["decision"] == "require_review"
+	assert pending_source["review_reasons"] == ["low_confidence_source_review_required"]
 
 	service.register_source(
 		source_id="src-knowledge",
@@ -343,29 +345,46 @@ def test_kngr_service_enforces_policy_guardrails():
 		source_evidence_refs=["doc:b"],
 	)
 
-	with pytest.raises(PermissionError, match="low_confidence_entity_review_required"):
-		service.resolve_entity(
-			entity_id="entity-low-confidence",
-			tenant_id="tenant-knowledge",
-			canonical_label="Entity low",
-			entity_type="concept",
-			source_id="src-knowledge",
-			source_evidence_refs=["doc:low"],
-			confidence_score=0.4,
-			review_recorded=False,
-		)
+	pending_entity = service.resolve_entity(
+		entity_id="entity-low-confidence",
+		tenant_id="tenant-knowledge",
+		canonical_label="Entity low",
+		entity_type="concept",
+		source_id="src-knowledge",
+		source_evidence_refs=["doc:low"],
+		confidence_score=0.4,
+		review_recorded=False,
+	)
+	assert pending_entity["status"] == "pending_review"
+	assert pending_entity["curation_status"] == "review_required"
+	assert pending_entity["review_reasons"] == ["low_confidence_entity_review_required"]
 
-	with pytest.raises(PermissionError, match="low_confidence_enrichment_review_required"):
-		service.enrich_entity(
-			enrichment_id="enrich-low",
-			tenant_id="tenant-knowledge",
-			entity_id=entity_a["id"],
-			semantic_labels=["low_confidence"],
-			attributes={},
-			evidence_links=["nlpc:a"],
-			confidence_score=0.4,
-			review_recorded=False,
-		)
+	pending_enrichment = service.enrich_entity(
+		enrichment_id="enrich-low",
+		tenant_id="tenant-knowledge",
+		entity_id=entity_a["id"],
+		semantic_labels=["low_confidence"],
+		attributes={},
+		evidence_links=["nlpc:a"],
+		confidence_score=0.4,
+		review_recorded=False,
+	)
+	assert pending_enrichment["status"] == "pending_review"
+	assert pending_enrichment["review_reasons"] == ["low_confidence_enrichment_review_required"]
+
+	pending_relationship = service.link_relationship(
+		relationship_id="rel-low",
+		tenant_id="tenant-knowledge",
+		subject_entity_id=entity_a["id"],
+		predicate="maybe_related_to",
+		object_entity_id=entity_b["id"],
+		source_id="src-knowledge",
+		evidence_links=["doc:maybe"],
+		confidence_score=0.4,
+		review_recorded=False,
+	)
+	assert pending_relationship["status"] == "pending_review"
+	assert pending_relationship["review_reasons"] == ["low_confidence_relationship_review_required"]
 
 	reviewed_relationship = service.link_relationship(
 		relationship_id="rel-reviewed",
@@ -405,17 +424,32 @@ def test_kngr_service_enforces_policy_guardrails():
 		)
 		deep_relationship_ids.append(relationship["id"])
 
-	with pytest.raises(PermissionError, match="deep_reasoning_review_required"):
-		service.build_reasoning_path(
-			path_id="path-deep",
-			tenant_id="tenant-knowledge",
-			query="Deep path",
-			start_entity_id=entity_a["id"],
-			end_entity_id=entity_b["id"],
-			relationship_ids=deep_relationship_ids,
-			evidence_links=["doc:deep"],
-			review_recorded=False,
-		)
+	pending_reasoning = service.build_reasoning_path(
+		path_id="path-deep",
+		tenant_id="tenant-knowledge",
+		query="Deep path",
+		start_entity_id=entity_a["id"],
+		end_entity_id=entity_b["id"],
+		relationship_ids=deep_relationship_ids,
+		evidence_links=["doc:deep"],
+		review_recorded=False,
+	)
+	assert pending_reasoning["status"] == "pending_review"
+	assert pending_reasoning["review_reasons"] == ["deep_reasoning_review_required"]
+
+	summary = service.dashboard_summary("tenant-knowledge")
+	assert summary["pending_source_review_count"] == 1
+	assert summary["pending_entity_review_count"] == 1
+	assert summary["pending_relationship_review_count"] == 1
+	assert summary["pending_enrichment_review_count"] == 1
+	assert summary["pending_reasoning_review_count"] == 1
+	assert dashboard_model(service, "tenant-knowledge")["pending_reviews"]["reasoning_paths"][0]["id"] == "path-deep"
+	assert source_manager_model(service, "tenant-knowledge")["pending_review"][0]["id"] == "src-low-confidence"
+	assert entity_browser_model(service, "tenant-knowledge")["pending_review"][0]["id"] == "entity-low-confidence"
+	assert relationship_browser_model(service, "tenant-knowledge")["pending_review"][0]["id"] == "rel-low"
+	assert enrichment_console_model(service, "tenant-knowledge")["pending_review"][0]["id"] == "enrich-low"
+	assert reasoning_paths_model(service, "tenant-knowledge")["pending_review"][0]["id"] == "path-deep"
+	assert governance_model(service, "tenant-knowledge")["pending_reviews"]["relationships"][0]["id"] == "rel-low"
 
 	with pytest.raises(PermissionError, match="curation_required"):
 		service.publish_graph(
@@ -478,6 +512,7 @@ def test_knowledge_agent_and_lifecycle_guardrails_execute():
 	assert agent["runtime"] == "claude_code"
 	assert agent["role"] == "publication_reviewer"
 	assert agent["status"] == "pending_review"
+	assert agent["review_reasons"] == ["knowledge_agent_human_approval_required"]
 	assert service.dashboard_summary(tenant_id)["pending_agent_review_count"] == 1
 
 	with pytest.raises(ValueError, match="kngr_lifecycle_batch_empty"):

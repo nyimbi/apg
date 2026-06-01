@@ -25,6 +25,9 @@ class KnowledgeSource:
 	evidence_refs: tuple[str, ...]
 	confidence_score: float
 	status: str = "active"
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
 	created_at: str = field(default_factory=utc_now_iso)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -38,6 +41,9 @@ class KnowledgeSource:
 			"evidence_refs": list(self.evidence_refs),
 			"confidence_score": self.confidence_score,
 			"status": self.status,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
 			"created_at": self.created_at,
 		}
 
@@ -57,6 +63,9 @@ class KnowledgeEntity:
 	confidence_score: float = 1.0
 	curation_status: str = "draft"
 	status: str = "active"
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
 	created_at: str = field(default_factory=utc_now_iso)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -72,6 +81,9 @@ class KnowledgeEntity:
 			"confidence_score": self.confidence_score,
 			"curation_status": self.curation_status,
 			"status": self.status,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
 			"created_at": self.created_at,
 		}
 
@@ -89,6 +101,9 @@ class KnowledgeRelationship:
 	evidence_links: tuple[str, ...]
 	confidence_score: float
 	status: str
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
 	created_at: str = field(default_factory=utc_now_iso)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -102,6 +117,9 @@ class KnowledgeRelationship:
 			"evidence_links": list(self.evidence_links),
 			"confidence_score": self.confidence_score,
 			"status": self.status,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
 			"created_at": self.created_at,
 		}
 
@@ -119,6 +137,9 @@ class SemanticEnrichment:
 	confidence_score: float
 	review_recorded: bool
 	status: str
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
 	created_at: str = field(default_factory=utc_now_iso)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -132,6 +153,9 @@ class SemanticEnrichment:
 			"confidence_score": self.confidence_score,
 			"review_recorded": self.review_recorded,
 			"status": self.status,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
 			"created_at": self.created_at,
 		}
 
@@ -150,6 +174,9 @@ class ReasoningPath:
 	reasoning_depth: int
 	review_recorded: bool
 	status: str
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
 	created_at: str = field(default_factory=utc_now_iso)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -164,6 +191,9 @@ class ReasoningPath:
 			"reasoning_depth": self.reasoning_depth,
 			"review_recorded": self.review_recorded,
 			"status": self.status,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
 			"created_at": self.created_at,
 		}
 
@@ -235,6 +265,9 @@ class KnowledgeAgentRecord:
 	contribution_disclosed: bool
 	human_approval_required: bool
 	status: str = "active"
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
 	created_at: str = field(default_factory=utc_now_iso)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -251,6 +284,9 @@ class KnowledgeAgentRecord:
 			"contribution_disclosed": self.contribution_disclosed,
 			"human_approval_required": self.human_approval_required,
 			"status": self.status,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
 			"created_at": self.created_at,
 		}
 
@@ -267,6 +303,7 @@ class KngrLifecycleBatchRecord:
 	accepted: bool
 	decision: str
 	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
 	required_processor: str = "bytewax"
 	status: str = "accepted"
 	created_at: str = field(default_factory=utc_now_iso)
@@ -282,6 +319,7 @@ class KngrLifecycleBatchRecord:
 			"accepted": self.accepted,
 			"decision": self.decision,
 			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
 			"required_processor": self.required_processor,
 			"status": self.status,
 			"created_at": self.created_at,

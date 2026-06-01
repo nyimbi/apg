@@ -12,6 +12,9 @@ knowledge-agent composition, Bytewax lifecycle batch governance, audit
 evidence, UI view models, deterministic guardrails, visual theming, and
 generated Python package evidence.
 
+Review-required knowledge graph records are durable pending-review objects with
+matched-rule and review-reason evidence; deny decisions remain hard guardrails.
+
 Authoritative companion documents:
 
 - `README.md` explains how to use KNGR in generated applications.

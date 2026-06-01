@@ -18,6 +18,60 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ### 2026-06-01 00:00 EAT
 
+KNGR review-evidence lifecycle packet:
+
+- Extended knowledge source, entity, relationship, enrichment, reasoning,
+  knowledge-agent, and lifecycle batch records with durable policy evidence
+  fields where needed: decision, matched rules, review reasons, and
+  `pending_review` status.
+- Changed review-required low-confidence source, entity, relationship, and
+  enrichment paths plus deep reasoning and privileged knowledge-agent paths to
+  persist pending-review records while keeping true deny outcomes
+  hard-blocking.
+- Surfaced pending-review queues in the KNGR dashboard, source manager, entity
+  browser, relationship browser, enrichment console, reasoning paths,
+  governance console, and semantic model.
+- Updated focused KNGR tests so low-confidence sources, entities,
+  relationships, enrichments, deep reasoning paths, and privileged knowledge
+  agents prove durable review evidence instead of transient exceptions.
+- Updated KNGR README, specification, plan, and capability pointer to document
+  the review queue lifecycle and deny/review distinction.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for KNGR modules and tests passed.
+- `./.venv/bin/pytest -q capabilities/common/kngr/test_capability_contract.py
+  capabilities/common/kngr/tests/test_package_contract.py` passed with 11 tests
+  and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.kngr import app; ..."`
+  passed package self-test.
+- `./.venv/bin/python -m json.tool capabilities/common/kngr/semantic_model.json`
+  passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/kngr --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, and no warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/kngr --json`
+  passed with no warnings and side-effect-free publish planning.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/common/kngr --json` passed with complete lifecycle evidence.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed with 109 operable contracts/packages and no warnings or errors.
+- KNGR stale-marker scan returned no matches across the edited KNGR packet.
+- `git diff --check -- capabilities/common/kngr docs/progress_log.md` passed.
+- Inline code review found and fixed a misleading review-required helper name
+  after review-required outcomes became durable records; no blocking findings
+  remain.
+
+Known gaps:
+
+- Did not run full repository tests, rendered browser UI checks, live graph or
+  ontology stores, durable Bytewax topology, external Codex/Claude
+  Code/OpenCode/Pi clients, GRPH/NLPC/META/SRCH/ONTO/AICR/CONF live adapters,
+  load checks, migration checks, or reasoning-quality benchmarks during this
+  battery-conscious slice.
+
+### 2026-06-01 00:00 EAT
+
 GRPH review-evidence lifecycle packet:
 
 - Extended `GraphSchema`, `GraphNode`, `GraphEdge`, `GraphTraversalResult`,

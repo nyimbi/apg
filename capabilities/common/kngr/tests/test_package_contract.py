@@ -51,6 +51,7 @@ def test_kngr_app_entrypoint_is_publishable():
 	assert "kngr" in model["capabilities"]
 	assert model["capabilities"]["kngr"]["agents"]["first_class"] is True
 	assert model["capabilities"]["kngr"]["streaming"]["required_processor"] == "bytewax"
+	assert model["capabilities"]["kngr"]["review_queues"]["relationships"] == "KnowledgeRelationship.status == pending_review"
 	assert model["capabilities"]["kngr"]["knowledge_lifecycle"]["lifecycle_batch"] == "KngrLifecycleBatchRecord"
 	assert model["composition"]["capability_dependencies"]["kngr"] == ["grph", "nlpc", "meta", "srch", "onto", "aicr", "conf"]
 	assert len(model["capabilities"]["kngr"]["ui"]["routes"]) >= 14

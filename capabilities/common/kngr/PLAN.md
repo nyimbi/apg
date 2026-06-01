@@ -38,10 +38,14 @@
    - Apply the expanded rules inside `KngrService`.
 	- Keep source/entity/relationship/enrichment/reasoning/curation/publication
 	  workflows dependency-light and tenant-scoped.
+	- Persist review-required sources, entities, relationships, enrichments,
+	  reasoning paths, and knowledge agents as durable `pending_review` records
+	  with matched rules and review reasons while keeping deny decisions
+	  hard-blocking.
 	- Add provider-neutral knowledge-agent registration state.
 	- Add Bytewax lifecycle batch validation state.
 	- Add aggregate graph listing and richer UI view models.
-   - Expose review fields through API helpers.
+   - Expose review fields and pending-review queues through API and UI helpers.
 
 4. Refresh package evidence:
    - Make `app.py` derive semantic metadata from the current contract.

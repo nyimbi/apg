@@ -32,6 +32,9 @@ adapters.
   opencode, Pi, and future runtimes.
 - Bytewax-only lifecycle batch validation for source, entity, relationship,
   enrichment, reasoning, curation, publication, and knowledge-agent changes.
+- Durable pending-review records for low-confidence sources, entities,
+  relationships, enrichments, deep reasoning paths, and privileged knowledge
+  agents, including matched rules and review reasons.
 - UI route metadata and view models for source, entity, relationship,
   enrichment, reasoning, context, curation, publication, governance, audit, and
   settings screens.
@@ -59,7 +62,9 @@ adapters.
 4. Enrich entities with semantic labels and attributes from NLPC, ontology,
    metadata, or AI-agent workflows.
 5. Build bounded reasoning paths over relationships with evidence links.
-6. Curate entities with explicit reviewer identity, decision, and evidence.
+6. Inspect pending-review queues for low-confidence evidence and deep reasoning
+   paths, then curate entities with explicit reviewer identity, decision, and
+   evidence.
 7. Publish curated graph snapshots for generated applications.
 8. Register knowledge agents for source, entity, relationship, enrichment,
    reasoning, curation, publication, and lifecycle governance.
@@ -142,14 +147,15 @@ batch = service.validate_kngr_lifecycle_batch(
 KNGR denies operations without tenant context, source identity, source owner,
 source URI, evidence, positive confidence, entity identity, labels, types,
 relationship endpoints, predicates, reasoning queries, curation decisions,
-publication names, publishers, or curated publication entities. It requires
-review for low-confidence source, entity, relationship, and enrichment records,
-as well as deep reasoning paths. Batch knowledge mutations must use Bytewax.
+publication names, publishers, or curated publication entities. Review-required
+operations are durable: low-confidence source, entity, relationship, and
+enrichment records, as well as deep reasoning paths and privileged
+knowledge-agent registrations, are stored with `pending_review` status, matched
+rule names, and review reasons. Batch knowledge mutations must use Bytewax.
 Cross-tenant access and unaudited graph state changes are blocked. KNGR denies
 knowledge-agent registrations that use unsupported runtimes or roles, omit
-scope, owner, or purpose, or hide machine contribution. Privileged
-knowledge-agent roles enter review until human approval evidence is recorded.
-Lifecycle batches that are not routed through Bytewax are denied.
+scope, owner, or purpose, or hide machine contribution. Lifecycle batches that
+are not routed through Bytewax are denied and retained as denied batch evidence.
 
 ## Composition
 

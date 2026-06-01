@@ -22,6 +22,9 @@ KNGR must provide:
   review state, and lifecycle status.
 - Bounded reasoning paths with query, start/end entities, relationship chain,
   evidence links, depth, review state, status, and audit event.
+- Durable pending-review queues for low-confidence sources, entities,
+  relationships, enrichments, deep reasoning paths, and privileged knowledge
+  agents.
 - Curation decisions with curator, allowed decision, evidence, notes, and entity
   curation-state updates.
 - Publication snapshots for curated entity and relationship sets.
@@ -85,6 +88,11 @@ cover:
 - Human review for privileged knowledge-agent roles.
 - Bytewax-only knowledge lifecycle batch checks.
 - Cross-tenant denial and audit requirement for state changes.
+
+Rules that require review must persist inspectable `pending_review` records
+with decision, matched rule names, and review reasons when the operation is
+otherwise safe to store. Rules that deny remain hard stops and must not create
+accepted lifecycle records.
 
 ## UI Contract
 

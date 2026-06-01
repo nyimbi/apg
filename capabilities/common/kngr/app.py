@@ -73,6 +73,14 @@ def semantic_model() -> dict[str, Any]:
 					"publication": "GraphPublication",
 					"knowledge_agent": "KnowledgeAgentRecord",
 				},
+				"review_queues": {
+					"sources": "KnowledgeSource.status == pending_review",
+					"entities": "KnowledgeEntity.status == pending_review",
+					"relationships": "KnowledgeRelationship.status == pending_review",
+					"enrichments": "SemanticEnrichment.status == pending_review",
+					"reasoning_paths": "ReasoningPath.status == pending_review",
+					"knowledge_agents": "KnowledgeAgentRecord.status == pending_review",
+				},
 				"knowledge_lifecycle": {
 					"source": "KnowledgeSource",
 					"entity": "KnowledgeEntity",

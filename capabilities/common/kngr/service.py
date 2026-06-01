@@ -72,7 +72,8 @@ class KngrService:
 			"confidence_score": confidence,
 			"review_recorded": bool(review_recorded),
 		})
-		self._raise_if_review_required(result, review_recorded)
+		self._raise_if_denied(result)
+		record_status = "pending_review" if result["decision"] == "require_review" else status
 		source = KnowledgeSource(
 			id=source_id,
 			tenant_id=tenant_id,
@@ -82,7 +83,10 @@ class KngrService:
 			connector=connector,
 			evidence_refs=tuple(evidence_refs),
 			confidence_score=confidence,
-			status=status,
+			status=record_status,
+			decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=self._review_reasons(result),
 		)
 		self._sources[source_id] = source
 		self._audit(tenant_id, source_id, "source_registered", owner, result["decision"], reasons=self._reasons(result), metadata={"connector": connector})
@@ -115,7 +119,8 @@ class KngrService:
 			"confidence_score": confidence,
 			"review_recorded": bool(review_recorded),
 		})
-		self._raise_if_review_required(result, review_recorded)
+		self._raise_if_denied(result)
+		record_status = "pending_review" if result["decision"] == "require_review" else "active"
 		entity = KnowledgeEntity(
 			id=entity_id,
 			tenant_id=tenant_id,
@@ -127,6 +132,10 @@ class KngrService:
 			attributes=dict(attributes or {}),
 			confidence_score=confidence,
 			curation_status=self._runtime.entity_curation_status(curation_recorded, confidence),
+			status=record_status,
+			decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=self._review_reasons(result),
 		)
 		self._entities[entity_id] = entity
 		self._audit(
@@ -167,7 +176,8 @@ class KngrService:
 			"confidence_score": confidence,
 			"review_recorded": bool(review_recorded),
 		})
-		self._raise_if_review_required(result, review_recorded)
+		self._raise_if_denied(result)
+		record_status = "pending_review" if result["decision"] == "require_review" else self._runtime.relationship_status(confidence, review_recorded)
 		relationship = KnowledgeRelationship(
 			id=relationship_id,
 			tenant_id=tenant_id,
@@ -177,7 +187,10 @@ class KngrService:
 			source_id=source_id,
 			evidence_links=tuple(evidence_links),
 			confidence_score=confidence,
-			status=self._runtime.relationship_status(confidence, review_recorded),
+			status=record_status,
+			decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=self._review_reasons(result),
 		)
 		self._relationships[relationship_id] = relationship
 		self._audit(
@@ -212,7 +225,10 @@ class KngrService:
 			"confidence_score": confidence,
 			"review_recorded": bool(review_recorded),
 		})
-		self._raise_if_review_required(result, review_recorded)
+		self._raise_if_denied(result)
+		status = "pending_review" if result["decision"] == "require_review" else (
+			"accepted_with_review" if confidence < 0.7 and review_recorded else "active"
+		)
 		enrichment = SemanticEnrichment(
 			id=enrichment_id,
 			tenant_id=tenant_id,
@@ -222,7 +238,10 @@ class KngrService:
 			evidence_links=tuple(evidence_links),
 			confidence_score=confidence,
 			review_recorded=review_recorded,
-			status="accepted_with_review" if result["decision"] == "require_review" else "active",
+			status=status,
+			decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=self._review_reasons(result),
 		)
 		self._enrichments[enrichment_id] = enrichment
 		self._audit(tenant_id, enrichment_id, "entity_enriched", entity_id, result["decision"], reasons=self._reasons(result))
@@ -254,7 +273,7 @@ class KngrService:
 			"review_recorded": bool(review_recorded),
 		})
 		self._raise_if_denied(result)
-		self._raise_if_review_required(result, review_recorded)
+		status = "pending_review" if result["decision"] == "require_review" else ("reviewed" if review_recorded else "active")
 		path = ReasoningPath(
 			id=path_id,
 			tenant_id=tenant_id,
@@ -265,7 +284,10 @@ class KngrService:
 			evidence_links=tuple(evidence_links),
 			reasoning_depth=depth,
 			review_recorded=review_recorded,
-			status="reviewed" if review_recorded else "active",
+			status=status,
+			decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=self._review_reasons(result),
 		)
 		self._reasoning_paths[path_id] = path
 		self._audit(tenant_id, path_id, "reasoning_path_built", start_entity_id, result["decision"], reasons=self._reasons(result))
@@ -313,7 +335,10 @@ class KngrService:
 				attributes=entity.attributes,
 				confidence_score=entity.confidence_score,
 				curation_status="curated",
-				status=entity.status,
+				status="accepted_with_review" if entity.status == "pending_review" else entity.status,
+				decision=entity.decision,
+				matched_rules=entity.matched_rules,
+				review_reasons=entity.review_reasons,
 				created_at=entity.created_at,
 			)
 		self._audit(tenant_id, curation_id, "entity_curated", curator, result["decision"], reasons=self._reasons(result), metadata={"entity_id": entity_id, "decision": decision})
@@ -438,6 +463,9 @@ class KngrService:
 			contribution_disclosed=bool(contribution_disclosed),
 			human_approval_required=bool(human_approval_required),
 			status=status,
+			decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=self._review_reasons(result),
 		)
 		self._knowledge_agents[self._tenant_record_key(tenant_id, record.id)] = record
 		self._audit(
@@ -481,6 +509,7 @@ class KngrService:
 			accepted=accepted,
 			decision=result["decision"],
 			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=self._review_reasons(result),
 			status="accepted" if accepted else "denied",
 		)
 		self._lifecycle_batches[self._tenant_record_key(tenant_id, record.id)] = record
@@ -533,12 +562,17 @@ class KngrService:
 				"curation_count": len(curations),
 				"publication_count": len(publications),
 				"knowledge_agent_count": len(knowledge_agents),
+				"pending_source_review_count": len(self._pending_review(sources)),
+				"pending_entity_review_count": len(self._pending_review(entities)),
+				"pending_relationship_review_count": len(self._pending_review(relationships)),
+				"pending_enrichment_review_count": len(self._pending_review(enrichments)),
+				"pending_reasoning_review_count": len(self._pending_review(reasoning_paths)),
 				"pending_agent_review_count": len([item for item in knowledge_agents if item["status"] == "pending_review"]),
 				"lifecycle_batch_count": len(lifecycle_batches),
 				"denied_lifecycle_batch_count": len([item for item in lifecycle_batches if item["status"] == "denied"]),
 				"review_required_count": len([
-					item for item in entities + relationships
-					if item.get("status") == "review_required" or item.get("curation_status") == "review_required"
+					item for item in sources + entities + relationships + enrichments + reasoning_paths
+					if item.get("status") in {"pending_review", "review_required"} or item.get("curation_status") == "review_required"
 				]),
 				"audit_event_count": len(audit_events),
 			},
@@ -575,24 +609,34 @@ class KngrService:
 		return self._list(self._audit_events, tenant_id)
 
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
+		sources = self.list_sources(tenant_id)
 		entities = self.list_entities(tenant_id)
 		relationships = self.list_relationships(tenant_id)
+		enrichments = self.list_enrichments(tenant_id)
+		reasoning_paths = self.list_reasoning_paths(tenant_id)
+		knowledge_agents = self.list_knowledge_agents(tenant_id)
+		lifecycle_batches = self.list_lifecycle_batches(tenant_id)
 		return {
 			"tenant_id": tenant_id,
-			"source_count": len(self.list_sources(tenant_id)),
+			"source_count": len(sources),
 			"entity_count": len(entities),
 			"relationship_count": len(relationships),
-			"enrichment_count": len(self.list_enrichments(tenant_id)),
-			"reasoning_path_count": len(self.list_reasoning_paths(tenant_id)),
+			"enrichment_count": len(enrichments),
+			"reasoning_path_count": len(reasoning_paths),
 			"curation_count": len(self.list_curations(tenant_id)),
 			"publication_count": len(self.list_publications(tenant_id)),
-			"knowledge_agent_count": len(self.list_knowledge_agents(tenant_id)),
-			"pending_agent_review_count": len([item for item in self.list_knowledge_agents(tenant_id) if item["status"] == "pending_review"]),
-			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
-			"denied_lifecycle_batch_count": len([item for item in self.list_lifecycle_batches(tenant_id) if item["status"] == "denied"]),
+			"knowledge_agent_count": len(knowledge_agents),
+			"pending_source_review_count": len(self._pending_review(sources)),
+			"pending_entity_review_count": len(self._pending_review(entities)),
+			"pending_relationship_review_count": len(self._pending_review(relationships)),
+			"pending_enrichment_review_count": len(self._pending_review(enrichments)),
+			"pending_reasoning_review_count": len(self._pending_review(reasoning_paths)),
+			"pending_agent_review_count": len([item for item in knowledge_agents if item["status"] == "pending_review"]),
+			"lifecycle_batch_count": len(lifecycle_batches),
+			"denied_lifecycle_batch_count": len([item for item in lifecycle_batches if item["status"] == "denied"]),
 			"review_required_count": len([
-				item for item in entities + relationships
-				if item.get("status") == "review_required" or item.get("curation_status") == "review_required"
+				item for item in sources + entities + relationships + enrichments + reasoning_paths
+				if item.get("status") in {"pending_review", "review_required"} or item.get("curation_status") == "review_required"
 			]),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 		}
@@ -622,11 +666,6 @@ class KngrService:
 	def _raise_if_denied(self, result: dict[str, Any]) -> None:
 		if result["decision"] == "deny":
 			raise PermissionError(", ".join(self._reasons(result)) or "knowledge_policy_blocked")
-
-	def _raise_if_review_required(self, result: dict[str, Any], review_recorded: bool) -> None:
-		self._raise_if_denied(result)
-		if result["decision"] == "require_review" and not review_recorded:
-			raise PermissionError(", ".join(self._reasons(result)) or "knowledge_review_required")
 
 	def _audit(
 		self,
@@ -662,8 +701,18 @@ class KngrService:
 			values = [record for record in values if record.tenant_id == tenant_id]
 		return [record.to_dict() for record in sorted(values, key=lambda item: item.id)]
 
+	def _pending_review(self, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+		return [record for record in records if record.get("status") == "pending_review"]
+
 	def _reasons(self, result: dict[str, Any]) -> tuple[str, ...]:
 		return tuple(action.get("reason", "knowledge_policy_blocked") for action in result.get("actions", ()))
+
+	def _review_reasons(self, result: dict[str, Any]) -> tuple[str, ...]:
+		return tuple(
+			action.get("reason", "knowledge_review_required")
+			for action in result.get("actions", ())
+			if action.get("decision") == "require_review"
+		)
 
 	def _tenant_record_key(self, tenant_id: str, record_id: str) -> str:
 		return f"{tenant_id}:{record_id}"

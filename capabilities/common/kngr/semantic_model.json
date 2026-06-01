@@ -342,6 +342,14 @@
         "aicr",
         "conf"
       ],
+      "review_queues": {
+        "enrichments": "SemanticEnrichment.status == pending_review",
+        "entities": "KnowledgeEntity.status == pending_review",
+        "knowledge_agents": "KnowledgeAgentRecord.status == pending_review",
+        "reasoning_paths": "ReasoningPath.status == pending_review",
+        "relationships": "KnowledgeRelationship.status == pending_review",
+        "sources": "KnowledgeSource.status == pending_review"
+      },
       "rule_engine": {
         "rules": [
           {
