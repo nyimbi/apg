@@ -1,0 +1,2111 @@
+{
+  "app": {
+    "description": "Human Intelligence package-backed APG capability",
+    "entity_count": 10,
+    "name": "intel_humint",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "intel_humint": {
+      "configuration": {
+        "adapters": {
+          "audit": "audl",
+          "auth": "auth",
+          "case_management": "case",
+          "event_stream": "bytewax",
+          "graph": "grph",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "rag": "ragn"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "authority_reviewer",
+            "source_manager",
+            "contact_planner",
+            "debriefing_analyst",
+            "welfare_reviewer",
+            "dissemination_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "authorities": {
+          "approver_required": true,
+          "evidence_required": true,
+          "expiry_required": true,
+          "supported_authority_types": [
+            "mission_order",
+            "consent",
+            "partner_authority",
+            "legal_mandate",
+            "oversight_authorization"
+          ],
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ]
+        },
+        "contact_plans": {
+          "approval_required": true,
+          "authority_required": true,
+          "evidence_required": true,
+          "objective_required": true,
+          "safety_plan_required": true,
+          "source_required": true,
+          "supported_methods": [
+            "in_person",
+            "secure_call",
+            "secure_message",
+            "partner_channel",
+            "interview",
+            "debrief"
+          ]
+        },
+        "contact_reports": {
+          "evidence_required": true,
+          "handler_required": true,
+          "plan_required": true,
+          "source_welfare_required": true
+        },
+        "debriefings": {
+          "analyst_required": true,
+          "credibility_required": true,
+          "evidence_required": true,
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ],
+          "topic_required": true
+        },
+        "dissemination": {
+          "approval_required": true,
+          "audience_required": true,
+          "evidence_required": true,
+          "lead_required": true,
+          "release_marking_required": true
+        },
+        "governance": {
+          "audit_events": true,
+          "coercion_prohibited": true,
+          "lawful_authority_required": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "source_welfare_required": true
+        },
+        "leads": {
+          "analyst_required": true,
+          "debriefing_required": true,
+          "evidence_required": true,
+          "supported_priorities": [
+            "low",
+            "medium",
+            "high",
+            "urgent"
+          ],
+          "supported_types": [
+            "identity",
+            "location",
+            "network",
+            "event",
+            "threat",
+            "financial",
+            "protective"
+          ]
+        },
+        "observability": {
+          "event_stream": "apg.intel.humint.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "reliability": {
+          "analyst_required": true,
+          "confidence_required": true,
+          "evidence_required": true,
+          "source_required": true,
+          "supported_grades": [
+            "a",
+            "b",
+            "c",
+            "d",
+            "e",
+            "f"
+          ]
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "sources": {
+          "authority_required": true,
+          "evidence_required": true,
+          "owner_required": true,
+          "protection_plan_required": true,
+          "supported_risk_levels": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "supported_source_types": [
+            "voluntary_source",
+            "confidential_human_source",
+            "partner_liaison",
+            "field_interview",
+            "community_contact",
+            "internal_report",
+            "diplomatic_contact"
+          ],
+          "supported_statuses": [
+            "prospective",
+            "active",
+            "paused",
+            "closed",
+            "protected"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "intel_humint_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_authorities": true,
+          "enable_contact_plans": true,
+          "enable_contact_reports": true,
+          "enable_dashboard": true,
+          "enable_debriefings": true,
+          "enable_dissemination": true,
+          "enable_leads": true,
+          "enable_reliability": true,
+          "enable_reviews": true,
+          "enable_sources": true
+        }
+      },
+      "name": "Human Intelligence",
+      "provides": [
+        "humint_authority_workflow",
+        "humint_source_workflow",
+        "humint_contact_plan_workflow",
+        "humint_contact_report_workflow",
+        "humint_debriefing_workflow",
+        "humint_reliability_workflow",
+        "humint_lead_workflow",
+        "humint_dissemination_workflow",
+        "humint_review_workflow",
+        "humint_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "grph",
+        "ragn"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "humint_policy_required",
+              "required_action": "attach_humint_policy"
+            },
+            "name": "humint_write_requires_policy"
+          },
+          {
+            "condition": {
+              "authority_type_supported": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_type_not_supported",
+              "required_action": "select_supported_authority_type"
+            },
+            "name": "authority_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_authority",
+              "scope_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_scope_required",
+              "required_action": "attach_scope_reference"
+            },
+            "name": "authority_scope_required"
+          },
+          {
+            "condition": {
+              "classification_supported": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "classification_not_supported",
+              "required_action": "select_supported_classification"
+            },
+            "name": "authority_classification_supported"
+          },
+          {
+            "condition": {
+              "approver_present": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_approver_required",
+              "required_action": "record_approver"
+            },
+            "name": "authority_approver_required"
+          },
+          {
+            "condition": {
+              "expiry_present": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_expiry_required",
+              "required_action": "set_expiry"
+            },
+            "name": "authority_expiry_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_evidence_required",
+              "required_action": "attach_authority_evidence"
+            },
+            "name": "authority_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "source_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_type_not_supported",
+              "required_action": "select_supported_source_type"
+            },
+            "name": "source_type_supported"
+          },
+          {
+            "condition": {
+              "handling_status_supported": false,
+              "operation": "register_source"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "handling_status_not_supported",
+              "required_action": "select_supported_status"
+            },
+            "name": "source_status_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "risk_level_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_level_not_supported",
+              "required_action": "select_supported_risk"
+            },
+            "name": "source_risk_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "owner_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_owner_required",
+              "required_action": "assign_source_owner"
+            },
+            "name": "source_owner_required"
+          },
+          {
+            "condition": {
+              "authority_present": false,
+              "operation": "register_source"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "lawful_authority_required",
+              "required_action": "select_authority"
+            },
+            "name": "source_authority_required"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "protection_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_protection_required",
+              "required_action": "attach_protection_reference"
+            },
+            "name": "source_protection_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "register_source"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_evidence_required",
+              "required_action": "attach_source_evidence"
+            },
+            "name": "source_evidence_required"
+          },
+          {
+            "condition": {
+              "authority_present": false,
+              "operation": "record_contact_plan"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "lawful_authority_required",
+              "required_action": "select_authority"
+            },
+            "name": "contact_authority_required"
+          },
+          {
+            "condition": {
+              "operation": "record_contact_plan",
+              "source_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_required",
+              "required_action": "select_source"
+            },
+            "name": "contact_source_required"
+          },
+          {
+            "condition": {
+              "operation": "record_contact_plan",
+              "source_authority_match": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_authority_mismatch",
+              "required_action": "select_source_for_authority"
+            },
+            "name": "contact_source_authority_match"
+          },
+          {
+            "condition": {
+              "contact_method_supported": false,
+              "operation": "record_contact_plan"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "contact_method_not_supported",
+              "required_action": "select_supported_contact_method"
+            },
+            "name": "contact_method_supported"
+          },
+          {
+            "condition": {
+              "objective_present": false,
+              "operation": "record_contact_plan"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "contact_objective_required",
+              "required_action": "attach_objective_reference"
+            },
+            "name": "contact_objective_required"
+          },
+          {
+            "condition": {
+              "operation": "record_contact_plan",
+              "safety_plan_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "safety_plan_required",
+              "required_action": "attach_safety_plan"
+            },
+            "name": "contact_safety_plan_required"
+          },
+          {
+            "condition": {
+              "approval_present": false,
+              "operation": "record_contact_plan"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "contact_approval_required",
+              "required_action": "attach_contact_approval"
+            },
+            "name": "contact_approval_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_contact_plan"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "contact_plan_evidence_required",
+              "required_action": "attach_contact_plan_evidence"
+            },
+            "name": "contact_evidence_required"
+          },
+          {
+            "condition": {
+              "coercive_scope": true,
+              "operation": "humint_agent_action"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "coercive_humint_action_denied",
+              "required_action": "remove_coercive_scope"
+            },
+            "name": "coercive_humint_action_denied"
+          },
+          {
+            "condition": {
+              "operation": "record_contact_report",
+              "plan_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "contact_plan_required",
+              "required_action": "select_contact_plan"
+            },
+            "name": "report_plan_required"
+          },
+          {
+            "condition": {
+              "operation": "record_contact_report",
+              "report_reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "contact_report_reference_required",
+              "required_action": "attach_report_reference"
+            },
+            "name": "report_reference_required"
+          },
+          {
+            "condition": {
+              "handler_present": false,
+              "operation": "record_contact_report"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "handler_required",
+              "required_action": "assign_handler"
+            },
+            "name": "report_handler_required"
+          },
+          {
+            "condition": {
+              "operation": "record_contact_report",
+              "source_welfare_valid": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_welfare_score_invalid",
+              "required_action": "set_welfare_0_to_1"
+            },
+            "name": "report_welfare_valid"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_contact_report"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "contact_report_evidence_required",
+              "required_action": "attach_report_evidence"
+            },
+            "name": "report_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_debriefing",
+              "report_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "contact_report_required",
+              "required_action": "select_contact_report"
+            },
+            "name": "debriefing_report_required"
+          },
+          {
+            "condition": {
+              "operation": "record_debriefing",
+              "topic_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "debriefing_topic_required",
+              "required_action": "record_topic"
+            },
+            "name": "debriefing_topic_required"
+          },
+          {
+            "condition": {
+              "classification_supported": false,
+              "operation": "record_debriefing"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "classification_not_supported",
+              "required_action": "select_supported_classification"
+            },
+            "name": "debriefing_classification_supported"
+          },
+          {
+            "condition": {
+              "credibility_valid": false,
+              "operation": "record_debriefing"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "credibility_score_invalid",
+              "required_action": "set_credibility_0_to_1"
+            },
+            "name": "debriefing_credibility_valid"
+          },
+          {
+            "condition": {
+              "analyst_present": false,
+              "operation": "record_debriefing"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "analyst_required",
+              "required_action": "assign_analyst"
+            },
+            "name": "debriefing_analyst_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_debriefing"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "debriefing_evidence_required",
+              "required_action": "attach_debriefing_evidence"
+            },
+            "name": "debriefing_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_reliability",
+              "source_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_required",
+              "required_action": "select_source"
+            },
+            "name": "reliability_source_required"
+          },
+          {
+            "condition": {
+              "operation": "record_reliability",
+              "reliability_grade_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "reliability_grade_not_supported",
+              "required_action": "select_supported_grade"
+            },
+            "name": "reliability_grade_supported"
+          },
+          {
+            "condition": {
+              "confidence_valid": false,
+              "operation": "record_reliability"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "confidence_score_invalid",
+              "required_action": "set_confidence_0_to_1"
+            },
+            "name": "reliability_confidence_valid"
+          },
+          {
+            "condition": {
+              "analyst_present": false,
+              "operation": "record_reliability"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "analyst_required",
+              "required_action": "assign_analyst"
+            },
+            "name": "reliability_analyst_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_reliability"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "reliability_evidence_required",
+              "required_action": "attach_reliability_evidence"
+            },
+            "name": "reliability_evidence_required"
+          },
+          {
+            "condition": {
+              "debriefing_present": false,
+              "operation": "record_lead"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "debriefing_required",
+              "required_action": "select_debriefing"
+            },
+            "name": "lead_debriefing_required"
+          },
+          {
+            "condition": {
+              "lead_type_supported": false,
+              "operation": "record_lead"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "lead_type_not_supported",
+              "required_action": "select_supported_lead_type"
+            },
+            "name": "lead_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_lead",
+              "priority_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "priority_not_supported",
+              "required_action": "select_supported_priority"
+            },
+            "name": "lead_priority_supported"
+          },
+          {
+            "condition": {
+              "analyst_present": false,
+              "operation": "record_lead"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "analyst_required",
+              "required_action": "assign_analyst"
+            },
+            "name": "lead_analyst_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_lead"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "lead_evidence_required",
+              "required_action": "attach_lead_evidence"
+            },
+            "name": "lead_evidence_required"
+          },
+          {
+            "condition": {
+              "lead_present": false,
+              "operation": "record_dissemination"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "lead_required",
+              "required_action": "select_lead"
+            },
+            "name": "dissemination_lead_required"
+          },
+          {
+            "condition": {
+              "audience_present": false,
+              "operation": "record_dissemination"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "audience_required",
+              "required_action": "select_audience"
+            },
+            "name": "dissemination_audience_required"
+          },
+          {
+            "condition": {
+              "operation": "record_dissemination",
+              "release_marking_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "release_marking_required",
+              "required_action": "set_release_marking"
+            },
+            "name": "dissemination_release_required"
+          },
+          {
+            "condition": {
+              "approval_present": false,
+              "operation": "record_dissemination"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "dissemination_approval_required",
+              "required_action": "attach_release_approval"
+            },
+            "name": "dissemination_approval_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_dissemination"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "dissemination_evidence_required",
+              "required_action": "attach_dissemination_evidence"
+            },
+            "name": "dissemination_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "status_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_status_not_supported",
+              "required_action": "select_supported_status"
+            },
+            "name": "review_status_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "reviewer_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "reviewer_required",
+              "required_action": "assign_reviewer"
+            },
+            "name": "review_reviewer_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_review"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_evidence_required",
+              "required_action": "attach_review_evidence"
+            },
+            "name": "review_evidence_required"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "humint_batch"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_humint_batch_to_bytewax"
+            },
+            "name": "humint_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_humint_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "humint_agent_runtime_not_supported",
+              "required_action": "select_supported_runtime"
+            },
+            "name": "humint_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_humint_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "humint_agent_role_not_supported",
+              "required_action": "select_supported_role"
+            },
+            "name": "humint_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "humint_agent_action",
+              "privileged_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_humint_agent_action_requires_human_approval"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "humint_policy_required",
+            "required_action": "attach_humint_policy"
+          },
+          "name": "humint_write_requires_policy"
+        },
+        {
+          "condition": {
+            "authority_type_supported": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_type_not_supported",
+            "required_action": "select_supported_authority_type"
+          },
+          "name": "authority_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_authority",
+            "scope_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_scope_required",
+            "required_action": "attach_scope_reference"
+          },
+          "name": "authority_scope_required"
+        },
+        {
+          "condition": {
+            "classification_supported": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "classification_not_supported",
+            "required_action": "select_supported_classification"
+          },
+          "name": "authority_classification_supported"
+        },
+        {
+          "condition": {
+            "approver_present": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_approver_required",
+            "required_action": "record_approver"
+          },
+          "name": "authority_approver_required"
+        },
+        {
+          "condition": {
+            "expiry_present": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_expiry_required",
+            "required_action": "set_expiry"
+          },
+          "name": "authority_expiry_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_evidence_required",
+            "required_action": "attach_authority_evidence"
+          },
+          "name": "authority_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "source_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_type_not_supported",
+            "required_action": "select_supported_source_type"
+          },
+          "name": "source_type_supported"
+        },
+        {
+          "condition": {
+            "handling_status_supported": false,
+            "operation": "register_source"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "handling_status_not_supported",
+            "required_action": "select_supported_status"
+          },
+          "name": "source_status_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "risk_level_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_level_not_supported",
+            "required_action": "select_supported_risk"
+          },
+          "name": "source_risk_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "owner_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_owner_required",
+            "required_action": "assign_source_owner"
+          },
+          "name": "source_owner_required"
+        },
+        {
+          "condition": {
+            "authority_present": false,
+            "operation": "register_source"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "lawful_authority_required",
+            "required_action": "select_authority"
+          },
+          "name": "source_authority_required"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "protection_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_protection_required",
+            "required_action": "attach_protection_reference"
+          },
+          "name": "source_protection_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "register_source"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_evidence_required",
+            "required_action": "attach_source_evidence"
+          },
+          "name": "source_evidence_required"
+        },
+        {
+          "condition": {
+            "authority_present": false,
+            "operation": "record_contact_plan"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "lawful_authority_required",
+            "required_action": "select_authority"
+          },
+          "name": "contact_authority_required"
+        },
+        {
+          "condition": {
+            "operation": "record_contact_plan",
+            "source_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_required",
+            "required_action": "select_source"
+          },
+          "name": "contact_source_required"
+        },
+        {
+          "condition": {
+            "operation": "record_contact_plan",
+            "source_authority_match": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_authority_mismatch",
+            "required_action": "select_source_for_authority"
+          },
+          "name": "contact_source_authority_match"
+        },
+        {
+          "condition": {
+            "contact_method_supported": false,
+            "operation": "record_contact_plan"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "contact_method_not_supported",
+            "required_action": "select_supported_contact_method"
+          },
+          "name": "contact_method_supported"
+        },
+        {
+          "condition": {
+            "objective_present": false,
+            "operation": "record_contact_plan"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "contact_objective_required",
+            "required_action": "attach_objective_reference"
+          },
+          "name": "contact_objective_required"
+        },
+        {
+          "condition": {
+            "operation": "record_contact_plan",
+            "safety_plan_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "safety_plan_required",
+            "required_action": "attach_safety_plan"
+          },
+          "name": "contact_safety_plan_required"
+        },
+        {
+          "condition": {
+            "approval_present": false,
+            "operation": "record_contact_plan"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "contact_approval_required",
+            "required_action": "attach_contact_approval"
+          },
+          "name": "contact_approval_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_contact_plan"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "contact_plan_evidence_required",
+            "required_action": "attach_contact_plan_evidence"
+          },
+          "name": "contact_evidence_required"
+        },
+        {
+          "condition": {
+            "coercive_scope": true,
+            "operation": "humint_agent_action"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "coercive_humint_action_denied",
+            "required_action": "remove_coercive_scope"
+          },
+          "name": "coercive_humint_action_denied"
+        },
+        {
+          "condition": {
+            "operation": "record_contact_report",
+            "plan_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "contact_plan_required",
+            "required_action": "select_contact_plan"
+          },
+          "name": "report_plan_required"
+        },
+        {
+          "condition": {
+            "operation": "record_contact_report",
+            "report_reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "contact_report_reference_required",
+            "required_action": "attach_report_reference"
+          },
+          "name": "report_reference_required"
+        },
+        {
+          "condition": {
+            "handler_present": false,
+            "operation": "record_contact_report"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "handler_required",
+            "required_action": "assign_handler"
+          },
+          "name": "report_handler_required"
+        },
+        {
+          "condition": {
+            "operation": "record_contact_report",
+            "source_welfare_valid": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_welfare_score_invalid",
+            "required_action": "set_welfare_0_to_1"
+          },
+          "name": "report_welfare_valid"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_contact_report"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "contact_report_evidence_required",
+            "required_action": "attach_report_evidence"
+          },
+          "name": "report_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_debriefing",
+            "report_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "contact_report_required",
+            "required_action": "select_contact_report"
+          },
+          "name": "debriefing_report_required"
+        },
+        {
+          "condition": {
+            "operation": "record_debriefing",
+            "topic_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "debriefing_topic_required",
+            "required_action": "record_topic"
+          },
+          "name": "debriefing_topic_required"
+        },
+        {
+          "condition": {
+            "classification_supported": false,
+            "operation": "record_debriefing"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "classification_not_supported",
+            "required_action": "select_supported_classification"
+          },
+          "name": "debriefing_classification_supported"
+        },
+        {
+          "condition": {
+            "credibility_valid": false,
+            "operation": "record_debriefing"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "credibility_score_invalid",
+            "required_action": "set_credibility_0_to_1"
+          },
+          "name": "debriefing_credibility_valid"
+        },
+        {
+          "condition": {
+            "analyst_present": false,
+            "operation": "record_debriefing"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "analyst_required",
+            "required_action": "assign_analyst"
+          },
+          "name": "debriefing_analyst_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_debriefing"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "debriefing_evidence_required",
+            "required_action": "attach_debriefing_evidence"
+          },
+          "name": "debriefing_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_reliability",
+            "source_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_required",
+            "required_action": "select_source"
+          },
+          "name": "reliability_source_required"
+        },
+        {
+          "condition": {
+            "operation": "record_reliability",
+            "reliability_grade_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "reliability_grade_not_supported",
+            "required_action": "select_supported_grade"
+          },
+          "name": "reliability_grade_supported"
+        },
+        {
+          "condition": {
+            "confidence_valid": false,
+            "operation": "record_reliability"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "confidence_score_invalid",
+            "required_action": "set_confidence_0_to_1"
+          },
+          "name": "reliability_confidence_valid"
+        },
+        {
+          "condition": {
+            "analyst_present": false,
+            "operation": "record_reliability"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "analyst_required",
+            "required_action": "assign_analyst"
+          },
+          "name": "reliability_analyst_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_reliability"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "reliability_evidence_required",
+            "required_action": "attach_reliability_evidence"
+          },
+          "name": "reliability_evidence_required"
+        },
+        {
+          "condition": {
+            "debriefing_present": false,
+            "operation": "record_lead"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "debriefing_required",
+            "required_action": "select_debriefing"
+          },
+          "name": "lead_debriefing_required"
+        },
+        {
+          "condition": {
+            "lead_type_supported": false,
+            "operation": "record_lead"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "lead_type_not_supported",
+            "required_action": "select_supported_lead_type"
+          },
+          "name": "lead_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_lead",
+            "priority_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "priority_not_supported",
+            "required_action": "select_supported_priority"
+          },
+          "name": "lead_priority_supported"
+        },
+        {
+          "condition": {
+            "analyst_present": false,
+            "operation": "record_lead"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "analyst_required",
+            "required_action": "assign_analyst"
+          },
+          "name": "lead_analyst_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_lead"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "lead_evidence_required",
+            "required_action": "attach_lead_evidence"
+          },
+          "name": "lead_evidence_required"
+        },
+        {
+          "condition": {
+            "lead_present": false,
+            "operation": "record_dissemination"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "lead_required",
+            "required_action": "select_lead"
+          },
+          "name": "dissemination_lead_required"
+        },
+        {
+          "condition": {
+            "audience_present": false,
+            "operation": "record_dissemination"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "audience_required",
+            "required_action": "select_audience"
+          },
+          "name": "dissemination_audience_required"
+        },
+        {
+          "condition": {
+            "operation": "record_dissemination",
+            "release_marking_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "release_marking_required",
+            "required_action": "set_release_marking"
+          },
+          "name": "dissemination_release_required"
+        },
+        {
+          "condition": {
+            "approval_present": false,
+            "operation": "record_dissemination"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "dissemination_approval_required",
+            "required_action": "attach_release_approval"
+          },
+          "name": "dissemination_approval_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_dissemination"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "dissemination_evidence_required",
+            "required_action": "attach_dissemination_evidence"
+          },
+          "name": "dissemination_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "status_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_status_not_supported",
+            "required_action": "select_supported_status"
+          },
+          "name": "review_status_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "reviewer_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "reviewer_required",
+            "required_action": "assign_reviewer"
+          },
+          "name": "review_reviewer_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_review"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_evidence_required",
+            "required_action": "attach_review_evidence"
+          },
+          "name": "review_evidence_required"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "humint_batch"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_humint_batch_to_bytewax"
+          },
+          "name": "humint_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_humint_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "humint_agent_runtime_not_supported",
+            "required_action": "select_supported_runtime"
+          },
+          "name": "humint_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_humint_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "humint_agent_role_not_supported",
+            "required_action": "select_supported_role"
+          },
+          "name": "humint_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "humint_agent_action",
+            "privileged_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_humint_agent_action_requires_human_approval"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "agents": {
+          "component": "HUMINTAgentWorkbench",
+          "permission": "intel_humint:admin",
+          "route": "/intel-humint/agents"
+        },
+        "authorities": {
+          "component": "SourceAuthorityConsole",
+          "permission": "intel_humint:authorities",
+          "route": "/intel-humint/authorities"
+        },
+        "contact_plans": {
+          "component": "ContactPlanWorkbench",
+          "permission": "intel_humint:contacts",
+          "route": "/intel-humint/contact-plans"
+        },
+        "contact_reports": {
+          "component": "ContactReportLedger",
+          "permission": "intel_humint:reports",
+          "route": "/intel-humint/contact-reports"
+        },
+        "dashboard": {
+          "component": "HUMINTDashboard",
+          "permission": "intel_humint:view",
+          "route": "/intel-humint/dashboard"
+        },
+        "debriefings": {
+          "component": "DebriefingWorkbench",
+          "permission": "intel_humint:analysis",
+          "route": "/intel-humint/debriefings"
+        },
+        "dissemination": {
+          "component": "HUMINTDisseminationConsole",
+          "permission": "intel_humint:dissemination",
+          "route": "/intel-humint/dissemination"
+        },
+        "leads": {
+          "component": "HUMINTLeadWorkbench",
+          "permission": "intel_humint:leads",
+          "route": "/intel-humint/leads"
+        },
+        "reliability": {
+          "component": "ReliabilityAssessmentWorkbench",
+          "permission": "intel_humint:analysis",
+          "route": "/intel-humint/reliability"
+        },
+        "reviews": {
+          "component": "HUMINTReviewConsole",
+          "permission": "intel_humint:reviews",
+          "route": "/intel-humint/reviews"
+        },
+        "settings": {
+          "component": "HUMINTSettings",
+          "permission": "intel_humint:admin",
+          "route": "/intel-humint/settings"
+        },
+        "sources": {
+          "component": "HumanSourceRegistry",
+          "permission": "intel_humint:sources",
+          "route": "/intel-humint/sources"
+        }
+      },
+      "streaming": {
+        "events": [
+          "humint_authority_recorded",
+          "humint_source_registered",
+          "humint_contact_plan_recorded",
+          "humint_contact_report_recorded",
+          "humint_debriefing_recorded",
+          "humint_reliability_recorded",
+          "humint_lead_recorded",
+          "humint_dissemination_recorded",
+          "humint_review_recorded",
+          "humint_agent_registered"
+        ],
+        "guardrails": [
+          "humint_batch_requires_bytewax",
+          "privileged_humint_agent_action_requires_human_approval",
+          "coercive_humint_action_denied"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.intel.humint.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "authorities": {
+            "icon": "shield-check",
+            "status_indicator": "authority-chip"
+          },
+          "contact_plans": {
+            "icon": "calendar-check",
+            "status_indicator": "safety-chip"
+          },
+          "contact_reports": {
+            "icon": "clipboard-list",
+            "status_indicator": "welfare-chip"
+          },
+          "debriefings": {
+            "icon": "messages-square",
+            "status_indicator": "credibility-chip"
+          },
+          "dissemination": {
+            "icon": "send",
+            "status_indicator": "release-chip"
+          },
+          "leads": {
+            "icon": "network",
+            "status_indicator": "priority-chip"
+          },
+          "reliability": {
+            "icon": "badge-check",
+            "status_indicator": "grade-chip"
+          },
+          "reviews": {
+            "icon": "clipboard-check",
+            "status_indicator": "review-chip"
+          },
+          "sources": {
+            "icon": "user-round-check",
+            "status_indicator": "source-status-chip"
+          }
+        },
+        "name": "intel_humint_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#7C2D12",
+          "color.danger": "#B91C1C",
+          "color.primary": "#244E3B",
+          "color.success": "#166534",
+          "color.warning": "#A16207",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/intel-humint/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "HUMINTDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/intel-humint/dashboard",
+            "permission": "intel_humint:view"
+          },
+          {
+            "component": "SourceAuthorityConsole",
+            "name": "authorities",
+            "nav_group": "Governance",
+            "path": "/intel-humint/authorities",
+            "permission": "intel_humint:authorities"
+          },
+          {
+            "component": "HumanSourceRegistry",
+            "name": "sources",
+            "nav_group": "Source Management",
+            "path": "/intel-humint/sources",
+            "permission": "intel_humint:sources"
+          },
+          {
+            "component": "ContactPlanWorkbench",
+            "name": "contact_plans",
+            "nav_group": "Operations",
+            "path": "/intel-humint/contact-plans",
+            "permission": "intel_humint:contacts"
+          },
+          {
+            "component": "ContactReportLedger",
+            "name": "contact_reports",
+            "nav_group": "Operations",
+            "path": "/intel-humint/contact-reports",
+            "permission": "intel_humint:reports"
+          },
+          {
+            "component": "DebriefingWorkbench",
+            "name": "debriefings",
+            "nav_group": "Analysis",
+            "path": "/intel-humint/debriefings",
+            "permission": "intel_humint:analysis"
+          },
+          {
+            "component": "ReliabilityAssessmentWorkbench",
+            "name": "reliability",
+            "nav_group": "Analysis",
+            "path": "/intel-humint/reliability",
+            "permission": "intel_humint:analysis"
+          },
+          {
+            "component": "HUMINTLeadWorkbench",
+            "name": "leads",
+            "nav_group": "Analysis",
+            "path": "/intel-humint/leads",
+            "permission": "intel_humint:leads"
+          },
+          {
+            "component": "HUMINTDisseminationConsole",
+            "name": "dissemination",
+            "nav_group": "Release",
+            "path": "/intel-humint/dissemination",
+            "permission": "intel_humint:dissemination"
+          },
+          {
+            "component": "HUMINTReviewConsole",
+            "name": "reviews",
+            "nav_group": "Governance",
+            "path": "/intel-humint/reviews",
+            "permission": "intel_humint:reviews"
+          },
+          {
+            "component": "HUMINTAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/intel-humint/agents",
+            "permission": "intel_humint:admin"
+          },
+          {
+            "component": "HUMINTSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/intel-humint/settings",
+            "permission": "intel_humint:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "humint_operations": {
+        "roles": [
+          "authority_reviewer",
+          "source_manager",
+          "contact_planner",
+          "debriefing_analyst",
+          "welfare_reviewer",
+          "dissemination_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "intel_humint": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "grph",
+        "ragn"
+      ]
+    }
+  },
+  "contracts": {
+    "intel_humint": {
+      "configuration": {
+        "adapters": {
+          "audit": "audl",
+          "auth": "auth",
+          "case_management": "case",
+          "event_stream": "bytewax",
+          "graph": "grph",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "rag": "ragn"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "authority_reviewer",
+            "source_manager",
+            "contact_planner",
+            "debriefing_analyst",
+            "welfare_reviewer",
+            "dissemination_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "authorities": {
+          "approver_required": true,
+          "evidence_required": true,
+          "expiry_required": true,
+          "supported_authority_types": [
+            "mission_order",
+            "consent",
+            "partner_authority",
+            "legal_mandate",
+            "oversight_authorization"
+          ],
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ]
+        },
+        "contact_plans": {
+          "approval_required": true,
+          "authority_required": true,
+          "evidence_required": true,
+          "objective_required": true,
+          "safety_plan_required": true,
+          "source_required": true,
+          "supported_methods": [
+            "in_person",
+            "secure_call",
+            "secure_message",
+            "partner_channel",
+            "interview",
+            "debrief"
+          ]
+        },
+        "contact_reports": {
+          "evidence_required": true,
+          "handler_required": true,
+          "plan_required": true,
+          "source_welfare_required": true
+        },
+        "debriefings": {
+          "analyst_required": true,
+          "credibility_required": true,
+          "evidence_required": true,
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ],
+          "topic_required": true
+        },
+        "dissemination": {
+          "approval_required": true,
+          "audience_required": true,
+          "evidence_required": true,
+          "lead_required": true,
+          "release_marking_required": true
+        },
+        "governance": {
+          "audit_events": true,
+          "coercion_prohibited": true,
+          "lawful_authority_required": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "source_welfare_required": true
+        },
+        "leads": {
+          "analyst_required": true,
+          "debriefing_required": true,
+          "evidence_required": true,
+          "supported_priorities": [
+            "low",
+            "medium",
+            "high",
+            "urgent"
+          ],
+          "supported_types": [
+            "identity",
+            "location",
+            "network",
+            "event",
+            "threat",
+            "financial",
+            "protective"
+          ]
+        },
+        "observability": {
+          "event_stream": "apg.intel.humint.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "reliability": {
+          "analyst_required": true,
+          "confidence_required": true,
+          "evidence_required": true,
+          "source_required": true,
+          "supported_grades": [
+            "a",
+            "b",
+            "c",
+            "d",
+            "e",
+            "f"
+          ]
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "sources": {
+          "authority_required": true,
+          "evidence_required": true,
+          "owner_required": true,
+          "protection_plan_required": true,
+          "supported_risk_levels": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "supported_source_types": [
+            "voluntary_source",
+            "confidential_human_source",
+            "partner_liaison",
+            "field_interview",
+            "community_contact",
+            "internal_report",
+            "diplomatic_contact"
+          ],
+          "supported_statuses": [
+            "prospective",
+            "active",
+            "paused",
+            "closed",
+            "protected"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "intel_humint_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_authorities": true,
+          "enable_contact_plans": true,
+          "enable_contact_reports": true,
+          "enable_dashboard": true,
+          "enable_debriefings": true,
+          "enable_dissemination": true,
+          "enable_leads": true,
+          "enable_reliability": true,
+          "enable_reviews": true,
+          "enable_sources": true
+        }
+      },
+      "id": "intel_humint",
+      "provides": [
+        "humint_authority_workflow",
+        "humint_source_workflow",
+        "humint_contact_plan_workflow",
+        "humint_contact_report_workflow",
+        "humint_debriefing_workflow",
+        "humint_reliability_workflow",
+        "humint_lead_workflow",
+        "humint_dissemination_workflow",
+        "humint_review_workflow",
+        "humint_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "grph",
+        "ragn"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 6,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "intel_humint": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}

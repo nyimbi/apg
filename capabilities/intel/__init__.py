@@ -60,6 +60,7 @@ CAPABILITY_META = {
 		'crawler',     # Web Crawler (legacy)
 		'osint',       # Open Source Intelligence
 		'sigint',      # Signals Intelligence
+		'humint',      # Human Intelligence
 		'radio',       # Radio Intelligence Listener
 	],
 	'security_requirements': {

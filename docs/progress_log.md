@@ -28689,3 +28689,93 @@ Known gaps:
   lawful-intercept provider integrations, storage backends, source
   authorization systems, dissemination delivery, durable Bytewax topology, or
   performance/load checks during this battery-conscious slice.
+
+## 2026-06-01 - Intel Human Intelligence executable capability
+
+- Promoted `capabilities/intel/humint` from placeholder into a first-class
+  executable APG capability with README, specification, plan, capability spec,
+  package manifest, release evidence, focused tests, and code-review notes.
+- Added lawful authority, human source, contact plan, contact report,
+  debriefing, reliability assessment, lead, dissemination, review, Bytewax
+  batch validation, dashboard summary, and provider-neutral HUMINT agent
+  workflows.
+- Added deterministic guardrails for tenant context, write policy, lawful
+  authority, source-authority match, source protection, source welfare, safety
+  planning, credibility and confidence bounds, evidence, release approval,
+  Bytewax lifecycle events, supported AI-agent runtimes and roles, privileged
+  AI-agent approval, and denial of coercive HUMINT automation scope.
+- Added compact UI/view models and theme tokens for dashboards, authorities,
+  sources, contact plans, contact reports, debriefings, reliability, leads,
+  dissemination, reviews, agents, and settings.
+- Updated intelligence capability metadata so `humint` is listed as an
+  implemented sub-capability.
+- Updated `capabilities/README.md` so the catalog snapshot reports 138 valid
+  contracts, 138 domain-specific packages, 138 strict complete package artifact
+  sets, and 4 Intel packages.
+- Removed the empty `_Human_Intelligence` marker file and added a generated
+  `semantic_model.json` from the executable application.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/intel/humint/__init__.py
+  capabilities/intel/humint/capability_contract.py
+  capabilities/intel/humint/models.py
+  capabilities/intel/humint/humint_runtime.py
+  capabilities/intel/humint/service.py
+  capabilities/intel/humint/api.py
+  capabilities/intel/humint/views.py
+  capabilities/intel/humint/app.py
+  capabilities/intel/humint/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/intel/humint/tests/test_package_contract.py` passed with 7
+  tests.
+- `./.venv/bin/python capabilities/intel/humint/app.py` passed self-test with
+  `passed: true` and `status: ok`.
+- `./.venv/bin/apg capabilities inspect intel_humint --json` passed with 57
+  rules, 12 UI routes, theme `intel_humint_control`, shell `apg_python`, and
+  Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/intel/humint --json` passed with `side_effect_free: true` and 0
+  warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/intel/humint --json` passed with 1 domain-specific capability,
+  0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/intel/humint --json` passed with 1 complete lifecycle, 57
+  rules, 12 UI routes, 11 theme tokens, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 138 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 138 operable contracts, 138 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/intel/humint`, `capabilities/intel/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed authority, source, contact plan, contact report, debriefing,
+  reliability, lead, dissemination, review, Bytewax batch, and AI-agent
+  lifecycle paths so rule evaluation happens before state mutation.
+- Confirmed service state is keyed by tenant plus record ID and covered by a
+  regression test with shared authority/source IDs across tenants.
+- Tightened HUMINT semantics around lawful authority, source-authority
+  relationships, source protection, source welfare, safety planning, evidence
+  capture, release approval, tenant-keyed state isolation, and privileged or
+  coercive AI-agent actions.
+- Kept field operations, source recruitment, covert communications, payment
+  handling, physical security, identity protection infrastructure, partner case
+  systems, storage backends, GraphRAG projections, dissemination delivery, and
+  durable Bytewax workers behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, field operations,
+  source recruitment, covert communications, payment handling, physical
+  security, identity protection infrastructure, partner case systems, storage
+  backends, GraphRAG projections, dissemination delivery, durable Bytewax
+  topology, or performance/load checks during this battery-conscious slice.
