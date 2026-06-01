@@ -32,6 +32,11 @@ and package evidence.
   grouped key lifecycle mutations into generated APG applications.
 - **Key lifecycle batch evidence**: accepted or denied batch validation record
   for grouped KEYM lifecycle mutations.
+- **Cloud federation adapter**: deterministic provider descriptor for AWS,
+  Azure, GCP, IBM Cloud, Oracle Cloud, Alibaba Cloud, DigitalOcean, and Vultr
+  key custody surfaces. The package can create, synchronize, rotate, fail over,
+  migrate, inspect, cost, and map compliance for federated key references
+  without importing provider SDKs.
 - **Audit event**: package evidence for key lifecycle and guardrail events.
 
 Reviewable records expose a consistent evidence shape:
@@ -62,9 +67,14 @@ Reviewable records expose a consistent evidence shape:
     `pending_review` evidence.
 12. Key lifecycle batch mutations must use Bytewax; denied non-Bytewax
     validations must persist evidence before raising.
-13. API helpers and UI view models must expose the package lifecycle state for
+13. Multi-cloud federation must initialize every configured provider as an APG
+    adapter descriptor, never as a package-level hard dependency on a cloud SDK.
+14. Federated keys must support primary and backup references, synchronization,
+    rotation, failover, migration, status inspection, cost analysis, and
+    compliance mapping through the dependency-light runtime.
+15. API helpers and UI view models must expose the package lifecycle state for
    generated APG applications.
-14. `app.py`, `semantic_model.json`, `release_report.json`, and
+16. `app.py`, `semantic_model.json`, `release_report.json`, and
     `package_manifest.json` must reflect the live capability contract.
 
 ## Adapter Boundaries
@@ -92,6 +102,8 @@ it with first-class key-agent composition:
 - register key agents with runtime, role, owner, purpose, scope, disclosure, and
   privileged human-approval or pending-review evidence;
 - validate Bytewax key lifecycle batches before accepting grouped mutation work;
+- initialize cloud federation adapters and run deterministic federated key
+  create, sync, rotate, failover, migrate, status, cost, and compliance flows;
 - compose pending operation, export approval, rotation exception, rotation,
   key-agent, and lifecycle batch reviews for generated governance consoles;
 - expose inventory, approvals, rotations, compromise, key-agent roster, audit,

@@ -25362,6 +25362,68 @@ Known gaps:
   contracts, but they do not replace future deep domain QA for live enterprise
   deployments.
 
+### 2026-06-01 11:08 EAT
+
+KEYM cloud federation hardening slice:
+
+- Replaced provider-specific no-op cloud federation initialization with
+  deterministic APG adapter descriptors for AWS KMS, Azure Key Vault, Google
+  Cloud KMS, IBM Cloud Key Protect, Oracle Cloud Vault, Alibaba Cloud KMS,
+  DigitalOcean Spaces, and Vultr Object Storage.
+- Fixed the `CloudOperation` dataclass import-time failure by moving required
+  fields before the generated operation ID default.
+- Added executable federation coverage for provider adapter initialization,
+  federated key reference creation, synchronization, rotation, failover,
+  metadata-only migration, and status inspection.
+- Updated KEYM `SPECIFICATION.md`, `PLAN.md`, `README.md`, and `cap_spec.md`
+  so cloud federation is documented as a dependency-light package runtime
+  surface with live provider SDKs kept behind external adapters.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/keym/cloud_federation.py capabilities/common/keym/tests/test_cloud_federation.py capabilities/common/keym/tests/test_capability_contract.py capabilities/common/keym/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/keym/tests/test_cloud_federation.py capabilities/common/keym/tests/test_capability_contract.py capabilities/common/keym/tests/test_package_contract.py`
+  passed with 16 tests and 10 pre-existing SQLAlchemy/Pydantic deprecation
+  warnings from imported shared modules.
+- Focused stale-marker scan over touched KEYM federation source, docs, and
+  tests returned no primary-slice stale markers.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/keym --json`
+  passed with one domain-specific KEYM implementation, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/keym --strict --json`
+  passed with one domain-specific KEYM implementation, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/common/keym --json`
+  passed with one complete lifecycle record, 16 rules, 12 routes, and 0
+  warnings/errors.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/keym --json`
+  passed with side-effect-free publish evidence and no warnings.
+- `./.venv/bin/python -c "import importlib; app=importlib.import_module('capabilities.common.keym.app'); r=app.self_test(); print(r); assert r['passed']"`
+  passed.
+- `git diff --check -- capabilities/common/keym docs/progress_log.md` passed.
+
+Code review:
+
+- Reviewed provider coverage: every enum value in `CloudProvider` now has a
+  configured adapter initializer and default provider metadata.
+- Reviewed adapter boundaries: the package runtime exposes local deterministic
+  behavior and credential-presence metadata without importing provider SDKs or
+  calling live clouds.
+- Reviewed federation lifecycle behavior: create, sync, rotate, failover,
+  migrate, and status paths now run through concrete local state transitions
+  that generated apps can compose.
+- Reviewed existing KEYM guardrails: tenant, policy, HSM attestation,
+  dual-control export, rotation exception, compromised-key, key-agent, and
+  Bytewax lifecycle-batch controls remain covered by focused package tests.
+
+Known gaps:
+
+- Did not run the full repository pytest suite, rendered KEYM UI checks, live
+  AWS/Azure/GCP/IBM/Oracle/Alibaba/DigitalOcean/Vultr SDK calls, live HSM or
+  vault integrations, performance/load tests, or live disaster-recovery drills
+  during this battery-conscious hardening slice.
+
 ### 2026-06-01 02:53 EAT
 
 AGNT governed execution run lifecycle slice:

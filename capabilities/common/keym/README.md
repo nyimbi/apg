@@ -195,6 +195,21 @@ disclosure. The service rejects unsupported runtimes, unsupported roles, missing
 scope, and missing disclosure. Privileged registrations without human approval
 are retained as `pending_review` evidence.
 
+## Cloud Federation
+
+`cloud_federation.py` provides a local, deterministic APG adapter runtime for
+multi-cloud key custody. It supports AWS KMS, Azure Key Vault, Google Cloud
+KMS, IBM Cloud Key Protect, Oracle Cloud Vault, Alibaba Cloud KMS,
+DigitalOcean Spaces, and Vultr Object Storage without importing those provider
+SDKs into the package runtime.
+
+Generated applications can initialize configured provider adapters, create
+federated key references, synchronize backup references, rotate all references,
+fail over from an unhealthy primary, migrate metadata-only custody to another
+provider, inspect federation status, estimate provider costs, and generate
+compliance coverage maps. Live SDK calls belong in external adapters that
+preserve this dependency-light contract.
+
 ## Adapter Boundaries
 
 The dependency-light runtime intentionally avoids direct live dependencies on
