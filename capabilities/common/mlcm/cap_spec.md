@@ -35,7 +35,14 @@ lifecycle batch -> audit`
 - Evaluation evidence enforcement: missing baselines are denied; missing
   evidence, fairness review, or explainability review becomes pending-review
   evidence with matched rule names.
+- Durable review evidence: pending versions, pending evaluations, privileged
+  lifecycle agents, denied lifecycle batches, and audit events expose matched
+  rules, review reasons, and audit evidence.
 - Model lifecycle-agent runtime, role, scope, owner, purpose, contribution
   disclosure, and privileged approval status.
 - Bytewax lifecycle batch processing for model, version, evaluation, promotion,
   deployment, drift, rollback, retirement, and agent batches.
+
+Generated applications can compose review queues from `list_pending_reviews()`
+or from dashboard, version manager, evaluation console, lifecycle-agent roster,
+lifecycle-batch, and governance view models without re-running policy rules.

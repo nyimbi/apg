@@ -27,6 +27,7 @@ def dashboard_model(
 		"drift_signals": service.list_drift_signals(tenant_id),
 		"model_lifecycle_agents": service.list_model_lifecycle_agents(tenant_id),
 		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
 	}
@@ -81,6 +82,11 @@ def version_manager_model(
 			for version in service.list_versions(tenant_id)
 			if version["status"] == "pending_review"
 		],
+		"pending_reviews": [
+			version
+			for version in service.list_pending_reviews(tenant_id)
+			if version.get("version")
+		],
 		"route": "/mlcm/versions",
 	}
 
@@ -98,6 +104,11 @@ def evaluation_console_model(
 			evaluation
 			for evaluation in service.list_evaluations(tenant_id)
 			if evaluation["status"] == "pending_review"
+		],
+		"pending_reviews": [
+			evaluation
+			for evaluation in service.list_pending_reviews(tenant_id)
+			if "score" in evaluation
 		],
 		"versions": service.list_versions(tenant_id),
 		"route": "/mlcm/evaluation",
@@ -205,6 +216,11 @@ def model_lifecycle_agent_roster_model(
 	return {
 		"tenant_id": tenant_id,
 		"agents": service.list_model_lifecycle_agents(tenant_id),
+		"pending_reviews": [
+			agent
+			for agent in service.list_model_lifecycle_agents(tenant_id)
+			if agent["status"] == "pending_review"
+		],
 		"supported_runtimes": contract["agents"]["supported_runtimes"],
 		"supported_roles": contract["agents"]["supported_roles"],
 		"privileged_roles": contract["agents"]["privileged_roles"],
@@ -222,6 +238,11 @@ def lifecycle_batch_model(
 	return {
 		"tenant_id": tenant_id,
 		"batches": service.list_lifecycle_batches(tenant_id),
+		"denied": [
+			batch
+			for batch in service.list_lifecycle_batches(tenant_id)
+			if batch["status"] == "denied"
+		],
 		"streaming": contract["streaming"],
 		"required_operations": contract["streaming"]["required_operations"],
 		"route": "/mlcm/lifecycle",
@@ -243,6 +264,7 @@ def governance_model(
 		"retirements": service.list_retirements(tenant_id),
 		"model_lifecycle_agents": service.list_model_lifecycle_agents(tenant_id),
 		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"route": "/mlcm/governance",
 	}

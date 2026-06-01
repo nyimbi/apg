@@ -159,6 +159,8 @@ def test_registration_includes_full_capability_contract():
 	assert registration["agents"]["first_class"] is True
 	assert registration["streaming"]["required_processor"] == "bytewax"
 	assert "model_lifecycle_agent_composition" in registration["capabilities"]
+	assert "review_evidence" in registration["capabilities"]
+	assert registration["endpoints"]["pending_reviews"] == "/mlcm/api/v1/pending-reviews"
 	assert "aicr" in registration["dependencies"]
 	assert "mlcm:deploy" in registration["permissions"]
 
@@ -366,18 +368,40 @@ def test_mlcm_version_and_evaluation_review_evidence_is_executable():
 		"version_creation_requires_training_data",
 		"version_creation_requires_baseline",
 	}
+	assert set(pending_version["review_reasons"]) == {
+		"training_data_lineage_required",
+		"baseline_ref_required",
+	}
+	assert set(pending_version["audit_evidence"]["required_actions"]) == {
+		"attach_training_data_ref",
+		"attach_baseline_ref",
+	}
 	assert pending_evaluation["status"] == "pending_review"
 	assert set(pending_evaluation["matched_rules"]) == {
 		"evaluation_requires_evidence",
 		"high_risk_evaluation_requires_fairness_review",
 		"high_risk_evaluation_requires_explainability",
 	}
+	assert set(pending_evaluation["review_reasons"]) == {
+		"evaluation_evidence_required",
+		"fairness_review_required",
+		"explainability_required",
+	}
+	assert set(pending_evaluation["audit_evidence"]["required_actions"]) == {
+		"attach_evaluation_evidence",
+		"record_fairness_review",
+		"record_explainability_evidence",
+	}
 	assert approved_evaluation["status"] == "passed"
 	assert approved_evaluation["decision"] == "allow"
+	assert approved_evaluation["review_reasons"] == []
 	assert service.dashboard_summary(tenant_id)["pending_evaluation_review_count"] == 1
+	assert service.dashboard_summary(tenant_id)["pending_review_count"] == 1
 	assert service.dashboard_summary(tenant_id)["pending_version_review_count"] == 0
+	assert service.list_pending_reviews(tenant_id)[0]["id"] == "release-eval-review"
 	assert version_manager_model(service, tenant_id)["pending_review"] == []
 	assert evaluation_console_model(service, tenant_id)["pending_review"][0]["id"] == "release-eval-review"
+	assert governance_model(service, tenant_id)["pending_reviews"][0]["id"] == "release-eval-review"
 
 
 def test_mlcm_service_enforces_policy_guardrails():
@@ -428,6 +452,9 @@ def test_mlcm_service_enforces_policy_guardrails():
 
 	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
 		service.validate_mlcm_lifecycle_batch(tenant_id, "legacy_queue", 1)
+	denied_batch = service.list_lifecycle_batches(tenant_id)[0]
+	assert denied_batch["status"] == "denied"
+	assert denied_batch["audit_evidence"]["reasons"] == ["bytewax_lifecycle_stream_required"]
 
 	service.register_model(
 		model_id="guardrail-model",
@@ -616,7 +643,11 @@ def test_privileged_model_lifecycle_agent_without_approval_is_pending_review():
 	)
 
 	assert agent["status"] == "pending_review"
+	assert agent["decision"] == "require_review"
+	assert agent["review_reasons"] == ["model_lifecycle_agent_human_approval_required"]
+	assert agent["audit_evidence"]["required_actions"] == ["record_human_model_lifecycle_agent_approval"]
 	assert service.dashboard_summary("tenant-review")["pending_agent_review_count"] == 1
+	assert service.list_pending_reviews("tenant-review")[0]["id"] == "deployment-reviewer"
 
 
 def test_api_helpers_expose_model_lifecycle_agents_and_batches():
@@ -641,4 +672,5 @@ def test_api_helpers_expose_model_lifecycle_agents_and_batches():
 	assert agent["id"] == "api-steward"
 	assert batch["accepted"] is True
 	assert api.list_model_lifecycle_agents("tenant-api-mlcm")[0]["id"] == "api-steward"
+	assert api.list_pending_reviews("tenant-api-mlcm") == []
 	assert api.list_lifecycle_batches("tenant-api-mlcm")[0]["id"] == "api-batch"

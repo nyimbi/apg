@@ -59,6 +59,12 @@ The coherent lifecycle packet is:
 - Version and evaluation methods must preserve rule decisions and matched rules
   on their records so generated applications can render review queues without
   replaying the policy engine.
+- Review-required versions, evaluations, and model lifecycle agents must expose
+  `decision`, `matched_rules`, `review_reasons`, and `audit_evidence`.
+- Denied lifecycle batches must preserve policy evidence even when the service
+  raises a hard `PermissionError`.
+- Service, API, dashboard, version, evaluation, agent, lifecycle, and
+  governance surfaces must expose pending-review queues.
 - Summary and list calls must remain tenant-scoped.
 - Compatibility calls `create_record()` and `list_records()` must continue to
   map to model registry behavior for older package callers.
@@ -86,6 +92,8 @@ Executable guardrail behavior:
   references, fairness review, or explainability review are missing.
 - Dashboard and UI models expose pending version and evaluation review counts
   for immediate operator action.
+- `list_pending_reviews()` returns pending version, evaluation, and lifecycle
+  agent records for generated approval consoles.
 
 ## First-Class Model Lifecycle Agents
 
@@ -101,12 +109,19 @@ without human approval are registered as `pending_review`; unsupported runtime,
 unsupported role, missing scope, missing owner, missing purpose, and missing
 contribution disclosure are blocked.
 
+Pending agent records preserve matched rules, review reasons, and required
+actions so Codex, Claude Code, OpenCode, Pi, or future agent contributors can
+be governed without provider-specific logic in the package.
+
 ## Bytewax Lifecycle Batches
 
 MLCM lifecycle mutation batches must use Bytewax as the required processor.
 The packet validates model, version, evaluation, promotion, deployment, drift,
 rollback, retirement, and model-lifecycle-agent batches. Non-Bytewax streams are
 denied and audited.
+
+Denied batch records keep `decision`, `matched_rules`, `review_reasons`, and
+`audit_evidence` so operators can inspect why the batch was rejected.
 
 ## Composition Interfaces
 

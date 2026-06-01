@@ -16,6 +16,76 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-06-01 05:44 EAT
+
+MLCM review-evidence lifecycle packet:
+
+- Extended model versions, evaluation runs, model lifecycle agent records,
+  lifecycle batch records, and audit events with durable policy evidence:
+  decision or policy decision, matched rules, review reasons, and audit
+  evidence.
+- Preserved review-required evidence for incomplete model version lineage,
+  high-risk or evidence-incomplete evaluations, and privileged model lifecycle
+  agents while keeping hard deny paths blocking.
+- Persisted denied non-Bytewax lifecycle batch records before raising so
+  operators can inspect rejected lifecycle mutations and their matched rules.
+- Added consolidated pending-review queues to MLCM service, API helper,
+  dashboard, version manager, evaluation console, lifecycle-agent roster,
+  lifecycle batch, governance, registration, package, and semantic model
+  surfaces.
+- Kept model lifecycle agents provider-neutral for Codex, Claude Code,
+  OpenCode, Pi, and future runtime contributors.
+- Updated focused MLCM tests and package contract tests to prove durable review
+  evidence for versions, evaluations, privileged lifecycle agents, denied
+  batches, API helpers, views, and semantic model evidence.
+- Updated MLCM README, specification, plan, and capability pointer to document
+  the pending-review queue lifecycle and hard deny distinction.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for MLCM modules and tests passed.
+- `./.venv/bin/pytest -q capabilities/common/mlcm/test_capability_contract.py
+  capabilities/common/mlcm/tests/test_package_contract.py` passed with 12 tests
+  and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.mlcm import app; ..."`
+  passed package self-test.
+- `./.venv/bin/python -m json.tool
+  capabilities/common/mlcm/semantic_model.json` passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/mlcm --json` passed with no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/mlcm --strict --json` passed with no warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/mlcm --json`
+  passed with no warnings and side-effect-free publish planning.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/common/mlcm --json` passed with complete lifecycle evidence and
+  43 rules.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed with 109 valid contracts, 109 operable packages, and no warnings or
+  errors.
+- Service smoke executed version -> evaluation -> lifecycle agent
+  pending-review flow and printed `pending_review pending_review
+  pending_review 3`.
+- Refined stale-marker scan returned no TODO/FIXME/placeholder/stub,
+  contract-only, Kafka, or not-implemented markers across the edited MLCM
+  packet.
+- `git diff --check -- capabilities/common/mlcm docs/progress_log.md` passed
+  before commit staging.
+- Inline code review found no blocking issues; residual risks remain around
+  rendered UI, live model providers, live model lifecycle agent CLIs, live
+  Bytewax topology, persistent storage, artifact stores, adapter integration,
+  load checks, quality benchmarks, deployment health checks, and drift quality
+  validation.
+
+Known gaps:
+
+- Full repository tests, rendered browser UI, live model providers, live
+  Codex/Claude Code/OpenCode/Pi lifecycle agents, live Bytewax topology,
+  persistent database and migrations, real artifact store, live
+  AICR/MONI/AUDL/AUTH adapters, load checks, model quality benchmarks,
+  deployment health checks, and drift quality validation still need later
+  verification outside this battery-conscious slice.
+
 ### 2026-06-01 05:33 EAT
 
 AGNT review-evidence lifecycle packet:

@@ -144,6 +144,8 @@ class MlcmService:
 			baseline_ref=baseline_ref,
 			decision=result["decision"],
 			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._review_reasons(result),
+			audit_evidence=self._audit_evidence(result),
 			metadata=dict(metadata or {}),
 		)
 		self._versions[version_record.id] = version_record
@@ -153,6 +155,7 @@ class MlcmService:
 			version_record.id,
 			f"Created version {version}",
 			metadata={"decision": result["decision"], "matched_rules": result["matched_rules"]},
+			policy_result=result,
 		)
 		return version_record.to_dict()
 
@@ -198,6 +201,8 @@ class MlcmService:
 			explainability_recorded=bool(explainability_recorded),
 			decision=result["decision"],
 			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._review_reasons(result),
+			audit_evidence=self._audit_evidence(result, fairness_review_recorded and explainability_recorded),
 		)
 		self._evaluations[evaluation.id] = evaluation
 		version.evaluation_score = normalized_score
@@ -213,6 +218,7 @@ class MlcmService:
 			evaluation.id,
 			f"Recorded evaluation score {normalized_score:.3f}",
 			metadata={"decision": result["decision"], "matched_rules": result["matched_rules"]},
+			policy_result=result,
 		)
 		return evaluation.to_dict()
 
@@ -512,6 +518,10 @@ class MlcmService:
 			contribution_disclosed=bool(contribution_disclosed),
 			human_approval_required=bool(human_approval_required),
 			status=status,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._review_reasons(result),
+			audit_evidence=self._audit_evidence(result, human_approval_required),
 		)
 		self._agents[self._tenant_record_key(tenant_id, record.id)] = record
 		self._audit(
@@ -520,6 +530,7 @@ class MlcmService:
 			record.id,
 			f"Registered model lifecycle agent {name}",
 			metadata={"runtime": runtime_value, "role": role_value, "status": status, "matched_rules": result["matched_rules"]},
+			policy_result=result,
 		)
 		return record.to_dict()
 
@@ -555,6 +566,8 @@ class MlcmService:
 			accepted=accepted,
 			decision=result["decision"],
 			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._review_reasons(result),
+			audit_evidence=self._audit_evidence(result),
 			status="accepted" if accepted else "denied",
 		)
 		self._lifecycle_batches[self._tenant_record_key(tenant_id, record.id)] = record
@@ -564,6 +577,7 @@ class MlcmService:
 			record.id,
 			f"MLCM lifecycle batch {record.status}",
 			metadata=record.to_dict(),
+			policy_result=result,
 		)
 		if not accepted:
 			self._raise_if_denied(result)
@@ -628,6 +642,17 @@ class MlcmService:
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events, tenant_id)
 
+	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return [
+			item
+			for item in (
+				self.list_versions(tenant_id)
+				+ self.list_evaluations(tenant_id)
+				+ self.list_model_lifecycle_agents(tenant_id)
+			)
+			if item.get("status") == "pending_review"
+		]
+
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		models = [item for item in self._models.values() if item.tenant_id == tenant_id]
@@ -637,6 +662,7 @@ class MlcmService:
 		promotions = [item for item in self._promotion_requests.values() if item.tenant_id == tenant_id]
 		agents = [item for item in self._agents.values() if item.tenant_id == tenant_id]
 		batches = [item for item in self._lifecycle_batches.values() if item.tenant_id == tenant_id]
+		pending_reviews = self.list_pending_reviews(tenant_id)
 		return {
 			"tenant_id": tenant_id,
 			"model_count": len(models),
@@ -651,6 +677,7 @@ class MlcmService:
 			"unresolved_drift_count": sum(1 for item in drift if item.drift_detected and not item.review_recorded),
 			"model_lifecycle_agent_count": len(agents),
 			"pending_agent_review_count": sum(1 for item in agents if item.status == "pending_review"),
+			"pending_review_count": len(pending_reviews),
 			"lifecycle_batch_count": len(batches),
 			"denied_lifecycle_batch_count": sum(1 for item in batches if item.status == "denied"),
 			"minimum_eval_score": self.minimum_eval_score,
@@ -723,7 +750,9 @@ class MlcmService:
 		message: str,
 		severity: str = "info",
 		metadata: dict[str, Any] | None = None,
+		policy_result: dict[str, Any] | None = None,
 	) -> None:
+		policy_result = policy_result or {"decision": "allow", "matched_rules": [], "actions": []}
 		event = MlcmAuditEvent(
 			id=stable_id("mlcmaudit", tenant_id, event_type, subject_id, len(self._audit_events)),
 			tenant_id=tenant_id,
@@ -732,8 +761,34 @@ class MlcmService:
 			message=message,
 			severity=severity,
 			metadata=dict(metadata or {}),
+			policy_decision=policy_result["decision"],
+			matched_rules=list(policy_result["matched_rules"]),
+			review_reasons=self._review_reasons(policy_result),
+			audit_evidence=self._audit_evidence(policy_result),
 		)
 		self._audit_events[event.id] = event
+
+	def _review_reasons(self, result: dict[str, Any]) -> list[str]:
+		if result["decision"] != "require_review":
+			return []
+		return [
+			action.get("reason", "model_lifecycle_review_required")
+			for action in result.get("actions", [])
+		]
+
+	def _audit_evidence(self, result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+		return {
+			"required_actions": [
+				action["required_action"]
+				for action in result.get("actions", [])
+				if action.get("required_action")
+			],
+			"reasons": [
+				action.get("reason", "model_lifecycle_policy_blocked")
+				for action in result.get("actions", [])
+			],
+			"review_recorded": bool(review_recorded),
+		}
 
 	def _list(self, records: dict[str, Any], tenant_id: str | None) -> list[dict[str, Any]]:
 		values = list(records.values())

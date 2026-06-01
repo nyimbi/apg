@@ -53,6 +53,7 @@ def test_package_app_entrypoint_is_publishable():
 	assert model["capabilities"]["mlcm"]["streaming"]["engine"] == "bytewax"
 	assert model["capabilities"]["mlcm"]["streaming"]["required_processor"] == "bytewax"
 	assert model["capabilities"]["mlcm"]["agents"]["first_class"] is True
+	assert model["capabilities"]["mlcm"]["review_evidence"]["durable_status"] == "pending_review"
 	assert model["capabilities"]["mlcm"]["model_lifecycle"]["model_lifecycle_agent"] == "ModelLifecycleAgentRecord"
 	assert model["composition"]["capability_dependencies"]["mlcm"] == ["aicr", "moni", "audl"]
 

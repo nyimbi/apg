@@ -95,6 +95,7 @@ def register_capability() -> dict[str, Any]:
 		"capabilities": {
 			"model_registry": "Register tenant-scoped AI models, versions, owners, and lifecycle state",
 			"release_evidence_guardrails": "Preserve version lineage and evaluation review decisions for generated-app review queues",
+			"review_evidence": "Persist review-required model versions, evaluations, lifecycle agents, and lifecycle batch decisions with policy evidence",
 			"promotion_gates": "Promote models through governed dev, staging, and production stages",
 			"model_evaluation": "Attach evaluation baselines, scores, and release evidence",
 			"drift_monitoring": "Surface drift state for review, rollback, and retraining workflows",
@@ -115,6 +116,7 @@ def register_capability() -> dict[str, Any]:
 			"rollback": "/mlcm/api/v1/rollback",
 			"retirements": "/mlcm/api/v1/retirements",
 			"agents": "/mlcm/api/v1/agents",
+			"pending_reviews": "/mlcm/api/v1/pending-reviews",
 			"lifecycle": "/mlcm/api/v1/lifecycle"
 		},
 		"adapters": contract["configuration"]["adapters"],

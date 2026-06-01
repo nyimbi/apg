@@ -192,6 +192,10 @@ def dashboard_summary(tenant_id: str = "default") -> dict[str, Any]:
 	return SERVICE.dashboard_summary(tenant_id)
 
 
+def list_pending_reviews(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_pending_reviews(tenant_id)
+
+
 def list_model_lifecycle_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_model_lifecycle_agents(tenant_id)
 

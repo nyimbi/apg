@@ -15,11 +15,14 @@
    - Add model lifecycle agent registration and lifecycle-batch validation.
    - Enforce version lineage and evaluation evidence guardrails in the service
      path, preserving matched policy rules for UI review queues.
+   - Preserve review reasons and audit evidence on review-required versions,
+     evaluations, lifecycle agents, denied lifecycle batches, and audit events.
 5. Refresh API helpers and UI view models so generated applications can compose
    the capability.
    - Add API/view coverage for model lifecycle agent rosters and Bytewax batch
      monitors.
    - Add view coverage for pending version and evaluation review queues.
+   - Add service/API/view coverage for consolidated pending-review queues.
 6. Replace static package evidence with dynamic contract-derived evidence.
 7. Update focused tests for contract, rules, service lifecycle, guardrails,
    generated-app views, package evidence, and compatibility behavior.
@@ -43,6 +46,8 @@
   while incomplete lineage becomes review evidence instead of silent success.
 - Evaluation recording denies missing baselines and marks high-risk or
   evidence-incomplete evaluations as pending review.
+- Pending-review records carry matched rules, review reasons, and audit
+  evidence through service, API, views, semantic model, and tests.
 - `app.py` builds semantic evidence from the live contract.
 - Tests do not require full repository execution.
 

@@ -30,6 +30,8 @@ audit evidence, UI metadata, and a Bytewax event-stream adapter contract.
   deployment, drift, rollback, retirement, and model-lifecycle-agent mutations.
 - Rule-engine metadata, UI route metadata, theme tokens, and generated-app
   semantic package evidence.
+- Durable review evidence for review-required versions, evaluations,
+  privileged model lifecycle agents, and denied lifecycle batches.
 - Adapter configuration for AICR, AUTH, AUDL, MONI, file artifacts, and Bytewax
   event streaming.
 
@@ -140,8 +142,16 @@ Incomplete version lineage and high-risk evaluation evidence are not silently
 accepted. `create_version()` records pending-review versions for missing
 training or baseline lineage, and `record_evaluation()` records pending-review
 evaluations for missing evidence, fairness review, or explainability review.
-Both records include `decision` and `matched_rules` so applications can compose
-review queues directly from service state.
+These records include `decision`, `matched_rules`, `review_reasons`, and
+`audit_evidence` so applications can compose review queues directly from
+service state. `list_pending_reviews()` and the dashboard, version,
+evaluation, agent, lifecycle, and governance view models expose the durable
+queues without replaying the policy engine.
+
+Privileged model lifecycle agents without human approval are also persisted as
+`pending_review` with the same evidence shape. Non-Bytewax lifecycle batches
+remain hard denials, but their denied records preserve matched rules and audit
+evidence for operator inspection.
 
 ## Focused Verification
 

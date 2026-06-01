@@ -278,6 +278,22 @@
         "moni",
         "audl"
       ],
+      "review_evidence": {
+        "deny_behavior": "PermissionError for hard deny decisions only",
+        "durable_status": "pending_review",
+        "pending_queues": [
+          "versions",
+          "evaluations",
+          "model_lifecycle_agents"
+        ],
+        "policy_fields": [
+          "decision",
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "audit_evidence"
+        ]
+      },
       "rule_engine": {
         "rules": [
           {
@@ -1893,7 +1909,23 @@
         "aicr",
         "moni",
         "audl"
-      ]
+      ],
+      "review_evidence": {
+        "deny_behavior": "PermissionError for hard deny decisions only",
+        "durable_status": "pending_review",
+        "pending_queues": [
+          "versions",
+          "evaluations",
+          "model_lifecycle_agents"
+        ],
+        "policy_fields": [
+          "decision",
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "audit_evidence"
+        ]
+      }
     }
   },
   "deployment": {

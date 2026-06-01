@@ -65,6 +65,8 @@ class ModelVersion:
 	promoted_at: str | None = None
 	decision: str = "allow"
 	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now_iso)
 	metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -85,6 +87,8 @@ class ModelVersion:
 			"promoted_at": self.promoted_at,
 			"decision": self.decision,
 			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"created_at": self.created_at,
 			"metadata": dict(self.metadata),
 		}
@@ -108,6 +112,8 @@ class EvaluationRun:
 	explainability_recorded: bool = False
 	decision: str = "allow"
 	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now_iso)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -126,6 +132,8 @@ class EvaluationRun:
 			"explainability_recorded": self.explainability_recorded,
 			"decision": self.decision,
 			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"created_at": self.created_at,
 		}
 
@@ -335,6 +343,10 @@ class ModelLifecycleAgentRecord:
 	contribution_disclosed: bool
 	human_approval_required: bool
 	status: str = "active"
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now_iso)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -351,6 +363,10 @@ class ModelLifecycleAgentRecord:
 			"contribution_disclosed": self.contribution_disclosed,
 			"human_approval_required": self.human_approval_required,
 			"status": self.status,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"created_at": self.created_at,
 		}
 
@@ -367,6 +383,8 @@ class MlcmLifecycleBatchRecord:
 	accepted: bool
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	required_processor: str = "bytewax"
 	status: str = "accepted"
 	created_at: str = field(default_factory=utc_now_iso)
@@ -382,6 +400,8 @@ class MlcmLifecycleBatchRecord:
 			"accepted": self.accepted,
 			"decision": self.decision,
 			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"required_processor": self.required_processor,
 			"status": self.status,
 			"created_at": self.created_at,
@@ -400,6 +420,10 @@ class MlcmAuditEvent:
 	severity: str = "info"
 	created_at: str = field(default_factory=utc_now_iso)
 	metadata: dict[str, Any] = field(default_factory=dict)
+	policy_decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 
 	def to_dict(self) -> dict[str, Any]:
 		return {
@@ -411,6 +435,10 @@ class MlcmAuditEvent:
 			"severity": self.severity,
 			"created_at": self.created_at,
 			"metadata": dict(self.metadata),
+			"policy_decision": self.policy_decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 		}
 
 

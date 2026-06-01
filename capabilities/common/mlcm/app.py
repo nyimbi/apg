@@ -11,7 +11,16 @@ SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"descript
 
 def semantic_model() -> dict[str, Any]:
 	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	model = json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	capability = model["capabilities"]["mlcm"]
+	capability["review_evidence"] = {
+		"durable_status": "pending_review",
+		"policy_fields": ["decision", "policy_decision", "matched_rules", "review_reasons", "audit_evidence"],
+		"pending_queues": ["versions", "evaluations", "model_lifecycle_agents"],
+		"deny_behavior": "PermissionError for hard deny decisions only",
+	}
+	model["contracts"]["mlcm"]["review_evidence"] = capability["review_evidence"]
+	return model
 
 
 def component_manifest() -> dict[str, Any]:
@@ -42,6 +51,8 @@ def self_test() -> dict[str, Any]:
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if "review_evidence" not in model.get("capabilities", {}).get("mlcm", {}):
+		errors.append("MLCM semantic model must expose durable review evidence")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",
