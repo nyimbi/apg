@@ -1,11 +1,16 @@
-"""
-darkweb Intelligence Capability
+"""APG Dark Web Monitoring executable capability package."""
 
-Placeholder for darkweb intelligence gathering, analysis and management capability.
-To be implemented as part of the comprehensive APG Intelligence platform.
-"""
+from .capability_contract import CAPABILITY_ID, CAPABILITY_NAME, CAPABILITY_VERSION, get_capability_contract
+from .service import DarkWebMonitoringService, IntelDarkWebService
 
-# Placeholder implementation
-__version__ = "1.0.0"
-__status__ = "Development"
+__all__ = [
+	"CAPABILITY_ID",
+	"CAPABILITY_NAME",
+	"CAPABILITY_VERSION",
+	"DarkWebMonitoringService",
+	"IntelDarkWebService",
+	"get_capability_contract",
+]
 
+__version__ = CAPABILITY_VERSION
+__status__ = "Executable"

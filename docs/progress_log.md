@@ -29163,3 +29163,115 @@ Known gaps:
   messaging, takedown actions, identity resolution, large-scale search/storage,
   GraphRAG projections, dissemination delivery, durable Bytewax topology, or
   performance/load checks during this battery-conscious slice.
+
+## 2026-06-01 - Intel Dark Web Monitoring executable capability
+
+Slice goal: replace the `capabilities/intel/darkweb` placeholder with a
+package-backed, executable APG capability for lawful defensive dark-web
+monitoring that can be composed into generated applications.
+
+Implemented:
+
+- Added `capabilities/intel/darkweb/SPECIFICATION.md` defining lawful
+  authority, monitoring programs, passive monitored sources, observations,
+  exposure indicators, marketplace risk assessments, threat actor assessments,
+  referrals, dissemination, reviews, UI/theming, AI agents, lifecycle
+  semantics, rule guardrails, and adapter boundaries.
+- Added `PLAN.md`, `README.md`, `cap_spec.md`, `package_manifest.json`,
+  `release_report.json`, and generated `semantic_model.json`.
+- Replaced the placeholder `__init__.py` with executable package exports and
+  removed the empty `_Dark_Web_Monitoring` marker.
+- Added domain models for authorities, monitoring programs, hidden-service
+  sources, observations, exposure indicators, marketplace risk assessments,
+  threat actor assessments, referrals, dissemination, reviews, and dark-web
+  monitoring agents.
+- Added a deterministic capability contract with tenant-safe configuration, 69
+  rules, 13 UI routes, compact theme tokens, Bytewax lifecycle metadata, and
+  provider-neutral AI-agent runtimes: `codex`, `claude_code`, `opencode`, and
+  `pi`.
+- Added the `DarkWebMonitoringService` executable runtime with tenant-keyed
+  state, rule-before-mutation enforcement, Bytewax audit events, program/source
+  authority alignment, observation fingerprint/confidence evidence, exposure
+  indicator validation, marketplace and threat actor assessments, referral and
+  dissemination approvals, review evidence, batch validation, and AI-agent
+  action guardrails.
+- Added API helpers, dashboard/console/agent view models, and a publishable
+  `app.py` entrypoint with self-test, component manifest, and semantic-model
+  generation.
+- Added focused package tests for contract shape, rule-engine denial paths,
+  full dark-web-monitoring lifecycle execution, tenant isolation, guardrail
+  rejection, API helpers, view models, and app entrypoint.
+- Updated `capabilities/intel/__init__.py` so `darkweb` is listed as an
+  implemented sub-capability.
+- Updated `capabilities/README.md` so the catalog snapshot reports 143 valid
+  contracts, 143 domain-specific packages, 143 strict complete package artifact
+  sets, and 9 Intel packages.
+
+Focused verification:
+
+- Generated `capabilities/intel/darkweb/semantic_model.json` from
+  `app.semantic_model()`.
+- `./.venv/bin/python -m py_compile
+  capabilities/intel/darkweb/__init__.py
+  capabilities/intel/darkweb/capability_contract.py
+  capabilities/intel/darkweb/models.py
+  capabilities/intel/darkweb/darkweb_runtime.py
+  capabilities/intel/darkweb/service.py
+  capabilities/intel/darkweb/api.py
+  capabilities/intel/darkweb/views.py
+  capabilities/intel/darkweb/app.py
+  capabilities/intel/darkweb/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/intel/darkweb/tests/test_package_contract.py` passed with 7
+  tests.
+- `./.venv/bin/python capabilities/intel/darkweb/app.py` passed self-test with
+  `passed: true` and `status: ok`.
+- `./.venv/bin/apg capabilities inspect intel_darkweb --json` passed with 69
+  rules, 13 UI routes, theme `intel_darkweb_control`, shell `apg_python`, and
+  Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/intel/darkweb --json` passed with `side_effect_free: true` and
+  0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/intel/darkweb --json` passed with 1 domain-specific capability,
+  0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/intel/darkweb --json` passed with 1 complete lifecycle, 69
+  rules, 13 UI routes, 11 theme tokens, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 143 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 143 operable contracts, 143 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/intel/darkweb`, `capabilities/intel/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed authority, program, source, observation, indicator, marketplace
+  risk, threat actor, referral, dissemination, review, Bytewax batch, and
+  AI-agent lifecycle paths so rule evaluation happens before state mutation.
+- Confirmed service state is keyed by tenant plus record ID and covered by a
+  regression test with shared authority/program IDs across tenants.
+- Tightened dark-web-monitoring semantics around lawful authority, passive
+  source access review, program/source authority alignment, observation
+  fingerprinting, confidence validation, analyst evidence, approval gates,
+  tenant isolation, and privileged or prohibited AI-agent actions.
+- Kept live dark-web network access, crawling, credential handling,
+  marketplace interaction, contraband transactions, exploit procurement,
+  account automation, identity resolution, large-scale storage/search, GraphRAG
+  projections, dissemination delivery, and durable Bytewax workers behind
+  adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live dark-web network
+  access, crawling, credential handling, marketplace interaction, contraband
+  transactions, exploit procurement, account automation, identity resolution,
+  large-scale storage/search, GraphRAG projections, dissemination delivery,
+  durable Bytewax topology, or performance/load checks during this
+  battery-conscious slice.

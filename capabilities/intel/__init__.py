@@ -65,6 +65,7 @@ CAPABILITY_META = {
 		'cybint',      # Cyber Intelligence
 		'finint',      # Financial Intelligence
 		'socint',      # Social Media Intelligence
+		'darkweb',     # Dark Web Monitoring
 		'radio',       # Radio Intelligence Listener
 	],
 	'security_requirements': {
