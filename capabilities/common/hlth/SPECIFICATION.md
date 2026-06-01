@@ -116,8 +116,10 @@ Supported runtimes in this packet are `codex`, `claude_code`, `opencode`, and
 `deployment_gate_reviewer`, and `dependency_map_reviewer`.
 
 Privileged roles are `prediction_reviewer`, `incident_reviewer`,
-`remediation_reviewer`, and `deployment_gate_reviewer`. They require explicit
-human approval before registration.
+`remediation_reviewer`, and `deployment_gate_reviewer`. Without explicit human
+approval they are persisted as `pending_review` records with policy decision,
+matched rules, review reasons, and required reviewer evidence so operators can
+approve or reject them instead of losing the attempted registration.
 
 ### Bytewax Lifecycle Stream
 
@@ -127,6 +129,18 @@ executable contract requires Bytewax as the lifecycle processor, uses
 `hlth.lifecycle` as the lifecycle stream name, and covers `hlth.components`,
 `hlth.checks`, `hlth.baselines`, `hlth.predictions`, `hlth.incidents`, and
 `hlth.agents` topics.
+
+Denied lifecycle batches are persisted with `denied` status before
+`PermissionError` is raised. This gives generated applications durable evidence
+for routing violations, remediation work queues, and audit timelines.
+
+### Review Evidence Lifecycle
+
+HLTH records must preserve policy decisions on review-required and denied
+records. The durable fields are `policy_decision`, `matched_rules`,
+`review_reasons`, and `review_evidence`. Pending review queues cover health
+checks, predictions, alerts, incidents, remediation requests, deployment gates,
+health agents, and lifecycle batches.
 
 ## Rules
 
@@ -155,7 +169,7 @@ Baseline rules:
 - deployment waivers require review evidence
 - health-agent runtimes and roles must be supported
 - health agents require scope, owner, purpose, and contribution disclosure
-- privileged health-agent roles require human approval
+- privileged health-agent roles require human approval evidence or review
 - health lifecycle batches must declare Bytewax as the processor
 
 ## UI and Theming
@@ -223,8 +237,8 @@ The HLTH packet is serviceable when:
 - `service.py` includes a dependency-light `HlthService` that can register
   components, record health checks, create baselines, request predictions,
   create alerts/incidents, request and decide remediation, evaluate deployment
-  gates, register health agents, validate Bytewax lifecycle batches, and list
-  audit evidence.
+  gates, register health agents, validate Bytewax lifecycle batches, preserve
+  review evidence, and list audit evidence.
 - `api.py` exposes callable helpers over `HlthService`.
 - `view_models.py` exposes generated-application view models.
 - `app.py`, `semantic_model.json`, and `release_report.json` are derived from

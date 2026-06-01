@@ -22,7 +22,9 @@ The packet will:
 6. Add first-class health-agent registration and Bytewax lifecycle-batch
    validation so AI reliability agents are composable under explicit
    guardrails.
-7. Prove the packet with focused tests, implementation audit, publish-plan, and
+7. Preserve durable review evidence for review-required health records,
+   privileged health agents, denied lifecycle batches, and audit timelines.
+8. Prove the packet with focused tests, implementation audit, publish-plan, and
    stale-marker scans.
 
 ## Implementation Tasks
@@ -47,6 +49,8 @@ The packet will:
   waiver review.
 - Add rules for health-agent runtime/role/scope/owner/purpose/disclosure,
   privileged-role approval, and Bytewax lifecycle-batch routing.
+- Add contract-level review-evidence metadata for policy fields, durable
+  statuses, pending review queues, and denied lifecycle-batch behavior.
 - Add routes for checks, baselines, deployment gates, audit, adapters, agents,
   and lifecycle batches.
 - Add theme components for component inventory, check timeline, baseline
@@ -61,6 +65,11 @@ The packet will:
   incident, remediation, deployment gate, health-agent, lifecycle-batch, and
   audit state.
 - Add deterministic guardrail evaluation using `capability_contract.py`.
+- Persist policy decisions, matched rules, review reasons, and review evidence
+  on governed records before returning or raising.
+- Preserve privileged health agents without approval as `pending_review`
+  records and denied non-Bytewax lifecycle batches as durable `denied`
+  evidence.
 - Add summaries for dashboards and release evidence.
 
 ### 4. API and View Models
@@ -69,7 +78,8 @@ The packet will:
   baselines, predictions, alerts, incidents, remediation requests, remediation
   decisions, deployment gates, health-agent registration, lifecycle-batch
   validation, record listing, and capability status.
-- Add `view_models.py` for generated-application UI models.
+- Add `view_models.py` for generated-application UI models and pending-review
+  surfaces.
 
 ### 5. Packaging Evidence
 

@@ -589,10 +589,10 @@ def default_rules() -> list[CapabilityRule]:
 		),
 		CapabilityRule(
 			name="health_agent_privileged_role_requires_human_approval",
-			description="Privileged health-agent roles require human approval.",
+			description="Privileged health-agent roles require human approval evidence or review.",
 			condition={"operation": "register_health_agent", "privileged_agent_role": True, "human_approval_required": False},
 			effect={
-				"decision": "deny",
+				"decision": "require_review",
 				"reason": "health_agent_human_approval_required",
 				"required_action": "require_human_approval_for_agent"
 			}
@@ -693,7 +693,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "hlth",
 		"display_name": "Health Checks and Diagnostics",
-		"provides": ["health_governance", "diagnostic_lifecycle", "health_agent_composition"],
+		"provides": ["health_governance", "diagnostic_lifecycle", "health_agent_composition", "review_evidence"],
 		"requires": ["moni", "mqeb", "conf"],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
@@ -704,6 +704,39 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		"ui": ui_manifest(),
 		"agents": agent_manifest(),
 		"streaming": streaming_manifest(),
+		"review_evidence": {
+			"durable_statuses": [
+				"pending",
+				"pending_review",
+				"review_required",
+				"denied",
+				"accepted",
+				"active",
+				"open",
+				"resolved",
+				"approved",
+				"rejected",
+				"allowed",
+				"blocked"
+			],
+			"policy_fields": [
+				"policy_decision",
+				"matched_rules",
+				"review_reasons",
+				"review_evidence"
+			],
+			"pending_queues": [
+				"checks",
+				"predictions",
+				"alerts",
+				"incidents",
+				"remediation_requests",
+				"deployment_gates",
+				"health_agents",
+				"lifecycle_batches"
+			],
+			"deny_behavior": "Denied HLTH lifecycle batches persist evidence before PermissionError"
+		},
 		"theme": {
 			"name": theme.name,
 			"tokens": theme.tokens,

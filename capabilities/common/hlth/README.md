@@ -5,6 +5,8 @@ generated applications a dependency-light control plane for registering
 components, recording health checks, maintaining baselines, opening alerts and
 incidents, reviewing remediation, gating deployments, composing health AI
 agents, validating Bytewax lifecycle batches, and publishing UI/theme metadata.
+It also preserves durable policy and review evidence for generated health
+review consoles.
 
 The current packet can be composed without starting ML engines, Kubernetes
 watchers, external observability backends, notification systems, ticketing
@@ -27,9 +29,14 @@ runtime adapters that must honor HLTH guardrail decisions.
 - Deployment gate decisions that block release while critical incidents remain
   unresolved unless explicitly waived.
 - First-class health-agent registration for Codex, Claude Code, opencode, Pi,
-  and future runtime adapters.
+  and future runtime adapters, including durable `pending_review` records for
+  otherwise valid privileged agents awaiting human approval.
 - Bytewax-first lifecycle batch validation for component, check, baseline,
-  prediction, incident, and health-agent mutations.
+  prediction, incident, and health-agent mutations, including persisted denial
+  evidence before `PermissionError` on non-Bytewax batches.
+- Pending-review queues and policy evidence fields for checks, predictions,
+  alerts, incidents, remediation requests, deployment gates, health agents, and
+  lifecycle batches.
 - Generated-application view models for health dashboards and operations
   screens.
 - Theme tokens and component metadata for health consoles.
@@ -61,6 +68,7 @@ from capabilities.common.hlth.api import (
     evaluate_deployment_gate,
     register_health_agent,
     validate_health_lifecycle_batch,
+    list_pending_reviews,
 )
 
 component = register_component_record(
@@ -141,6 +149,8 @@ batch = validate_health_lifecycle_batch(
     event_stream="bytewax",
     mutation_count=6,
 )
+
+pending = list_pending_reviews("tenant-a")
 ```
 
 ## Rule Evaluation
@@ -205,7 +215,9 @@ Production adapters should:
    can be disabled or reviewed.
 8. Treat HLTH health-agent registrations as governance records, not embedded
    runtime clients.
-9. Route lifecycle mutation batches through Bytewax and preserve the
+9. Preserve `policy_decision`, `matched_rules`, `review_reasons`, and
+   `review_evidence` when moving records into external stores.
+10. Route lifecycle mutation batches through Bytewax and preserve the
    `hlth.lifecycle` event-time contract.
 
 ## Verification

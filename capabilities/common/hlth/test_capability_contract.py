@@ -21,6 +21,7 @@ from capabilities.common.hlth.view_models import (
 	lifecycle_batch_model,
 	prediction_model,
 	remediation_model,
+	settings_model,
 )
 
 
@@ -50,7 +51,9 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"ui",
 		"theme"
 	]
-	assert contract["provides"] == ["health_governance", "diagnostic_lifecycle", "health_agent_composition"]
+	assert contract["provides"] == ["health_governance", "diagnostic_lifecycle", "health_agent_composition", "review_evidence"]
+	assert "health_agents" in contract["review_evidence"]["pending_queues"]
+	assert "policy_decision" in contract["review_evidence"]["policy_fields"]
 	assert contract["requires"] == ["moni", "mqeb", "conf"]
 	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
 	assert "deployment_gate_reviewer" in contract["agents"]["privileged_roles"]
@@ -174,6 +177,25 @@ def test_rule_engine_enforces_health_agent_and_bytewax_guardrails():
 	assert "bytewax_health_stream_required" in batch["matched_rules"]
 
 
+def test_rule_engine_preserves_privileged_health_agent_review_state():
+	result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_health_agent",
+		"agent_runtime_supported": True,
+		"agent_role_supported": True,
+		"agent_scope_present": True,
+		"agent_owner_present": True,
+		"agent_purpose_present": True,
+		"contribution_disclosed": True,
+		"privileged_agent_role": True,
+		"human_approval_required": False,
+	})
+
+	assert result["decision"] == "require_review"
+	assert result["matched_rules"] == ["health_agent_privileged_role_requires_human_approval"]
+	assert result["actions"][0]["required_action"] == "require_human_approval_for_agent"
+
+
 def test_hlth_service_governs_components_checks_predictions_incidents_and_gates():
 	service = HlthService("tenant-health")
 	component = service.register_component(
@@ -243,17 +265,16 @@ def test_hlth_service_governs_components_checks_predictions_incidents_and_gates(
 		waiver_recorded=True,
 		waiver_review_recorded=True,
 	)
-	with pytest.raises(PermissionError, match="health_agent_human_approval_required"):
-		service.register_health_agent(
-			tenant_id="tenant-health",
-			agent_id="agent-denied",
-			name="Denied Remediation Agent",
-			runtime="codex",
-			role="remediation_reviewer",
-			scope="production remediation",
-			owner="platform",
-			purpose="review health remediation",
-		)
+	review_agent = service.register_health_agent(
+		tenant_id="tenant-health",
+		agent_id="agent-review",
+		name="Review Remediation Agent",
+		runtime="codex",
+		role="remediation_reviewer",
+		scope="production remediation",
+		owner="platform",
+		purpose="review health remediation",
+	)
 	agent = service.register_health_agent(
 		tenant_id="tenant-health",
 		agent_id="agent-gate",
@@ -278,18 +299,28 @@ def test_hlth_service_governs_components_checks_predictions_incidents_and_gates(
 	assert baseline.status == "active"
 	assert stale_prediction.status == "pending_review"
 	assert {"stale_baseline_requires_review", "low_confidence_prediction_requires_review"} <= set(stale_prediction.matched_rules)
+	assert stale_prediction.policy_decision == "require_review"
+	assert stale_prediction.review_reasons == ["baseline_review_required", "prediction_confidence_review_required"]
 	assert denied_status == "review_denied"
 	assert approved.status == "approved"
+	assert approved.policy_decision == "allow"
 	assert blocked_gate.status == "blocked"
 	assert "unresolved_critical_incident_blocks_deploy" in blocked_gate.matched_rules
+	assert blocked_gate.policy_decision == "deny"
 	assert waived_gate.status == "allowed"
+	assert review_agent.status == "pending_review"
+	assert review_agent.policy_decision == "require_review"
+	assert review_agent.review_reasons == ["health_agent_human_approval_required"]
 	assert agent.runtime == "claude_code"
 	assert agent.role == "deployment_gate_reviewer"
 	assert batch.accepted is True
+	assert batch.policy_decision == "allow"
 	assert batch.required_processor == "bytewax"
 	assert service.dashboard_summary("tenant-health")["component_count"] == 1
 	assert service.dashboard_summary("tenant-health")["open_incident_count"] == 1
-	assert service.dashboard_summary("tenant-health")["health_agent_count"] == 1
+	assert service.dashboard_summary("tenant-health")["health_agent_count"] == 2
+	assert service.dashboard_summary("tenant-health")["pending_health_agent_review_count"] == 1
+	assert service.dashboard_summary("tenant-health")["pending_review_count"] >= 2
 
 
 def test_hlth_service_fails_closed_for_invalid_lifecycle_references():
@@ -379,6 +410,10 @@ def test_hlth_service_fails_closed_for_invalid_lifecycle_references():
 			event_stream="legacy_broker",
 			mutation_count=1,
 		)
+	denied_batch = [
+		item for item in service.list_records("tenant-health", "lifecycle_batches")
+		if item["status"] == "denied"
+	][0]
 
 	assert missing.status == "denied"
 	assert "component_must_be_registered" in missing.matched_rules
@@ -386,6 +421,8 @@ def test_hlth_service_fails_closed_for_invalid_lifecycle_references():
 	assert "disabled_component_blocks_health_check" in disabled.matched_rules
 	assert missing_baseline.status == "denied"
 	assert "prediction_requires_baseline" in missing_baseline.matched_rules
+	assert denied_batch["policy_decision"] == "deny"
+	assert denied_batch["review_reasons"] == ["bytewax_health_stream_required"]
 
 
 def test_generated_view_models_are_operable():
@@ -446,6 +483,7 @@ def test_generated_view_models_are_operable():
 	assert deployment_gate_model(service, "tenant-health")["columns"]
 	assert health_agent_roster_model(service, "tenant-health")["rows"][0]["role"] == "component_health_reviewer"
 	assert lifecycle_batch_model(service, "tenant-health")["streaming"]["required_processor"] == "bytewax"
+	assert settings_model("tenant-health")["review_evidence"]["pending_queues"]
 	assert "moni" in adapter_health_model("tenant-health")["supported_probe_sources"]
 
 
@@ -461,4 +499,5 @@ def test_registration_includes_full_capability_contract():
 	assert registration["ui_components"]["agents"] == "/hlth/agents"
 	assert registration["agents"]["first_class"] is True
 	assert registration["streaming"]["required_processor"] == "bytewax"
+	assert registration["review_evidence"]["deny_behavior"] == "Denied HLTH lifecycle batches persist evidence before PermissionError"
 	assert registration["dependencies"] == ["moni", "mqeb", "conf"]

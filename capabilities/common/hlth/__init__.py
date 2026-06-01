@@ -539,7 +539,8 @@ def register_capability() -> Dict[str, Any]:
 			'capability_rules': 'Evaluate deterministic health governance rules',
 			'visual_theming': 'Apply health-console theme tokens and components',
 			'health_agent_composition': 'Register first-class health agents across Codex, Claude Code, opencode, Pi, and future runtime adapters',
-			'lifecycle_batch_validation': 'Validate health lifecycle mutation batches against Bytewax-first stream rules'
+			'lifecycle_batch_validation': 'Validate health lifecycle mutation batches against Bytewax-first stream rules',
+			'review_evidence': 'Compose durable pending-review, denial, matched-rule, and reviewer evidence across health lifecycle records'
 		},
 		'endpoints': {
 			'assessment': '/hlth/api/v1/assessment',
@@ -564,6 +565,7 @@ def register_capability() -> Dict[str, Any]:
 		'ui_manifest': contract['ui'],
 		'agents': contract['agents'],
 		'streaming': contract['streaming'],
+		'review_evidence': contract['review_evidence'],
 		'theme': contract['theme'],
 		'permissions': CAPABILITY_METADATA['permissions']
 	}

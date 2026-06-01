@@ -16,6 +16,69 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-06-01 08:36 EAT
+
+HLTH durable review-evidence packet:
+
+- Extended review-required health checks, predictions, remediation requests,
+  deployment gates, privileged health agents, lifecycle batch evidence, alerts,
+  incidents, and audit events with durable policy evidence: policy decision,
+  matched rules, review reasons, and review evidence.
+- Added contract-level `review_evidence` metadata and exposed it through
+  registration metadata, API helpers, view models, semantic model, release
+  evidence, package tests, and app self-test.
+- Preserved privileged health agents without human approval as
+  `pending_review` records instead of discarding registration evidence.
+- Preserved denied non-Bytewax health lifecycle batch validations as `denied`
+  evidence before raising `PermissionError`.
+- Added pending-review queue composition for checks, predictions, alerts,
+  incidents, remediation requests, deployment gates, health agents, and
+  lifecycle batches.
+- Kept HLTH health agents provider-neutral for Codex, Claude Code, OpenCode,
+  Pi, and future reliability-governance runtimes while retaining human approval
+  controls for privileged roles and Bytewax-first lifecycle processing.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for HLTH package init, models,
+  service, API helpers, contract, app, view models, and focused tests passed.
+- `./.venv/bin/pytest -q capabilities/common/hlth/test_capability_contract.py
+  capabilities/common/hlth/tests/test_package_contract.py` passed with 10 tests
+  and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.hlth import app; ..."`
+  passed package self-test.
+- `./.venv/bin/python -m json.tool
+  capabilities/common/hlth/semantic_model.json` passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/hlth --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/hlth --strict --json` passed with no warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/hlth --json`
+  passed with no warnings and side-effect-free publish planning.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/common/hlth --json` passed with complete lifecycle evidence,
+  release evidence, review evidence, and 28 rules.
+- HLTH stale-marker scan returned no TODO/FIXME/stub/placeholder, Kafka,
+  materialized-baseline, contract-only, or not-implemented markers across the
+  edited HLTH packet.
+- Service smoke executed stale prediction review evidence, approved production
+  remediation evidence, privileged health-agent review evidence, accepted
+  Bytewax batch evidence, and denied non-Bytewax batch persistence, printing
+  `require_review allow pending_review require_review accepted denied
+  bytewax_health_stream_required 2`.
+
+Known gaps:
+
+- Full repository tests, rendered HLTH UI, live active probes, service
+  discovery, MONI/OpenTelemetry/Prometheus/Kubernetes/cloud feeds, notification
+  and ticketing adapters, remediation executors, deployment gate adapters,
+  production persistence and retention enforcement, durable Bytewax workers and
+  dataflows, live APG AUTH/MTEN/AUDL/CONF/MQEB/MONI/NTFY/CACH adapters,
+  benchmark/load checks, runtime SLO validation, ML model accuracy validation,
+  and live AI runtime adapters still need later validation outside this
+  battery-conscious slice.
+
 ### 2026-06-01 08:26 EAT
 
 MONI durable review-evidence packet:

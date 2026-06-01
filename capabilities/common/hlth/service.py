@@ -178,6 +178,9 @@ class HlthCheckRecord:
 	alert_id: str | None = None
 	incident_id: str | None = None
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -211,6 +214,9 @@ class HlthPredictionRecord:
 	decision: str
 	status: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -229,6 +235,9 @@ class HlthAlertRecord:
 	notification_route: str | None = None
 	incident_id: str | None = None
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 	resolved_at: datetime | None = None
 
@@ -247,6 +256,9 @@ class HlthIncidentRecord:
 	component_ids: list[str] = field(default_factory=list)
 	alert_ids: list[str] = field(default_factory=list)
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 	resolved_at: datetime | None = None
 
@@ -270,6 +282,9 @@ class HlthRemediationRequestRecord:
 	reviewer: str | None = None
 	review_notes: str | None = None
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "require_review"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 	decided_at: datetime | None = None
 
@@ -286,6 +301,9 @@ class HlthDeploymentGateRecord:
 	unresolved_critical_incidents: int
 	waiver_recorded: bool = False
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -304,6 +322,10 @@ class HlthAgentRecord:
 	contribution_disclosed: bool
 	human_approval_required: bool
 	status: str = "active"
+	policy_decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -318,6 +340,9 @@ class HlthLifecycleBatchRecord:
 	accepted: bool
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	required_processor: str = "bytewax"
 	status: str = "accepted"
 	created_at: datetime = field(default_factory=datetime.utcnow)
@@ -334,6 +359,9 @@ class HlthAuditEventRecord:
 	actor: str
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	details: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -6242,7 +6270,7 @@ class HlthService:
 			"created_at": datetime.utcnow().isoformat(),
 		}
 		self.records[f"{tenant_id}:{record_id}"] = record
-		self._audit(tenant_id, "record.created", record_id, "system", "allow", [], record)
+		self._audit(tenant_id, "record.created", record_id, "system", _allow_result(), record)
 		return record
 
 	def register_component(
@@ -6274,7 +6302,7 @@ class HlthService:
 			status=status,
 		)
 		self.components[self._component_key(record.tenant_id, record.component_id)] = record
-		self._audit(record.tenant_id, "component.registered", record.component_id, record.owner, "allow", [], asdict(record))
+		self._audit(record.tenant_id, "component.registered", record.component_id, record.owner, _allow_result(), asdict(record))
 		return record
 
 	def record_health_check(
@@ -6333,9 +6361,12 @@ class HlthService:
 			alert_id=alert.alert_id if alert else None,
 			incident_id=alert.incident_id if alert else None,
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 		)
 		self.checks[record.check_id] = record
-		self._audit(tenant_id, "check.recorded", record.check_id, component_id, decision["decision"], decision["matched_rules"], context)
+		self._audit(tenant_id, "check.recorded", record.check_id, component_id, decision, context)
 		return record
 
 	def create_baseline(
@@ -6367,7 +6398,7 @@ class HlthService:
 			reviewed=reviewed,
 		)
 		self.baselines[record.baseline_id] = record
-		self._audit(tenant_id, "baseline.created", record.baseline_id, component_id, "allow", [], asdict(record))
+		self._audit(tenant_id, "baseline.created", record.baseline_id, component_id, _allow_result(), asdict(record))
 		return record
 
 	def request_prediction(
@@ -6418,9 +6449,12 @@ class HlthService:
 			decision=decision["decision"],
 			status=status,
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision, review_recorded=baseline_review_recorded or bool(baseline and baseline.reviewed)),
 		)
 		self.predictions[record.prediction_id] = record
-		self._audit(tenant_id, "prediction.requested", record.prediction_id, component_id, decision["decision"], decision["matched_rules"], context)
+		self._audit(tenant_id, "prediction.requested", record.prediction_id, component_id, decision, context)
 		return record
 
 	def create_alert(
@@ -6472,9 +6506,12 @@ class HlthService:
 			decision=decision["decision"],
 			status=status,
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 		)
 		self.alerts[record.alert_id] = record
-		self._audit(tenant_id, "alert.created", record.alert_id, owner or "system", decision["decision"], decision["matched_rules"], context)
+		self._audit(tenant_id, "alert.created", record.alert_id, owner or "system", decision, context)
 		return record
 
 	def create_incident(
@@ -6509,9 +6546,12 @@ class HlthService:
 			component_ids=list(component_ids or []),
 			alert_ids=list(alert_ids or []),
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 		)
 		self.incidents[record.incident_id] = record
-		self._audit(tenant_id, "incident.created", record.incident_id, owner or "system", decision["decision"], decision["matched_rules"], context)
+		self._audit(tenant_id, "incident.created", record.incident_id, owner or "system", decision, context)
 		return record
 
 	def request_remediation(
@@ -6559,9 +6599,12 @@ class HlthService:
 			decision=decision["decision"],
 			status="pending_review" if decision["decision"] != "deny" else "denied",
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 		)
 		self.remediation_requests[record.request_id] = record
-		self._audit(tenant_id, "remediation.requested", record.request_id, record.requester, decision["decision"], decision["matched_rules"], context)
+		self._audit(tenant_id, "remediation.requested", record.request_id, record.requester, decision, context)
 		return record
 
 	def decide_remediation(
@@ -6597,7 +6640,10 @@ class HlthService:
 		record.review_notes = notes
 		record.decided_at = datetime.utcnow()
 		record.matched_rules = rule_decision["matched_rules"]
-		self._audit(record.tenant_id, "remediation.decided", request_id, reviewer, record.decision, record.matched_rules, context)
+		record.policy_decision = rule_decision["decision"]
+		record.review_reasons = self._reasons(rule_decision)
+		record.review_evidence = self._review_evidence(rule_decision, review_recorded=True)
+		self._audit(record.tenant_id, "remediation.decided", request_id, reviewer, rule_decision, context)
 		return record
 
 	def evaluate_deployment_gate(
@@ -6636,9 +6682,12 @@ class HlthService:
 			unresolved_critical_incidents=len(unresolved),
 			waiver_recorded=waiver_recorded,
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision, review_recorded=waiver_review_recorded),
 		)
 		self.deployment_gates[record.gate_id] = record
-		self._audit(tenant_id, "deployment_gate.evaluated", record.gate_id, deployment_id, decision["decision"], decision["matched_rules"], context)
+		self._audit(tenant_id, "deployment_gate.evaluated", record.gate_id, deployment_id, decision, context)
 		return record
 
 	def register_health_agent(
@@ -6690,9 +6739,14 @@ class HlthService:
 			purpose=self._require_text(purpose, "purpose"),
 			contribution_disclosed=bool(contribution_disclosed),
 			human_approval_required=bool(human_approval_required),
+			status="pending_review" if rule_decision["decision"] == "require_review" else "active",
+			policy_decision=rule_decision["decision"],
+			matched_rules=list(rule_decision["matched_rules"]),
+			review_reasons=self._reasons(rule_decision),
+			review_evidence=self._review_evidence(rule_decision, review_recorded=bool(human_approval_required)),
 		)
 		self.health_agents[record_key] = record
-		self._audit(tenant_id, "agent.registered", agent_id, record.owner, "allow", rule_decision["matched_rules"], asdict(record))
+		self._audit(tenant_id, "agent.registered", agent_id, record.owner, rule_decision, asdict(record))
 		return record
 
 	def validate_health_lifecycle_batch(
@@ -6723,10 +6777,13 @@ class HlthService:
 			accepted=accepted,
 			decision=rule_decision["decision"],
 			matched_rules=list(rule_decision["matched_rules"]),
+			policy_decision=rule_decision["decision"],
+			review_reasons=self._reasons(rule_decision),
+			review_evidence=self._review_evidence(rule_decision),
 			status="accepted" if accepted else "denied",
 		)
 		self.lifecycle_batches[record.batch_id] = record
-		self._audit(tenant_id, f"lifecycle_batch.{record.status}", stream_value, "hlth", rule_decision["decision"], rule_decision["matched_rules"], asdict(record))
+		self._audit(tenant_id, f"lifecycle_batch.{record.status}", stream_value, "hlth", rule_decision, asdict(record))
 		if not accepted:
 			raise PermissionError(self._first_reason(rule_decision))
 		return record
@@ -6776,10 +6833,31 @@ class HlthService:
 			"blocked_deployment_count": sum(1 for row in self.list_records(tenant_id, "deployment_gates") if row["status"] == "blocked"),
 			"pending_remediation_count": sum(1 for row in self.list_records(tenant_id, "remediation_requests") if row["status"] == "pending_review"),
 			"health_agent_count": len(self.list_records(tenant_id, "health_agents")),
+			"pending_health_agent_review_count": sum(1 for row in self.list_records(tenant_id, "health_agents") if row["status"] == "pending_review"),
 			"lifecycle_batch_count": len(self.list_records(tenant_id, "lifecycle_batches")),
 			"denied_lifecycle_batch_count": sum(1 for row in self.list_records(tenant_id, "lifecycle_batches") if not row["accepted"]),
+			"pending_review_count": len(self.list_pending_reviews(tenant_id)),
 			"audit_event_count": len(self.list_records(tenant_id, "audit_events")),
 		}
+
+	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		"""Return all HLTH records awaiting operator or human review."""
+		tenant_id = tenant_id or self.tenant_id
+		items = (
+			self.list_records(tenant_id, "checks")
+			+ self.list_records(tenant_id, "predictions")
+			+ self.list_records(tenant_id, "alerts")
+			+ self.list_records(tenant_id, "incidents")
+			+ self.list_records(tenant_id, "remediation_requests")
+			+ self.list_records(tenant_id, "deployment_gates")
+			+ self.list_records(tenant_id, "health_agents")
+			+ self.list_records(tenant_id, "lifecycle_batches")
+		)
+		return [
+			item
+			for item in items
+			if item.get("status") in {"pending", "pending_review", "review_required"}
+		]
 
 	def _audit(
 		self,
@@ -6787,20 +6865,41 @@ class HlthService:
 		event_type: str,
 		subject: str,
 		actor: str,
-		decision: str,
-		matched_rules: list[str],
+		policy_result: dict[str, Any],
 		details: dict[str, Any],
 	) -> None:
+		policy_result = policy_result or _allow_result()
 		self.audit_events.append(HlthAuditEventRecord(
 			event_id=hlth_id(),
 			tenant_id=tenant_id,
 			event_type=event_type,
 			subject=subject,
 			actor=actor,
-			decision=decision,
-			matched_rules=list(matched_rules),
+			decision=policy_result["decision"],
+			matched_rules=list(policy_result["matched_rules"]),
+			policy_decision=policy_result["decision"],
+			review_reasons=self._reasons(policy_result),
+			review_evidence=self._review_evidence(policy_result),
 			details=details,
 		))
+
+	def _reasons(self, result: dict[str, Any]) -> list[str]:
+		return list(dict.fromkeys(
+			str(action["reason"])
+			for action in result.get("actions", [])
+			if action.get("reason")
+		))
+
+	def _review_evidence(self, result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+		return {
+			"required_actions": list(dict.fromkeys(
+				str(action.get("required_action"))
+				for action in result.get("actions", [])
+				if action.get("required_action")
+			)),
+			"reasons": self._reasons(result),
+			"review_recorded": bool(review_recorded),
+		}
 
 	@staticmethod
 	def _require_text(value: str, field_name: str) -> str:
@@ -6870,3 +6969,7 @@ class HlthService:
 def hlth_id() -> str:
 	"""Return a sortable enough local identifier without adding dependencies."""
 	return f"hlth-{datetime.utcnow().timestamp():.6f}".replace(".", "")
+
+
+def _allow_result() -> dict[str, Any]:
+	return {"decision": "allow", "matched_rules": [], "actions": []}

@@ -20,6 +20,8 @@ def dashboard_model(service: HlthService, tenant_id: str = "default") -> dict[st
 		"title": "Health Checks and Diagnostics",
 		"tenant_id": tenant_id,
 		"summary": service.dashboard_summary(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
+		"review_evidence": contract["review_evidence"],
 		"theme": contract["theme"],
 		"primary_actions": [
 			{"id": "register_component", "label": "Register component", "permission": "health.manage"},
@@ -125,6 +127,11 @@ def health_agent_roster_model(service: HlthService, tenant_id: str = "default") 
 	return {
 		"tenant_id": tenant_id,
 		"rows": service.list_records(tenant_id, "health_agents"),
+		"pending_reviews": [
+			agent
+			for agent in service.list_records(tenant_id, "health_agents")
+			if agent.get("status") == "pending_review"
+		],
 		"supported_runtimes": contract["agents"]["supported_runtimes"],
 		"supported_roles": contract["agents"]["supported_roles"],
 		"privileged_roles": contract["agents"]["privileged_roles"],
@@ -160,6 +167,7 @@ def settings_model(tenant_id: str = "default") -> dict[str, Any]:
 		"configuration_schema": contract["configuration_schema"],
 		"agents": contract["agents"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"theme": contract["theme"],
 		"routes": contract["ui"]["routes"],
 	}

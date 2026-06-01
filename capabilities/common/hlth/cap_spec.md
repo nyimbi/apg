@@ -5,7 +5,8 @@ diagnostics control plane. It focuses on executable composition contracts:
 component registration, health check records, baselines, predictions, alerts,
 incidents, remediation review, deployment gates, rules, generated-application UI
 metadata, health-agent composition, Bytewax lifecycle validation, and adapter
-boundaries.
+boundaries. Review-required and denied records preserve durable policy evidence
+for generated health consoles and audit timelines.
 
 ## Current Executable Scope
 
@@ -18,8 +19,13 @@ boundaries.
   independent reviewer, and notes evidence.
 - Evaluate deployment gates against unresolved critical incidents.
 - Register first-class health agents with runtime, role, scope, owner, purpose,
-  contribution-disclosure, and human-approval evidence.
-- Validate lifecycle mutation batches through a Bytewax-first stream contract.
+  contribution-disclosure, and human-approval evidence; otherwise valid
+  privileged agents without approval are retained as `pending_review`.
+- Validate lifecycle mutation batches through a Bytewax-first stream contract
+  and persist denied non-Bytewax batch evidence before raising.
+- Expose pending-review queues and policy fields for checks, predictions,
+  alerts, incidents, remediation requests, deployment gates, health agents, and
+  lifecycle batches.
 - Publish deterministic rules, UI routes, theme components, semantic model, and
   release evidence.
 
@@ -40,7 +46,9 @@ dependency-light package:
 Adapters must not bypass tenant context, component registration, alert route,
 incident ownership, baseline review, prediction confidence, remediation review,
 deployment gate rules, health-agent guardrails, or Bytewax lifecycle batch
-validation.
+validation. They must also preserve `policy_decision`, `matched_rules`,
+`review_reasons`, and `review_evidence` when syncing HLTH records into external
+stores.
 
 ## Proof Commands
 

@@ -29,7 +29,8 @@ def test_package_contract_shape_is_valid():
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "hlth"
 	assert contract["display_name"] == "Health Checks and Diagnostics"
-	assert contract["provides"] == ["health_governance", "diagnostic_lifecycle", "health_agent_composition"]
+	assert contract["provides"] == ["health_governance", "diagnostic_lifecycle", "health_agent_composition", "review_evidence"]
+	assert contract["review_evidence"]["pending_queues"]
 	assert contract["requires"] == ["moni", "mqeb", "conf"]
 	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
 	assert contract["streaming"]["required_processor"] == "bytewax"
@@ -65,5 +66,7 @@ def test_package_app_entrypoint_is_publishable():
 	assert model["capabilities"]["hlth"]["approvals"]["deployment_gate"] == "HlthDeploymentGateRecord"
 	assert model["capabilities"]["hlth"]["approvals"]["health_agent"] == "HlthAgentRecord"
 	assert model["capabilities"]["hlth"]["streaming"]["required_processor"] == "bytewax"
+	assert "review_evidence" in model["capabilities"]["hlth"]["provides"]
+	assert model["capabilities"]["hlth"]["review_evidence"]["pending_queues"]
 	assert "codex" in model["capabilities"]["hlth"]["agents"]["health_agent_contract"]["supported_runtimes"]
 	assert "moni" in model["capabilities"]["hlth"]["adapters"]["supported_probe_sources"]

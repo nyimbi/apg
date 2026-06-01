@@ -63,6 +63,7 @@ def semantic_model() -> dict[str, Any]:
 					"health_agent_contract": contract["agents"],
 				},
 				"streaming": contract["streaming"],
+				"review_evidence": contract["review_evidence"],
 				"theme": contract["theme"],
 				"runtime": {
 					"api": "api.py",
@@ -100,6 +101,7 @@ def semantic_model() -> dict[str, Any]:
 				"requires": contract["requires"],
 				"agents": contract["agents"],
 				"streaming": contract["streaming"],
+				"review_evidence": contract["review_evidence"],
 			}
 		},
 		"rules": {
@@ -181,6 +183,7 @@ def self_test() -> dict[str, Any]:
 	adapters = capability.get("adapters", {})
 	agents = capability.get("agents", {}).get("health_agent_contract", {})
 	streaming = capability.get("streaming", {})
+	review_evidence = capability.get("review_evidence", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "hlth" not in model.get("capabilities", {}):
@@ -197,6 +200,8 @@ def self_test() -> dict[str, Any]:
 		errors.append("HLTH agent manifest must include Codex runtime")
 	if streaming.get("required_processor") != "bytewax":
 		errors.append("HLTH streaming manifest must remain Bytewax-first")
+	if "health_agents" not in review_evidence.get("pending_queues", []):
+		errors.append("HLTH review evidence must expose health-agent pending queue")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",
