@@ -15,12 +15,15 @@ custom master-data records.
 
 The current packet focuses on executable composition: contract data, lifecycle
 service methods, guardrails, UI route metadata, theme tokens, view models,
-semantic model generation, package tests, and adapter boundaries.
+semantic model generation, package tests, adapter boundaries, and durable
+review evidence for stewarded records.
 
 It also makes AI/data agents first-class MDM participants. Agents can be
 registered per tenant with supported runtime, role, scope, owner, purpose,
-machine-contribution disclosure, and human-approval metadata. Bytewax is the
-required lifecycle processing engine for this packet.
+machine-contribution disclosure, and human-approval metadata. Otherwise valid
+privileged agents without approval are preserved as `pending_review` records.
+Bytewax is the required lifecycle processing engine for this packet, and denied
+non-Bytewax batches preserve denial evidence before raising.
 
 ## Lifecycle
 
@@ -59,6 +62,7 @@ The capability denies or routes decisions when:
 - Data-agent scope, owner, purpose, or contribution disclosure is missing.
 - Privileged data-agent roles are registered without human approval.
 - Lifecycle batches are submitted through anything other than Bytewax.
+- Review-required or denied lifecycle records lack durable policy evidence.
 
 ## UI And Theme
 
@@ -99,7 +103,8 @@ contract:
 - cache and audit services
 
 Adapters must preserve the guardrail decisions produced by
-`capability_contract.py`.
+`capability_contract.py`, including `policy_decision`, `matched_rules`,
+`review_reasons`, and `review_evidence`.
 
 Agent runtime adapters may integrate Codex, Claude Code, opencode, Pi, or later
 providers. They must remain adapter-level integrations and must not replace the

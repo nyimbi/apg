@@ -30,6 +30,8 @@ production adapters are attached.
   agent runtimes, supported data-agent roles, agent scope, owner, purpose,
   machine contribution disclosure, privileged-role human approval, and Bytewax
   lifecycle batches.
+- Add contract-level review-evidence metadata for policy fields, durable
+  statuses, pending review queues, and denied lifecycle-batch behavior.
 - Add UI routes for dashboard, entities, golden records, quality, duplicates,
   stewardship, lineage, cross references, publish, analytics, audit, adapters,
   data agents, lifecycle batches, and settings.
@@ -43,11 +45,16 @@ production adapters are attached.
   publish decisions, data agents, lifecycle batches, and audit events.
 - Ensure all lifecycle methods evaluate rules and preserve matched-rule
   evidence.
+- Persist policy decisions, review reasons, and review evidence before
+  returning or raising.
+- Preserve otherwise valid privileged data agents without human approval as
+  `pending_review` records and denied non-Bytewax lifecycle batches as durable
+  `denied` evidence.
 
 ### 4. Composition Surfaces
 
 - Add API helper functions that call the generated-app control plane.
-- Add view models for each UI route.
+- Add view models for each UI route, including pending-review composition.
 - Replace stale embedded semantic JSON with contract-derived `app.py` output.
 - Update package manifest, semantic model, and release report.
 

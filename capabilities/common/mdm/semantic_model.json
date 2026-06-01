@@ -292,7 +292,8 @@
       "provides": [
         "master_data_governance",
         "golden_record_lifecycle",
-        "data_agent_composition"
+        "data_agent_composition",
+        "review_evidence"
       ],
       "requires": [
         "auth",
@@ -300,6 +301,38 @@
         "conf",
         "mten"
       ],
+      "review_evidence": {
+        "deny_behavior": "Denied MDM lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "pending",
+          "pending_review",
+          "review_required",
+          "review_denied",
+          "denied",
+          "accepted",
+          "active",
+          "published",
+          "retired",
+          "reviewed",
+          "merged"
+        ],
+        "pending_queues": [
+          "entities",
+          "quality_assessments",
+          "duplicate_candidates",
+          "merge_requests",
+          "cross_references",
+          "publish_records",
+          "data_agents",
+          "lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "review_evidence"
+        ]
+      },
       "rule_engine": {
         "rules": [
           {
@@ -608,9 +641,9 @@
               "operation": "register_data_agent",
               "privileged_agent_role": true
             },
-            "description": "Privileged data-agent roles require human approval.",
+            "description": "Privileged data-agent roles require human approval evidence or review.",
             "effect": {
-              "decision": "deny",
+              "decision": "require_review",
               "reason": "data_agent_human_approval_required",
               "required_action": "require_human_approval_for_agent"
             },
@@ -939,9 +972,9 @@
             "operation": "register_data_agent",
             "privileged_agent_role": true
           },
-          "description": "Privileged data-agent roles require human approval.",
+          "description": "Privileged data-agent roles require human approval evidence or review.",
           "effect": {
-            "decision": "deny",
+            "decision": "require_review",
             "reason": "data_agent_human_approval_required",
             "required_action": "require_human_approval_for_agent"
           },
@@ -1489,7 +1522,8 @@
       "provides": [
         "master_data_governance",
         "golden_record_lifecycle",
-        "data_agent_composition"
+        "data_agent_composition",
+        "review_evidence"
       ],
       "requires": [
         "auth",
@@ -1497,6 +1531,38 @@
         "conf",
         "mten"
       ],
+      "review_evidence": {
+        "deny_behavior": "Denied MDM lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "pending",
+          "pending_review",
+          "review_required",
+          "review_denied",
+          "denied",
+          "accepted",
+          "active",
+          "published",
+          "retired",
+          "reviewed",
+          "merged"
+        ],
+        "pending_queues": [
+          "entities",
+          "quality_assessments",
+          "duplicate_candidates",
+          "merge_requests",
+          "cross_references",
+          "publish_records",
+          "data_agents",
+          "lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "review_evidence"
+        ]
+      },
       "streaming": {
         "broker_core_dependency_allowed": false,
         "engine": "bytewax",
@@ -1624,9 +1690,9 @@
         "operation": "register_data_agent",
         "privileged_agent_role": true
       },
-      "description": "Privileged data-agent roles require human approval.",
+      "description": "Privileged data-agent roles require human approval evidence or review.",
       "effect": {
-        "decision": "deny",
+        "decision": "require_review",
         "reason": "data_agent_human_approval_required",
         "required_action": "require_human_approval_for_agent"
       },

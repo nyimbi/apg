@@ -557,10 +557,10 @@ def default_rules() -> list[CapabilityRule]:
 		),
 		CapabilityRule(
 			name="data_agent_privileged_role_requires_human_approval",
-			description="Privileged data-agent roles require human approval.",
+			description="Privileged data-agent roles require human approval evidence or review.",
 			condition={"operation": "register_data_agent", "privileged_agent_role": True, "human_approval_required": False},
 			effect={
-				"decision": "deny",
+				"decision": "require_review",
 				"reason": "data_agent_human_approval_required",
 				"required_action": "require_human_approval_for_agent"
 			}
@@ -661,7 +661,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "mdm",
 		"display_name": "Master Data Management",
-		"provides": ["master_data_governance", "golden_record_lifecycle", "data_agent_composition"],
+		"provides": ["master_data_governance", "golden_record_lifecycle", "data_agent_composition", "review_evidence"],
 		"requires": ["auth", "audl", "conf", "mten"],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
@@ -672,6 +672,38 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		"ui": ui_manifest(),
 		"agents": agent_manifest(),
 		"streaming": streaming_manifest(),
+		"review_evidence": {
+			"durable_statuses": [
+				"pending",
+				"pending_review",
+				"review_required",
+				"review_denied",
+				"denied",
+				"accepted",
+				"active",
+				"published",
+				"retired",
+				"reviewed",
+				"merged"
+			],
+			"policy_fields": [
+				"policy_decision",
+				"matched_rules",
+				"review_reasons",
+				"review_evidence"
+			],
+			"pending_queues": [
+				"entities",
+				"quality_assessments",
+				"duplicate_candidates",
+				"merge_requests",
+				"cross_references",
+				"publish_records",
+				"data_agents",
+				"lifecycle_batches"
+			],
+			"deny_behavior": "Denied MDM lifecycle batches persist evidence before PermissionError"
+		},
 		"theme": {
 			"name": theme.name,
 			"tokens": theme.tokens,

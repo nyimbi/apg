@@ -29,7 +29,8 @@ def test_package_contract_shape_is_valid():
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "mdm"
 	assert contract["display_name"] == "Master Data Management"
-	assert contract["provides"] == ["master_data_governance", "golden_record_lifecycle", "data_agent_composition"]
+	assert contract["provides"] == ["master_data_governance", "golden_record_lifecycle", "data_agent_composition", "review_evidence"]
+	assert contract["review_evidence"]["pending_queues"]
 	assert contract["requires"] == ["auth", "audl", "conf", "mten"]
 	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
 	assert contract["streaming"]["required_processor"] == "bytewax"
@@ -68,5 +69,7 @@ def test_package_app_entrypoint_is_publishable():
 	assert model["capabilities"]["mdm"]["approvals"]["golden_record_merge"] == "MdmMergeRequestRecord"
 	assert model["capabilities"]["mdm"]["approvals"]["data_agent"] == "MdmDataAgentRecord"
 	assert model["capabilities"]["mdm"]["streaming"]["required_processor"] == "bytewax"
+	assert "review_evidence" in model["capabilities"]["mdm"]["provides"]
+	assert model["capabilities"]["mdm"]["review_evidence"]["pending_queues"]
 	assert "codex" in model["capabilities"]["mdm"]["agents"]["data_agent_contract"]["supported_runtimes"]
 	assert model["capabilities"]["mdm"]["adapters"]["event_stream"] == "bytewax"

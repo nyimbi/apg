@@ -91,6 +91,9 @@ class MdmEntityRecord:
 	duplicate_status: str = "not_checked"
 	golden_record_id: str | None = None
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 	updated_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -108,6 +111,9 @@ class MdmQualityRecord:
 	decision: str
 	status: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	issues: list[dict[str, Any]] = field(default_factory=list)
 	recommendations: list[str] = field(default_factory=list)
 	created_at: datetime = field(default_factory=datetime.utcnow)
@@ -130,6 +136,9 @@ class MdmDuplicateCandidateRecord:
 	review_notes: str | None = None
 	review_decision: str | None = None
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 	reviewed_at: datetime | None = None
 
@@ -146,6 +155,9 @@ class MdmGoldenRecord:
 	status: str
 	decision: str = "allow"
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	attributes: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 	updated_at: datetime = field(default_factory=datetime.utcnow)
@@ -165,6 +177,9 @@ class MdmMergeRequestRecord:
 	decision: str
 	status: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	review_notes: str | None = None
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -182,6 +197,9 @@ class MdmCrossReferenceRecord:
 	decision: str
 	status: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -197,6 +215,9 @@ class MdmPublishRecord:
 	status: str
 	quality_score: float | None
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -215,6 +236,10 @@ class MdmDataAgentRecord:
 	contribution_disclosed: bool
 	human_approval_required: bool
 	status: str = "active"
+	policy_decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -229,6 +254,9 @@ class MdmLifecycleBatchRecord:
 	accepted: bool
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	required_processor: str = "bytewax"
 	status: str = "accepted"
 	created_at: datetime = field(default_factory=datetime.utcnow)
@@ -245,6 +273,9 @@ class MdmAuditEventRecord:
 	actor: str
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	details: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -1613,7 +1644,7 @@ class MdmService:
 			"created_at": datetime.utcnow().isoformat(),
 		}
 		self.records[f"{tenant_id}:{record_id}"] = record
-		self._audit(tenant_id, "record.created", record_id, "system", "allow", [], record)
+		self._audit(tenant_id, "record.created", record_id, "system", _allow_result(), record)
 		return record
 
 	def register_entity(
@@ -1662,9 +1693,12 @@ class MdmService:
 			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
 			decision=decision["decision"],
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 		)
 		self.entities[self._entity_key(record.tenant_id, record.entity_id)] = record
-		self._audit(tenant_id, "entity.registered", record.entity_id, record.data_owner or "system", decision["decision"], decision["matched_rules"], context)
+		self._audit(tenant_id, "entity.registered", record.entity_id, record.data_owner or "system", decision, context)
 		return record
 
 	def assess_quality(
@@ -1700,6 +1734,9 @@ class MdmService:
 			decision=decision["decision"],
 			status="accepted" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 			issues=list(issues or []),
 			recommendations=list(recommendations or []),
 		)
@@ -1708,7 +1745,7 @@ class MdmService:
 			entity.quality_score = overall_score
 			entity.latest_quality_assessment_id = record.assessment_id
 			entity.updated_at = datetime.utcnow()
-		self._audit(tenant_id, "quality.assessed", entity.entity_id, record.assessor, decision["decision"], decision["matched_rules"], context)
+		self._audit(tenant_id, "quality.assessed", entity.entity_id, record.assessor, decision, context)
 		return record
 
 	def create_duplicate_candidate(
@@ -1743,10 +1780,13 @@ class MdmService:
 			status="review_required" if decision["decision"] == "require_review" else "accepted",
 			steward_review_recorded=steward_review_recorded,
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision, review_recorded=steward_review_recorded),
 		)
 		self.duplicate_candidates[record.candidate_id] = record
 		entity.duplicate_status = record.status
-		self._audit(tenant_id, "duplicate.candidate.created", record.candidate_id, "system", decision["decision"], decision["matched_rules"], asdict(record))
+		self._audit(tenant_id, "duplicate.candidate.created", record.candidate_id, "system", decision, asdict(record))
 		return record
 
 	def review_duplicate_candidate(
@@ -1775,8 +1815,11 @@ class MdmService:
 		record.decision = review_decision if decision["decision"] == "allow" else decision["decision"]
 		record.status = "reviewed" if decision["decision"] == "allow" else "review_denied"
 		record.matched_rules = decision["matched_rules"]
+		record.policy_decision = decision["decision"]
+		record.review_reasons = self._reasons(decision)
+		record.review_evidence = self._review_evidence(decision, review_recorded=decision["decision"] == "allow")
 		record.reviewed_at = datetime.utcnow()
-		self._audit(record.tenant_id, "duplicate.candidate.reviewed", record.candidate_id, record.steward, record.decision, record.matched_rules, context)
+		self._audit(record.tenant_id, "duplicate.candidate.reviewed", record.candidate_id, record.steward, decision, context)
 		return record
 
 	def create_golden_record(
@@ -1810,7 +1853,7 @@ class MdmService:
 		for source in sources:
 			source.golden_record_id = record.golden_record_id
 			source.updated_at = datetime.utcnow()
-		self._audit(tenant_id, "golden_record.created", record.golden_record_id, "system", "allow", [], asdict(record))
+		self._audit(tenant_id, "golden_record.created", record.golden_record_id, "system", _allow_result(), asdict(record))
 		return record
 
 	def merge_golden_record(
@@ -1851,6 +1894,9 @@ class MdmService:
 			decision=decision["decision"],
 			status=status,
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision, review_recorded=bool(independent_steward)),
 		)
 		self.merge_requests[record.merge_id] = record
 		if decision["decision"] == "allow":
@@ -1858,7 +1904,7 @@ class MdmService:
 			golden_record.source_entity_ids = list(dict.fromkeys(golden_record.source_entity_ids + source_entity_ids))
 			golden_record.survivorship_policy = survivorship_policy or golden_record.survivorship_policy
 			golden_record.updated_at = datetime.utcnow()
-		self._audit(tenant_id, "golden_record.merge_requested", record.merge_id, independent_steward or "system", decision["decision"], decision["matched_rules"], context)
+		self._audit(tenant_id, "golden_record.merge_requested", record.merge_id, independent_steward or "system", decision, context)
 		return record
 
 	def update_cross_reference(
@@ -1889,9 +1935,12 @@ class MdmService:
 			decision=decision["decision"],
 			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision, review_recorded=bool(evidence_reference)),
 		)
 		self.cross_references[record.cross_reference_id] = record
-		self._audit(tenant_id, "cross_reference.updated", record.cross_reference_id, source_system, decision["decision"], decision["matched_rules"], context)
+		self._audit(tenant_id, "cross_reference.updated", record.cross_reference_id, source_system, decision, context)
 		return record
 
 	def retire_entity(
@@ -1913,10 +1962,13 @@ class MdmService:
 		decision = evaluate_capability_rules(context)
 		entity.decision = decision["decision"]
 		entity.matched_rules = decision["matched_rules"]
+		entity.policy_decision = decision["decision"]
+		entity.review_reasons = self._reasons(decision)
+		entity.review_evidence = self._review_evidence(decision, review_recorded=bool(lineage_evidence))
 		if decision["decision"] == "allow":
 			entity.status = "retired"
 			entity.updated_at = datetime.utcnow()
-		self._audit(tenant_id, "entity.retired", entity.entity_id, self._require_text(actor, "actor"), decision["decision"], decision["matched_rules"], context)
+		self._audit(tenant_id, "entity.retired", entity.entity_id, self._require_text(actor, "actor"), decision, context)
 		return entity
 
 	def publish_entity(
@@ -1946,12 +1998,15 @@ class MdmService:
 			status="published" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
 			quality_score=entity.quality_score,
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 		)
 		self.publish_records[record.publish_id] = record
 		if decision["decision"] == "allow":
 			entity.status = "published"
 			entity.updated_at = datetime.utcnow()
-		self._audit(tenant_id, "entity.publish_evaluated", record.publish_id, entity.data_owner or "system", decision["decision"], decision["matched_rules"], context)
+		self._audit(tenant_id, "entity.publish_evaluated", record.publish_id, entity.data_owner or "system", decision, context)
 		return record
 
 	def register_data_agent(
@@ -1993,8 +2048,7 @@ class MdmService:
 				"agent.registration_denied",
 				agent_id,
 				str(owner or "system").strip() or "system",
-				rule_decision["decision"],
-				rule_decision["matched_rules"],
+				rule_decision,
 				context,
 			)
 			raise PermissionError(self._first_reason(rule_decision))
@@ -2012,9 +2066,14 @@ class MdmService:
 			purpose=self._require_text(purpose, "purpose"),
 			contribution_disclosed=bool(contribution_disclosed),
 			human_approval_required=bool(human_approval_required),
+			status="pending_review" if rule_decision["decision"] == "require_review" else "active",
+			policy_decision=rule_decision["decision"],
+			matched_rules=list(rule_decision["matched_rules"]),
+			review_reasons=self._reasons(rule_decision),
+			review_evidence=self._review_evidence(rule_decision, review_recorded=bool(human_approval_required)),
 		)
 		self.data_agents[record_key] = record
-		self._audit(tenant_id, "agent.registered", agent_id, record.owner, "allow", rule_decision["matched_rules"], asdict(record))
+		self._audit(tenant_id, "agent.registered", agent_id, record.owner, rule_decision, asdict(record))
 		return record
 
 	def validate_mdm_lifecycle_batch(
@@ -2045,10 +2104,13 @@ class MdmService:
 			accepted=accepted,
 			decision=rule_decision["decision"],
 			matched_rules=list(rule_decision["matched_rules"]),
+			policy_decision=rule_decision["decision"],
+			review_reasons=self._reasons(rule_decision),
+			review_evidence=self._review_evidence(rule_decision),
 			status="accepted" if accepted else "denied",
 		)
 		self.lifecycle_batches[record.batch_id] = record
-		self._audit(tenant_id, f"lifecycle_batch.{record.status}", stream_value, "mdm", rule_decision["decision"], rule_decision["matched_rules"], asdict(record))
+		self._audit(tenant_id, f"lifecycle_batch.{record.status}", stream_value, "mdm", rule_decision, asdict(record))
 		if not accepted:
 			raise PermissionError(self._first_reason(rule_decision))
 		return record
@@ -2095,10 +2157,31 @@ class MdmService:
 			"pending_merge_count": sum(1 for row in self.list_records(tenant_id, "merge_requests") if row["status"] == "pending_review"),
 			"published_entity_count": sum(1 for row in self.list_records(tenant_id, "entities") if row["status"] == "published"),
 			"data_agent_count": len(self.list_records(tenant_id, "data_agents")),
+			"pending_data_agent_review_count": sum(1 for row in self.list_records(tenant_id, "data_agents") if row["status"] == "pending_review"),
 			"lifecycle_batch_count": len(self.list_records(tenant_id, "lifecycle_batches")),
 			"denied_lifecycle_batch_count": sum(1 for row in self.list_records(tenant_id, "lifecycle_batches") if not row["accepted"]),
+			"pending_review_count": len(self.list_pending_reviews(tenant_id)),
 			"audit_event_count": len(self.list_records(tenant_id, "audit_events")),
 		}
+
+	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		"""Return all MDM records awaiting steward or human review."""
+		tenant_id = tenant_id or self.tenant_id
+		items = (
+			self.list_records(tenant_id, "entities")
+			+ self.list_records(tenant_id, "quality_assessments")
+			+ self.list_records(tenant_id, "duplicate_candidates")
+			+ self.list_records(tenant_id, "merge_requests")
+			+ self.list_records(tenant_id, "cross_references")
+			+ self.list_records(tenant_id, "publish_records")
+			+ self.list_records(tenant_id, "data_agents")
+			+ self.list_records(tenant_id, "lifecycle_batches")
+		)
+		return [
+			item
+			for item in items
+			if item.get("status") in {"pending", "pending_review", "review_required"}
+		]
 
 	def _audit(
 		self,
@@ -2106,20 +2189,41 @@ class MdmService:
 		event_type: str,
 		subject: str,
 		actor: str,
-		decision: str,
-		matched_rules: list[str],
+		policy_result: dict[str, Any],
 		details: dict[str, Any],
 	) -> None:
+		policy_result = policy_result or _allow_result()
 		self.audit_events.append(MdmAuditEventRecord(
 			event_id=uuid7str(),
 			tenant_id=tenant_id,
 			event_type=event_type,
 			subject=subject,
 			actor=actor,
-			decision=decision,
-			matched_rules=list(matched_rules),
+			decision=policy_result["decision"],
+			matched_rules=list(policy_result["matched_rules"]),
+			policy_decision=policy_result["decision"],
+			review_reasons=self._reasons(policy_result),
+			review_evidence=self._review_evidence(policy_result),
 			details=details,
 		))
+
+	def _reasons(self, result: dict[str, Any]) -> list[str]:
+		return list(dict.fromkeys(
+			str(action["reason"])
+			for action in result.get("actions", [])
+			if action.get("reason")
+		))
+
+	def _review_evidence(self, result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+		return {
+			"required_actions": list(dict.fromkeys(
+				str(action.get("required_action"))
+				for action in result.get("actions", [])
+				if action.get("required_action")
+			)),
+			"reasons": self._reasons(result),
+			"review_recorded": bool(review_recorded),
+		}
 
 	def _supported_entity_types(self, tenant_id: str) -> set[str]:
 		return set(self.describe(tenant_id)["configuration"]["entities"]["supported_entity_types"])
@@ -2172,6 +2276,10 @@ class MdmService:
 			if action.get("reason"):
 				return str(action["reason"])
 		return "mdm_operation_denied"
+
+
+def _allow_result() -> dict[str, Any]:
+	return {"decision": "allow", "matched_rules": [], "actions": []}
 
 
 # Export main classes

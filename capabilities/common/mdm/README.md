@@ -4,6 +4,8 @@
 It lets generated applications register tenant-scoped entities, score data
 quality, review duplicate candidates, compose golden records, manage
 cross-system identifiers, evaluate publish readiness, and retain audit evidence.
+It preserves durable policy and review evidence for generated stewardship
+queues and audit timelines.
 
 The capability has two runtime surfaces:
 
@@ -34,9 +36,15 @@ they must honor the same capability contract and guardrails.
 - First-class data-agent registration for Codex, Claude Code, opencode, Pi,
   and future APG-compatible runtimes.
 - Data-agent guardrails for supported roles, declared scope, owner, purpose,
-  machine-contribution disclosure, and human approval for privileged roles.
+  machine-contribution disclosure, and human approval for privileged roles,
+  including durable `pending_review` records for otherwise valid privileged
+  agents awaiting approval.
 - Bytewax lifecycle batch validation for mastered entity, quality, duplicate,
-  golden-record, publish, and data-agent streams.
+  golden-record, publish, and data-agent streams, including persisted denial
+  evidence before `PermissionError` on non-Bytewax batches.
+- Pending-review queues and policy evidence fields for entities, quality
+  assessments, duplicate candidates, merge requests, cross references, publish
+  records, data agents, and lifecycle batches.
 - Generated-application route, theme, adapter, and view-model contracts.
 - Bytewax lifecycle adapter boundary for publishing mastered changes.
 
@@ -56,7 +64,8 @@ they must honor the same capability contract and guardrails.
 9. Validate lifecycle batches through Bytewax before publishing operational
    evidence.
 10. Publish the entity only when ownership and quality gates pass.
-11. Preserve audit events for every lifecycle decision.
+11. Preserve policy decisions, review reasons, review evidence, and audit
+   events for every lifecycle decision.
 
 ## Quick Use
 
@@ -171,6 +180,7 @@ MDM evaluates deterministic rules before lifecycle decisions. Key guardrails:
   required.
 - Privileged data-agent roles require human approval.
 - Lifecycle batch processing must use Bytewax.
+- Review-required and denied records must preserve policy and review evidence.
 
 ## Adapter Boundaries
 
@@ -184,6 +194,8 @@ This packet defines the executable control plane. Production adapters may supply
 - Cache, audit, search, and security integrations.
 
 Adapters must not bypass the contract in `capability_contract.py`.
+They must preserve `policy_decision`, `matched_rules`, `review_reasons`, and
+`review_evidence` when syncing MDM records into external systems.
 
 The MDM packet intentionally does not embed SDK clients for Codex, Claude Code,
 opencode, Pi, or future agent providers. Those runtimes connect through

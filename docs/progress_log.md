@@ -16,6 +16,68 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-06-01 08:49 EAT
+
+MDM durable review-evidence packet:
+
+- Extended review-required entities, quality assessments, duplicate
+  candidates, merge requests, cross references, publish records, privileged
+  data agents, lifecycle batch evidence, and audit events with durable policy
+  evidence: policy decision, matched rules, review reasons, and review
+  evidence.
+- Added contract-level `review_evidence` metadata and exposed it through
+  registration metadata, API helpers, view models, semantic model, release
+  evidence, package tests, and app self-test.
+- Preserved privileged data agents without human approval as `pending_review`
+  records instead of discarding registration evidence.
+- Preserved denied non-Bytewax MDM lifecycle batch validations as `denied`
+  evidence before raising `PermissionError`.
+- Added pending-review queue composition for entities, quality assessments,
+  duplicate candidates, merge requests, cross references, publish records, data
+  agents, and lifecycle batches.
+- Kept MDM data agents provider-neutral for Codex, Claude Code, OpenCode, Pi,
+  and future data-governance runtimes while retaining human approval controls
+  for privileged roles and Bytewax-first lifecycle processing.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for MDM package init, models,
+  service, API helpers, contract, app, view models, and focused tests passed.
+- `./.venv/bin/pytest -q capabilities/common/mdm/test_capability_contract.py
+  capabilities/common/mdm/tests/test_package_contract.py` passed with 11 tests
+  and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.mdm import app; ..."`
+  passed package self-test.
+- `./.venv/bin/python -m json.tool
+  capabilities/common/mdm/semantic_model.json` passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/mdm --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/mdm --strict --json` passed with no warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/mdm --json`
+  passed with no warnings and side-effect-free publish planning.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/common/mdm --json` passed with complete lifecycle evidence,
+  release evidence, review evidence, and 25 rules.
+- MDM stale-marker scan returned no TODO/FIXME/stub/placeholder, Kafka,
+  materialized-baseline, contract-only, or not-implemented markers across the
+  edited MDM packet.
+- Service smoke executed duplicate review evidence, approved publish evidence,
+  privileged data-agent review evidence, accepted Bytewax batch evidence, and
+  denied non-Bytewax batch persistence, printing `require_review allow
+  pending_review require_review accepted denied bytewax_mdm_stream_required 2`.
+- `git diff --check -- capabilities/common/mdm docs/progress_log.md` passed.
+
+Known gaps:
+
+- Full repository tests, rendered MDM UI, production database persistence and
+  migrations, live quality, matching, lineage, metadata catalog, cache, audit,
+  search, and security adapters, durable Bytewax workers and dataflows, live
+  APG AUTH/MTEN/AUDL/CONF/MQEB/MONI/CACH/META adapters, benchmark/load checks,
+  runtime SLO validation, and live AI runtime adapters still need later
+  validation outside this battery-conscious slice.
+
 ### 2026-06-01 08:36 EAT
 
 HLTH durable review-evidence packet:

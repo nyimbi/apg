@@ -45,8 +45,9 @@ AI/data agents are first-class MDM citizens. They can participate in review,
 quality, duplicate matching, golden-record, survivorship, lineage, and publish
 gate workflows when they are explicitly registered with runtime, role, scope,
 owner, purpose, and contribution disclosure metadata. Privileged agent roles
-must be approved for human-supervised operation before they can affect
-publication-sensitive lifecycle steps.
+without approval are retained as `pending_review` records with policy decision,
+matched rules, review reasons, and required approval evidence so data stewards
+can approve or reject them instead of losing the registration attempt.
 
 The contract starts with supported runtimes `codex`, `claude_code`,
 `opencode`, and `pi`. New runtimes must be added through the contract rather
@@ -125,9 +126,20 @@ than hidden inside service code.
 - Require lifecycle processors to declare the `bytewax` event stream.
 - Track batch status, mutation count, and matched guardrails for UI/runtime
   evidence.
+- Persist denied non-Bytewax lifecycle batches as durable `denied` evidence
+  before raising `PermissionError`.
 - Keep broker transports out of the core lifecycle contract; event brokers may
   exist behind adapters, but Bytewax is the required lifecycle processing
   engine for this packet.
+
+### Review Evidence
+
+- Preserve `policy_decision`, `matched_rules`, `review_reasons`, and
+  `review_evidence` on governed records.
+- Compose pending-review queues for entities, quality assessments, duplicate
+  candidates, merge requests, cross references, publish records, data agents,
+  and lifecycle batches.
+- Preserve denied records as operator-facing evidence, not only exceptions.
 
 ### UI and Theming
 

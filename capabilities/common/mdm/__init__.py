@@ -298,7 +298,8 @@ def register_capability() -> dict:
             "capability_rules": "Evaluate deterministic master-data governance rules",
             "visual_theming": "Apply golden-record console theme tokens and components",
             "data_agent_composition": "Register first-class data agents across Codex, Claude Code, opencode, Pi, and future runtime adapters",
-            "lifecycle_batch_validation": "Validate master-data lifecycle mutation batches against Bytewax-first stream rules"
+            "lifecycle_batch_validation": "Validate master-data lifecycle mutation batches against Bytewax-first stream rules",
+            "review_evidence": "Compose durable pending-review, denial, matched-rule, and steward evidence across master-data lifecycle records"
         },
         "endpoints": {
             "entities": "/mdm/api/v1/entities",
@@ -317,6 +318,7 @@ def register_capability() -> dict:
         "ui_manifest": contract["ui"],
         "agents": contract["agents"],
         "streaming": contract["streaming"],
+        "review_evidence": contract["review_evidence"],
         "theme": contract["theme"],
         "permissions": [
             "mdm:view",

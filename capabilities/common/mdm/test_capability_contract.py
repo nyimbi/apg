@@ -43,7 +43,9 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"ui",
 		"theme"
 	]
-	assert contract["provides"] == ["master_data_governance", "golden_record_lifecycle", "data_agent_composition"]
+	assert contract["provides"] == ["master_data_governance", "golden_record_lifecycle", "data_agent_composition", "review_evidence"]
+	assert "data_agents" in contract["review_evidence"]["pending_queues"]
+	assert "policy_decision" in contract["review_evidence"]["policy_fields"]
 	assert contract["requires"] == ["auth", "audl", "conf", "mten"]
 	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
 	assert "golden_record_reviewer" in contract["agents"]["privileged_roles"]
@@ -140,6 +142,25 @@ def test_rule_engine_enforces_data_agent_and_bytewax_guardrails():
 	assert "bytewax_mdm_stream_required" in batch["matched_rules"]
 
 
+def test_rule_engine_preserves_privileged_data_agent_review_state():
+	result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_data_agent",
+		"agent_runtime_supported": True,
+		"agent_role_supported": True,
+		"agent_scope_present": True,
+		"agent_owner_present": True,
+		"agent_purpose_present": True,
+		"contribution_disclosed": True,
+		"privileged_agent_role": True,
+		"human_approval_required": False,
+	})
+
+	assert result["decision"] == "require_review"
+	assert result["matched_rules"] == ["data_agent_privileged_role_requires_human_approval"]
+	assert result["actions"][0]["required_action"] == "require_human_approval_for_agent"
+
+
 def test_registration_includes_full_capability_contract():
 	registration = register_capability()
 
@@ -151,6 +172,7 @@ def test_registration_includes_full_capability_contract():
 	assert registration["ui_components"]["agents"] == "/mdm/agents"
 	assert registration["agents"]["first_class"] is True
 	assert registration["streaming"]["required_processor"] == "bytewax"
+	assert registration["review_evidence"]["deny_behavior"] == "Denied MDM lifecycle batches persist evidence before PermissionError"
 	assert "mten" in registration["dependencies"]
 
 
@@ -207,18 +229,16 @@ def test_mdm_service_lifecycle_enforces_publish_and_duplicate_guardrails():
 		entity_id=entity.entity_id,
 		channel="bytewax.entity_stream",
 	)
-	with pytest.raises(PermissionError, match="data_agent_human_approval_required"):
-		service.register_data_agent(
-			tenant_id="tenant-master",
-			agent_id="agent-denied",
-			name="Denied Golden Agent",
-			runtime="codex",
-			role="golden_record_reviewer",
-			scope="customer golden records",
-			owner="data-office",
-			purpose="review merge decisions",
-		)
-	assert any(event.event_type == "agent.registration_denied" for event in service.audit_events)
+	review_agent = service.register_data_agent(
+		tenant_id="tenant-master",
+		agent_id="agent-review",
+		name="Review Golden Agent",
+		runtime="codex",
+		role="golden_record_reviewer",
+		scope="customer golden records",
+		owner="data-office",
+		purpose="review merge decisions",
+	)
 	agent = service.register_data_agent(
 		tenant_id="tenant-master",
 		agent_id="agent-publish",
@@ -238,16 +258,26 @@ def test_mdm_service_lifecycle_enforces_publish_and_duplicate_guardrails():
 
 	assert duplicate.status == "review_required"
 	assert duplicate.matched_rules == ["duplicate_candidates_require_review"]
+	assert duplicate.policy_decision == "require_review"
+	assert duplicate.review_reasons == ["duplicate_review_required"]
 	assert denied_publish.status == "denied"
 	assert "publish_requires_latest_quality_assessment" in denied_publish.matched_rules
+	assert denied_publish.policy_decision == "deny"
 	assert quality.status == "accepted"
 	assert approved_publish.status == "published"
+	assert approved_publish.policy_decision == "allow"
+	assert review_agent.status == "pending_review"
+	assert review_agent.policy_decision == "require_review"
+	assert review_agent.review_reasons == ["data_agent_human_approval_required"]
 	assert agent.runtime == "claude_code"
 	assert agent.role == "publish_gate_reviewer"
 	assert batch.accepted is True
+	assert batch.policy_decision == "allow"
 	assert batch.required_processor == "bytewax"
 	assert service.dashboard_summary("tenant-master")["published_entity_count"] == 1
-	assert service.dashboard_summary("tenant-master")["data_agent_count"] == 1
+	assert service.dashboard_summary("tenant-master")["data_agent_count"] == 2
+	assert service.dashboard_summary("tenant-master")["pending_data_agent_review_count"] == 1
+	assert service.dashboard_summary("tenant-master")["pending_review_count"] >= 2
 
 
 def test_mdm_service_blocks_restricted_entities_without_evidence():
@@ -287,6 +317,19 @@ def test_mdm_service_blocks_restricted_entities_without_evidence():
 			event_stream="legacy_broker",
 			mutation_count=1,
 		)
+	denied_batch = [
+		item for item in service.list_records("tenant-master", "lifecycle_batches")
+		if item["status"] == "denied"
+	][0]
+
+	assert record.policy_decision == "deny"
+	assert record.review_reasons == [
+		"restricted_data_owner_required",
+		"audit_evidence_required",
+		"classification_evidence_required",
+	]
+	assert denied_batch["policy_decision"] == "deny"
+	assert denied_batch["review_reasons"] == ["bytewax_mdm_stream_required"]
 
 
 def test_mdm_service_golden_record_and_cross_reference_guardrails():
@@ -332,8 +375,11 @@ def test_mdm_service_golden_record_and_cross_reference_guardrails():
 	assert blocked_merge.matched_rules == ["golden_record_merge_requires_survivorship"]
 	assert review_merge.status == "pending_review"
 	assert review_merge.matched_rules == ["conflicted_merge_requires_independent_steward"]
+	assert review_merge.policy_decision == "require_review"
+	assert review_merge.review_reasons == ["independent_steward_required"]
 	assert blocked_mapping.status == "denied"
 	assert blocked_mapping.matched_rules == ["cross_reference_requires_source_evidence"]
+	assert blocked_mapping.policy_decision == "deny"
 
 
 def test_view_models_and_settings_are_composable():
@@ -371,3 +417,4 @@ def test_view_models_and_settings_are_composable():
 	assert lifecycle_batch_model(service, "tenant-master")["streaming"]["required_processor"] == "bytewax"
 	assert adapter_health_model("tenant-master")["event_stream"] == "bytewax"
 	assert settings_model("tenant-master")["configuration"]["tenant_id"] == "tenant-master"
+	assert settings_model("tenant-master")["review_evidence"]["pending_queues"]

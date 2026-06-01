@@ -113,6 +113,10 @@ def list_records(tenant_id: str | None = None, record_type: str | None = None) -
     return SERVICE.list_records(tenant_id, record_type)
 
 
+def list_pending_reviews(tenant_id: str | None = None) -> list[dict[str, Any]]:
+    return SERVICE.list_pending_reviews(tenant_id)
+
+
 def list_mdm(tenant_id: str | None = None) -> dict[str, Any]:
     return {
         "summary": SERVICE.dashboard_summary(tenant_id),
@@ -125,6 +129,7 @@ def list_mdm(tenant_id: str | None = None) -> dict[str, Any]:
         "publish_records": SERVICE.list_records(tenant_id, "publish_records"),
         "data_agents": SERVICE.list_records(tenant_id, "data_agents"),
         "lifecycle_batches": SERVICE.list_records(tenant_id, "lifecycle_batches"),
+        "pending_reviews": SERVICE.list_pending_reviews(tenant_id),
         "audit_events": SERVICE.list_records(tenant_id, "audit_events"),
     }
 
