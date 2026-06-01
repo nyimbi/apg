@@ -29,6 +29,20 @@ The generated-application surface is dependency-light. `face_runtime.py`, `api_h
 - `app.py` derives semantic model and component manifest data from the live contract.
 - `test_capability_contract.py` and `tests/test_package_contract.py` provide focused verification.
 
+## Production API Image Sources
+
+The generated runtime stores governed metadata and does not perform raw image
+inference. The production Flask API adapter still needs to normalize request
+images before handing them to recognition services. Enrollment, verification,
+and identification endpoints accept strict base64 `image_data`, base64 `data:`
+image URLs, and governed `http`/`https` image URLs.
+
+Remote URL handling is deliberately fail-closed: unsupported schemes,
+private-network or loopback host resolution, empty payloads, payloads over 10
+MiB, and non-image content types are rejected before service invocation. Live
+capture devices, model servers, and image storage systems remain external
+adapters.
+
 ## Basic Usage
 
 ```python

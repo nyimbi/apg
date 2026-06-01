@@ -25424,6 +25424,79 @@ Known gaps:
   vault integrations, performance/load tests, or live disaster-recovery drills
   during this battery-conscious hardening slice.
 
+### 2026-06-01 11:26 EAT
+
+FREC production API image-source hardening slice:
+
+- Implemented governed production API image-source normalization for enrollment,
+  verification, and identification requests. The API now accepts strict base64
+  `image_data`, base64 `data:` image URLs, and guarded public HTTP/HTTPS image
+  URLs instead of returning URL-processing-not-implemented responses.
+- Added SSRF-oriented guardrails for URL sources: unsupported schemes,
+  unresolved hosts, private/loopback/link-local/reserved host resolution, empty
+  payloads, payloads over 10 MiB, and non-image content types are rejected
+  before service invocation.
+- Made FREC production API service dependencies lazy so importing request
+  normalization and route code no longer requires optional database-backed
+  services such as `asyncpg`.
+- Fixed Pydantic v2 import compatibility by importing `EmailStr`,
+  `PositiveFloat`, and `PositiveInt` from `pydantic`.
+- Fixed SQLAlchemy declarative import compatibility for FREC ORM models by
+  mapping JSON database column `metadata` through non-reserved `metadata_`
+  attributes while preserving instance-level `metadata` constructor and access
+  behavior.
+- Updated FREC `SPECIFICATION.md`, `PLAN.md`, `README.md`, and `cap_spec.md`
+  to document governed production API image-source behavior while preserving
+  the dependency-light generated runtime boundary.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/frec/api.py capabilities/common/frec/views.py capabilities/common/frec/models.py capabilities/common/frec/tests/test_api_image_sources.py capabilities/common/frec/tests/test_package_contract.py capabilities/common/frec/test_capability_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/frec/tests/test_api_image_sources.py capabilities/common/frec/test_capability_contract.py capabilities/common/frec/tests/test_package_contract.py`
+  passed with 14 tests and 10 pre-existing SQLAlchemy/Pydantic deprecation
+  warnings from imported shared modules.
+- Focused stale-marker scan over touched FREC API, model, view, docs, and image
+  source tests returned no primary-slice stale markers.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/frec --json`
+  passed with one domain-specific FREC implementation, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/frec --strict --json`
+  passed with one domain-specific FREC implementation, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/common/frec --json`
+  passed with one complete lifecycle record, 44 rules, 15 routes, and 0
+  warnings/errors.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/frec --json`
+  passed with side-effect-free publish evidence and no warnings.
+- `./.venv/bin/python -c "import importlib; app=importlib.import_module('capabilities.common.frec.app'); r=app.self_test(); print(r); assert r['passed']"`
+  passed.
+- `./.venv/bin/python -c "from capabilities.common.frec.models import FaUser; u=FaUser(tenant_id='tenant-a', external_user_id='user-a', metadata={'scope':'test'}); assert u.metadata == {'scope':'test'}; assert u.metadata_ == {'scope':'test'}; print(u.metadata)"`
+  passed.
+- `git diff --check -- capabilities/common/frec docs/progress_log.md` passed.
+
+Code review:
+
+- Reviewed image-source behavior: base64 decode is strict, data URLs are local,
+  remote URLs are public-host-only, payloads are size-limited, and service
+  methods receive byte buffers only after validation.
+- Reviewed adapter boundaries: generated FREC runtime remains metadata-only and
+  dependency-light; production API image normalization remains an adapter
+  surface for live capture/storage/model deployments.
+- Reviewed import boundaries: optional database-backed recognition services are
+  loaded lazily by `get_service` rather than at module import time.
+- Reviewed ORM compatibility: JSON column names remain `metadata` in the
+  database while Python mapped attributes avoid SQLAlchemy's reserved
+  declarative name.
+
+Known gaps:
+
+- Did not run the full repository pytest suite, rendered FREC UI checks, live
+  camera/image-store/model-server integration, live async database execution,
+  live CVSN/BIOP/MFAU/AICR/ENCR/AUDL adapters, image decoding into structured
+  pixel tensors beyond byte-buffer normalization, or performance/load tests
+  during this battery-conscious hardening slice.
+
 ### 2026-06-01 02:53 EAT
 
 AGNT governed execution run lifecycle slice:

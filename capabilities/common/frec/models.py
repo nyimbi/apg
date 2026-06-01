@@ -69,7 +69,26 @@ class FaProcessingStatus(str, Enum):
 
 # SQLAlchemy Models
 
-class FaUser(Base):
+class _MetadataAliasMixin:
+	"""Map user-facing metadata to a non-reserved SQLAlchemy attribute."""
+
+	def __init__(self, **kwargs):
+		if "metadata" in kwargs:
+			kwargs["metadata_"] = kwargs.pop("metadata")
+		super().__init__(**kwargs)
+
+	def __getattribute__(self, name: str):
+		if name == "metadata":
+			return object.__getattribute__(self, "metadata_") or {}
+		return super().__getattribute__(name)
+
+	def __setattr__(self, name: str, value):
+		if name == "metadata":
+			name = "metadata_"
+		super().__setattr__(name, value)
+
+
+class FaUser(_MetadataAliasMixin, Base):
 	"""User facial profile management with multi-tenant support"""
 	__tablename__ = 'fa_users'
 	__table_args__ = (
@@ -105,14 +124,14 @@ class FaUser(Base):
 	status = Column(String(50), default='active')
 	
 	# Metadata for business context
-	metadata = Column(JSON, default=dict)
+	metadata_ = Column("metadata", JSON, default=dict)
 
 	# Relationships
 	templates = relationship("FaTemplate", back_populates="user", cascade="all, delete-orphan")
 	verifications = relationship("FaVerification", back_populates="user", cascade="all, delete-orphan")
 	emotions = relationship("FaEmotion", back_populates="user", cascade="all, delete-orphan")
 
-class FaTemplate(Base):
+class FaTemplate(_MetadataAliasMixin, Base):
 	"""Encrypted facial template storage with versioning"""
 	__tablename__ = 'fa_templates'
 	__table_args__ = (
@@ -160,12 +179,12 @@ class FaTemplate(Base):
 	anonymized = Column(Boolean, default=False)
 	
 	# Metadata
-	metadata = Column(JSON, default=dict)
+	metadata_ = Column("metadata", JSON, default=dict)
 
 	# Relationships
 	user = relationship("FaUser", back_populates="templates")
 
-class FaVerification(Base):
+class FaVerification(_MetadataAliasMixin, Base):
 	"""Facial verification attempts and results with contextual intelligence"""
 	__tablename__ = 'fa_verifications'
 	__table_args__ = (
@@ -223,12 +242,12 @@ class FaVerification(Base):
 	retry_count = Column(Integer, default=0)
 	
 	# Metadata
-	metadata = Column(JSON, default=dict)
+	metadata_ = Column("metadata", JSON, default=dict)
 
 	# Relationships
 	user = relationship("FaUser", back_populates="verifications")
 
-class FaEmotion(Base):
+class FaEmotion(_MetadataAliasMixin, Base):
 	"""Real-time emotion analysis results with micro-expression detection"""
 	__tablename__ = 'fa_emotions'
 	__table_args__ = (
@@ -285,12 +304,12 @@ class FaEmotion(Base):
 	consent_for_analysis = Column(Boolean, default=True)
 	
 	# Metadata
-	metadata = Column(JSON, default=dict)
+	metadata_ = Column("metadata", JSON, default=dict)
 
 	# Relationships
 	user = relationship("FaUser", back_populates="emotions")
 
-class FaCollaboration(Base):
+class FaCollaboration(_MetadataAliasMixin, Base):
 	"""Multi-expert collaborative verification sessions"""
 	__tablename__ = 'fa_collaborations'
 	__table_args__ = (
@@ -345,9 +364,9 @@ class FaCollaboration(Base):
 	updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 	
 	# Metadata
-	metadata = Column(JSON, default=dict)
+	metadata_ = Column("metadata", JSON, default=dict)
 
-class FaAuditLog(Base):
+class FaAuditLog(_MetadataAliasMixin, Base):
 	"""Comprehensive audit logging for facial recognition activities"""
 	__tablename__ = 'fa_audit_logs'
 	__table_args__ = (
@@ -410,9 +429,9 @@ class FaAuditLog(Base):
 	compliance_reviewed = Column(Boolean, default=False)
 	
 	# Metadata
-	metadata = Column(JSON, default=dict)
+	metadata_ = Column("metadata", JSON, default=dict)
 
-class FaSettings(Base):
+class FaSettings(_MetadataAliasMixin, Base):
 	"""User and tenant configuration settings"""
 	__tablename__ = 'fa_settings'
 	__table_args__ = (
@@ -456,7 +475,7 @@ class FaSettings(Base):
 	previous_value = Column(JSON)
 	
 	# Metadata
-	metadata = Column(JSON, default=dict)
+	metadata_ = Column("metadata", JSON, default=dict)
 
 # Pydantic Models for API
 

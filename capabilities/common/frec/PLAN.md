@@ -29,6 +29,9 @@ Build one coherent facial-recognition lifecycle and guardrail packet: docs, exec
 	- Add `view_models.py` for route-ready UI data.
 	- Keep production `api.py`, `views.py`, and `service.py` as adapter targets.
 	- Surface `/frec/agents` and `/frec/lifecycle` route-ready models.
+	- Harden production `api.py` image-source normalization so base64 payloads,
+	  data URLs, and governed HTTP/HTTPS image URLs are executable instead of
+	  returning unimplemented responses.
 
 5. Refresh package evidence.
    - Replace static `app.py` semantic model with contract-derived output.
@@ -51,4 +54,6 @@ Build one coherent facial-recognition lifecycle and guardrail packet: docs, exec
 - Facial-recognition agents have supported runtime, supported role, owner, purpose, scope, contribution disclosure, and privileged-role review guardrails.
 - Lifecycle batches are non-empty, use supported FREC operations, and declare Bytewax.
 - Generated-app helpers do not import production web frameworks.
+- Production API image URL handling blocks unsupported schemes, private network
+  hosts, oversized payloads, and non-image content before service invocation.
 - Package metadata is synchronized with the live contract.

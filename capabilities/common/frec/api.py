@@ -10,12 +10,17 @@ Copyright: © 2025 Datacraft
 
 import asyncio
 import base64
+import binascii
+import ipaddress
 import json
+import socket
 from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 from flask import Blueprint, request, jsonify, current_app
 from functools import wraps
 import numpy as np
+from urllib.parse import unquote_to_bytes, urlparse
+from urllib.request import Request, urlopen
 
 from .views import (
     UserCreateRequest, UserUpdateRequest, UserResponse,
@@ -33,12 +38,6 @@ from .views import (
     ImageQualityResponse, ValidationResult
 )
 
-from .service import FacialRecognitionService
-from .contextual_intelligence import ContextualIntelligenceEngine
-from .emotion_intelligence import EmotionIntelligenceEngine
-from .collaborative_verification import CollaborativeVerificationEngine
-from .predictive_analytics import PredictiveAnalyticsEngine
-from .privacy_architecture import PrivacyArchitectureEngine
 from .context import resolve_tenant_id
 
 # Create API Blueprint
@@ -46,6 +45,8 @@ facial_api = Blueprint('facial_api', __name__, url_prefix='/api/v1/facial')
 
 # Global service instances (would be properly initialized in production)
 _services = {}
+MAX_IMAGE_BYTES = 10 * 1024 * 1024
+ALLOWED_IMAGE_URL_SCHEMES = {"data", "http", "https"}
 
 def get_service(service_type: str, tenant_id: str):
     """Get or create service instance for tenant"""
@@ -53,6 +54,7 @@ def get_service(service_type: str, tenant_id: str):
     
     if service_key not in _services:
         if service_type == 'facial':
+            from .service import FacialRecognitionService
             # Mock initialization - would use real config in production
             _services[service_key] = FacialRecognitionService(
                 database_url="postgresql://localhost/facial_db",
@@ -60,14 +62,19 @@ def get_service(service_type: str, tenant_id: str):
                 tenant_id=tenant_id
             )
         elif service_type == 'contextual':
+            from .contextual_intelligence import ContextualIntelligenceEngine
             _services[service_key] = ContextualIntelligenceEngine(tenant_id)
         elif service_type == 'emotion':
+            from .emotion_intelligence import EmotionIntelligenceEngine
             _services[service_key] = EmotionIntelligenceEngine(tenant_id)
         elif service_type == 'collaboration':
+            from .collaborative_verification import CollaborativeVerificationEngine
             _services[service_key] = CollaborativeVerificationEngine(tenant_id)
         elif service_type == 'predictive':
+            from .predictive_analytics import PredictiveAnalyticsEngine
             _services[service_key] = PredictiveAnalyticsEngine(tenant_id)
         elif service_type == 'privacy':
+            from .privacy_architecture import PrivacyArchitectureEngine
             _services[service_key] = PrivacyArchitectureEngine(tenant_id)
     
     return _services.get(service_key)
@@ -117,6 +124,78 @@ def validate_json(model_class):
 def get_tenant_id():
     """Extract tenant ID from request headers"""
     return resolve_tenant_id(request=request)
+
+def _decode_image_bytes(image_data: str) -> bytes:
+    """Decode strict base64 image bytes."""
+    try:
+        return base64.b64decode(image_data, validate=True)
+    except (binascii.Error, ValueError) as e:
+        raise ValueError(f"Invalid image data: {str(e)}") from e
+
+def _hostname_is_public(hostname: str) -> bool:
+    """Return true when a URL hostname resolves only to public addresses."""
+    try:
+        addresses = socket.getaddrinfo(hostname, None)
+    except socket.gaierror as e:
+        raise ValueError(f"Unable to resolve image URL host: {hostname}") from e
+    for address in addresses:
+        ip_address = ipaddress.ip_address(address[4][0])
+        if (
+            ip_address.is_private
+            or ip_address.is_loopback
+            or ip_address.is_link_local
+            or ip_address.is_multicast
+            or ip_address.is_reserved
+            or ip_address.is_unspecified
+        ):
+            return False
+    return True
+
+def _read_image_url(image_url: str) -> bytes:
+    """Read image bytes from a data, http, or https URL with SSRF guardrails."""
+    parsed = urlparse(image_url)
+    if parsed.scheme not in ALLOWED_IMAGE_URL_SCHEMES:
+        raise ValueError("Unsupported image URL scheme")
+    if parsed.scheme == "data":
+        header, separator, payload = image_url.partition(",")
+        if not separator:
+            raise ValueError("Invalid data URL image payload")
+        if ";base64" in header.lower():
+            return _decode_image_bytes(payload)
+        return unquote_to_bytes(payload)
+    if not parsed.hostname:
+        raise ValueError("Image URL host is required")
+    if not _hostname_is_public(parsed.hostname):
+        raise ValueError("Image URL host must resolve to a public address")
+    req = Request(image_url, headers={"User-Agent": "APG-FREC/1.0"})
+    with urlopen(req, timeout=5) as response:
+        content_type = response.headers.get("Content-Type", "")
+        if content_type and not (
+            content_type.startswith("image/")
+            or content_type.startswith("application/octet-stream")
+        ):
+            raise ValueError(f"Unsupported image content type: {content_type}")
+        content_length = response.headers.get("Content-Length")
+        if content_length and int(content_length) > MAX_IMAGE_BYTES:
+            raise ValueError("Image URL payload exceeds maximum size")
+        image_bytes = response.read(MAX_IMAGE_BYTES + 1)
+    if len(image_bytes) > MAX_IMAGE_BYTES:
+        raise ValueError("Image URL payload exceeds maximum size")
+    if not image_bytes:
+        raise ValueError("Image URL returned no image data")
+    return image_bytes
+
+def _face_image_from_request(validated_data: Any) -> np.ndarray:
+    """Convert base64 image data or governed image URL into a numpy buffer."""
+    if getattr(validated_data, "image_data", None):
+        image_bytes = _decode_image_bytes(validated_data.image_data)
+    elif getattr(validated_data, "image_url", None):
+        image_bytes = _read_image_url(validated_data.image_url)
+    else:
+        raise ValueError("Either image_data or image_url must be provided")
+    if not image_bytes:
+        raise ValueError("Image payload is empty")
+    return np.frombuffer(image_bytes, dtype=np.uint8)
 
 # Health Check Endpoint
 @facial_api.route('/health', methods=['GET'])
@@ -249,22 +328,13 @@ async def enroll_face(validated_data: EnrollmentRequest):
         tenant_id = get_tenant_id()
         facial_service = get_service('facial', tenant_id)
         
-        # Convert image data to numpy array
-        if validated_data.image_data:
-            try:
-                image_bytes = base64.b64decode(validated_data.image_data)
-                # In production, would properly decode image
-                face_image = np.frombuffer(image_bytes, dtype=np.uint8)
-            except Exception as e:
-                return jsonify(ErrorResponse(
-                    error=f"Invalid image data: {str(e)}",
-                    error_code="INVALID_IMAGE_DATA"
-                ).dict()), 400
-        else:
+        try:
+            face_image = _face_image_from_request(validated_data)
+        except Exception as e:
             return jsonify(ErrorResponse(
-                error="Image data processing not implemented for URLs",
-                error_code="URL_PROCESSING_NOT_IMPLEMENTED"
-            ).dict()), 501
+                error=f"Invalid image data: {str(e)}",
+                error_code="INVALID_IMAGE_DATA"
+            ).dict()), 400
         
         # Prepare enrollment metadata
         enrollment_metadata = {
@@ -310,21 +380,13 @@ async def verify_face(validated_data: VerificationRequest):
         tenant_id = get_tenant_id()
         facial_service = get_service('facial', tenant_id)
         
-        # Convert image data
-        if validated_data.image_data:
-            try:
-                image_bytes = base64.b64decode(validated_data.image_data)
-                face_image = np.frombuffer(image_bytes, dtype=np.uint8)
-            except Exception as e:
-                return jsonify(ErrorResponse(
-                    error=f"Invalid image data: {str(e)}",
-                    error_code="INVALID_IMAGE_DATA"
-                ).dict()), 400
-        else:
+        try:
+            face_image = _face_image_from_request(validated_data)
+        except Exception as e:
             return jsonify(ErrorResponse(
-                error="Image data processing not implemented for URLs",
-                error_code="URL_PROCESSING_NOT_IMPLEMENTED"
-            ).dict()), 501
+                error=f"Invalid image data: {str(e)}",
+                error_code="INVALID_IMAGE_DATA"
+            ).dict()), 400
         
         # Prepare verification config
         verification_config = {
@@ -416,21 +478,13 @@ async def identify_face(validated_data: IdentificationRequest):
         tenant_id = get_tenant_id()
         facial_service = get_service('facial', tenant_id)
         
-        # Convert image data
-        if validated_data.image_data:
-            try:
-                image_bytes = base64.b64decode(validated_data.image_data)
-                face_image = np.frombuffer(image_bytes, dtype=np.uint8)
-            except Exception as e:
-                return jsonify(ErrorResponse(
-                    error=f"Invalid image data: {str(e)}",
-                    error_code="INVALID_IMAGE_DATA"
-                ).dict()), 400
-        else:
+        try:
+            face_image = _face_image_from_request(validated_data)
+        except Exception as e:
             return jsonify(ErrorResponse(
-                error="Image data processing not implemented for URLs",
-                error_code="URL_PROCESSING_NOT_IMPLEMENTED"
-            ).dict()), 501
+                error=f"Invalid image data: {str(e)}",
+                error_code="INVALID_IMAGE_DATA"
+            ).dict()), 400
         
         # Prepare identification config
         identification_config = {

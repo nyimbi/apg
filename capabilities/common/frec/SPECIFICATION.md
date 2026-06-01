@@ -24,6 +24,11 @@ The current packet also makes facial-recognition governance agents first-class c
 14. Register facial-recognition governance agents as tenant-scoped records with supported runtime, supported role, explicit scope, accountable owner, declared purpose, and machine-contribution disclosure.
 15. Mark privileged facial-recognition agent roles as pending review unless human approval evidence is recorded.
 16. Validate lifecycle batches only when they are non-empty, declare a supported FREC operation, and are routed through Bytewax.
+17. The production API adapter must accept facial image bytes from strict
+    base64 payloads, base64 data URLs, or governed HTTP/HTTPS image URLs.
+18. Remote image URL handling must reject unsupported schemes, private or
+    loopback host resolution, empty payloads, oversized payloads, and non-image
+    content types before passing bytes into recognition services.
 
 ## Configuration
 
@@ -83,6 +88,12 @@ It must also cover unsupported agent runtimes, unsupported agent roles, missing 
 - list helpers, `dashboard_summary`, and `package`
 
 The runtime stores deterministic metadata and decisions. It does not perform real face inference or raw-image processing.
+
+The production API adapter may normalize image bytes for enrollment,
+verification, and identification requests. That adapter behavior must remain
+guarded and dependency-light: base64 payloads are decoded strictly, data URLs
+are decoded locally, HTTP/HTTPS URLs are size-limited and content-type checked,
+and private-network hosts are rejected to avoid SSRF exposure.
 
 ## UI Contract
 

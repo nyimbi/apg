@@ -13,8 +13,7 @@ from typing import Dict, List, Any, Optional, Union
 from enum import Enum
 from uuid_extensions import uuid7str
 
-from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
-from pydantic.types import EmailStr, PositiveFloat, PositiveInt
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, PositiveFloat, PositiveInt, field_validator, model_validator
 
 # Configuration for all models
 class BaseConfig:
