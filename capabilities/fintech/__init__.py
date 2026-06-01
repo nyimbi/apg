@@ -87,6 +87,7 @@ CAPABILITY_META = {
 		'agency',        # Agency Banking
 		'remittance',    # Cross-Border Remittance
 		'insurance',     # InsurTech
+		'risk',          # Risk Management
 		'kyc',           # Know Your Customer
 		'aml',           # Anti Money Laundering
 		'fraud',         # Fraud Detection

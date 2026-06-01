@@ -1,0 +1,1783 @@
+{
+  "app": {
+    "description": "FinTech Risk Management package-backed APG capability",
+    "entity_count": 9,
+    "name": "fintech_risk",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "fintech_risk": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "analytics": "bia",
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "reporting": "fin_rpt",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "risk_appetite_reviewer",
+            "exposure_monitor",
+            "stress_testing_reviewer",
+            "control_assurance_agent",
+            "risk_event_reviewer",
+            "model_risk_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "appetite": {
+          "evidence_required": true,
+          "owner_required": true,
+          "supported_domains": [
+            "credit",
+            "market",
+            "liquidity",
+            "operational",
+            "fraud",
+            "compliance",
+            "model",
+            "third_party"
+          ],
+          "threshold_required": true
+        },
+        "breaches": {
+          "evidence_required": true,
+          "exposure_required": true,
+          "remediation_owner_required": true,
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "controls": {
+          "effectiveness_score_required": true,
+          "evidence_required": true,
+          "owner_required": true,
+          "supported_types": [
+            "preventive",
+            "detective",
+            "corrective",
+            "compensating",
+            "automated",
+            "manual"
+          ]
+        },
+        "events": {
+          "evidence_required": true,
+          "profile_required": true,
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "supported_types": [
+            "limit_breach",
+            "control_failure",
+            "loss_event",
+            "model_drift",
+            "policy_exception",
+            "third_party_issue"
+          ]
+        },
+        "exposures": {
+          "limit_required": true,
+          "positive_amount_required": true,
+          "profile_required": true,
+          "source_required": true,
+          "supported_types": [
+            "credit_limit",
+            "settlement",
+            "liquidity",
+            "fx",
+            "market_value",
+            "operational_loss",
+            "fraud_loss"
+          ]
+        },
+        "governance": {
+          "audit_events": true,
+          "human_approval_required_for_limit_override": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "observability": {
+          "event_stream": "apg.fintech.risk.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "profiles": {
+          "kyc_required": true,
+          "score_required": true,
+          "source_required": true,
+          "supported_currencies": [
+            "USD",
+            "KES",
+            "EUR",
+            "GBP",
+            "NGN",
+            "GHS",
+            "ZAR"
+          ],
+          "supported_subject_types": [
+            "customer",
+            "merchant",
+            "wallet",
+            "account",
+            "portfolio",
+            "loan",
+            "agent",
+            "counterparty"
+          ]
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "stress_testing": {
+          "impact_required": true,
+          "mitigation_required": true,
+          "probability_required": true,
+          "profile_required": true,
+          "supported_scenarios": [
+            "macro_shock",
+            "liquidity_run",
+            "fraud_spike",
+            "counterparty_default",
+            "market_drawdown",
+            "outage",
+            "regulatory_change"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_risk_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_appetite": true,
+          "enable_breaches": true,
+          "enable_controls": true,
+          "enable_dashboard": true,
+          "enable_events": true,
+          "enable_exposures": true,
+          "enable_profiles": true,
+          "enable_reviews": true,
+          "enable_stress_tests": true
+        }
+      },
+      "name": "FinTech Risk Management",
+      "provides": [
+        "risk_appetite_workflow",
+        "risk_profile_workflow",
+        "risk_exposure_workflow",
+        "risk_control_workflow",
+        "risk_stress_testing_workflow",
+        "risk_limit_breach_workflow",
+        "risk_event_workflow",
+        "risk_review_workflow",
+        "risk_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "bia",
+        "fin_rpt"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_policy_required",
+              "required_action": "attach_risk_policy"
+            },
+            "name": "risk_write_requires_policy"
+          },
+          {
+            "condition": {
+              "domain_supported": false,
+              "operation": "register_appetite"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_domain_not_supported",
+              "required_action": "select_supported_domain"
+            },
+            "name": "appetite_domain_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_appetite",
+              "positive_threshold": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_threshold_required",
+              "required_action": "set_positive_threshold"
+            },
+            "name": "appetite_threshold_required"
+          },
+          {
+            "condition": {
+              "operation": "register_appetite",
+              "owner_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "appetite_owner_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "register_appetite"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_evidence_required",
+              "required_action": "attach_evidence"
+            },
+            "name": "appetite_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "create_profile",
+              "subject_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_subject_required",
+              "required_action": "attach_subject"
+            },
+            "name": "profile_subject_required"
+          },
+          {
+            "condition": {
+              "operation": "create_profile",
+              "subject_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_subject_type_not_supported",
+              "required_action": "select_supported_subject_type"
+            },
+            "name": "profile_subject_type_supported"
+          },
+          {
+            "condition": {
+              "kyc_present": false,
+              "operation": "create_profile"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_kyc_required",
+              "required_action": "attach_kyc"
+            },
+            "name": "profile_kyc_required"
+          },
+          {
+            "condition": {
+              "operation": "create_profile",
+              "score_valid": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_score_out_of_range",
+              "required_action": "set_valid_score"
+            },
+            "name": "profile_score_range"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "create_profile"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "profile_currency_supported"
+          },
+          {
+            "condition": {
+              "operation": "create_profile",
+              "source_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_source_required",
+              "required_action": "attach_source"
+            },
+            "name": "profile_source_required"
+          },
+          {
+            "condition": {
+              "operation": "record_exposure",
+              "profile_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_profile_required",
+              "required_action": "select_profile"
+            },
+            "name": "exposure_profile_required"
+          },
+          {
+            "condition": {
+              "exposure_type_supported": false,
+              "operation": "record_exposure"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_exposure_type_not_supported",
+              "required_action": "select_supported_exposure_type"
+            },
+            "name": "exposure_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_exposure",
+              "positive_amount": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_exposure_amount_required",
+              "required_action": "set_positive_amount"
+            },
+            "name": "exposure_amount_positive"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "record_exposure"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "exposure_currency_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_exposure",
+              "positive_limit": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_limit_required",
+              "required_action": "set_positive_limit"
+            },
+            "name": "exposure_limit_required"
+          },
+          {
+            "condition": {
+              "operation": "record_exposure",
+              "source_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_source_required",
+              "required_action": "attach_source"
+            },
+            "name": "exposure_source_required"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "record_exposure",
+              "over_limit": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_limit_override_approval"
+            },
+            "name": "limit_override_requires_human_approval"
+          },
+          {
+            "condition": {
+              "operation": "evaluate_control",
+              "profile_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_profile_required",
+              "required_action": "select_profile"
+            },
+            "name": "control_profile_required"
+          },
+          {
+            "condition": {
+              "control_type_supported": false,
+              "operation": "evaluate_control"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_control_type_not_supported",
+              "required_action": "select_supported_control_type"
+            },
+            "name": "control_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "evaluate_control",
+              "owner_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "control_owner_required",
+              "required_action": "assign_control_owner"
+            },
+            "name": "control_owner_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "evaluate_control"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "control_evidence_required",
+              "required_action": "attach_control_evidence"
+            },
+            "name": "control_evidence_required"
+          },
+          {
+            "condition": {
+              "effectiveness_score_valid": false,
+              "operation": "evaluate_control"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "control_effectiveness_out_of_range",
+              "required_action": "set_valid_effectiveness_score"
+            },
+            "name": "control_effectiveness_required"
+          },
+          {
+            "condition": {
+              "operation": "run_stress_scenario",
+              "profile_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_profile_required",
+              "required_action": "select_profile"
+            },
+            "name": "scenario_profile_required"
+          },
+          {
+            "condition": {
+              "operation": "run_stress_scenario",
+              "scenario_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "scenario_type_not_supported",
+              "required_action": "select_supported_scenario"
+            },
+            "name": "scenario_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "run_stress_scenario",
+              "positive_impact": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "scenario_impact_required",
+              "required_action": "set_positive_impact"
+            },
+            "name": "scenario_impact_positive"
+          },
+          {
+            "condition": {
+              "operation": "run_stress_scenario",
+              "probability_valid": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "scenario_probability_out_of_range",
+              "required_action": "set_probability_bps"
+            },
+            "name": "scenario_probability_valid"
+          },
+          {
+            "condition": {
+              "mitigation_present": false,
+              "operation": "run_stress_scenario"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "scenario_mitigation_required",
+              "required_action": "attach_mitigation"
+            },
+            "name": "scenario_mitigation_required"
+          },
+          {
+            "condition": {
+              "exposure_present": false,
+              "operation": "record_limit_breach"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_exposure_required",
+              "required_action": "select_exposure"
+            },
+            "name": "breach_exposure_required"
+          },
+          {
+            "condition": {
+              "operation": "record_limit_breach",
+              "severity_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_severity_not_supported",
+              "required_action": "select_supported_severity"
+            },
+            "name": "breach_severity_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_limit_breach"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "breach_evidence_required",
+              "required_action": "attach_breach_evidence"
+            },
+            "name": "breach_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_limit_breach",
+              "owner_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "remediation_owner_required",
+              "required_action": "assign_remediation_owner"
+            },
+            "name": "breach_owner_required"
+          },
+          {
+            "condition": {
+              "operation": "open_risk_event",
+              "profile_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_profile_required",
+              "required_action": "select_profile"
+            },
+            "name": "event_profile_required"
+          },
+          {
+            "condition": {
+              "event_type_supported": false,
+              "operation": "open_risk_event"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_event_type_not_supported",
+              "required_action": "select_supported_event_type"
+            },
+            "name": "event_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "open_risk_event",
+              "severity_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_severity_not_supported",
+              "required_action": "select_supported_severity"
+            },
+            "name": "event_severity_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "open_risk_event"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_event_evidence_required",
+              "required_action": "attach_event_evidence"
+            },
+            "name": "event_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "status_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_status_not_supported",
+              "required_action": "select_supported_status"
+            },
+            "name": "review_status_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "reviewer_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "reviewer_required",
+              "required_action": "assign_reviewer"
+            },
+            "name": "review_reviewer_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_review"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_evidence_required",
+              "required_action": "attach_review_evidence"
+            },
+            "name": "review_evidence_required"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "risk_batch"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_risk_batch_to_bytewax"
+            },
+            "name": "risk_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_risk_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_agent_runtime_not_supported",
+              "required_action": "select_supported_runtime"
+            },
+            "name": "risk_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_risk_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_agent_role_not_supported",
+              "required_action": "select_supported_role"
+            },
+            "name": "risk_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "risk_agent_action",
+              "privileged_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_risk_agent_action_requires_human_approval"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_policy_required",
+            "required_action": "attach_risk_policy"
+          },
+          "name": "risk_write_requires_policy"
+        },
+        {
+          "condition": {
+            "domain_supported": false,
+            "operation": "register_appetite"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_domain_not_supported",
+            "required_action": "select_supported_domain"
+          },
+          "name": "appetite_domain_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_appetite",
+            "positive_threshold": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_threshold_required",
+            "required_action": "set_positive_threshold"
+          },
+          "name": "appetite_threshold_required"
+        },
+        {
+          "condition": {
+            "operation": "register_appetite",
+            "owner_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "appetite_owner_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "register_appetite"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_evidence_required",
+            "required_action": "attach_evidence"
+          },
+          "name": "appetite_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "create_profile",
+            "subject_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_subject_required",
+            "required_action": "attach_subject"
+          },
+          "name": "profile_subject_required"
+        },
+        {
+          "condition": {
+            "operation": "create_profile",
+            "subject_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_subject_type_not_supported",
+            "required_action": "select_supported_subject_type"
+          },
+          "name": "profile_subject_type_supported"
+        },
+        {
+          "condition": {
+            "kyc_present": false,
+            "operation": "create_profile"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_kyc_required",
+            "required_action": "attach_kyc"
+          },
+          "name": "profile_kyc_required"
+        },
+        {
+          "condition": {
+            "operation": "create_profile",
+            "score_valid": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_score_out_of_range",
+            "required_action": "set_valid_score"
+          },
+          "name": "profile_score_range"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "create_profile"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "profile_currency_supported"
+        },
+        {
+          "condition": {
+            "operation": "create_profile",
+            "source_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_source_required",
+            "required_action": "attach_source"
+          },
+          "name": "profile_source_required"
+        },
+        {
+          "condition": {
+            "operation": "record_exposure",
+            "profile_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_profile_required",
+            "required_action": "select_profile"
+          },
+          "name": "exposure_profile_required"
+        },
+        {
+          "condition": {
+            "exposure_type_supported": false,
+            "operation": "record_exposure"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_exposure_type_not_supported",
+            "required_action": "select_supported_exposure_type"
+          },
+          "name": "exposure_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_exposure",
+            "positive_amount": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_exposure_amount_required",
+            "required_action": "set_positive_amount"
+          },
+          "name": "exposure_amount_positive"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "record_exposure"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "exposure_currency_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_exposure",
+            "positive_limit": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_limit_required",
+            "required_action": "set_positive_limit"
+          },
+          "name": "exposure_limit_required"
+        },
+        {
+          "condition": {
+            "operation": "record_exposure",
+            "source_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_source_required",
+            "required_action": "attach_source"
+          },
+          "name": "exposure_source_required"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "record_exposure",
+            "over_limit": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_limit_override_approval"
+          },
+          "name": "limit_override_requires_human_approval"
+        },
+        {
+          "condition": {
+            "operation": "evaluate_control",
+            "profile_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_profile_required",
+            "required_action": "select_profile"
+          },
+          "name": "control_profile_required"
+        },
+        {
+          "condition": {
+            "control_type_supported": false,
+            "operation": "evaluate_control"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_control_type_not_supported",
+            "required_action": "select_supported_control_type"
+          },
+          "name": "control_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "evaluate_control",
+            "owner_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "control_owner_required",
+            "required_action": "assign_control_owner"
+          },
+          "name": "control_owner_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "evaluate_control"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "control_evidence_required",
+            "required_action": "attach_control_evidence"
+          },
+          "name": "control_evidence_required"
+        },
+        {
+          "condition": {
+            "effectiveness_score_valid": false,
+            "operation": "evaluate_control"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "control_effectiveness_out_of_range",
+            "required_action": "set_valid_effectiveness_score"
+          },
+          "name": "control_effectiveness_required"
+        },
+        {
+          "condition": {
+            "operation": "run_stress_scenario",
+            "profile_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_profile_required",
+            "required_action": "select_profile"
+          },
+          "name": "scenario_profile_required"
+        },
+        {
+          "condition": {
+            "operation": "run_stress_scenario",
+            "scenario_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "scenario_type_not_supported",
+            "required_action": "select_supported_scenario"
+          },
+          "name": "scenario_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "run_stress_scenario",
+            "positive_impact": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "scenario_impact_required",
+            "required_action": "set_positive_impact"
+          },
+          "name": "scenario_impact_positive"
+        },
+        {
+          "condition": {
+            "operation": "run_stress_scenario",
+            "probability_valid": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "scenario_probability_out_of_range",
+            "required_action": "set_probability_bps"
+          },
+          "name": "scenario_probability_valid"
+        },
+        {
+          "condition": {
+            "mitigation_present": false,
+            "operation": "run_stress_scenario"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "scenario_mitigation_required",
+            "required_action": "attach_mitigation"
+          },
+          "name": "scenario_mitigation_required"
+        },
+        {
+          "condition": {
+            "exposure_present": false,
+            "operation": "record_limit_breach"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_exposure_required",
+            "required_action": "select_exposure"
+          },
+          "name": "breach_exposure_required"
+        },
+        {
+          "condition": {
+            "operation": "record_limit_breach",
+            "severity_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_severity_not_supported",
+            "required_action": "select_supported_severity"
+          },
+          "name": "breach_severity_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_limit_breach"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "breach_evidence_required",
+            "required_action": "attach_breach_evidence"
+          },
+          "name": "breach_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_limit_breach",
+            "owner_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "remediation_owner_required",
+            "required_action": "assign_remediation_owner"
+          },
+          "name": "breach_owner_required"
+        },
+        {
+          "condition": {
+            "operation": "open_risk_event",
+            "profile_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_profile_required",
+            "required_action": "select_profile"
+          },
+          "name": "event_profile_required"
+        },
+        {
+          "condition": {
+            "event_type_supported": false,
+            "operation": "open_risk_event"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_event_type_not_supported",
+            "required_action": "select_supported_event_type"
+          },
+          "name": "event_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "open_risk_event",
+            "severity_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_severity_not_supported",
+            "required_action": "select_supported_severity"
+          },
+          "name": "event_severity_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "open_risk_event"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_event_evidence_required",
+            "required_action": "attach_event_evidence"
+          },
+          "name": "event_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "status_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_status_not_supported",
+            "required_action": "select_supported_status"
+          },
+          "name": "review_status_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "reviewer_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "reviewer_required",
+            "required_action": "assign_reviewer"
+          },
+          "name": "review_reviewer_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_review"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_evidence_required",
+            "required_action": "attach_review_evidence"
+          },
+          "name": "review_evidence_required"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "risk_batch"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_risk_batch_to_bytewax"
+          },
+          "name": "risk_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_risk_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_agent_runtime_not_supported",
+            "required_action": "select_supported_runtime"
+          },
+          "name": "risk_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_risk_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_agent_role_not_supported",
+            "required_action": "select_supported_role"
+          },
+          "name": "risk_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "risk_agent_action",
+            "privileged_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_risk_agent_action_requires_human_approval"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "agents": {
+          "component": "RiskAgentWorkbench",
+          "permission": "fintech_risk:admin",
+          "route": "/fintech-risk/agents"
+        },
+        "appetite": {
+          "component": "RiskAppetiteConsole",
+          "permission": "fintech_risk:appetite",
+          "route": "/fintech-risk/appetite"
+        },
+        "breaches": {
+          "component": "LimitBreachQueue",
+          "permission": "fintech_risk:breaches",
+          "route": "/fintech-risk/breaches"
+        },
+        "controls": {
+          "component": "ControlAssuranceConsole",
+          "permission": "fintech_risk:controls",
+          "route": "/fintech-risk/controls"
+        },
+        "dashboard": {
+          "component": "RiskDashboard",
+          "permission": "fintech_risk:view",
+          "route": "/fintech-risk/dashboard"
+        },
+        "events": {
+          "component": "RiskEventWorkbench",
+          "permission": "fintech_risk:events",
+          "route": "/fintech-risk/events"
+        },
+        "exposures": {
+          "component": "ExposureMonitor",
+          "permission": "fintech_risk:exposures",
+          "route": "/fintech-risk/exposures"
+        },
+        "profiles": {
+          "component": "RiskProfileConsole",
+          "permission": "fintech_risk:profiles",
+          "route": "/fintech-risk/profiles"
+        },
+        "reviews": {
+          "component": "RiskReviewConsole",
+          "permission": "fintech_risk:reviews",
+          "route": "/fintech-risk/reviews"
+        },
+        "settings": {
+          "component": "RiskSettings",
+          "permission": "fintech_risk:admin",
+          "route": "/fintech-risk/settings"
+        },
+        "stress_tests": {
+          "component": "StressTestingWorkbench",
+          "permission": "fintech_risk:stress",
+          "route": "/fintech-risk/stress-tests"
+        }
+      },
+      "streaming": {
+        "events": [
+          "risk_appetite_registered",
+          "risk_profile_created",
+          "risk_exposure_recorded",
+          "risk_control_evaluated",
+          "risk_stress_scenario_recorded",
+          "risk_limit_breach_recorded",
+          "risk_event_opened",
+          "risk_review_recorded",
+          "risk_agent_registered"
+        ],
+        "guardrails": [
+          "risk_batch_requires_bytewax",
+          "privileged_risk_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.fintech.risk.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "appetite": {
+            "icon": "gauge",
+            "status_indicator": "appetite-chip"
+          },
+          "breaches": {
+            "icon": "triangle-alert",
+            "status_indicator": "breach-chip"
+          },
+          "controls": {
+            "icon": "shield-check",
+            "status_indicator": "control-chip"
+          },
+          "events": {
+            "icon": "sirens",
+            "status_indicator": "event-chip"
+          },
+          "exposures": {
+            "icon": "chart-no-axes-combined",
+            "status_indicator": "exposure-chip"
+          },
+          "profiles": {
+            "icon": "user-round-check",
+            "status_indicator": "risk-score-chip"
+          },
+          "reviews": {
+            "icon": "clipboard-check",
+            "status_indicator": "review-chip"
+          },
+          "stress_tests": {
+            "icon": "activity",
+            "status_indicator": "scenario-chip"
+          }
+        },
+        "name": "fintech_risk_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#2563EB",
+          "color.danger": "#B91C1C",
+          "color.primary": "#0F766E",
+          "color.success": "#15803D",
+          "color.warning": "#A16207",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/fintech-risk/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "RiskDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/fintech-risk/dashboard",
+            "permission": "fintech_risk:view"
+          },
+          {
+            "component": "RiskAppetiteConsole",
+            "name": "appetite",
+            "nav_group": "Governance",
+            "path": "/fintech-risk/appetite",
+            "permission": "fintech_risk:appetite"
+          },
+          {
+            "component": "RiskProfileConsole",
+            "name": "profiles",
+            "nav_group": "Risk",
+            "path": "/fintech-risk/profiles",
+            "permission": "fintech_risk:profiles"
+          },
+          {
+            "component": "ExposureMonitor",
+            "name": "exposures",
+            "nav_group": "Risk",
+            "path": "/fintech-risk/exposures",
+            "permission": "fintech_risk:exposures"
+          },
+          {
+            "component": "ControlAssuranceConsole",
+            "name": "controls",
+            "nav_group": "Controls",
+            "path": "/fintech-risk/controls",
+            "permission": "fintech_risk:controls"
+          },
+          {
+            "component": "StressTestingWorkbench",
+            "name": "stress_tests",
+            "nav_group": "Analytics",
+            "path": "/fintech-risk/stress-tests",
+            "permission": "fintech_risk:stress"
+          },
+          {
+            "component": "LimitBreachQueue",
+            "name": "breaches",
+            "nav_group": "Issues",
+            "path": "/fintech-risk/breaches",
+            "permission": "fintech_risk:breaches"
+          },
+          {
+            "component": "RiskEventWorkbench",
+            "name": "events",
+            "nav_group": "Issues",
+            "path": "/fintech-risk/events",
+            "permission": "fintech_risk:events"
+          },
+          {
+            "component": "RiskReviewConsole",
+            "name": "reviews",
+            "nav_group": "Governance",
+            "path": "/fintech-risk/reviews",
+            "permission": "fintech_risk:reviews"
+          },
+          {
+            "component": "RiskAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/fintech-risk/agents",
+            "permission": "fintech_risk:admin"
+          },
+          {
+            "component": "RiskSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/fintech-risk/settings",
+            "permission": "fintech_risk:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "risk_review": {
+        "roles": [
+          "risk_appetite_reviewer",
+          "exposure_monitor",
+          "stress_testing_reviewer",
+          "control_assurance_agent",
+          "risk_event_reviewer",
+          "model_risk_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "fintech_risk": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "bia",
+        "fin_rpt"
+      ]
+    }
+  },
+  "contracts": {
+    "fintech_risk": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "analytics": "bia",
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "reporting": "fin_rpt",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "risk_appetite_reviewer",
+            "exposure_monitor",
+            "stress_testing_reviewer",
+            "control_assurance_agent",
+            "risk_event_reviewer",
+            "model_risk_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "appetite": {
+          "evidence_required": true,
+          "owner_required": true,
+          "supported_domains": [
+            "credit",
+            "market",
+            "liquidity",
+            "operational",
+            "fraud",
+            "compliance",
+            "model",
+            "third_party"
+          ],
+          "threshold_required": true
+        },
+        "breaches": {
+          "evidence_required": true,
+          "exposure_required": true,
+          "remediation_owner_required": true,
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "controls": {
+          "effectiveness_score_required": true,
+          "evidence_required": true,
+          "owner_required": true,
+          "supported_types": [
+            "preventive",
+            "detective",
+            "corrective",
+            "compensating",
+            "automated",
+            "manual"
+          ]
+        },
+        "events": {
+          "evidence_required": true,
+          "profile_required": true,
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "supported_types": [
+            "limit_breach",
+            "control_failure",
+            "loss_event",
+            "model_drift",
+            "policy_exception",
+            "third_party_issue"
+          ]
+        },
+        "exposures": {
+          "limit_required": true,
+          "positive_amount_required": true,
+          "profile_required": true,
+          "source_required": true,
+          "supported_types": [
+            "credit_limit",
+            "settlement",
+            "liquidity",
+            "fx",
+            "market_value",
+            "operational_loss",
+            "fraud_loss"
+          ]
+        },
+        "governance": {
+          "audit_events": true,
+          "human_approval_required_for_limit_override": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "observability": {
+          "event_stream": "apg.fintech.risk.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "profiles": {
+          "kyc_required": true,
+          "score_required": true,
+          "source_required": true,
+          "supported_currencies": [
+            "USD",
+            "KES",
+            "EUR",
+            "GBP",
+            "NGN",
+            "GHS",
+            "ZAR"
+          ],
+          "supported_subject_types": [
+            "customer",
+            "merchant",
+            "wallet",
+            "account",
+            "portfolio",
+            "loan",
+            "agent",
+            "counterparty"
+          ]
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "stress_testing": {
+          "impact_required": true,
+          "mitigation_required": true,
+          "probability_required": true,
+          "profile_required": true,
+          "supported_scenarios": [
+            "macro_shock",
+            "liquidity_run",
+            "fraud_spike",
+            "counterparty_default",
+            "market_drawdown",
+            "outage",
+            "regulatory_change"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_risk_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_appetite": true,
+          "enable_breaches": true,
+          "enable_controls": true,
+          "enable_dashboard": true,
+          "enable_events": true,
+          "enable_exposures": true,
+          "enable_profiles": true,
+          "enable_reviews": true,
+          "enable_stress_tests": true
+        }
+      },
+      "id": "fintech_risk",
+      "provides": [
+        "risk_appetite_workflow",
+        "risk_profile_workflow",
+        "risk_exposure_workflow",
+        "risk_control_workflow",
+        "risk_stress_testing_workflow",
+        "risk_limit_breach_workflow",
+        "risk_event_workflow",
+        "risk_review_workflow",
+        "risk_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "bia",
+        "fin_rpt"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 12,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "fintech_risk": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}

@@ -27964,3 +27964,94 @@ Known gaps:
   bordereaux, regulator filing, actuarial reserving, document signing, durable
   Bytewax topology, or performance/load checks during this battery-conscious
   slice.
+
+## 2026-06-01 - FinTech Risk Management executable capability
+
+Completed:
+
+- Promoted `capabilities/fintech/risk` from placeholder into a first-class
+  executable APG capability with README, specification, plan, capability spec,
+  package manifest, semantic model, release evidence, focused tests, and
+  code-review notes.
+- Added executable risk appetite registration, risk profile creation, exposure
+  recording, control evaluation, stress scenario recording, limit breach intake,
+  risk event intake, review recording, dashboard summary, Bytewax batch
+  validation, and provider-neutral risk agent registration workflows.
+- Added deterministic guardrails for tenant context, write policy evidence,
+  appetite domain/threshold/owner/evidence, profile subject/type/KYC/score/
+  currency/source, exposure profile/type/amount/currency/limit/source/override
+  approval, control profile/type/owner/evidence/effectiveness, scenario
+  profile/type/impact/probability/mitigation, breach exposure/severity/evidence/
+  owner, event profile/type/severity/evidence, review status/reviewer/evidence,
+  Bytewax lifecycle events, supported AI-agent runtimes/roles, and privileged
+  AI-agent approval.
+- Added compact UI/view models and theme tokens for dashboards, appetite,
+  profiles, exposures, controls, stress tests, breaches, events, reviews,
+  agents, and settings.
+- Updated fintech capability metadata so `risk` is listed as an implemented
+  sub-capability.
+- Updated `capabilities/README.md` so the catalog snapshot reports 130 valid
+  contracts, 130 domain-specific packages, 130 strict complete package artifact
+  sets, and 22 fintech packages.
+- Removed the empty `_Risk_Management` marker file and regenerated
+  `semantic_model.json` from the executable application.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/fintech/risk/__init__.py
+  capabilities/fintech/risk/capability_contract.py
+  capabilities/fintech/risk/models.py
+  capabilities/fintech/risk/risk_runtime.py
+  capabilities/fintech/risk/service.py
+  capabilities/fintech/risk/api.py
+  capabilities/fintech/risk/views.py
+  capabilities/fintech/risk/app.py
+  capabilities/fintech/risk/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/fintech/risk/tests/test_package_contract.py`
+  passed with 6 tests.
+- `./.venv/bin/python capabilities/fintech/risk/app.py` passed self-test with
+  `passed: true` and `status: ok`.
+- `./.venv/bin/apg capabilities inspect fintech_risk --json` passed with 44
+  rules, 11 UI routes, theme `fintech_risk_control`, shell `apg_python`, and
+  Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan capabilities/fintech/risk --json`
+  passed with `side_effect_free: true` and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/fintech/risk --json` passed with 1 domain-specific capability,
+  0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/fintech/risk --json` passed with 1 complete lifecycle, 44 rules,
+  11 UI routes, 11 theme tokens, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 130 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 130 operable contracts, 130 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/fintech/risk`, `capabilities/fintech/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed appetite, profile, exposure, control, stress scenario, limit breach,
+  risk event, review, and AI-agent lifecycle paths so rule evaluation happens
+  before state mutation.
+- Tightened exposure handling so over-limit records require explicit human
+  approval before the exposure is accepted.
+- Reviewed provider-neutral risk agent behavior so Codex, Claude Code,
+  OpenCode, and Pi runtimes remain first-class configuration choices and
+  privileged actions require human approval.
+- Kept live core banking, payment capture, market data, regulator filing,
+  external model engines, document signing, and durable Bytewax workers behind
+  adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live ledger posting,
+  payment capture, market-data feeds, model training, regulator filing,
+  document signing, durable Bytewax topology, or performance/load checks during
+  this battery-conscious slice.
