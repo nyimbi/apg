@@ -78,6 +78,7 @@ CAPABILITY_META = {
 		'embedded',      # Embedded Finance
 		'wealth',        # Wealth Management
 		'robo',          # Robo Advisory
+		'portfolio',     # Portfolio Management
 		'neobanking',    # Neo Banking
 		'lending',       # Digital Lending
 		'bnpl',          # Buy Now Pay Later

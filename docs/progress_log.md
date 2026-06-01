@@ -27596,3 +27596,91 @@ Known gaps:
   integrations, statement rendering, billing collection, regulator filing,
   durable Bytewax topology, or performance/load checks during this
   battery-conscious slice.
+
+## 2026-06-01 - FinTech Portfolio Management executable capability
+
+- Promoted `capabilities/fintech/portfolio` from a placeholder package into a
+  first-class APG capability with `README.md`, `SPECIFICATION.md`, `PLAN.md`,
+  `cap_spec.md`, contract, models, service, API helpers, view models, app
+  entrypoint, semantic/package/release evidence, and focused tests.
+- Added portfolio books, holding ledger records, allocation policies,
+  valuations, benchmark assignments, risk exposures, performance attribution,
+  cash movements, corporate actions, compliance breaches, review records,
+  dashboard summaries, Bytewax batch validation, and provider-neutral
+  portfolio agent registration.
+- Added deterministic Portfolio Management guardrails for tenant context,
+  write policy, owner/type/base-currency controls, holding portfolio/instrument
+  and positive quantity/cost controls, allocation totals, valuation source/date
+  and positive market value, benchmark index assignment, risk source/as-of
+  evidence, attribution period/source evidence, cash amount/currency/reference,
+  corporate-action type/evidence, compliance severity/evidence, review
+  status/evidence, Bytewax lifecycle events, supported AI-agent runtimes/roles,
+  and privileged-agent approval.
+- Updated fintech capability metadata so `portfolio` is listed as an
+  implemented sub-capability.
+- Updated `capabilities/README.md` so the catalog snapshot reports 126 valid
+  contracts, 126 domain-specific packages, 126 strict complete package artifact
+  sets, and 18 fintech packages.
+- Removed the empty `_Portfolio_Management` marker file and published
+  `semantic_model.json`, `package_manifest.json`, and `release_report.json`.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/fintech/portfolio/__init__.py
+  capabilities/fintech/portfolio/capability_contract.py
+  capabilities/fintech/portfolio/models.py
+  capabilities/fintech/portfolio/portfolio_runtime.py
+  capabilities/fintech/portfolio/service.py
+  capabilities/fintech/portfolio/api.py capabilities/fintech/portfolio/views.py
+  capabilities/fintech/portfolio/app.py
+  capabilities/fintech/portfolio/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/fintech/portfolio/tests/test_package_contract.py` passed with 6
+  tests.
+- `./.venv/bin/python capabilities/fintech/portfolio/app.py` passed self-test
+  with `passed: true` and `status: ok`.
+- `./.venv/bin/apg capabilities inspect fintech_portfolio --json` passed with
+  38 rules, 14 UI routes, theme `portfolio_management_control`, shell
+  `apg_python`, and Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan capabilities/fintech/portfolio
+  --json` passed with `side_effect_free: true` and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/fintech/portfolio --json` passed with 1 domain-specific
+  capability, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/fintech/portfolio --json` passed with 1 complete lifecycle, 38
+  rules, 14 UI routes, 11 theme tokens, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 126 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 126 operable contracts, 126 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/fintech/portfolio`, `capabilities/fintech/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed portfolio book, holding, allocation, valuation, benchmark, risk,
+  attribution, cash, corporate-action, breach, review, and AI-agent lifecycle
+  paths so rule evaluation happens before state mutation.
+- Tightened allocation policy activation so target allocations must total 100
+  percent and carry policy evidence before activation.
+- Reviewed valuation, risk, attribution, cash, and corporate-action workflows
+  so source/date/reference evidence is required before records are accepted.
+- Reviewed provider-neutral portfolio agent behavior so Codex, Claude Code,
+  OpenCode, and Pi runtimes remain first-class configuration choices and
+  privileged actions require human approval.
+- Kept live custody, broker routing, market data feeds, tax-lot accounting,
+  statement rendering, billing collection, regulator filing, and durable
+  Bytewax workers behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live custody/broker
+  routing, live market-data ingestion, official tax-lot accounting, statement
+  rendering, billing collection, regulator filing, durable Bytewax topology, or
+  performance/load checks during this battery-conscious slice.

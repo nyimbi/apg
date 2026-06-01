@@ -1,0 +1,1667 @@
+{
+  "app": {
+    "description": "Portfolio Management package-backed APG capability",
+    "entity_count": 12,
+    "name": "fintech_portfolio",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "fintech_portfolio": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "analytics": "bia",
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "market_data": "market_data",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "reporting": "fin_rpt",
+          "robo": "fintech_robo",
+          "wallets": "fintech_wallets",
+          "wealth": "fintech_wealth"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "portfolio_book_reviewer",
+            "allocation_policy_reviewer",
+            "valuation_reviewer",
+            "risk_exposure_reviewer",
+            "performance_attribution_reviewer",
+            "corporate_action_reviewer",
+            "portfolio_compliance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "allocation_policies": {
+          "allocation_total_percent": 100,
+          "policy_reference_required": true,
+          "review_required_before_activation": true
+        },
+        "attribution": {
+          "benchmark_required": true,
+          "period_required": true,
+          "source_required": true
+        },
+        "benchmarks": {
+          "index_required": true,
+          "policy_reference_required": true,
+          "portfolio_required": true
+        },
+        "cash": {
+          "positive_amount_required": true,
+          "reference_required": true,
+          "supported_currencies": [
+            "USD",
+            "KES",
+            "EUR",
+            "GBP",
+            "NGN",
+            "GHS",
+            "ZAR"
+          ]
+        },
+        "compliance": {
+          "evidence_required": true,
+          "review_required": true,
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "corporate_actions": {
+          "effective_date_required": true,
+          "evidence_required": true,
+          "instrument_required": true,
+          "supported_types": [
+            "dividend",
+            "split",
+            "merger",
+            "spin_off",
+            "rights_issue",
+            "coupon",
+            "redemption"
+          ]
+        },
+        "governance": {
+          "audit_events": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "holdings": {
+          "instrument_required": true,
+          "portfolio_required": true,
+          "positive_cost_required": true,
+          "positive_quantity_required": true
+        },
+        "observability": {
+          "event_stream": "apg.fintech.portfolio.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "portfolios": {
+          "base_currency_required": true,
+          "owner_required": true,
+          "supported_currencies": [
+            "USD",
+            "KES",
+            "EUR",
+            "GBP",
+            "NGN",
+            "GHS",
+            "ZAR"
+          ],
+          "supported_types": [
+            "discretionary",
+            "advisory",
+            "model",
+            "execution_only",
+            "treasury"
+          ]
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "risk": {
+          "as_of_date_required": true,
+          "exposure_source_required": true,
+          "risk_limit_reference_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "portfolio_management_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_allocations": true,
+          "enable_attribution": true,
+          "enable_benchmarks": true,
+          "enable_cash": true,
+          "enable_compliance": true,
+          "enable_corporate_actions": true,
+          "enable_dashboard": true,
+          "enable_holdings": true,
+          "enable_portfolios": true,
+          "enable_reviews": true,
+          "enable_risk": true,
+          "enable_valuations": true
+        },
+        "valuations": {
+          "positive_market_value_required": true,
+          "source_required": true,
+          "valuation_date_required": true
+        }
+      },
+      "name": "Portfolio Management",
+      "provides": [
+        "portfolio_book_workflow",
+        "portfolio_holding_workflow",
+        "portfolio_allocation_policy_workflow",
+        "portfolio_valuation_workflow",
+        "portfolio_benchmark_workflow",
+        "portfolio_risk_workflow",
+        "portfolio_attribution_workflow",
+        "portfolio_cash_workflow",
+        "portfolio_corporate_action_workflow",
+        "portfolio_compliance_workflow",
+        "portfolio_review_workflow",
+        "portfolio_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_wealth",
+        "fintech_robo",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "bia",
+        "fin_rpt"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "policy_evidence_required",
+              "required_action": "attach_policy_evidence"
+            },
+            "name": "portfolio_write_requires_policy"
+          },
+          {
+            "condition": {
+              "operation": "create_portfolio_book",
+              "owner_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "portfolio_owner_required",
+              "required_action": "select_owner"
+            },
+            "name": "portfolio_owner_required"
+          },
+          {
+            "condition": {
+              "operation": "create_portfolio_book",
+              "portfolio_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "portfolio_type_not_supported",
+              "required_action": "select_supported_portfolio_type"
+            },
+            "name": "portfolio_type_supported"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "create_portfolio_book"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "portfolio_currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "portfolio_currency_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_holding",
+              "portfolio_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "holding_portfolio_required",
+              "required_action": "select_portfolio"
+            },
+            "name": "holding_portfolio_required"
+          },
+          {
+            "condition": {
+              "instrument_present": false,
+              "operation": "record_holding"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "holding_instrument_required",
+              "required_action": "select_instrument"
+            },
+            "name": "holding_instrument_required"
+          },
+          {
+            "condition": {
+              "operation": "record_holding",
+              "positive_quantity": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_holding_quantity_required",
+              "required_action": "set_positive_quantity"
+            },
+            "name": "holding_positive_quantity"
+          },
+          {
+            "condition": {
+              "operation": "record_holding",
+              "positive_cost": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_holding_cost_required",
+              "required_action": "set_positive_cost"
+            },
+            "name": "holding_positive_cost"
+          },
+          {
+            "condition": {
+              "operation": "activate_allocation_policy",
+              "portfolio_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "allocation_portfolio_required",
+              "required_action": "select_portfolio"
+            },
+            "name": "allocation_portfolio_required"
+          },
+          {
+            "condition": {
+              "allocation_totals_100": false,
+              "operation": "activate_allocation_policy"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "allocation_total_must_equal_100",
+              "required_action": "rebalance_allocation"
+            },
+            "name": "allocation_total_required"
+          },
+          {
+            "condition": {
+              "operation": "activate_allocation_policy",
+              "policy_reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "allocation_policy_reference_required",
+              "required_action": "attach_policy_reference"
+            },
+            "name": "allocation_policy_reference_required"
+          },
+          {
+            "condition": {
+              "operation": "record_valuation",
+              "portfolio_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "valuation_portfolio_required",
+              "required_action": "select_portfolio"
+            },
+            "name": "valuation_portfolio_required"
+          },
+          {
+            "condition": {
+              "operation": "record_valuation",
+              "positive_market_value": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_market_value_required",
+              "required_action": "set_positive_market_value"
+            },
+            "name": "valuation_positive_market_value"
+          },
+          {
+            "condition": {
+              "operation": "record_valuation",
+              "source_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "valuation_source_required",
+              "required_action": "attach_valuation_source"
+            },
+            "name": "valuation_source_required"
+          },
+          {
+            "condition": {
+              "operation": "record_valuation",
+              "valuation_date_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "valuation_date_required",
+              "required_action": "set_valuation_date"
+            },
+            "name": "valuation_date_required"
+          },
+          {
+            "condition": {
+              "operation": "assign_benchmark",
+              "portfolio_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "benchmark_portfolio_required",
+              "required_action": "select_portfolio"
+            },
+            "name": "benchmark_portfolio_required"
+          },
+          {
+            "condition": {
+              "index_present": false,
+              "operation": "assign_benchmark"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "benchmark_index_required",
+              "required_action": "select_benchmark_index"
+            },
+            "name": "benchmark_index_required"
+          },
+          {
+            "condition": {
+              "operation": "record_risk_exposure",
+              "portfolio_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_portfolio_required",
+              "required_action": "select_portfolio"
+            },
+            "name": "risk_portfolio_required"
+          },
+          {
+            "condition": {
+              "operation": "record_risk_exposure",
+              "source_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_source_required",
+              "required_action": "attach_risk_source"
+            },
+            "name": "risk_source_required"
+          },
+          {
+            "condition": {
+              "as_of_date_present": false,
+              "operation": "record_risk_exposure"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_as_of_date_required",
+              "required_action": "set_as_of_date"
+            },
+            "name": "risk_as_of_date_required"
+          },
+          {
+            "condition": {
+              "operation": "record_attribution",
+              "portfolio_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "attribution_portfolio_required",
+              "required_action": "select_portfolio"
+            },
+            "name": "attribution_portfolio_required"
+          },
+          {
+            "condition": {
+              "operation": "record_attribution",
+              "period_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "attribution_period_required",
+              "required_action": "set_period"
+            },
+            "name": "attribution_period_required"
+          },
+          {
+            "condition": {
+              "operation": "record_attribution",
+              "source_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "attribution_source_required",
+              "required_action": "attach_attribution_source"
+            },
+            "name": "attribution_source_required"
+          },
+          {
+            "condition": {
+              "operation": "record_cash_movement",
+              "portfolio_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "cash_portfolio_required",
+              "required_action": "select_portfolio"
+            },
+            "name": "cash_portfolio_required"
+          },
+          {
+            "condition": {
+              "operation": "record_cash_movement",
+              "positive_amount": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_cash_amount_required",
+              "required_action": "set_positive_amount"
+            },
+            "name": "cash_positive_amount"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "record_cash_movement"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "cash_currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "cash_currency_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_cash_movement",
+              "reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "cash_reference_required",
+              "required_action": "attach_reference"
+            },
+            "name": "cash_reference_required"
+          },
+          {
+            "condition": {
+              "action_type_supported": false,
+              "operation": "record_corporate_action"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "corporate_action_type_not_supported",
+              "required_action": "select_supported_action_type"
+            },
+            "name": "corporate_action_type_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_corporate_action"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "corporate_action_evidence_required",
+              "required_action": "attach_action_evidence"
+            },
+            "name": "corporate_action_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_compliance_breach",
+              "severity_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "compliance_severity_not_supported",
+              "required_action": "select_supported_severity"
+            },
+            "name": "compliance_severity_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_compliance_breach"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "compliance_evidence_required",
+              "required_action": "attach_breach_evidence"
+            },
+            "name": "compliance_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "status_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_status_not_supported",
+              "required_action": "select_supported_status"
+            },
+            "name": "review_status_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_review"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_evidence_required",
+              "required_action": "attach_review_evidence"
+            },
+            "name": "review_evidence_required"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "portfolio_batch"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_portfolio_batch_to_bytewax"
+            },
+            "name": "portfolio_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_portfolio_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "portfolio_agent_runtime_not_supported",
+              "required_action": "select_supported_runtime"
+            },
+            "name": "portfolio_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_portfolio_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "portfolio_agent_role_not_supported",
+              "required_action": "select_supported_role"
+            },
+            "name": "portfolio_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "portfolio_agent_action",
+              "privileged_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_portfolio_agent_action_requires_human_approval"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "policy_evidence_required",
+            "required_action": "attach_policy_evidence"
+          },
+          "name": "portfolio_write_requires_policy"
+        },
+        {
+          "condition": {
+            "operation": "create_portfolio_book",
+            "owner_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "portfolio_owner_required",
+            "required_action": "select_owner"
+          },
+          "name": "portfolio_owner_required"
+        },
+        {
+          "condition": {
+            "operation": "create_portfolio_book",
+            "portfolio_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "portfolio_type_not_supported",
+            "required_action": "select_supported_portfolio_type"
+          },
+          "name": "portfolio_type_supported"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "create_portfolio_book"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "portfolio_currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "portfolio_currency_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_holding",
+            "portfolio_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "holding_portfolio_required",
+            "required_action": "select_portfolio"
+          },
+          "name": "holding_portfolio_required"
+        },
+        {
+          "condition": {
+            "instrument_present": false,
+            "operation": "record_holding"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "holding_instrument_required",
+            "required_action": "select_instrument"
+          },
+          "name": "holding_instrument_required"
+        },
+        {
+          "condition": {
+            "operation": "record_holding",
+            "positive_quantity": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_holding_quantity_required",
+            "required_action": "set_positive_quantity"
+          },
+          "name": "holding_positive_quantity"
+        },
+        {
+          "condition": {
+            "operation": "record_holding",
+            "positive_cost": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_holding_cost_required",
+            "required_action": "set_positive_cost"
+          },
+          "name": "holding_positive_cost"
+        },
+        {
+          "condition": {
+            "operation": "activate_allocation_policy",
+            "portfolio_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "allocation_portfolio_required",
+            "required_action": "select_portfolio"
+          },
+          "name": "allocation_portfolio_required"
+        },
+        {
+          "condition": {
+            "allocation_totals_100": false,
+            "operation": "activate_allocation_policy"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "allocation_total_must_equal_100",
+            "required_action": "rebalance_allocation"
+          },
+          "name": "allocation_total_required"
+        },
+        {
+          "condition": {
+            "operation": "activate_allocation_policy",
+            "policy_reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "allocation_policy_reference_required",
+            "required_action": "attach_policy_reference"
+          },
+          "name": "allocation_policy_reference_required"
+        },
+        {
+          "condition": {
+            "operation": "record_valuation",
+            "portfolio_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "valuation_portfolio_required",
+            "required_action": "select_portfolio"
+          },
+          "name": "valuation_portfolio_required"
+        },
+        {
+          "condition": {
+            "operation": "record_valuation",
+            "positive_market_value": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_market_value_required",
+            "required_action": "set_positive_market_value"
+          },
+          "name": "valuation_positive_market_value"
+        },
+        {
+          "condition": {
+            "operation": "record_valuation",
+            "source_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "valuation_source_required",
+            "required_action": "attach_valuation_source"
+          },
+          "name": "valuation_source_required"
+        },
+        {
+          "condition": {
+            "operation": "record_valuation",
+            "valuation_date_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "valuation_date_required",
+            "required_action": "set_valuation_date"
+          },
+          "name": "valuation_date_required"
+        },
+        {
+          "condition": {
+            "operation": "assign_benchmark",
+            "portfolio_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "benchmark_portfolio_required",
+            "required_action": "select_portfolio"
+          },
+          "name": "benchmark_portfolio_required"
+        },
+        {
+          "condition": {
+            "index_present": false,
+            "operation": "assign_benchmark"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "benchmark_index_required",
+            "required_action": "select_benchmark_index"
+          },
+          "name": "benchmark_index_required"
+        },
+        {
+          "condition": {
+            "operation": "record_risk_exposure",
+            "portfolio_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_portfolio_required",
+            "required_action": "select_portfolio"
+          },
+          "name": "risk_portfolio_required"
+        },
+        {
+          "condition": {
+            "operation": "record_risk_exposure",
+            "source_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_source_required",
+            "required_action": "attach_risk_source"
+          },
+          "name": "risk_source_required"
+        },
+        {
+          "condition": {
+            "as_of_date_present": false,
+            "operation": "record_risk_exposure"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_as_of_date_required",
+            "required_action": "set_as_of_date"
+          },
+          "name": "risk_as_of_date_required"
+        },
+        {
+          "condition": {
+            "operation": "record_attribution",
+            "portfolio_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "attribution_portfolio_required",
+            "required_action": "select_portfolio"
+          },
+          "name": "attribution_portfolio_required"
+        },
+        {
+          "condition": {
+            "operation": "record_attribution",
+            "period_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "attribution_period_required",
+            "required_action": "set_period"
+          },
+          "name": "attribution_period_required"
+        },
+        {
+          "condition": {
+            "operation": "record_attribution",
+            "source_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "attribution_source_required",
+            "required_action": "attach_attribution_source"
+          },
+          "name": "attribution_source_required"
+        },
+        {
+          "condition": {
+            "operation": "record_cash_movement",
+            "portfolio_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "cash_portfolio_required",
+            "required_action": "select_portfolio"
+          },
+          "name": "cash_portfolio_required"
+        },
+        {
+          "condition": {
+            "operation": "record_cash_movement",
+            "positive_amount": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_cash_amount_required",
+            "required_action": "set_positive_amount"
+          },
+          "name": "cash_positive_amount"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "record_cash_movement"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "cash_currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "cash_currency_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_cash_movement",
+            "reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "cash_reference_required",
+            "required_action": "attach_reference"
+          },
+          "name": "cash_reference_required"
+        },
+        {
+          "condition": {
+            "action_type_supported": false,
+            "operation": "record_corporate_action"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "corporate_action_type_not_supported",
+            "required_action": "select_supported_action_type"
+          },
+          "name": "corporate_action_type_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_corporate_action"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "corporate_action_evidence_required",
+            "required_action": "attach_action_evidence"
+          },
+          "name": "corporate_action_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_compliance_breach",
+            "severity_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "compliance_severity_not_supported",
+            "required_action": "select_supported_severity"
+          },
+          "name": "compliance_severity_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_compliance_breach"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "compliance_evidence_required",
+            "required_action": "attach_breach_evidence"
+          },
+          "name": "compliance_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "status_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_status_not_supported",
+            "required_action": "select_supported_status"
+          },
+          "name": "review_status_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_review"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_evidence_required",
+            "required_action": "attach_review_evidence"
+          },
+          "name": "review_evidence_required"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "portfolio_batch"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_portfolio_batch_to_bytewax"
+          },
+          "name": "portfolio_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_portfolio_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "portfolio_agent_runtime_not_supported",
+            "required_action": "select_supported_runtime"
+          },
+          "name": "portfolio_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_portfolio_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "portfolio_agent_role_not_supported",
+            "required_action": "select_supported_role"
+          },
+          "name": "portfolio_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "portfolio_agent_action",
+            "privileged_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_portfolio_agent_action_requires_human_approval"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "agents": {
+          "component": "PortfolioAgentWorkbench",
+          "permission": "fintech_portfolio:admin",
+          "route": "/fintech-portfolio/agents"
+        },
+        "allocations": {
+          "component": "AllocationPolicyConsole",
+          "permission": "fintech_portfolio:allocations",
+          "route": "/fintech-portfolio/allocations"
+        },
+        "attribution": {
+          "component": "PerformanceAttributionWorkbench",
+          "permission": "fintech_portfolio:attribution",
+          "route": "/fintech-portfolio/attribution"
+        },
+        "benchmarks": {
+          "component": "BenchmarkAssignmentConsole",
+          "permission": "fintech_portfolio:benchmarks",
+          "route": "/fintech-portfolio/benchmarks"
+        },
+        "cash": {
+          "component": "PortfolioCashConsole",
+          "permission": "fintech_portfolio:cash",
+          "route": "/fintech-portfolio/cash"
+        },
+        "compliance": {
+          "component": "PortfolioComplianceConsole",
+          "permission": "fintech_portfolio:compliance",
+          "route": "/fintech-portfolio/compliance"
+        },
+        "corporate_actions": {
+          "component": "CorporateActionConsole",
+          "permission": "fintech_portfolio:corporate_actions",
+          "route": "/fintech-portfolio/corporate-actions"
+        },
+        "dashboard": {
+          "component": "PortfolioDashboard",
+          "permission": "fintech_portfolio:view",
+          "route": "/fintech-portfolio/dashboard"
+        },
+        "holdings": {
+          "component": "HoldingLedger",
+          "permission": "fintech_portfolio:holdings",
+          "route": "/fintech-portfolio/holdings"
+        },
+        "portfolios": {
+          "component": "PortfolioBookConsole",
+          "permission": "fintech_portfolio:portfolios",
+          "route": "/fintech-portfolio/portfolios"
+        },
+        "reviews": {
+          "component": "PortfolioReviewConsole",
+          "permission": "fintech_portfolio:reviews",
+          "route": "/fintech-portfolio/reviews"
+        },
+        "risk": {
+          "component": "PortfolioRiskConsole",
+          "permission": "fintech_portfolio:risk",
+          "route": "/fintech-portfolio/risk"
+        },
+        "settings": {
+          "component": "PortfolioSettings",
+          "permission": "fintech_portfolio:admin",
+          "route": "/fintech-portfolio/settings"
+        },
+        "valuations": {
+          "component": "ValuationWorkbench",
+          "permission": "fintech_portfolio:valuations",
+          "route": "/fintech-portfolio/valuations"
+        }
+      },
+      "streaming": {
+        "events": [
+          "portfolio_book_created",
+          "portfolio_holding_recorded",
+          "allocation_policy_activated",
+          "portfolio_valuation_recorded",
+          "benchmark_assigned",
+          "risk_exposure_recorded",
+          "performance_attribution_recorded",
+          "cash_movement_recorded",
+          "corporate_action_recorded",
+          "compliance_breach_recorded",
+          "portfolio_review_recorded",
+          "portfolio_agent_registered"
+        ],
+        "guardrails": [
+          "portfolio_batch_requires_bytewax",
+          "privileged_portfolio_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.fintech.portfolio.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "allocations": {
+            "icon": "pie-chart",
+            "status_indicator": "allocation-chip"
+          },
+          "attribution": {
+            "icon": "chart-no-axes-combined",
+            "status_indicator": "attribution-chip"
+          },
+          "benchmarks": {
+            "icon": "gauge",
+            "status_indicator": "benchmark-chip"
+          },
+          "cash": {
+            "icon": "wallet-cards",
+            "status_indicator": "cash-chip"
+          },
+          "compliance": {
+            "icon": "scale",
+            "status_indicator": "breach-chip"
+          },
+          "corporate_actions": {
+            "icon": "git-branch-plus",
+            "status_indicator": "action-chip"
+          },
+          "holdings": {
+            "icon": "layers",
+            "status_indicator": "holding-chip"
+          },
+          "portfolios": {
+            "icon": "briefcase-business",
+            "status_indicator": "portfolio-chip"
+          },
+          "reviews": {
+            "icon": "clipboard-check",
+            "status_indicator": "review-chip"
+          },
+          "risk": {
+            "icon": "shield-alert",
+            "status_indicator": "risk-chip"
+          },
+          "valuations": {
+            "icon": "line-chart",
+            "status_indicator": "valuation-chip"
+          }
+        },
+        "name": "portfolio_management_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#2563EB",
+          "color.danger": "#B91C1C",
+          "color.primary": "#0F766E",
+          "color.success": "#15803D",
+          "color.warning": "#A16207",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/fintech-portfolio/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "PortfolioDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/fintech-portfolio/dashboard",
+            "permission": "fintech_portfolio:view"
+          },
+          {
+            "component": "PortfolioBookConsole",
+            "name": "portfolios",
+            "nav_group": "Books",
+            "path": "/fintech-portfolio/portfolios",
+            "permission": "fintech_portfolio:portfolios"
+          },
+          {
+            "component": "HoldingLedger",
+            "name": "holdings",
+            "nav_group": "Books",
+            "path": "/fintech-portfolio/holdings",
+            "permission": "fintech_portfolio:holdings"
+          },
+          {
+            "component": "AllocationPolicyConsole",
+            "name": "allocations",
+            "nav_group": "Policy",
+            "path": "/fintech-portfolio/allocations",
+            "permission": "fintech_portfolio:allocations"
+          },
+          {
+            "component": "ValuationWorkbench",
+            "name": "valuations",
+            "nav_group": "Operations",
+            "path": "/fintech-portfolio/valuations",
+            "permission": "fintech_portfolio:valuations"
+          },
+          {
+            "component": "BenchmarkAssignmentConsole",
+            "name": "benchmarks",
+            "nav_group": "Policy",
+            "path": "/fintech-portfolio/benchmarks",
+            "permission": "fintech_portfolio:benchmarks"
+          },
+          {
+            "component": "PortfolioRiskConsole",
+            "name": "risk",
+            "nav_group": "Risk",
+            "path": "/fintech-portfolio/risk",
+            "permission": "fintech_portfolio:risk"
+          },
+          {
+            "component": "PerformanceAttributionWorkbench",
+            "name": "attribution",
+            "nav_group": "Performance",
+            "path": "/fintech-portfolio/attribution",
+            "permission": "fintech_portfolio:attribution"
+          },
+          {
+            "component": "PortfolioCashConsole",
+            "name": "cash",
+            "nav_group": "Operations",
+            "path": "/fintech-portfolio/cash",
+            "permission": "fintech_portfolio:cash"
+          },
+          {
+            "component": "CorporateActionConsole",
+            "name": "corporate_actions",
+            "nav_group": "Operations",
+            "path": "/fintech-portfolio/corporate-actions",
+            "permission": "fintech_portfolio:corporate_actions"
+          },
+          {
+            "component": "PortfolioComplianceConsole",
+            "name": "compliance",
+            "nav_group": "Governance",
+            "path": "/fintech-portfolio/compliance",
+            "permission": "fintech_portfolio:compliance"
+          },
+          {
+            "component": "PortfolioReviewConsole",
+            "name": "reviews",
+            "nav_group": "Governance",
+            "path": "/fintech-portfolio/reviews",
+            "permission": "fintech_portfolio:reviews"
+          },
+          {
+            "component": "PortfolioAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/fintech-portfolio/agents",
+            "permission": "fintech_portfolio:admin"
+          },
+          {
+            "component": "PortfolioSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/fintech-portfolio/settings",
+            "permission": "fintech_portfolio:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "portfolio_review": {
+        "roles": [
+          "portfolio_book_reviewer",
+          "allocation_policy_reviewer",
+          "valuation_reviewer",
+          "risk_exposure_reviewer",
+          "performance_attribution_reviewer",
+          "corporate_action_reviewer",
+          "portfolio_compliance_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "fintech_portfolio": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_wealth",
+        "fintech_robo",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "bia",
+        "fin_rpt"
+      ]
+    }
+  },
+  "contracts": {
+    "fintech_portfolio": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "analytics": "bia",
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "market_data": "market_data",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "reporting": "fin_rpt",
+          "robo": "fintech_robo",
+          "wallets": "fintech_wallets",
+          "wealth": "fintech_wealth"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "portfolio_book_reviewer",
+            "allocation_policy_reviewer",
+            "valuation_reviewer",
+            "risk_exposure_reviewer",
+            "performance_attribution_reviewer",
+            "corporate_action_reviewer",
+            "portfolio_compliance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "allocation_policies": {
+          "allocation_total_percent": 100,
+          "policy_reference_required": true,
+          "review_required_before_activation": true
+        },
+        "attribution": {
+          "benchmark_required": true,
+          "period_required": true,
+          "source_required": true
+        },
+        "benchmarks": {
+          "index_required": true,
+          "policy_reference_required": true,
+          "portfolio_required": true
+        },
+        "cash": {
+          "positive_amount_required": true,
+          "reference_required": true,
+          "supported_currencies": [
+            "USD",
+            "KES",
+            "EUR",
+            "GBP",
+            "NGN",
+            "GHS",
+            "ZAR"
+          ]
+        },
+        "compliance": {
+          "evidence_required": true,
+          "review_required": true,
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "corporate_actions": {
+          "effective_date_required": true,
+          "evidence_required": true,
+          "instrument_required": true,
+          "supported_types": [
+            "dividend",
+            "split",
+            "merger",
+            "spin_off",
+            "rights_issue",
+            "coupon",
+            "redemption"
+          ]
+        },
+        "governance": {
+          "audit_events": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "holdings": {
+          "instrument_required": true,
+          "portfolio_required": true,
+          "positive_cost_required": true,
+          "positive_quantity_required": true
+        },
+        "observability": {
+          "event_stream": "apg.fintech.portfolio.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "portfolios": {
+          "base_currency_required": true,
+          "owner_required": true,
+          "supported_currencies": [
+            "USD",
+            "KES",
+            "EUR",
+            "GBP",
+            "NGN",
+            "GHS",
+            "ZAR"
+          ],
+          "supported_types": [
+            "discretionary",
+            "advisory",
+            "model",
+            "execution_only",
+            "treasury"
+          ]
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "risk": {
+          "as_of_date_required": true,
+          "exposure_source_required": true,
+          "risk_limit_reference_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "portfolio_management_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_allocations": true,
+          "enable_attribution": true,
+          "enable_benchmarks": true,
+          "enable_cash": true,
+          "enable_compliance": true,
+          "enable_corporate_actions": true,
+          "enable_dashboard": true,
+          "enable_holdings": true,
+          "enable_portfolios": true,
+          "enable_reviews": true,
+          "enable_risk": true,
+          "enable_valuations": true
+        },
+        "valuations": {
+          "positive_market_value_required": true,
+          "source_required": true,
+          "valuation_date_required": true
+        }
+      },
+      "id": "fintech_portfolio",
+      "provides": [
+        "portfolio_book_workflow",
+        "portfolio_holding_workflow",
+        "portfolio_allocation_policy_workflow",
+        "portfolio_valuation_workflow",
+        "portfolio_benchmark_workflow",
+        "portfolio_risk_workflow",
+        "portfolio_attribution_workflow",
+        "portfolio_cash_workflow",
+        "portfolio_corporate_action_workflow",
+        "portfolio_compliance_workflow",
+        "portfolio_review_workflow",
+        "portfolio_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_wealth",
+        "fintech_robo",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "bia",
+        "fin_rpt"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 14,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "fintech_portfolio": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}
