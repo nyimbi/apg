@@ -39,7 +39,9 @@ surface. Those are adapters.
 - `publication`
 - `audit_event`
 
-Each record includes id, tenant id, kind, status, metadata, and creation timestamp. Tenant isolation is enforced on every lookup.
+Each record includes id, tenant id, kind, status, metadata, policy decision,
+matched rules, review reasons, audit evidence, and creation timestamp. Tenant
+isolation is enforced on every lookup.
 
 ## Configuration
 
@@ -73,7 +75,9 @@ The rule engine is deterministic. Rules are evaluated against context dictionari
 - `require_review`
 - `deny`
 
-Runtime methods raise `PermissionError` for denied operations and for review-required operations where review evidence is missing.
+Runtime methods raise `PermissionError` for denied operations. Review-required
+operations are persisted as `pending_review` records with policy evidence so
+generated applications can route them through review queues.
 
 Rule categories:
 
@@ -83,6 +87,7 @@ Rule categories:
 - Hybrid retrieval query, source, index, access-filter, result-window, and confidence guardrails.
 - Reasoning start-node, hop-count, evidence-path, explanation, and multi-hop review guardrails.
 - Generation query, retrieval context, reasoning path, answer text, provenance, citation, model policy, unsafe answer, and confidence guardrails.
+- Pending-retrieval reasoning and pending-context generation review guardrails.
 - Curation and publication approval guardrails.
 - Bytewax event-stream and audit guardrails.
 - GraphRAG-agent supported runtime, supported role, explicit scope, accountable
@@ -143,6 +148,9 @@ Generated apps should call `grag_runtime.GragService`. Production deployments ma
 - The runtime executes the lifecycle from source registration to publication.
 - The runtime executes GraphRAG-agent registration and Bytewax lifecycle batch
   validation.
+- The runtime persists review-required graph-source retirement, hybrid query,
+  reasoning, generation, and privileged GraphRAG-agent outcomes as
+  pending-review evidence.
 - Guardrails block missing tenant context, source data, indexes, evidence, provenance, citations, curation evidence, unsafe answers, and unapproved publication.
 - Guardrails block unsupported agent runtimes, unsupported roles, missing
   scope, missing owner, missing purpose, missing contribution disclosure, and

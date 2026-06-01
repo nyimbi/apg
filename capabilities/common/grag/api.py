@@ -171,6 +171,10 @@ def list_lifecycle_batches(tenant_id: str | None = None) -> list[dict[str, Any]]
 	return SERVICE.list_lifecycle_batches(tenant_id)
 
 
+def list_pending_reviews(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_pending_reviews(tenant_id)
+
+
 def grag_package(tenant_id: str | None = None) -> dict[str, Any]:
 	return SERVICE.grag_package(tenant_id)
 

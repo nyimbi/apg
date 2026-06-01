@@ -24,7 +24,8 @@
 - Implement source registration, hybrid query, reasoning path, answer generation, curation, publication, audit, dashboard, package, and listing methods.
 - Implement provider-neutral GraphRAG-agent records, lifecycle batch records,
   registration, validation, listing, dashboard summaries, and audit events.
-- Enforce deny and review-required results in runtime methods.
+- Enforce deny results in runtime methods and persist review-required results
+  as pending-review records with policy evidence.
 
 ## 4. API And UI Helpers
 
@@ -32,6 +33,8 @@
 - Add generated-app UI helper models to `views.py` while preserving legacy
   model exports for heavier production modules, including agent roster and
   lifecycle batch monitor models.
+- Add pending-review queues to dashboard, source, retrieval, reasoning,
+  generation, curation, governance, API, and package surfaces.
 
 ## 5. Package Evidence
 

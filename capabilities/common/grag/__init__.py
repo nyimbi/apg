@@ -53,6 +53,7 @@ def register_capability() -> dict[str, Any]:
 			"reasoning_explanations": "Expose answer paths, confidence, and provenance",
 			"graphrag_agent_composition": "Compose Codex, Claude Code, opencode, and Pi style GraphRAG agents behind provider-neutral guardrails",
 			"bytewax_lifecycle_batches": "Validate GraphRAG lifecycle batches through Bytewax-first processor contracts",
+			"review_evidence": "Persist review-required GraphRAG lifecycle outcomes as pending-review records with policy evidence",
 			"capability_rules": "Evaluate deterministic GraphRAG governance rules",
 			"visual_theming": "Apply graph-RAG reasoning theme tokens and components"
 		},
@@ -67,6 +68,7 @@ def register_capability() -> dict[str, Any]:
 			"generation": "/grag/api/v1/generation",
 			"curation": "/grag/api/v1/curation",
 			"publications": "/grag/api/v1/publications",
+			"pending_reviews": "/grag/api/v1/pending-reviews",
 			"agents": "/grag/api/v1/agents",
 			"lifecycle": "/grag/api/v1/lifecycle",
 			"audit": "/grag/api/v1/audit"

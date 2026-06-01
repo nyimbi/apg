@@ -657,6 +657,7 @@ def dashboard_model(service: GragService | None = None, tenant_id: str = "defaul
 		"publications": service.list_publications(tenant_id),
 		"graphrag_agents": service.list_graphrag_agents(tenant_id),
 		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"agents": contract["agents"],
@@ -666,22 +667,33 @@ def dashboard_model(service: GragService | None = None, tenant_id: str = "defaul
 
 
 def query_model(service: GragService, tenant_id: str = "default") -> dict[str, object]:
+	hybrid_queries = service.list_hybrid_queries(tenant_id)
+	answers = service.list_answers(tenant_id)
 	return {
 		"tenant_id": tenant_id,
 		"graph_sources": service.list_graph_sources(tenant_id),
 		"vector_sources": service.list_vector_sources(tenant_id),
-		"hybrid_queries": service.list_hybrid_queries(tenant_id),
-		"answers": service.list_answers(tenant_id),
+		"hybrid_queries": hybrid_queries,
+		"answers": answers,
+		"pending_review": [
+			item for item in hybrid_queries + answers
+			if item["status"] == "pending_review"
+		],
 	}
 
 
 def graph_source_model(service: GragService, tenant_id: str = "default") -> dict[str, object]:
+	graph_sources = service.list_graph_sources(tenant_id)
 	return {
 		"tenant_id": tenant_id,
-		"graph_sources": service.list_graph_sources(tenant_id),
+		"graph_sources": graph_sources,
 		"restricted_sources": [
-			source for source in service.list_graph_sources(tenant_id)
+			source for source in graph_sources
 			if source["metadata"].get("classification") == "restricted"
+		],
+		"pending_review": [
+			source for source in graph_sources
+			if source["status"] == "pending_review"
 		],
 	}
 
@@ -694,19 +706,29 @@ def vector_source_model(service: GragService, tenant_id: str = "default") -> dic
 
 
 def hybrid_retrieval_model(service: GragService, tenant_id: str = "default") -> dict[str, object]:
+	hybrid_queries = service.list_hybrid_queries(tenant_id)
 	return {
 		"tenant_id": tenant_id,
 		"graph_sources": service.list_graph_sources(tenant_id),
 		"vector_sources": service.list_vector_sources(tenant_id),
-		"hybrid_queries": service.list_hybrid_queries(tenant_id),
+		"hybrid_queries": hybrid_queries,
+		"pending_review": [
+			query for query in hybrid_queries
+			if query["status"] == "pending_review"
+		],
 	}
 
 
 def reasoning_model(service: GragService, tenant_id: str = "default") -> dict[str, object]:
+	reasoning_paths = service.list_reasoning_paths(tenant_id)
 	return {
 		"tenant_id": tenant_id,
 		"hybrid_queries": service.list_hybrid_queries(tenant_id),
-		"reasoning_paths": service.list_reasoning_paths(tenant_id),
+		"reasoning_paths": reasoning_paths,
+		"pending_review": [
+			path for path in reasoning_paths
+			if path["status"] == "pending_review"
+		],
 	}
 
 
@@ -721,20 +743,30 @@ def provenance_model(service: GragService, tenant_id: str = "default") -> dict[s
 
 
 def generation_model(service: GragService, tenant_id: str = "default") -> dict[str, object]:
+	answers = service.list_answers(tenant_id)
 	return {
 		"tenant_id": tenant_id,
-		"answers": service.list_answers(tenant_id),
+		"answers": answers,
 		"hybrid_queries": service.list_hybrid_queries(tenant_id),
 		"reasoning_paths": service.list_reasoning_paths(tenant_id),
+		"pending_review": [
+			answer for answer in answers
+			if answer["status"] == "pending_review"
+		],
 	}
 
 
 def curation_model(service: GragService, tenant_id: str = "default") -> dict[str, object]:
+	answers = service.list_answers(tenant_id)
 	return {
 		"tenant_id": tenant_id,
-		"answers": service.list_answers(tenant_id),
+		"answers": answers,
 		"curations": service.list_curations(tenant_id),
 		"publications": service.list_publications(tenant_id),
+		"pending_review": [
+			answer for answer in answers
+			if answer["status"] == "pending_review"
+		],
 	}
 
 
@@ -747,6 +779,7 @@ def governance_model(service: GragService, tenant_id: str = "default") -> dict[s
 		"streaming": contract["streaming"],
 		"graphrag_agents": service.list_graphrag_agents(tenant_id),
 		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"configuration": contract["configuration"],
 	}

@@ -18,6 +18,64 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ### 2026-06-01 00:00 EAT
 
+GRAG review-evidence lifecycle packet:
+
+- Extended GRAG records, GraphRAG-agent records, lifecycle batches, and audit
+  events with durable policy evidence fields: decision, matched rules, review
+  reasons, and audit evidence.
+- Changed review-required graph-source retirement, low-confidence hybrid
+  retrievals, reasoning from pending-review retrievals, deep reasoning paths,
+  low-confidence answers, answers generated from pending-review graph context,
+  and privileged GraphRAG-agent registrations to persist `pending_review`
+  records while keeping true deny outcomes hard-blocking.
+- Added pending-review queues to GRAG dashboard, query, graph-source, hybrid
+  retrieval, reasoning, generation, curation, governance, API, package, and
+  semantic model surfaces.
+- Updated focused GRAG tests so review-required lifecycle outcomes prove
+  durable evidence instead of transient exceptions.
+- Updated GRAG README, specification, plan, and capability pointer to document
+  the review queue lifecycle and deny/review distinction.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for GRAG modules and tests passed.
+- `./.venv/bin/pytest -q capabilities/common/grag/test_capability_contract.py
+  capabilities/common/grag/test_package_contract.py` passed with 9 tests and
+  10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.grag import app; ..."`
+  passed package self-test.
+- `./.venv/bin/python -m json.tool capabilities/common/grag/semantic_model.json`
+  passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/grag --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, and no warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/grag --json`
+  passed with no warnings and side-effect-free publish planning.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/common/grag --json` passed with complete lifecycle evidence.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed with 109 operable contracts/packages and no warnings or errors.
+- Service smoke executed graph source -> vector source -> low-confidence
+  hybrid query -> pending-retrieval reasoning path -> pending-context answer
+  and printed `pending_review pending_review pending_review 3`.
+- GRAG stale-marker scan returned no TODO/FIXME/placeholder/stub/baseline or
+  Kafka markers across the edited GRAG packet.
+- `git diff --check -- capabilities/common/grag docs/progress_log.md` passed.
+- Inline code review found no blocking issues; residual risks remain around
+  live graph/vector stores, rendered UI, durable stores, external agent
+  clients, live Bytewax topology, and retrieval/reasoning quality evaluation.
+
+Known gaps:
+
+- Full repository tests, rendered browser UI checks, live graph/vector stores,
+  durable Bytewax topology, external Codex/Claude Code/OpenCode/Pi clients,
+  live RAGN/KNGR/GRPH/SRCH/NLPC/AICR/ONTO/AUDL adapters, load checks,
+  migration checks, model-provider calls, and retrieval/reasoning quality
+  benchmarks still need later verification outside this battery-conscious
+  slice.
+
+### 2026-06-01 00:00 EAT
+
 RAGN review-evidence lifecycle packet:
 
 - Extended RAGN records, RAG-agent records, lifecycle batches, and audit events

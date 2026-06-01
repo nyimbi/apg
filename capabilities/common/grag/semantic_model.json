@@ -133,7 +133,9 @@
         "graphrag_agent": "GraphRAGAgentRecord",
         "large_result_window": "GragRecord",
         "low_answer_confidence": "GragRecord",
-        "low_retrieval_confidence": "GragRecord"
+        "low_retrieval_confidence": "GragRecord",
+        "pending_graph_context_generation": "GragRecord",
+        "pending_retrieval_reasoning": "GragRecord"
       },
       "business_rules": [],
       "components": {},
@@ -357,6 +359,13 @@
         "conf",
         "audl"
       ],
+      "review_evidence": {
+        "audit_evidence_field": "audit_evidence",
+        "decision_field": "decision",
+        "matched_rules_field": "matched_rules",
+        "pending_status": "pending_review",
+        "review_reasons_field": "review_reasons"
+      },
       "rule_engine": {
         "rules": [
           {
@@ -688,6 +697,20 @@
           },
           {
             "condition": {
+              "operation": "build_reasoning_path",
+              "review_recorded": false,
+              "upstream_review_pending": true
+            },
+            "description": "Reasoning paths built from pending-review retrieval remain in review until retrieval is approved.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "pending_retrieval_reasoning_review_required",
+              "required_action": "review_reasoning_against_retrieval"
+            },
+            "name": "reasoning_from_pending_retrieval_requires_review"
+          },
+          {
+            "condition": {
               "operation": "generate_answer",
               "query_present": false
             },
@@ -804,6 +827,20 @@
               "required_action": "record_answer_review"
             },
             "name": "low_answer_confidence_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "generate_answer",
+              "review_recorded": false,
+              "upstream_review_pending": true
+            },
+            "description": "Answers generated from pending-review retrieval or reasoning remain in review until grounding is approved.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "pending_graph_context_generation_review_required",
+              "required_action": "review_graph_grounded_answer"
+            },
+            "name": "generation_from_pending_graph_context_requires_review"
           },
           {
             "condition": {
@@ -1333,6 +1370,20 @@
         },
         {
           "condition": {
+            "operation": "build_reasoning_path",
+            "review_recorded": false,
+            "upstream_review_pending": true
+          },
+          "description": "Reasoning paths built from pending-review retrieval remain in review until retrieval is approved.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "pending_retrieval_reasoning_review_required",
+            "required_action": "review_reasoning_against_retrieval"
+          },
+          "name": "reasoning_from_pending_retrieval_requires_review"
+        },
+        {
+          "condition": {
             "operation": "generate_answer",
             "query_present": false
           },
@@ -1449,6 +1500,20 @@
             "required_action": "record_answer_review"
           },
           "name": "low_answer_confidence_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "generate_answer",
+            "review_recorded": false,
+            "upstream_review_pending": true
+          },
+          "description": "Answers generated from pending-review retrieval or reasoning remain in review until grounding is approved.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "pending_graph_context_generation_review_required",
+            "required_action": "review_graph_grounded_answer"
+          },
+          "name": "generation_from_pending_graph_context_requires_review"
         },
         {
           "condition": {
@@ -2389,6 +2454,20 @@
       },
       "name": "external_model_requires_policy"
     },
+    "generation_from_pending_graph_context_requires_review": {
+      "condition": {
+        "operation": "generate_answer",
+        "review_recorded": false,
+        "upstream_review_pending": true
+      },
+      "description": "Answers generated from pending-review retrieval or reasoning remain in review until grounding is approved.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "pending_graph_context_generation_review_required",
+        "required_action": "review_graph_grounded_answer"
+      },
+      "name": "generation_from_pending_graph_context_requires_review"
+    },
     "generation_requires_answer_text": {
       "condition": {
         "answer_text_present": false,
@@ -2783,6 +2862,20 @@
         "required_action": "approve_answer"
       },
       "name": "publication_requires_curated_answer"
+    },
+    "reasoning_from_pending_retrieval_requires_review": {
+      "condition": {
+        "operation": "build_reasoning_path",
+        "review_recorded": false,
+        "upstream_review_pending": true
+      },
+      "description": "Reasoning paths built from pending-review retrieval remain in review until retrieval is approved.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "pending_retrieval_reasoning_review_required",
+        "required_action": "review_reasoning_against_retrieval"
+      },
+      "name": "reasoning_from_pending_retrieval_requires_review"
     },
     "reasoning_requires_evidence_path": {
       "condition": {

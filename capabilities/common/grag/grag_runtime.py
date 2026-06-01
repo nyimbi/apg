@@ -20,6 +20,10 @@ class GragRecord:
 	kind: str
 	status: str
 	metadata: dict[str, Any] = field(default_factory=dict)
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now_iso)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -29,6 +33,10 @@ class GragRecord:
 			"kind": self.kind,
 			"status": self.status,
 			"metadata": dict(self.metadata),
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"created_at": self.created_at,
 		}
 
@@ -48,6 +56,10 @@ class GraphRAGAgentRecord:
 	contribution_disclosed: bool
 	human_approval_required: bool
 	status: str = "active"
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now_iso)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -64,6 +76,10 @@ class GraphRAGAgentRecord:
 			"contribution_disclosed": self.contribution_disclosed,
 			"human_approval_required": self.human_approval_required,
 			"status": self.status,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"created_at": self.created_at,
 		}
 
@@ -80,6 +96,8 @@ class GragLifecycleBatchRecord:
 	accepted: bool
 	decision: str
 	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	required_processor: str = "bytewax"
 	status: str = "accepted"
 	created_at: str = field(default_factory=utc_now_iso)
@@ -95,6 +113,8 @@ class GragLifecycleBatchRecord:
 			"accepted": self.accepted,
 			"decision": self.decision,
 			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"required_processor": self.required_processor,
 			"status": self.status,
 			"created_at": self.created_at,
@@ -148,7 +168,7 @@ class GragService:
 			"provenance_attached": bool(provenance_refs),
 			"review_recorded": bool(review_recorded),
 		})
-		self._raise_if_review_required(result, review_recorded)
+		self._raise_if_denied(result)
 		record = GragRecord(
 			id=source_id,
 			tenant_id=tenant_id,
@@ -161,6 +181,7 @@ class GragService:
 				"provenance_refs": list(provenance_refs),
 				"classification": classification,
 			},
+			**self._policy_fields(result, review_recorded),
 		)
 		self._graph_sources[source_id] = record
 		self._audit(tenant_id, source_id, "graph_source_registered", owner, result)
@@ -173,13 +194,14 @@ class GragService:
 			"operation": "retire_graph_source",
 			"review_recorded": bool(review_recorded),
 		})
-		self._raise_if_review_required(result, review_recorded)
+		self._raise_if_denied(result)
 		record = GragRecord(
 			id=source.id,
 			tenant_id=tenant_id,
 			kind="graph_source",
-			status="retired",
-			metadata={**source.metadata, "retired_by": reviewer},
+			status=self._status_after_review(result, "retired"),
+			metadata={**source.metadata, "retired_by": reviewer, "requested_status": "retired"},
+			**self._policy_fields(result, review_recorded),
 		)
 		self._graph_sources[source_id] = record
 		self._audit(tenant_id, source_id, "graph_source_retired", reviewer, result)
@@ -215,6 +237,7 @@ class GragService:
 				"document_refs": list(document_refs),
 				"owner": owner,
 			},
+			**self._policy_fields(result),
 		)
 		self._vector_sources[source_id] = record
 		self._audit(tenant_id, source_id, "vector_source_registered", owner, result)
@@ -252,12 +275,12 @@ class GragService:
 			"retrieval_confidence": confidence,
 			"review_recorded": bool(review_recorded),
 		})
-		self._raise_if_review_required(result, review_recorded)
+		self._raise_if_denied(result)
 		record = GragRecord(
 			id=query_id,
 			tenant_id=tenant_id,
 			kind="hybrid_query",
-			status="reviewed" if review_recorded else "active",
+			status=self._status_after_review(result, "reviewed" if review_recorded else "active"),
 			metadata={
 				"query": query,
 				"graph_source_id": graph_source_id,
@@ -265,7 +288,9 @@ class GragService:
 				"result_window": int(result_window),
 				"source_classification": source_classification,
 				"retrieval_confidence": confidence,
+				"access_filter_applied": bool(access_filter_applied),
 			},
+			**self._policy_fields(result, review_recorded),
 		)
 		self._hybrid_queries[query_id] = record
 		self._audit(tenant_id, query_id, "hybrid_query_run", graph_source_id, result)
@@ -282,7 +307,7 @@ class GragService:
 		explanation: str,
 		review_recorded: bool = False,
 	) -> dict[str, Any]:
-		self._require_record(self._hybrid_queries, query_id, tenant_id, "hybrid_query_not_found")
+		query_record = self._require_record(self._hybrid_queries, query_id, tenant_id, "hybrid_query_not_found")
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
 			"operation": "build_reasoning_path",
@@ -291,14 +316,15 @@ class GragService:
 			"evidence_path_present": bool(evidence_path),
 			"hop_count": int(hop_count),
 			"explanation_present": bool(explanation),
+			"upstream_review_pending": query_record.status == "pending_review",
 			"review_recorded": bool(review_recorded),
 		})
-		self._raise_if_review_required(result, review_recorded)
+		self._raise_if_denied(result)
 		record = GragRecord(
 			id=path_id,
 			tenant_id=tenant_id,
 			kind="reasoning_path",
-			status="reviewed" if review_recorded else "active",
+			status=self._status_after_review(result, "reviewed" if review_recorded else "active"),
 			metadata={
 				"query_id": query_id,
 				"start_node_id": start_node_id,
@@ -306,6 +332,7 @@ class GragService:
 				"hop_count": int(hop_count),
 				"explanation": explanation,
 			},
+			**self._policy_fields(result, review_recorded),
 		)
 		self._reasoning_paths[path_id] = record
 		self._audit(tenant_id, path_id, "reasoning_path_built", start_node_id, result)
@@ -327,8 +354,8 @@ class GragService:
 		confidence_score: float = 1.0,
 		review_recorded: bool = False,
 	) -> dict[str, Any]:
-		self._require_record(self._hybrid_queries, query_id, tenant_id, "hybrid_query_not_found")
-		self._require_record(self._reasoning_paths, path_id, tenant_id, "reasoning_path_not_found")
+		query_record = self._require_record(self._hybrid_queries, query_id, tenant_id, "hybrid_query_not_found")
+		path_record = self._require_record(self._reasoning_paths, path_id, tenant_id, "reasoning_path_not_found")
 		confidence = max(0.0, min(1.0, round(float(confidence_score), 4)))
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
@@ -343,14 +370,15 @@ class GragService:
 			"model_policy_attached": bool(model_policy_attached),
 			"unsafe_answer_detected": bool(unsafe_answer_detected),
 			"answer_confidence": confidence,
+			"upstream_review_pending": query_record.status == "pending_review" or path_record.status == "pending_review",
 			"review_recorded": bool(review_recorded),
 		})
-		self._raise_if_review_required(result, review_recorded)
+		self._raise_if_denied(result)
 		record = GragRecord(
 			id=answer_id,
 			tenant_id=tenant_id,
 			kind="answer",
-			status="generated",
+			status=self._status_after_review(result, "generated"),
 			metadata={
 				"query_id": query_id,
 				"path_id": path_id,
@@ -362,6 +390,7 @@ class GragService:
 				"model_location": model_location,
 				"confidence_score": confidence,
 			},
+			**self._policy_fields(result, review_recorded),
 		)
 		self._answers[answer_id] = record
 		self._audit(tenant_id, answer_id, "answer_generated", path_id, result)
@@ -383,6 +412,7 @@ class GragService:
 			kind="curation",
 			status=decision,
 			metadata={"answer_id": answer_id, "curator": curator, "decision": decision, "evidence": evidence},
+			**self._policy_fields(result),
 		)
 		self._curations[curation_id] = record
 		self._audit(tenant_id, curation_id, "answer_curated", curator, result)
@@ -403,6 +433,7 @@ class GragService:
 			kind="publication",
 			status="published",
 			metadata={"answer_id": answer_id, "curation_id": curation_id, "publisher": publisher},
+			**self._policy_fields(result),
 		)
 		self._publications[publication_id] = record
 		self._audit(tenant_id, publication_id, "answer_published", publisher, result)
@@ -466,6 +497,7 @@ class GragService:
 			contribution_disclosed=bool(contribution_disclosed),
 			human_approval_required=bool(human_approval_required),
 			status=status,
+			**self._policy_fields(result, human_approval_required),
 		)
 		self._graphrag_agents[self._tenant_record_key(tenant_id, record.id)] = record
 		self._audit(tenant_id, record.id, "graphrag_agent_registered", owner, result)
@@ -501,6 +533,8 @@ class GragService:
 			accepted=accepted,
 			decision=result["decision"],
 			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=tuple(self._review_reasons(result)),
+			audit_evidence=self._audit_evidence(result),
 			status="accepted" if accepted else "denied",
 		)
 		self._lifecycle_batches[self._tenant_record_key(tenant_id, record.id)] = record
@@ -542,19 +576,42 @@ class GragService:
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events, tenant_id)
 
+	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return [
+			item
+			for item in (
+				self.list_graph_sources(tenant_id)
+				+ self.list_hybrid_queries(tenant_id)
+				+ self.list_reasoning_paths(tenant_id)
+				+ self.list_answers(tenant_id)
+				+ self.list_curations(tenant_id)
+				+ self.list_publications(tenant_id)
+				+ self.list_graphrag_agents(tenant_id)
+				+ self.list_lifecycle_batches(tenant_id)
+			)
+			if item["status"] == "pending_review"
+		]
+
 	def dashboard_summary(self, tenant_id: str | None = "default") -> dict[str, Any]:
 		answers = self.list_answers(tenant_id)
 		queries = self.list_hybrid_queries(tenant_id)
+		reasoning_paths = self.list_reasoning_paths(tenant_id)
+		pending_reviews = self.list_pending_reviews(tenant_id)
 		return {
 			"tenant_id": tenant_id,
 			"graph_source_count": len(self.list_graph_sources(tenant_id)),
 			"vector_source_count": len(self.list_vector_sources(tenant_id)),
 			"hybrid_query_count": len(queries),
-			"reasoning_path_count": len(self.list_reasoning_paths(tenant_id)),
+			"reasoning_path_count": len(reasoning_paths),
 			"answer_count": len(answers),
 			"curation_count": len(self.list_curations(tenant_id)),
 			"publication_count": len(self.list_publications(tenant_id)),
 			"graphrag_agent_count": len(self.list_graphrag_agents(tenant_id)),
+			"pending_review_count": len(pending_reviews),
+			"pending_graph_source_review_count": len([item for item in self.list_graph_sources(tenant_id) if item["status"] == "pending_review"]),
+			"pending_hybrid_query_review_count": len([item for item in queries if item["status"] == "pending_review"]),
+			"pending_reasoning_review_count": len([item for item in reasoning_paths if item["status"] == "pending_review"]),
+			"pending_answer_review_count": len([item for item in answers if item["status"] == "pending_review"]),
 			"pending_agent_review_count": len([item for item in self.list_graphrag_agents(tenant_id) if item["status"] == "pending_review"]),
 			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
 			"denied_lifecycle_batch_count": len([item for item in self.list_lifecycle_batches(tenant_id) if item["status"] == "denied"]),
@@ -575,6 +632,7 @@ class GragService:
 			"publications": self.list_publications(tenant_id),
 			"graphrag_agents": self.list_graphrag_agents(tenant_id),
 			"lifecycle_batches": self.list_lifecycle_batches(tenant_id),
+			"pending_reviews": self.list_pending_reviews(tenant_id),
 			"audit_events": self.list_audit_events(tenant_id),
 			"summary": self.dashboard_summary(tenant_id),
 		}
@@ -583,10 +641,29 @@ class GragService:
 		if result["decision"] == "deny":
 			raise PermissionError(", ".join(self._reasons(result)) or "grag_policy_blocked")
 
-	def _raise_if_review_required(self, result: dict[str, Any], review_recorded: bool) -> None:
-		self._raise_if_denied(result)
-		if result["decision"] == "require_review" and not review_recorded:
-			raise PermissionError(", ".join(self._reasons(result)) or "grag_review_required")
+	def _status_after_review(self, result: dict[str, Any], accepted_status: str) -> str:
+		if result["decision"] == "require_review":
+			return "pending_review"
+		return accepted_status
+
+	def _policy_fields(self, result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+		return {
+			"decision": result["decision"],
+			"matched_rules": tuple(result["matched_rules"]),
+			"review_reasons": tuple(self._review_reasons(result)),
+			"audit_evidence": self._audit_evidence(result, review_recorded),
+		}
+
+	def _audit_evidence(self, result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+		return {
+			"required_actions": [
+				action["required_action"]
+				for action in result.get("actions", ())
+				if action.get("required_action")
+			],
+			"reasons": list(self._reasons(result)),
+			"review_recorded": bool(review_recorded),
+		}
 
 	def _require_record(self, records: dict[str, GragRecord], record_id: str, tenant_id: str, reason: str) -> GragRecord:
 		record = records.get(record_id)
@@ -601,7 +678,14 @@ class GragService:
 			tenant_id=tenant_id,
 			kind="audit_event",
 			status=result["decision"],
-			metadata={"subject_id": subject_id, "event_type": event_type, "actor": actor, "reasons": self._reasons(result)},
+			metadata={
+				"subject_id": subject_id,
+				"event_type": event_type,
+				"actor": actor,
+				"reasons": self._reasons(result),
+				"matched_rules": tuple(result["matched_rules"]),
+			},
+			**self._policy_fields(result),
 		)
 
 	def _list(self, records: dict[str, Any], tenant_id: str | None = None) -> list[dict[str, Any]]:
@@ -612,6 +696,11 @@ class GragService:
 
 	def _reasons(self, result: dict[str, Any]) -> tuple[str, ...]:
 		return tuple(action.get("reason", "grag_policy_blocked") for action in result.get("actions", ()))
+
+	def _review_reasons(self, result: dict[str, Any]) -> tuple[str, ...]:
+		if result["decision"] != "require_review":
+			return ()
+		return self._reasons(result)
 
 	def _tenant_record_key(self, tenant_id: str, record_id: str) -> str:
 		return f"{tenant_id}:{record_id}"

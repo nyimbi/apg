@@ -70,9 +70,18 @@ def semantic_model() -> dict[str, Any]:
 					"large_result_window": "GragRecord",
 					"low_retrieval_confidence": "GragRecord",
 					"deep_reasoning_path": "GragRecord",
+					"pending_retrieval_reasoning": "GragRecord",
 					"low_answer_confidence": "GragRecord",
+					"pending_graph_context_generation": "GragRecord",
 					"answer_publication": "GragRecord",
 					"graphrag_agent": "GraphRAGAgentRecord",
+				},
+				"review_evidence": {
+					"pending_status": "pending_review",
+					"decision_field": "decision",
+					"matched_rules_field": "matched_rules",
+					"review_reasons_field": "review_reasons",
+					"audit_evidence_field": "audit_evidence",
 				},
 				"graph_rag_lifecycle": {
 					"graph_source": "GragRecord",

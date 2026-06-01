@@ -142,8 +142,10 @@ def test_registration_includes_full_capability_contract():
 	assert registration["streaming"]["required_processor"] == "bytewax"
 	assert registration["capabilities"]["graph_grounded_generation"]
 	assert registration["capabilities"]["graphrag_agent_composition"]
+	assert registration["capabilities"]["review_evidence"]
 	assert registration["endpoints"]["audit"] == "/grag/api/v1/audit"
 	assert registration["endpoints"]["agents"] == "/grag/api/v1/agents"
+	assert registration["endpoints"]["pending_reviews"] == "/grag/api/v1/pending-reviews"
 	assert "grag:reason" in registration["permissions"]
 	assert "grag:audit" in registration["permissions"]
 
@@ -317,6 +319,17 @@ def test_grag_service_enforces_policy_guardrails():
 		document_refs=["doc-restricted"],
 		owner="steward",
 	)
+	pending_retirement = service.retire_graph_source(
+		source_id=graph["id"],
+		tenant_id="tenant-grag",
+		reviewer="steward",
+		review_recorded=False,
+	)
+	assert pending_retirement["status"] == "pending_review"
+	assert pending_retirement["decision"] == "require_review"
+	assert pending_retirement["matched_rules"] == ["graph_source_retire_requires_review"]
+	assert pending_retirement["review_reasons"] == ["graph_source_retire_review_required"]
+	assert pending_retirement["audit_evidence"]["required_actions"] == ["record_graph_source_review"]
 
 	with pytest.raises(PermissionError, match="access_filter_required"):
 		service.run_hybrid_query(
@@ -329,16 +342,49 @@ def test_grag_service_enforces_policy_guardrails():
 			access_filter_applied=False,
 		)
 
-	with pytest.raises(PermissionError, match="low_retrieval_confidence_review_required"):
-		service.run_hybrid_query(
-			query_id="query-low",
-			tenant_id="tenant-grag",
-			query="low?",
-			graph_source_id=graph["id"],
-			vector_source_id=vector["id"],
-			retrieval_confidence=0.4,
-			review_recorded=False,
-		)
+	pending_retrieval = service.run_hybrid_query(
+		query_id="query-low",
+		tenant_id="tenant-grag",
+		query="low?",
+		graph_source_id=graph["id"],
+		vector_source_id=vector["id"],
+		retrieval_confidence=0.4,
+		review_recorded=False,
+	)
+	assert pending_retrieval["status"] == "pending_review"
+	assert pending_retrieval["decision"] == "require_review"
+	assert "low_retrieval_confidence_requires_review" in pending_retrieval["matched_rules"]
+	assert pending_retrieval["review_reasons"] == ["low_retrieval_confidence_review_required"]
+
+	pending_path = service.build_reasoning_path(
+		path_id="path-pending-retrieval",
+		tenant_id="tenant-grag",
+		query_id=pending_retrieval["id"],
+		start_node_id="policy:travel",
+		evidence_path=["policy:travel", "approval:manager"],
+		hop_count=2,
+		explanation="Pending retrieval still needs reasoning review.",
+		review_recorded=False,
+	)
+	assert pending_path["status"] == "pending_review"
+	assert pending_path["matched_rules"] == ["reasoning_from_pending_retrieval_requires_review"]
+	assert pending_path["review_reasons"] == ["pending_retrieval_reasoning_review_required"]
+
+	pending_answer = service.generate_answer(
+		answer_id="answer-pending-context",
+		tenant_id="tenant-grag",
+		query_id=pending_retrieval["id"],
+		path_id=pending_path["id"],
+		query="low?",
+		answer_text="Answer from graph context that still needs review.",
+		provenance_refs=["manual"],
+		citations=[{"source_id": "manual", "document_id": "doc", "chunk_id": "chunk-pending"}],
+		confidence_score=0.9,
+		review_recorded=False,
+	)
+	assert pending_answer["status"] == "pending_review"
+	assert pending_answer["matched_rules"] == ["generation_from_pending_graph_context_requires_review"]
+	assert pending_answer["review_reasons"] == ["pending_graph_context_generation_review_required"]
 
 	retrieval = service.run_hybrid_query(
 		query_id="query-reviewed",
@@ -360,6 +406,19 @@ def test_grag_service_enforces_policy_guardrails():
 			hop_count=1,
 			explanation="No evidence.",
 		)
+
+	pending_deep_path = service.build_reasoning_path(
+		path_id="path-deep",
+		tenant_id="tenant-grag",
+		query_id=retrieval["id"],
+		start_node_id="policy:travel",
+		evidence_path=["policy:travel", "approval:manager", "approval:finance", "risk:budget", "control:policy"],
+		hop_count=5,
+		explanation="Deep path requires review.",
+		review_recorded=False,
+	)
+	assert pending_deep_path["status"] == "pending_review"
+	assert pending_deep_path["matched_rules"] == ["multi_hop_requires_review"]
 
 	path = service.build_reasoning_path(
 		path_id="path-reviewed",
@@ -397,6 +456,21 @@ def test_grag_service_enforces_policy_guardrails():
 			model_location="external",
 			model_policy_attached=False,
 		)
+
+	pending_low_answer = service.generate_answer(
+		answer_id="answer-low-confidence",
+		tenant_id="tenant-grag",
+		query_id=retrieval["id"],
+		path_id=path["id"],
+		query="low?",
+		answer_text="Low confidence answer.",
+		provenance_refs=["manual"],
+		citations=[{"source_id": "manual", "document_id": "doc", "chunk_id": "chunk-low"}],
+		confidence_score=0.4,
+		review_recorded=False,
+	)
+	assert pending_low_answer["status"] == "pending_review"
+	assert pending_low_answer["matched_rules"] == ["low_answer_confidence_requires_review"]
 
 	answer = service.generate_answer(
 		answer_id="answer-reviewed",
@@ -453,6 +527,15 @@ def test_grag_service_enforces_policy_guardrails():
 		human_approval_required=False,
 	)
 	assert pending_agent["status"] == "pending_review"
+	assert pending_agent["decision"] == "require_review"
+	assert pending_agent["review_reasons"] == ["graphrag_agent_human_approval_required"]
+	assert service.dashboard_summary("tenant-grag")["pending_review_count"] >= 6
+	assert graph_source_model(service, "tenant-grag")["pending_review"][0]["id"] == "graph-policy"
+	assert hybrid_retrieval_model(service, "tenant-grag")["pending_review"][0]["id"] == "query-low"
+	assert reasoning_model(service, "tenant-grag")["pending_review"]
+	assert generation_model(service, "tenant-grag")["pending_review"]
+	assert curation_model(service, "tenant-grag")["pending_review"]
+	assert governance_model(service, "tenant-grag")["pending_reviews"]
 
 	with pytest.raises(ValueError, match="grag_lifecycle_batch_empty"):
 		service.validate_grag_lifecycle_batch("tenant-grag", "bytewax", 0)
@@ -462,3 +545,4 @@ def test_grag_service_enforces_policy_guardrails():
 
 	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
 		service.validate_grag_lifecycle_batch("tenant-grag", "legacy_queue", 1, "graphrag_agent_batch")
+	assert service.list_lifecycle_batches("tenant-grag")[-1]["status"] == "denied"

@@ -18,6 +18,8 @@ The generated-app surface is dependency-light and executable. The heavier Apache
 - Multi-hop reasoning paths with start node, hop count, evidence path, explanation, and review gates.
 - Graph-grounded answer generation with provenance refs, citations, model policy controls, confidence gates, and unsafe-answer blocking.
 - Curation and publication lifecycle for approved answers.
+- Durable review evidence for review-required graph-source retirement, hybrid
+  retrieval, reasoning, answer, and GraphRAG-agent outcomes.
 - First-class GraphRAG agents for provider-neutral runtime composition, scoped
   review roles, accountable ownership, machine-contribution disclosure, and
   privileged-role approval.
@@ -138,6 +140,10 @@ agent runtime and role, explicit agent scope, owner, purpose, machine
 contribution disclosure, privileged-role human approval status, and Bytewax-only
 lifecycle batches.
 
+Review-required outcomes are persisted as `pending_review` records with
+`decision`, `matched_rules`, `review_reasons`, and `audit_evidence`. True deny
+outcomes still fail immediately.
+
 ## Files
 
 - `SPECIFICATION.md` defines the capability behavior and integration boundaries.
@@ -147,4 +153,4 @@ lifecycle batches.
 - `api.py` exposes import-light API helper functions.
 - `views.py` contains legacy model definitions plus generated-app UI metadata helpers.
 - `app.py` exposes package metadata, semantic model generation, and self-test.
-- `test_capability_contract.py` and `tests/test_package_contract.py` provide focused verification.
+- `test_capability_contract.py` and `test_package_contract.py` provide focused verification.
