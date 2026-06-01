@@ -1691,6 +1691,10 @@ class AiAgentRecord:
 	contribution_disclosed: bool
 	human_approval_required: bool
 	status: str = "active"
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 	def to_dict(self) -> dict[str, Any]:
@@ -1707,6 +1711,10 @@ class AiAgentRecord:
 			"contribution_disclosed": self.contribution_disclosed,
 			"human_approval_required": self.human_approval_required,
 			"status": self.status,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"created_at": self.created_at.isoformat(),
 		}
 
@@ -1723,6 +1731,8 @@ class AiLifecycleBatchRecord:
 	accepted: bool
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	required_processor: str = "bytewax"
 	status: str = "accepted"
 	created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
@@ -1738,6 +1748,8 @@ class AiLifecycleBatchRecord:
 			"accepted": self.accepted,
 			"decision": self.decision,
 			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"required_processor": self.required_processor,
 			"status": self.status,
 			"created_at": self.created_at.isoformat(),
@@ -1758,6 +1770,8 @@ class AiModelMetricRecord:
 	drift_review_recorded: bool = False
 	decision: str = "allow"
 	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	status: str = "recorded"
 	created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -1774,6 +1788,8 @@ class AiModelMetricRecord:
 			"drift_review_recorded": self.drift_review_recorded,
 			"decision": self.decision,
 			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"status": self.status,
 			"created_at": self.created_at.isoformat(),
 		}
@@ -1968,6 +1984,8 @@ class AicrService:
 			drift_review_recorded=bool(drift_review_recorded),
 			decision=result["decision"],
 			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._review_reasons(result),
+			audit_evidence=self._audit_evidence(result, drift_review_recorded),
 			status="pending_review" if result["decision"] == "require_review" else "recorded",
 		)
 		self._model_metrics[self._tenant_key(tenant_id, record.metric_id)] = record
@@ -1982,6 +2000,7 @@ class AicrService:
 			model_id,
 			f"Recorded model metric {record.metric_name} for {model_id}.",
 			record.to_dict(),
+			policy_result=result,
 		)
 		return record.to_dict()
 
@@ -2090,6 +2109,10 @@ class AicrService:
 			contribution_disclosed=bool(contribution_disclosed),
 			human_approval_required=bool(human_approval_required),
 			status=status,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._review_reasons(result),
+			audit_evidence=self._audit_evidence(result, human_approval_required),
 		)
 		self._ai_agents[self._tenant_key(tenant_id, agent_id)] = record
 		self._record_event(
@@ -2098,6 +2121,7 @@ class AicrService:
 			agent_id,
 			f"Registered AI agent {name}.",
 			{"runtime": runtime_value, "role": role_value, "status": status, "matched_rules": result["matched_rules"]},
+			policy_result=result,
 		)
 		return record.to_dict()
 
@@ -2132,6 +2156,8 @@ class AicrService:
 			accepted=accepted,
 			decision=result["decision"],
 			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._review_reasons(result),
+			audit_evidence=self._audit_evidence(result),
 			status="accepted" if accepted else "denied",
 		)
 		self._lifecycle_batches[self._tenant_key(tenant_id, record.batch_id)] = record
@@ -2141,6 +2167,7 @@ class AicrService:
 			record.batch_id,
 			f"AICR lifecycle batch {record.status}.",
 			record.to_dict(),
+			policy_result=result,
 		)
 		if not accepted:
 			_raise_if_blocked(result)
@@ -2250,6 +2277,10 @@ class AicrService:
 				prompt_summary=prompt_summary,
 				context_tokens=context_tokens,
 				workflow_risk=workflow_risk,
+				policy_decision=result["decision"],
+				matched_rules=list(result["matched_rules"]),
+				review_reasons=self._review_reasons(result),
+				audit_evidence=self._audit_evidence(result),
 			)
 			self._approvals[self._tenant_key(tenant_id, request_id)] = approval
 			self._record_event(
@@ -2258,6 +2289,7 @@ class AicrService:
 				subject_id=request_id,
 				message=f"Requested inference approval for {service_id}.",
 				evidence={"workflow_risk": workflow_risk, "context_tokens": context_tokens},
+				policy_result=result,
 			)
 			return approval.model_dump(mode="json")
 		inference = self._complete_inference(request_id, service, prompt_summary)
@@ -2296,6 +2328,10 @@ class AicrService:
 			context_tokens=approval.context_tokens,
 			workflow_risk=approval.workflow_risk,
 			decision=decision,
+			policy_decision=approval.policy_decision,
+			matched_rules=list(approval.matched_rules),
+			review_reasons=list(approval.review_reasons),
+			audit_evidence=dict(approval.audit_evidence),
 			reviewer=reviewer,
 			notes=notes,
 		)
@@ -2344,9 +2380,22 @@ class AicrService:
 			events = [event for event in events if event.tenant_id == tenant_id]
 		return [event.model_dump(mode="json") for event in events]
 
+	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return [
+			item
+			for item in (
+				self.list_model_metrics(tenant_id)
+				+ self.list_ai_agents(tenant_id)
+				+ self.list_inference_approvals(tenant_id)
+				+ self.list_lifecycle_batches(tenant_id)
+			)
+			if item.get("status") == "pending_review" or item.get("decision") == "pending"
+		]
+
 	def governance_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		services = self.list_ai_services(tenant_id)
 		approvals = self.list_inference_approvals(tenant_id)
+		pending_reviews = self.list_pending_reviews(tenant_id)
 		return {
 			"tenant_id": tenant_id,
 			"service_count": len(services),
@@ -2360,6 +2409,11 @@ class AicrService:
 			"workflow_count": len(self.list_workflows(tenant_id)),
 			"agent_runtime_count": len(self.list_agent_runtimes(tenant_id)),
 			"ai_agent_count": len(self.list_ai_agents(tenant_id)),
+			"pending_review_count": len(pending_reviews),
+			"pending_ai_agent_review_count": len([
+				agent for agent in self.list_ai_agents(tenant_id)
+				if agent["status"] == "pending_review"
+			]),
 			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
 			"denied_lifecycle_batch_count": len([
 				batch for batch in self.list_lifecycle_batches(tenant_id)
@@ -2410,7 +2464,9 @@ class AicrService:
 		subject_id: str,
 		message: str,
 		evidence: dict[str, Any] | None = None,
+		policy_result: dict[str, Any] | None = None,
 	) -> None:
+		policy_result = policy_result or {"decision": "allow", "matched_rules": [], "actions": []}
 		self._events.append(
 			AICRGovernanceEvent(
 				tenant_id=tenant_id,
@@ -2418,8 +2474,34 @@ class AicrService:
 				subject_id=subject_id,
 				message=message,
 				evidence=dict(evidence or {}),
+				policy_decision=policy_result["decision"],
+				matched_rules=list(policy_result["matched_rules"]),
+				review_reasons=self._review_reasons(policy_result),
+				audit_evidence=self._audit_evidence(policy_result),
 			)
 		)
+
+	def _review_reasons(self, result: dict[str, Any]) -> list[str]:
+		if result["decision"] != "require_review":
+			return []
+		return [
+			action.get("reason", "ai_core_review_required")
+			for action in result.get("actions", [])
+		]
+
+	def _audit_evidence(self, result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+		return {
+			"required_actions": [
+				action["required_action"]
+				for action in result.get("actions", [])
+				if action.get("required_action")
+			],
+			"reasons": [
+				action.get("reason", "ai_core_policy_blocked")
+				for action in result.get("actions", [])
+			],
+			"review_recorded": bool(review_recorded),
+		}
 
 
 def _raise_if_blocked(result: dict[str, Any]) -> None:

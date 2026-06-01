@@ -84,6 +84,11 @@ approval are accepted only as `pending_review`; unsupported runtime, unsupported
 role, missing scope, missing owner, missing purpose, and missing contribution
 disclosure are blocked.
 
+Review-required AICR outcomes are durable. Drifted model metrics, high-risk or
+large-context inference approvals, privileged AI-agent registrations, and
+lifecycle batch decisions expose policy evidence fields: `policy_decision` or
+`decision`, `matched_rules`, `review_reasons`, and `audit_evidence`.
+
 ## Bytewax Lifecycle Batches
 
 AICR lifecycle mutation batches must use Bytewax as the required processor.
@@ -136,6 +141,8 @@ AICR exposes 14 generated-app UI routes:
   runtimes.
 - Runtime can record model metrics and route drift above threshold into review
   evidence.
+- Runtime exposes durable pending-review queues for drifted metrics,
+  privileged AI agents, inference approvals, and lifecycle decisions.
 - Runtime can register first-class AI agents and validate Bytewax lifecycle
   batches.
 - Runtime blocks unsafe missing-evidence paths.

@@ -25,6 +25,8 @@ compose AI services before live provider adapters are wired in.
    - Add first-class AI-agent registration and Bytewax lifecycle-batch
      validation methods.
    - Keep existing high-risk inference approval behavior compatible.
+   - Persist review-required model metrics, AI agents, inference approvals, and
+     lifecycle decisions with policy evidence fields.
    - Enforce key guardrails at runtime.
 
 3. API and UI
@@ -32,6 +34,7 @@ compose AI services before live provider adapters are wired in.
      operations.
    - Add API helper and view-model coverage for first-class AI agents and
      lifecycle batch monitoring.
+   - Expose pending-review queues for generated approval consoles.
    - Extend `views.py` with provider registry, model catalog, model metric
      console, workflow designer, agent runtime console, audit, and richer
      metrics models.
@@ -52,6 +55,8 @@ compose AI services before live provider adapters are wired in.
 - Model metrics require a registered model, metric name, recorder identity, and
   drift-review evidence when drift is above threshold.
 - High-risk and large-context inference remains gated by approval.
+- Review-required outcomes keep matched rules, review reasons, and audit
+  evidence after the human decision is recorded.
 - Agent runtimes have explicit supported-runtime and tool-policy guardrails.
 - First-class AI agents have explicit supported-runtime, supported-role, scope,
   owner, purpose, disclosure, and privileged approval guardrails.

@@ -29,6 +29,7 @@ def dashboard_model(
 		"agent_runtimes": service.list_agent_runtimes(tenant_id),
 		"ai_agents": service.list_ai_agents(tenant_id),
 		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
 		"summary": service.governance_summary(tenant_id),
 		"inference_approvals": service.list_inference_approvals(tenant_id),
 		"inference_results": service.list_inference_results(tenant_id),
@@ -87,6 +88,10 @@ def model_metric_console_model(
 		"tenant_id": tenant_id,
 		"models": service.list_models(tenant_id),
 		"model_metrics": service.list_model_metrics(tenant_id),
+		"pending_reviews": [
+			metric for metric in service.list_model_metrics(tenant_id)
+			if metric["status"] == "pending_review"
+		],
 		"drift_threshold": contract["configuration"]["models"]["drift_threshold"],
 		"required_fields": ["model_id", "metric_name", "value", "recorded_by"],
 		"actions": ["record_metric", "record_drift_review"],
@@ -104,6 +109,7 @@ def inference_console_model(
 			approval for approval in service.list_inference_approvals(tenant_id)
 			if approval["decision"] == "pending"
 		],
+		"pending_reviews": service.list_pending_reviews(tenant_id),
 		"results": service.list_inference_results(tenant_id),
 		"request_fields": ["id", "service_id", "prompt_summary", "workflow_risk", "context_tokens"],
 	}
@@ -122,6 +128,7 @@ def governance_center_model(
 		"agent_runtimes": service.list_agent_runtimes(tenant_id),
 		"ai_agents": service.list_ai_agents(tenant_id),
 		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
 		"approvals": service.list_inference_approvals(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 	}
@@ -162,6 +169,10 @@ def ai_agent_roster_model(
 	return {
 		"tenant_id": tenant_id,
 		"agents": service.list_ai_agents(tenant_id),
+		"pending_reviews": [
+			agent for agent in service.list_ai_agents(tenant_id)
+			if agent["status"] == "pending_review"
+		],
 		"supported_runtimes": contract["agents"]["supported_runtimes"],
 		"supported_roles": contract["agents"]["supported_roles"],
 		"privileged_roles": contract["agents"]["privileged_roles"],
@@ -178,6 +189,10 @@ def lifecycle_batch_model(
 	return {
 		"tenant_id": tenant_id,
 		"batches": service.list_lifecycle_batches(tenant_id),
+		"denied": [
+			batch for batch in service.list_lifecycle_batches(tenant_id)
+			if batch["status"] == "denied"
+		],
 		"streaming": contract["streaming"],
 		"required_operations": contract["streaming"]["required_operations"],
 	}
@@ -211,6 +226,8 @@ def metrics_model(
 		"workflow_count": summary["workflow_count"],
 		"agent_runtime_count": summary["agent_runtime_count"],
 		"ai_agent_count": summary["ai_agent_count"],
+		"pending_review_count": summary["pending_review_count"],
+		"pending_ai_agent_review_count": summary["pending_ai_agent_review_count"],
 		"lifecycle_batch_count": summary["lifecycle_batch_count"],
 		"denied_lifecycle_batch_count": summary["denied_lifecycle_batch_count"],
 		"healthy_service_count": summary["healthy_service_count"],

@@ -281,6 +281,23 @@
         "mqeb",
         "moni"
       ],
+      "review_evidence": {
+        "deny_behavior": "PermissionError for hard deny decisions only",
+        "durable_status": "pending_review",
+        "pending_queues": [
+          "model_metrics",
+          "ai_agents",
+          "inference_approvals",
+          "lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "decision",
+          "matched_rules",
+          "review_reasons",
+          "audit_evidence"
+        ]
+      },
       "rule_engine": {
         "rules": [
           {
@@ -1883,7 +1900,24 @@
         "auth",
         "mqeb",
         "moni"
-      ]
+      ],
+      "review_evidence": {
+        "deny_behavior": "PermissionError for hard deny decisions only",
+        "durable_status": "pending_review",
+        "pending_queues": [
+          "model_metrics",
+          "ai_agents",
+          "inference_approvals",
+          "lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "decision",
+          "matched_rules",
+          "review_reasons",
+          "audit_evidence"
+        ]
+      }
     }
   },
   "deployment": {

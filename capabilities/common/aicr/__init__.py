@@ -832,6 +832,7 @@ def register_capability() -> Dict[str, Any]:
 			"model_metric_governance": "Record model metrics and route drift signals into review evidence",
 			"agent_runtime_registry": "Register Codex, Claude Code, OpenCode, Pi, Ollama, and custom agent runtimes as governed services",
 			"ai_agent_composition": "Register provider-neutral AI agents as first-class scoped, owned, auditable APG citizens",
+			"review_evidence": "Persist review-required AICR outcomes as pending-review records with policy evidence",
 			"bytewax_lifecycle_processing": "Require AICR lifecycle batches to use Bytewax processing evidence",
 			"workflow_orchestration": "Compose AI workflows with human approval and monitoring",
 			"capability_rules": "Evaluate deterministic AI infrastructure governance rules",
@@ -847,6 +848,7 @@ def register_capability() -> Dict[str, Any]:
 			"workflows": "/aicr/api/v1/workflows",
 			"agents": "/aicr/api/v1/agents",
 			"lifecycle": "/aicr/api/v1/lifecycle",
+			"pending_reviews": "/aicr/api/v1/pending-reviews",
 			"metrics": "/aicr/api/v1/metrics"
 		},
 		"ui_components": {

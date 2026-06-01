@@ -39,6 +39,12 @@ control plane for generated applications.
 10. Approve high-risk or large-context requests.
 11. Execute approved inference and record audit evidence.
 
+Review-required lifecycle outcomes are durable. Drifted model metrics,
+high-risk or large-context inference approvals, privileged AI agents, and
+lifecycle decisions expose `policy_decision` or `decision`, `matched_rules`,
+`review_reasons`, and `audit_evidence` so generated applications can compose
+approval queues without losing policy context.
+
 ## Guardrails
 
 The package currently exposes deterministic guardrails for tenant context,

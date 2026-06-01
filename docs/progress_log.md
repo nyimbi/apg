@@ -16,6 +16,66 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-06-01 05:23 EAT
+
+AICR review-evidence lifecycle packet:
+
+- Extended AI-agent, lifecycle batch, model metric, inference approval, and
+  governance event records with durable policy evidence fields: decision,
+  policy decision where applicable, matched rules, review reasons, and audit
+  evidence.
+- Changed review-required drift metrics, high-risk or large-context inference
+  approvals, privileged AI-agent registrations, and lifecycle decisions to
+  preserve inspectable pending-review evidence while keeping true deny outcomes
+  hard-blocking.
+- Added pending-review queues to AICR dashboard, model metric console,
+  inference console, governance center, AI-agent roster, lifecycle batch,
+  metrics, API helper, registration, package, and semantic model surfaces.
+- Updated focused AICR tests so review-required outcomes prove durable
+  evidence instead of relying on transient policy decisions.
+- Updated AICR README, specification, plan, and capability pointer to document
+  the review queue lifecycle and deny/review distinction.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for AICR modules and tests passed.
+- `./.venv/bin/pytest -q capabilities/common/aicr/test_capability_contract.py
+  capabilities/common/aicr/tests/test_package_contract.py` passed with 17
+  tests and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.aicr import app; ..."`
+  passed package self-test.
+- `./.venv/bin/python -m json.tool
+  capabilities/common/aicr/semantic_model.json` passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/aicr --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/aicr --strict --json` passed with no warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/aicr --json`
+  passed with no warnings and side-effect-free publish planning.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/common/aicr --json` passed with complete lifecycle evidence and
+  41 rules.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed with 109 operable contracts/packages and no warnings or errors.
+- Service smoke executed AI service -> provider -> model -> drift metric ->
+  high-risk large-context inference approval -> privileged AI agent and printed
+  `pending_review pending pending_review 3`.
+- AICR stale-marker scan returned no TODO/FIXME/placeholder/stub/baseline,
+  Kafka, or not-implemented markers across the edited AICR packet.
+- Inline code review found no blocking issues; residual risks remain around
+  rendered UI, live providers, durable Bytewax topology, external agent
+  clients, and model/agent quality evaluation.
+
+Known gaps:
+
+- Full repository tests, rendered browser UI checks, live AI providers, live
+  agent CLI clients, durable Bytewax topology, live
+  CONF/AUTH/MQEB/MONI/AUDL/KEYM/MLCM/AGNT adapters, load checks, migrations,
+  model-provider calls, model quality benchmarks, and agent execution quality
+  evaluation still need later verification outside this battery-conscious
+  slice.
+
 ### 2026-06-01 00:00 EAT
 
 ONTO review-evidence lifecycle packet:

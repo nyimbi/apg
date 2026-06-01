@@ -52,5 +52,6 @@ def test_package_app_entrypoint_is_publishable():
 	assert model["capabilities"]["aicr"]["streaming"]["engine"] == "bytewax"
 	assert model["capabilities"]["aicr"]["streaming"]["required_processor"] == "bytewax"
 	assert model["capabilities"]["aicr"]["agents"]["first_class"] is True
+	assert model["capabilities"]["aicr"]["review_evidence"]["durable_status"] == "pending_review"
 	assert model["capabilities"]["aicr"]["ai_control_lifecycle"]["ai_agent"] == "AiAgentRecord"
 	assert model["composition"]["capability_dependencies"]["aicr"] == ["conf", "auth", "mqeb", "moni"]

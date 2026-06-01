@@ -764,6 +764,10 @@ class AICRInferenceApproval(BaseModel):
 	context_tokens: int = 0
 	workflow_risk: str = "normal"
 	decision: str = "pending"
+	policy_decision: str = "require_review"
+	matched_rules: list[str] = Field(default_factory=list)
+	review_reasons: list[str] = Field(default_factory=list)
+	audit_evidence: dict[str, Any] = Field(default_factory=dict)
 	reviewer: str | None = None
 	notes: str | None = None
 
@@ -779,6 +783,10 @@ class AICRGovernanceEvent(BaseModel):
 	subject_id: str
 	message: str
 	evidence: dict[str, Any] = Field(default_factory=dict)
+	policy_decision: str = "allow"
+	matched_rules: list[str] = Field(default_factory=list)
+	review_reasons: list[str] = Field(default_factory=list)
+	audit_evidence: dict[str, Any] = Field(default_factory=dict)
 	timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)

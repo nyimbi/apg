@@ -163,6 +163,8 @@ def test_registration_includes_full_capability_contract():
 	assert "model_metric_governance" in registration["capabilities"]
 	assert "agent_runtime_registry" in registration["capabilities"]
 	assert "ai_agent_composition" in registration["capabilities"]
+	assert "review_evidence" in registration["capabilities"]
+	assert registration["endpoints"]["pending_reviews"] == "/aicr/api/v1/pending-reviews"
 	assert registration["agents"]["first_class"] is True
 	assert registration["streaming"]["required_processor"] == "bytewax"
 	assert "auth" in registration["dependencies"]
@@ -267,6 +269,9 @@ def test_service_blocks_provider_model_workflow_and_agent_guardrail_gaps():
 		service.register_ai_agent("agent", "tenant-ai", "Agent", "codex", "model_steward", "", "owner", "purpose")
 	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
 		service.validate_aicr_lifecycle_batch("tenant-ai", "legacy_queue", 1)
+	denied_batch = service.list_lifecycle_batches("tenant-ai")[0]
+	assert denied_batch["status"] == "denied"
+	assert denied_batch["audit_evidence"]["reasons"] == ["bytewax_lifecycle_stream_required"]
 
 
 def test_privileged_ai_agent_without_human_approval_is_pending_review():
@@ -284,7 +289,11 @@ def test_privileged_ai_agent_without_human_approval_is_pending_review():
 	)
 
 	assert agent["status"] == "pending_review"
+	assert agent["decision"] == "require_review"
+	assert agent["review_reasons"] == ["ai_agent_human_approval_required"]
+	assert agent["audit_evidence"]["review_recorded"] is False
 	assert service.governance_summary("tenant-ai")["ai_agent_count"] == 1
+	assert service.governance_summary("tenant-ai")["pending_ai_agent_review_count"] == 1
 
 
 def test_model_metric_drift_review_lifecycle():
@@ -319,10 +328,15 @@ def test_model_metric_drift_review_lifecycle():
 
 	assert pending["status"] == "pending_review"
 	assert pending["matched_rules"] == ["drift_review_required"]
+	assert pending["review_reasons"] == ["drift_review_required"]
+	assert pending["audit_evidence"]["required_actions"] == ["record_drift_review"]
 	assert service.list_models("tenant-ai")[0]["status"] == "drift_review_required"
 	assert reviewed["status"] == "recorded"
+	assert reviewed["review_reasons"] == []
 	assert console["drift_threshold"] == 0.2
+	assert console["pending_reviews"][0]["id"] == pending["id"]
 	assert governance["summary"]["pending_model_metric_review_count"] == 1
+	assert governance["pending_reviews"][0]["id"] == pending["id"]
 	assert {event["event_type"] for event in governance["audit_events"]} >= {"model_metric_recorded"}
 
 
@@ -348,7 +362,10 @@ def test_service_runs_high_risk_inference_approval_lifecycle():
 	queue = views.inference_console_model(service, "tenant-ai")
 
 	assert approval["decision"] == "pending"
+	assert approval["policy_decision"] == "require_review"
+	assert set(approval["review_reasons"]) == {"large_context_review_required", "workflow_approval_required"}
 	assert queue["pending_approvals"][0]["id"] == "inference-1"
+	assert queue["pending_reviews"][0]["id"] == "inference-1"
 
 	with pytest.raises(PermissionError, match="inference_approval_required"):
 		service.run_approved_inference("inference-1", "tenant-ai")
@@ -364,8 +381,11 @@ def test_service_runs_high_risk_inference_approval_lifecycle():
 	evidence = views.governance_center_model(service, "tenant-ai")
 
 	assert decision["decision"] == "approved"
+	assert set(decision["review_reasons"]) == {"large_context_review_required", "workflow_approval_required"}
 	assert result["status"] == "completed"
 	assert evidence["summary"]["inference_approval_count"] == 1
+	assert evidence["summary"]["pending_review_count"] == 0
+	assert set(evidence["approvals"][0]["review_reasons"]) == {"large_context_review_required", "workflow_approval_required"}
 	assert {event["event_type"] for event in evidence["audit_events"]} >= {
 		"ai_service_registered",
 		"inference_approval_requested",

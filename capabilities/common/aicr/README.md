@@ -17,6 +17,8 @@ tenant, policy, approval, audit, and observability guardrails.
 - Governed inference requests with model policy checks, health checks,
   large-context review, high-risk approval, PII redaction, tool allowlists, and
   cross-tenant routing denial.
+- Durable review evidence for drifted metrics, high-risk inference approvals,
+  privileged AI-agent registrations, and lifecycle batch decisions.
 - Workflow and agent-runtime registration for first-class AI agent composition.
 - First-class AI-agent records for Codex, Claude Code, OpenCode, and Pi
   contributors, including role, scope, owner, purpose, contribution disclosure,
@@ -80,6 +82,15 @@ service.record_model_metric(
 	0.97,
 	"eval-owner",
 )
+pending_metric = service.record_model_metric(
+	"tenant-a",
+	"reasoning-model",
+	"population_stability_index",
+	0.34,
+	"eval-owner",
+	drift_score=0.34,
+)
+assert pending_metric["status"] == "pending_review"
 approval = service.request_inference(
 	"request-1",
 	"tenant-a",
@@ -129,6 +140,12 @@ registered services,
 unsupported agent runtimes, first-class AI agents without supported runtime,
 supported role, scope, owner, purpose, or contribution disclosure, non-Bytewax
 lifecycle batches, and external agent actions without approval.
+
+Hard deny decisions raise `PermissionError`. Review-required decisions persist
+or return records with policy evidence fields: `policy_decision` or `decision`,
+`matched_rules`, `review_reasons`, and `audit_evidence`. Generated
+applications can use `list_pending_reviews()` and the dashboard, inference,
+metric, agent, lifecycle, and governance view models to compose review queues.
 
 ## Focused Verification
 

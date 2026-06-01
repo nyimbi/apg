@@ -183,6 +183,11 @@ def list_lifecycle_batches(tenant_id: str | None = None) -> list[dict[str, Any]]
 	return SERVICE.list_lifecycle_batches(tenant_id)
 
 
+def list_pending_reviews(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	"""List AICR review-required records for the optional tenant."""
+	return SERVICE.list_pending_reviews(tenant_id)
+
+
 def list_inference_approvals(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	"""List inference approvals for the optional tenant."""
 	return SERVICE.list_inference_approvals(tenant_id)
@@ -214,6 +219,7 @@ __all__ = [
 	"list_agent_runtimes",
 	"list_ai_agents",
 	"list_lifecycle_batches",
+	"list_pending_reviews",
 	"list_inference_approvals",
 	"list_audit_events",
 ]
