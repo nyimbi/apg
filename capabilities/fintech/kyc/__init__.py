@@ -1,11 +1,6 @@
-"""
-kyc FinTech Capability
+"""APG Know Your Customer capability package."""
 
-Placeholder for kyc financial technology capability.
-To be implemented as part of the comprehensive APG FinTech platform.
-"""
+from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .service import FintechKycService, KnowYourCustomerService
 
-# Placeholder implementation
-__version__ = "1.0.0"
-__status__ = "Development"
-
+__all__ = ["FintechKycService", "KnowYourCustomerService", "evaluate_capability_rules", "get_capability_contract"]

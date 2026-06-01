@@ -72,6 +72,7 @@ CAPABILITY_META = {
 	'implemented_subcapabilities': [
 		'payments',      # Digital Payments
 		'wallets',       # Digital Wallets
+		'kyc',           # Know Your Customer
 		'tms',           # Treasury Management System (existing)
 		'gateway',       # Payment Gateway (existing)
 		'switch',        # Payment Switch (existing)

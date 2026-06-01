@@ -1,0 +1,1192 @@
+{
+  "app": {
+    "description": "Know Your Customer package-backed APG capability",
+    "entity_count": 5,
+    "name": "fintech_kyc",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "fintech_kyc": {
+      "configuration": {
+        "adapters": {
+          "audit": "audl",
+          "auth": "auth",
+          "biometrics": "biop",
+          "consent": "cons",
+          "event_stream": "bytewax",
+          "keys": "keym",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "vision": "cvsn",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "kyc_ops_reviewer",
+            "document_reviewer",
+            "sanctions_reviewer",
+            "risk_reviewer",
+            "onboarding_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "decisions": {
+          "address_document_required": true,
+          "consent_required": true,
+          "expiry_days": 365,
+          "identity_document_required": true,
+          "risk_assessment_required": true,
+          "screening_required": true
+        },
+        "documents": {
+          "extracted_subject_required": true,
+          "minimum_confidence": 0.75,
+          "supported_types": [
+            "passport",
+            "national_id",
+            "driver_license",
+            "resident_permit",
+            "business_registration",
+            "tax_id",
+            "utility_bill",
+            "bank_statement"
+          ],
+          "token_reference_required": true
+        },
+        "governance": {
+          "audit_kyc_events": true,
+          "customer_consent_required": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_document_events": true,
+          "emit_profile_events": true,
+          "emit_screening_events": true,
+          "event_stream": "apg.fintech.kyc.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "profiles": {
+          "consent_required": true,
+          "country_required": true,
+          "legal_name_required": true,
+          "supported_customer_types": [
+            "individual",
+            "sole_proprietor",
+            "business",
+            "nonprofit",
+            "government"
+          ]
+        },
+        "risk": {
+          "enhanced_due_diligence_required": true,
+          "high_risk_threshold": 75,
+          "medium_risk_threshold": 45
+        },
+        "screening": {
+          "adverse_media_required": true,
+          "pep_required": true,
+          "review_required_for_hits": true,
+          "sanctions_required": true,
+          "watchlist_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_kyc_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_dashboard": true,
+          "enable_documents": true,
+          "enable_profiles": true,
+          "enable_reviews": true,
+          "enable_risk": true,
+          "enable_screening": true
+        }
+      },
+      "name": "Know Your Customer",
+      "provides": [
+        "customer_identity_lifecycle",
+        "document_verification_workflow",
+        "sanctions_pep_screening",
+        "kyc_risk_scoring",
+        "customer_due_diligence",
+        "enhanced_due_diligence",
+        "kyc_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "cons",
+        "ntfy",
+        "biop",
+        "cvsn",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "KYC operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "description": "KYC writes require policy evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "kyc_policy_required",
+              "required_action": "attach_kyc_policy"
+            },
+            "name": "kyc_write_requires_policy"
+          },
+          {
+            "condition": {
+              "operation": "open_profile",
+              "subject_present": false
+            },
+            "description": "KYC profiles require subject reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "kyc_subject_required",
+              "required_action": "attach_subject_reference"
+            },
+            "name": "profile_subject_required"
+          },
+          {
+            "condition": {
+              "legal_name_present": false,
+              "operation": "open_profile"
+            },
+            "description": "KYC profiles require legal name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "legal_name_required",
+              "required_action": "capture_legal_name"
+            },
+            "name": "profile_legal_name_required"
+          },
+          {
+            "condition": {
+              "customer_type_supported": false,
+              "operation": "open_profile"
+            },
+            "description": "KYC customer type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_type_not_supported",
+              "required_action": "select_supported_customer_type"
+            },
+            "name": "profile_customer_type_supported"
+          },
+          {
+            "condition": {
+              "country_present": false,
+              "operation": "open_profile"
+            },
+            "description": "KYC profiles require country code.",
+            "effect": {
+              "decision": "deny",
+              "reason": "country_required",
+              "required_action": "capture_country_code"
+            },
+            "name": "profile_country_required"
+          },
+          {
+            "condition": {
+              "consent_recorded": false,
+              "operation": "open_profile"
+            },
+            "description": "KYC profiles require consent evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_consent_required",
+              "required_action": "record_customer_consent"
+            },
+            "name": "profile_consent_required"
+          },
+          {
+            "condition": {
+              "operation": "register_document",
+              "profile_present": false
+            },
+            "description": "Documents require an existing KYC profile.",
+            "effect": {
+              "decision": "deny",
+              "reason": "kyc_profile_required",
+              "required_action": "select_profile"
+            },
+            "name": "document_profile_required"
+          },
+          {
+            "condition": {
+              "document_type_supported": false,
+              "operation": "register_document"
+            },
+            "description": "Document type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "document_type_not_supported",
+              "required_action": "select_supported_document_type"
+            },
+            "name": "document_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_document",
+              "token_reference_present": false
+            },
+            "description": "Documents require tokenized storage reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "document_token_required",
+              "required_action": "attach_document_token"
+            },
+            "name": "document_token_required"
+          },
+          {
+            "condition": {
+              "extracted_subject_present": false,
+              "operation": "register_document"
+            },
+            "description": "Documents require extracted subject evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "document_subject_required",
+              "required_action": "extract_document_subject"
+            },
+            "name": "document_subject_required"
+          },
+          {
+            "condition": {
+              "confidence_below_minimum": true,
+              "operation": "register_document"
+            },
+            "description": "Document confidence must meet the configured minimum.",
+            "effect": {
+              "decision": "deny",
+              "reason": "document_confidence_below_minimum",
+              "required_action": "reverify_document"
+            },
+            "name": "document_confidence_minimum"
+          },
+          {
+            "condition": {
+              "operation": "record_screening",
+              "profile_present": false
+            },
+            "description": "Screening requires an existing KYC profile.",
+            "effect": {
+              "decision": "deny",
+              "reason": "kyc_profile_required",
+              "required_action": "select_profile"
+            },
+            "name": "screening_profile_required"
+          },
+          {
+            "condition": {
+              "operation": "record_screening",
+              "review_recorded": false,
+              "screening_hit": true
+            },
+            "description": "Sanctions, PEP, watchlist, or adverse-media hits require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "screening_review_required",
+              "required_action": "record_screening_review"
+            },
+            "name": "screening_hits_require_review"
+          },
+          {
+            "condition": {
+              "operation": "score_risk",
+              "risk_score_out_of_range": true
+            },
+            "description": "KYC risk score must be between 0 and 100.",
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_score_out_of_range",
+              "required_action": "set_valid_risk_score"
+            },
+            "name": "risk_score_range"
+          },
+          {
+            "condition": {
+              "high_risk": true,
+              "operation": "score_risk",
+              "review_recorded": false
+            },
+            "description": "High KYC risk requires enhanced due diligence review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "enhanced_due_diligence_required",
+              "required_action": "record_edd_review"
+            },
+            "name": "high_risk_requires_edd"
+          },
+          {
+            "condition": {
+              "identity_document_present": false,
+              "operation": "record_decision"
+            },
+            "description": "Verification requires identity document evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "identity_document_required",
+              "required_action": "attach_identity_document"
+            },
+            "name": "decision_identity_document_required"
+          },
+          {
+            "condition": {
+              "address_document_present": false,
+              "operation": "record_decision"
+            },
+            "description": "Verification requires address document evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "address_document_required",
+              "required_action": "attach_address_document"
+            },
+            "name": "decision_address_document_required"
+          },
+          {
+            "condition": {
+              "operation": "record_decision",
+              "screening_present": false
+            },
+            "description": "Verification requires screening evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "screening_required",
+              "required_action": "record_screening"
+            },
+            "name": "decision_screening_required"
+          },
+          {
+            "condition": {
+              "operation": "record_decision",
+              "risk_present": false
+            },
+            "description": "Verification requires risk score evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_assessment_required",
+              "required_action": "score_risk"
+            },
+            "name": "decision_risk_required"
+          },
+          {
+            "condition": {
+              "open_review_flags": true,
+              "operation": "record_decision"
+            },
+            "description": "Verification cannot proceed with unresolved review flags.",
+            "effect": {
+              "decision": "deny",
+              "reason": "open_review_flags",
+              "required_action": "resolve_reviews"
+            },
+            "name": "decision_blocks_open_reviews"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "kyc_batch"
+            },
+            "description": "KYC batches require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_kyc_batch_to_bytewax"
+            },
+            "name": "kyc_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "kyc_event"
+            },
+            "description": "KYC events require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_kyc_event_to_bytewax"
+            },
+            "name": "kyc_event_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_kyc_agent"
+            },
+            "description": "KYC agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "kyc_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "kyc_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_kyc_agent"
+            },
+            "description": "KYC agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "kyc_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "kyc_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "kyc_agent_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged KYC-agent actions require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_kyc_agent_action_requires_human_approval"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "KYC operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "description": "KYC writes require policy evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "kyc_policy_required",
+            "required_action": "attach_kyc_policy"
+          },
+          "name": "kyc_write_requires_policy"
+        },
+        {
+          "condition": {
+            "operation": "open_profile",
+            "subject_present": false
+          },
+          "description": "KYC profiles require subject reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "kyc_subject_required",
+            "required_action": "attach_subject_reference"
+          },
+          "name": "profile_subject_required"
+        },
+        {
+          "condition": {
+            "legal_name_present": false,
+            "operation": "open_profile"
+          },
+          "description": "KYC profiles require legal name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "legal_name_required",
+            "required_action": "capture_legal_name"
+          },
+          "name": "profile_legal_name_required"
+        },
+        {
+          "condition": {
+            "customer_type_supported": false,
+            "operation": "open_profile"
+          },
+          "description": "KYC customer type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_type_not_supported",
+            "required_action": "select_supported_customer_type"
+          },
+          "name": "profile_customer_type_supported"
+        },
+        {
+          "condition": {
+            "country_present": false,
+            "operation": "open_profile"
+          },
+          "description": "KYC profiles require country code.",
+          "effect": {
+            "decision": "deny",
+            "reason": "country_required",
+            "required_action": "capture_country_code"
+          },
+          "name": "profile_country_required"
+        },
+        {
+          "condition": {
+            "consent_recorded": false,
+            "operation": "open_profile"
+          },
+          "description": "KYC profiles require consent evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_consent_required",
+            "required_action": "record_customer_consent"
+          },
+          "name": "profile_consent_required"
+        },
+        {
+          "condition": {
+            "operation": "register_document",
+            "profile_present": false
+          },
+          "description": "Documents require an existing KYC profile.",
+          "effect": {
+            "decision": "deny",
+            "reason": "kyc_profile_required",
+            "required_action": "select_profile"
+          },
+          "name": "document_profile_required"
+        },
+        {
+          "condition": {
+            "document_type_supported": false,
+            "operation": "register_document"
+          },
+          "description": "Document type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "document_type_not_supported",
+            "required_action": "select_supported_document_type"
+          },
+          "name": "document_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_document",
+            "token_reference_present": false
+          },
+          "description": "Documents require tokenized storage reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "document_token_required",
+            "required_action": "attach_document_token"
+          },
+          "name": "document_token_required"
+        },
+        {
+          "condition": {
+            "extracted_subject_present": false,
+            "operation": "register_document"
+          },
+          "description": "Documents require extracted subject evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "document_subject_required",
+            "required_action": "extract_document_subject"
+          },
+          "name": "document_subject_required"
+        },
+        {
+          "condition": {
+            "confidence_below_minimum": true,
+            "operation": "register_document"
+          },
+          "description": "Document confidence must meet the configured minimum.",
+          "effect": {
+            "decision": "deny",
+            "reason": "document_confidence_below_minimum",
+            "required_action": "reverify_document"
+          },
+          "name": "document_confidence_minimum"
+        },
+        {
+          "condition": {
+            "operation": "record_screening",
+            "profile_present": false
+          },
+          "description": "Screening requires an existing KYC profile.",
+          "effect": {
+            "decision": "deny",
+            "reason": "kyc_profile_required",
+            "required_action": "select_profile"
+          },
+          "name": "screening_profile_required"
+        },
+        {
+          "condition": {
+            "operation": "record_screening",
+            "review_recorded": false,
+            "screening_hit": true
+          },
+          "description": "Sanctions, PEP, watchlist, or adverse-media hits require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "screening_review_required",
+            "required_action": "record_screening_review"
+          },
+          "name": "screening_hits_require_review"
+        },
+        {
+          "condition": {
+            "operation": "score_risk",
+            "risk_score_out_of_range": true
+          },
+          "description": "KYC risk score must be between 0 and 100.",
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_score_out_of_range",
+            "required_action": "set_valid_risk_score"
+          },
+          "name": "risk_score_range"
+        },
+        {
+          "condition": {
+            "high_risk": true,
+            "operation": "score_risk",
+            "review_recorded": false
+          },
+          "description": "High KYC risk requires enhanced due diligence review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "enhanced_due_diligence_required",
+            "required_action": "record_edd_review"
+          },
+          "name": "high_risk_requires_edd"
+        },
+        {
+          "condition": {
+            "identity_document_present": false,
+            "operation": "record_decision"
+          },
+          "description": "Verification requires identity document evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "identity_document_required",
+            "required_action": "attach_identity_document"
+          },
+          "name": "decision_identity_document_required"
+        },
+        {
+          "condition": {
+            "address_document_present": false,
+            "operation": "record_decision"
+          },
+          "description": "Verification requires address document evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "address_document_required",
+            "required_action": "attach_address_document"
+          },
+          "name": "decision_address_document_required"
+        },
+        {
+          "condition": {
+            "operation": "record_decision",
+            "screening_present": false
+          },
+          "description": "Verification requires screening evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "screening_required",
+            "required_action": "record_screening"
+          },
+          "name": "decision_screening_required"
+        },
+        {
+          "condition": {
+            "operation": "record_decision",
+            "risk_present": false
+          },
+          "description": "Verification requires risk score evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_assessment_required",
+            "required_action": "score_risk"
+          },
+          "name": "decision_risk_required"
+        },
+        {
+          "condition": {
+            "open_review_flags": true,
+            "operation": "record_decision"
+          },
+          "description": "Verification cannot proceed with unresolved review flags.",
+          "effect": {
+            "decision": "deny",
+            "reason": "open_review_flags",
+            "required_action": "resolve_reviews"
+          },
+          "name": "decision_blocks_open_reviews"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "kyc_batch"
+          },
+          "description": "KYC batches require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_kyc_batch_to_bytewax"
+          },
+          "name": "kyc_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "kyc_event"
+          },
+          "description": "KYC events require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_kyc_event_to_bytewax"
+          },
+          "name": "kyc_event_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_kyc_agent"
+          },
+          "description": "KYC agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "kyc_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "kyc_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_kyc_agent"
+          },
+          "description": "KYC agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "kyc_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "kyc_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "kyc_agent_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged KYC-agent actions require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_kyc_agent_action_requires_human_approval"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "agents": {
+          "component": "KycAgentWorkbench",
+          "permission": "fintech_kyc:admin",
+          "route": "/fintech-kyc/agents"
+        },
+        "dashboard": {
+          "component": "KycDashboard",
+          "permission": "fintech_kyc:view",
+          "route": "/fintech-kyc/dashboard"
+        },
+        "documents": {
+          "component": "KycDocumentVault",
+          "permission": "fintech_kyc:manage_documents",
+          "route": "/fintech-kyc/documents"
+        },
+        "profiles": {
+          "component": "KycProfileWorkbench",
+          "permission": "fintech_kyc:manage_profiles",
+          "route": "/fintech-kyc/profiles"
+        },
+        "reviews": {
+          "component": "KycReviewQueue",
+          "permission": "fintech_kyc:review",
+          "route": "/fintech-kyc/reviews"
+        },
+        "risk": {
+          "component": "KycRiskConsole",
+          "permission": "fintech_kyc:review_risk",
+          "route": "/fintech-kyc/risk"
+        },
+        "screening": {
+          "component": "KycScreeningConsole",
+          "permission": "fintech_kyc:screen",
+          "route": "/fintech-kyc/screening"
+        },
+        "settings": {
+          "component": "KycSettings",
+          "permission": "fintech_kyc:admin",
+          "route": "/fintech-kyc/settings"
+        }
+      },
+      "streaming": {
+        "events": [
+          "kyc_profile_opened",
+          "kyc_document_registered",
+          "kyc_screening_recorded",
+          "kyc_risk_scored",
+          "kyc_decision_recorded",
+          "kyc_agent_registered"
+        ],
+        "guardrails": [
+          "kyc_batch_requires_bytewax",
+          "kyc_event_requires_bytewax",
+          "privileged_kyc_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.fintech.kyc.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "agents": {
+            "status_style": "agent-chip",
+            "visual": "agent-lane"
+          },
+          "documents": {
+            "icon": "file-check",
+            "status_indicator": "confidence-chip"
+          },
+          "profiles": {
+            "icon": "user-check",
+            "status_indicator": "kyc-status-pill"
+          },
+          "reviews": {
+            "status_style": "decision-chip",
+            "visual": "review-queue"
+          },
+          "risk": {
+            "status_style": "risk-chip",
+            "visual": "risk-band"
+          },
+          "screening": {
+            "status_style": "screening-chip",
+            "visual": "watchlist-lane"
+          }
+        },
+        "name": "fintech_kyc_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#0E7490",
+          "color.danger": "#B42318",
+          "color.primary": "#24405F",
+          "color.success": "#15803D",
+          "color.warning": "#A16207",
+          "density": "compact",
+          "surface.canvas": "#F7F9FC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#172033",
+          "text.secondary": "#52606D"
+        }
+      },
+      "ui": {
+        "api_prefix": "/fintech-kyc/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "KycDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/fintech-kyc/dashboard",
+            "permission": "fintech_kyc:view"
+          },
+          {
+            "component": "KycProfileWorkbench",
+            "name": "profiles",
+            "nav_group": "Profiles",
+            "path": "/fintech-kyc/profiles",
+            "permission": "fintech_kyc:manage_profiles"
+          },
+          {
+            "component": "KycDocumentVault",
+            "name": "documents",
+            "nav_group": "Evidence",
+            "path": "/fintech-kyc/documents",
+            "permission": "fintech_kyc:manage_documents"
+          },
+          {
+            "component": "KycScreeningConsole",
+            "name": "screening",
+            "nav_group": "Screening",
+            "path": "/fintech-kyc/screening",
+            "permission": "fintech_kyc:screen"
+          },
+          {
+            "component": "KycRiskConsole",
+            "name": "risk",
+            "nav_group": "Risk",
+            "path": "/fintech-kyc/risk",
+            "permission": "fintech_kyc:review_risk"
+          },
+          {
+            "component": "KycReviewQueue",
+            "name": "reviews",
+            "nav_group": "Reviews",
+            "path": "/fintech-kyc/reviews",
+            "permission": "fintech_kyc:review"
+          },
+          {
+            "component": "KycAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/fintech-kyc/agents",
+            "permission": "fintech_kyc:admin"
+          },
+          {
+            "component": "KycSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/fintech-kyc/settings",
+            "permission": "fintech_kyc:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "kyc_review": {
+        "roles": [
+          "kyc_ops_reviewer",
+          "document_reviewer",
+          "sanctions_reviewer",
+          "risk_reviewer",
+          "onboarding_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "fintech_kyc": [
+        "auth",
+        "audl",
+        "cons",
+        "ntfy",
+        "biop",
+        "cvsn",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets"
+      ]
+    }
+  },
+  "contracts": {
+    "fintech_kyc": {
+      "configuration": {
+        "adapters": {
+          "audit": "audl",
+          "auth": "auth",
+          "biometrics": "biop",
+          "consent": "cons",
+          "event_stream": "bytewax",
+          "keys": "keym",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "vision": "cvsn",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "kyc_ops_reviewer",
+            "document_reviewer",
+            "sanctions_reviewer",
+            "risk_reviewer",
+            "onboarding_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "decisions": {
+          "address_document_required": true,
+          "consent_required": true,
+          "expiry_days": 365,
+          "identity_document_required": true,
+          "risk_assessment_required": true,
+          "screening_required": true
+        },
+        "documents": {
+          "extracted_subject_required": true,
+          "minimum_confidence": 0.75,
+          "supported_types": [
+            "passport",
+            "national_id",
+            "driver_license",
+            "resident_permit",
+            "business_registration",
+            "tax_id",
+            "utility_bill",
+            "bank_statement"
+          ],
+          "token_reference_required": true
+        },
+        "governance": {
+          "audit_kyc_events": true,
+          "customer_consent_required": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_document_events": true,
+          "emit_profile_events": true,
+          "emit_screening_events": true,
+          "event_stream": "apg.fintech.kyc.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "profiles": {
+          "consent_required": true,
+          "country_required": true,
+          "legal_name_required": true,
+          "supported_customer_types": [
+            "individual",
+            "sole_proprietor",
+            "business",
+            "nonprofit",
+            "government"
+          ]
+        },
+        "risk": {
+          "enhanced_due_diligence_required": true,
+          "high_risk_threshold": 75,
+          "medium_risk_threshold": 45
+        },
+        "screening": {
+          "adverse_media_required": true,
+          "pep_required": true,
+          "review_required_for_hits": true,
+          "sanctions_required": true,
+          "watchlist_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_kyc_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_dashboard": true,
+          "enable_documents": true,
+          "enable_profiles": true,
+          "enable_reviews": true,
+          "enable_risk": true,
+          "enable_screening": true
+        }
+      },
+      "id": "fintech_kyc",
+      "provides": [
+        "customer_identity_lifecycle",
+        "document_verification_workflow",
+        "sanctions_pep_screening",
+        "kyc_risk_scoring",
+        "customer_due_diligence",
+        "enhanced_due_diligence",
+        "kyc_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "cons",
+        "ntfy",
+        "biop",
+        "cvsn",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 10,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "fintech_kyc": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}

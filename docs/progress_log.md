@@ -26444,3 +26444,75 @@ Known gaps:
 - Did not run full repository tests, rendered UI checks, live bank/mobile-money
   or card provider flows, live ledger posting, durable Bytewax topology, or
   performance/load checks during this battery-conscious slice.
+
+### 2026-06-01 13:19 EAT
+
+Fintech Know Your Customer executable capability slice:
+
+- Promoted `capabilities/fintech/kyc` from an empty package into a first-class
+  APG capability with `README.md`, `SPECIFICATION.md`, `PLAN.md`, `cap_spec.md`,
+  contract, models, service, API helpers, view models, app entrypoint,
+  semantic/package/release evidence, and focused tests.
+- Added tenant-scoped identity profiles, consent-backed onboarding evidence,
+  document verification, sanctions/PEP/watchlist/adverse-media screening, risk
+  scoring, KYC decisions, dashboard summaries, Bytewax batch validation, and
+  provider-neutral KYC-agent registration.
+- Added deterministic KYC guardrails for tenant context, write policy, subject,
+  legal name, customer type, country, consent, profile ownership, document type,
+  tokenized document reference, extracted subject, document confidence,
+  screening hits, risk score range, enhanced due diligence, required identity
+  and address documents, screening evidence, risk evidence, unresolved reviews,
+  Bytewax lifecycle events, supported AI-agent runtimes and roles, and
+  privileged-agent human approval.
+- Added `kyc_runtime.py` domain helpers for normalized codes, country codes,
+  confidence, risk scores, and risk-band decisions.
+- Updated fintech capability metadata so `kyc` is listed as an implemented
+  sub-capability.
+- Removed the empty `_Know_Your_Customer` marker file and refreshed
+  `semantic_model.json`, `package_manifest.json`, and `release_report.json`.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/fintech/kyc/__init__.py capabilities/fintech/kyc/capability_contract.py capabilities/fintech/kyc/models.py capabilities/fintech/kyc/kyc_runtime.py capabilities/fintech/kyc/service.py capabilities/fintech/kyc/api.py capabilities/fintech/kyc/views.py capabilities/fintech/kyc/app.py capabilities/fintech/kyc/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/fintech/kyc/tests/test_package_contract.py`
+  passed with 6 tests.
+- `./.venv/bin/python capabilities/fintech/kyc/app.py` passed with
+  `self_test()` status `ok`.
+- `./.venv/bin/apg capabilities inspect fintech_kyc --json` passed with 26
+  rules, 8 routes, Bytewax streaming, and provider-neutral KYC-agent runtimes.
+- `./.venv/bin/apg capabilities publish-plan capabilities/fintech/kyc --json`
+  passed with side-effect-free publish evidence and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/fintech/kyc --json`
+  passed with one domain-specific fintech KYC implementation, 0 baseline
+  markers, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/fintech/kyc --json`
+  passed with one complete lifecycle record, 26 rules, 8 routes, 11 theme
+  tokens, and 0 warnings/errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 112 operable contracts, 112 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Focused stale-marker scan returned only the intentional Bytewax-not-Kafka
+  documentation line in the edited KYC README.
+
+Code review:
+
+- Reviewed onboarding guardrails so profiles cannot be opened without subject,
+  legal name, supported customer type, country, and consent evidence.
+- Reviewed document guardrails so unsupported types, missing token references,
+  missing extracted subjects, and low confidence deny before state acceptance.
+- Reviewed screening and risk guardrails so watchlist hits and high-risk scores
+  require review evidence before verification.
+- Reviewed decision guardrails so verification requires identity document,
+  address document, screening evidence, risk evidence, and resolved reviews.
+- Kept live vendors, biometric providers, sanctions/PEP feeds, adverse-media
+  services, government registries, payment providers, wallets, audit sinks,
+  notifications, identity, consent, key management, and durable Bytewax workers
+  behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live document-provider
+  flows, live biometric checks, live sanctions/PEP/adverse-media feeds, live
+  government-registry checks, durable Bytewax topology, or performance/load
+  checks during this battery-conscious slice.
