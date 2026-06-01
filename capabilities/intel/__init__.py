@@ -71,6 +71,7 @@ CAPABILITY_META = {
 		'monitoring',  # Real-Time Monitoring
 		'fusion',      # Intelligence Fusion
 		'analytics',   # Intelligence Analytics
+		'correlation', # Data Correlation
 	],
 	'security_requirements': {
 		'classification_handling': True,

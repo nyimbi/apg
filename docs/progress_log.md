@@ -29816,3 +29816,113 @@ Known gaps:
   execution engines, graph writes, RAG indexing, dashboard rendering,
   notification delivery, durable Bytewax topology, or performance/load checks
   during this battery-conscious slice.
+
+## 2026-06-01 - Intel Correlation executable package
+
+Implemented and reviewed `capabilities/intel/correlation` as a complete
+executable APG package for governed, evidence-backed cross-source data
+correlation.
+
+What changed:
+
+- Replaced the placeholder marker with an executable package exporting
+  `DataCorrelationService`, `IntelCorrelationService`, and
+  `get_capability_contract`.
+- Added a detailed `SPECIFICATION.md`, `PLAN.md`, `README.md`, and
+  `cap_spec.md` defining the authority, workspace, source, entity,
+  observation, correlation rule, run, cluster, decision, referral, review,
+  Bytewax lifecycle, AI-agent, UI, theme, and adapter-boundary model.
+- Added `capability_contract.py` with 71 deterministic rules, 14 UI routes,
+  compact `intel_correlation_control` theme tokens, APG dependencies, Bytewax
+  lifecycle metadata, and provider-neutral AI-agent runtimes for `codex`,
+  `claude_code`, `opencode`, and `pi`.
+- Added in-memory domain models and a tenant-scoped service for lawful
+  authority records, correlation workspaces, source lineage, entity records,
+  observations, correlation rules, runs, match clusters, resolution decisions,
+  referrals, reviews, Bytewax batch validation, and AI-agent guardrails.
+- Added API helpers, dashboard/console/agent view models, and a publishable
+  `app.py` entrypoint with self-test, component manifest, and semantic-model
+  generation.
+- Added package manifest, release evidence, generated semantic model, and
+  focused tests for contract shape, rule-engine denial paths, full correlation
+  lifecycle execution, tenant isolation, guardrail rejection, API helpers, view
+  models, and app entrypoint.
+- Updated `capabilities/intel/__init__.py` so `correlation` is listed as an
+  implemented sub-capability.
+- Updated `capabilities/README.md` so the catalog snapshot reports 149 valid
+  contracts, 149 domain-specific packages, 149 strict complete package artifact
+  sets, and 15 Intel packages.
+
+Focused verification:
+
+- Generated `capabilities/intel/correlation/semantic_model.json` from
+  `app.semantic_model()`.
+- `./.venv/bin/python -m py_compile
+  capabilities/intel/correlation/__init__.py
+  capabilities/intel/correlation/capability_contract.py
+  capabilities/intel/correlation/models.py
+  capabilities/intel/correlation/correlation_runtime.py
+  capabilities/intel/correlation/service.py
+  capabilities/intel/correlation/api.py
+  capabilities/intel/correlation/views.py
+  capabilities/intel/correlation/app.py
+  capabilities/intel/correlation/tests/test_package_contract.py` passed.
+- `./.venv/bin/python capabilities/intel/correlation/app.py` passed self-test
+  with `passed: true` and `status: ok`.
+- `./.venv/bin/python -m json.tool
+  capabilities/intel/correlation/package_manifest.json` passed.
+- `./.venv/bin/python -m json.tool
+  capabilities/intel/correlation/release_report.json` passed.
+- `./.venv/bin/pytest -q
+  capabilities/intel/correlation/tests/test_package_contract.py` passed with 7
+  tests.
+- `./.venv/bin/apg capabilities inspect intel_correlation --json` passed with
+  71 rules, 14 UI routes, theme `intel_correlation_control`, shell
+  `apg_python`, and Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/intel/correlation --json` passed with `side_effect_free: true`
+  and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/intel/correlation --json` passed with 1 domain-specific
+  capability, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/intel/correlation --json` passed with 1 complete lifecycle, 0
+  warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 149 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 149 operable contracts, 149 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/intel/correlation`, `capabilities/intel/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed authority, workspace, source, entity, observation, rule, run,
+  cluster, decision, referral, review, Bytewax batch, and AI-agent lifecycle
+  paths so rule evaluation happens before state mutation.
+- Confirmed service state is keyed by tenant plus record ID and covered by a
+  regression test with shared authority/workspace IDs across tenants.
+- Confirmed source records require an existing tenant workspace, custodian,
+  lineage, and evidence before entities or observations can be recorded.
+- Confirmed rule thresholds, entity/observation/run/cluster confidence scores,
+  decision approvals, and referral approvals are enforced before mutation.
+- Confirmed AI-agent actions deny unapproved identity merge, source tampering,
+  privacy bypass, evidence fabrication, autonomous referral, and unreviewed
+  high-impact match scopes.
+- Kept live entity-resolution engines, fuzzy matching providers, graph writes,
+  geospatial joins, RAG indexing, storage backends, notification delivery, case
+  writes, referral delivery, and durable Bytewax workers behind adapter
+  boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live matching engines,
+  fuzzy matching providers, graph writes, geospatial joins, RAG indexing,
+  storage backends, notification delivery, case-management writes, referral
+  delivery, durable Bytewax topology, or performance/load checks during this
+  battery-conscious slice.
