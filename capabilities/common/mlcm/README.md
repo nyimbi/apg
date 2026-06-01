@@ -10,9 +10,11 @@ audit evidence, UI metadata, and a Bytewax event-stream adapter contract.
 - Model registry with owner, problem type, risk level, status, tags, and tenant
   boundaries.
 - Version management with artifact URI, stage, model card, training data,
-  baseline lineage, evaluation score, and promotion state.
+  baseline lineage, evaluation score, promotion state, matched guardrail rules,
+  and pending-review state for incomplete release evidence.
 - Evaluation runs with baseline references, metrics, evidence references, and
-  deterministic pass/fail status against configurable thresholds.
+  deterministic pass/fail or pending-review status against configurable
+  thresholds, fairness review, and explainability review.
 - Promotion gates for dev, staging, and production, including production
   approval enforcement and low-score blocking.
 - Deployment targets and deployment records for APG-generated applications,
@@ -80,6 +82,8 @@ service.record_evaluation(
 	"baseline:fraud-risk-2026-q1",
 	metrics={"auc": 0.94, "precision": 0.87},
 	evidence_refs=["report:eval-fraud-v1"],
+	fairness_review_recorded=True,
+	explainability_recorded=True,
 )
 service.request_promotion(
 	"promote-fraud-v1-prod",
@@ -131,6 +135,13 @@ streams, model lifecycle agents without supported runtime, supported role,
 scope, owner, purpose, or contribution disclosure, non-Bytewax lifecycle
 batches, incomplete release lineage, and critical-risk operations without human
 review.
+
+Incomplete version lineage and high-risk evaluation evidence are not silently
+accepted. `create_version()` records pending-review versions for missing
+training or baseline lineage, and `record_evaluation()` records pending-review
+evaluations for missing evidence, fairness review, or explainability review.
+Both records include `decision` and `matched_rules` so applications can compose
+review queues directly from service state.
 
 ## Focused Verification
 

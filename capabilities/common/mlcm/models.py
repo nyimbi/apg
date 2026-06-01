@@ -63,6 +63,8 @@ class ModelVersion:
 	evaluation_score: float | None = None
 	evaluation_id: str | None = None
 	promoted_at: str | None = None
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
 	created_at: str = field(default_factory=utc_now_iso)
 	metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -81,6 +83,8 @@ class ModelVersion:
 			"evaluation_score": self.evaluation_score,
 			"evaluation_id": self.evaluation_id,
 			"promoted_at": self.promoted_at,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
 			"created_at": self.created_at,
 			"metadata": dict(self.metadata),
 		}
@@ -100,6 +104,10 @@ class EvaluationRun:
 	status: str = "passed"
 	evidence_refs: list[str] = field(default_factory=list)
 	evaluator: str = ""
+	fairness_review_recorded: bool = False
+	explainability_recorded: bool = False
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
 	created_at: str = field(default_factory=utc_now_iso)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -114,6 +122,10 @@ class EvaluationRun:
 			"status": self.status,
 			"evidence_refs": list(self.evidence_refs),
 			"evaluator": self.evaluator,
+			"fairness_review_recorded": self.fairness_review_recorded,
+			"explainability_recorded": self.explainability_recorded,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
 			"created_at": self.created_at,
 		}
 

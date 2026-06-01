@@ -94,6 +94,7 @@ def register_capability() -> dict[str, Any]:
 		"rule_engine": contract["rule_engine"],
 		"capabilities": {
 			"model_registry": "Register tenant-scoped AI models, versions, owners, and lifecycle state",
+			"release_evidence_guardrails": "Preserve version lineage and evaluation review decisions for generated-app review queues",
 			"promotion_gates": "Promote models through governed dev, staging, and production stages",
 			"model_evaluation": "Attach evaluation baselines, scores, and release evidence",
 			"drift_monitoring": "Surface drift state for review, rollback, and retraining workflows",

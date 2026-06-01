@@ -76,6 +76,11 @@ def version_manager_model(
 		"versions": service.list_versions(tenant_id),
 		"evaluations": service.list_evaluations(tenant_id),
 		"promotions": service.list_promotion_requests(tenant_id),
+		"pending_review": [
+			version
+			for version in service.list_versions(tenant_id)
+			if version["status"] == "pending_review"
+		],
 		"route": "/mlcm/versions",
 	}
 
@@ -89,6 +94,11 @@ def evaluation_console_model(
 		"tenant_id": tenant_id,
 		"minimum_eval_score": service.minimum_eval_score,
 		"evaluations": service.list_evaluations(tenant_id),
+		"pending_review": [
+			evaluation
+			for evaluation in service.list_evaluations(tenant_id)
+			if evaluation["status"] == "pending_review"
+		],
 		"versions": service.list_versions(tenant_id),
 		"route": "/mlcm/evaluation",
 	}
@@ -227,6 +237,8 @@ def governance_model(
 	return {
 		"tenant_id": tenant_id,
 		"rules": contract["rule_engine"]["rules"],
+		"versions": service.list_versions(tenant_id),
+		"evaluations": service.list_evaluations(tenant_id),
 		"promotions": service.list_promotion_requests(tenant_id),
 		"retirements": service.list_retirements(tenant_id),
 		"model_lifecycle_agents": service.list_model_lifecycle_agents(tenant_id),

@@ -1,57 +1,5 @@
 {
-  "agents": {
-    "mlcm_model_governance": {
-      "adapter_contract": "aicr_provider_neutral_agent_adapter",
-      "first_class": true,
-      "guardrails": [
-        "supported_runtime",
-        "supported_role",
-        "explicit_scope",
-        "accountable_owner",
-        "declared_purpose",
-        "machine_contribution_disclosure",
-        "human_approval_for_privileged_roles"
-      ],
-      "privileged_roles": [
-        "evaluation_reviewer",
-        "fairness_reviewer",
-        "explainability_reviewer",
-        "promotion_reviewer",
-        "deployment_reviewer",
-        "drift_reviewer",
-        "rollback_reviewer",
-        "retirement_reviewer"
-      ],
-      "required_fields": [
-        "tenant_id",
-        "agent_id",
-        "name",
-        "runtime",
-        "role",
-        "scope",
-        "owner",
-        "purpose"
-      ],
-      "supported_roles": [
-        "model_card_reviewer",
-        "evaluation_reviewer",
-        "fairness_reviewer",
-        "explainability_reviewer",
-        "promotion_reviewer",
-        "deployment_reviewer",
-        "drift_reviewer",
-        "rollback_reviewer",
-        "retirement_reviewer",
-        "model_steward"
-      ],
-      "supported_runtimes": [
-        "codex",
-        "claude_code",
-        "opencode",
-        "pi"
-      ]
-    }
-  },
+  "agents": {},
   "app": {
     "description": "AI Model Lifecycle Management package-backed APG capability",
     "entity_count": 0,
@@ -60,17 +8,6 @@
   },
   "capabilities": {
     "mlcm": {
-      "adapters": {
-        "ai_core": "aicr",
-        "artifact_store": "filestore",
-        "audit_sink": "audl",
-        "auth_provider": "auth",
-        "event_stream": "bytewax",
-        "generated_app_runtime": "service.MlcmService",
-        "http_api": "api.py",
-        "metrics_sink": "moni",
-        "production_runtime": "service.MlcmService"
-      },
       "agents": {
         "adapter_contract": "aicr_provider_neutral_agent_adapter",
         "first_class": true,
@@ -122,14 +59,27 @@
           "pi"
         ]
       },
-      "approvals": {
-        "deployment": "DeploymentRecord",
-        "drift": "DriftSignal",
-        "model_lifecycle_agent": "ModelLifecycleAgentRecord",
-        "promotion": "PromotionRequest",
-        "retirement": "RetirementRecord",
-        "rollback": "RollbackRecord"
+      "ai_control_lifecycle": {
+        "adapter_contract": "aicr_provider_neutral_agent_adapter",
+        "ai_agent": "AiAgentRecord",
+        "first_class": true,
+        "guardrails": [
+          "supported_runtime",
+          "supported_role",
+          "explicit_scope",
+          "accountable_owner",
+          "declared_purpose",
+          "machine_contribution_disclosure",
+          "human_approval_for_privileged_roles"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
       },
+      "approvals": {},
       "business_rules": [],
       "components": {},
       "configuration": {
@@ -298,18 +248,24 @@
       "i18n": {},
       "master_data": {},
       "model_lifecycle": {
-        "audit": "MlcmAuditEvent",
-        "deployment": "DeploymentRecord",
-        "drift": "DriftSignal",
-        "evaluation": "EvaluationRun",
-        "lifecycle_batch": "MlcmLifecycleBatchRecord",
-        "model": "ModelArtifact",
+        "adapter_contract": "aicr_provider_neutral_agent_adapter",
+        "first_class": true,
+        "guardrails": [
+          "supported_runtime",
+          "supported_role",
+          "explicit_scope",
+          "accountable_owner",
+          "declared_purpose",
+          "machine_contribution_disclosure",
+          "human_approval_for_privileged_roles"
+        ],
         "model_lifecycle_agent": "ModelLifecycleAgentRecord",
-        "promotion": "PromotionRequest",
-        "retirement": "RetirementRecord",
-        "rollback": "RollbackRecord",
-        "target": "DeploymentTarget",
-        "version": "ModelVersion"
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
       },
       "name": "AI Model Lifecycle Management",
       "provides": [
@@ -1755,29 +1711,7 @@
     }
   },
   "composition": {
-    "agent_teams": {
-      "mlcm_model_governance": {
-        "roles": [
-          "model_card_reviewer",
-          "evaluation_reviewer",
-          "fairness_reviewer",
-          "explainability_reviewer",
-          "promotion_reviewer",
-          "deployment_reviewer",
-          "drift_reviewer",
-          "rollback_reviewer",
-          "retirement_reviewer",
-          "model_steward"
-        ],
-        "runtimes": [
-          "codex",
-          "claude_code",
-          "opencode",
-          "pi"
-        ],
-        "stream": "mlcm.lifecycle"
-      }
-    },
+    "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
       "mlcm": [
@@ -1789,57 +1723,6 @@
   },
   "contracts": {
     "mlcm": {
-      "agents": {
-        "adapter_contract": "aicr_provider_neutral_agent_adapter",
-        "first_class": true,
-        "guardrails": [
-          "supported_runtime",
-          "supported_role",
-          "explicit_scope",
-          "accountable_owner",
-          "declared_purpose",
-          "machine_contribution_disclosure",
-          "human_approval_for_privileged_roles"
-        ],
-        "privileged_roles": [
-          "evaluation_reviewer",
-          "fairness_reviewer",
-          "explainability_reviewer",
-          "promotion_reviewer",
-          "deployment_reviewer",
-          "drift_reviewer",
-          "rollback_reviewer",
-          "retirement_reviewer"
-        ],
-        "required_fields": [
-          "tenant_id",
-          "agent_id",
-          "name",
-          "runtime",
-          "role",
-          "scope",
-          "owner",
-          "purpose"
-        ],
-        "supported_roles": [
-          "model_card_reviewer",
-          "evaluation_reviewer",
-          "fairness_reviewer",
-          "explainability_reviewer",
-          "promotion_reviewer",
-          "deployment_reviewer",
-          "drift_reviewer",
-          "rollback_reviewer",
-          "retirement_reviewer",
-          "model_steward"
-        ],
-        "supported_runtimes": [
-          "codex",
-          "claude_code",
-          "opencode",
-          "pi"
-        ]
-      },
       "configuration": {
         "adapters": {
           "ai_core": "aicr",
@@ -2010,36 +1893,7 @@
         "aicr",
         "moni",
         "audl"
-      ],
-      "streaming": {
-        "broker_core_dependency_allowed": false,
-        "engine": "bytewax",
-        "lifecycle_stream": "mlcm.lifecycle",
-        "required_operations": [
-          "model_batch",
-          "version_batch",
-          "evaluation_batch",
-          "promotion_batch",
-          "deployment_batch",
-          "drift_batch",
-          "rollback_batch",
-          "retirement_batch",
-          "model_lifecycle_agent_batch"
-        ],
-        "required_processor": "bytewax",
-        "topics": [
-          "mlcm.models",
-          "mlcm.versions",
-          "mlcm.evaluations",
-          "mlcm.promotions",
-          "mlcm.deployments",
-          "mlcm.drift",
-          "mlcm.rollbacks",
-          "mlcm.retirements",
-          "mlcm.agents"
-        ],
-        "watermark": "event_time"
-      }
+      ]
     }
   },
   "deployment": {
@@ -2051,7 +1905,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 3,
       "kind": "capability",
       "nodes": 1
     },

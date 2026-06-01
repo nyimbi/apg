@@ -119,20 +119,41 @@ class MlcmService:
 		self._require_tenant(tenant_id)
 		model = self._require_model(model_id, tenant_id)
 		model.updated_at = utc_now_iso()
+		stage_value = normalize_stage(stage)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "create_version",
+			"model_registered": True,
+			"artifact_uri_present": bool(str(artifact_uri or "").strip()),
+			"training_data_ref_present": bool(str(training_data_ref or "").strip()),
+			"baseline_ref_present": bool(str(baseline_ref or "").strip()),
+			"non_dev_stage": stage_value != "dev",
+			"model_card_present": bool(model_card),
+		})
+		self._raise_if_denied(result)
 		version_record = ModelVersion(
 			id=version_id,
 			tenant_id=tenant_id,
 			model_id=model.id,
 			version=version,
 			artifact_uri=artifact_uri,
-			stage=normalize_stage(stage),
+			stage=stage_value,
+			status="pending_review" if result["decision"] == "require_review" else "candidate",
 			model_card=dict(model_card or {}),
 			training_data_ref=training_data_ref,
 			baseline_ref=baseline_ref,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
 			metadata=dict(metadata or {}),
 		)
 		self._versions[version_record.id] = version_record
-		self._audit(tenant_id, "model_version_created", version_record.id, f"Created version {version}")
+		self._audit(
+			tenant_id,
+			"model_version_created",
+			version_record.id,
+			f"Created version {version}",
+			metadata={"decision": result["decision"], "matched_rules": result["matched_rules"]},
+		)
 		return version_record.to_dict()
 
 	def record_evaluation(
@@ -145,10 +166,23 @@ class MlcmService:
 		metrics: dict[str, float] | None = None,
 		evidence_refs: list[str] | None = None,
 		evaluator: str = "",
+		fairness_review_recorded: bool = False,
+		explainability_recorded: bool = False,
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		version = self._require_version(version_id, tenant_id)
+		model = self._require_model(version.model_id, tenant_id)
 		normalized_score = normalize_score(score)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "record_evaluation",
+			"baseline_ref_present": bool(str(baseline_ref or "").strip()),
+			"evidence_refs_present": bool(evidence_refs),
+			"risk_level": model.risk_level,
+			"fairness_review_recorded": bool(fairness_review_recorded),
+			"explainability_recorded": bool(explainability_recorded),
+		})
+		self._raise_if_denied(result)
 		evaluation = EvaluationRun(
 			id=evaluation_id,
 			tenant_id=tenant_id,
@@ -157,16 +191,29 @@ class MlcmService:
 			score=normalized_score,
 			baseline_ref=baseline_ref,
 			metrics=dict(metrics or {}),
-			status=evaluation_status(normalized_score, self.minimum_eval_score),
+			status="pending_review" if result["decision"] == "require_review" else evaluation_status(normalized_score, self.minimum_eval_score),
 			evidence_refs=list(evidence_refs or []),
 			evaluator=evaluator,
+			fairness_review_recorded=bool(fairness_review_recorded),
+			explainability_recorded=bool(explainability_recorded),
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
 		)
 		self._evaluations[evaluation.id] = evaluation
 		version.evaluation_score = normalized_score
 		version.evaluation_id = evaluation.id
 		version.baseline_ref = baseline_ref or version.baseline_ref
-		version.status = "candidate" if evaluation.status == "passed" else "needs_improvement"
-		self._audit(tenant_id, "model_evaluated", evaluation.id, f"Recorded evaluation score {normalized_score:.3f}")
+		if evaluation.status == "pending_review":
+			version.status = "pending_review"
+		else:
+			version.status = "candidate" if evaluation.status == "passed" else "needs_improvement"
+		self._audit(
+			tenant_id,
+			"model_evaluated",
+			evaluation.id,
+			f"Recorded evaluation score {normalized_score:.3f}",
+			metadata={"decision": result["decision"], "matched_rules": result["matched_rules"]},
+		)
 		return evaluation.to_dict()
 
 	def request_promotion(
@@ -594,11 +641,13 @@ class MlcmService:
 			"tenant_id": tenant_id,
 			"model_count": len(models),
 			"version_count": len(versions),
+			"pending_version_review_count": sum(1 for item in versions if item.status == "pending_review"),
 			"deployment_count": len(deployments),
 			"serving_count": sum(1 for item in deployments if item.status == "serving"),
 			"retired_model_count": sum(1 for item in models if item.status == "retired"),
 			"production_version_count": sum(1 for item in versions if item.stage == "production"),
 			"pending_promotion_count": sum(1 for item in promotions if item.status == "blocked"),
+			"pending_evaluation_review_count": sum(1 for item in self._evaluations.values() if item.tenant_id == tenant_id and item.status == "pending_review"),
 			"unresolved_drift_count": sum(1 for item in drift if item.drift_detected and not item.review_recorded),
 			"model_lifecycle_agent_count": len(agents),
 			"pending_agent_review_count": sum(1 for item in agents if item.status == "pending_review"),

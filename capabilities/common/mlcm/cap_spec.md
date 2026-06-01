@@ -29,6 +29,12 @@ lifecycle batch -> audit`
 
 ## Guardrail Additions
 
+- Version lineage enforcement: missing artifacts and non-development model-card
+  gaps are denied; missing training or baseline lineage becomes pending-review
+  evidence with matched rule names.
+- Evaluation evidence enforcement: missing baselines are denied; missing
+  evidence, fairness review, or explainability review becomes pending-review
+  evidence with matched rule names.
 - Model lifecycle-agent runtime, role, scope, owner, purpose, contribution
   disclosure, and privileged approval status.
 - Bytewax lifecycle batch processing for model, version, evaluation, promotion,

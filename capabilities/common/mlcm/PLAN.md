@@ -13,10 +13,13 @@
 4. Extend runtime records and service behavior only where the lifecycle packet
    needs executable support.
    - Add model lifecycle agent registration and lifecycle-batch validation.
+   - Enforce version lineage and evaluation evidence guardrails in the service
+     path, preserving matched policy rules for UI review queues.
 5. Refresh API helpers and UI view models so generated applications can compose
    the capability.
    - Add API/view coverage for model lifecycle agent rosters and Bytewax batch
      monitors.
+   - Add view coverage for pending version and evaluation review queues.
 6. Replace static package evidence with dynamic contract-derived evidence.
 7. Update focused tests for contract, rules, service lifecycle, guardrails,
    generated-app views, package evidence, and compatibility behavior.
@@ -36,6 +39,10 @@
 - `MlcmService` remains dependency-light and tenant-scoped.
 - Retirement and rollback behavior does not permit cross-model or serving-risk
   violations.
+- Version creation denies missing artifacts and production model-card gaps,
+  while incomplete lineage becomes review evidence instead of silent success.
+- Evaluation recording denies missing baselines and marks high-risk or
+  evidence-incomplete evaluations as pending review.
 - `app.py` builds semantic evidence from the live contract.
 - Tests do not require full repository execution.
 

@@ -200,6 +200,8 @@ def test_mlcm_lifecycle_is_executable():
 		metrics={"auc": 0.94, "precision": 0.87},
 		evidence_refs=["report:eval-fraud-v1"],
 		evaluator="ml-quality",
+		fairness_review_recorded=True,
+		explainability_recorded=True,
 	)
 	promotion = service.request_promotion(
 		request_id="promote-fraud-v1-prod",
@@ -267,6 +269,8 @@ def test_mlcm_lifecycle_is_executable():
 	summary = service.dashboard_summary(tenant_id)
 	assert summary["model_count"] == 1
 	assert summary["production_version_count"] == 1
+	assert summary["pending_version_review_count"] == 0
+	assert summary["pending_evaluation_review_count"] == 0
 	assert summary["serving_count"] == 1
 	assert summary["unresolved_drift_count"] == 0
 	assert summary["model_lifecycle_agent_count"] == 1
@@ -285,6 +289,95 @@ def test_mlcm_lifecycle_is_executable():
 	assert lifecycle_batch_model(service, tenant_id)["batches"][0]["id"] == "mlcm-batch-1"
 	assert audit_timeline_model(service, tenant_id)["audit_events"]
 	assert governance_model(service, tenant_id)["audit_events"]
+
+
+def test_mlcm_version_and_evaluation_review_evidence_is_executable():
+	service = MlcmService()
+	tenant_id = "tenant-release-evidence"
+	service.register_model(
+		model_id="release-model",
+		tenant_id=tenant_id,
+		name="Release Model",
+		owner="ml-release",
+		problem_type="classification",
+		risk_level="high",
+	)
+
+	with pytest.raises(PermissionError, match="artifact_uri_required"):
+		service.create_version(
+			version_id="release-v0",
+			tenant_id=tenant_id,
+			model_id="release-model",
+			version="0.0.1",
+			artifact_uri="",
+		)
+	with pytest.raises(PermissionError, match="model_card_required"):
+		service.create_version(
+			version_id="release-prod-no-card",
+			tenant_id=tenant_id,
+			model_id="release-model",
+			version="1.0.0",
+			artifact_uri="s3://models/release/1.0.0/model.pkl",
+			stage="production",
+		)
+
+	pending_version = service.create_version(
+		version_id="release-v1",
+		tenant_id=tenant_id,
+		model_id="release-model",
+		version="1.0.0",
+		artifact_uri="s3://models/release/1.0.0/model.pkl",
+		model_card={
+			"purpose": "classify release risk",
+			"owner": "ml-release",
+			"training_data": "release-2026",
+			"limitations": "requires monitored drift",
+		},
+	)
+	with pytest.raises(PermissionError, match="evaluation_baseline_required"):
+		service.record_evaluation(
+			evaluation_id="release-eval-no-baseline",
+			tenant_id=tenant_id,
+			version_id=pending_version["id"],
+			score=0.91,
+			baseline_ref="",
+		)
+	pending_evaluation = service.record_evaluation(
+		evaluation_id="release-eval-review",
+		tenant_id=tenant_id,
+		version_id=pending_version["id"],
+		score=0.91,
+		baseline_ref="baseline:release",
+		evidence_refs=[],
+	)
+	approved_evaluation = service.record_evaluation(
+		evaluation_id="release-eval-approved",
+		tenant_id=tenant_id,
+		version_id=pending_version["id"],
+		score=0.92,
+		baseline_ref="baseline:release",
+		evidence_refs=["report:release"],
+		fairness_review_recorded=True,
+		explainability_recorded=True,
+	)
+
+	assert pending_version["status"] == "pending_review"
+	assert set(pending_version["matched_rules"]) == {
+		"version_creation_requires_training_data",
+		"version_creation_requires_baseline",
+	}
+	assert pending_evaluation["status"] == "pending_review"
+	assert set(pending_evaluation["matched_rules"]) == {
+		"evaluation_requires_evidence",
+		"high_risk_evaluation_requires_fairness_review",
+		"high_risk_evaluation_requires_explainability",
+	}
+	assert approved_evaluation["status"] == "passed"
+	assert approved_evaluation["decision"] == "allow"
+	assert service.dashboard_summary(tenant_id)["pending_evaluation_review_count"] == 1
+	assert service.dashboard_summary(tenant_id)["pending_version_review_count"] == 0
+	assert version_manager_model(service, tenant_id)["pending_review"] == []
+	assert evaluation_console_model(service, tenant_id)["pending_review"][0]["id"] == "release-eval-review"
 
 
 def test_mlcm_service_enforces_policy_guardrails():

@@ -23625,3 +23625,75 @@ Known gaps:
   checks during this battery-conscious capability slice.
 - Existing SQLAlchemy and Pydantic deprecation warnings surfaced by focused
   tests remain outside this slice.
+
+### 2026-06-01 03:18 EAT
+
+MLCM version lineage and evaluation review lifecycle slice:
+
+- Made existing MLCM version-lineage rules executable in `MlcmService`.
+  Version creation now denies missing artifacts and non-development versions
+  without model cards.
+- Added pending-review version evidence when training data or baseline lineage
+  is incomplete, preserving `decision` and `matched_rules` on model-version
+  records.
+- Made existing evaluation evidence rules executable. Evaluation recording now
+  denies missing baselines and records pending-review evaluations when evidence
+  references, fairness review, or explainability review are missing.
+- Added `decision`, `matched_rules`, fairness-review, and explainability-review
+  fields to evaluation records so generated apps can compose review queues
+  directly from service state.
+- Surfaced pending version and evaluation review queues in view models and
+  added pending review counts to dashboard summaries.
+- Updated API helpers, `SPECIFICATION.md`, `PLAN.md`, `README.md`,
+  `cap_spec.md`, package evidence, and registration metadata to describe the
+  executable release-evidence guardrails.
+- Extended the capability materializer so generated semantic evidence includes
+  model-lifecycle-specific first-class agent metadata for MLCM packages.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/mlcm/__init__.py capabilities/common/mlcm/capability_contract.py capabilities/common/mlcm/models.py capabilities/common/mlcm/lifecycle_runtime.py capabilities/common/mlcm/service.py capabilities/common/mlcm/api.py capabilities/common/mlcm/views.py capabilities/common/mlcm/app.py capabilities/common/mlcm/test_capability_contract.py capabilities/common/mlcm/tests/test_package_contract.py compiler/capability_materializer.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/mlcm/test_capability_contract.py capabilities/common/mlcm/tests/test_package_contract.py`
+  passed with 12 tests and 10 pre-existing dependency deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.mlcm import app; r=app.self_test(); print(r); assert r['passed']"`
+  passed.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/mlcm --json`
+  passed with one domain-specific MLCM implementation, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/mlcm --json`
+  passed and showed 43 rules, 15 routes, Bytewax streaming, first-class model
+  lifecycle agents, and model-lifecycle package evidence.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/common/mlcm --json`
+  passed with one complete lifecycle record, 43 rules, 15 routes, and 0
+  warnings/errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 109 operable contracts, 109 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- `./.venv/bin/apg tooling audit --json` passed all 21 tooling surfaces.
+- `git diff --check -- capabilities/common/mlcm compiler/capability_materializer.py docs/progress_log.md`
+  passed.
+
+Code review:
+
+- Reviewed denial behavior: missing artifacts, non-development model-card gaps,
+  and missing evaluation baselines now fail before records are accepted.
+- Reviewed review behavior: incomplete training/baseline lineage and high-risk
+  evaluation evidence gaps become auditable `pending_review` records rather
+  than silent success.
+- Reviewed tenant boundaries: model, version, and evaluation lookups still use
+  existing tenant-scoped require helpers before mutating records.
+- Reviewed generated evidence: MLCM package semantic evidence now preserves
+  runtime adapter names, first-class agent metadata, and model lifecycle agent
+  evidence expected by package tests.
+- Kept the lifecycle dependency-light and provider-neutral; live model
+  providers, artifact stores, metrics sinks, and Bytewax execution remain
+  adapter concerns.
+
+Known gaps:
+
+- Did not run the full repository test suite, rendered UI checks, live model
+  providers, durable artifact stores, live metrics sinks, live Bytewax topology,
+  or performance/load checks during this battery-conscious capability slice.
+- Existing SQLAlchemy and Pydantic deprecation warnings surfaced by focused
+  tests remain outside this slice.

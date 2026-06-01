@@ -13,9 +13,11 @@ The coherent lifecycle packet is:
 
 1. Register a model with tenant, owner, problem type, risk level, and metadata.
 2. Create model versions with artifact, model card, training data, and baseline
-   lineage.
+   lineage; missing training or baseline lineage is recorded as review-required
+   evidence, while missing artifacts or non-development model cards are denied.
 3. Record evaluation evidence and score the version against the configured
-   release threshold.
+   release threshold; high-risk models require fairness and explainability
+   review evidence before the evaluation is treated as fully passed.
 4. Request promotion through dev, staging, and production gates.
 5. Create deployment targets and deploy approved versions.
 6. Register first-class model lifecycle agents for model-card, evaluation,
@@ -54,6 +56,9 @@ The coherent lifecycle packet is:
   model lifecycle agents, lifecycle batches, and audit events.
 - Service methods must raise `PermissionError` for policy denials and
   `LookupError` for missing tenant-scoped records.
+- Version and evaluation methods must preserve rule decisions and matched rules
+  on their records so generated applications can render review queues without
+  replaying the policy engine.
 - Summary and list calls must remain tenant-scoped.
 - Compatibility calls `create_record()` and `list_records()` must continue to
   map to model registry behavior for older package callers.
@@ -69,6 +74,18 @@ impact review, deployment drain, cross-tenant access, audit evidence, model
 lifecycle agent runtime/role/scope/owner/purpose/disclosure/approval, Bytewax
 streaming, lifecycle batch processing, release lineage, and critical-risk human
 review.
+
+Executable guardrail behavior:
+
+- `create_version()` denies missing artifacts and non-development versions
+  without model cards.
+- `create_version()` records `pending_review` version state when training data
+  or baseline lineage is incomplete.
+- `record_evaluation()` denies missing evaluation baselines.
+- `record_evaluation()` records `pending_review` evaluation state when evidence
+  references, fairness review, or explainability review are missing.
+- Dashboard and UI models expose pending version and evaluation review counts
+  for immediate operator action.
 
 ## First-Class Model Lifecycle Agents
 

@@ -435,6 +435,15 @@ def _semantic_model_data(
 			"supported_runtimes": list(agents.get("supported_runtimes", [])),
 			"guardrails": list(agents.get("guardrails", [])),
 		}
+	model_lifecycle = {}
+	if "model_lifecycle_agent_composition" in provides:
+		model_lifecycle = {
+			"first_class": agents.get("first_class") is True,
+			"model_lifecycle_agent": "ModelLifecycleAgentRecord",
+			"adapter_contract": agents.get("adapter_contract"),
+			"supported_runtimes": list(agents.get("supported_runtimes", [])),
+			"guardrails": list(agents.get("guardrails", [])),
+		}
 	return {
 		"format": "apg.semantic-model.v1",
 		"ok": True,
@@ -479,6 +488,7 @@ def _semantic_model_data(
 				"runtime": runtime,
 				"agents": agents,
 				"ai_control_lifecycle": ai_control_lifecycle,
+				"model_lifecycle": model_lifecycle,
 				"erp_modules": [_category(record.path)],
 				"components": {},
 				"business_rules": [],

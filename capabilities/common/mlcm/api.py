@@ -65,6 +65,8 @@ def record_evaluation(payload: dict[str, Any]) -> dict[str, Any]:
 		metrics=dict(payload.get("metrics") or {}),
 		evidence_refs=list(payload.get("evidence_refs") or []),
 		evaluator=str(payload.get("evaluator") or ""),
+		fairness_review_recorded=bool(payload.get("fairness_review_recorded", False)),
+		explainability_recorded=bool(payload.get("explainability_recorded", False)),
 	)
 
 
