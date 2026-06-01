@@ -16,6 +16,64 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-06-01 07:30 EAT
+
+SECU durable review-evidence packet:
+
+- Extended policy exceptions, compliance evidence gaps, privileged security
+  agents, security lifecycle batch evidence, and security audit events with
+  durable policy evidence: policy decision, matched rules, review reasons, and
+  review evidence.
+- Added contract-level `review_evidence` metadata and exposed it through
+  registration metadata, API helpers, view models, semantic model, package
+  tests, and app self-test.
+- Preserved privileged security agents without human approval as
+  `pending_review` records instead of discarding registration evidence.
+- Preserved denied non-Bytewax security lifecycle batch validations as
+  `denied` evidence before raising `PermissionError`.
+- Added pending-review queue composition for policy exceptions, compliance
+  controls, security agents, and security lifecycle batches.
+- Kept SECU security agents provider-neutral for Codex, Claude Code, OpenCode,
+  Pi, and future security operations runtimes while retaining human approval
+  controls for privileged roles and Bytewax-first lifecycle processing.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for SECU package init,
+  security runtime, service, API helpers, views, contract, app, and focused
+  tests passed.
+- `./.venv/bin/pytest -q capabilities/common/secu/tests/test_capability_contract.py
+  capabilities/common/secu/tests/test_package_contract.py` passed with 16 tests
+  and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.secu import app; ..."`
+  passed package self-test.
+- `./.venv/bin/python -m json.tool
+  capabilities/common/secu/semantic_model.json` passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/secu --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/secu --strict --json` passed with no warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/secu --json`
+  passed with no warnings and side-effect-free publish planning.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/common/secu --json` passed with complete lifecycle evidence and
+  14 rules.
+- SECU stale-marker scan returned no TODO/FIXME/stub/placeholder, Kafka,
+  materialized-baseline, contract-only, or not-implemented markers across the
+  edited SECU packet.
+- Service smoke executed compliance gap review evidence, privileged
+  security-agent review evidence, accepted Bytewax batch evidence, and denied
+  non-Bytewax batch persistence, printing `require_review pending_review
+  require_review accepted denied bytewax_security_stream_required 2`.
+
+Known gaps:
+
+- Full repository tests, rendered security UI, live SIEM, EDR/MDM, SOAR, DLP,
+  GRC, IAM, AI threat-detection providers, live Bytewax workers, production
+  persistence and migrations, and load checks still need later verification
+  outside this battery-conscious slice.
+
 ### 2026-06-01 07:18 EAT
 
 AUTH durable review-evidence packet:

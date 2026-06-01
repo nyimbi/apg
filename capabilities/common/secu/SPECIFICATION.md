@@ -25,6 +25,9 @@ Those systems are adapters behind the package contract.
 - Register AI security agents for risk review, threat triage, incident
   response, compliance review, and exception review.
 - Validate security lifecycle batch intent against the Bytewax lifecycle stream.
+- Preserve durable review evidence for policy exceptions, compliance evidence
+  gaps, privileged security-agent review, denied lifecycle batch routing, and
+  audit events.
 - Expose API helpers, view models, UI routes, theme components, rules,
   semantic evidence, and focused tests for APG composition.
 
@@ -104,6 +107,30 @@ Required evidence:
 - `human_approval_required`
 - `policy_ref`
 
+### Security Lifecycle Batch Evidence
+
+Accepted and denied batch lifecycle validations are durable records.
+
+Required evidence:
+
+- `id`
+- `tenant_id`
+- `event_stream`
+- `mutation_count`
+- `status`
+- `processor`
+- `policy_decision`
+- `matched_rules`
+- `review_reasons`
+- `review_evidence`
+
+Reviewable records expose a consistent evidence shape:
+
+- `policy_decision`
+- `matched_rules`
+- `review_reasons`
+- `review_evidence`
+
 ## Lifecycle Requirements
 
 ### Policy And Posture
@@ -137,8 +164,10 @@ Required evidence:
 - Incidents and containment emit security audit events.
 - Security agents require supported runtime, supported role, explicit scope,
   owner, purpose, and contribution disclosure.
-- Privileged security-agent roles require human approval.
-- Security lifecycle batch operations require the Bytewax stream.
+- Privileged security-agent roles without human approval are retained as
+  `pending_review` evidence.
+- Security lifecycle batch operations require the Bytewax stream and denied
+  validations persist evidence before raising.
 
 ## Rules
 
@@ -158,6 +187,11 @@ The deterministic rule engine must enforce at least:
 - `security_agent_requires_scope`
 - `security_agent_privileged_role_requires_human_approval`
 - `bytewax_security_stream_required`
+
+The capability contract must publish `review_evidence` metadata naming durable
+statuses, policy fields, pending queues, and denied batch behavior. Pending
+queues include policy exceptions, compliance controls, security agents, and
+security lifecycle batches.
 
 ## UI Surfaces
 
@@ -189,8 +223,10 @@ Production adapters must preserve the same guardrails:
 - Do not approve policy exceptions without independent review.
 - Do not resolve critical incidents without containment evidence.
 - Do not satisfy compliance controls without audit evidence.
-- Do not allow privileged security-agent actions without human approval.
-- Do not route security lifecycle batches outside Bytewax.
+- Do not allow privileged security-agent actions without human approval or
+  durable pending review.
+- Do not route security lifecycle batches outside Bytewax; denied attempts must
+  preserve evidence.
 
 ## Focused Proof
 

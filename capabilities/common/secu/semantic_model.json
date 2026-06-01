@@ -185,13 +185,39 @@
         "security_policies",
         "compliance_automation",
         "incident_response_governance",
-        "security_agents"
+        "security_agents",
+        "review_evidence"
       ],
       "requires": [
         "auth",
         "conf",
         "audl"
       ],
+      "review_evidence": {
+        "deny_behavior": "Denied security lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "pending",
+          "pending_review",
+          "evidence_required",
+          "non_compliant",
+          "denied",
+          "approved",
+          "rejected",
+          "accepted"
+        ],
+        "pending_queues": [
+          "policy_exceptions",
+          "compliance_controls",
+          "security_agents",
+          "security_lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "review_evidence"
+        ]
+      },
       "rule_engine": {
         "rules": [
           {
@@ -354,9 +380,9 @@
               "human_approval_required": false,
               "operation": "register_security_agent"
             },
-            "description": "Privileged SECU agent roles require human approval.",
+            "description": "Privileged SECU agent roles require human approval evidence or review.",
             "effect": {
-              "decision": "deny",
+              "decision": "require_review",
               "reason": "security_agent_human_approval_required",
               "required_action": "enable_human_approval_for_privileged_security_agent"
             },
@@ -539,9 +565,9 @@
             "human_approval_required": false,
             "operation": "register_security_agent"
           },
-          "description": "Privileged SECU agent roles require human approval.",
+          "description": "Privileged SECU agent roles require human approval evidence or review.",
           "effect": {
-            "decision": "deny",
+            "decision": "require_review",
             "reason": "security_agent_human_approval_required",
             "required_action": "enable_human_approval_for_privileged_security_agent"
           },
@@ -964,13 +990,39 @@
         "security_policies",
         "compliance_automation",
         "incident_response_governance",
-        "security_agents"
+        "security_agents",
+        "review_evidence"
       ],
       "requires": [
         "auth",
         "conf",
         "audl"
-      ]
+      ],
+      "review_evidence": {
+        "deny_behavior": "Denied security lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "pending",
+          "pending_review",
+          "evidence_required",
+          "non_compliant",
+          "denied",
+          "approved",
+          "rejected",
+          "accepted"
+        ],
+        "pending_queues": [
+          "policy_exceptions",
+          "compliance_controls",
+          "security_agents",
+          "security_lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "review_evidence"
+        ]
+      }
     }
   },
   "deployment": {
@@ -1137,9 +1189,9 @@
         "human_approval_required": false,
         "operation": "register_security_agent"
       },
-      "description": "Privileged SECU agent roles require human approval.",
+      "description": "Privileged SECU agent roles require human approval evidence or review.",
       "effect": {
-        "decision": "deny",
+        "decision": "require_review",
         "reason": "security_agent_human_approval_required",
         "required_action": "enable_human_approval_for_privileged_security_agent"
       },

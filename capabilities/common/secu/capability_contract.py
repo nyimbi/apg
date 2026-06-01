@@ -149,6 +149,8 @@ class CapabilityRuleEngine:
 					decision = "quarantine"
 				elif rule.effect.get("decision") == "challenge" and decision == "allow":
 					decision = "challenge"
+				elif rule.effect.get("decision") == "require_review" and decision == "allow":
+					decision = "require_review"
 
 		return {
 			"decision": decision,
@@ -363,14 +365,14 @@ def default_rules() -> list[CapabilityRule]:
 		),
 		CapabilityRule(
 			name="security_agent_privileged_role_requires_human_approval",
-			description="Privileged SECU agent roles require human approval.",
+			description="Privileged SECU agent roles require human approval evidence or review.",
 			condition={
 				"operation": "register_security_agent",
 				"agent_privileged_role": True,
 				"human_approval_required": False
 			},
 			effect={
-				"decision": "deny",
+				"decision": "require_review",
 				"reason": "security_agent_human_approval_required",
 				"required_action": "enable_human_approval_for_privileged_security_agent"
 			}
@@ -488,7 +490,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"security_policies",
 			"compliance_automation",
 			"incident_response_governance",
-			"security_agents"
+			"security_agents",
+			"review_evidence"
 		],
 		"requires": ["auth", "conf", "audl"],
 		"configuration": config.for_tenant(tenant_id, overrides),
@@ -504,7 +507,22 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"components": theme.components
 		},
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest()
+		"streaming": streaming_manifest(),
+		"review_evidence": {
+			"durable_statuses": [
+				"pending",
+				"pending_review",
+				"evidence_required",
+				"non_compliant",
+				"denied",
+				"approved",
+				"rejected",
+				"accepted",
+			],
+			"policy_fields": ["policy_decision", "matched_rules", "review_reasons", "review_evidence"],
+			"pending_queues": ["policy_exceptions", "compliance_controls", "security_agents", "security_lifecycle_batches"],
+			"deny_behavior": "Denied security lifecycle batches persist evidence before PermissionError",
+		}
 	}
 
 

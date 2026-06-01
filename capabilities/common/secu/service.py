@@ -1108,6 +1108,7 @@ class SecuService:
 			SecurityAuditEventRecord,
 			SecurityAgentRecord,
 			SecurityIncidentRecord,
+			SecurityLifecycleBatchRecord,
 			SecurityPolicyRecord,
 			ThreatIndicatorRecord,
 			clamp_score,
@@ -1135,6 +1136,7 @@ class SecuService:
 			"SecurityAuditEventRecord": SecurityAuditEventRecord,
 			"SecurityAgentRecord": SecurityAgentRecord,
 			"SecurityIncidentRecord": SecurityIncidentRecord,
+			"SecurityLifecycleBatchRecord": SecurityLifecycleBatchRecord,
 			"SecurityPolicyRecord": SecurityPolicyRecord,
 			"ThreatIndicatorRecord": ThreatIndicatorRecord,
 		}
@@ -1158,6 +1160,7 @@ class SecuService:
 		self.policy_exceptions: dict[str, Any] = {}
 		self.incidents: dict[str, Any] = {}
 		self.security_agents: dict[str, Any] = {}
+		self.security_lifecycle_batches: dict[str, Any] = {}
 		self.audit_events: dict[str, Any] = {}
 
 	def describe(self, tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -1339,6 +1342,11 @@ class SecuService:
 			raise ValueError("control_owner_required")
 		evidence_attached = bool(str(evidence_ref or "").strip())
 		status = self._helpers["control_status"](bool(compliant), evidence_attached, waived)
+		policy_result = (
+			_review_result("compliance_evidence_required", "attach_audit_evidence")
+			if status in {"evidence_required", "non_compliant"}
+			else _allow_result()
+		)
 		record_cls = self._records["ComplianceControlRecord"]
 		record = record_cls(
 			id=self._helpers["stable_id"]("secu_control", tenant_id, framework, control_id),
@@ -1350,10 +1358,22 @@ class SecuService:
 			compliant=bool(compliant),
 			audit_evidence_attached=evidence_attached,
 			evidence_ref=evidence_ref,
+			policy_decision=policy_result["decision"],
+			matched_rules=list(policy_result["matched_rules"]),
+			review_reasons=self._reasons(policy_result),
+			review_evidence=self._review_evidence(policy_result, review_recorded=evidence_attached),
 		)
 		self.controls[record.id] = record
 		if status in {"evidence_required", "non_compliant"}:
-			self._record_event(tenant_id, "compliance_gap_recorded", record.id, f"Compliance control requires action: {control_id}", owner, "medium")
+			self._record_event(
+				tenant_id,
+				"compliance_gap_recorded",
+				record.id,
+				f"Compliance control requires action: {control_id}",
+				owner,
+				"medium",
+				policy_result=policy_result,
+			)
 		return record.to_dict()
 
 	def request_policy_exception(
@@ -1383,6 +1403,7 @@ class SecuService:
 		record_id = self._helpers["stable_id"]("secu_exception", tenant_id, exception_id)
 		if record_id in self.policy_exceptions:
 			raise ValueError(f"policy_exception_already_exists:{exception_id}")
+		policy_result = _review_result("policy_exception_review_required", "review_policy_exception")
 		record_cls = self._records["PolicyExceptionRecord"]
 		record = record_cls(
 			id=record_id,
@@ -1391,9 +1412,21 @@ class SecuService:
 			requested_by=requested_by,
 			reason=reason,
 			expires_at=expires_at,
+			policy_decision=policy_result["decision"],
+			matched_rules=list(policy_result["matched_rules"]),
+			review_reasons=self._reasons(policy_result),
+			review_evidence=self._review_evidence(policy_result),
 		)
 		self.policy_exceptions[record.id] = record
-		self._record_event(tenant_id, "policy_exception_requested", record.id, f"Policy exception requested: {policy_id}", requested_by, "medium")
+		self._record_event(
+			tenant_id,
+			"policy_exception_requested",
+			record.id,
+			f"Policy exception requested: {policy_id}",
+			requested_by,
+			"medium",
+			policy_result=policy_result,
+		)
 		return record.to_dict()
 
 	def decide_policy_exception(
@@ -1433,10 +1466,22 @@ class SecuService:
 			decision=decision,
 			reviewer=reviewer,
 			notes=notes,
+			policy_decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._reasons(result),
+			review_evidence=self._review_evidence(result, review_recorded=True),
 			created_at=record.created_at,
 		)
 		self.policy_exceptions[record.id] = decided
-		self._record_event(tenant_id, "policy_exception_decided", record.id, f"Policy exception {decision}: {record.policy_id}", reviewer, "medium")
+		self._record_event(
+			tenant_id,
+			"policy_exception_decided",
+			record.id,
+			f"Policy exception {decision}: {record.policy_id}",
+			reviewer,
+			"medium",
+			policy_result=result,
+		)
 		return decided.to_dict()
 
 	def open_incident(
@@ -1617,7 +1662,11 @@ class SecuService:
 			contribution_disclosed=bool(contribution_disclosed),
 			human_approval_required=bool(human_approval_required),
 			policy_ref=policy_ref,
-			status=str(status or "active"),
+			status="pending_review" if result["decision"] == "require_review" else str(status or "active"),
+			policy_decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._reasons(result),
+			review_evidence=self._review_evidence(result, review_recorded=bool(human_approval_required)),
 		)
 		self.security_agents[record.id] = record
 		self._record_event(
@@ -1627,6 +1676,7 @@ class SecuService:
 			f"Security agent registered: {name}",
 			owner,
 			"medium" if normalized_role in self._privileged_agent_roles else "info",
+			policy_result=result,
 		)
 		return record.to_dict()
 
@@ -1638,21 +1688,47 @@ class SecuService:
 	) -> dict[str, Any]:
 		"""Validate security batch lifecycle intent before routing to Bytewax."""
 		self._require_tenant(tenant_id)
+		if int(mutation_count) < 1:
+			raise ValueError("security_lifecycle_batch_empty")
 		normalized_stream = self._normalize_agent_token(event_stream)
 		result = self.evaluate({
 			"operation": "security_lifecycle_batch",
 			"event_stream": normalized_stream,
 			"mutation_count": int(mutation_count),
 		})
+		record_cls = self._records["SecurityLifecycleBatchRecord"]
+		record = record_cls(
+			id=self._helpers["stable_id"]("secu_batch", tenant_id, normalized_stream, len(self.security_lifecycle_batches)),
+			tenant_id=tenant_id,
+			event_stream=normalized_stream,
+			mutation_count=int(mutation_count),
+			status="denied" if result["decision"] == "deny" else "accepted",
+			policy_decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._reasons(result),
+			review_evidence=self._review_evidence(result),
+		)
+		self.security_lifecycle_batches[record.id] = record
+		self._record_event(
+			tenant_id,
+			"security_lifecycle_batch_validated",
+			record.id,
+			f"Security lifecycle batch {record.status}: {normalized_stream}",
+			"system",
+			"medium" if record.status == "denied" else "info",
+			policy_result=result,
+		)
 		if result["decision"] == "deny":
 			raise PermissionError(self._first_reason(result))
-		return {
+		payload = record.to_dict()
+		payload.update({
 			"tenant_id": tenant_id,
 			"event_stream": normalized_stream,
 			"mutation_count": int(mutation_count),
 			"accepted": True,
 			"rule_result": result,
-		}
+		})
+		return payload
 
 	def create_record(
 		self,
@@ -1703,8 +1779,24 @@ class SecuService:
 	def list_security_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.security_agents, tenant_id)
 
+	def list_security_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.security_lifecycle_batches, tenant_id)
+
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.audit_events, tenant_id)
+
+	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		items = (
+			self.list_policy_exceptions(tenant_id)
+			+ self.list_controls(tenant_id)
+			+ self.list_security_agents(tenant_id)
+			+ self.list_security_lifecycle_batches(tenant_id)
+		)
+		return [
+			item
+			for item in items
+			if item.get("status") in {"pending", "pending_review", "review_required", "evidence_required", "non_compliant"}
+		]
 
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		"""Return a compact security-operations dashboard model."""
@@ -1722,8 +1814,13 @@ class SecuService:
 			"non_allow_decision_count": sum(1 for item in assessments if item["decision"] != "allow"),
 			"compliance_gap_count": sum(1 for item in controls if item["status"] in {"evidence_required", "non_compliant"}),
 			"policy_exception_count": len(self.list_policy_exceptions(tenant_id)),
+			"pending_policy_exception_count": sum(1 for item in self.list_policy_exceptions(tenant_id) if item["status"] == "pending"),
 			"open_incident_count": sum(1 for item in self.list_incidents(tenant_id) if item["status"] != "resolved"),
 			"security_agent_count": len(self.list_security_agents(tenant_id)),
+			"pending_security_agent_review_count": sum(1 for item in self.list_security_agents(tenant_id) if item["status"] == "pending_review"),
+			"security_lifecycle_batch_count": len(self.list_security_lifecycle_batches(tenant_id)),
+			"denied_security_lifecycle_batch_count": sum(1 for item in self.list_security_lifecycle_batches(tenant_id) if item["status"] == "denied"),
+			"pending_review_count": len(self.list_pending_reviews(tenant_id)),
 			"recent_events": self.list_audit_events(tenant_id)[-5:],
 		}
 
@@ -1753,7 +1850,9 @@ class SecuService:
 		message: str,
 		actor: str,
 		severity: str = "info",
+		policy_result: dict[str, Any] | None = None,
 	) -> dict[str, Any]:
+		policy_result = policy_result or _allow_result()
 		record_cls = self._records["SecurityAuditEventRecord"]
 		record = record_cls(
 			id=self._helpers["stable_id"]("secu_event", tenant_id, event_type, subject_id, len(self.audit_events)),
@@ -1763,6 +1862,10 @@ class SecuService:
 			message=message,
 			actor=actor,
 			severity=severity,
+			policy_decision=policy_result["decision"],
+			matched_rules=list(policy_result["matched_rules"]),
+			review_reasons=self._reasons(policy_result),
+			review_evidence=self._review_evidence(policy_result),
 		)
 		self.audit_events[record.id] = record
 		return record.to_dict()
@@ -1807,11 +1910,41 @@ class SecuService:
 				return str(action["reason"])
 		return "security_operation_denied"
 
+	def _reasons(self, result: dict[str, Any]) -> list[str]:
+		return [
+			str(action["reason"])
+			for action in result.get("actions", [])
+			if action.get("reason")
+		]
+
+	def _review_evidence(self, result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+		return {
+			"required_actions": [
+				str(action.get("required_action"))
+				for action in result.get("actions", [])
+				if action.get("required_action")
+			],
+			"reasons": self._reasons(result),
+			"review_recorded": bool(review_recorded),
+		}
+
 	def _list(self, records: dict[str, Any], tenant_id: str | None = None) -> list[dict[str, Any]]:
 		items = [record.to_dict() for record in records.values()]
 		if tenant_id is not None:
 			items = [item for item in items if item["tenant_id"] == tenant_id]
 		return sorted(items, key=lambda item: item["id"])
+
+
+def _allow_result() -> dict[str, Any]:
+	return {"decision": "allow", "matched_rules": [], "actions": []}
+
+
+def _review_result(reason: str, required_action: str) -> dict[str, Any]:
+	return {
+		"decision": "require_review",
+		"matched_rules": [],
+		"actions": [{"reason": reason, "required_action": required_action}],
+	}
 
 
 # Global service instance

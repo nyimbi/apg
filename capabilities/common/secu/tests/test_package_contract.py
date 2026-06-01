@@ -37,6 +37,8 @@ def test_contract_shape_is_valid():
 	assert contract["theme"]["tokens"]["border.radius"]
 	assert contract["agents"]["first_class"] is True
 	assert contract["streaming"]["engine"] == "bytewax"
+	assert "review_evidence" in contract["provides"]
+	assert contract["review_evidence"]["pending_queues"]
 
 
 def test_app_entrypoint_is_publishable():
@@ -58,6 +60,8 @@ def test_app_entrypoint_is_publishable():
 	assert capability["approvals"]["security_agent"] == "SecurityAgentRecord"
 	assert capability["agents"]["first_class"] is True
 	assert capability["streaming"]["engine"] == "bytewax"
+	assert "review_evidence" in capability["provides"]
+	assert capability["review_evidence"]["pending_queues"]
 	assert model["agents"]["secu_agent_contract"]["first_class"] is True
 
 
@@ -161,18 +165,23 @@ def test_security_lifecycle_records_governed_exception_incident_and_audit_state(
 	assert assessment["decision"] == "challenge"
 	assert assessment["required_actions"] == ["complete_security_challenge"]
 	assert control["status"] == "evidence_required"
+	assert control["policy_decision"] == "require_review"
 	assert approved["status"] == "approved"
+	assert approved["policy_decision"] == "allow"
 	assert resolved["status"] == "resolved"
 	assert agent["runtime"] == "claude_code"
 	assert agent["role"] == "incident_responder"
 	assert batch["event_stream"] == "bytewax"
 	assert batch["accepted"] is True
+	assert batch["status"] == "accepted"
 	assert summary["policy_count"] == 1
 	assert summary["assessment_count"] == 1
 	assert summary["compliance_gap_count"] == 1
 	assert summary["policy_exception_count"] == 1
 	assert summary["open_incident_count"] == 0
 	assert summary["security_agent_count"] == 1
+	assert summary["security_lifecycle_batch_count"] == 1
+	assert summary["pending_review_count"] == 1
 	assert {event["event_type"] for event in service.list_audit_events("tenant-a")} >= {
 		"policy_exception_requested",
 		"policy_exception_decided",
@@ -192,20 +201,29 @@ def test_rule_guardrails_deny_quarantine_and_require_tenant_context():
 		service.create_policy("tenant-a", "No owner", "")
 	with pytest.raises(ValueError, match="unsupported_device_trust:rooted"):
 		service.record_device_posture("tenant-a", "device-1", "user-1", trust_state="rooted")
-	with pytest.raises(PermissionError, match="security_agent_human_approval_required"):
-		service.register_security_agent(
-			"tenant-a",
-			"unapproved-agent",
-			"Unapproved Agent",
-			"codex",
-			"exception_reviewer",
-			"policy exception review",
-			"secops",
-			"review exceptions",
-			human_approval_required=False,
-		)
+	review_agent = service.register_security_agent(
+		"tenant-a",
+		"unapproved-agent",
+		"Unapproved Agent",
+		"codex",
+		"exception_reviewer",
+		"policy exception review",
+		"secops",
+		"review exceptions",
+		human_approval_required=False,
+	)
+	assert review_agent["status"] == "pending_review"
+	assert review_agent["policy_decision"] == "require_review"
+	assert review_agent["review_reasons"] == ["security_agent_human_approval_required"]
 	with pytest.raises(PermissionError, match="bytewax_security_stream_required"):
 		service.validate_security_lifecycle_batch("tenant-a", "memory", 1)
+	denied_batch = [
+		item for item in service.list_security_lifecycle_batches("tenant-a")
+		if item["status"] == "denied"
+	][0]
+	assert denied_batch["status"] == "denied"
+	assert denied_batch["policy_decision"] == "deny"
+	assert denied_batch["review_reasons"] == ["bytewax_security_stream_required"]
 
 	service.record_device_posture("tenant-a", "device-2", "user-1", trust_state="compromised")
 	quarantined = service.assess_access("tenant-a", "user-1", "user", 60, device_id="device-2")
@@ -429,9 +447,13 @@ def test_api_and_view_models_expose_security_posture_surfaces():
 	assert status["policy_exception_count"] == 2
 	assert status["open_incident_count"] == 1
 	assert status["security_agent_count"] == 1
+	assert status["pending_review_count"] == 1
 	assert posture["summary"]["active_threat_count"] == 1
 	assert posture["security_agents"][0]["id"] == agent["id"]
+	assert posture["security_lifecycle_batches"][0]["status"] == "accepted"
+	assert posture["pending_reviews"][0]["status"] == "pending"
 	assert dashboard["summary"]["assessment_count"] == 1
+	assert dashboard["review_evidence"]["deny_behavior"] == "Denied security lifecycle batches persist evidence before PermissionError"
 	assert risk["route"] == "/secu/risk"
 	assert threats["severity_filters"] == ["info", "low", "medium", "high", "critical"]
 	assert policies["security_levels"][-1] == "critical"
@@ -443,6 +465,8 @@ def test_api_and_view_models_expose_security_posture_surfaces():
 	assert agents["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
 	assert agents["agents"][0]["runtime"] == "opencode"
 	assert batch["accepted"] is True
+	assert batch["status"] == "accepted"
 	assert audit["events"]
-	assert rules["decision_order"] == ["deny", "quarantine", "challenge", "allow"]
+	assert rules["decision_order"] == ["deny", "quarantine", "challenge", "require_review", "allow"]
 	assert settings["theme"]["name"] == "secu_zero_trust"
+	assert settings["review_evidence"]["pending_queues"]

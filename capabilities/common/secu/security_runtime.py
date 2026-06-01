@@ -20,7 +20,8 @@ THREAT_SEVERITIES = {"info", "low", "medium", "high", "critical"}
 CONTROL_STATUSES = {"implemented", "evidence_required", "non_compliant", "waived"}
 EXCEPTION_STATUSES = {"pending", "approved", "rejected", "expired"}
 INCIDENT_STATUSES = {"open", "contained", "resolved"}
-SECU_AGENT_STATUSES = {"active", "suspended", "retired"}
+SECU_AGENT_STATUSES = {"active", "pending_review", "suspended", "retired"}
+SECURITY_BATCH_STATUSES = {"accepted", "denied"}
 
 
 def utc_now() -> str:
@@ -198,6 +199,10 @@ class ComplianceControlRecord:
 	compliant: bool
 	audit_evidence_attached: bool
 	evidence_ref: str | None = None
+	policy_decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	assessed_at: str = field(default_factory=utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -213,6 +218,10 @@ class SecurityAuditEventRecord:
 	message: str
 	actor: str
 	severity: str = "info"
+	policy_decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -231,6 +240,10 @@ class PolicyExceptionRecord:
 	decision: str = ""
 	reviewer: str = ""
 	notes: str = ""
+	policy_decision: str = "require_review"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=lambda: ["policy_exception_review_required"])
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -271,7 +284,29 @@ class SecurityAgentRecord:
 	human_approval_required: bool
 	policy_ref: str | None = None
 	status: str = "active"
+	policy_decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	registered_at: str = field(default_factory=utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return serialize_record(self)
+
+
+@dataclass(slots=True)
+class SecurityLifecycleBatchRecord:
+	id: str
+	tenant_id: str
+	event_stream: str
+	mutation_count: int
+	status: str = "accepted"
+	processor: str = "bytewax"
+	policy_decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
+	created_at: str = field(default_factory=utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
 		return serialize_record(self)
@@ -284,6 +319,7 @@ __all__ = [
 	"INCIDENT_STATUSES",
 	"SECURITY_LEVELS",
 	"SECU_AGENT_STATUSES",
+	"SECURITY_BATCH_STATUSES",
 	"THREAT_SEVERITIES",
 	"ComplianceControlRecord",
 	"DevicePostureRecord",
@@ -292,6 +328,7 @@ __all__ = [
 	"SecurityAuditEventRecord",
 	"SecurityAgentRecord",
 	"SecurityIncidentRecord",
+	"SecurityLifecycleBatchRecord",
 	"SecurityPolicyRecord",
 	"ThreatIndicatorRecord",
 	"clamp_score",

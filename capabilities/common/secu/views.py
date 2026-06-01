@@ -30,8 +30,11 @@ def dashboard_model(
 		"policy_exceptions": service.list_policy_exceptions(tenant_id),
 		"incidents": service.list_incidents(tenant_id),
 		"security_agents": service.list_security_agents(tenant_id),
+		"security_lifecycle_batches": service.list_security_lifecycle_batches(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"theme": contract["theme"],
 	}
 
@@ -172,6 +175,10 @@ def security_agents_model(
 		"route": "/secu/agents",
 		"tenant_id": tenant_id,
 		"agents": service.list_security_agents(tenant_id),
+		"pending_reviews": [
+			item for item in service.list_security_agents(tenant_id)
+			if item["status"] == "pending_review"
+		],
 		"supported_runtimes": contract["agents"]["supported_runtimes"],
 		"supported_roles": contract["agents"]["supported_roles"],
 		"privileged_roles": contract["agents"]["privileged_roles"],
@@ -186,7 +193,7 @@ def rule_workbench_model(tenant_id: str = "default") -> dict[str, object]:
 		"route": "/secu/rules",
 		"tenant_id": tenant_id,
 		"rules": contract["rule_engine"]["rules"],
-		"decision_order": ["deny", "quarantine", "challenge", "allow"],
+		"decision_order": ["deny", "quarantine", "challenge", "require_review", "allow"],
 	}
 
 
@@ -198,5 +205,6 @@ def settings_model(tenant_id: str = "default") -> dict[str, object]:
 		"configuration": contract["configuration"],
 		"agents": contract["agents"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"theme": contract["theme"],
 	}

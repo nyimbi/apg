@@ -61,6 +61,7 @@ def semantic_model() -> dict[str, Any]:
 				"screens": routes,
 				"theme": contract["theme"],
 				"agents": contract["agents"],
+				"review_evidence": contract["review_evidence"],
 				"runtime": {
 					"api": "api.py",
 					"entrypoint": "app.py",
@@ -85,6 +86,7 @@ def semantic_model() -> dict[str, Any]:
 				"configuration": contract["configuration"],
 				"provides": contract["provides"],
 				"requires": contract["requires"],
+				"review_evidence": contract["review_evidence"],
 			}
 		},
 		"rules": {
@@ -177,6 +179,10 @@ def self_test() -> dict[str, Any]:
 		errors.append("SECU semantic model agent manifest is stale")
 	if model.get("capabilities", {}).get("secu", {}).get("streaming", {}).get("engine") != "bytewax":
 		errors.append("SECU semantic model Bytewax stream manifest is stale")
+	if "review_evidence" not in model.get("capabilities", {}).get("secu", {}).get("provides", []):
+		errors.append("SECU review evidence provide is missing")
+	if "review_evidence" not in model.get("capabilities", {}).get("secu", {}):
+		errors.append("SECU durable review evidence is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

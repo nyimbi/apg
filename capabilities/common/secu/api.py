@@ -24,8 +24,10 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"active_threat_count": summary["active_threat_count"],
 		"compliance_gap_count": summary["compliance_gap_count"],
 		"policy_exception_count": summary["policy_exception_count"],
+		"pending_policy_exception_count": summary["pending_policy_exception_count"],
 		"open_incident_count": summary["open_incident_count"],
 		"security_agent_count": summary["security_agent_count"],
+		"pending_review_count": summary["pending_review_count"],
 	}
 
 
@@ -169,6 +171,14 @@ def validate_security_lifecycle_batch(payload: dict[str, Any]) -> dict[str, Any]
 	)
 
 
+def list_security_lifecycle_batches(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_security_lifecycle_batches(tenant_id)
+
+
+def list_pending_reviews(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_pending_reviews(tenant_id)
+
+
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.create_record(
 		record_id=str(payload["id"]),
@@ -192,6 +202,8 @@ def list_security_posture(tenant_id: str = "default") -> dict[str, Any]:
 		"policy_exceptions": SERVICE.list_policy_exceptions(tenant_id),
 		"incidents": SERVICE.list_incidents(tenant_id),
 		"security_agents": SERVICE.list_security_agents(tenant_id),
+		"security_lifecycle_batches": SERVICE.list_security_lifecycle_batches(tenant_id),
+		"pending_reviews": SERVICE.list_pending_reviews(tenant_id),
 		"audit_events": SERVICE.list_audit_events(tenant_id),
 		"summary": SERVICE.dashboard_summary(tenant_id),
 	}

@@ -2,14 +2,16 @@
 
 ## Slice
 
-Implement first-class SECU security-agent composition and Bytewax lifecycle
-guardrails as the next coherent foundation packet.
+Implement durable SECU review evidence on top of first-class security-agent
+composition and Bytewax lifecycle guardrails as the next coherent foundation
+packet.
 
 SECU already has deterministic security policy, device posture, threat,
 assessment, compliance, policy exception, incident response, quarantine, and
-audit lifecycle behavior. This slice makes AI security agents governed
-participants in those workflows and makes batch security lifecycle intent
-explicitly Bytewax-routed.
+audit lifecycle behavior. This slice makes reviewable SECU decisions durable:
+AI security agents without required human approval become pending-review
+records, compliance gaps and policy exceptions carry policy evidence, and
+denied non-Bytewax lifecycle batches are preserved before raising.
 
 ## Implementation Steps
 
@@ -23,19 +25,28 @@ explicitly Bytewax-routed.
 
 2. Extend runtime state:
    - add `SecurityAgentRecord`;
+   - add durable policy/review evidence to policy exceptions, compliance
+     controls, security agents, security lifecycle batches, and audit events;
+   - add `SecurityLifecycleBatchRecord`;
    - add tenant-qualified security-agent store;
-   - add registration, listing, audit event, and dashboard summary behavior;
-   - add Bytewax lifecycle batch validation.
+   - add registration, listing, pending-review, audit event, and dashboard
+     summary behavior;
+   - add durable Bytewax lifecycle batch validation.
 
 3. Extend generated-application surfaces:
-   - add API helpers for agent registration and batch validation;
-   - add security-agent roster view model;
-   - expose agents and streaming metadata through settings and dashboard views;
-   - include agents and streaming in the package semantic model.
+   - add API helpers for agent registration, batch validation, pending reviews,
+     and batch evidence;
+   - add security-agent roster and pending-review view models;
+   - expose agents, streaming, and review evidence metadata through settings
+     and dashboard views;
+   - include agents, streaming, and review evidence in the package semantic
+     model.
 
 4. Extend verification:
    - positive agent registration and Bytewax validation;
-   - negative unsupported/privileged agent guardrails;
+   - negative unsupported agent guardrails;
+   - privileged agent pending-review evidence;
+   - denied lifecycle batch persistence;
    - contract, app, API, view, semantic model, and package evidence checks.
 
 5. Refresh package evidence:
@@ -66,6 +77,8 @@ packet is stable.
 ## Review Risks
 
 - Agent role/runtime normalization must be predictable for CLI-style names.
-- Privileged security-agent roles must fail closed without human approval.
-- Batch lifecycle routing must reject non-Bytewax streams.
+- Privileged security-agent roles must become pending review without human
+  approval evidence.
+- Batch lifecycle routing must reject non-Bytewax streams and preserve denial
+  evidence.
 - Semantic model and release evidence must stay contract-derived.

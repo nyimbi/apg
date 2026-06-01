@@ -30,6 +30,14 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["agents"]["first_class"] is True
 	assert contract["streaming"]["engine"] == "bytewax"
 	assert "security_agent_privileged_role_requires_human_approval" in contract["agents"]["guardrails"]
+	assert "review_evidence" in contract["provides"]
+	assert contract["review_evidence"]["pending_queues"] == [
+		"policy_exceptions",
+		"compliance_controls",
+		"security_agents",
+		"security_lifecycle_batches",
+	]
+	assert "policy_decision" in contract["review_evidence"]["policy_fields"]
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
 		"risk",
@@ -142,7 +150,8 @@ def test_rule_engine_denies_high_risk_context():
 def test_rule_engine_enforces_exception_and_incident_guardrails(context, reason):
 	result = evaluate_capability_rules(context)
 
-	assert result["decision"] == "deny"
+	expected_decision = "require_review" if reason == "security_agent_human_approval_required" else "deny"
+	assert result["decision"] == expected_decision
 	assert result["actions"][0]["reason"] == reason
 
 
@@ -155,8 +164,10 @@ def test_capability_info_and_registration_include_manifest_theme_and_permissions
 	assert info["ui_manifest"]["requires_theme"] is True
 	assert info["agents"]["first_class"] is True
 	assert info["streaming"]["engine"] == "bytewax"
+	assert info["review_evidence"]["deny_behavior"] == "Denied security lifecycle batches persist evidence before PermissionError"
 	assert info["theme"]["name"] == "secu_zero_trust"
 	assert registration["rule_engine"]["type"] == "deterministic"
+	assert registration["review_evidence"]["durable_statuses"]
 	assert registration["ui_components"]["policies"] == "/secu/policies"
 	assert registration["ui_components"]["exceptions"] == "/secu/exceptions"
 	assert registration["ui_components"]["incidents"] == "/secu/incidents"

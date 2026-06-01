@@ -10,6 +10,10 @@ Use:
   boundaries, and acceptance gates.
 - `PLAN.md` for the current implementation and review plan.
 
+The current executable packet adds durable SECU review evidence for policy
+exceptions, compliance evidence gaps, privileged security-agent review, denied
+Bytewax lifecycle batch routing, and audit events.
+
 Focused proof commands:
 
 ```bash

@@ -31,6 +31,9 @@ the same rule and lifecycle contracts.
 - Governed security-agent registration for `codex`, `claude_code`,
   `opencode`, and `pi` runtimes, including owner, purpose, scope, role,
   disclosure, and privileged-role human approval evidence.
+- Durable review evidence for policy exceptions, compliance evidence gaps,
+  privileged security-agent review, denied security lifecycle batch routing,
+  and audit events.
 - Bytewax lifecycle stream metadata and batch-routing guardrail for security
   lifecycle mutations.
 - Audit events for governed security state transitions.
@@ -103,7 +106,8 @@ resolved = service.resolve_incident(
 
 Security agents are explicit participants in review and response workflows.
 Privileged roles such as `incident_responder`, `compliance_reviewer`, and
-`exception_reviewer` fail closed unless human approval is required.
+`exception_reviewer` are retained as `pending_review` evidence when human
+approval is not required.
 
 ```python
 agent = service.register_security_agent(
@@ -122,6 +126,28 @@ agent = service.register_security_agent(
 assert agent["runtime"] == "claude_code"
 assert agent["role"] == "incident_responder"
 ```
+
+## Durable Review Evidence
+
+SECU preserves review and remediation state for generated security consoles.
+Policy exceptions, compliance controls that require evidence, privileged
+security-agent registrations, security lifecycle batch validations, and audit
+events carry the same policy evidence fields:
+
+- `policy_decision`;
+- `matched_rules`;
+- `review_reasons`;
+- `review_evidence`.
+
+Generated applications can compose the active review queue:
+
+```python
+pending = service.list_pending_reviews("tenant-a")
+```
+
+Denied non-Bytewax lifecycle batches are also stored through
+`list_security_lifecycle_batches()` before `PermissionError` is raised, so
+operators can see the routing violation that must be remediated.
 
 Batch security lifecycle mutation intent must route through Bytewax:
 
@@ -150,6 +176,8 @@ service.validate_security_lifecycle_batch(
 - `resolve_incident`
 - `register_security_agent`
 - `validate_security_lifecycle_batch`
+- `list_security_lifecycle_batches`
+- `list_pending_reviews`
 - `list_security_posture`
 
 These helpers are designed for generated APG applications and package smoke
@@ -192,8 +220,9 @@ The deterministic rule engine currently enforces:
 - incident resolution requires containment evidence.
 - security agents must use supported runtimes, supported roles, and explicit
   scope;
-- privileged security-agent roles require human approval;
-- security lifecycle batch operations must use Bytewax.
+- privileged security-agent roles require human approval evidence or review;
+- security lifecycle batch operations must use Bytewax and denied validations
+  preserve review evidence.
 
 These rules are exposed through `capability_contract.py`, `app.py`,
 `semantic_model.json`, and `release_report.json` so APG composition tooling can

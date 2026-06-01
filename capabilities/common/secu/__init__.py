@@ -369,7 +369,8 @@ APG_SECURITY_METADATA = {
 		"incident_response_governance",
 		"device_quarantine_governance",
 		"security_audit_timeline",
-		"security_agents"
+		"security_agents",
+		"review_evidence"
 	],
 	"load_priority": 50,  # Load after dependencies
 	"multi_tenant": True,
@@ -387,6 +388,7 @@ def get_capability_info(tenant_id: str = "default", overrides: Optional[Dict[str
 		"ui_manifest": contract["ui"],
 		"agents": contract["agents"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"theme": contract["theme"]
 	}
 
@@ -410,6 +412,7 @@ def register_capability() -> Dict[str, Any]:
 		"ui_manifest": contract["ui"],
 		"agents": contract["agents"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"theme": contract["theme"],
 		"permissions": [
 			"secu:view",
