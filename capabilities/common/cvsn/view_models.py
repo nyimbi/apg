@@ -111,10 +111,12 @@ def similarity_search_model(service: CvsnService | None = None, tenant_id: str =
 def review_console_model(service: CvsnService | None = None, tenant_id: str = "default") -> dict[str, object]:
 	service = service or CvsnService()
 	threshold = service.describe(tenant_id)["configuration"]["vision_tasks"]["minimum_confidence_score"]
+	jobs = service.list_jobs(tenant_id)
 	return {
 		"tenant_id": tenant_id,
 		"route": "/cvsn/review",
-		"low_confidence_jobs": [job for job in service.list_jobs(tenant_id) if job["confidence_score"] < threshold],
+		"low_confidence_jobs": [job for job in jobs if job["confidence_score"] < threshold],
+		"pending_review_jobs": [job for job in jobs if job["status"] == "pending_review"],
 	}
 
 

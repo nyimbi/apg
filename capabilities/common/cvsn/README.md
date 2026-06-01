@@ -12,7 +12,8 @@ models; and publish audit evidence through deterministic guardrails.
 - Processing jobs for OCR, object detection, image classification, quality
   inspection, factory safety, video analytics, visual similarity, barcode/QR,
   facial analysis, and content moderation.
-- Preflight policy checks before generated-app processing runs.
+- Preflight policy checks before generated-app processing runs, with
+  review-required outcomes preserved as `pending_review` job evidence.
 - Model registration and release with MLCM linkage, model-card evidence,
   evaluation evidence, approval evidence, and audit events.
 - Pipeline registration with owner, model reference, version, and enabled tasks.
@@ -81,6 +82,15 @@ job = service.run_job(
 	inspection_plan_attached=True,
 	defect_taxonomy_attached=True,
 )
+review_job = service.run_job(
+	"job-review-001",
+	"tenant-a",
+	asset["id"],
+	"object_detection",
+	"operator-1",
+	human_review_recorded=False,
+)
+assert review_job["status"] == "pending_review"
 agent = service.register_vision_agent(
 	"agent-001",
 	"tenant-a",
@@ -114,7 +124,10 @@ without async queueing, batches over configured limits, long video clips, video
 analytics without sampling policy, model registration without MLCM linkage or
 model card, model release without evaluation or approval, cross-tenant
 processing, state changes without audit evidence, and non-Bytewax vision event
-streams. AI vision-agent guardrails also block unsupported runtimes,
+streams. Low-confidence results, unacknowledged critical incidents, and large
+non-queued batches are retained as `pending_review` jobs with matched rule and
+review-reason evidence for the generated review console. AI vision-agent
+guardrails also block unsupported runtimes,
 unsupported roles, missing scope, missing owner, missing purpose, missing
 machine-contribution disclosure, and route privileged roles through pending
 human review when approval evidence is absent. Lifecycle mutation batches are

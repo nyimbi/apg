@@ -54,14 +54,18 @@ later.
 
 - Run enabled vision tasks against ingested assets.
 - Store processing jobs with task, operator, confidence, results, and status.
+- Store policy decision, matched rule names, and review reasons for processing
+  jobs so generated applications can build review queues from durable evidence.
 - Support OCR, object detection, image classification, quality inspection,
   factory safety, video analytics, visual similarity, barcode/QR, facial
   analysis, and content moderation.
 - Evaluate policy before task execution.
 - Enforce task enablement, operator evidence, asset-kind constraints, quality
   plan evidence, defect taxonomy, safety alerting, biometric consent,
-  anonymization, retention limits, moderation policy, review requirements, batch
-  limits, and video sampling policy.
+  anonymization, retention limits, moderation policy, batch limits, and video
+  sampling policy.
+- Record review-required processing outcomes as `pending_review` jobs instead
+  of discarding result evidence. Denial outcomes still fail the operation.
 
 ### Model Lifecycle
 
@@ -131,8 +135,9 @@ stable.
   metadata.
 - `CvsnService` executes asset, job, pipeline, model, release, agent,
   lifecycle-batch, list, dashboard, and APG record compatibility flows.
-- Guardrail tests prove denied or review-required cases fail before processing
-  work is accepted.
+- Guardrail tests prove denied preflight cases fail before processing work is
+  executed, while review-required processing outcomes are retained as
+  `pending_review` job evidence.
 - `app.self_test()` passes and fails if route, rule, Bytewax, or runtime
   evidence becomes stale.
 - Package JSON evidence can be regenerated from `app.semantic_model()` and

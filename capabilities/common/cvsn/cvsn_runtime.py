@@ -45,6 +45,9 @@ class VisionJob:
 	confidence_score: float
 	results: dict[str, Any]
 	status: str = "completed"
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
 
 	def to_dict(self) -> dict[str, Any]:
 		return {
@@ -56,6 +59,9 @@ class VisionJob:
 			"confidence_score": self.confidence_score,
 			"results": dict(self.results),
 			"status": self.status,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
 		}
 
 
@@ -297,7 +303,7 @@ class CvsnService:
 			"sampling_policy_attached": sampling_policy_attached,
 			"moderation_policy_attached": moderation_policy_attached,
 		})
-		self._raise_if_blocked(preflight)
+		self._raise_if_denied(preflight)
 		confidence_score, results = self._run_processing(asset, processing_type)
 		postflight_context = {
 			"tenant_context_present": bool(tenant_id),
@@ -311,11 +317,24 @@ class CvsnService:
 			if key in results:
 				postflight_context[key] = results[key]
 		postflight = self.evaluate(postflight_context)
-		self._raise_if_blocked(postflight)
-		job = VisionJob(job_id, tenant_id, asset_id, processing_type, operator, confidence_score, results)
+		combined = self._combine(preflight, postflight)
+		self._raise_if_denied(combined)
+		job = VisionJob(
+			job_id,
+			tenant_id,
+			asset_id,
+			processing_type,
+			operator,
+			confidence_score,
+			results,
+			status="pending_review" if combined["decision"] == "require_review" else "completed",
+			decision=combined["decision"],
+			matched_rules=list(combined["matched_rules"]),
+			review_reasons=self._review_reasons(combined),
+		)
 		self._jobs[job_id] = job
 		asset.status = "processed"
-		self._audit(tenant_id, "job_completed", job_id, self._combine(preflight, postflight))
+		self._audit(tenant_id, "job_completed", job_id, combined)
 		return job.to_dict()
 
 	def register_pipeline(
@@ -552,6 +571,7 @@ class CvsnService:
 			"video_job_count": len([job for job in jobs if job["processing_type"] == "video_analytics"]),
 			"quality_job_count": len([job for job in jobs if job["processing_type"] == "quality_inspection"]),
 			"safety_job_count": len([job for job in jobs if job["processing_type"] == "factory_safety"]),
+			"pending_job_review_count": len([job for job in jobs if job["status"] == "pending_review"]),
 			"model_count": len(self.list_models(tenant_id)),
 			"released_model_count": len([model for model in self.list_models(tenant_id) if model["status"] == "released"]),
 			"pipeline_count": len(self.list_pipelines(tenant_id)),
@@ -644,6 +664,13 @@ class CvsnService:
 
 	def _reasons(self, result: dict[str, Any]) -> str:
 		return ", ".join(action.get("reason", "cvsn_policy_blocked") for action in result.get("actions", [])) or "cvsn_policy_blocked"
+
+	def _review_reasons(self, result: dict[str, Any]) -> list[str]:
+		return [
+			action.get("reason", "cvsn_review_required")
+			for action in result.get("actions", [])
+			if action.get("decision") == "require_review"
+		]
 
 	def _digest(self, value: str) -> str:
 		return sha256(value.encode("utf-8")).hexdigest()

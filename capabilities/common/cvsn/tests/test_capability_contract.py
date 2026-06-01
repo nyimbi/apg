@@ -224,6 +224,7 @@ def test_cvsn_lifecycle_is_executable():
 		"video_job_count": 0,
 		"quality_job_count": 1,
 		"safety_job_count": 0,
+		"pending_job_review_count": 0,
 		"model_count": 1,
 		"released_model_count": 1,
 		"pipeline_count": 1,
@@ -313,15 +314,17 @@ def test_cvsn_service_enforces_policy_guardrails_before_processing():
 			"operator",
 			alerting_enabled=False,
 		)
-	with pytest.raises(PermissionError, match="incident_acknowledgement_required"):
-		service.run_job(
-			"job-critical-safety",
-			"tenant-vision",
-			"image",
-			"factory_safety",
-			"operator",
-			incident_acknowledged=False,
-		)
+	safety_review = service.run_job(
+		"job-critical-safety",
+		"tenant-vision",
+		"image",
+		"factory_safety",
+		"operator",
+		incident_acknowledged=False,
+	)
+	assert safety_review["status"] == "pending_review"
+	assert safety_review["decision"] == "require_review"
+	assert safety_review["review_reasons"] == ["incident_acknowledgement_required"]
 
 	with pytest.raises(PermissionError, match="mlcm_model_ref_required"):
 		service.register_model("model", "tenant-vision", "Model", "object_detection", "", "owner", "1.0.0", "card")
@@ -376,3 +379,52 @@ def test_cvsn_service_enforces_agent_and_lifecycle_guardrails():
 
 	assert service.list_lifecycle_batches("tenant-vision")[0]["status"] == "denied"
 	assert service.dashboard_summary("tenant-vision")["denied_lifecycle_batch_count"] == 1
+
+
+def test_cvsn_processing_review_lifecycle_records_pending_review_jobs():
+	service = CvsnService()
+	service.ingest_asset("asset-review", "tenant-vision", "image", "image/png", 1, "s3://review")
+	task_calls: list[str] = []
+
+	def low_confidence(asset, processing_type):
+		task_calls.append(processing_type)
+		return 0.55, {"objects": [], "object_count": 0}
+
+	service._run_processing = low_confidence  # type: ignore[method-assign]
+	low_confidence_job = service.run_job(
+		"job-low-confidence",
+		"tenant-vision",
+		"asset-review",
+		"object_detection",
+		"operator",
+		human_review_recorded=False,
+	)
+	large_batch_job = service.run_job(
+		"job-large-batch",
+		"tenant-vision",
+		"asset-review",
+		"object_detection",
+		"operator",
+		batch_size=25,
+		async_queue_enabled=False,
+	)
+
+	assert task_calls == ["object_detection", "object_detection"]
+	assert low_confidence_job["status"] == "pending_review"
+	assert low_confidence_job["decision"] == "require_review"
+	assert "low_confidence_requires_review" in low_confidence_job["matched_rules"]
+	assert low_confidence_job["review_reasons"] == ["low_confidence_review_required"]
+	assert large_batch_job["status"] == "pending_review"
+	assert "large_batch_requires_async_queue" in large_batch_job["matched_rules"]
+	assert large_batch_job["review_reasons"] == ["large_batch_requires_async_queue"]
+	assert service.dashboard_summary("tenant-vision")["pending_job_review_count"] == 2
+
+	review_model = review_console_model(service, "tenant-vision")
+	assert [item["id"] for item in review_model["pending_review_jobs"]] == [
+		"job-large-batch",
+		"job-low-confidence",
+	]
+	assert {item["id"] for item in review_model["low_confidence_jobs"]} == {
+		"job-large-batch",
+		"job-low-confidence",
+	}

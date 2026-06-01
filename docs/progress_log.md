@@ -23768,3 +23768,69 @@ Known gaps:
   slice.
 - Existing SQLAlchemy and Pydantic deprecation warnings surfaced by focused
   tests remain outside this slice.
+
+### 2026-06-01 03:36 EAT
+
+CVSN processing review lifecycle slice:
+
+- Added executable pending-review state for CVSN processing jobs. Denial
+  guardrails still fail the operation, while review-required outcomes now
+  retain job evidence for generated-application review queues.
+- Extended `VisionJob` with `decision`, `matched_rules`, and `review_reasons`
+  so low-confidence processing, large non-queued batches, and unacknowledged
+  critical safety incidents can be reviewed without replaying vision tasks.
+- Updated `run_job()` to combine preflight and postflight policy decisions,
+  fail only denied outcomes, and persist `pending_review` jobs when the rule
+  engine returns `require_review`.
+- Surfaced pending processing-review queues through `dashboard_summary()` and
+  `review_console_model()`.
+- Updated CVSN `SPECIFICATION.md`, `PLAN.md`, `README.md`, and `cap_spec.md`
+  to describe processing-review evidence and generated review-console usage.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/cvsn/__init__.py capabilities/common/cvsn/capability_contract.py capabilities/common/cvsn/cvsn_runtime.py capabilities/common/cvsn/view_models.py capabilities/common/cvsn/app.py capabilities/common/cvsn/tests/test_capability_contract.py capabilities/common/cvsn/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/cvsn/tests/test_capability_contract.py capabilities/common/cvsn/tests/test_package_contract.py`
+  passed with 10 tests and 10 pre-existing SQLAlchemy/Pydantic deprecation
+  warnings from imported shared modules.
+- `./.venv/bin/python -c "from capabilities.common.cvsn import app; r=app.self_test(); print(r); assert r['passed']"`
+  passed.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/cvsn --json`
+  passed with one domain-specific CVSN implementation, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/cvsn --json`
+  passed and showed 38 rules, 15 routes, Bytewax streaming, first-class vision
+  agent evidence, and side-effect-free publish evidence.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/common/cvsn --json`
+  passed with one complete lifecycle record, 38 rules, 15 routes, and 0
+  warnings/errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 109 operable contracts, 109 complete packages, 0
+  package gaps, 0 warnings, and 0 errors.
+- Focused stale-marker scan over touched CVSN source, docs, and tests returned
+  no primary-slice stale markers.
+- `git diff --check -- capabilities/common/cvsn` passed.
+
+Code review:
+
+- Reviewed preflight behavior: denied asset, tenant, task, operator, biometric,
+  sampling, and model-release guardrails still raise before a job is accepted.
+- Reviewed review behavior: `require_review` outcomes now retain deterministic
+  matched-rule and review-reason evidence rather than being discarded as hard
+  failures.
+- Reviewed tenant boundaries: jobs still require tenant-scoped asset lookup
+  before processing and list APIs filter by tenant id.
+- Reviewed UI surfacing: dashboard and review models consume stored service
+  state, so review queues do not re-run computer-vision work.
+- Kept live CV providers, object storage, model registries, metrics sinks, and
+  Bytewax execution behind adapters.
+
+Known gaps:
+
+- Did not run the full repository test suite, rendered UI checks, live OpenCV,
+  OCR, object-detection, video, safety-alerting, object-storage, model-registry,
+  metrics, live Bytewax topology, or performance/load checks during this
+  battery-conscious capability slice.
+- Existing SQLAlchemy and Pydantic deprecation warnings surfaced by focused
+  tests remain outside this slice.

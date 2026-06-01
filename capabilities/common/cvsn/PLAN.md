@@ -19,6 +19,9 @@
 - Add `CvsnService` as the dependency-light generated-app runtime.
 - Implement in-memory asset, job, model, pipeline, and audit records.
 - Implement in-memory vision-agent and lifecycle-batch records.
+- Preserve review-required processing outcomes as `pending_review` jobs with
+  matched rules and review reasons, while denial guardrails still fail the
+  operation.
 - Add deterministic task behavior so applications are executable before live
   computer-vision providers are wired.
 - Add runtime operations for registering governed AI vision agents and
@@ -31,6 +34,8 @@
 - Add route-specific view models for dashboard, assets, documents, images,
   video, quality, safety, similarity, review, models, agents, lifecycle,
   governance, and audit.
+- Expose pending processing-review queues in dashboard and review-console
+  models without replaying computer-vision tasks.
 - Ensure view models import only the contract and dependency-light runtime.
 
 ## Phase 4 - Package Evidence
