@@ -62,6 +62,15 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["agents"]["first_class"] is True
 	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
 	assert contract["streaming"]["engine"] == "bytewax"
+	assert "review_evidence" in contract["provides"]
+	assert contract["review_evidence"]["pending_queues"] == [
+		"operations",
+		"exception_reviews",
+		"rotations",
+		"crypto_agents",
+		"crypto_lifecycle_batches",
+	]
+	assert "policy_decision" in contract["review_evidence"]["policy_fields"]
 
 
 def test_rule_engine_enforces_crypto_guardrails():
@@ -149,7 +158,8 @@ def test_rule_engine_enforces_crypto_guardrails():
 def test_rule_engine_enforces_exception_and_rotation_guardrails(context, reason):
 	result = evaluate_capability_rules(context)
 
-	assert result["decision"] == "deny"
+	expected_decision = "require_review" if reason == "crypto_agent_privileged_role_requires_human_approval" else "deny"
+	assert result["decision"] == expected_decision
 	assert result["actions"][0]["reason"] == reason
 
 
@@ -166,6 +176,7 @@ def test_registration_includes_full_capability_contract():
 	assert registration["ui_components"]["agents"] == "/encr/agents"
 	assert registration["agents"]["first_class"] is True
 	assert registration["streaming"]["engine"] == "bytewax"
+	assert registration["review_evidence"]["deny_behavior"] == "Denied crypto lifecycle batches persist evidence before PermissionError"
 	assert "secu" in registration["dependencies"]
 	assert "encr:review" in registration["permissions"]
 	assert "encr:rotate" in registration["permissions"]

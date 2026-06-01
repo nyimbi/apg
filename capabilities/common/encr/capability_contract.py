@@ -402,14 +402,14 @@ def default_rules() -> list[CapabilityRule]:
 		),
 		CapabilityRule(
 			name="crypto_agent_privileged_role_requires_human_approval",
-			description="Privileged crypto-agent roles require human approval.",
+			description="Privileged crypto-agent roles require human approval evidence or review.",
 			condition={
 				"operation": "register_crypto_agent",
 				"crypto_agent_privileged_role": True,
 				"human_approval_required": False
 			},
 			effect={
-				"decision": "deny",
+				"decision": "require_review",
 				"reason": "crypto_agent_privileged_role_requires_human_approval",
 				"required_action": "require_human_crypto_approval"
 			}
@@ -515,7 +515,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "encr",
 		"display_name": "Encryption Services",
-		"provides": ["encr_operations", "crypto_governance", "crypto_agent_composition"],
+		"provides": ["encr_operations", "crypto_governance", "crypto_agent_composition", "review_evidence"],
 		"requires": ["conf", "auth", "secu", "audl"],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
@@ -530,7 +530,24 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"components": theme.components
 		},
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest()
+		"streaming": streaming_manifest(),
+		"review_evidence": {
+			"durable_statuses": [
+				"pending",
+				"pending_review",
+				"review_required",
+				"scheduled",
+				"denied",
+				"allowed",
+				"approved",
+				"rejected",
+				"completed",
+				"accepted",
+			],
+			"policy_fields": ["policy_decision", "matched_rules", "review_reasons", "review_evidence"],
+			"pending_queues": ["operations", "exception_reviews", "rotations", "crypto_agents", "crypto_lifecycle_batches"],
+			"deny_behavior": "Denied crypto lifecycle batches persist evidence before PermissionError",
+		}
 	}
 
 

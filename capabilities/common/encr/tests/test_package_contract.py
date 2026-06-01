@@ -37,6 +37,8 @@ def test_contract_shape_is_valid():
 	assert len(contract["rule_engine"]["rules"]) >= 14
 	assert contract["agents"]["first_class"] is True
 	assert contract["streaming"]["engine"] == "bytewax"
+	assert "review_evidence" in contract["provides"]
+	assert contract["review_evidence"]["pending_queues"]
 	assert contract["theme"]["tokens"]["border.radius"]
 
 
@@ -64,6 +66,8 @@ def test_app_entrypoint_is_publishable():
 	assert capability["approvals"]["crypto_agent"] == "CryptoAgentRecord"
 	assert capability["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
 	assert capability["streaming"]["engine"] == "bytewax"
+	assert "review_evidence" in capability["provides"]
+	assert capability["review_evidence"]["pending_queues"]
 
 
 def test_encryption_lifecycle_records_domains_operations_reviews_rotations_and_audit():
@@ -150,18 +154,24 @@ def test_encryption_lifecycle_records_domains_operations_reviews_rotations_and_a
 	assert domain["algorithm_quantum_safe"] is True
 	assert allowed["status"] == "allowed"
 	assert legacy["status"] == "review_required"
+	assert legacy["policy_decision"] == "require_review"
 	assert approved["status"] == "approved"
+	assert approved["policy_decision"] == "allow"
 	assert completed["status"] == "completed"
+	assert completed["policy_decision"] == "allow"
 	assert agent["runtime"] == "opencode"
 	assert agent["role"] == "threat_rotation_reviewer"
 	assert batch["event_stream"] == "bytewax"
 	assert batch["accepted"] is True
+	assert batch["status"] == "accepted"
 	assert after_rotation["status"] == "allowed"
 	assert summary["key_domain_count"] == 1
 	assert summary["operation_count"] == 3
 	assert summary["crypto_agent_count"] == 1
 	assert summary["pending_exception_count"] == 0
 	assert summary["scheduled_rotation_count"] == 0
+	assert summary["crypto_lifecycle_batch_count"] == 1
+	assert summary["pending_review_count"] == 0
 	assert {event["event_type"] for event in service.list_audit_events("tenant-a")} >= {
 		"key_domain_registered",
 		"crypto_operation_allowed",
@@ -258,19 +268,27 @@ def test_guardrails_fail_closed_for_crypto_operations_reviews_and_rotations():
 	completed = service.complete_key_rotation("tenant-a", rotation["id"], "key-admin", "audit://rotation")
 	with pytest.raises(ValueError, match="key_rotation_already_completed"):
 		service.complete_key_rotation("tenant-a", completed["id"], "key-admin", "audit://rotation-again")
-	with pytest.raises(PermissionError, match="crypto_agent_privileged_role_requires_human_approval"):
-		service.register_crypto_agent(
-			"tenant-a",
-			"agent-denied",
-			"Agent Denied",
-			"codex",
-			"exception_reviewer",
-			"legacy exception review",
-			"secops",
-			"review crypto exceptions",
-		)
+	review_agent = service.register_crypto_agent(
+		"tenant-a",
+		"agent-denied",
+		"Agent Denied",
+		"codex",
+		"exception_reviewer",
+		"legacy exception review",
+		"secops",
+		"review crypto exceptions",
+	)
+	assert review_agent["status"] == "pending_review"
+	assert review_agent["policy_decision"] == "require_review"
+	assert review_agent["review_reasons"] == ["crypto_agent_privileged_role_requires_human_approval"]
 	with pytest.raises(PermissionError, match="bytewax_crypto_stream_required"):
 		service.validate_crypto_lifecycle_batch("tenant-a", "legacy_queue", 1)
+	denied_batch = [
+		item for item in service.list_crypto_lifecycle_batches("tenant-a")
+		if item["status"] == "denied"
+	][0]
+	assert denied_batch["policy_decision"] == "deny"
+	assert denied_batch["review_reasons"] == ["bytewax_crypto_stream_required"]
 	with pytest.raises(ValueError, match="crypto_lifecycle_batch_empty"):
 		service.validate_crypto_lifecycle_batch("tenant-a", "bytewax", 0)
 
@@ -387,11 +405,16 @@ def test_api_and_view_models_expose_crypto_posture_surfaces():
 	assert status["key_domain_count"] == 1
 	assert status["operation_count"] == 2
 	assert status["crypto_agent_count"] == 1
+	assert status["crypto_lifecycle_batch_count"] == 1
 	assert posture["summary"]["scheduled_rotation_count"] == 0
 	assert posture["crypto_agents"][0]["id"] == agent["id"]
+	assert posture["crypto_lifecycle_batches"][0]["status"] == "accepted"
+	assert posture["pending_reviews"] == []
 	assert batch["required_processor"] == "bytewax"
+	assert batch["status"] == "accepted"
 	assert dashboard["summary"]["operation_count"] == 2
 	assert dashboard["streaming"]["engine"] == "bytewax"
+	assert dashboard["review_evidence"]["deny_behavior"] == "Denied crypto lifecycle batches persist evidence before PermissionError"
 	assert operations["review_required"] == []
 	assert keys["classifications"][-1] == "critical"
 	assert policies["decision_order"] == ["deny", "require_review", "allow"]
@@ -402,8 +425,10 @@ def test_api_and_view_models_expose_crypto_posture_surfaces():
 	assert analytics["summary"]["key_domain_count"] == 1
 	assert audit["events"]
 	assert agents["crypto_agents"][0]["runtime"] == "claude_code"
+	assert agents["pending_reviews"] == []
 	assert "exception_reviewer" in agents["privileged_roles"]
 	assert settings["agents"]["first_class"] is True
 	assert settings["streaming"]["lifecycle_stream"] == "encr.lifecycle"
+	assert settings["review_evidence"]["pending_queues"]
 	assert settings["theme"]["name"] == "encr_quantum_guard"
 	assert api_threat_bypass["status"] == "denied"

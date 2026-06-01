@@ -30,8 +30,17 @@ evidence.
   rotations, or homomorphic compute requests.
 - **Crypto lifecycle stream**: the Bytewax-backed event stream that must carry
   batch crypto lifecycle mutations into generated APG applications.
+- **Crypto lifecycle batch evidence**: accepted or denied batch validation
+  record for grouped ENCR lifecycle mutations.
 - **Audit event**: immutable package evidence for key-domain, operation,
   review, and rotation lifecycle transitions.
+
+Reviewable records expose a consistent evidence shape:
+
+- `policy_decision`
+- `matched_rules`
+- `review_reasons`
+- `review_evidence`
 
 ## Functional Requirements
 
@@ -53,9 +62,10 @@ evidence.
     `opencode`, or `pi`.
 11. Crypto agents must declare supported ENCR roles, owner, purpose, operating
     scope, and contribution disclosure.
-12. Privileged crypto-agent roles must require human approval.
-13. Crypto lifecycle batch mutations must use Bytewax and be rejected when
-    routed through any other stream engine.
+12. Privileged crypto-agent roles without human approval must be retained as
+    `pending_review` evidence.
+13. Crypto lifecycle batch mutations must use Bytewax; denied non-Bytewax
+    validations must persist evidence before raising.
 14. API helpers and UI view models must expose the lifecycle state for generated
     APG applications.
 15. `app.py`, `semantic_model.json`, `release_report.json`, and
@@ -82,9 +92,11 @@ it with first-class agent composition:
 - request and decide crypto exception reviews;
 - schedule and complete key rotations with evidence;
 - register crypto agents with runtime, role, owner, purpose, scope, disclosure,
-  and privileged human-approval evidence;
+  and privileged human-approval or pending-review evidence;
 - validate Bytewax crypto lifecycle batches before accepting grouped mutation
   work;
+- compose pending operation, exception, rotation, crypto-agent, and lifecycle
+  batch reviews for generated governance consoles;
 - expose operation queues, exception queues, rotation consoles, audit timelines,
   crypto-agent rosters, Bytewax stream metadata, and contract-derived semantic
   evidence.

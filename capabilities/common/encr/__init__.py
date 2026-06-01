@@ -41,7 +41,8 @@ CAPABILITY_METADATA = {
 			"zero_knowledge_encryption",
 			"autonomous_key_management",
 			"homomorphic_computation",
-			"threat_adaptive_encryption"
+			"threat_adaptive_encryption",
+			"review_evidence"
 		],
 		"export_functions": [
 			"encrypt_quantum_safe",
@@ -141,6 +142,7 @@ def register_capability() -> Dict[str, Any]:
 			"threat_adaptive_key_rotation": "Schedule and complete key rotations with evidence",
 			"crypto_agent_composition": "Register accountable AI agents for crypto governance workflows",
 			"bytewax_lifecycle_streaming": "Require Bytewax for crypto lifecycle batch mutations",
+			"review_evidence": "Compose pending operation, exception, rotation, agent, and lifecycle batch review evidence",
 			"capability_rules": "Evaluate deterministic cryptographic governance rules",
 			"visual_theming": "Apply encryption-control theme tokens and components"
 		},
@@ -164,6 +166,7 @@ def register_capability() -> Dict[str, Any]:
 		"theme": contract["theme"],
 		"agents": contract["agents"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"permissions": [
 			"encr:view",
 			"encr:operate",

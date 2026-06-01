@@ -23,6 +23,9 @@ homomorphic, or KEYM integrations.
 - Key rotation scheduling and completion with evidence.
 - First-class crypto-agent composition for policy, lifecycle, entropy,
   exception, threat-rotation, and homomorphic-compute review.
+- Durable review evidence for review-required operations, crypto exception
+  reviews, key rotations, privileged crypto agents, denied lifecycle batches,
+  and audit events.
 - Bytewax lifecycle stream enforcement for grouped crypto mutations.
 - API helpers and UI view models for generated APG applications.
 - Contract, theme, semantic model, and release evidence for APG composition
@@ -129,6 +132,28 @@ batch = service.validate_crypto_lifecycle_batch(
 )
 ```
 
+## Durable Review Evidence
+
+ENCR preserves review state for generated cryptographic governance consoles.
+Review-required operations, exception reviews, scheduled rotations, privileged
+crypto-agent registrations, lifecycle batch validations, and audit events carry
+the same evidence fields:
+
+- `policy_decision`;
+- `matched_rules`;
+- `review_reasons`;
+- `review_evidence`.
+
+Generated applications can compose the active review queue:
+
+```python
+pending = service.list_pending_reviews("tenant-a")
+```
+
+Denied non-Bytewax lifecycle batches are stored through
+`list_crypto_lifecycle_batches()` before `PermissionError` is raised, so
+operators can see and remediate the routing violation.
+
 ## API Helpers
 
 `api.py` exposes a shared dependency-light service:
@@ -142,6 +167,8 @@ batch = service.validate_crypto_lifecycle_batch(
 - `complete_key_rotation`
 - `register_crypto_agent`
 - `validate_crypto_lifecycle_batch`
+- `list_crypto_lifecycle_batches`
+- `list_pending_reviews`
 - `list_crypto_posture`
 - compatibility `create_record` and `list_records`
 
@@ -173,7 +200,8 @@ roles are `crypto_policy_reviewer`, `key_lifecycle_reviewer`,
 
 Every crypto agent must declare owner, purpose, scope, and contribution
 disclosure. The service rejects unsupported runtimes, unsupported roles, missing
-scope, missing disclosure, and privileged registrations without human approval.
+scope, and missing disclosure. Privileged registrations without human approval
+are retained as `pending_review` evidence.
 
 ## Adapter Boundaries
 

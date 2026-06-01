@@ -29,10 +29,13 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"key_domain_count": summary["key_domain_count"],
 		"operation_count": summary["operation_count"],
 		"crypto_agent_count": summary["crypto_agent_count"],
+		"pending_crypto_agent_review_count": summary["pending_crypto_agent_review_count"],
 		"denied_operation_count": summary["denied_operation_count"],
 		"review_required_count": summary["review_required_count"],
 		"pending_exception_count": summary["pending_exception_count"],
 		"scheduled_rotation_count": summary["scheduled_rotation_count"],
+		"crypto_lifecycle_batch_count": summary["crypto_lifecycle_batch_count"],
+		"pending_review_count": summary["pending_review_count"],
 	}
 
 
@@ -126,6 +129,14 @@ def validate_crypto_lifecycle_batch(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def list_crypto_lifecycle_batches(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_crypto_lifecycle_batches(tenant_id)
+
+
+def list_pending_reviews(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_pending_reviews(tenant_id)
+
+
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.create_record(
 		record_id=str(payload["id"]),
@@ -146,6 +157,8 @@ def list_crypto_posture(tenant_id: str = "default") -> dict[str, Any]:
 		"exception_reviews": SERVICE.list_exception_reviews(tenant_id),
 		"rotations": SERVICE.list_rotations(tenant_id),
 		"crypto_agents": SERVICE.list_crypto_agents(tenant_id),
+		"crypto_lifecycle_batches": SERVICE.list_crypto_lifecycle_batches(tenant_id),
+		"pending_reviews": SERVICE.list_pending_reviews(tenant_id),
 		"audit_events": SERVICE.list_audit_events(tenant_id),
 		"summary": SERVICE.dashboard_summary(tenant_id),
 	}

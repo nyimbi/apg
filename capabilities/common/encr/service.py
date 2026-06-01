@@ -162,6 +162,9 @@ class CryptoOperationRecord:
 	status: str
 	matched_rules: list[str]
 	required_actions: list[str]
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=_utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -179,6 +182,10 @@ class CryptoExceptionReviewRecord:
 	decision: str = ""
 	reviewer: str = ""
 	notes: str = ""
+	policy_decision: str = "require_review"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=lambda: ["crypto_exception_review_required"])
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=_utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -195,6 +202,10 @@ class KeyRotationRecord:
 	status: str = "scheduled"
 	actor: str = ""
 	evidence: str = ""
+	policy_decision: str = "require_review"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=lambda: ["key_rotation_review_required"])
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=_utc_now)
 	completed_at: str = ""
 
@@ -211,6 +222,10 @@ class CryptoAuditEventRecord:
 	message: str
 	actor: str
 	severity: str = "info"
+	policy_decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=_utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -231,7 +246,29 @@ class CryptoAgentRecord:
 	human_approval_required: bool
 	policy_ref: str | None = None
 	status: str = "active"
+	policy_decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	registered_at: str = field(default_factory=_utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass(slots=True)
+class CryptoLifecycleBatchRecord:
+	id: str
+	tenant_id: str
+	event_stream: str
+	mutation_count: int
+	status: str = "accepted"
+	processor: str = "bytewax"
+	policy_decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
+	created_at: str = field(default_factory=_utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
 		return asdict(self)
@@ -260,6 +297,7 @@ class EncrService:
 		self.rotations: dict[str, KeyRotationRecord] = {}
 		self.audit_events: dict[str, CryptoAuditEventRecord] = {}
 		self.crypto_agents: dict[str, CryptoAgentRecord] = {}
+		self.crypto_lifecycle_batches: dict[str, CryptoLifecycleBatchRecord] = {}
 
 	def describe(self, tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 		return self._get_contract(tenant_id, overrides)
@@ -367,10 +405,21 @@ class EncrService:
 			status=status,
 			matched_rules=list(result["matched_rules"]),
 			required_actions=_required_actions(result),
+			policy_decision=result["decision"],
+			review_reasons=self._reasons(result),
+			review_evidence=self._review_evidence(result),
 		)
 		self.operations[record.id] = record
 		severity = "high" if status == "denied" else "medium" if status == "review_required" else "info"
-		self._record_event(tenant_id, f"crypto_operation_{status}", record.id, f"Crypto operation {status}: {record.operation_type}", domain.owner, severity)
+		self._record_event(
+			tenant_id,
+			f"crypto_operation_{status}",
+			record.id,
+			f"Crypto operation {status}: {record.operation_type}",
+			domain.owner,
+			severity,
+			policy_result=result,
+		)
 		return record.to_dict()
 
 	def request_crypto_exception(
@@ -394,15 +443,28 @@ class EncrService:
 		record_id = _stable_id("encr_exception_review", tenant_id, review_id)
 		if record_id in self.exception_reviews:
 			raise ValueError(f"crypto_exception_review_already_exists:{review_id}")
+		policy_result = _review_result("crypto_exception_review_required", "review_crypto_exception")
 		record = CryptoExceptionReviewRecord(
 			id=record_id,
 			tenant_id=tenant_id,
 			operation_id=operation.id,
 			requested_by=str(requested_by).strip(),
 			reason=str(reason).strip(),
+			policy_decision=policy_result["decision"],
+			matched_rules=list(policy_result["matched_rules"]),
+			review_reasons=self._reasons(policy_result),
+			review_evidence=self._review_evidence(policy_result),
 		)
 		self.exception_reviews[record.id] = record
-		self._record_event(tenant_id, "crypto_exception_requested", record.id, f"Crypto exception requested: {operation.id}", requested_by, "medium")
+		self._record_event(
+			tenant_id,
+			"crypto_exception_requested",
+			record.id,
+			f"Crypto exception requested: {operation.id}",
+			requested_by,
+			"medium",
+			policy_result=policy_result,
+		)
 		return record.to_dict()
 
 	def decide_crypto_exception(
@@ -434,12 +496,26 @@ class EncrService:
 		record.decision = decision
 		record.reviewer = str(reviewer).strip()
 		record.notes = str(notes).strip()
+		record.policy_decision = result["decision"]
+		record.matched_rules = list(result["matched_rules"])
+		record.review_reasons = self._reasons(result)
+		record.review_evidence = self._review_evidence(result, review_recorded=True)
 		if decision == "approved":
 			operation = self._get_operation(tenant_id, record.operation_id)
 			operation.status = "allowed"
 			operation.decision = "allow"
+			operation.policy_decision = "allow"
 			operation.required_actions = []
-		self._record_event(tenant_id, "crypto_exception_decided", record.id, f"Crypto exception {decision}: {record.operation_id}", reviewer, "medium")
+			operation.review_evidence = self._review_evidence(result, review_recorded=True)
+		self._record_event(
+			tenant_id,
+			"crypto_exception_decided",
+			record.id,
+			f"Crypto exception {decision}: {record.operation_id}",
+			reviewer,
+			"medium",
+			policy_result=result,
+		)
 		return record.to_dict()
 
 	def schedule_key_rotation(
@@ -461,16 +537,29 @@ class EncrService:
 		record_id = _stable_id("encr_key_rotation", tenant_id, rotation_id)
 		if record_id in self.rotations:
 			raise ValueError(f"key_rotation_already_exists:{rotation_id}")
+		policy_result = _review_result("key_rotation_review_required", "complete_key_rotation_with_evidence")
 		record = KeyRotationRecord(
 			id=record_id,
 			tenant_id=tenant_id,
 			key_domain_id=domain.id,
 			requested_by=str(requested_by).strip(),
 			reason=str(reason).strip(),
+			policy_decision=policy_result["decision"],
+			matched_rules=list(policy_result["matched_rules"]),
+			review_reasons=self._reasons(policy_result),
+			review_evidence=self._review_evidence(policy_result),
 		)
 		domain.rotation_status = "scheduled"
 		self.rotations[record.id] = record
-		self._record_event(tenant_id, "key_rotation_scheduled", record.id, f"Key rotation scheduled: {domain.name}", requested_by, "medium")
+		self._record_event(
+			tenant_id,
+			"key_rotation_scheduled",
+			record.id,
+			f"Key rotation scheduled: {domain.name}",
+			requested_by,
+			"medium",
+			policy_result=policy_result,
+		)
 		return record.to_dict()
 
 	def complete_key_rotation(
@@ -496,10 +585,22 @@ class EncrService:
 		record.actor = str(actor).strip()
 		record.evidence = str(evidence).strip()
 		record.completed_at = _utc_now()
+		record.policy_decision = result["decision"]
+		record.matched_rules = list(result["matched_rules"])
+		record.review_reasons = self._reasons(result)
+		record.review_evidence = self._review_evidence(result, review_recorded=True)
 		domain = self._get_key_domain(tenant_id, record.key_domain_id)
 		domain.rotation_status = "rotated"
 		domain.last_rotated_at = record.completed_at
-		self._record_event(tenant_id, "key_rotation_completed", record.id, f"Key rotation completed: {domain.name}", actor, "medium")
+		self._record_event(
+			tenant_id,
+			"key_rotation_completed",
+			record.id,
+			f"Key rotation completed: {domain.name}",
+			actor,
+			"medium",
+			policy_result=result,
+		)
 		return record.to_dict()
 
 	def register_crypto_agent(
@@ -554,9 +655,22 @@ class EncrService:
 			contribution_disclosed=True,
 			human_approval_required=bool(human_approval_required),
 			policy_ref=str(policy_ref).strip() if policy_ref else None,
+			status="pending_review" if result["decision"] == "require_review" else "active",
+			policy_decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._reasons(result),
+			review_evidence=self._review_evidence(result, review_recorded=bool(human_approval_required)),
 		)
 		self.crypto_agents[record.id] = record
-		self._record_event(tenant_id, "crypto_agent_registered", record.id, f"Crypto agent registered: {record.name}", owner, "medium")
+		self._record_event(
+			tenant_id,
+			"crypto_agent_registered",
+			record.id,
+			f"Crypto agent registered: {record.name}",
+			owner,
+			"medium",
+			policy_result=result,
+		)
 		return record.to_dict()
 
 	def validate_crypto_lifecycle_batch(
@@ -566,22 +680,46 @@ class EncrService:
 		mutation_count: int,
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
+		if mutation_count < 1:
+			raise ValueError("crypto_lifecycle_batch_empty")
 		stream = self._normalize_agent_token(event_stream)
 		result = self.evaluate({
 			"operation": "validate_crypto_lifecycle_batch",
 			"event_stream": stream,
 		})
+		record = CryptoLifecycleBatchRecord(
+			id=_stable_id("encr_batch", tenant_id, stream, len(self.crypto_lifecycle_batches)),
+			tenant_id=tenant_id,
+			event_stream=stream,
+			mutation_count=int(mutation_count),
+			status="denied" if result["decision"] == "deny" else "accepted",
+			policy_decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._reasons(result),
+			review_evidence=self._review_evidence(result),
+		)
+		self.crypto_lifecycle_batches[record.id] = record
+		self._record_event(
+			tenant_id,
+			"crypto_lifecycle_batch_validated",
+			record.id,
+			f"Crypto lifecycle batch {record.status}: {stream}",
+			"system",
+			"medium" if record.status == "denied" else "info",
+			policy_result=result,
+		)
 		if result["decision"] == "deny":
 			raise PermissionError(self._first_reason(result))
-		if mutation_count < 1:
-			raise ValueError("crypto_lifecycle_batch_empty")
-		return {
+		payload = record.to_dict()
+		payload.update({
 			"tenant_id": tenant_id,
 			"event_stream": stream,
 			"mutation_count": int(mutation_count),
 			"accepted": True,
 			"required_processor": "bytewax",
-		}
+			"rule_result": result,
+		})
+		return payload
 
 	def create_record(
 		self,
@@ -635,6 +773,23 @@ class EncrService:
 	def list_crypto_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.crypto_agents, tenant_id)
 
+	def list_crypto_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.crypto_lifecycle_batches, tenant_id)
+
+	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		items = (
+			self.list_operations(tenant_id)
+			+ self.list_exception_reviews(tenant_id)
+			+ self.list_rotations(tenant_id)
+			+ self.list_crypto_agents(tenant_id)
+			+ self.list_crypto_lifecycle_batches(tenant_id)
+		)
+		return [
+			item
+			for item in items
+			if item.get("status") in {"pending", "pending_review", "review_required", "scheduled"}
+		]
+
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		operations = self.list_operations(tenant_id)
 		return {
@@ -642,10 +797,14 @@ class EncrService:
 			"key_domain_count": len(self.list_key_domains(tenant_id)),
 			"operation_count": len(operations),
 			"crypto_agent_count": len(self.list_crypto_agents(tenant_id)),
+			"pending_crypto_agent_review_count": sum(1 for item in self.list_crypto_agents(tenant_id) if item["status"] == "pending_review"),
+			"crypto_lifecycle_batch_count": len(self.list_crypto_lifecycle_batches(tenant_id)),
+			"denied_crypto_lifecycle_batch_count": sum(1 for item in self.list_crypto_lifecycle_batches(tenant_id) if item["status"] == "denied"),
 			"denied_operation_count": sum(1 for item in operations if item["status"] == "denied"),
 			"review_required_count": sum(1 for item in operations if item["status"] == "review_required"),
 			"pending_exception_count": sum(1 for item in self.list_exception_reviews(tenant_id) if item["status"] == "pending"),
 			"scheduled_rotation_count": sum(1 for item in self.list_rotations(tenant_id) if item["status"] == "scheduled"),
+			"pending_review_count": len(self.list_pending_reviews(tenant_id)),
 			"recent_events": self.list_audit_events(tenant_id)[-5:],
 		}
 
@@ -685,7 +844,9 @@ class EncrService:
 		message: str,
 		actor: str,
 		severity: str = "info",
+		policy_result: dict[str, Any] | None = None,
 	) -> dict[str, Any]:
+		policy_result = policy_result or _allow_result()
 		record = CryptoAuditEventRecord(
 			id=_stable_id("encr_event", tenant_id, event_type, subject_id, len(self.audit_events)),
 			tenant_id=tenant_id,
@@ -694,6 +855,10 @@ class EncrService:
 			message=message,
 			actor=actor,
 			severity=severity,
+			policy_decision=policy_result["decision"],
+			matched_rules=list(policy_result["matched_rules"]),
+			review_reasons=self._reasons(policy_result),
+			review_evidence=self._review_evidence(policy_result),
 		)
 		self.audit_events[record.id] = record
 		return record.to_dict()
@@ -704,6 +869,24 @@ class EncrService:
 				return str(action["reason"])
 		return "crypto_operation_denied"
 
+	def _reasons(self, result: dict[str, Any]) -> list[str]:
+		return [
+			str(action["reason"])
+			for action in result.get("actions", [])
+			if action.get("reason")
+		]
+
+	def _review_evidence(self, result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+		return {
+			"required_actions": [
+				str(action.get("required_action"))
+				for action in result.get("actions", [])
+				if action.get("required_action")
+			],
+			"reasons": self._reasons(result),
+			"review_recorded": bool(review_recorded),
+		}
+
 	def _normalize_agent_token(self, value: str) -> str:
 		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
 
@@ -712,6 +895,18 @@ class EncrService:
 		if tenant_id is not None:
 			items = [item for item in items if item["tenant_id"] == tenant_id]
 		return sorted(items, key=lambda item: item["id"])
+
+
+def _allow_result() -> dict[str, Any]:
+	return {"decision": "allow", "matched_rules": [], "actions": []}
+
+
+def _review_result(reason: str, required_action: str) -> dict[str, Any]:
+	return {
+		"decision": "require_review",
+		"matched_rules": [],
+		"actions": [{"reason": reason, "required_action": required_action}],
+	}
 
 
 class APGEncryptionService:

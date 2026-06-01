@@ -28,8 +28,11 @@ def dashboard_model(
 		"exception_reviews": service.list_exception_reviews(tenant_id),
 		"rotations": service.list_rotations(tenant_id),
 		"crypto_agents": service.list_crypto_agents(tenant_id),
+		"crypto_lifecycle_batches": service.list_crypto_lifecycle_batches(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"theme": contract["theme"],
 	}
 
@@ -160,6 +163,10 @@ def crypto_agents_model(
 		"route": "/encr/agents",
 		"tenant_id": tenant_id,
 		"crypto_agents": service.list_crypto_agents(tenant_id),
+		"pending_reviews": [
+			agent for agent in service.list_crypto_agents(tenant_id)
+			if agent["status"] == "pending_review"
+		],
 		"supported_runtimes": agents["supported_runtimes"],
 		"supported_roles": agents["supported_roles"],
 		"privileged_roles": agents["privileged_roles"],
@@ -185,5 +192,6 @@ def settings_model(tenant_id: str = "default") -> dict[str, object]:
 		"configuration": contract["configuration"],
 		"agents": contract["agents"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"theme": contract["theme"],
 	}
