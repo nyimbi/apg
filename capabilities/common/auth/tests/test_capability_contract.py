@@ -87,7 +87,15 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["configuration"]["security_agents"]["privileged_roles_require_human_approval"] is True
 	assert contract["agents"]["first_class"] is True
 	assert "security_agent_privileged_role_requires_human_approval" in contract["agents"]["guardrails"]
-	assert set(contract["provides"]) >= {"identity_registry", "role_governance", "security_agents"}
+	assert set(contract["provides"]) >= {"identity_registry", "role_governance", "security_agents", "review_evidence"}
+	assert contract["review_evidence"]["pending_queues"] == [
+		"role_assignment_approvals",
+		"privacy_budget_approvals",
+		"privacy_queries",
+		"security_agents",
+		"batch_auth_mutations",
+	]
+	assert "policy_decision" in contract["review_evidence"]["policy_fields"]
 	assert contract["requires"] == ["audl", "mten", "keym", "secu"]
 	assert len(contract["rule_engine"]["rules"]) >= 9
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
@@ -142,6 +150,11 @@ def test_rule_engine_denies_unsafe_privileged_access():
 		"requested_operation": "batch_auth_mutation",
 		"event_stream": "memory",
 	})
+	agent_review_result = evaluate_capability_rules({
+		"security_agent_present": True,
+		"agent_privileged_role": True,
+		"human_approval_required": False,
+	})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) == {
@@ -155,6 +168,8 @@ def test_rule_engine_denies_unsafe_privileged_access():
 	assert approval_result["matched_rules"] == ["role_assignment_approval_requires_independent_reviewer"]
 	assert privacy_approval_result["matched_rules"] == ["privacy_budget_approval_requires_independent_reviewer"]
 	assert batch_result["matched_rules"] == ["batch_auth_mutation_requires_bytewax"]
+	assert agent_review_result["decision"] == "require_review"
+	assert agent_review_result["matched_rules"] == ["security_agent_privileged_role_requires_human_approval"]
 
 
 def test_capability_info_and_registration_include_manifest_and_theme():
@@ -166,8 +181,10 @@ def test_capability_info_and_registration_include_manifest_and_theme():
 	assert info["configuration"]["tenant_id"] == "default"
 	assert info["ui_manifest"]["requires_theme"] is True
 	assert info["theme"]["name"] == "auth_trust_fabric"
+	assert info["review_evidence"]["deny_behavior"] == "Denied batch AUTH mutations persist evidence before PermissionError"
 	assert registration["aliases"] == ["auth_rbac"]
 	assert registration["rule_engine"]["type"] == "deterministic"
+	assert registration["review_evidence"]["durable_statuses"]
 	assert registration["ui_components"]["metrics"] == "/auth/metrics/overview"
 	assert registration["ui_components"]["role_approvals"] == "/auth/roles/approvals"
 	assert registration["ui_components"]["privacy_reviews"] == "/auth/privacy/reviews"
@@ -266,6 +283,10 @@ def test_auth_service_runs_identity_role_session_access_and_privacy_lifecycle():
 		"privacy_approval_count": 0,
 		"pending_privacy_approval_count": 0,
 		"security_agent_count": 0,
+		"pending_security_agent_review_count": 0,
+		"batch_auth_mutation_count": 0,
+		"denied_batch_auth_mutation_count": 0,
+		"pending_review_count": 0,
 		"denied_decision_count": 0,
 		"privacy_review_count": 0,
 		"average_trust_score": session["trust_score"],
@@ -467,7 +488,10 @@ def test_auth_security_agents_and_bytewax_guardrails():
 	assert agent["purpose"] == "summarize role evidence for reviewers"
 	assert agent["human_approval_required"] is True
 	assert batch["accepted"] is True
+	assert batch["status"] == "accepted"
+	assert batch["policy_decision"] == "allow"
 	assert dashboard["security_agents"][0]["id"] == "security-agent-1"
+	assert dashboard["batch_auth_mutations"][0]["id"] == batch["id"]
 	assert agents["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
 	assert "role_reviewer" in agents["privileged_roles"]
 	assert "security_agent_privileged_role_requires_human_approval" in agents["guardrails"]
@@ -495,16 +519,25 @@ def test_auth_security_agents_and_bytewax_guardrails():
 			purpose="identity review evidence",
 		)
 
-	with pytest.raises(PermissionError, match="security_agent_human_approval_required"):
-		service.register_security_agent(
-			agent_id="unapproved-privileged-agent",
-			tenant_id="tenant-auth-agent",
-			name="Unapproved Privileged Agent",
-			runtime="codex",
-			role="privacy_reviewer",
-			scope="privacy budget review",
-			human_approval_required=False,
-		)
+	review_agent = service.register_security_agent(
+		agent_id="unapproved-privileged-agent",
+		tenant_id="tenant-auth-agent",
+		name="Unapproved Privileged Agent",
+		runtime="codex",
+		role="privacy_reviewer",
+		scope="privacy budget review",
+		owner="auth-security",
+		purpose="privacy budget review support",
+		contribution_disclosed=True,
+		human_approval_required=False,
+	)
+	assert review_agent["status"] == "pending_review"
+	assert review_agent["policy_decision"] == "require_review"
+	assert review_agent["review_reasons"] == ["security_agent_human_approval_required"]
+	assert review_agent["review_evidence"]["required_actions"] == [
+		"enable_human_approval_for_privileged_security_agent"
+	]
+	assert service.list_pending_reviews("tenant-auth-agent")[0]["id"] == "unapproved-privileged-agent"
 
 	with pytest.raises(PermissionError, match="bytewax_event_stream_required"):
 		service.validate_batch_auth_mutation(
@@ -512,6 +545,10 @@ def test_auth_security_agents_and_bytewax_guardrails():
 			event_stream="memory",
 			mutation_count=1,
 		)
+	denied_batch = service.list_batch_auth_mutations("tenant-auth-agent")[-1]
+	assert denied_batch["status"] == "denied"
+	assert denied_batch["policy_decision"] == "deny"
+	assert denied_batch["review_reasons"] == ["bytewax_event_stream_required"]
 
 
 def test_api_helpers_and_view_models_expose_auth_lifecycle():
@@ -615,6 +652,7 @@ def test_api_helpers_and_view_models_expose_auth_lifecycle():
 	assert approved_privacy["approval_recorded"] is True
 	assert api_helpers.capability_status(identity["tenant_id"])["role_approval_count"] == 1
 	assert dashboard["summary"]["admin_assignment_count"] == 1
+	assert dashboard["pending_reviews"][0]["id"] == "api-privacy"
 	assert dashboard["privacy_approvals"][0]["id"] == "api-privacy-approval"
 	assert approval_queue["decided_approvals"][0]["id"] == "api-approval"
 	assert privacy_center["decided_approvals"][0]["id"] == "api-privacy-approval"
@@ -644,6 +682,9 @@ def test_api_helpers_expose_security_agents_and_batch_guardrail():
 	assert agent["purpose"] == "identity review support"
 	assert api_helpers.list_security_agents("tenant-api-security-agent")[0]["id"] == "api-security-agent"
 	assert batch["accepted"] is True
+	assert batch["status"] == "accepted"
+	assert api_helpers.list_batch_auth_mutations("tenant-api-security-agent")[0]["status"] == "accepted"
+	assert api_helpers.list_pending_reviews("tenant-api-security-agent") == []
 
 
 def test_auth_service_infers_privileged_access_tier_from_permission_and_role():

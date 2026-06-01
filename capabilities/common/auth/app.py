@@ -61,6 +61,7 @@ def semantic_model() -> dict[str, Any]:
 				"screens": routes,
 				"theme": contract["theme"],
 				"agents": contract["agents"],
+				"review_evidence": contract["review_evidence"],
 				"runtime": {
 					"api": "api.py",
 					"api_helpers": "api_helpers.py",
@@ -87,6 +88,7 @@ def semantic_model() -> dict[str, Any]:
 				"configuration": contract["configuration"],
 				"provides": contract["provides"],
 				"requires": contract["requires"],
+				"review_evidence": contract["review_evidence"],
 			}
 		},
 		"rules": {
@@ -176,6 +178,10 @@ def self_test() -> dict[str, Any]:
 		errors.append("AUTH semantic model agent manifest is stale")
 	if model.get("capabilities", {}).get("auth", {}).get("streaming", {}).get("engine") != "bytewax":
 		errors.append("AUTH semantic model Bytewax stream manifest is stale")
+	if "review_evidence" not in model.get("capabilities", {}).get("auth", {}).get("provides", []):
+		errors.append("AUTH review evidence provide is missing")
+	if "review_evidence" not in model.get("capabilities", {}).get("auth", {}):
+		errors.append("AUTH durable review evidence is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

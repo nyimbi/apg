@@ -34,6 +34,8 @@ def test_package_contract_shape_is_valid():
 	assert contract["streaming"]["engine"] == "bytewax"
 	assert contract["agents"]["first_class"] is True
 	assert "codex" in contract["configuration"]["security_agents"]["supported_runtimes"]
+	assert "review_evidence" in contract["provides"]
+	assert contract["review_evidence"]["pending_queues"]
 	for required_doc in ("README.md", "SPECIFICATION.md", "PLAN.md", "cap_spec.md"):
 		assert (PACKAGE_DIR / required_doc).exists()
 
@@ -53,5 +55,7 @@ def test_package_app_entrypoint_is_publishable():
 	assert model["capabilities"]["auth"]["streaming"]["processor"] == "bytewax"
 	assert model["capabilities"]["auth"]["streaming"]["engine"] == "bytewax"
 	assert model["capabilities"]["auth"]["agents"]["first_class"] is True
+	assert "review_evidence" in model["capabilities"]["auth"]["provides"]
+	assert model["capabilities"]["auth"]["review_evidence"]["pending_queues"]
 	assert model["agents"]["auth_security_agent_contract"]["first_class"] is True
 	assert model["capabilities"]["auth"]["screens"]["security_agents"]["route"] == "/auth/security/agents"

@@ -220,6 +220,14 @@ def list_security_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_security_agents(tenant_id)
 
 
+def list_batch_auth_mutations(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_batch_auth_mutations(tenant_id)
+
+
+def list_pending_reviews(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_pending_reviews(tenant_id)
+
+
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.create_record(
 		record_id=str(payload["id"]),

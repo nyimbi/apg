@@ -15,6 +15,7 @@ from .capability_contract import (
 from .models import (
 	AuthAccessDecision,
 	AuthAuditEvent,
+	AuthBatchMutationEvidence,
 	AuthIdentity,
 	AuthPrivacyBudgetApproval,
 	AuthPrivacyQuery,
@@ -39,6 +40,7 @@ class AuthService:
 		self._privacy_queries: dict[tuple[str, str], AuthPrivacyQuery] = {}
 		self._privacy_approvals: dict[tuple[str, str], AuthPrivacyBudgetApproval] = {}
 		self._security_agents: dict[tuple[str, str], AuthSecurityAgent] = {}
+		self._batch_mutations: dict[tuple[str, str], AuthBatchMutationEvidence] = {}
 		self._audit_events: dict[tuple[str, str], AuthAuditEvent] = {}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -147,6 +149,7 @@ class AuthService:
 			raise ValueError("role_approval_requester_required")
 		if not justification:
 			raise ValueError("role_approval_justification_required")
+		review_result = _review_result("role_assignment_review_required", "review_role_assignment")
 		approval = AuthRoleAssignmentApproval(
 			id=approval_id,
 			tenant_id=tenant_id,
@@ -154,6 +157,10 @@ class AuthService:
 			role_id=role_id,
 			requested_by=requested_by,
 			justification=justification,
+			policy_decision=review_result["decision"],
+			matched_rules=tuple(review_result["matched_rules"]),
+			review_reasons=self._reasons(review_result),
+			review_evidence=self._review_evidence(review_result),
 		)
 		self._role_approvals[self._tenant_key(tenant_id, approval_id)] = approval
 		self._record_audit(
@@ -161,8 +168,10 @@ class AuthService:
 			subject_id=approval_id,
 			event_type="role_assignment_approval_requested",
 			actor=requested_by,
-			decision="require_review",
+			decision=review_result["decision"],
+			reasons=self._reasons(review_result),
 			metadata={"user_id": user_id, "role_id": role_id, "role_tier": role.tier},
+			policy_result=review_result,
 		)
 		return approval.to_dict()
 
@@ -196,6 +205,10 @@ class AuthService:
 			reviewer=reviewer,
 			notes=notes,
 			status=decision,
+			policy_decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=self._reasons(result),
+			review_evidence=self._review_evidence(result, review_recorded=True),
 		)
 		self._role_approvals[self._tenant_key(tenant_id, approval_id)] = decided
 		self._record_audit(
@@ -206,6 +219,7 @@ class AuthService:
 			decision=decision,
 			reasons=self._reasons(result),
 			metadata={"user_id": approval.user_id, "role_id": approval.role_id},
+			policy_result=result,
 		)
 		return decided.to_dict()
 
@@ -253,6 +267,7 @@ class AuthService:
 			decision=result["decision"],
 			reasons=self._reasons(result),
 			metadata={"user_id": user_id, "role_id": role_id, "role_tier": role.tier},
+			policy_result=result,
 		)
 		return assignment.to_dict()
 
@@ -315,6 +330,7 @@ class AuthService:
 			decision=result["decision"],
 			reasons=self._reasons(result),
 			metadata={"risk_level": risk_level, "auth_source": auth_source, "trust_score": trust_score},
+			policy_result=result,
 		)
 		return session.to_dict()
 
@@ -386,6 +402,7 @@ class AuthService:
 			decision=decision,
 			reasons=tuple(reasons),
 			metadata={"permission": permission, "role_ids": role_ids},
+			policy_result=result,
 		)
 		return access_decision.to_dict()
 
@@ -416,6 +433,7 @@ class AuthService:
 			raise ValueError("privacy_approval_requester_required")
 		if not justification:
 			raise ValueError("privacy_approval_justification_required")
+		review_result = _review_result("privacy_budget_review_required", "review_privacy_budget")
 		approval = AuthPrivacyBudgetApproval(
 			id=approval_id,
 			tenant_id=tenant_id,
@@ -424,6 +442,10 @@ class AuthService:
 			epsilon_cost=float(epsilon_cost),
 			requested_by=requested_by,
 			justification=justification,
+			policy_decision=review_result["decision"],
+			matched_rules=tuple(review_result["matched_rules"]),
+			review_reasons=self._reasons(review_result),
+			review_evidence=self._review_evidence(review_result),
 		)
 		self._privacy_approvals[self._tenant_key(tenant_id, approval_id)] = approval
 		self._record_audit(
@@ -431,9 +453,10 @@ class AuthService:
 			subject_id=approval_id,
 			event_type="privacy_budget_approval_requested",
 			actor=requested_by,
-			decision="require_review",
-			reasons=self._reasons(result),
+			decision=review_result["decision"],
+			reasons=self._reasons(review_result),
 			metadata={"user_id": user_id, "query_type": query_type, "epsilon_cost": float(epsilon_cost)},
+			policy_result=review_result,
 		)
 		return approval.to_dict()
 
@@ -467,6 +490,10 @@ class AuthService:
 			reviewer=reviewer,
 			notes=notes,
 			status=decision,
+			policy_decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=self._reasons(result),
+			review_evidence=self._review_evidence(result, review_recorded=True),
 		)
 		self._privacy_approvals[self._tenant_key(tenant_id, approval_id)] = decided
 		self._record_audit(
@@ -477,6 +504,7 @@ class AuthService:
 			decision=decision,
 			reasons=self._reasons(result),
 			metadata={"user_id": approval.user_id, "query_type": approval.query_type},
+			policy_result=result,
 		)
 		return decided.to_dict()
 
@@ -531,6 +559,10 @@ class AuthService:
 			approval_recorded=approval is not None,
 			reasons=tuple(reasons),
 			approval_id=approval.id if approval else approval_id,
+			policy_decision=privacy_result["decision"],
+			matched_rules=tuple(privacy_result["matched_rules"]),
+			review_reasons=tuple(reasons),
+			review_evidence=self._review_evidence(privacy_result, review_recorded=approval is not None),
 		)
 		self._privacy_queries[self._tenant_key(tenant_id, query_id)] = query
 		self._record_audit(
@@ -541,6 +573,7 @@ class AuthService:
 			decision=decision,
 			reasons=tuple(reasons),
 			metadata={"query_type": query_type, "epsilon_cost": float(epsilon_cost)},
+			policy_result=privacy_result,
 		)
 		return query.to_dict()
 
@@ -600,7 +633,11 @@ class AuthService:
 			purpose=agent_purpose,
 			human_approval_required=human_approval_required,
 			policy_ref=policy_ref,
-			status=status,
+			status="pending_review" if result["decision"] == "require_review" else status,
+			policy_decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=self._reasons(result),
+			review_evidence=self._review_evidence(result, review_recorded=human_approval_required),
 		)
 		self._security_agents[self._tenant_key(tenant_id, agent_id)] = agent
 		self._record_audit(
@@ -618,6 +655,7 @@ class AuthService:
 				"purpose": agent_purpose,
 				"human_approval_required": human_approval_required,
 			},
+			policy_result=result,
 		)
 		return agent.to_dict()
 
@@ -631,20 +669,65 @@ class AuthService:
 		mutation_count: int,
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
+		if int(mutation_count) < 1:
+			raise ValueError("batch_auth_mutation_empty")
+		stream_name = _normalize_token(event_stream)
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
 			"requested_operation": "batch_auth_mutation",
-			"event_stream": _normalize_token(event_stream),
+			"event_stream": stream_name,
 			"mutation_count": mutation_count,
 		})
-		self._raise_if_denied(result)
-		return {
+		record = AuthBatchMutationEvidence(
+			id=f"auth-batch-{len(self._batch_mutations) + 1:04d}",
+			tenant_id=tenant_id,
+			event_stream=stream_name,
+			mutation_count=int(mutation_count),
+			status="denied" if result["decision"] == "deny" else "accepted",
+			policy_decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=self._reasons(result),
+			review_evidence=self._review_evidence(result),
+		)
+		self._batch_mutations[self._tenant_key(tenant_id, record.id)] = record
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=record.id,
+			event_type="batch_auth_mutation_validated",
+			actor="system",
+			decision=record.status,
+			reasons=self._reasons(result),
+			metadata={"event_stream": stream_name, "mutation_count": int(mutation_count)},
+			policy_result=result,
+		)
+		if result["decision"] == "deny":
+			self._raise_if_denied(result)
+		payload = record.to_dict()
+		payload.update({
 			"tenant_id": tenant_id,
-			"event_stream": _normalize_token(event_stream),
-			"mutation_count": mutation_count,
+			"event_stream": "bytewax",
+			"mutation_count": int(mutation_count),
 			"accepted": True,
 			"rule_result": result,
-		}
+		})
+		return payload
+
+	def list_batch_auth_mutations(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._batch_mutations.values(), tenant_id)
+
+	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		items = (
+			self.list_role_assignment_approvals(tenant_id)
+			+ self.list_privacy_budget_approvals(tenant_id)
+			+ self.list_privacy_queries(tenant_id)
+			+ self.list_security_agents(tenant_id)
+			+ self.list_batch_auth_mutations(tenant_id)
+		)
+		return [
+			item
+			for item in items
+			if item.get("status") in {"pending", "pending_review", "review_required"}
+		]
 
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		identities = [item for item in self._identities.values() if item.tenant_id == tenant_id]
@@ -670,6 +753,16 @@ class AuthService:
 				if item.tenant_id == tenant_id and item.status == "pending"
 			]),
 			"security_agent_count": len([item for item in self._security_agents.values() if item.tenant_id == tenant_id]),
+			"pending_security_agent_review_count": len([
+				item for item in self._security_agents.values()
+				if item.tenant_id == tenant_id and item.status == "pending_review"
+			]),
+			"batch_auth_mutation_count": len([item for item in self._batch_mutations.values() if item.tenant_id == tenant_id]),
+			"denied_batch_auth_mutation_count": len([
+				item for item in self._batch_mutations.values()
+				if item.tenant_id == tenant_id and item.status == "denied"
+			]),
+			"pending_review_count": len(self.list_pending_reviews(tenant_id)),
 			"denied_decision_count": len([item for item in decisions if item.decision == "deny"]),
 			"privacy_review_count": len([
 				item for item in self._privacy_queries.values()
@@ -903,7 +996,9 @@ class AuthService:
 		decision: str,
 		reasons: tuple[str, ...] = (),
 		metadata: dict[str, Any] | None = None,
+		policy_result: dict[str, Any] | None = None,
 	) -> AuthAuditEvent:
+		policy_result = policy_result or _allow_result()
 		event = AuthAuditEvent(
 			id=f"auth-audit-{len(self._audit_events) + 1:04d}",
 			tenant_id=tenant_id,
@@ -913,12 +1008,16 @@ class AuthService:
 			decision=decision,
 			reasons=tuple(reason for reason in reasons if reason),
 			metadata=dict(metadata or {}),
+			policy_decision=policy_result["decision"],
+			matched_rules=tuple(policy_result["matched_rules"]),
+			review_reasons=self._reasons(policy_result),
+			review_evidence=self._review_evidence(policy_result),
 		)
 		self._audit_events[self._tenant_key(tenant_id, event.id)] = event
 		return event
 
 	def _raise_if_denied(self, result: dict[str, Any]) -> None:
-		if result["decision"] != "allow":
+		if result["decision"] == "deny":
 			reasons = ", ".join(self._reasons(result))
 			raise PermissionError(reasons or "capability_policy_blocked")
 
@@ -927,6 +1026,17 @@ class AuthService:
 			str(action.get("reason") or action.get("required_action") or "capability_policy_blocked")
 			for action in result.get("actions", [])
 		)
+
+	def _review_evidence(self, result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+		return {
+			"required_actions": [
+				str(action.get("required_action"))
+				for action in result.get("actions", [])
+				if action.get("required_action")
+			],
+			"reasons": list(self._reasons(result)),
+			"review_recorded": bool(review_recorded),
+		}
 
 	def _list(self, values: Any, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		items = list(values)
@@ -943,3 +1053,15 @@ def _coerce_bool(value: Any) -> bool:
 
 def _normalize_token(value: str) -> str:
 	return value.strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def _allow_result() -> dict[str, Any]:
+	return {"decision": "allow", "matched_rules": [], "actions": []}
+
+
+def _review_result(reason: str, required_action: str) -> dict[str, Any]:
+	return {
+		"decision": "require_review",
+		"matched_rules": [],
+		"actions": [{"reason": reason, "required_action": required_action}],
+	}

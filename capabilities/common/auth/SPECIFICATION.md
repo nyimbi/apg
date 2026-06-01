@@ -64,8 +64,17 @@ AUTH owns these package-level records:
 - `AuthSecurityAgent`: governed AI security-agent registration with tenant,
   runtime, role, owner, purpose, scope, disclosure, human approval, policy, and
   status evidence.
+- `AuthBatchMutationEvidence`: accepted or denied Bytewax batch AUTH mutation
+  validation with durable policy evidence.
 - `AuthAuditEvent`: tenant-scoped governance event for identity, role, session,
   access, privacy, and approval lifecycle changes.
+
+Reviewable lifecycle records expose a consistent evidence shape:
+
+- `policy_decision`;
+- `matched_rules`;
+- `review_reasons`;
+- `review_evidence`.
 
 All mutable package-level state must be tenant-qualified so duplicate IDs in
 different tenants cannot collide.
@@ -92,11 +101,15 @@ The focused lifecycle is:
 10. Revoke sessions by tenant-local session ID and list current tenant identity,
    role, session, decision,
    privacy, approval, and audit state.
-11. Register security agents only when they use a supported runtime, supported
-    role, accountable owner, declared purpose, explicit scope, registration
-    state, contribution disclosure, and human approval for privileged roles.
-12. Validate batch AUTH mutation intent against the Bytewax lifecycle stream.
-13. Emit tenant-scoped audit events for identity, role, approval, assignment,
+11. Register security agents when they use a supported runtime, supported role,
+    accountable owner, declared purpose, explicit scope, registration state,
+    and contribution disclosure; retain privileged security agents without
+    human approval as `pending_review` evidence.
+12. Validate batch AUTH mutation intent against the Bytewax lifecycle stream
+    and persist accepted or denied validation evidence.
+13. Compose pending role, privacy, security-agent, and batch review records for
+    generated review consoles.
+14. Emit tenant-scoped audit events for identity, role, approval, assignment,
     session, access, privacy, and revocation lifecycle changes.
 
 ## Rules And Guardrails
@@ -128,7 +141,7 @@ The contract rules are executable guardrails:
 - `security_agent_requires_disclosure`: AI-assisted contributions must be
   disclosed.
 - `security_agent_privileged_role_requires_human_approval`: privileged AI
-  security-agent roles require explicit human approval.
+  security-agent roles require explicit human approval evidence or review.
 - `auth_state_change_requires_audit`: AUTH lifecycle state changes require
   audit evidence.
 - `batch_auth_mutation_requires_bytewax`: batch AUTH mutation intent must use
@@ -188,6 +201,12 @@ Generated applications must display agent scope and contribution disclosure in
 review surfaces so human approvers can distinguish agent-assisted summaries
 from direct reviewer decisions.
 
+Privileged agent registration without human approval must not vanish as a
+transient exception. The service records it with `status: pending_review`,
+`policy_decision: require_review`, and the required action
+`enable_human_approval_for_privileged_security_agent` so a generated AUTH
+console can route it to an accountable human reviewer.
+
 The capability contract also publishes an `agents` manifest with
 `first_class: true`, supported runtimes, supported roles, privileged roles,
 composition points, and guardrails. This is the APG composition surface for
@@ -209,6 +228,26 @@ contract and generated semantic model:
   assignment, session start/revocation, access evaluation, privacy decisions,
   and security-agent registration;
 - batch mutation guardrail: `batch_auth_mutation_requires_bytewax`.
+
+Denied non-Bytewax batch AUTH mutation attempts must be stored as
+`AuthBatchMutationEvidence` with `status: denied` and
+`review_reasons: ["bytewax_event_stream_required"]` before the service raises
+`PermissionError`.
+
+## Durable Review Evidence
+
+AUTH publishes a `review_evidence` contract section that names durable
+statuses, policy fields, pending-review queues, and denied batch mutation
+behavior. Generated APG applications use this section to compose review
+consoles without hard-coding AUTH internals.
+
+Pending queues include:
+
+- role assignment approvals;
+- privacy budget approvals;
+- privacy queries;
+- security agents;
+- batch AUTH mutations.
 
 ## Adapter Boundaries
 
@@ -247,14 +286,15 @@ Local package tests must not require those systems.
 - API helpers and view models expose the same lifecycle state.
 - Security agents can be registered with supported runtime, supported role,
   owner, purpose, scope, disclosure, human approval, and policy evidence.
-- Privileged security-agent roles fail closed when human approval is not
-  required.
+- Privileged security-agent roles without human approval are preserved as
+  `pending_review` evidence with the human-approval required action.
 - Unsupported security-agent runtime, missing scope, or undisclosed agent
   contribution fails closed.
 - Batch AUTH mutation validation accepts Bytewax and denies other stream
-  providers.
+  providers while preserving denied validation evidence.
 - Generated semantic model exposes the current login/dashboard route names,
-  security-agent route, provides/requires metadata, and Bytewax stream metadata.
+  security-agent route, provides/requires metadata, review-evidence metadata,
+  and Bytewax stream metadata.
 - Publish-plan and implementation-audit checks pass.
 - Legacy generated-package naming is removed from package tests.
 

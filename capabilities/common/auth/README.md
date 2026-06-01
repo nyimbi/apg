@@ -28,6 +28,9 @@ audit surfaces.
 - Security-agent registration for `codex`, `claude_code`, `opencode`, and `pi`
   runtimes with explicit role, owner, purpose, scope, disclosure, approval, and
   policy evidence.
+- Durable review evidence for role approvals, privacy approvals, privacy
+  queries, privileged security-agent review, denied batch mutation routing, and
+  audit events.
 - Bytewax lifecycle stream metadata for batch AUTH mutation and generated
   application composition.
 - API-helper and view-model modules for generated APG Python applications.
@@ -79,16 +82,16 @@ role = service.define_role(
 )
 
 approval = service.request_role_assignment_approval(
-    request_id="approve-alice-admin",
+    approval_id="approve-alice-admin",
     tenant_id=tenant_id,
-    identity_id=identity["id"],
+    user_id=identity["id"],
     role_id=role["id"],
     requested_by="system",
     justification="Initial tenant administrator.",
 )
 
 service.decide_role_assignment_approval(
-    request_id=approval["id"],
+    approval_id=approval["id"],
     tenant_id=tenant_id,
     reviewer="system",
     decision="approved",
@@ -98,7 +101,7 @@ service.decide_role_assignment_approval(
 assignment = service.assign_role(
     assignment_id="alice-admin",
     tenant_id=tenant_id,
-    identity_id=identity["id"],
+    user_id=identity["id"],
     role_id=role["id"],
     assigned_by="system",
     approval_id=approval["id"],
@@ -135,13 +138,37 @@ assert agent["human_approval_required"] is True
 ```
 
 Privileged agent roles, including `role_reviewer`, `privacy_reviewer`, and
-`federation_reviewer`, fail closed when `human_approval_required` is false.
+`federation_reviewer`, are retained as `pending_review` evidence when
+`human_approval_required` is false.
+
+## Durable Review Evidence
+
+AUTH preserves review state instead of dropping important governance attempts
+on the floor. Role assignment approvals, privacy-budget approvals, privacy
+queries that require review, privileged security-agent registrations, denied
+batch mutation validations, and audit events carry the same policy evidence
+shape:
+
+- `policy_decision`;
+- `matched_rules`;
+- `review_reasons`;
+- `review_evidence`.
+
+Generated applications can compose a single pending review queue:
+
+```python
+pending = service.list_pending_reviews(tenant_id)
+```
+
+This lets AUTH dashboards show human reviewers the exact role, privacy, agent,
+or batch lifecycle decision that needs attention.
 
 ## Bytewax Guardrail
 
 Batch AUTH mutation must be routed through the declared Bytewax lifecycle
 stream. The dependency-light service validates the declared stream provider
-before accepting batch mutation intent.
+before accepting batch mutation intent and persists denial evidence before
+raising `PermissionError` for non-Bytewax streams.
 
 ```python
 service.validate_batch_auth_mutation(
@@ -169,6 +196,8 @@ service.validate_batch_auth_mutation(
   guardrails.
 - `streaming`: Bytewax engine, processor, topics, state collections, lifecycle
   events, and batch mutation guardrail.
+- `review_evidence`: durable statuses, policy fields, pending-review queues,
+  and denied batch mutation behavior.
 
 ## Verification
 

@@ -78,6 +78,10 @@ class AuthRoleAssignmentApproval:
 	reviewer: str | None = None
 	notes: str | None = None
 	status: str = "pending"
+	policy_decision: str = "require_review"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ("role_assignment_review_required",)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 
 	def to_dict(self) -> dict[str, Any]:
 		return {
@@ -91,6 +95,10 @@ class AuthRoleAssignmentApproval:
 			"reviewer": self.reviewer,
 			"notes": self.notes,
 			"status": self.status,
+			"policy_decision": self.policy_decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"review_evidence": dict(self.review_evidence),
 		}
 
 
@@ -196,6 +204,10 @@ class AuthPrivacyQuery:
 	approval_recorded: bool = False
 	reasons: tuple[str, ...] = ()
 	approval_id: str | None = None
+	policy_decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 
 	def to_dict(self) -> dict[str, Any]:
 		return {
@@ -209,6 +221,10 @@ class AuthPrivacyQuery:
 			"approval_recorded": self.approval_recorded,
 			"reasons": list(self.reasons),
 			"approval_id": self.approval_id,
+			"policy_decision": self.policy_decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"review_evidence": dict(self.review_evidence),
 		}
 
 
@@ -227,6 +243,10 @@ class AuthPrivacyBudgetApproval:
 	reviewer: str | None = None
 	notes: str | None = None
 	status: str = "pending"
+	policy_decision: str = "require_review"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ("privacy_budget_review_required",)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 
 	def to_dict(self) -> dict[str, Any]:
 		return {
@@ -241,6 +261,10 @@ class AuthPrivacyBudgetApproval:
 			"reviewer": self.reviewer,
 			"notes": self.notes,
 			"status": self.status,
+			"policy_decision": self.policy_decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"review_evidence": dict(self.review_evidence),
 		}
 
 
@@ -256,6 +280,10 @@ class AuthAuditEvent:
 	decision: str
 	reasons: tuple[str, ...] = ()
 	metadata: dict[str, Any] = field(default_factory=dict)
+	policy_decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 
 	def to_dict(self) -> dict[str, Any]:
 		return {
@@ -267,6 +295,10 @@ class AuthAuditEvent:
 			"decision": self.decision,
 			"reasons": list(self.reasons),
 			"metadata": dict(self.metadata),
+			"policy_decision": self.policy_decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"review_evidence": dict(self.review_evidence),
 		}
 
 
@@ -287,6 +319,10 @@ class AuthSecurityAgent:
 	human_approval_required: bool
 	policy_ref: str | None = None
 	status: str = "active"
+	policy_decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 
 	def to_dict(self) -> dict[str, Any]:
 		return {
@@ -303,4 +339,38 @@ class AuthSecurityAgent:
 			"human_approval_required": self.human_approval_required,
 			"policy_ref": self.policy_ref,
 			"status": self.status,
+			"policy_decision": self.policy_decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"review_evidence": dict(self.review_evidence),
+		}
+
+
+@dataclass(frozen=True)
+class AuthBatchMutationEvidence:
+	"""Bytewax batch AUTH mutation validation evidence."""
+
+	id: str
+	tenant_id: str
+	event_stream: str
+	mutation_count: int
+	status: str = "accepted"
+	processor: str = "bytewax"
+	policy_decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
+	review_evidence: dict[str, Any] = field(default_factory=dict)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"event_stream": self.event_stream,
+			"mutation_count": self.mutation_count,
+			"status": self.status,
+			"processor": self.processor,
+			"policy_decision": self.policy_decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"review_evidence": dict(self.review_evidence),
 		}

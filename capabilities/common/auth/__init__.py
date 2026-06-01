@@ -2027,6 +2027,9 @@ def get_capability_info(tenant_id: str = "default", overrides: Optional[Dict[str
 		"rule_engine": contract["rule_engine"],
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 	}
 
 
@@ -2054,6 +2057,8 @@ def register_capability() -> Dict[str, Any]:
 			"role_assignment_approvals": "Require independent approval evidence before privileged role assignment",
 			"privacy_budget_approvals": "Require independent approval evidence before privacy-budget overrides",
 			"sessions": "Issue, monitor, and revoke enriched sessions",
+			"security_agents": "Register governed AI security agents for identity, role, session, privacy, and federation review",
+			"review_evidence": "Compose pending role, privacy, agent, and batch review evidence queues",
 			"behavioral_auth": "Continuously score behavioral trust signals",
 			"biometrics": "Manage biometric fusion enrollment and verification",
 			"federation": "Coordinate trusted federated identity mesh flows",
@@ -2078,6 +2083,9 @@ def register_capability() -> Dict[str, Any]:
 		},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"permissions": [
 			"auth:view",
 			"auth:login",

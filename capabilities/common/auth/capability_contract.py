@@ -410,14 +410,14 @@ def default_rules() -> list[CapabilityRule]:
 		),
 		CapabilityRule(
 			name="security_agent_privileged_role_requires_human_approval",
-			description="Privileged AI security-agent roles require explicit human approval.",
+			description="Privileged AI security-agent roles require explicit human approval evidence or review.",
 			condition={
 				"security_agent_present": True,
 				"agent_privileged_role": True,
 				"human_approval_required": False
 			},
 			effect={
-				"decision": "deny",
+				"decision": "require_review",
 				"reason": "security_agent_human_approval_required",
 				"required_action": "enable_human_approval_for_privileged_security_agent"
 			}
@@ -558,7 +558,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"session_control",
 			"access_decisions",
 			"privacy_budget_governance",
-			"security_agents"
+			"security_agents",
+			"review_evidence"
 		],
 		"requires": ["audl", "mten", "keym", "secu"],
 		"configuration": config.for_tenant(tenant_id, overrides),
@@ -574,7 +575,13 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"components": theme.components
 		},
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest()
+		"streaming": streaming_manifest(),
+		"review_evidence": {
+			"durable_statuses": ["pending", "pending_review", "review_required", "denied", "approved", "rejected", "accepted"],
+			"policy_fields": ["policy_decision", "matched_rules", "review_reasons", "review_evidence"],
+			"pending_queues": ["role_assignment_approvals", "privacy_budget_approvals", "privacy_queries", "security_agents", "batch_auth_mutations"],
+			"deny_behavior": "Denied batch AUTH mutations persist evidence before PermissionError",
+		}
 	}
 
 

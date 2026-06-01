@@ -10,6 +10,10 @@ Use:
   and acceptance gates.
 - `PLAN.md` for the current implementation and review plan.
 
+The current executable packet adds durable AUTH review evidence for role
+approvals, privacy approvals, privacy queries, privileged security-agent
+review, denied Bytewax batch mutation routing, and audit events.
+
 Focused proof commands:
 
 ```bash

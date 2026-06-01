@@ -41,9 +41,12 @@ def dashboard_model(
 		"privacy_queries": service.list_privacy_queries(tenant_id),
 		"privacy_approvals": service.list_privacy_budget_approvals(tenant_id),
 		"security_agents": service.list_security_agents(tenant_id),
+		"batch_auth_mutations": service.list_batch_auth_mutations(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"theme": contract["theme"],
 	}
 
@@ -133,6 +136,7 @@ def audit_model(
 		"audit_events": service.list_audit_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"theme": contract["theme"],
 	}
 
@@ -145,6 +149,11 @@ def security_agents_model(
 	contract = get_capability_contract(tenant_id)
 	return {
 		"agents": service.list_security_agents(tenant_id),
+		"pending_reviews": [
+			agent
+			for agent in service.list_security_agents(tenant_id)
+			if agent["status"] == "pending_review"
+		],
 		"supported_runtimes": contract["configuration"]["security_agents"]["supported_runtimes"],
 		"allowed_roles": contract["configuration"]["security_agents"]["allowed_roles"],
 		"privileged_roles": contract["configuration"]["security_agents"]["privileged_roles"],
@@ -184,6 +193,7 @@ def settings_model(tenant_id: str = "default") -> dict[str, object]:
 		"configuration": contract["configuration"],
 		"rules": contract["rule_engine"]["rules"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"theme": contract["theme"],
 	}
 
