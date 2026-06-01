@@ -29275,3 +29275,113 @@ Known gaps:
   large-scale storage/search, GraphRAG projections, dissemination delivery,
   durable Bytewax topology, or performance/load checks during this
   battery-conscious slice.
+
+## 2026-06-01 - Intel Radio Intelligence Listener executable capability
+
+Slice goal: replace the `capabilities/intel/radio` marker-only package with a
+package-backed, executable APG capability for lawful passive radio monitoring
+that can be composed into generated applications.
+
+Implemented:
+
+- Added `capabilities/intel/radio/SPECIFICATION.md` defining lawful authority,
+  band plans, receivers, collection sessions, signal observations,
+  transmission classifications, event assessments, referrals, dissemination,
+  reviews, UI/theming, AI agents, lifecycle semantics, rule guardrails, and
+  adapter boundaries.
+- Added `PLAN.md`, `README.md`, `cap_spec.md`, `package_manifest.json`,
+  `release_report.json`, and generated `semantic_model.json`.
+- Added executable package exports in `__init__.py` and removed the empty
+  `_Radio_Intelligence_Listener` marker.
+- Added domain models for authorities, band plans, receivers, collection
+  sessions, signal observations, transmission classifications, event
+  assessments, referrals, dissemination, reviews, and radio agents.
+- Added a deterministic capability contract with tenant-safe configuration, 71
+  rules, 13 UI routes, compact theme tokens, Bytewax lifecycle metadata, and
+  provider-neutral AI-agent runtimes: `codex`, `claude_code`, `opencode`, and
+  `pi`.
+- Added the `RadioIntelligenceListenerService` executable runtime with
+  tenant-keyed state, rule-before-mutation enforcement, Bytewax audit events,
+  frequency-range validation, band/receiver authority alignment, receiver
+  calibration evidence, observation frequency bounds, signal fingerprint and
+  confidence validation, classification/event analysis, referral and
+  dissemination approvals, review evidence, batch validation, and AI-agent
+  action guardrails.
+- Added API helpers, dashboard/console/agent view models, and a publishable
+  `app.py` entrypoint with self-test, component manifest, and semantic-model
+  generation.
+- Added focused package tests for contract shape, rule-engine denial paths,
+  full radio monitoring lifecycle execution, tenant isolation, guardrail
+  rejection, API helpers, view models, and app entrypoint.
+- Updated `capabilities/README.md` so the catalog snapshot reports 144 valid
+  contracts, 144 domain-specific packages, 144 strict complete package artifact
+  sets, and 10 Intel packages.
+
+Focused verification:
+
+- Generated `capabilities/intel/radio/semantic_model.json` from
+  `app.semantic_model()`.
+- `./.venv/bin/python -m py_compile
+  capabilities/intel/radio/__init__.py
+  capabilities/intel/radio/capability_contract.py
+  capabilities/intel/radio/models.py
+  capabilities/intel/radio/radio_runtime.py
+  capabilities/intel/radio/service.py
+  capabilities/intel/radio/api.py
+  capabilities/intel/radio/views.py
+  capabilities/intel/radio/app.py
+  capabilities/intel/radio/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/intel/radio/tests/test_package_contract.py` passed with 7
+  tests.
+- `./.venv/bin/python capabilities/intel/radio/app.py` passed self-test with
+  `passed: true` and `status: ok`.
+- `./.venv/bin/apg capabilities inspect intel_radio --json` passed with 71
+  rules, 13 UI routes, theme `intel_radio_control`, shell `apg_python`, and
+  Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/intel/radio --json` passed with `side_effect_free: true` and 0
+  warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/intel/radio --json` passed with 1 domain-specific capability, 0
+  warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/intel/radio --json` passed with 1 complete lifecycle, 71 rules,
+  13 UI routes, 11 theme tokens, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 144 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 144 operable contracts, 144 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/intel/radio`, `capabilities/intel/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed authority, band plan, receiver, session, observation,
+  classification, event, referral, dissemination, review, Bytewax batch, and
+  AI-agent lifecycle paths so rule evaluation happens before state mutation.
+- Confirmed service state is keyed by tenant plus record ID and covered by a
+  regression test with shared authority/band IDs across tenants.
+- Tightened radio-listener semantics around lawful authority, passive
+  monitoring, frequency-range validation, receiver calibration, band/receiver
+  authority alignment, observation frequency bounds, signal fingerprinting,
+  confidence validation, analyst evidence, approval gates, tenant isolation,
+  and privileged or prohibited AI-agent actions.
+- Kept live receiver control, SDR drivers, signal capture, demodulation,
+  recording storage, geolocation, decryption, transmission, jamming, spoofing,
+  interference, protected-communication interception, dissemination delivery,
+  and durable Bytewax workers behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live receiver control,
+  SDR drivers, signal capture, demodulation, recording storage, geolocation,
+  decryption, transmission, jamming, spoofing, interference,
+  protected-communication interception, dissemination delivery, durable
+  Bytewax topology, or performance/load checks during this battery-conscious
+  slice.
