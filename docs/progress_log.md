@@ -27341,3 +27341,90 @@ Known gaps:
   delivery/retry workers, developer portal hosting, regulator filing, durable
   Bytewax topology, or performance/load checks during this battery-conscious
   slice.
+
+## 2026-06-01 - FinTech Embedded Finance executable capability
+
+- Promoted `capabilities/fintech/embedded` from a placeholder package into a
+  first-class APG capability with `README.md`, `SPECIFICATION.md`, `PLAN.md`,
+  `cap_spec.md`, contract, models, service, API helpers, view models, app
+  entrypoint, semantic/package/release evidence, and focused tests.
+- Added partner-program onboarding, host application registration, embedded
+  product placement, customer consent capture, embedded account opening,
+  embedded payment initiation, embedded card offers, lending offers, settlement
+  batch closure, revenue-share recording, dashboard summaries, Bytewax batch
+  validation, and provider-neutral embedded finance agent registration.
+- Added deterministic Embedded Finance guardrails for tenant context, write
+  policy, partner KYB/contract/risk evidence, host app program/environment/
+  domain/terms evidence, placement product/channel/scope/risk controls, consent
+  app/customer/scope/expiry evidence, account KYC/wallet evidence, payment
+  application/placement/consent/scope/amount/currency/risk controls, card
+  limit/risk controls, lending affordability/underwriting evidence, settlement
+  reconciliation, revenue-share bounds, Bytewax lifecycle events, supported
+  AI-agent runtimes/roles, and privileged-agent approval.
+- Updated fintech capability metadata so `embedded` is listed as an implemented
+  sub-capability.
+- Removed the empty `_Embedded_Finance` marker file and published
+  `semantic_model.json`, `package_manifest.json`, and `release_report.json`.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/fintech/embedded/__init__.py
+  capabilities/fintech/embedded/capability_contract.py
+  capabilities/fintech/embedded/models.py
+  capabilities/fintech/embedded/embedded_runtime.py
+  capabilities/fintech/embedded/service.py
+  capabilities/fintech/embedded/api.py capabilities/fintech/embedded/views.py
+  capabilities/fintech/embedded/app.py
+  capabilities/fintech/embedded/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/fintech/embedded/tests/test_package_contract.py` passed with 6
+  tests.
+- `./.venv/bin/python capabilities/fintech/embedded/app.py` passed self-test
+  with `passed: true` and `status: ok`.
+- `./.venv/bin/apg capabilities inspect fintech_embedded --json` passed with
+  42 rules, 13 UI routes, theme `embedded_finance_control`, shell
+  `apg_python`, and Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan capabilities/fintech/embedded
+  --json` passed with `side_effect_free: true` and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/fintech/embedded --json` passed with 1 domain-specific
+  capability, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/fintech/embedded --json` passed with 1 complete lifecycle, 42
+  rules, 13 UI routes, 11 theme tokens, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 123 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 123 operable contracts, 123 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/fintech/embedded`, `capabilities/fintech/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed partner program, host application, placement, consent, account,
+  payment, card, lending, settlement, revenue-share, and AI-agent lifecycle
+  paths so rule evaluation happens before state mutation.
+- Tightened payment initiation so the selected placement must belong to the
+  selected host application and the selected consent must cover
+  `payments.write`.
+- Reviewed settlement and revenue-share controls so reconciliations and bounded
+  percentages are enforced before operational records are written.
+- Reviewed provider-neutral embedded-finance agent behavior so Codex, Claude
+  Code, OpenCode, and Pi runtimes remain first-class configuration choices and
+  privileged actions require human approval.
+- Kept live partner portals, hosted consent screens, payment rails, wallet
+  linking, card processors, loan booking, settlement networks, regulator filing,
+  and durable Bytewax workers behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live partner portal,
+  live hosted consent screens, payment rail posting, wallet linking, card
+  processor issuance, loan booking, settlement network submission, regulator
+  filing, durable Bytewax topology, or performance/load checks during this
+  battery-conscious slice.

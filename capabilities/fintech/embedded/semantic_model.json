@@ -1,0 +1,1695 @@
+{
+  "app": {
+    "description": "Embedded Finance package-backed APG capability",
+    "entity_count": 11,
+    "name": "fintech_embedded",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "fintech_embedded": {
+      "configuration": {
+        "accounts": {
+          "kyc_required": true,
+          "wallet_reference_required": true
+        },
+        "adapters": {
+          "aml": "fintech_aml",
+          "audit": "audl",
+          "auth": "auth",
+          "banking_apis": "fintech_apis",
+          "bnpl": "fintech_bnpl",
+          "cards": "fintech_cards",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "lending": "fintech_lending",
+          "mobile": "fintech_mobile",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "partner_risk_reviewer",
+            "placement_reviewer",
+            "consent_reviewer",
+            "settlement_reviewer",
+            "embedded_compliance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "applications": {
+          "domain_required": true,
+          "supported_environments": [
+            "sandbox",
+            "pilot",
+            "production"
+          ],
+          "terms_required": true
+        },
+        "cards": {
+          "positive_limit_required": true,
+          "risk_reference_required": true
+        },
+        "consents": {
+          "customer_reference_required": true,
+          "expiry_required": true,
+          "scope_required": true
+        },
+        "governance": {
+          "audit_events": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "lending": {
+          "affordability_required": true,
+          "underwriting_required": true
+        },
+        "observability": {
+          "event_stream": "apg.fintech.embedded.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "payments": {
+          "positive_amount_required": true,
+          "risk_reference_required": true,
+          "supported_currencies": [
+            "USD",
+            "KES",
+            "EUR",
+            "GBP",
+            "NGN",
+            "GHS",
+            "ZAR"
+          ]
+        },
+        "placements": {
+          "risk_policy_required": true,
+          "scope_required": true,
+          "supported_channels": [
+            "checkout",
+            "marketplace",
+            "mobile_app",
+            "web_app",
+            "pos",
+            "agent",
+            "api"
+          ],
+          "supported_products": [
+            "accounts",
+            "wallet",
+            "payments",
+            "cards",
+            "loans",
+            "bnpl",
+            "remittance",
+            "insurance",
+            "marketplace_finance"
+          ]
+        },
+        "programs": {
+          "contract_required": true,
+          "kyb_required": true,
+          "risk_review_required": true
+        },
+        "revenue_share": {
+          "maximum_percent": 100,
+          "minimum_percent": 0
+        },
+        "settlements": {
+          "positive_amount_required": true,
+          "reconciliation_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "embedded_finance_control"
+        },
+        "ui": {
+          "enable_accounts": true,
+          "enable_agents": true,
+          "enable_applications": true,
+          "enable_cards": true,
+          "enable_consents": true,
+          "enable_dashboard": true,
+          "enable_lending": true,
+          "enable_payments": true,
+          "enable_placements": true,
+          "enable_programs": true,
+          "enable_revenue_share": true,
+          "enable_settlements": true
+        }
+      },
+      "name": "Embedded Finance",
+      "provides": [
+        "partner_program_workflow",
+        "host_application_workflow",
+        "embedded_product_placement_workflow",
+        "embedded_customer_consent_workflow",
+        "embedded_account_workflow",
+        "embedded_payment_workflow",
+        "embedded_card_workflow",
+        "embedded_lending_workflow",
+        "embedded_settlement_workflow",
+        "embedded_revenue_share_workflow",
+        "embedded_finance_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_apis",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_cards",
+        "fintech_lending",
+        "fintech_bnpl",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "fintech_mobile"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "policy_evidence_required",
+              "required_action": "attach_policy_evidence"
+            },
+            "name": "embedded_write_requires_policy"
+          },
+          {
+            "condition": {
+              "kyb_present": false,
+              "operation": "register_partner_program"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "partner_kyb_required",
+              "required_action": "attach_kyb_evidence"
+            },
+            "name": "program_kyb_required"
+          },
+          {
+            "condition": {
+              "contract_present": false,
+              "operation": "register_partner_program"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "partner_contract_required",
+              "required_action": "attach_contract"
+            },
+            "name": "program_contract_required"
+          },
+          {
+            "condition": {
+              "operation": "register_partner_program",
+              "risk_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "partner_risk_review_required",
+              "required_action": "attach_risk_review"
+            },
+            "name": "program_risk_required"
+          },
+          {
+            "condition": {
+              "operation": "register_host_application",
+              "program_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "host_program_required",
+              "required_action": "select_partner_program"
+            },
+            "name": "application_program_required"
+          },
+          {
+            "condition": {
+              "environment_supported": false,
+              "operation": "register_host_application"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "host_environment_not_supported",
+              "required_action": "select_supported_environment"
+            },
+            "name": "application_environment_supported"
+          },
+          {
+            "condition": {
+              "domain_present": false,
+              "operation": "register_host_application"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "host_domain_required",
+              "required_action": "attach_domain"
+            },
+            "name": "application_domain_required"
+          },
+          {
+            "condition": {
+              "operation": "register_host_application",
+              "terms_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "host_terms_required",
+              "required_action": "attach_terms"
+            },
+            "name": "application_terms_required"
+          },
+          {
+            "condition": {
+              "application_present": false,
+              "operation": "publish_product_placement"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "placement_application_required",
+              "required_action": "select_host_application"
+            },
+            "name": "placement_application_required"
+          },
+          {
+            "condition": {
+              "operation": "publish_product_placement",
+              "product_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "embedded_product_not_supported",
+              "required_action": "select_supported_product"
+            },
+            "name": "placement_product_supported"
+          },
+          {
+            "condition": {
+              "channel_supported": false,
+              "operation": "publish_product_placement"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "embedded_channel_not_supported",
+              "required_action": "select_supported_channel"
+            },
+            "name": "placement_channel_supported"
+          },
+          {
+            "condition": {
+              "operation": "publish_product_placement",
+              "scopes_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "placement_scopes_required",
+              "required_action": "attach_scopes"
+            },
+            "name": "placement_scopes_required"
+          },
+          {
+            "condition": {
+              "operation": "publish_product_placement",
+              "risk_policy_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "placement_risk_policy_required",
+              "required_action": "attach_risk_policy"
+            },
+            "name": "placement_risk_policy_required"
+          },
+          {
+            "condition": {
+              "application_present": false,
+              "operation": "capture_customer_consent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "consent_application_required",
+              "required_action": "select_host_application"
+            },
+            "name": "consent_application_required"
+          },
+          {
+            "condition": {
+              "customer_present": false,
+              "operation": "capture_customer_consent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "consent_customer_required",
+              "required_action": "attach_customer_reference"
+            },
+            "name": "consent_customer_required"
+          },
+          {
+            "condition": {
+              "operation": "capture_customer_consent",
+              "scopes_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "consent_scopes_required",
+              "required_action": "attach_scopes"
+            },
+            "name": "consent_scopes_required"
+          },
+          {
+            "condition": {
+              "expiry_present": false,
+              "operation": "capture_customer_consent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "consent_expiry_required",
+              "required_action": "attach_expiry"
+            },
+            "name": "consent_expiry_required"
+          },
+          {
+            "condition": {
+              "application_present": false,
+              "operation": "open_embedded_account"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "account_application_required",
+              "required_action": "select_host_application"
+            },
+            "name": "account_application_required"
+          },
+          {
+            "condition": {
+              "kyc_present": false,
+              "operation": "open_embedded_account"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "account_kyc_required",
+              "required_action": "attach_kyc_reference"
+            },
+            "name": "account_kyc_required"
+          },
+          {
+            "condition": {
+              "operation": "open_embedded_account",
+              "wallet_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "account_wallet_required",
+              "required_action": "attach_wallet_reference"
+            },
+            "name": "account_wallet_required"
+          },
+          {
+            "condition": {
+              "application_present": false,
+              "operation": "initiate_embedded_payment"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_application_required",
+              "required_action": "select_host_application"
+            },
+            "name": "payment_application_required"
+          },
+          {
+            "condition": {
+              "operation": "initiate_embedded_payment",
+              "placement_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_placement_required",
+              "required_action": "select_placement"
+            },
+            "name": "payment_placement_required"
+          },
+          {
+            "condition": {
+              "operation": "initiate_embedded_payment",
+              "placement_matches_application": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_placement_application_mismatch",
+              "required_action": "select_application_placement"
+            },
+            "name": "payment_placement_matches_application"
+          },
+          {
+            "condition": {
+              "consent_present": false,
+              "operation": "initiate_embedded_payment"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_consent_required",
+              "required_action": "capture_consent"
+            },
+            "name": "payment_consent_required"
+          },
+          {
+            "condition": {
+              "consent_covers_scope": false,
+              "operation": "initiate_embedded_payment"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_scope_not_consented",
+              "required_action": "capture_matching_consent"
+            },
+            "name": "payment_consent_covers_scope"
+          },
+          {
+            "condition": {
+              "operation": "initiate_embedded_payment",
+              "positive_amount": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_payment_amount_required",
+              "required_action": "set_positive_amount"
+            },
+            "name": "payment_positive_amount"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "initiate_embedded_payment"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "payment_currency_supported"
+          },
+          {
+            "condition": {
+              "operation": "initiate_embedded_payment",
+              "risk_reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_risk_reference_required",
+              "required_action": "attach_risk_reference"
+            },
+            "name": "payment_risk_required"
+          },
+          {
+            "condition": {
+              "application_present": false,
+              "operation": "offer_embedded_card"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "card_application_required",
+              "required_action": "select_host_application"
+            },
+            "name": "card_application_required"
+          },
+          {
+            "condition": {
+              "operation": "offer_embedded_card",
+              "positive_limit": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_card_limit_required",
+              "required_action": "set_positive_limit"
+            },
+            "name": "card_positive_limit"
+          },
+          {
+            "condition": {
+              "operation": "offer_embedded_card",
+              "risk_reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "card_risk_reference_required",
+              "required_action": "attach_risk_reference"
+            },
+            "name": "card_risk_required"
+          },
+          {
+            "condition": {
+              "affordability_present": false,
+              "operation": "create_lending_offer"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "affordability_evidence_required",
+              "required_action": "attach_affordability"
+            },
+            "name": "lending_affordability_required"
+          },
+          {
+            "condition": {
+              "operation": "create_lending_offer",
+              "underwriting_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "underwriting_evidence_required",
+              "required_action": "attach_underwriting"
+            },
+            "name": "lending_underwriting_required"
+          },
+          {
+            "condition": {
+              "operation": "close_settlement_batch",
+              "reconciled": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "settlement_reconciliation_required",
+              "required_action": "attach_reconciliation"
+            },
+            "name": "settlement_reconciliation_required"
+          },
+          {
+            "condition": {
+              "operation": "close_settlement_batch",
+              "positive_amount": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_settlement_amount_required",
+              "required_action": "set_positive_amount"
+            },
+            "name": "settlement_positive_amount"
+          },
+          {
+            "condition": {
+              "operation": "record_revenue_share",
+              "program_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "revenue_share_program_required",
+              "required_action": "select_partner_program"
+            },
+            "name": "revenue_share_program_required"
+          },
+          {
+            "condition": {
+              "operation": "record_revenue_share",
+              "percent_bounded": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "revenue_share_percent_out_of_bounds",
+              "required_action": "set_valid_percent"
+            },
+            "name": "revenue_share_percent_bounded"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "embedded_batch"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_embedded_batch_to_bytewax"
+            },
+            "name": "embedded_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_embedded_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "embedded_agent_runtime_not_supported",
+              "required_action": "select_supported_runtime"
+            },
+            "name": "embedded_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_embedded_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "embedded_agent_role_not_supported",
+              "required_action": "select_supported_role"
+            },
+            "name": "embedded_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "embedded_agent_action",
+              "privileged_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_embedded_agent_action_requires_human_approval"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "policy_evidence_required",
+            "required_action": "attach_policy_evidence"
+          },
+          "name": "embedded_write_requires_policy"
+        },
+        {
+          "condition": {
+            "kyb_present": false,
+            "operation": "register_partner_program"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "partner_kyb_required",
+            "required_action": "attach_kyb_evidence"
+          },
+          "name": "program_kyb_required"
+        },
+        {
+          "condition": {
+            "contract_present": false,
+            "operation": "register_partner_program"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "partner_contract_required",
+            "required_action": "attach_contract"
+          },
+          "name": "program_contract_required"
+        },
+        {
+          "condition": {
+            "operation": "register_partner_program",
+            "risk_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "partner_risk_review_required",
+            "required_action": "attach_risk_review"
+          },
+          "name": "program_risk_required"
+        },
+        {
+          "condition": {
+            "operation": "register_host_application",
+            "program_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "host_program_required",
+            "required_action": "select_partner_program"
+          },
+          "name": "application_program_required"
+        },
+        {
+          "condition": {
+            "environment_supported": false,
+            "operation": "register_host_application"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "host_environment_not_supported",
+            "required_action": "select_supported_environment"
+          },
+          "name": "application_environment_supported"
+        },
+        {
+          "condition": {
+            "domain_present": false,
+            "operation": "register_host_application"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "host_domain_required",
+            "required_action": "attach_domain"
+          },
+          "name": "application_domain_required"
+        },
+        {
+          "condition": {
+            "operation": "register_host_application",
+            "terms_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "host_terms_required",
+            "required_action": "attach_terms"
+          },
+          "name": "application_terms_required"
+        },
+        {
+          "condition": {
+            "application_present": false,
+            "operation": "publish_product_placement"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "placement_application_required",
+            "required_action": "select_host_application"
+          },
+          "name": "placement_application_required"
+        },
+        {
+          "condition": {
+            "operation": "publish_product_placement",
+            "product_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "embedded_product_not_supported",
+            "required_action": "select_supported_product"
+          },
+          "name": "placement_product_supported"
+        },
+        {
+          "condition": {
+            "channel_supported": false,
+            "operation": "publish_product_placement"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "embedded_channel_not_supported",
+            "required_action": "select_supported_channel"
+          },
+          "name": "placement_channel_supported"
+        },
+        {
+          "condition": {
+            "operation": "publish_product_placement",
+            "scopes_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "placement_scopes_required",
+            "required_action": "attach_scopes"
+          },
+          "name": "placement_scopes_required"
+        },
+        {
+          "condition": {
+            "operation": "publish_product_placement",
+            "risk_policy_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "placement_risk_policy_required",
+            "required_action": "attach_risk_policy"
+          },
+          "name": "placement_risk_policy_required"
+        },
+        {
+          "condition": {
+            "application_present": false,
+            "operation": "capture_customer_consent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "consent_application_required",
+            "required_action": "select_host_application"
+          },
+          "name": "consent_application_required"
+        },
+        {
+          "condition": {
+            "customer_present": false,
+            "operation": "capture_customer_consent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "consent_customer_required",
+            "required_action": "attach_customer_reference"
+          },
+          "name": "consent_customer_required"
+        },
+        {
+          "condition": {
+            "operation": "capture_customer_consent",
+            "scopes_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "consent_scopes_required",
+            "required_action": "attach_scopes"
+          },
+          "name": "consent_scopes_required"
+        },
+        {
+          "condition": {
+            "expiry_present": false,
+            "operation": "capture_customer_consent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "consent_expiry_required",
+            "required_action": "attach_expiry"
+          },
+          "name": "consent_expiry_required"
+        },
+        {
+          "condition": {
+            "application_present": false,
+            "operation": "open_embedded_account"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "account_application_required",
+            "required_action": "select_host_application"
+          },
+          "name": "account_application_required"
+        },
+        {
+          "condition": {
+            "kyc_present": false,
+            "operation": "open_embedded_account"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "account_kyc_required",
+            "required_action": "attach_kyc_reference"
+          },
+          "name": "account_kyc_required"
+        },
+        {
+          "condition": {
+            "operation": "open_embedded_account",
+            "wallet_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "account_wallet_required",
+            "required_action": "attach_wallet_reference"
+          },
+          "name": "account_wallet_required"
+        },
+        {
+          "condition": {
+            "application_present": false,
+            "operation": "initiate_embedded_payment"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_application_required",
+            "required_action": "select_host_application"
+          },
+          "name": "payment_application_required"
+        },
+        {
+          "condition": {
+            "operation": "initiate_embedded_payment",
+            "placement_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_placement_required",
+            "required_action": "select_placement"
+          },
+          "name": "payment_placement_required"
+        },
+        {
+          "condition": {
+            "operation": "initiate_embedded_payment",
+            "placement_matches_application": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_placement_application_mismatch",
+            "required_action": "select_application_placement"
+          },
+          "name": "payment_placement_matches_application"
+        },
+        {
+          "condition": {
+            "consent_present": false,
+            "operation": "initiate_embedded_payment"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_consent_required",
+            "required_action": "capture_consent"
+          },
+          "name": "payment_consent_required"
+        },
+        {
+          "condition": {
+            "consent_covers_scope": false,
+            "operation": "initiate_embedded_payment"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_scope_not_consented",
+            "required_action": "capture_matching_consent"
+          },
+          "name": "payment_consent_covers_scope"
+        },
+        {
+          "condition": {
+            "operation": "initiate_embedded_payment",
+            "positive_amount": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_payment_amount_required",
+            "required_action": "set_positive_amount"
+          },
+          "name": "payment_positive_amount"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "initiate_embedded_payment"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "payment_currency_supported"
+        },
+        {
+          "condition": {
+            "operation": "initiate_embedded_payment",
+            "risk_reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_risk_reference_required",
+            "required_action": "attach_risk_reference"
+          },
+          "name": "payment_risk_required"
+        },
+        {
+          "condition": {
+            "application_present": false,
+            "operation": "offer_embedded_card"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "card_application_required",
+            "required_action": "select_host_application"
+          },
+          "name": "card_application_required"
+        },
+        {
+          "condition": {
+            "operation": "offer_embedded_card",
+            "positive_limit": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_card_limit_required",
+            "required_action": "set_positive_limit"
+          },
+          "name": "card_positive_limit"
+        },
+        {
+          "condition": {
+            "operation": "offer_embedded_card",
+            "risk_reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "card_risk_reference_required",
+            "required_action": "attach_risk_reference"
+          },
+          "name": "card_risk_required"
+        },
+        {
+          "condition": {
+            "affordability_present": false,
+            "operation": "create_lending_offer"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "affordability_evidence_required",
+            "required_action": "attach_affordability"
+          },
+          "name": "lending_affordability_required"
+        },
+        {
+          "condition": {
+            "operation": "create_lending_offer",
+            "underwriting_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "underwriting_evidence_required",
+            "required_action": "attach_underwriting"
+          },
+          "name": "lending_underwriting_required"
+        },
+        {
+          "condition": {
+            "operation": "close_settlement_batch",
+            "reconciled": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "settlement_reconciliation_required",
+            "required_action": "attach_reconciliation"
+          },
+          "name": "settlement_reconciliation_required"
+        },
+        {
+          "condition": {
+            "operation": "close_settlement_batch",
+            "positive_amount": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_settlement_amount_required",
+            "required_action": "set_positive_amount"
+          },
+          "name": "settlement_positive_amount"
+        },
+        {
+          "condition": {
+            "operation": "record_revenue_share",
+            "program_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "revenue_share_program_required",
+            "required_action": "select_partner_program"
+          },
+          "name": "revenue_share_program_required"
+        },
+        {
+          "condition": {
+            "operation": "record_revenue_share",
+            "percent_bounded": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "revenue_share_percent_out_of_bounds",
+            "required_action": "set_valid_percent"
+          },
+          "name": "revenue_share_percent_bounded"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "embedded_batch"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_embedded_batch_to_bytewax"
+          },
+          "name": "embedded_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_embedded_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "embedded_agent_runtime_not_supported",
+            "required_action": "select_supported_runtime"
+          },
+          "name": "embedded_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_embedded_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "embedded_agent_role_not_supported",
+            "required_action": "select_supported_role"
+          },
+          "name": "embedded_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "embedded_agent_action",
+            "privileged_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_embedded_agent_action_requires_human_approval"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "accounts": {
+          "component": "EmbeddedAccountConsole",
+          "permission": "fintech_embedded:accounts",
+          "route": "/fintech-embedded/accounts"
+        },
+        "agents": {
+          "component": "EmbeddedFinanceAgentWorkbench",
+          "permission": "fintech_embedded:admin",
+          "route": "/fintech-embedded/agents"
+        },
+        "applications": {
+          "component": "HostApplicationConsole",
+          "permission": "fintech_embedded:applications",
+          "route": "/fintech-embedded/applications"
+        },
+        "cards": {
+          "component": "EmbeddedCardConsole",
+          "permission": "fintech_embedded:cards",
+          "route": "/fintech-embedded/cards"
+        },
+        "consents": {
+          "component": "EmbeddedConsentWorkbench",
+          "permission": "fintech_embedded:consents",
+          "route": "/fintech-embedded/consents"
+        },
+        "dashboard": {
+          "component": "EmbeddedFinanceDashboard",
+          "permission": "fintech_embedded:view",
+          "route": "/fintech-embedded/dashboard"
+        },
+        "lending": {
+          "component": "EmbeddedLendingConsole",
+          "permission": "fintech_embedded:lending",
+          "route": "/fintech-embedded/lending"
+        },
+        "payments": {
+          "component": "EmbeddedPaymentConsole",
+          "permission": "fintech_embedded:payments",
+          "route": "/fintech-embedded/payments"
+        },
+        "placements": {
+          "component": "ProductPlacementConsole",
+          "permission": "fintech_embedded:placements",
+          "route": "/fintech-embedded/placements"
+        },
+        "programs": {
+          "component": "PartnerProgramConsole",
+          "permission": "fintech_embedded:programs",
+          "route": "/fintech-embedded/programs"
+        },
+        "revenue_share": {
+          "component": "RevenueShareConsole",
+          "permission": "fintech_embedded:revenue_share",
+          "route": "/fintech-embedded/revenue-share"
+        },
+        "settings": {
+          "component": "EmbeddedFinanceSettings",
+          "permission": "fintech_embedded:admin",
+          "route": "/fintech-embedded/settings"
+        },
+        "settlements": {
+          "component": "EmbeddedSettlementConsole",
+          "permission": "fintech_embedded:settlements",
+          "route": "/fintech-embedded/settlements"
+        }
+      },
+      "streaming": {
+        "events": [
+          "partner_program_registered",
+          "host_application_registered",
+          "product_placement_published",
+          "customer_consent_captured",
+          "embedded_account_opened",
+          "embedded_payment_initiated",
+          "embedded_card_offered",
+          "embedded_lending_offer_created",
+          "settlement_batch_closed",
+          "revenue_share_recorded",
+          "embedded_agent_registered"
+        ],
+        "guardrails": [
+          "embedded_batch_requires_bytewax",
+          "privileged_embedded_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.fintech.embedded.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "accounts": {
+            "icon": "wallet",
+            "status_indicator": "account-chip"
+          },
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "applications": {
+            "icon": "app-window",
+            "status_indicator": "app-chip"
+          },
+          "cards": {
+            "icon": "badge-credit-card",
+            "status_indicator": "card-chip"
+          },
+          "consents": {
+            "icon": "file-check",
+            "status_indicator": "consent-chip"
+          },
+          "lending": {
+            "icon": "landmark",
+            "status_indicator": "loan-chip"
+          },
+          "payments": {
+            "icon": "credit-card",
+            "status_indicator": "payment-chip"
+          },
+          "placements": {
+            "icon": "layout-template",
+            "status_indicator": "placement-chip"
+          },
+          "programs": {
+            "icon": "handshake",
+            "status_indicator": "program-chip"
+          },
+          "revenue_share": {
+            "icon": "percent",
+            "status_indicator": "revenue-chip"
+          },
+          "settlements": {
+            "icon": "receipt",
+            "status_indicator": "settlement-chip"
+          }
+        },
+        "name": "embedded_finance_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#1D4ED8",
+          "color.danger": "#B91C1C",
+          "color.primary": "#0F766E",
+          "color.success": "#15803D",
+          "color.warning": "#A16207",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/fintech-embedded/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "EmbeddedFinanceDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/fintech-embedded/dashboard",
+            "permission": "fintech_embedded:view"
+          },
+          {
+            "component": "PartnerProgramConsole",
+            "name": "programs",
+            "nav_group": "Partners",
+            "path": "/fintech-embedded/programs",
+            "permission": "fintech_embedded:programs"
+          },
+          {
+            "component": "HostApplicationConsole",
+            "name": "applications",
+            "nav_group": "Partners",
+            "path": "/fintech-embedded/applications",
+            "permission": "fintech_embedded:applications"
+          },
+          {
+            "component": "ProductPlacementConsole",
+            "name": "placements",
+            "nav_group": "Products",
+            "path": "/fintech-embedded/placements",
+            "permission": "fintech_embedded:placements"
+          },
+          {
+            "component": "EmbeddedConsentWorkbench",
+            "name": "consents",
+            "nav_group": "Consent",
+            "path": "/fintech-embedded/consents",
+            "permission": "fintech_embedded:consents"
+          },
+          {
+            "component": "EmbeddedAccountConsole",
+            "name": "accounts",
+            "nav_group": "Journeys",
+            "path": "/fintech-embedded/accounts",
+            "permission": "fintech_embedded:accounts"
+          },
+          {
+            "component": "EmbeddedPaymentConsole",
+            "name": "payments",
+            "nav_group": "Journeys",
+            "path": "/fintech-embedded/payments",
+            "permission": "fintech_embedded:payments"
+          },
+          {
+            "component": "EmbeddedCardConsole",
+            "name": "cards",
+            "nav_group": "Journeys",
+            "path": "/fintech-embedded/cards",
+            "permission": "fintech_embedded:cards"
+          },
+          {
+            "component": "EmbeddedLendingConsole",
+            "name": "lending",
+            "nav_group": "Journeys",
+            "path": "/fintech-embedded/lending",
+            "permission": "fintech_embedded:lending"
+          },
+          {
+            "component": "EmbeddedSettlementConsole",
+            "name": "settlements",
+            "nav_group": "Operations",
+            "path": "/fintech-embedded/settlements",
+            "permission": "fintech_embedded:settlements"
+          },
+          {
+            "component": "RevenueShareConsole",
+            "name": "revenue_share",
+            "nav_group": "Operations",
+            "path": "/fintech-embedded/revenue-share",
+            "permission": "fintech_embedded:revenue_share"
+          },
+          {
+            "component": "EmbeddedFinanceAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/fintech-embedded/agents",
+            "permission": "fintech_embedded:admin"
+          },
+          {
+            "component": "EmbeddedFinanceSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/fintech-embedded/settings",
+            "permission": "fintech_embedded:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "embedded_review": {
+        "roles": [
+          "partner_risk_reviewer",
+          "placement_reviewer",
+          "consent_reviewer",
+          "settlement_reviewer",
+          "embedded_compliance_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "fintech_embedded": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_apis",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_cards",
+        "fintech_lending",
+        "fintech_bnpl",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "fintech_mobile"
+      ]
+    }
+  },
+  "contracts": {
+    "fintech_embedded": {
+      "configuration": {
+        "accounts": {
+          "kyc_required": true,
+          "wallet_reference_required": true
+        },
+        "adapters": {
+          "aml": "fintech_aml",
+          "audit": "audl",
+          "auth": "auth",
+          "banking_apis": "fintech_apis",
+          "bnpl": "fintech_bnpl",
+          "cards": "fintech_cards",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "lending": "fintech_lending",
+          "mobile": "fintech_mobile",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "partner_risk_reviewer",
+            "placement_reviewer",
+            "consent_reviewer",
+            "settlement_reviewer",
+            "embedded_compliance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "applications": {
+          "domain_required": true,
+          "supported_environments": [
+            "sandbox",
+            "pilot",
+            "production"
+          ],
+          "terms_required": true
+        },
+        "cards": {
+          "positive_limit_required": true,
+          "risk_reference_required": true
+        },
+        "consents": {
+          "customer_reference_required": true,
+          "expiry_required": true,
+          "scope_required": true
+        },
+        "governance": {
+          "audit_events": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "lending": {
+          "affordability_required": true,
+          "underwriting_required": true
+        },
+        "observability": {
+          "event_stream": "apg.fintech.embedded.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "payments": {
+          "positive_amount_required": true,
+          "risk_reference_required": true,
+          "supported_currencies": [
+            "USD",
+            "KES",
+            "EUR",
+            "GBP",
+            "NGN",
+            "GHS",
+            "ZAR"
+          ]
+        },
+        "placements": {
+          "risk_policy_required": true,
+          "scope_required": true,
+          "supported_channels": [
+            "checkout",
+            "marketplace",
+            "mobile_app",
+            "web_app",
+            "pos",
+            "agent",
+            "api"
+          ],
+          "supported_products": [
+            "accounts",
+            "wallet",
+            "payments",
+            "cards",
+            "loans",
+            "bnpl",
+            "remittance",
+            "insurance",
+            "marketplace_finance"
+          ]
+        },
+        "programs": {
+          "contract_required": true,
+          "kyb_required": true,
+          "risk_review_required": true
+        },
+        "revenue_share": {
+          "maximum_percent": 100,
+          "minimum_percent": 0
+        },
+        "settlements": {
+          "positive_amount_required": true,
+          "reconciliation_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "embedded_finance_control"
+        },
+        "ui": {
+          "enable_accounts": true,
+          "enable_agents": true,
+          "enable_applications": true,
+          "enable_cards": true,
+          "enable_consents": true,
+          "enable_dashboard": true,
+          "enable_lending": true,
+          "enable_payments": true,
+          "enable_placements": true,
+          "enable_programs": true,
+          "enable_revenue_share": true,
+          "enable_settlements": true
+        }
+      },
+      "id": "fintech_embedded",
+      "provides": [
+        "partner_program_workflow",
+        "host_application_workflow",
+        "embedded_product_placement_workflow",
+        "embedded_customer_consent_workflow",
+        "embedded_account_workflow",
+        "embedded_payment_workflow",
+        "embedded_card_workflow",
+        "embedded_lending_workflow",
+        "embedded_settlement_workflow",
+        "embedded_revenue_share_workflow",
+        "embedded_finance_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_apis",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_cards",
+        "fintech_lending",
+        "fintech_bnpl",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "fintech_mobile"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 15,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "fintech_embedded": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}

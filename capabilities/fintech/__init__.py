@@ -75,6 +75,7 @@ CAPABILITY_META = {
 		'wallets',       # Digital Wallets
 		'mobile',        # Mobile Banking
 		'apis',          # Banking APIs
+		'embedded',      # Embedded Finance
 		'neobanking',    # Neo Banking
 		'lending',       # Digital Lending
 		'bnpl',          # Buy Now Pay Later
