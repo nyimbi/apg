@@ -289,7 +289,8 @@
       "provides": [
         "api_gateway",
         "traffic_management",
-        "gateway_agent_composition"
+        "gateway_agent_composition",
+        "review_evidence"
       ],
       "requires": [
         "auth",
@@ -297,6 +298,39 @@
         "mqeb",
         "conf"
       ],
+      "review_evidence": {
+        "deny_behavior": "Denied APIG lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "pending",
+          "pending_review",
+          "pending_quota_review",
+          "review_required",
+          "review_denied",
+          "denied",
+          "accepted",
+          "registered",
+          "active",
+          "deployed",
+          "retired"
+        ],
+        "pending_queues": [
+          "upstreams",
+          "consumers",
+          "routes",
+          "quota_reviews",
+          "policies",
+          "traffic_shifts",
+          "deployments",
+          "gateway_agents",
+          "lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "review_evidence"
+        ]
+      },
       "rule_engine": {
         "rules": [
           {
@@ -1715,7 +1749,8 @@
       "provides": [
         "api_gateway",
         "traffic_management",
-        "gateway_agent_composition"
+        "gateway_agent_composition",
+        "review_evidence"
       ],
       "requires": [
         "auth",
@@ -1723,6 +1758,39 @@
         "mqeb",
         "conf"
       ],
+      "review_evidence": {
+        "deny_behavior": "Denied APIG lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "pending",
+          "pending_review",
+          "pending_quota_review",
+          "review_required",
+          "review_denied",
+          "denied",
+          "accepted",
+          "registered",
+          "active",
+          "deployed",
+          "retired"
+        ],
+        "pending_queues": [
+          "upstreams",
+          "consumers",
+          "routes",
+          "quota_reviews",
+          "policies",
+          "traffic_shifts",
+          "deployments",
+          "gateway_agents",
+          "lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "review_evidence"
+        ]
+      },
       "streaming": {
         "engine": "bytewax",
         "lifecycle_stream": "apig.lifecycle",

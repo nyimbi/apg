@@ -533,6 +533,11 @@ class GatewayUpstreamRecord(BaseModel):
 	base_url: str = Field(description="Base URL for the upstream service")
 	owner: str = Field(description="Route or service owner")
 	health: str = Field("healthy", description="Current upstream health state")
+	decision: str = Field("allow", description="allow, deny, or require_review")
+	matched_rules: List[str] = Field(default_factory=list, description="Matched guardrail rules")
+	policy_decision: str = Field("allow", description="Persisted policy decision")
+	review_reasons: List[str] = Field(default_factory=list, description="Review or denial reasons")
+	review_evidence: Dict[str, Any] = Field(default_factory=dict, description="Required action evidence")
 	labels: Dict[str, Any] = Field(default_factory=dict, description="Routing and discovery labels")
 
 
@@ -549,6 +554,11 @@ class GatewayConsumerRecord(BaseModel):
 	credential_rotation_recorded: bool = Field(False, description="Whether credential rotation evidence exists")
 	rbac_approval_recorded: bool = Field(False, description="Whether restricted access has RBAC approval")
 	status: str = Field("registered", description="Consumer lifecycle status")
+	decision: str = Field("allow", description="allow, deny, or require_review")
+	matched_rules: List[str] = Field(default_factory=list, description="Matched guardrail rules")
+	policy_decision: str = Field("allow", description="Persisted policy decision")
+	review_reasons: List[str] = Field(default_factory=list, description="Review or denial reasons")
+	review_evidence: Dict[str, Any] = Field(default_factory=dict, description="Required action evidence")
 
 
 class GatewayRouteRecord(BaseModel):
@@ -571,6 +581,11 @@ class GatewayRouteRecord(BaseModel):
 	wasm_filter_attached: bool = Field(False, description="Whether a WASM edge filter is attached")
 	filter_signature_verified: bool = Field(True, description="Whether attached filter signature is verified")
 	status: str = Field("active", description="Route lifecycle status")
+	decision: str = Field("allow", description="allow, deny, or require_review")
+	matched_rules: List[str] = Field(default_factory=list, description="Matched guardrail rules")
+	policy_decision: str = Field("allow", description="Persisted policy decision")
+	review_reasons: List[str] = Field(default_factory=list, description="Review or denial reasons")
+	review_evidence: Dict[str, Any] = Field(default_factory=dict, description="Required action evidence")
 
 
 class GatewayQuotaReview(BaseModel):
@@ -586,6 +601,10 @@ class GatewayQuotaReview(BaseModel):
 	decision: str = Field("pending", description="pending, approved, or rejected")
 	reviewer: Optional[str] = Field(None, description="Reviewer who decided the request")
 	notes: Optional[str] = Field(None, description="Reviewer notes")
+	matched_rules: List[str] = Field(default_factory=list, description="Matched guardrail rules")
+	policy_decision: str = Field("require_review", description="Persisted policy decision")
+	review_reasons: List[str] = Field(default_factory=list, description="Review or denial reasons")
+	review_evidence: Dict[str, Any] = Field(default_factory=dict, description="Required action evidence")
 
 
 class GatewayPolicyRecord(BaseModel):
@@ -600,6 +619,9 @@ class GatewayPolicyRecord(BaseModel):
 	status: str = Field("active", description="Policy lifecycle status")
 	decision: str = Field("allow", description="allow, deny, or require_review")
 	matched_rules: List[str] = Field(default_factory=list, description="Matched guardrail rules")
+	policy_decision: str = Field("allow", description="Persisted policy decision")
+	review_reasons: List[str] = Field(default_factory=list, description="Review or denial reasons")
+	review_evidence: Dict[str, Any] = Field(default_factory=dict, description="Required action evidence")
 	metadata: Dict[str, Any] = Field(default_factory=dict, description="Policy metadata")
 
 
@@ -615,6 +637,9 @@ class GatewayTrafficShiftRecord(BaseModel):
 	status: str = Field("active", description="Traffic shift lifecycle status")
 	decision: str = Field("allow", description="allow, deny, or require_review")
 	matched_rules: List[str] = Field(default_factory=list, description="Matched guardrail rules")
+	policy_decision: str = Field("allow", description="Persisted policy decision")
+	review_reasons: List[str] = Field(default_factory=list, description="Review or denial reasons")
+	review_evidence: Dict[str, Any] = Field(default_factory=dict, description="Required action evidence")
 	rollback_plan: Optional[str] = Field(None, description="Rollback plan")
 
 
@@ -630,6 +655,9 @@ class GatewayDeploymentRecord(BaseModel):
 	status: str = Field("deployed", description="Deployment lifecycle status")
 	decision: str = Field("allow", description="allow, deny, or require_review")
 	matched_rules: List[str] = Field(default_factory=list, description="Matched guardrail rules")
+	policy_decision: str = Field("allow", description="Persisted policy decision")
+	review_reasons: List[str] = Field(default_factory=list, description="Review or denial reasons")
+	review_evidence: Dict[str, Any] = Field(default_factory=dict, description="Required action evidence")
 
 
 class GatewayAgentRecord(BaseModel):
@@ -649,6 +677,9 @@ class GatewayAgentRecord(BaseModel):
 	status: str = Field("active", description="Agent lifecycle status")
 	decision: str = Field("allow", description="allow, deny, or require_review")
 	matched_rules: List[str] = Field(default_factory=list, description="Matched guardrail rules")
+	policy_decision: str = Field("allow", description="Persisted policy decision")
+	review_reasons: List[str] = Field(default_factory=list, description="Review or denial reasons")
+	review_evidence: Dict[str, Any] = Field(default_factory=dict, description="Required action evidence")
 
 
 class GatewayLifecycleBatchRecord(BaseModel):
@@ -662,6 +693,10 @@ class GatewayLifecycleBatchRecord(BaseModel):
 	accepted: bool = Field(description="Whether the batch is accepted")
 	decision: str = Field("allow", description="allow, deny, or require_review")
 	matched_rules: List[str] = Field(default_factory=list, description="Matched guardrail rules")
+	policy_decision: str = Field("allow", description="Persisted policy decision")
+	review_reasons: List[str] = Field(default_factory=list, description="Review or denial reasons")
+	review_evidence: Dict[str, Any] = Field(default_factory=dict, description="Required action evidence")
+	required_processor: str = Field("bytewax", description="Required lifecycle processor")
 	status: str = Field("accepted", description="Batch lifecycle status")
 
 
@@ -674,6 +709,10 @@ class GatewayAuditEvent(BaseModel):
 	event_type: str = Field(description="Gateway lifecycle event type")
 	subject_id: str = Field(description="Subject record ID")
 	message: str = Field(description="Human-readable event message")
+	policy_decision: str = Field("allow", description="Persisted policy decision")
+	matched_rules: List[str] = Field(default_factory=list, description="Matched guardrail rules")
+	review_reasons: List[str] = Field(default_factory=list, description="Review or denial reasons")
+	review_evidence: Dict[str, Any] = Field(default_factory=dict, description="Required action evidence")
 	evidence: Dict[str, Any] = Field(default_factory=dict, description="Structured event evidence")
 	timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

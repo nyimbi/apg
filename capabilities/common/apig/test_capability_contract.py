@@ -60,8 +60,10 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert "security_policy_reviewer" in contract["agents"]["privileged_roles"]
 	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert "gateway_agent_batch" in contract["streaming"]["operations"]
-	assert contract["provides"] == ["api_gateway", "traffic_management", "gateway_agent_composition"]
+	assert contract["provides"] == ["api_gateway", "traffic_management", "gateway_agent_composition", "review_evidence"]
 	assert contract["requires"] == ["auth", "moni", "mqeb", "conf"]
+	assert "gateway_agents" in contract["review_evidence"]["pending_queues"]
+	assert "policy_decision" in contract["review_evidence"]["policy_fields"]
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "gateway_topology_map" in contract["theme"]["components"]
 	assert "gateway_agent_roster" in contract["theme"]["components"]
@@ -145,6 +147,8 @@ def test_registration_includes_full_capability_contract():
 	assert "gateway_agent_composition" in registration["capabilities"]
 	assert registration["agents"]["first_class"] is True
 	assert registration["streaming"]["required_processor"] == "bytewax"
+	assert registration["review_evidence"]["deny_behavior"].startswith("Denied APIG")
+	assert "review_evidence" in registration["capabilities"]
 	assert "auth" in registration["dependencies"]
 
 
@@ -181,7 +185,10 @@ def test_service_runs_high_quota_route_review_activation_lifecycle():
 	traffic = views.traffic_console_model(service, "tenant-gateway")
 
 	assert request["route"]["status"] == "pending_quota_review"
+	assert request["route"]["policy_decision"] == "require_review"
+	assert request["route"]["review_reasons"] == ["quota_review_required"]
 	assert request["quota_review"]["decision"] == "pending"
+	assert request["quota_review"]["policy_decision"] == "require_review"
 	assert request["route"]["consumer_id"] == "orders-client"
 	assert traffic["pending_quota_review_count"] == 1
 
@@ -199,6 +206,7 @@ def test_service_runs_high_quota_route_review_activation_lifecycle():
 	dashboard = views.dashboard_model(service, "tenant-gateway")
 
 	assert decision["decision"] == "approved"
+	assert decision["review_evidence"]["review_recorded"] is True
 	assert activated["status"] == "active"
 	assert dashboard["summary"]["active_route_count"] == 1
 	assert {event["event_type"] for event in dashboard["audit_events"]} >= {
@@ -415,6 +423,8 @@ def test_service_enforces_policy_canary_deployment_and_retirement_guardrails():
 	)
 	assert policy["status"] == "pending_review"
 	assert policy["matched_rules"] == ["policy_change_requires_review"]
+	assert policy["policy_decision"] == "require_review"
+	assert policy["review_reasons"] == ["policy_review_required"]
 
 	no_rollback_shift = service.shift_traffic(
 		shift_id="shift-no-rollback",
@@ -453,6 +463,7 @@ def test_service_enforces_policy_canary_deployment_and_retirement_guardrails():
 	)
 	assert review_shift["status"] == "pending_review"
 	assert review_shift["matched_rules"] == ["canary_requires_review"]
+	assert review_shift["policy_decision"] == "require_review"
 
 	allowed_shift = service.shift_traffic(
 		shift_id="shift-allowed",
@@ -493,6 +504,7 @@ def test_service_enforces_policy_canary_deployment_and_retirement_guardrails():
 	)
 	assert prod_deployment["status"] == "pending_review"
 	assert prod_deployment["matched_rules"] == ["production_deployment_requires_approval"]
+	assert prod_deployment["policy_decision"] == "require_review"
 
 	with pytest.raises(PermissionError, match="impact_review_required"):
 		service.retire_route(
@@ -537,6 +549,8 @@ def test_service_enforces_policy_canary_deployment_and_retirement_guardrails():
 	assert pending_agent["runtime"] == "claude_code"
 	assert pending_agent["role"] == "security_policy_reviewer"
 	assert pending_agent["matched_rules"] == ["gateway_agent_privileged_role_requires_human_approval"]
+	assert pending_agent["policy_decision"] == "require_review"
+	assert pending_agent["review_reasons"] == ["privileged_gateway_agent_human_approval_required"]
 
 	agent = service.register_gateway_agent(
 		agent_id="security-agent",
@@ -566,9 +580,20 @@ def test_service_enforces_policy_canary_deployment_and_retirement_guardrails():
 	assert batch["status"] == "accepted"
 	summary = service.gateway_summary(tenant_id)
 	assert summary["gateway_agent_count"] == 2
+	assert summary["pending_gateway_agent_review_count"] == 1
+	assert summary["pending_review_count"] >= 4
 	assert summary["lifecycle_batch_count"] == 2
 	assert summary["denied_lifecycle_batch_count"] == 1
 	assert summary["audit_event_count"] >= 14
+	denied_batch = [
+		row
+		for row in service.list_lifecycle_batches(tenant_id)
+		if row["status"] == "denied"
+	][0]
+	assert denied_batch["policy_decision"] == "deny"
+	assert denied_batch["required_processor"] == "bytewax"
+	assert denied_batch["review_reasons"] == ["bytewax_required"]
+	assert service.list_pending_reviews(tenant_id)
 
 
 def test_view_models_expose_gateway_composition_surfaces():
@@ -609,21 +634,38 @@ def test_view_models_expose_gateway_composition_surfaces():
 		owner="api",
 		purpose="review retirement impact evidence",
 	)
+	service.register_gateway_agent(
+		agent_id="ui-review-agent",
+		tenant_id=tenant_id,
+		name="UI Review Agent",
+		runtime="pi",
+		role="security_policy_reviewer",
+		scope="gateway security policies",
+		owner="api",
+		purpose="review policy-sensitive route changes",
+		human_approval_required=False,
+	)
 	service.validate_apig_lifecycle_batch(
 		tenant_id=tenant_id,
 		event_stream="bytewax",
 		mutation_count=1,
 	)
 
-	assert views.dashboard_model(service, tenant_id)["summary"]["route_count"] == 1
+	dashboard = views.dashboard_model(service, tenant_id)
+	assert dashboard["summary"]["route_count"] == 1
+	assert dashboard["pending_reviews"]
+	assert dashboard["review_evidence"]["pending_queues"]
 	assert views.upstream_manager_model(service, tenant_id)["rows"][0]["id"] == "ui-api"
 	assert views.consumer_manager_model(service, tenant_id)["rows"][0]["id"] == "ui-client"
 	assert views.route_designer_model(service, tenant_id)["routes"][0]["id"] == "ui-route"
 	assert views.edge_filter_model(service, tenant_id)["routes"][0]["id"] == "ui-route"
 	assert views.security_policy_model(service, tenant_id)["required_external_route_controls"] == ["mtls_enabled"]
-	assert views.gateway_agent_roster_model(service, tenant_id)["rows"][0]["id"] == "ui-agent"
+	roster = views.gateway_agent_roster_model(service, tenant_id)
+	assert roster["rows"][0]["id"] == "ui-agent"
+	assert roster["pending_reviews"][0]["id"] == "ui-review-agent"
 	assert views.lifecycle_batch_model(service, tenant_id)["streaming"]["required_processor"] == "bytewax"
 	assert views.settings_model(tenant_id)["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert views.settings_model(tenant_id)["review_evidence"]["pending_queues"]
 
 
 def test_api_helpers_expose_governed_route_lifecycle():
@@ -645,6 +687,7 @@ def test_api_helpers_expose_governed_route_lifecycle():
 		"auth_policy_attached": "true",
 		"requested_rps_limit": 250000,
 	})
+	assert any(row["id"] == "api-route" for row in api.list_pending_reviews(upstream["tenant_id"]))
 	decision = api.decide_quota_review({
 		"id": request["quota_review"]["id"],
 		"tenant_id": upstream["tenant_id"],
@@ -658,6 +701,7 @@ def test_api_helpers_expose_governed_route_lifecycle():
 	})
 
 	assert decision["decision"] == "approved"
+	assert request["route"]["policy_decision"] == "require_review"
 	assert activated["status"] == "active"
 	assert api.list_routes(upstream["tenant_id"])[0]["id"] == "api-route"
 	assert api.list_audit_events(upstream["tenant_id"])[-1]["event_type"] == "route_activated"

@@ -28,6 +28,7 @@ adapters:
 - `api_gateway`
 - `traffic_management`
 - `gateway_agent_composition`
+- `review_evidence`
 - upstream lifecycle governance
 - consumer lifecycle governance
 - route publication and retirement workflow
@@ -36,6 +37,8 @@ adapters:
 - provider-neutral AI/automation agent participation for Codex, Claude Code,
   OpenCode, Pi, and future runtimes
 - Bytewax lifecycle-batch validation
+- durable review evidence and pending-review queues for generated gateway
+  governance consoles
 - generated-application UI route and theme metadata
 
 ## Required Services
@@ -66,6 +69,13 @@ regions, observability, production approval, policy review, and route retirement
 impact review. It also enforces supported gateway-agent runtime and role,
 agent scope, owner, purpose, contribution disclosure, privileged-role human
 approval, and Bytewax-only lifecycle-batch routing.
+
+Reviewable records expose `policy_decision`, `matched_rules`,
+`review_reasons`, and `review_evidence`. Otherwise valid privileged gateway
+agents without human approval remain durable `pending_review` records, high
+quota routes remain visible in pending review queues, and denied non-Bytewax
+lifecycle batches are persisted with denial evidence before the service raises
+`PermissionError`.
 
 ## UI
 

@@ -78,6 +78,7 @@ def register_capability() -> dict[str, Any]:
 		"rule_engine": contract["rule_engine"],
 		"agents": contract["agents"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"capabilities": {
 			"upstream_lifecycle": "Register and govern upstream services",
 			"consumer_lifecycle": "Register API consumers and credential controls",
@@ -87,6 +88,7 @@ def register_capability() -> dict[str, Any]:
 			"deployment_gates": "Evaluate gateway deployment readiness and approvals",
 			"gateway_agent_composition": "Register governed AI and automation agents as first-class APIG participants",
 			"bytewax_lifecycle_batches": "Validate Bytewax-routed lifecycle batches before generated applications mutate APIG state",
+			"review_evidence": "Preserve policy decisions, matched rules, review reasons, and review evidence for generated gateway governance queues",
 			"capability_rules": "Evaluate deterministic gateway governance rules",
 			"visual_theming": "Apply gateway-console theme tokens and components",
 		},

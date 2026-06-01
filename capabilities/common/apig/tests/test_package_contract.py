@@ -34,6 +34,9 @@ def test_package_contract_shape_is_valid():
 	assert contract["agents"]["first_class"] is True
 	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert "gateway_agent_composition" in contract["provides"]
+	assert "review_evidence" in contract["provides"]
+	assert "gateway_agents" in contract["review_evidence"]["pending_queues"]
+	assert "policy_decision" in contract["review_evidence"]["policy_fields"]
 	assert contract["requires"] == ["auth", "moni", "mqeb", "conf"]
 	assert contract["theme"]["tokens"]["border.radius"]
 
@@ -54,4 +57,6 @@ def test_package_app_entrypoint_is_publishable():
 	assert model["capabilities"]["apig"]["gateway_lifecycle"]["route"] == "GatewayRouteRecord"
 	assert model["capabilities"]["apig"]["gateway_lifecycle"]["gateway_agent"] == "GatewayAgentRecord"
 	assert model["capabilities"]["apig"]["streaming"]["required_processor"] == "bytewax"
+	assert "gateway_agents" in model["capabilities"]["apig"]["review_evidence"]["pending_queues"]
+	assert model["contracts"]["apig"]["review_evidence"]["deny_behavior"].startswith("Denied APIG")
 	assert model["agents"]["apig_gateway_agents"]["first_class"] is True

@@ -16,6 +16,78 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-06-01 10:01 EAT
+
+APIG durable review-evidence packet:
+
+- Extended upstream, consumer, route, quota review, gateway policy, traffic
+  shift, deployment, gateway-agent, lifecycle-batch, and audit records with
+  durable policy evidence: policy decision, matched rules, review reasons, and
+  review evidence.
+- Added contract-level `review_evidence` metadata and exposed it through
+  registration metadata, API helpers, view models, semantic model, release
+  evidence, package tests, and app self-test.
+- Preserved high-quota route requests as `pending_quota_review` records and
+  quota-review queue entries with operator-facing review evidence.
+- Preserved privileged gateway agents without human approval as
+  `pending_review` records instead of discarding registration evidence.
+- Preserved denied non-Bytewax APIG lifecycle batch validations as `denied`
+  evidence before raising `PermissionError`, including the required Bytewax
+  processor evidence.
+- Added pending-review queue composition for upstreams, consumers, routes,
+  quota reviews, policies, traffic shifts, deployments, gateway agents, and
+  lifecycle batches.
+- Kept APIG gateway agents provider-neutral for Codex, Claude Code, OpenCode,
+  Pi, and future gateway-governance runtimes while retaining human approval
+  controls for privileged roles and Bytewax-first lifecycle processing.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for APIG package init, models,
+  gateway runtime, API helpers, contract, app, view models, views, and focused
+  tests passed.
+- `./.venv/bin/pytest -q capabilities/common/apig/test_capability_contract.py
+  capabilities/common/apig/tests/test_package_contract.py` passed with 11
+  tests and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "import importlib; app =
+  importlib.import_module('capabilities.common.apig.app'); ..."` passed package
+  self-test.
+- `./.venv/bin/python -m json.tool
+  capabilities/common/apig/semantic_model.json` passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/apig --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/apig --strict --json` passed with no warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/apig --json`
+  passed with no warnings and side-effect-free publish planning.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/common/apig --json` passed with complete lifecycle evidence,
+  release evidence, review evidence, and 33 rules.
+- APIG stale-marker scan returned no TODO/FIXME/stub/placeholder, Kafka,
+  materialized-baseline, contract-only, or not-implemented markers across the
+  edited APIG packet.
+- Service smoke executed high-quota route review evidence, gateway policy
+  review evidence, privileged gateway-agent review evidence, accepted Bytewax
+  batch evidence, and denied non-Bytewax batch persistence, printing
+  `pending_quota_review require_review pending_review require_review
+  pending_review accepted deny bytewax_required 4`.
+- `git diff --check -- capabilities/common/apig docs/progress_log.md` passed.
+
+Known gaps:
+
+- Full repository tests, rendered APIG UI, production reverse proxy/service
+  mesh/ingress configuration, Kubernetes deployment, WebAssembly runtime
+  execution, live service discovery, live AUTH/KEYM/AUDL/CACH/MONI adapters,
+  durable Bytewax workers and dataflows, production traffic manager behavior,
+  benchmark and load checks, runtime SLO validation, and live AI runtime
+  adapters still need later verification.
+
+Next capability:
+
+- Continue the ordered common capability sequence with `regy` unless current
+  filesystem evidence shows a higher-priority incomplete packet.
+
 ### 2026-06-01 09:43 EAT
 
 DVRL durable review-evidence packet:

@@ -62,6 +62,7 @@ def semantic_model() -> dict[str, Any]:
 				"theme": contract["theme"],
 				"agents": contract["agents"],
 				"streaming": contract["streaming"],
+				"review_evidence": contract["review_evidence"],
 				"runtime": {
 					"api": "api.py",
 					"entrypoint": "app.py",
@@ -104,6 +105,7 @@ def semantic_model() -> dict[str, Any]:
 				"requires": contract["requires"],
 				"agents": contract["agents"],
 				"streaming": contract["streaming"],
+				"review_evidence": contract["review_evidence"],
 			}
 		},
 		"rules": {
@@ -182,6 +184,7 @@ def self_test() -> dict[str, Any]:
 	routes = capability.get("ui", {}).get("routes", [])
 	rules = capability.get("rule_engine", {}).get("rules", [])
 	adapters = capability.get("adapters", {})
+	review_evidence = capability.get("review_evidence", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "apig" not in model.get("capabilities", {}):
@@ -198,6 +201,8 @@ def self_test() -> dict[str, Any]:
 		errors.append("APIG semantic model must expose first-class gateway-agent composition")
 	if capability.get("streaming", {}).get("required_processor") != "bytewax":
 		errors.append("APIG semantic model must require Bytewax lifecycle processing")
+	if "gateway_agents" not in review_evidence.get("pending_queues", []):
+		errors.append("APIG semantic model must expose gateway-agent pending review evidence")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

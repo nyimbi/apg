@@ -33,6 +33,10 @@ APIG is intentionally split into two layers:
 - First-class gateway-agent records for AI and automation tools.
 - Bytewax lifecycle-batch validation before generated applications apply
   batched APIG state changes.
+- Durable review evidence on reviewable records: `policy_decision`,
+  `matched_rules`, `review_reasons`, and `review_evidence`.
+- Pending-review queues for routes, quota reviews, policies, traffic shifts,
+  deployments, gateway agents, and lifecycle batches.
 - Contract-derived semantic model and package evidence.
 
 ## Important Files
@@ -107,6 +111,28 @@ batch = service.validate_apig_lifecycle_batch(
 
 assert agent["status"] == "active"
 assert batch["status"] == "accepted"
+```
+
+High-risk gateway changes preserve review evidence for operator consoles:
+
+```python
+request = service.request_route(
+    route_id="orders-launch",
+    tenant_id="tenant-a",
+    path="/orders-launch",
+    methods=["GET"],
+    upstream_id="orders-api",
+    owner="api-team",
+    route_exposure="public",
+    auth_policy_attached=True,
+    requested_rps_limit=250000,
+    justification="Launch traffic forecast requires elevated quota.",
+)
+
+assert request["route"]["status"] == "pending_quota_review"
+assert request["route"]["policy_decision"] == "require_review"
+assert request["quota_review"]["review_reasons"] == ["quota_review_required"]
+assert service.list_pending_reviews("tenant-a")
 ```
 
 ## UI Composition

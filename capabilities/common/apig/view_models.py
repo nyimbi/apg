@@ -29,6 +29,8 @@ def dashboard_model(service: ApigService | None = None, tenant_id: str = "defaul
 		"deployments": service.list_deployments(tenant_id),
 		"gateway_agents": service.list_gateway_agents(tenant_id),
 		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
+		"review_evidence": contract["review_evidence"],
 		"audit_events": service.list_audit_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
@@ -160,6 +162,11 @@ def gateway_agent_roster_model(service: ApigService | None = None, tenant_id: st
 		"supported_runtimes": contract["agents"]["supported_runtimes"],
 		"supported_roles": contract["agents"]["supported_roles"],
 		"privileged_roles": contract["agents"]["privileged_roles"],
+		"pending_reviews": [
+			review
+			for review in service.list_pending_reviews(tenant_id)
+			if "runtime" in review and "role" in review
+		],
 	}
 
 
@@ -191,6 +198,7 @@ def settings_model(tenant_id: str = "default") -> dict[str, Any]:
 		"configuration_schema": contract["configuration_schema"],
 		"agents": contract["agents"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"theme": contract["theme"],
 		"routes": contract["ui"]["routes"],
 	}

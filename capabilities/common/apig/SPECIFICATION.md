@@ -118,6 +118,17 @@ review, retirement impact review, gateway-agent runtime/role/scope/owner/
 purpose/contribution disclosure, privileged gateway-agent human approval, and
 Bytewax-only lifecycle-batch routing.
 
+Reviewable and denied records must persist durable evidence for generated
+applications and gateway governance consoles. Upstream, consumer, route, quota
+review, policy, traffic shift, deployment, gateway-agent, lifecycle-batch, and
+audit records expose `policy_decision`, `matched_rules`, `review_reasons`, and
+`review_evidence`. Generated applications can list pending review queues
+without replaying rule evaluation.
+
+Denied non-Bytewax lifecycle batches must be persisted with policy evidence
+before `PermissionError` is raised so remediation workflows can show the
+required processor, matched rule, reason, and required action.
+
 ## Adapter Boundaries
 
 The dependency-light control plane must not execute live proxy operations.
@@ -132,13 +143,15 @@ declared gateway-agent records and APG approval/audit controls.
 
 - Root `README.md`, `SPECIFICATION.md`, and `PLAN.md` describe current APIG
   behavior and adapter boundaries.
-- Contract exposes configuration, rules, adapters, agents, streaming, UI,
-  theme, and package evidence for upstream, consumer, route, traffic, policy,
-  deployment, agent, lifecycle-batch, and audit workflows.
+- Contract exposes configuration, rules, adapters, agents, streaming, review
+  evidence, UI, theme, and package evidence for upstream, consumer, route,
+  traffic, policy, deployment, agent, lifecycle-batch, and audit workflows.
 - Generated apps can use a dependency-light service for gateway lifecycle
   workflows, gateway-agent registration, and Bytewax lifecycle-batch validation
   without optional production dependencies.
 - Focused tests cover positive and negative guardrail paths.
+- Focused tests cover durable review evidence and pending-review queues for
+  generated gateway governance consoles.
 - `app.py`, `semantic_model.json`, `package_manifest.json`, and
   `release_report.json` derive from the current contract.
 - Focused compile, tests, implementation audit, publish-plan, stale marker

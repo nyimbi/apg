@@ -86,6 +86,7 @@ class ApigService:
 			base_url=base_url.rstrip("/"),
 			owner=owner,
 			health=health,
+			**_policy_kwargs(result),
 			labels=dict(labels or {}),
 		)
 		self._upstreams[self._tenant_key(tenant_id, upstream_id)] = record
@@ -95,6 +96,7 @@ class ApigService:
 			subject_id=upstream_id,
 			message=f"Registered upstream {name}.",
 			evidence={"base_url": record.base_url, "owner": owner, "health": health, "matched_rules": result["matched_rules"]},
+			policy_result=result,
 		)
 		return record.model_dump(mode="json")
 
@@ -134,6 +136,7 @@ class ApigService:
 			credential_rotation_recorded=credential_rotation_recorded,
 			rbac_approval_recorded=rbac_approval_recorded,
 			status="registered",
+			**_policy_kwargs(result),
 		)
 		self._consumers[self._tenant_key(tenant_id, consumer_id)] = record
 		self._record_event(
@@ -142,6 +145,7 @@ class ApigService:
 			subject_id=consumer_id,
 			message=f"Registered consumer {name}.",
 			evidence={"access_tier": access_tier, "matched_rules": result["matched_rules"]},
+			policy_result=result,
 		)
 		return record.model_dump(mode="json")
 
@@ -210,6 +214,7 @@ class ApigService:
 			wasm_filter_attached=wasm_filter_attached,
 			filter_signature_verified=filter_signature_verified,
 			status=status,
+			**_policy_kwargs(result),
 		)
 		self._routes[self._tenant_key(tenant_id, route_id)] = route
 		self._record_event(
@@ -218,6 +223,7 @@ class ApigService:
 			subject_id=route_id,
 			message=f"Requested route {path}.",
 			evidence={"status": status, "upstream_id": upstream_id, "requested_rps_limit": requested_rps_limit, "matched_rules": result["matched_rules"]},
+			policy_result=result,
 		)
 		if result["decision"] == "require_review":
 			review = GatewayQuotaReview(
@@ -227,6 +233,10 @@ class ApigService:
 				requested_rps_limit=requested_rps_limit,
 				requester=owner,
 				justification=justification or "High gateway quota requested.",
+				matched_rules=result["matched_rules"],
+				policy_decision=result["decision"],
+				review_reasons=_reasons(result),
+				review_evidence=_review_evidence(result),
 			)
 			self._quota_reviews[self._tenant_key(tenant_id, review.id)] = review
 			self._record_event(
@@ -235,6 +245,7 @@ class ApigService:
 				subject_id=review.id,
 				message=f"Requested quota review for {route_id}.",
 				evidence={"route_id": route_id, "requested_rps_limit": requested_rps_limit},
+				policy_result=result,
 			)
 			return {"route": route.model_dump(mode="json"), "quota_review": review.model_dump(mode="json")}
 		return route.model_dump(mode="json")
@@ -266,6 +277,10 @@ class ApigService:
 			decision=decision,
 			reviewer=reviewer,
 			notes=notes,
+			matched_rules=list(review.matched_rules),
+			policy_decision=review.policy_decision,
+			review_reasons=list(review.review_reasons),
+			review_evidence={**review.review_evidence, "review_recorded": True},
 		)
 		self._quota_reviews[self._tenant_key(tenant_id, review_id)] = decided
 		self._record_event(
@@ -300,6 +315,11 @@ class ApigService:
 			wasm_filter_attached=route.wasm_filter_attached,
 			filter_signature_verified=route.filter_signature_verified,
 			status="active",
+			decision=route.decision,
+			matched_rules=list(route.matched_rules),
+			policy_decision=route.policy_decision,
+			review_reasons=list(route.review_reasons),
+			review_evidence=dict(route.review_evidence),
 		)
 		self._routes[self._tenant_key(tenant_id, route_id)] = activated
 		self._record_event(
@@ -334,8 +354,7 @@ class ApigService:
 			policy_type=policy_type,
 			actor=actor,
 			status="active" if result["decision"] == "allow" else _status_for_decision(result["decision"]),
-			decision=result["decision"],
-			matched_rules=result["matched_rules"],
+			**_policy_kwargs(result, policy_review_recorded),
 			metadata=dict(metadata or {}),
 		)
 		self._policies[self._tenant_key(tenant_id, policy_id)] = record
@@ -345,6 +364,8 @@ class ApigService:
 			subject_id=policy_id,
 			message=f"Evaluated policy change {name}.",
 			evidence={"decision": result["decision"], "matched_rules": result["matched_rules"]},
+			policy_result=result,
+			review_recorded=policy_review_recorded,
 		)
 		return record.model_dump(mode="json")
 
@@ -375,8 +396,7 @@ class ApigService:
 			canary_percent=canary_percent,
 			actor=actor,
 			status="active" if result["decision"] == "allow" else _status_for_decision(result["decision"]),
-			decision=result["decision"],
-			matched_rules=result["matched_rules"],
+			**_policy_kwargs(result, canary_review_recorded),
 			rollback_plan=rollback_plan,
 		)
 		self._traffic_shifts[self._tenant_key(tenant_id, shift_id)] = record
@@ -386,6 +406,8 @@ class ApigService:
 			subject_id=shift_id,
 			message=f"Evaluated canary shift for {route_id}.",
 			evidence={"decision": result["decision"], "canary_percent": canary_percent, "matched_rules": result["matched_rules"]},
+			policy_result=result,
+			review_recorded=canary_review_recorded,
 		)
 		return record.model_dump(mode="json")
 
@@ -416,8 +438,7 @@ class ApigService:
 			region=region,
 			actor=actor,
 			status="deployed" if result["decision"] == "allow" else _status_for_decision(result["decision"]),
-			decision=result["decision"],
-			matched_rules=result["matched_rules"],
+			**_policy_kwargs(result, deployment_approval_recorded),
 		)
 		self._deployments[self._tenant_key(tenant_id, deployment_id)] = record
 		self._record_event(
@@ -426,6 +447,8 @@ class ApigService:
 			subject_id=deployment_id,
 			message=f"Evaluated {environment} deployment in {region}.",
 			evidence={"decision": result["decision"], "matched_rules": result["matched_rules"]},
+			policy_result=result,
+			review_recorded=deployment_approval_recorded,
 		)
 		return record.model_dump(mode="json")
 
@@ -461,6 +484,7 @@ class ApigService:
 			wasm_filter_attached=route.wasm_filter_attached,
 			filter_signature_verified=route.filter_signature_verified,
 			status="retired",
+			**_policy_kwargs(result, impact_review_recorded),
 		)
 		self._routes[self._tenant_key(tenant_id, route_id)] = retired
 		self._record_event(
@@ -469,6 +493,8 @@ class ApigService:
 			subject_id=route_id,
 			message=f"Retired route {route.path}.",
 			evidence={"actor": actor, "matched_rules": result["matched_rules"]},
+			policy_result=result,
+			review_recorded=impact_review_recorded,
 		)
 		return retired.model_dump(mode="json")
 
@@ -507,6 +533,7 @@ class ApigService:
 				subject_id=agent_id,
 				message=f"Denied gateway agent {name}.",
 				evidence={"runtime": runtime_value, "role": role_value, "matched_rules": result["matched_rules"]},
+				policy_result=result,
 			)
 			_raise_if_blocked(result)
 		if self._tenant_key(tenant_id, agent_id) in self._gateway_agents:
@@ -523,8 +550,7 @@ class ApigService:
 			contribution_disclosed=bool(contribution_disclosed),
 			human_approval_required=bool(human_approval_required),
 			status="active" if result["decision"] == "allow" else _status_for_decision(result["decision"]),
-			decision=result["decision"],
-			matched_rules=result["matched_rules"],
+			**_policy_kwargs(result, bool(human_approval_required)),
 		)
 		self._gateway_agents[self._tenant_key(tenant_id, agent_id)] = record
 		self._record_event(
@@ -533,6 +559,8 @@ class ApigService:
 			subject_id=agent_id,
 			message=f"Registered gateway agent {name}.",
 			evidence={"runtime": runtime_value, "role": role_value, "status": record.status, "matched_rules": result["matched_rules"]},
+			policy_result=result,
+			review_recorded=bool(human_approval_required),
 		)
 		return record.model_dump(mode="json")
 
@@ -558,8 +586,7 @@ class ApigService:
 			event_stream=stream_value,
 			mutation_count=mutation_count,
 			accepted=accepted,
-			decision=result["decision"],
-			matched_rules=result["matched_rules"],
+			**_policy_kwargs(result),
 			status="accepted" if accepted else "denied",
 		)
 		self._lifecycle_batches[self._tenant_key(tenant_id, record.id)] = record
@@ -569,6 +596,7 @@ class ApigService:
 			subject_id=record.id,
 			message=f"Validated APIG lifecycle batch through {stream_value}.",
 			evidence={"event_stream": stream_value, "mutation_count": mutation_count, "matched_rules": result["matched_rules"]},
+			policy_result=result,
 		)
 		if not accepted:
 			_raise_if_blocked(result)
@@ -624,10 +652,33 @@ class ApigService:
 			"traffic_shift_count": len(self.list_traffic_shifts(tenant_id)),
 			"deployment_count": len(self.list_deployments(tenant_id)),
 			"gateway_agent_count": len(self.list_gateway_agents(tenant_id)),
+			"pending_gateway_agent_review_count": len([agent for agent in self.list_gateway_agents(tenant_id) if agent["status"] == "pending_review"]),
 			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
 			"denied_lifecycle_batch_count": len([batch for batch in self.list_lifecycle_batches(tenant_id) if batch["status"] == "denied"]),
+			"review_count": len(self.list_pending_reviews(tenant_id)),
+			"pending_review_count": len(self.list_pending_reviews(tenant_id)),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 		}
+
+	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		"""Return gateway records awaiting quota, policy, traffic, deployment, or agent review."""
+		items = (
+			self.list_upstreams(tenant_id)
+			+ self.list_consumers(tenant_id)
+			+ self.list_routes(tenant_id)
+			+ self.list_quota_reviews(tenant_id)
+			+ self.list_policies(tenant_id)
+			+ self.list_traffic_shifts(tenant_id)
+			+ self.list_deployments(tenant_id)
+			+ self.list_gateway_agents(tenant_id)
+			+ self.list_lifecycle_batches(tenant_id)
+		)
+		return [
+			record
+			for record in items
+			if record.get("status") in {"pending", "pending_review", "pending_quota_review", "review_required"}
+			or record.get("decision") == "pending"
+		]
 
 	def list_records(self, tenant_id: str | None = None, record_type: str | None = None) -> list[dict[str, Any]]:
 		collections = {
@@ -729,16 +780,57 @@ class ApigService:
 		subject_id: str,
 		message: str,
 		evidence: dict[str, Any] | None = None,
+		policy_result: dict[str, Any] | None = None,
+		review_recorded: bool = False,
 	) -> None:
+		result = policy_result or _allow_result()
 		self._events.append(
 			GatewayAuditEvent(
 				tenant_id=tenant_id,
 				event_type=event_type,
 				subject_id=subject_id,
 				message=message,
+				policy_decision=result["decision"],
+				matched_rules=list(result["matched_rules"]),
+				review_reasons=_reasons(result),
+				review_evidence=_review_evidence(result, review_recorded),
 				evidence=dict(evidence or {}),
 			)
 		)
+
+
+def _allow_result() -> dict[str, Any]:
+	return {"decision": "allow", "matched_rules": [], "actions": []}
+
+
+def _reasons(result: dict[str, Any]) -> list[str]:
+	return list(dict.fromkeys(
+		str(action["reason"])
+		for action in result.get("actions", [])
+		if action.get("reason")
+	))
+
+
+def _review_evidence(result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+	return {
+		"required_actions": list(dict.fromkeys(
+			str(action.get("required_action"))
+			for action in result.get("actions", [])
+			if action.get("required_action")
+		)),
+		"reasons": _reasons(result),
+		"review_recorded": bool(review_recorded),
+	}
+
+
+def _policy_kwargs(result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+	return {
+		"decision": result["decision"],
+		"matched_rules": list(result["matched_rules"]),
+		"policy_decision": result["decision"],
+		"review_reasons": _reasons(result),
+		"review_evidence": _review_evidence(result, review_recorded),
+	}
 
 
 def _raise_if_blocked(result: dict[str, Any]) -> None:

@@ -15,6 +15,8 @@ Known gaps:
 - `app.py` and package evidence need to expose contract-level
   `provides`/`requires`, agents, streaming, and composition metadata instead of
   static `apig_operations` evidence.
+- APIG needs durable review evidence on every reviewable or denied gateway
+  lifecycle record.
 
 ## Build Sequence
 
@@ -38,6 +40,10 @@ Known gaps:
      retirement records/workflows.
    - Add gateway-agent records, registration guardrails, lifecycle-batch
      records, Bytewax validation, and dashboard counts.
+   - Persist `policy_decision`, `matched_rules`, `review_reasons`, and
+     `review_evidence` across reviewable lifecycle records and audit events.
+   - Preserve denied non-Bytewax lifecycle-batch evidence before raising
+     `PermissionError`.
    - Keep production gateway/service-mesh/edge runtime code behind adapter
      boundaries.
 
@@ -54,6 +60,9 @@ Known gaps:
      `package_manifest.json`.
    - Expand focused tests for guardrails, lifecycle behavior, UI models, package
      contract shape, and app evidence.
+   - Assert pending-review queues and review evidence appear in service,
+     API/view models, registration metadata, semantic model, and release
+     evidence.
 
 6. Verification and commit
    - Run focused compile, APIG package tests, implementation audit, publish

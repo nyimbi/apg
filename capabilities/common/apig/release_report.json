@@ -19,6 +19,11 @@
       "service": "gateway_runtime.py",
       "views": "view_models.py"
     },
+    "review_evidence": {
+      "deny_behavior": "Denied APIG lifecycle batches persist evidence before PermissionError",
+      "pending_queue_count": 9,
+      "policy_field_count": 4
+    },
     "self_test": {
       "capability": "apig",
       "errors": [],

@@ -379,7 +379,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "apig",
 		"display_name": "API Gateway & Management",
-		"provides": ["api_gateway", "traffic_management", "gateway_agent_composition"],
+		"provides": ["api_gateway", "traffic_management", "gateway_agent_composition", "review_evidence"],
 		"requires": ["auth", "moni", "mqeb", "conf"],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
@@ -388,6 +388,39 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		"theme": {"name": theme.name, "tokens": theme.tokens, "components": theme.components},
 		"agents": agent_manifest(),
 		"streaming": streaming_manifest(),
+		"review_evidence": {
+			"durable_statuses": [
+				"pending",
+				"pending_review",
+				"pending_quota_review",
+				"review_required",
+				"review_denied",
+				"denied",
+				"accepted",
+				"registered",
+				"active",
+				"deployed",
+				"retired"
+			],
+			"policy_fields": [
+				"policy_decision",
+				"matched_rules",
+				"review_reasons",
+				"review_evidence"
+			],
+			"pending_queues": [
+				"upstreams",
+				"consumers",
+				"routes",
+				"quota_reviews",
+				"policies",
+				"traffic_shifts",
+				"deployments",
+				"gateway_agents",
+				"lifecycle_batches"
+			],
+			"deny_behavior": "Denied APIG lifecycle batches persist evidence before PermissionError"
+		},
 	}
 
 
