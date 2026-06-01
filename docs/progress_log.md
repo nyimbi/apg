@@ -28149,3 +28149,94 @@ Known gaps:
   document signing, external GRC integration, live ledger posting, durable
   Bytewax topology, or performance/load checks during this battery-conscious
   slice.
+
+## 2026-06-01 - FinTech Regulatory Technology executable capability
+
+- Promoted `capabilities/fintech/regtech` from placeholder into a first-class
+  executable APG capability with README, specification, plan, capability spec,
+  package manifest, semantic model, release evidence, focused tests, and
+  code-review notes.
+- Added executable regulatory source registration, regulatory change intake,
+  obligation and policy mapping, impact assessment, filing package preparation,
+  submission recording, regulatory inquiry intake, response recording, review
+  recording, Bytewax batch validation, dashboard summary, and provider-neutral
+  RegTech agent registration workflows.
+- Added deterministic guardrails for tenant context, write policy evidence,
+  source regulator/jurisdiction/reference/owner/evidence, change
+  source/framework/type/effective date/severity/evidence, obligation
+  reference/policy/owner/due date, impact capability/risk/evidence/reviewer,
+  filing framework/type/period/evidence/owner, submission filing/channel/
+  submitter/timestamp/acknowledgment, inquiry regulator/reference/severity/due
+  date/evidence, response inquiry/responder/reference/approval, review
+  status/reviewer/evidence, Bytewax lifecycle events, supported AI-agent
+  runtimes/roles, and privileged AI-agent approval.
+- Added compact UI/view models and theme tokens for dashboards, regulatory
+  sources, changes, obligations, impact assessments, filings, submissions,
+  inquiries, responses, reviews, agents, and settings.
+- Updated fintech capability metadata so `regtech` is listed as an implemented
+  sub-capability.
+- Updated `capabilities/README.md` so the catalog snapshot reports 132 valid
+  contracts, 132 domain-specific packages, 132 strict complete package artifact
+  sets, and 24 fintech packages.
+- Removed the empty `_Regulatory_Technology` marker file and regenerated
+  `semantic_model.json` from the executable application.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/fintech/regtech/__init__.py
+  capabilities/fintech/regtech/capability_contract.py
+  capabilities/fintech/regtech/models.py
+  capabilities/fintech/regtech/regtech_runtime.py
+  capabilities/fintech/regtech/service.py
+  capabilities/fintech/regtech/api.py
+  capabilities/fintech/regtech/views.py
+  capabilities/fintech/regtech/app.py
+  capabilities/fintech/regtech/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/fintech/regtech/tests/test_package_contract.py` passed with 6
+  tests.
+- `./.venv/bin/python capabilities/fintech/regtech/app.py` passed self-test
+  with `passed: true` and `status: ok`.
+- `./.venv/bin/apg capabilities inspect fintech_regtech --json` passed with 49
+  rules, 12 UI routes, theme `regtech_control`, shell `apg_python`, and Bytewax
+  streaming.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/fintech/regtech --json` passed with `side_effect_free: true`
+  and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/fintech/regtech --json` passed with 1 domain-specific
+  capability, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/fintech/regtech --json` passed with 1 complete lifecycle, 49
+  rules, 12 UI routes, 11 theme tokens, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 132 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 132 operable contracts, 132 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/fintech/regtech`, `capabilities/fintech/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed source, change, obligation mapping, impact, filing, submission,
+  inquiry, response, review, and AI-agent lifecycle paths so rule evaluation
+  happens before state mutation.
+- Tightened RegTech semantics around regulator-neutral enumerations, supported
+  regulatory frameworks, obligation/policy traceability, approved inquiry
+  responses, and provider-neutral agent roles.
+- Kept live regulator portal submission, legal interpretation services,
+  regulator identity federation, document signing, external GRC suites, and
+  durable Bytewax workers behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live regulator portal
+  submission, legal interpretation services, regulator identity federation,
+  document signing, external GRC suites, durable Bytewax topology, or
+  performance/load checks during this battery-conscious slice.

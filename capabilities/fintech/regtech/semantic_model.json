@@ -1,0 +1,1954 @@
+{
+  "app": {
+    "description": "Regulatory Technology package-backed APG capability",
+    "entity_count": 10,
+    "name": "fintech_regtech",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "fintech_regtech": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "audit": "audl",
+          "auth": "auth",
+          "compliance": "fintech_compliance",
+          "event_stream": "bytewax",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "reporting": "fin_rpt",
+          "risk": "fintech_risk"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "regulatory_change_reviewer",
+            "filing_preparer",
+            "submission_reviewer",
+            "inquiry_response_agent",
+            "policy_mapping_agent",
+            "regulatory_horizon_agent"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "changes": {
+          "effective_date_required": true,
+          "evidence_required": true,
+          "severity_required": true,
+          "source_required": true,
+          "supported_frameworks": [
+            "pci_dss",
+            "psd2",
+            "open_banking",
+            "gdpr",
+            "sox",
+            "basel_iii",
+            "mifid_ii",
+            "aml",
+            "kyc",
+            "data_privacy"
+          ],
+          "supported_types": [
+            "new_rule",
+            "rule_update",
+            "guidance",
+            "enforcement_action",
+            "consultation",
+            "deadline_change"
+          ]
+        },
+        "filings": {
+          "evidence_required": true,
+          "owner_required": true,
+          "period_required": true,
+          "supported_frameworks": [
+            "pci_dss",
+            "psd2",
+            "open_banking",
+            "gdpr",
+            "sox",
+            "basel_iii",
+            "mifid_ii",
+            "aml",
+            "kyc",
+            "data_privacy"
+          ],
+          "supported_types": [
+            "regulatory_return",
+            "incident_notice",
+            "license_update",
+            "audit_response",
+            "prudential_report",
+            "conduct_report"
+          ]
+        },
+        "governance": {
+          "audit_events": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "impact_assessments": {
+          "change_required": true,
+          "evidence_required": true,
+          "impacted_capability_required": true,
+          "reviewer_required": true,
+          "supported_risk_ratings": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "inquiries": {
+          "due_date_required": true,
+          "evidence_required": true,
+          "reference_required": true,
+          "supported_regulators": [
+            "central_bank",
+            "securities_regulator",
+            "data_protection_authority",
+            "financial_conduct_authority",
+            "payments_regulator",
+            "tax_authority"
+          ],
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "obligations": {
+          "change_required": true,
+          "due_date_required": true,
+          "obligation_reference_required": true,
+          "owner_required": true,
+          "policy_reference_required": true
+        },
+        "observability": {
+          "event_stream": "apg.fintech.regtech.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "responses": {
+          "approval_reference_required": true,
+          "inquiry_required": true,
+          "responder_required": true,
+          "response_reference_required": true
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "sources": {
+          "evidence_required": true,
+          "owner_required": true,
+          "source_reference_required": true,
+          "supported_jurisdictions": [
+            "KE",
+            "US",
+            "GB",
+            "EU",
+            "NG",
+            "GH",
+            "ZA",
+            "SG",
+            "GLOBAL"
+          ],
+          "supported_regulators": [
+            "central_bank",
+            "securities_regulator",
+            "data_protection_authority",
+            "financial_conduct_authority",
+            "payments_regulator",
+            "tax_authority"
+          ]
+        },
+        "submissions": {
+          "acknowledgment_required": true,
+          "filing_required": true,
+          "submitted_at_required": true,
+          "submitted_by_required": true,
+          "supported_channels": [
+            "portal",
+            "api",
+            "email",
+            "sftp",
+            "manual"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "regtech_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_changes": true,
+          "enable_dashboard": true,
+          "enable_filings": true,
+          "enable_impact": true,
+          "enable_inquiries": true,
+          "enable_obligations": true,
+          "enable_responses": true,
+          "enable_reviews": true,
+          "enable_sources": true,
+          "enable_submissions": true
+        }
+      },
+      "name": "Regulatory Technology",
+      "provides": [
+        "regulatory_source_workflow",
+        "regulatory_change_workflow",
+        "regulatory_obligation_mapping_workflow",
+        "regulatory_policy_mapping_workflow",
+        "regulatory_impact_workflow",
+        "regulatory_filing_workflow",
+        "regulatory_submission_workflow",
+        "regulatory_inquiry_workflow",
+        "regulatory_response_workflow",
+        "regulatory_review_workflow",
+        "regulatory_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_compliance",
+        "fintech_risk",
+        "fintech_aml",
+        "fintech_kyc",
+        "fin_rpt"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "regtech_policy_required",
+              "required_action": "attach_regtech_policy"
+            },
+            "name": "regtech_write_requires_policy"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "regulator_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "regulator_not_supported",
+              "required_action": "select_supported_regulator"
+            },
+            "name": "source_regulator_supported"
+          },
+          {
+            "condition": {
+              "jurisdiction_supported": false,
+              "operation": "register_source"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "jurisdiction_not_supported",
+              "required_action": "select_supported_jurisdiction"
+            },
+            "name": "source_jurisdiction_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "source_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_reference_required",
+              "required_action": "attach_source_reference"
+            },
+            "name": "source_reference_required"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "owner_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_owner_required",
+              "required_action": "assign_source_owner"
+            },
+            "name": "source_owner_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "register_source"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_evidence_required",
+              "required_action": "attach_source_evidence"
+            },
+            "name": "source_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_change",
+              "source_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "regulatory_source_required",
+              "required_action": "select_source"
+            },
+            "name": "change_source_required"
+          },
+          {
+            "condition": {
+              "framework_supported": false,
+              "operation": "record_change"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "framework_not_supported",
+              "required_action": "select_supported_framework"
+            },
+            "name": "change_framework_supported"
+          },
+          {
+            "condition": {
+              "change_type_supported": false,
+              "operation": "record_change"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "change_type_not_supported",
+              "required_action": "select_supported_change_type"
+            },
+            "name": "change_type_supported"
+          },
+          {
+            "condition": {
+              "effective_date_present": false,
+              "operation": "record_change"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "effective_date_required",
+              "required_action": "set_effective_date"
+            },
+            "name": "change_effective_date_required"
+          },
+          {
+            "condition": {
+              "operation": "record_change",
+              "severity_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "severity_not_supported",
+              "required_action": "select_supported_severity"
+            },
+            "name": "change_severity_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_change"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "change_evidence_required",
+              "required_action": "attach_change_evidence"
+            },
+            "name": "change_evidence_required"
+          },
+          {
+            "condition": {
+              "change_present": false,
+              "operation": "map_obligation"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "regulatory_change_required",
+              "required_action": "select_change"
+            },
+            "name": "obligation_change_required"
+          },
+          {
+            "condition": {
+              "obligation_present": false,
+              "operation": "map_obligation"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "obligation_reference_required",
+              "required_action": "attach_obligation_reference"
+            },
+            "name": "obligation_reference_required"
+          },
+          {
+            "condition": {
+              "operation": "map_obligation",
+              "policy_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "policy_reference_required",
+              "required_action": "attach_policy_reference"
+            },
+            "name": "policy_reference_required"
+          },
+          {
+            "condition": {
+              "operation": "map_obligation",
+              "owner_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "obligation_owner_required",
+              "required_action": "assign_obligation_owner"
+            },
+            "name": "obligation_owner_required"
+          },
+          {
+            "condition": {
+              "due_date_present": false,
+              "operation": "map_obligation"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "obligation_due_date_required",
+              "required_action": "set_due_date"
+            },
+            "name": "obligation_due_date_required"
+          },
+          {
+            "condition": {
+              "change_present": false,
+              "operation": "assess_impact"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "regulatory_change_required",
+              "required_action": "select_change"
+            },
+            "name": "impact_change_required"
+          },
+          {
+            "condition": {
+              "impacted_capability_present": false,
+              "operation": "assess_impact"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "impacted_capability_required",
+              "required_action": "attach_impacted_capability"
+            },
+            "name": "impact_capability_required"
+          },
+          {
+            "condition": {
+              "operation": "assess_impact",
+              "risk_rating_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_rating_not_supported",
+              "required_action": "select_supported_risk_rating"
+            },
+            "name": "impact_risk_rating_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "assess_impact"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "impact_evidence_required",
+              "required_action": "attach_impact_evidence"
+            },
+            "name": "impact_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "assess_impact",
+              "reviewer_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "impact_reviewer_required",
+              "required_action": "assign_reviewer"
+            },
+            "name": "impact_reviewer_required"
+          },
+          {
+            "condition": {
+              "framework_supported": false,
+              "operation": "prepare_filing"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "framework_not_supported",
+              "required_action": "select_supported_framework"
+            },
+            "name": "filing_framework_supported"
+          },
+          {
+            "condition": {
+              "filing_type_supported": false,
+              "operation": "prepare_filing"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "filing_type_not_supported",
+              "required_action": "select_supported_filing_type"
+            },
+            "name": "filing_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "prepare_filing",
+              "period_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "filing_period_required",
+              "required_action": "set_period"
+            },
+            "name": "filing_period_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "prepare_filing"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "filing_evidence_required",
+              "required_action": "attach_filing_evidence"
+            },
+            "name": "filing_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "prepare_filing",
+              "owner_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "filing_owner_required",
+              "required_action": "assign_filing_owner"
+            },
+            "name": "filing_owner_required"
+          },
+          {
+            "condition": {
+              "filing_present": false,
+              "operation": "record_submission"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "filing_required",
+              "required_action": "select_filing"
+            },
+            "name": "submission_filing_required"
+          },
+          {
+            "condition": {
+              "channel_supported": false,
+              "operation": "record_submission"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "submission_channel_not_supported",
+              "required_action": "select_supported_submission_channel"
+            },
+            "name": "submission_channel_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_submission",
+              "submitted_by_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "submitted_by_required",
+              "required_action": "record_submitter"
+            },
+            "name": "submission_submitter_required"
+          },
+          {
+            "condition": {
+              "operation": "record_submission",
+              "submitted_at_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "submitted_at_required",
+              "required_action": "record_submission_time"
+            },
+            "name": "submission_timestamp_required"
+          },
+          {
+            "condition": {
+              "acknowledgment_present": false,
+              "operation": "record_submission"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "acknowledgment_required",
+              "required_action": "attach_acknowledgment"
+            },
+            "name": "submission_acknowledgment_required"
+          },
+          {
+            "condition": {
+              "operation": "open_inquiry",
+              "regulator_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "regulator_not_supported",
+              "required_action": "select_supported_regulator"
+            },
+            "name": "inquiry_regulator_supported"
+          },
+          {
+            "condition": {
+              "operation": "open_inquiry",
+              "reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "inquiry_reference_required",
+              "required_action": "attach_inquiry_reference"
+            },
+            "name": "inquiry_reference_required"
+          },
+          {
+            "condition": {
+              "operation": "open_inquiry",
+              "severity_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "severity_not_supported",
+              "required_action": "select_supported_severity"
+            },
+            "name": "inquiry_severity_supported"
+          },
+          {
+            "condition": {
+              "due_date_present": false,
+              "operation": "open_inquiry"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "inquiry_due_date_required",
+              "required_action": "set_due_date"
+            },
+            "name": "inquiry_due_date_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "open_inquiry"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "inquiry_evidence_required",
+              "required_action": "attach_inquiry_evidence"
+            },
+            "name": "inquiry_evidence_required"
+          },
+          {
+            "condition": {
+              "inquiry_present": false,
+              "operation": "record_response"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "inquiry_required",
+              "required_action": "select_inquiry"
+            },
+            "name": "response_inquiry_required"
+          },
+          {
+            "condition": {
+              "operation": "record_response",
+              "responder_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "responder_required",
+              "required_action": "assign_responder"
+            },
+            "name": "response_responder_required"
+          },
+          {
+            "condition": {
+              "operation": "record_response",
+              "response_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "response_reference_required",
+              "required_action": "attach_response"
+            },
+            "name": "response_reference_required"
+          },
+          {
+            "condition": {
+              "approval_present": false,
+              "operation": "record_response"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "response_approval_required",
+              "required_action": "attach_response_approval"
+            },
+            "name": "response_approval_required"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "status_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_status_not_supported",
+              "required_action": "select_supported_status"
+            },
+            "name": "review_status_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "reviewer_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "reviewer_required",
+              "required_action": "assign_reviewer"
+            },
+            "name": "review_reviewer_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_review"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_evidence_required",
+              "required_action": "attach_review_evidence"
+            },
+            "name": "review_evidence_required"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "regtech_batch"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_regtech_batch_to_bytewax"
+            },
+            "name": "regtech_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_regtech_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "regtech_agent_runtime_not_supported",
+              "required_action": "select_supported_runtime"
+            },
+            "name": "regtech_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_regtech_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "regtech_agent_role_not_supported",
+              "required_action": "select_supported_role"
+            },
+            "name": "regtech_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "regtech_agent_action",
+              "privileged_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_regtech_agent_action_requires_human_approval"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "regtech_policy_required",
+            "required_action": "attach_regtech_policy"
+          },
+          "name": "regtech_write_requires_policy"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "regulator_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "regulator_not_supported",
+            "required_action": "select_supported_regulator"
+          },
+          "name": "source_regulator_supported"
+        },
+        {
+          "condition": {
+            "jurisdiction_supported": false,
+            "operation": "register_source"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "jurisdiction_not_supported",
+            "required_action": "select_supported_jurisdiction"
+          },
+          "name": "source_jurisdiction_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "source_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_reference_required",
+            "required_action": "attach_source_reference"
+          },
+          "name": "source_reference_required"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "owner_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_owner_required",
+            "required_action": "assign_source_owner"
+          },
+          "name": "source_owner_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "register_source"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_evidence_required",
+            "required_action": "attach_source_evidence"
+          },
+          "name": "source_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_change",
+            "source_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "regulatory_source_required",
+            "required_action": "select_source"
+          },
+          "name": "change_source_required"
+        },
+        {
+          "condition": {
+            "framework_supported": false,
+            "operation": "record_change"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "framework_not_supported",
+            "required_action": "select_supported_framework"
+          },
+          "name": "change_framework_supported"
+        },
+        {
+          "condition": {
+            "change_type_supported": false,
+            "operation": "record_change"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "change_type_not_supported",
+            "required_action": "select_supported_change_type"
+          },
+          "name": "change_type_supported"
+        },
+        {
+          "condition": {
+            "effective_date_present": false,
+            "operation": "record_change"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "effective_date_required",
+            "required_action": "set_effective_date"
+          },
+          "name": "change_effective_date_required"
+        },
+        {
+          "condition": {
+            "operation": "record_change",
+            "severity_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "severity_not_supported",
+            "required_action": "select_supported_severity"
+          },
+          "name": "change_severity_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_change"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "change_evidence_required",
+            "required_action": "attach_change_evidence"
+          },
+          "name": "change_evidence_required"
+        },
+        {
+          "condition": {
+            "change_present": false,
+            "operation": "map_obligation"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "regulatory_change_required",
+            "required_action": "select_change"
+          },
+          "name": "obligation_change_required"
+        },
+        {
+          "condition": {
+            "obligation_present": false,
+            "operation": "map_obligation"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "obligation_reference_required",
+            "required_action": "attach_obligation_reference"
+          },
+          "name": "obligation_reference_required"
+        },
+        {
+          "condition": {
+            "operation": "map_obligation",
+            "policy_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "policy_reference_required",
+            "required_action": "attach_policy_reference"
+          },
+          "name": "policy_reference_required"
+        },
+        {
+          "condition": {
+            "operation": "map_obligation",
+            "owner_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "obligation_owner_required",
+            "required_action": "assign_obligation_owner"
+          },
+          "name": "obligation_owner_required"
+        },
+        {
+          "condition": {
+            "due_date_present": false,
+            "operation": "map_obligation"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "obligation_due_date_required",
+            "required_action": "set_due_date"
+          },
+          "name": "obligation_due_date_required"
+        },
+        {
+          "condition": {
+            "change_present": false,
+            "operation": "assess_impact"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "regulatory_change_required",
+            "required_action": "select_change"
+          },
+          "name": "impact_change_required"
+        },
+        {
+          "condition": {
+            "impacted_capability_present": false,
+            "operation": "assess_impact"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "impacted_capability_required",
+            "required_action": "attach_impacted_capability"
+          },
+          "name": "impact_capability_required"
+        },
+        {
+          "condition": {
+            "operation": "assess_impact",
+            "risk_rating_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_rating_not_supported",
+            "required_action": "select_supported_risk_rating"
+          },
+          "name": "impact_risk_rating_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "assess_impact"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "impact_evidence_required",
+            "required_action": "attach_impact_evidence"
+          },
+          "name": "impact_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "assess_impact",
+            "reviewer_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "impact_reviewer_required",
+            "required_action": "assign_reviewer"
+          },
+          "name": "impact_reviewer_required"
+        },
+        {
+          "condition": {
+            "framework_supported": false,
+            "operation": "prepare_filing"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "framework_not_supported",
+            "required_action": "select_supported_framework"
+          },
+          "name": "filing_framework_supported"
+        },
+        {
+          "condition": {
+            "filing_type_supported": false,
+            "operation": "prepare_filing"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "filing_type_not_supported",
+            "required_action": "select_supported_filing_type"
+          },
+          "name": "filing_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "prepare_filing",
+            "period_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "filing_period_required",
+            "required_action": "set_period"
+          },
+          "name": "filing_period_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "prepare_filing"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "filing_evidence_required",
+            "required_action": "attach_filing_evidence"
+          },
+          "name": "filing_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "prepare_filing",
+            "owner_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "filing_owner_required",
+            "required_action": "assign_filing_owner"
+          },
+          "name": "filing_owner_required"
+        },
+        {
+          "condition": {
+            "filing_present": false,
+            "operation": "record_submission"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "filing_required",
+            "required_action": "select_filing"
+          },
+          "name": "submission_filing_required"
+        },
+        {
+          "condition": {
+            "channel_supported": false,
+            "operation": "record_submission"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "submission_channel_not_supported",
+            "required_action": "select_supported_submission_channel"
+          },
+          "name": "submission_channel_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_submission",
+            "submitted_by_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "submitted_by_required",
+            "required_action": "record_submitter"
+          },
+          "name": "submission_submitter_required"
+        },
+        {
+          "condition": {
+            "operation": "record_submission",
+            "submitted_at_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "submitted_at_required",
+            "required_action": "record_submission_time"
+          },
+          "name": "submission_timestamp_required"
+        },
+        {
+          "condition": {
+            "acknowledgment_present": false,
+            "operation": "record_submission"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "acknowledgment_required",
+            "required_action": "attach_acknowledgment"
+          },
+          "name": "submission_acknowledgment_required"
+        },
+        {
+          "condition": {
+            "operation": "open_inquiry",
+            "regulator_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "regulator_not_supported",
+            "required_action": "select_supported_regulator"
+          },
+          "name": "inquiry_regulator_supported"
+        },
+        {
+          "condition": {
+            "operation": "open_inquiry",
+            "reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "inquiry_reference_required",
+            "required_action": "attach_inquiry_reference"
+          },
+          "name": "inquiry_reference_required"
+        },
+        {
+          "condition": {
+            "operation": "open_inquiry",
+            "severity_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "severity_not_supported",
+            "required_action": "select_supported_severity"
+          },
+          "name": "inquiry_severity_supported"
+        },
+        {
+          "condition": {
+            "due_date_present": false,
+            "operation": "open_inquiry"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "inquiry_due_date_required",
+            "required_action": "set_due_date"
+          },
+          "name": "inquiry_due_date_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "open_inquiry"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "inquiry_evidence_required",
+            "required_action": "attach_inquiry_evidence"
+          },
+          "name": "inquiry_evidence_required"
+        },
+        {
+          "condition": {
+            "inquiry_present": false,
+            "operation": "record_response"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "inquiry_required",
+            "required_action": "select_inquiry"
+          },
+          "name": "response_inquiry_required"
+        },
+        {
+          "condition": {
+            "operation": "record_response",
+            "responder_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "responder_required",
+            "required_action": "assign_responder"
+          },
+          "name": "response_responder_required"
+        },
+        {
+          "condition": {
+            "operation": "record_response",
+            "response_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "response_reference_required",
+            "required_action": "attach_response"
+          },
+          "name": "response_reference_required"
+        },
+        {
+          "condition": {
+            "approval_present": false,
+            "operation": "record_response"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "response_approval_required",
+            "required_action": "attach_response_approval"
+          },
+          "name": "response_approval_required"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "status_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_status_not_supported",
+            "required_action": "select_supported_status"
+          },
+          "name": "review_status_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "reviewer_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "reviewer_required",
+            "required_action": "assign_reviewer"
+          },
+          "name": "review_reviewer_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_review"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_evidence_required",
+            "required_action": "attach_review_evidence"
+          },
+          "name": "review_evidence_required"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "regtech_batch"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_regtech_batch_to_bytewax"
+          },
+          "name": "regtech_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_regtech_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "regtech_agent_runtime_not_supported",
+            "required_action": "select_supported_runtime"
+          },
+          "name": "regtech_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_regtech_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "regtech_agent_role_not_supported",
+            "required_action": "select_supported_role"
+          },
+          "name": "regtech_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "regtech_agent_action",
+            "privileged_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_regtech_agent_action_requires_human_approval"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "agents": {
+          "component": "RegTechAgentWorkbench",
+          "permission": "fintech_regtech:admin",
+          "route": "/fintech-regtech/agents"
+        },
+        "changes": {
+          "component": "RegulatoryChangeQueue",
+          "permission": "fintech_regtech:changes",
+          "route": "/fintech-regtech/changes"
+        },
+        "dashboard": {
+          "component": "RegTechDashboard",
+          "permission": "fintech_regtech:view",
+          "route": "/fintech-regtech/dashboard"
+        },
+        "filings": {
+          "component": "FilingConsole",
+          "permission": "fintech_regtech:filings",
+          "route": "/fintech-regtech/filings"
+        },
+        "impact": {
+          "component": "ImpactAssessmentWorkbench",
+          "permission": "fintech_regtech:impact",
+          "route": "/fintech-regtech/impact"
+        },
+        "inquiries": {
+          "component": "RegulatoryInquiryWorkbench",
+          "permission": "fintech_regtech:inquiries",
+          "route": "/fintech-regtech/inquiries"
+        },
+        "obligations": {
+          "component": "ObligationMappingConsole",
+          "permission": "fintech_regtech:obligations",
+          "route": "/fintech-regtech/obligations"
+        },
+        "responses": {
+          "component": "RegulatoryResponseConsole",
+          "permission": "fintech_regtech:responses",
+          "route": "/fintech-regtech/responses"
+        },
+        "reviews": {
+          "component": "RegTechReviewConsole",
+          "permission": "fintech_regtech:reviews",
+          "route": "/fintech-regtech/reviews"
+        },
+        "settings": {
+          "component": "RegTechSettings",
+          "permission": "fintech_regtech:admin",
+          "route": "/fintech-regtech/settings"
+        },
+        "sources": {
+          "component": "RegulatorySourceConsole",
+          "permission": "fintech_regtech:sources",
+          "route": "/fintech-regtech/sources"
+        },
+        "submissions": {
+          "component": "SubmissionMonitor",
+          "permission": "fintech_regtech:submissions",
+          "route": "/fintech-regtech/submissions"
+        }
+      },
+      "streaming": {
+        "events": [
+          "regulatory_source_registered",
+          "regulatory_change_recorded",
+          "regulatory_obligation_mapped",
+          "regulatory_impact_assessed",
+          "regulatory_filing_prepared",
+          "regulatory_submission_recorded",
+          "regulatory_inquiry_opened",
+          "regulatory_response_recorded",
+          "regulatory_review_recorded",
+          "regulatory_agent_registered"
+        ],
+        "guardrails": [
+          "regtech_batch_requires_bytewax",
+          "privileged_regtech_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.fintech.regtech.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "changes": {
+            "icon": "radar",
+            "status_indicator": "change-chip"
+          },
+          "filings": {
+            "icon": "file-check",
+            "status_indicator": "filing-chip"
+          },
+          "impact": {
+            "icon": "git-branch",
+            "status_indicator": "impact-chip"
+          },
+          "inquiries": {
+            "icon": "message-square-warning",
+            "status_indicator": "inquiry-chip"
+          },
+          "obligations": {
+            "icon": "scale",
+            "status_indicator": "obligation-chip"
+          },
+          "responses": {
+            "icon": "reply",
+            "status_indicator": "response-chip"
+          },
+          "reviews": {
+            "icon": "clipboard-check",
+            "status_indicator": "review-chip"
+          },
+          "sources": {
+            "icon": "satellite-dish",
+            "status_indicator": "source-chip"
+          },
+          "submissions": {
+            "icon": "send",
+            "status_indicator": "submission-chip"
+          }
+        },
+        "name": "regtech_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#4F46E5",
+          "color.danger": "#B91C1C",
+          "color.primary": "#075985",
+          "color.success": "#15803D",
+          "color.warning": "#A16207",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/fintech-regtech/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "RegTechDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/fintech-regtech/dashboard",
+            "permission": "fintech_regtech:view"
+          },
+          {
+            "component": "RegulatorySourceConsole",
+            "name": "sources",
+            "nav_group": "Sources",
+            "path": "/fintech-regtech/sources",
+            "permission": "fintech_regtech:sources"
+          },
+          {
+            "component": "RegulatoryChangeQueue",
+            "name": "changes",
+            "nav_group": "Horizon",
+            "path": "/fintech-regtech/changes",
+            "permission": "fintech_regtech:changes"
+          },
+          {
+            "component": "ObligationMappingConsole",
+            "name": "obligations",
+            "nav_group": "Obligations",
+            "path": "/fintech-regtech/obligations",
+            "permission": "fintech_regtech:obligations"
+          },
+          {
+            "component": "ImpactAssessmentWorkbench",
+            "name": "impact",
+            "nav_group": "Impact",
+            "path": "/fintech-regtech/impact",
+            "permission": "fintech_regtech:impact"
+          },
+          {
+            "component": "FilingConsole",
+            "name": "filings",
+            "nav_group": "Filings",
+            "path": "/fintech-regtech/filings",
+            "permission": "fintech_regtech:filings"
+          },
+          {
+            "component": "SubmissionMonitor",
+            "name": "submissions",
+            "nav_group": "Filings",
+            "path": "/fintech-regtech/submissions",
+            "permission": "fintech_regtech:submissions"
+          },
+          {
+            "component": "RegulatoryInquiryWorkbench",
+            "name": "inquiries",
+            "nav_group": "Inquiries",
+            "path": "/fintech-regtech/inquiries",
+            "permission": "fintech_regtech:inquiries"
+          },
+          {
+            "component": "RegulatoryResponseConsole",
+            "name": "responses",
+            "nav_group": "Inquiries",
+            "path": "/fintech-regtech/responses",
+            "permission": "fintech_regtech:responses"
+          },
+          {
+            "component": "RegTechReviewConsole",
+            "name": "reviews",
+            "nav_group": "Governance",
+            "path": "/fintech-regtech/reviews",
+            "permission": "fintech_regtech:reviews"
+          },
+          {
+            "component": "RegTechAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/fintech-regtech/agents",
+            "permission": "fintech_regtech:admin"
+          },
+          {
+            "component": "RegTechSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/fintech-regtech/settings",
+            "permission": "fintech_regtech:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "regulatory_review": {
+        "roles": [
+          "regulatory_change_reviewer",
+          "filing_preparer",
+          "submission_reviewer",
+          "inquiry_response_agent",
+          "policy_mapping_agent",
+          "regulatory_horizon_agent"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "fintech_regtech": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_compliance",
+        "fintech_risk",
+        "fintech_aml",
+        "fintech_kyc",
+        "fin_rpt"
+      ]
+    }
+  },
+  "contracts": {
+    "fintech_regtech": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "audit": "audl",
+          "auth": "auth",
+          "compliance": "fintech_compliance",
+          "event_stream": "bytewax",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "reporting": "fin_rpt",
+          "risk": "fintech_risk"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "regulatory_change_reviewer",
+            "filing_preparer",
+            "submission_reviewer",
+            "inquiry_response_agent",
+            "policy_mapping_agent",
+            "regulatory_horizon_agent"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "changes": {
+          "effective_date_required": true,
+          "evidence_required": true,
+          "severity_required": true,
+          "source_required": true,
+          "supported_frameworks": [
+            "pci_dss",
+            "psd2",
+            "open_banking",
+            "gdpr",
+            "sox",
+            "basel_iii",
+            "mifid_ii",
+            "aml",
+            "kyc",
+            "data_privacy"
+          ],
+          "supported_types": [
+            "new_rule",
+            "rule_update",
+            "guidance",
+            "enforcement_action",
+            "consultation",
+            "deadline_change"
+          ]
+        },
+        "filings": {
+          "evidence_required": true,
+          "owner_required": true,
+          "period_required": true,
+          "supported_frameworks": [
+            "pci_dss",
+            "psd2",
+            "open_banking",
+            "gdpr",
+            "sox",
+            "basel_iii",
+            "mifid_ii",
+            "aml",
+            "kyc",
+            "data_privacy"
+          ],
+          "supported_types": [
+            "regulatory_return",
+            "incident_notice",
+            "license_update",
+            "audit_response",
+            "prudential_report",
+            "conduct_report"
+          ]
+        },
+        "governance": {
+          "audit_events": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "impact_assessments": {
+          "change_required": true,
+          "evidence_required": true,
+          "impacted_capability_required": true,
+          "reviewer_required": true,
+          "supported_risk_ratings": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "inquiries": {
+          "due_date_required": true,
+          "evidence_required": true,
+          "reference_required": true,
+          "supported_regulators": [
+            "central_bank",
+            "securities_regulator",
+            "data_protection_authority",
+            "financial_conduct_authority",
+            "payments_regulator",
+            "tax_authority"
+          ],
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "obligations": {
+          "change_required": true,
+          "due_date_required": true,
+          "obligation_reference_required": true,
+          "owner_required": true,
+          "policy_reference_required": true
+        },
+        "observability": {
+          "event_stream": "apg.fintech.regtech.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "responses": {
+          "approval_reference_required": true,
+          "inquiry_required": true,
+          "responder_required": true,
+          "response_reference_required": true
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "sources": {
+          "evidence_required": true,
+          "owner_required": true,
+          "source_reference_required": true,
+          "supported_jurisdictions": [
+            "KE",
+            "US",
+            "GB",
+            "EU",
+            "NG",
+            "GH",
+            "ZA",
+            "SG",
+            "GLOBAL"
+          ],
+          "supported_regulators": [
+            "central_bank",
+            "securities_regulator",
+            "data_protection_authority",
+            "financial_conduct_authority",
+            "payments_regulator",
+            "tax_authority"
+          ]
+        },
+        "submissions": {
+          "acknowledgment_required": true,
+          "filing_required": true,
+          "submitted_at_required": true,
+          "submitted_by_required": true,
+          "supported_channels": [
+            "portal",
+            "api",
+            "email",
+            "sftp",
+            "manual"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "regtech_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_changes": true,
+          "enable_dashboard": true,
+          "enable_filings": true,
+          "enable_impact": true,
+          "enable_inquiries": true,
+          "enable_obligations": true,
+          "enable_responses": true,
+          "enable_reviews": true,
+          "enable_sources": true,
+          "enable_submissions": true
+        }
+      },
+      "id": "fintech_regtech",
+      "provides": [
+        "regulatory_source_workflow",
+        "regulatory_change_workflow",
+        "regulatory_obligation_mapping_workflow",
+        "regulatory_policy_mapping_workflow",
+        "regulatory_impact_workflow",
+        "regulatory_filing_workflow",
+        "regulatory_submission_workflow",
+        "regulatory_inquiry_workflow",
+        "regulatory_response_workflow",
+        "regulatory_review_workflow",
+        "regulatory_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_compliance",
+        "fintech_risk",
+        "fintech_aml",
+        "fintech_kyc",
+        "fin_rpt"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 10,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "fintech_regtech": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}

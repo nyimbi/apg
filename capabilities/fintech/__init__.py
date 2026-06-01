@@ -88,6 +88,7 @@ CAPABILITY_META = {
 		'remittance',    # Cross-Border Remittance
 		'insurance',     # InsurTech
 		'risk',          # Risk Management
+		'regtech',       # Regulatory Technology
 		'kyc',           # Know Your Customer
 		'aml',           # Anti Money Laundering
 		'fraud',         # Fraud Detection
