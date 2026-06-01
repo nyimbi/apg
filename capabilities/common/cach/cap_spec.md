@@ -13,6 +13,9 @@ CACH is APG's cache governance and runtime-adapter capability. It provides:
   freshness, encryption, tenant isolation, TTL limits, warming, memory pressure,
   eviction review, cache-agent composition, and Bytewax lifecycle batches;
 - first-class cache-agent composition for Codex, Claude Code, opencode, and Pi;
+- durable review evidence and pending-review queues for entries, warming plans,
+  eviction reviews, privileged cache agents, lifecycle batches, and audit
+  events;
 - Bytewax-first lifecycle batch validation without requiring live stream
   workers in the package runtime;
 - dependency-light service, API helper, view-model, semantic-model, release, and

@@ -257,13 +257,44 @@
       "provides": [
         "cache_governance",
         "cache_runtime_adapters",
-        "cache_agent_composition"
+        "cache_agent_composition",
+        "review_evidence"
       ],
       "requires": [
         "conf",
         "auth",
         "audl"
       ],
+      "review_evidence": {
+        "deny_behavior": "Denied CACH lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "pending",
+          "pending_review",
+          "review_required",
+          "denied",
+          "active",
+          "expired",
+          "invalidated",
+          "refresh_required",
+          "ready",
+          "approved",
+          "rejected",
+          "accepted"
+        ],
+        "pending_queues": [
+          "entries",
+          "warming_plans",
+          "eviction_reviews",
+          "cache_agents",
+          "lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "review_evidence"
+        ]
+      },
       "rule_engine": {
         "rules": [
           {
@@ -553,9 +584,9 @@
               "operation": "register_cache_agent",
               "privileged_agent_role": true
             },
-            "description": "Privileged cache-agent roles require human approval.",
+            "description": "Privileged cache-agent roles require human approval evidence or review.",
             "effect": {
-              "decision": "deny",
+              "decision": "require_review",
               "reason": "cache_agent_human_approval_required",
               "required_action": "require_human_approval_for_agent"
             },
@@ -865,9 +896,9 @@
             "operation": "register_cache_agent",
             "privileged_agent_role": true
           },
-          "description": "Privileged cache-agent roles require human approval.",
+          "description": "Privileged cache-agent roles require human approval evidence or review.",
           "effect": {
-            "decision": "deny",
+            "decision": "require_review",
             "reason": "cache_agent_human_approval_required",
             "required_action": "require_human_approval_for_agent"
           },
@@ -966,8 +997,8 @@
         }
       },
       "streaming": {
-        "engine": "bytewax",
         "broker_core_dependency_allowed": false,
+        "engine": "bytewax",
         "lifecycle_stream": "cach.lifecycle",
         "required_operations": [
           "cache_policy_batch",
@@ -1369,16 +1400,47 @@
       "provides": [
         "cache_governance",
         "cache_runtime_adapters",
-        "cache_agent_composition"
+        "cache_agent_composition",
+        "review_evidence"
       ],
       "requires": [
         "conf",
         "auth",
         "audl"
       ],
+      "review_evidence": {
+        "deny_behavior": "Denied CACH lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "pending",
+          "pending_review",
+          "review_required",
+          "denied",
+          "active",
+          "expired",
+          "invalidated",
+          "refresh_required",
+          "ready",
+          "approved",
+          "rejected",
+          "accepted"
+        ],
+        "pending_queues": [
+          "entries",
+          "warming_plans",
+          "eviction_reviews",
+          "cache_agents",
+          "lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "review_evidence"
+        ]
+      },
       "streaming": {
-        "engine": "bytewax",
         "broker_core_dependency_allowed": false,
+        "engine": "bytewax",
         "lifecycle_stream": "cach.lifecycle",
         "required_operations": [
           "cache_policy_batch",
@@ -1447,9 +1509,9 @@
         "operation": "register_cache_agent",
         "privileged_agent_role": true
       },
-      "description": "Privileged cache-agent roles require human approval.",
+      "description": "Privileged cache-agent roles require human approval evidence or review.",
       "effect": {
-        "decision": "deny",
+        "decision": "require_review",
         "reason": "cache_agent_human_approval_required",
         "required_action": "require_human_approval_for_agent"
       },

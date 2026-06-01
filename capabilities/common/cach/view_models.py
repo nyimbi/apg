@@ -22,6 +22,8 @@ def dashboard_model(service: CacheGovernanceService, tenant_id: str = "default")
 		"summary": service.dashboard_summary(tenant_id),
 		"agents": contract["agents"],
 		"streaming": contract["streaming"],
+		"pending_reviews": service.list_pending_reviews(tenant_id),
+		"review_evidence": contract["review_evidence"],
 		"theme": contract["theme"],
 		"primary_actions": [
 			{"id": "create_namespace", "label": "Create namespace", "permission": "cach:manage_namespaces"},
@@ -151,6 +153,11 @@ def cache_agent_roster_model(service: CacheGovernanceService, tenant_id: str = "
 	return {
 		"tenant_id": tenant_id,
 		"rows": service.list_records("cache_agents", tenant_id),
+		"pending_reviews": [
+			agent
+			for agent in service.list_records("cache_agents", tenant_id)
+			if agent.get("status") == "pending_review"
+		],
 		"supported_runtimes": contract["agents"]["supported_runtimes"],
 		"supported_roles": contract["agents"]["supported_roles"],
 		"privileged_roles": contract["agents"]["privileged_roles"],
@@ -188,6 +195,7 @@ def settings_model(tenant_id: str = "default") -> dict[str, Any]:
 		"configuration_schema": contract["configuration_schema"],
 		"agents": contract["agents"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"theme": contract["theme"],
 		"routes": contract["ui"]["routes"],
 	}

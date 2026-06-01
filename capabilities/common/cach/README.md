@@ -22,6 +22,9 @@ Redis, Flask-AppBuilder, AI services, or optional compression packages.
 - First-class cache-agent registration for Codex, Claude Code, opencode, and Pi
   with owner, purpose, scope, contribution disclosure, and human approval
   guardrails.
+- Durable review evidence across cache entries, warming plans, eviction reviews,
+  privileged cache agents, lifecycle batches, and audit events.
+- Pending-review queue composition for generated cache operations consoles.
 - Bytewax lifecycle-batch validation for cache policy, warming, agent, and
   eviction mutations.
 - Compact generated-application view models for operations UIs.
@@ -131,6 +134,12 @@ batch = validate_cache_lifecycle_batch(
 )
 ```
 
+Privileged cache agents that are otherwise valid but missing human approval are
+stored as `pending_review` with `policy_decision="require_review"`. Denied
+non-Bytewax lifecycle batches are stored as `denied` before `PermissionError` is
+raised. Generated applications can use `list_pending_reviews()` or
+`list_cache_governance()` to build a single review queue.
+
 ## Rule Evaluation
 
 ```python
@@ -187,6 +196,8 @@ CACH does not require a specific backend. A production adapter should:
 3. Emit audit and telemetry events through APG adapters when available.
 4. Preserve tenant isolation in backend key construction.
 5. Respect encryption, TTL, invalidation, freshness, and eviction decisions.
+6. Preserve CACH policy evidence fields when moving records between durable
+   storage and runtime adapters.
 
 ## Verification
 

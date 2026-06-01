@@ -227,6 +227,11 @@ def list_records(record_type: str, tenant_id: str | None = None) -> list[dict[st
 	return SERVICE.list_records(record_type, tenant_id)
 
 
+def list_pending_reviews(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	"""List CACH records that require review across generated-app queues."""
+	return SERVICE.list_pending_reviews(tenant_id)
+
+
 def list_cache_governance(tenant_id: str | None = None) -> dict[str, Any]:
 	"""Return all generated-app governance records for a tenant."""
 	return {
@@ -237,6 +242,7 @@ def list_cache_governance(tenant_id: str | None = None) -> dict[str, Any]:
 		"eviction_reviews": SERVICE.list_records("eviction_reviews", tenant_id),
 		"cache_agents": SERVICE.list_records("cache_agents", tenant_id),
 		"lifecycle_batches": SERVICE.list_records("lifecycle_batches", tenant_id),
+		"pending_reviews": SERVICE.list_pending_reviews(tenant_id),
 		"audit_events": SERVICE.list_records("audit_events", tenant_id),
 	}
 

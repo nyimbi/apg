@@ -16,6 +16,64 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-06-01 08:13 EAT
+
+CACH durable review-evidence packet:
+
+- Extended review-required cache entries, warming plans, eviction reviews,
+  privileged cache agents, lifecycle batch evidence, and audit events with
+  durable policy evidence: policy decision, matched rules, review reasons, and
+  review evidence.
+- Added contract-level `review_evidence` metadata and exposed it through
+  registration metadata, API helpers, view models, semantic model, package
+  tests, and app self-test.
+- Preserved privileged cache agents without human approval as `pending_review`
+  records instead of discarding registration evidence.
+- Preserved denied non-Bytewax cache lifecycle batch validations as `denied`
+  evidence before raising `PermissionError`.
+- Added pending-review queue composition for entries, warming plans, eviction
+  reviews, cache agents, and lifecycle batches.
+- Kept CACH cache agents provider-neutral for Codex, Claude Code, OpenCode, Pi,
+  and future cache-governance runtimes while retaining human approval controls
+  for privileged roles and Bytewax-first lifecycle processing.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for CACH package init, models,
+  service, API helpers, contract, app, view models, and focused tests passed.
+- `./.venv/bin/pytest -q capabilities/common/cach/tests/test_capability_contract.py
+  capabilities/common/cach/tests/test_package_contract.py` passed with 10 tests
+  and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.cach import app; ..."`
+  passed package self-test.
+- `./.venv/bin/python -m json.tool
+  capabilities/common/cach/semantic_model.json` passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/cach --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/cach --strict --json` passed with no warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/cach --json`
+  passed with no warnings and side-effect-free publish planning.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/common/cach --json` passed with complete lifecycle evidence and
+  24 rules.
+- CACH stale-marker scan returned no TODO/FIXME/stub/placeholder, Kafka,
+  materialized-baseline, contract-only, or not-implemented markers across the
+  edited CACH packet.
+- Service smoke executed TTL review evidence, warming plan review evidence,
+  privileged cache-agent review evidence, accepted Bytewax batch evidence, and
+  denied non-Bytewax batch persistence, printing `require_review require_review
+  pending_review require_review accepted denied bytewax_cache_stream_required 3`.
+
+Known gaps:
+
+- Full repository tests, rendered cache UI, live Redis/Valkey/edge/CDN/query
+  cache adapters, distributed invalidation, live Bytewax workers and dataflows,
+  production persistence and migrations, APG AUTH/MTEN/AUDL/CONF/MQEB/MONI
+  adapters, benchmark/load checks, and dashboard browser verification still
+  need later validation outside this battery-conscious slice.
+
 ### 2026-06-01 08:04 EAT
 
 MQEB durable review-evidence packet:

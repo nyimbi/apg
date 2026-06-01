@@ -190,6 +190,7 @@ def register_capability() -> dict:
 			"eviction_review": "Capture memory pressure, eviction plans, independent review, and audit notes",
 			"cache_agent_composition": "Register first-class cache agents with runtime, role, owner, purpose, scope, disclosure, and approval guardrails",
 			"lifecycle_batch_validation": "Validate cache lifecycle mutation batches against Bytewax-first stream rules",
+			"review_evidence": "Compose durable pending-review, denial, matched-rule, and reviewer evidence across cache lifecycle records",
 			"adaptive_optimization": "Tune cache tiers from performance and access signals",
 			"capability_rules": "Evaluate deterministic cache governance rules",
 			"visual_theming": "Apply cache-control theme tokens and components"
@@ -215,6 +216,7 @@ def register_capability() -> dict:
 		"ui_manifest": contract["ui"],
 		"agents": contract["agents"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"theme": contract["theme"],
 		"permissions": [
 			"cach:view",

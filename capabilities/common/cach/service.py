@@ -105,6 +105,9 @@ class CacheEntryRecord:
 	status: str
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 	expires_at: datetime | None = None
 	last_accessed_at: datetime | None = None
@@ -127,6 +130,9 @@ class CacheWarmingPlanRecord:
 	decision: str
 	status: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	reviewer: str | None = None
 	review_notes: str | None = None
 	created_at: datetime = field(default_factory=datetime.utcnow)
@@ -149,6 +155,9 @@ class CacheEvictionReviewRecord:
 	reviewer: str | None = None
 	review_notes: str | None = None
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "require_review"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 	decided_at: datetime | None = None
 
@@ -168,6 +177,10 @@ class CacheAgentRecord:
 	contribution_disclosed: bool
 	human_approval_required: bool
 	status: str = "active"
+	policy_decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -182,6 +195,9 @@ class CacheLifecycleBatchRecord:
 	accepted: bool
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	required_processor: str = "bytewax"
 	status: str = "accepted"
 	created_at: datetime = field(default_factory=datetime.utcnow)
@@ -198,6 +214,9 @@ class CacheAuditEventRecord:
 	actor: str
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	details: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -275,7 +294,7 @@ class CacheGovernanceService:
 			status=status,
 		)
 		self.namespaces[self._namespace_key(tenant_id, namespace)] = record
-		self._audit(tenant_id, "namespace.created", namespace, owner, "allow", [], asdict(record))
+		self._audit(tenant_id, "namespace.created", namespace, owner, _allow_result(), asdict(record))
 		return record
 
 	def write_entry(
@@ -343,10 +362,13 @@ class CacheGovernanceService:
 			status=status,
 			decision=decision["decision"],
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 			expires_at=datetime.utcnow() + timedelta(seconds=effective_ttl),
 		)
 		self.entries[self._entry_key(tenant_id, namespace, key)] = record
-		self._audit(tenant_id, "entry.write", f"{namespace}/{key}", producer, decision["decision"], decision["matched_rules"], context)
+		self._audit(tenant_id, "entry.write", f"{namespace}/{key}", producer, decision, context)
 		return record
 
 	def read_entry(
@@ -381,7 +403,7 @@ class CacheGovernanceService:
 				entry.status = "expired"
 		elif entry and decision["decision"] == "deny" and stale:
 			entry.status = "refresh_required"
-		self._audit(tenant_id, "entry.read", f"{namespace}/{key}", actor, decision["decision"], decision["matched_rules"], context)
+		self._audit(tenant_id, "entry.read", f"{namespace}/{key}", actor, decision, context)
 		return {
 			"hit": entry is not None,
 			"entry": asdict(entry) if entry else None,
@@ -395,7 +417,7 @@ class CacheGovernanceService:
 		if entry:
 			entry.status = "invalidated"
 			entry.invalidated_at = datetime.utcnow()
-		self._audit(tenant_id, "entry.delete", f"{namespace}/{key}", actor, "allow", [], {"found": entry is not None})
+		self._audit(tenant_id, "entry.delete", f"{namespace}/{key}", actor, _allow_result(), {"found": entry is not None})
 		return {"deleted": entry is not None, "entry": asdict(entry) if entry else None}
 
 	def request_warming_plan(
@@ -438,9 +460,12 @@ class CacheGovernanceService:
 			decision=decision["decision"],
 			status=status,
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 		)
 		self.warming_plans[record.plan_id] = record
-		self._audit(tenant_id, "warming.requested", namespace, requester, decision["decision"], decision["matched_rules"], context)
+		self._audit(tenant_id, "warming.requested", namespace, requester, decision, context)
 		return record
 
 	def decide_warming_plan(
@@ -474,10 +499,13 @@ class CacheGovernanceService:
 			record.decision = decision
 			record.status = decision
 			record.matched_rules = rule_decision["matched_rules"]
+		record.policy_decision = rule_decision["decision"]
+		record.review_reasons = self._reasons(rule_decision)
+		record.review_evidence = self._review_evidence(rule_decision, review_recorded=True)
 		record.reviewer = reviewer
 		record.review_notes = notes
 		record.decided_at = datetime.utcnow()
-		self._audit(record.tenant_id, "warming.decided", record.namespace, reviewer, record.decision, record.matched_rules, context)
+		self._audit(record.tenant_id, "warming.decided", record.namespace, reviewer, rule_decision, context)
 		return record
 
 	def request_eviction_review(
@@ -508,10 +536,15 @@ class CacheGovernanceService:
 			memory_utilization_percent=memory_utilization_percent,
 			proposed_action=self._require_text(proposed_action, "proposed_action"),
 			reason=self._require_text(reason, "reason"),
+			decision=decision["decision"],
+			status="denied" if decision["decision"] == "deny" else "pending_review",
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 		)
 		self.eviction_reviews[record.review_id] = record
-		self._audit(tenant_id, "eviction.requested", namespace, requester, decision["decision"], decision["matched_rules"], context)
+		self._audit(tenant_id, "eviction.requested", namespace, requester, decision, context)
 		return record
 
 	def decide_eviction_review(
@@ -545,10 +578,13 @@ class CacheGovernanceService:
 			record.decision = decision
 			record.status = decision
 			record.matched_rules = rule_decision["matched_rules"]
+		record.policy_decision = rule_decision["decision"]
+		record.review_reasons = self._reasons(rule_decision)
+		record.review_evidence = self._review_evidence(rule_decision, review_recorded=True)
 		record.reviewer = reviewer
 		record.review_notes = notes
 		record.decided_at = datetime.utcnow()
-		self._audit(record.tenant_id, "eviction.decided", record.namespace, reviewer, record.decision, record.matched_rules, context)
+		self._audit(record.tenant_id, "eviction.decided", record.namespace, reviewer, rule_decision, context)
 		return record
 
 	def register_cache_agent(
@@ -600,9 +636,14 @@ class CacheGovernanceService:
 			purpose=self._require_text(purpose, "purpose"),
 			contribution_disclosed=bool(contribution_disclosed),
 			human_approval_required=bool(human_approval_required),
+			status="pending_review" if rule_decision["decision"] == "require_review" else "active",
+			policy_decision=rule_decision["decision"],
+			matched_rules=list(rule_decision["matched_rules"]),
+			review_reasons=self._reasons(rule_decision),
+			review_evidence=self._review_evidence(rule_decision, review_recorded=bool(human_approval_required)),
 		)
 		self.cache_agents[record_key] = record
-		self._audit(tenant_id, "agent.registered", agent_id, record.owner, "allow", rule_decision["matched_rules"], asdict(record))
+		self._audit(tenant_id, "agent.registered", agent_id, record.owner, rule_decision, asdict(record))
 		return record
 
 	def validate_cache_lifecycle_batch(
@@ -633,10 +674,13 @@ class CacheGovernanceService:
 			accepted=accepted,
 			decision=rule_decision["decision"],
 			matched_rules=list(rule_decision["matched_rules"]),
+			policy_decision=rule_decision["decision"],
+			review_reasons=self._reasons(rule_decision),
+			review_evidence=self._review_evidence(rule_decision),
 			status="accepted" if accepted else "denied",
 		)
 		self.lifecycle_batches[record.batch_id] = record
-		self._audit(tenant_id, f"lifecycle_batch.{record.status}", stream_value, "cach", rule_decision["decision"], rule_decision["matched_rules"], asdict(record))
+		self._audit(tenant_id, f"lifecycle_batch.{record.status}", stream_value, "cach", rule_decision, asdict(record))
 		if not accepted:
 			raise PermissionError(self._first_reason(rule_decision))
 		return record
@@ -663,10 +707,28 @@ class CacheGovernanceService:
 			"pending_warming_reviews": len(pending_warming),
 			"pending_eviction_reviews": len(pending_evictions),
 			"cache_agent_count": sum(1 for agent in self.cache_agents.values() if agent.tenant_id == tenant_id),
+			"pending_cache_agent_review_count": sum(1 for agent in self.cache_agents.values() if agent.tenant_id == tenant_id and agent.status == "pending_review"),
 			"lifecycle_batch_count": sum(1 for batch in self.lifecycle_batches.values() if batch.tenant_id == tenant_id),
 			"denied_lifecycle_batch_count": sum(1 for batch in self.lifecycle_batches.values() if batch.tenant_id == tenant_id and not batch.accepted),
+			"pending_review_count": len(self.list_pending_reviews(tenant_id)),
 			"audit_event_count": sum(1 for event in self.audit_events if event.tenant_id == tenant_id),
 		}
+
+	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		"""Return all CACH records awaiting human or operator review."""
+		tenant_id = tenant_id or self.tenant_id
+		items = (
+			self.list_records("entries", tenant_id)
+			+ self.list_records("warming_plans", tenant_id)
+			+ self.list_records("eviction_reviews", tenant_id)
+			+ self.list_records("cache_agents", tenant_id)
+			+ self.list_records("lifecycle_batches", tenant_id)
+		)
+		return [
+			item
+			for item in items
+			if item.get("status") in {"pending", "pending_review", "review_required"}
+		]
 
 	def list_records(self, record_type: str, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		"""List lifecycle records for APIs and view models."""
@@ -694,20 +756,41 @@ class CacheGovernanceService:
 		event_type: str,
 		subject: str,
 		actor: str,
-		decision: str,
-		matched_rules: list[str],
+		policy_result: dict[str, Any],
 		details: dict[str, Any],
 	) -> None:
+		policy_result = policy_result or _allow_result()
 		self.audit_events.append(CacheAuditEventRecord(
 			event_id=uuid7str(),
 			tenant_id=tenant_id,
 			event_type=event_type,
 			subject=subject,
 			actor=actor,
-			decision=decision,
-			matched_rules=list(matched_rules),
+			decision=policy_result["decision"],
+			matched_rules=list(policy_result["matched_rules"]),
+			policy_decision=policy_result["decision"],
+			review_reasons=self._reasons(policy_result),
+			review_evidence=self._review_evidence(policy_result),
 			details=details,
 		))
+
+	def _reasons(self, result: dict[str, Any]) -> list[str]:
+		return [
+			str(action["reason"])
+			for action in result.get("actions", [])
+			if action.get("reason")
+		]
+
+	def _review_evidence(self, result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+		return {
+			"required_actions": [
+				str(action.get("required_action"))
+				for action in result.get("actions", [])
+				if action.get("required_action")
+			],
+			"reasons": self._reasons(result),
+			"review_recorded": bool(review_recorded),
+		}
 
 	@staticmethod
 	def _require_text(value: str, field_name: str) -> str:
@@ -737,6 +820,10 @@ class CacheGovernanceService:
 			if action.get("reason"):
 				return str(action["reason"])
 		return "cache_operation_denied"
+
+
+def _allow_result() -> dict[str, Any]:
+	return {"decision": "allow", "matched_rules": [], "actions": []}
 
 
 class CacheService:

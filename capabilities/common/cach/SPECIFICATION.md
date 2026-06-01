@@ -35,8 +35,8 @@ CACH must let a generated application:
 6. Require namespace registration before writes or warming.
 7. Deny stale reads for critical data unless stale-while-revalidate is explicitly
    enabled and the namespace policy permits it.
-8. Require review for TTLs, warming batches, memory pressure, and eviction
-   actions that exceed tenant or namespace limits.
+8. Require review for TTLs, warming batches, memory pressure, privileged cache
+   agents, and eviction actions that exceed tenant or namespace limits.
 9. Record warming plans with source evidence, batch size, requester, reviewer,
    and decision state.
 10. Record eviction/capacity review decisions with independent reviewer notes.
@@ -50,8 +50,11 @@ CACH must let a generated application:
    warming, eviction, freshness, tier optimization, adapter health, and
    lifecycle audit decisions.
 14. Fail closed when cache agents omit supported runtime, supported role, owner,
-   purpose, scope, contribution disclosure, or privileged-role human approval.
-15. Validate cache lifecycle batches through a Bytewax-first stream manifest
+   purpose, scope, or contribution disclosure.
+15. Preserve privileged cache agents without human approval as durable
+   `pending_review` records so generated review consoles can route approval
+   work instead of losing evidence in transient exceptions.
+16. Validate cache lifecycle batches through a Bytewax-first stream manifest
    before generated applications compose cache policy, warming, agent, or
    eviction mutations.
 
@@ -118,12 +121,35 @@ Privileged roles require human approval:
 - tier optimization reviewer
 - adapter health reviewer
 
+If a privileged cache agent is otherwise valid but lacks human approval evidence,
+CACH must persist it with `status="pending_review"` and `policy_decision` set to
+`require_review`. Unsupported runtimes, unsupported roles, missing scope, missing
+owner, missing purpose, and missing contribution disclosure remain blocking
+denials.
+
 ### Lifecycle Batches
 
 Cache lifecycle batches represent groups of namespace, entry, warming, eviction,
 and agent mutations. They must be non-empty and declare Bytewax as the lifecycle
 processor. Live workers remain adapter work; this packet records the contract
 and validation evidence.
+
+Denied lifecycle batches must be preserved with `status="denied"` before
+raising `PermissionError` so audit, remediation, and generated UI surfaces can
+show which non-Bytewax path was rejected.
+
+### Durable Review Evidence
+
+Every reviewable CACH record must expose durable policy evidence:
+
+- `policy_decision`
+- `matched_rules`
+- `review_reasons`
+- `review_evidence`
+
+Generated applications must be able to compose a pending-review queue across
+cache entries, warming plans, eviction reviews, cache agents, and lifecycle
+batches.
 
 ### Rules
 

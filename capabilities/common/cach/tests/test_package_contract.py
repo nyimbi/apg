@@ -33,6 +33,8 @@ def test_package_contract_shape_is_valid():
 	assert len(contract["rule_engine"]["rules"]) >= 24
 	assert contract["agents"]["first_class"] is True
 	assert contract["streaming"]["engine"] == "bytewax"
+	assert "review_evidence" in contract["provides"]
+	assert contract["review_evidence"]["pending_queues"]
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"namespaces",
 		"evictions",
@@ -61,4 +63,6 @@ def test_package_app_entrypoint_is_publishable():
 	assert model["capabilities"]["cach"]["cache_lifecycle"]["lifecycle_batch"] == "CacheLifecycleBatchRecord"
 	assert model["capabilities"]["cach"]["agents"]["cach_agent_contract"]["first_class"] is True
 	assert model["capabilities"]["cach"]["streaming"]["engine"] == "bytewax"
+	assert "review_evidence" in model["capabilities"]["cach"]["provides"]
+	assert model["capabilities"]["cach"]["review_evidence"]["pending_queues"]
 	assert "memory" in model["capabilities"]["cach"]["adapters"]["supported_backends"]

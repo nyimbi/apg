@@ -516,10 +516,10 @@ def default_rules() -> list[CapabilityRule]:
 		),
 		CapabilityRule(
 			name="cache_agent_privileged_role_requires_human_approval",
-			description="Privileged cache-agent roles require human approval.",
+			description="Privileged cache-agent roles require human approval evidence or review.",
 			condition={"operation": "register_cache_agent", "privileged_agent_role": True, "human_approval_required": False},
 			effect={
-				"decision": "deny",
+				"decision": "require_review",
 				"reason": "cache_agent_human_approval_required",
 				"required_action": "require_human_approval_for_agent"
 			}
@@ -616,7 +616,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "cach",
 		"display_name": "Cache Management",
-		"provides": ["cache_governance", "cache_runtime_adapters", "cache_agent_composition"],
+		"provides": ["cache_governance", "cache_runtime_adapters", "cache_agent_composition", "review_evidence"],
 		"requires": ["conf", "auth", "audl"],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
@@ -627,6 +627,36 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		"ui": ui_manifest(),
 		"agents": agent_manifest(),
 		"streaming": streaming_manifest(),
+		"review_evidence": {
+			"durable_statuses": [
+				"pending",
+				"pending_review",
+				"review_required",
+				"denied",
+				"active",
+				"expired",
+				"invalidated",
+				"refresh_required",
+				"ready",
+				"approved",
+				"rejected",
+				"accepted"
+			],
+			"policy_fields": [
+				"policy_decision",
+				"matched_rules",
+				"review_reasons",
+				"review_evidence"
+			],
+			"pending_queues": [
+				"entries",
+				"warming_plans",
+				"eviction_reviews",
+				"cache_agents",
+				"lifecycle_batches"
+			],
+			"deny_behavior": "Denied CACH lifecycle batches persist evidence before PermissionError"
+		},
 		"theme": {
 			"name": theme.name,
 			"tokens": theme.tokens,

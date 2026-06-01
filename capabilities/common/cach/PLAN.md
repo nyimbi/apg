@@ -17,7 +17,10 @@ The packet will be narrow, executable, and reviewable:
 6. Prove the packet with focused tests and publish-plan validation.
 
 The current packet extends that baseline with first-class cache-agent
-composition and Bytewax lifecycle-batch guardrails.
+composition, Bytewax lifecycle-batch guardrails, and durable review evidence
+that generated cache operations consoles can compose across pending entries,
+warming plans, eviction reviews, privileged cache agents, and lifecycle
+batches.
 
 ## Implementation Tasks
 
@@ -50,6 +53,12 @@ composition and Bytewax lifecycle-batch guardrails.
   events.
 - Add records for cache agents and lifecycle batches.
 - Enforce the deterministic rule engine from `capability_contract.py`.
+- Preserve policy decisions, matched rules, review reasons, and review evidence
+  on reviewable records and audit events.
+- Preserve privileged cache agents without human approval as pending-review
+  records while keeping unsupported runtimes, unsupported roles, and missing
+  required fields as blocking denials.
+- Preserve denied non-Bytewax lifecycle batches before raising `PermissionError`.
 - Provide summaries for generated UI and release evidence.
 
 ### 4. API and View Models
@@ -60,6 +69,8 @@ composition and Bytewax lifecycle-batch guardrails.
   namespace inventory, entry explorer, warming console, eviction queue, topology,
   adapters, audit, and settings.
 - Add cache-agent roster and lifecycle-batch monitor models.
+- Add a composed pending-review queue for entries, warming plans, eviction
+  reviews, cache agents, and lifecycle batches.
 
 ### 5. Packaging Evidence
 
