@@ -59,6 +59,7 @@ CAPABILITY_META = {
 	'implemented_subcapabilities': [
 		'crawler',     # Web Crawler (legacy)
 		'osint',       # Open Source Intelligence
+		'sigint',      # Signals Intelligence
 		'radio',       # Radio Intelligence Listener
 	],
 	'security_requirements': {

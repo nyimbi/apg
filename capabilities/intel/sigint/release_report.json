@@ -1,0 +1,24 @@
+{
+  "evidence": {
+    "contracts": {
+      "capability_contract": {
+        "display_name": "Signals Intelligence",
+        "errors": []
+      }
+    },
+    "self_test": {
+      "capability": "intel_sigint",
+      "passed": true,
+      "status": "ok"
+    },
+    "semantic_model": {
+      "capability": "intel_sigint",
+      "format": "apg.semantic-model.v1"
+    }
+  },
+  "format": "apg.release-report.v1",
+  "ok": true,
+  "package": "intel_sigint",
+  "source": "capability_contract.py",
+  "target": "python"
+}

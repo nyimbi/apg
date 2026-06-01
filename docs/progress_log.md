@@ -28603,3 +28603,89 @@ Known gaps:
   projections, storage adapters, source-term verification, release distribution,
   durable Bytewax topology, or performance/load checks during this
   battery-conscious slice.
+
+## 2026-06-01 - Intel Signals Intelligence executable capability
+
+- Promoted `capabilities/intel/sigint` from placeholder into a first-class
+  executable APG capability with README, specification, plan, capability spec,
+  package manifest, release evidence, focused tests, and code-review notes.
+- Added lawful authority, signal source, collection task, observation,
+  processing batch, signal pattern, assessment, review, Bytewax batch
+  validation, dashboard summary, and provider-neutral SIGINT agent workflows.
+- Added deterministic guardrails for tenant context, write policy, lawful
+  authority, source-authority match, minimization, retention, confidence and
+  quality bounds, evidence, review status, Bytewax lifecycle events, supported
+  AI-agent runtimes and roles, and privileged AI-agent approval.
+- Added compact UI/view models and theme tokens for dashboards, authorities,
+  sources, collection tasks, observations, processing, patterns, assessments,
+  reviews, agents, and settings.
+- Updated intelligence capability metadata so `sigint` is listed as an
+  implemented sub-capability.
+- Updated `capabilities/README.md` so the catalog snapshot reports 137 valid
+  contracts, 137 domain-specific packages, 137 strict complete package artifact
+  sets, and 3 Intel packages.
+- Removed the empty `_Signals_Intelligence` marker file and added a generated
+  `semantic_model.json` from the executable application.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/intel/sigint/__init__.py
+  capabilities/intel/sigint/capability_contract.py
+  capabilities/intel/sigint/models.py
+  capabilities/intel/sigint/sigint_runtime.py
+  capabilities/intel/sigint/service.py
+  capabilities/intel/sigint/api.py
+  capabilities/intel/sigint/views.py
+  capabilities/intel/sigint/app.py
+  capabilities/intel/sigint/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/intel/sigint/tests/test_package_contract.py` passed with 7
+  tests.
+- `./.venv/bin/python capabilities/intel/sigint/app.py` passed self-test with
+  `passed: true` and `status: ok`.
+- `./.venv/bin/apg capabilities inspect intel_sigint --json` passed with 49
+  rules, 11 UI routes, theme `intel_sigint_control`, shell `apg_python`, and
+  Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/intel/sigint --json` passed with `side_effect_free: true` and 0
+  warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/intel/sigint --json` passed with 1 domain-specific capability, 0
+  warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/intel/sigint --json` passed with 1 complete lifecycle, 49 rules,
+  11 UI routes, 11 theme tokens, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 137 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 137 operable contracts, 137 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/intel/sigint`, `capabilities/intel/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed authority, source, collection task, observation, processing batch,
+  pattern, assessment, review, Bytewax batch, and AI-agent lifecycle paths so
+  rule evaluation happens before state mutation.
+- Tightened SIGINT semantics around lawful authority, source-authority
+  relationships, retention, minimization, evidence capture, confidence and
+  quality bounds, tenant-keyed state isolation, review evidence, and
+  privileged AI-agent approval.
+- Kept live RF/telecom/satellite receivers, packet capture, interception,
+  demodulation, decryption, lawful-intercept provider integrations, storage
+  backends, source authorization systems, dissemination delivery, and durable
+  Bytewax workers behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live RF/telecom/
+  satellite receivers, packet capture, interception, demodulation, decryption,
+  lawful-intercept provider integrations, storage backends, source
+  authorization systems, dissemination delivery, durable Bytewax topology, or
+  performance/load checks during this battery-conscious slice.
