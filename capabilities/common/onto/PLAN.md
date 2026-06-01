@@ -19,14 +19,15 @@
 
 - Extend domain models with namespaces, validation reports, and exports.
 - Extend `OntoService` to enforce namespace uniqueness, duplicate-term review, taxonomy integrity, validation reports, publication validation, and export formats.
+- Persist review-required duplicate terms, breaking curation requests, deprecations, low-confidence mappings, validation issues, and privileged ontology-agent registrations as `pending_review` records with policy evidence.
 - Add ontology-agent records and lifecycle-batch records with tenant-qualified storage, audit evidence, and dashboard counts.
 - Preserve existing ontology, term, taxonomy, mapping, review, publication, audit, and compatibility behavior.
 
 ## 4. API And UI
 
 - Add payload helpers for namespaces, term deprecation, validation, and exports.
-- Add payload helpers for ontology-agent registration and lifecycle-batch validation.
-- Add view models for namespaces, validation, exchange, ontology agents, lifecycle batches, audit, and settings.
+- Add payload helpers for ontology-agent registration, lifecycle-batch validation, pending-review queues, and package evidence.
+- Add view models for namespaces, validation, exchange, ontology agents, lifecycle batches, pending-review queues, audit, and settings.
 
 ## 5. Package Evidence
 

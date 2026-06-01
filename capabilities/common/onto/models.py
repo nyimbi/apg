@@ -25,6 +25,10 @@ class Ontology:
 	status: str = "draft"
 	description: str = ""
 	metadata: dict[str, Any] = field(default_factory=dict)
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now_iso)
 	updated_at: str = field(default_factory=utc_now_iso)
 
@@ -39,6 +43,10 @@ class Ontology:
 			"status": self.status,
 			"description": self.description,
 			"metadata": dict(self.metadata),
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"created_at": self.created_at,
 			"updated_at": self.updated_at,
 		}
@@ -58,6 +66,10 @@ class OntologyTerm:
 	synonyms: list[str] = field(default_factory=list)
 	external_refs: list[str] = field(default_factory=list)
 	metadata: dict[str, Any] = field(default_factory=dict)
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now_iso)
 	updated_at: str = field(default_factory=utc_now_iso)
 
@@ -73,6 +85,10 @@ class OntologyTerm:
 			"synonyms": list(self.synonyms),
 			"external_refs": list(self.external_refs),
 			"metadata": dict(self.metadata),
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"created_at": self.created_at,
 			"updated_at": self.updated_at,
 		}
@@ -90,6 +106,10 @@ class OntologyNamespace:
 	owner: str
 	status: str = "active"
 	metadata: dict[str, Any] = field(default_factory=dict)
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now_iso)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -102,6 +122,10 @@ class OntologyNamespace:
 			"owner": self.owner,
 			"status": self.status,
 			"metadata": dict(self.metadata),
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"created_at": self.created_at,
 		}
 
@@ -117,6 +141,10 @@ class TaxonomyEdge:
 	child_term_id: str
 	relationship_type: str = "broader_than"
 	status: str = "active"
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now_iso)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -128,6 +156,10 @@ class TaxonomyEdge:
 			"child_term_id": self.child_term_id,
 			"relationship_type": self.relationship_type,
 			"status": self.status,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"created_at": self.created_at,
 		}
 
@@ -148,6 +180,10 @@ class SemanticMapping:
 	status: str = "active"
 	created_at: str = field(default_factory=utc_now_iso)
 	metadata: dict[str, Any] = field(default_factory=dict)
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 
 	def to_dict(self) -> dict[str, Any]:
 		return {
@@ -163,6 +199,10 @@ class SemanticMapping:
 			"status": self.status,
 			"created_at": self.created_at,
 			"metadata": dict(self.metadata),
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 		}
 
 
@@ -178,6 +218,10 @@ class CurationReview:
 	reviewer: str
 	status: str = "approved"
 	notes: str = ""
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now_iso)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -190,6 +234,10 @@ class CurationReview:
 			"reviewer": self.reviewer,
 			"status": self.status,
 			"notes": self.notes,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"created_at": self.created_at,
 		}
 
@@ -208,6 +256,10 @@ class OntologyPublication:
 	duplicate_count: int = 0
 	term_count: int = 0
 	mapping_count: int = 0
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now_iso)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -222,6 +274,10 @@ class OntologyPublication:
 			"duplicate_count": self.duplicate_count,
 			"term_count": self.term_count,
 			"mapping_count": self.mapping_count,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"created_at": self.created_at,
 		}
 
@@ -238,6 +294,10 @@ class ValidationReport:
 	status: str = "passed"
 	review_recorded: bool = False
 	review_ref: str = ""
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now_iso)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -250,6 +310,10 @@ class ValidationReport:
 			"status": self.status,
 			"review_recorded": self.review_recorded,
 			"review_ref": self.review_ref,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"created_at": self.created_at,
 		}
 
@@ -265,6 +329,10 @@ class OntologyExport:
 	version: str
 	status: str = "ready"
 	artifact_ref: str = ""
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now_iso)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -276,6 +344,10 @@ class OntologyExport:
 			"version": self.version,
 			"status": self.status,
 			"artifact_ref": self.artifact_ref,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"created_at": self.created_at,
 		}
 
@@ -295,6 +367,10 @@ class OntologyAgentRecord:
 	contribution_disclosed: bool
 	human_approval_required: bool
 	status: str = "active"
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now_iso)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -311,6 +387,10 @@ class OntologyAgentRecord:
 			"contribution_disclosed": self.contribution_disclosed,
 			"human_approval_required": self.human_approval_required,
 			"status": self.status,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"created_at": self.created_at,
 		}
 
@@ -327,6 +407,8 @@ class OntoLifecycleBatchRecord:
 	accepted: bool
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: tuple[str, ...] = ()
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	required_processor: str = "bytewax"
 	status: str = "accepted"
 	created_at: str = field(default_factory=utc_now_iso)
@@ -342,6 +424,8 @@ class OntoLifecycleBatchRecord:
 			"accepted": self.accepted,
 			"decision": self.decision,
 			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"required_processor": self.required_processor,
 			"status": self.status,
 			"created_at": self.created_at,
@@ -360,6 +444,10 @@ class OntoAuditEvent:
 	severity: str = "info"
 	created_at: str = field(default_factory=utc_now_iso)
 	metadata: dict[str, Any] = field(default_factory=dict)
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 
 	def to_dict(self) -> dict[str, Any]:
 		return {
@@ -371,6 +459,10 @@ class OntoAuditEvent:
 			"severity": self.severity,
 			"created_at": self.created_at,
 			"metadata": dict(self.metadata),
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 		}
 
 

@@ -32,6 +32,7 @@ def dashboard_model(
 		"exports": service.list_exports(tenant_id),
 		"ontology_agents": service.list_ontology_agents(tenant_id),
 		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"agents": contract["agents"],
@@ -58,10 +59,12 @@ def term_editor_model(
 	tenant_id: str = "default",
 ) -> dict[str, object]:
 	service = service or OntoService()
+	terms = service.list_terms(tenant_id)
 	return {
 		"tenant_id": tenant_id,
-		"terms": service.list_terms(tenant_id),
+		"terms": terms,
 		"reviews": service.list_reviews(tenant_id),
+		"pending_reviews": [item for item in terms if item["status"] == "pending_review"],
 		"route": "/onto/terms",
 	}
 
@@ -84,11 +87,13 @@ def mapping_workbench_model(
 	tenant_id: str = "default",
 ) -> dict[str, object]:
 	service = service or OntoService()
+	mappings = service.list_mappings(tenant_id)
 	return {
 		"tenant_id": tenant_id,
 		"confidence_threshold": service.confidence_threshold,
-		"mappings": service.list_mappings(tenant_id),
+		"mappings": mappings,
 		"reviews": service.list_reviews(tenant_id),
+		"pending_reviews": [item for item in mappings if item["status"] == "pending_review"],
 		"route": "/onto/mappings",
 	}
 
@@ -111,10 +116,12 @@ def publication_queue_model(
 	tenant_id: str = "default",
 ) -> dict[str, object]:
 	service = service or OntoService()
+	publications = service.list_publications(tenant_id)
 	return {
 		"tenant_id": tenant_id,
 		"ontologies": service.list_ontologies(tenant_id),
-		"publications": service.list_publications(tenant_id),
+		"publications": publications,
+		"pending_reviews": service.list_pending_reviews(tenant_id),
 		"route": "/onto/publication",
 	}
 
@@ -124,10 +131,12 @@ def validation_model(
 	tenant_id: str = "default",
 ) -> dict[str, object]:
 	service = service or OntoService()
+	reports = service.list_validation_reports(tenant_id)
 	return {
 		"tenant_id": tenant_id,
 		"ontologies": service.list_ontologies(tenant_id),
-		"validation_reports": service.list_validation_reports(tenant_id),
+		"validation_reports": reports,
+		"pending_reviews": [item for item in reports if item["status"] == "pending_review"],
 		"route": "/onto/validation",
 	}
 
@@ -207,6 +216,7 @@ def governance_model(
 		"reviews": service.list_reviews(tenant_id),
 		"ontology_agents": service.list_ontology_agents(tenant_id),
 		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"configuration": contract["configuration"],
 		"route": "/onto/governance",

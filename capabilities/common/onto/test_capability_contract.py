@@ -140,7 +140,9 @@ def test_registration_includes_full_capability_contract():
 	assert registration["agents"]["first_class"] is True
 	assert registration["streaming"]["required_processor"] == "bytewax"
 	assert registration["capabilities"]["ontology_agent_composition"]
+	assert registration["capabilities"]["review_evidence"]
 	assert registration["endpoints"]["agents"] == "/onto/api/v1/agents"
+	assert registration["endpoints"]["pending_reviews"] == "/onto/api/v1/pending-reviews"
 	assert registration["endpoints"]["audit"] == "/onto/api/v1/audit"
 	assert "onto:publish" in registration["permissions"]
 	assert "onto:audit" in registration["permissions"]
@@ -382,24 +384,28 @@ def test_onto_service_enforces_policy_guardrails():
 			child_term_id=parent["id"],
 		)
 
-	with pytest.raises(PermissionError, match="breaking_change_review_required"):
-		service.curate_term(
-			review_id="breaking-no-review",
-			tenant_id=tenant_id,
-			term_id=parent["id"],
-			reviewer="steward",
-			change_type="breaking",
-			review_recorded=False,
-		)
+	breaking_review = service.curate_term(
+		review_id="breaking-no-review",
+		tenant_id=tenant_id,
+		term_id=parent["id"],
+		reviewer="steward",
+		change_type="breaking",
+		review_recorded=False,
+		notes="breaking change submitted for review",
+	)
+	assert breaking_review["status"] == "pending_review"
+	assert breaking_review["decision"] == "require_review"
+	assert breaking_review["review_reasons"] == ["breaking_change_review_required"]
 
-	with pytest.raises(PermissionError, match="mapping_review_required"):
-		service.create_mapping(
-			mapping_id="low-confidence",
-			tenant_id=tenant_id,
-			term_id=parent["id"],
-			target_ref="meta:low-confidence",
-			confidence=0.5,
-		)
+	low_confidence_mapping = service.create_mapping(
+		mapping_id="low-confidence",
+		tenant_id=tenant_id,
+		term_id=parent["id"],
+		target_ref="meta:low-confidence",
+		confidence=0.5,
+	)
+	assert low_confidence_mapping["status"] == "pending_review"
+	assert low_confidence_mapping["review_reasons"] == ["mapping_review_required"]
 
 	service.curate_term(
 		review_id="review-parent",
@@ -415,6 +421,18 @@ def test_onto_service_enforces_policy_guardrails():
 		reviewer="steward",
 		status="curated",
 	)
+	pending_duplicate = service.create_term(
+		term_id="pending-duplicate-parent",
+		tenant_id=tenant_id,
+		ontology_id=ontology["id"],
+		label="Parent",
+		owner="steward",
+		review_recorded=False,
+	)
+	assert pending_duplicate["status"] == "pending_review"
+	assert pending_duplicate["review_reasons"] == ["duplicate_term_review_required"]
+	assert pending_duplicate["audit_evidence"]["review_recorded"] is False
+
 	duplicate = service.create_term(
 		term_id="duplicate-parent",
 		tenant_id=tenant_id,
@@ -430,6 +448,16 @@ def test_onto_service_enforces_policy_guardrails():
 		reviewer="steward",
 		status="curated",
 	)
+	deprecation_review = service.deprecate_term(
+		review_id="deprecate-no-review",
+		tenant_id=tenant_id,
+		term_id=child["id"],
+		replacement_term_id=parent["id"],
+		reviewer="steward",
+		review_recorded=False,
+	)
+	assert deprecation_review["status"] == "pending_review"
+	assert deprecation_review["review_reasons"] == ["term_deprecation_review_required"]
 	with pytest.raises(PermissionError, match="publication_approval_required"):
 		service.publish_ontology(
 			publication_id="publish-no-approval",
@@ -444,13 +472,14 @@ def test_onto_service_enforces_policy_guardrails():
 			ontology_id=ontology["id"],
 			approval_recorded=True,
 		)
-	with pytest.raises(PermissionError, match="validation_review_required"):
-		service.validate_ontology(
-			report_id="validation-with-duplicates",
-			tenant_id=tenant_id,
-			ontology_id=ontology["id"],
-			review_recorded=False,
-		)
+	validation_review = service.validate_ontology(
+		report_id="validation-with-duplicates",
+		tenant_id=tenant_id,
+		ontology_id=ontology["id"],
+		review_recorded=False,
+	)
+	assert validation_review["status"] == "pending_review"
+	assert validation_review["review_reasons"] == ["validation_review_required"]
 	service.validate_ontology(
 		report_id="validation-with-reviewed-duplicates",
 		tenant_id=tenant_id,
@@ -507,6 +536,8 @@ def test_onto_service_enforces_policy_guardrails():
 		human_approval_required=False,
 	)
 	assert pending_agent["status"] == "pending_review"
+	assert pending_agent["decision"] == "require_review"
+	assert pending_agent["review_reasons"] == ["ontology_agent_human_approval_required"]
 
 	with pytest.raises(ValueError, match="onto_lifecycle_batch_empty"):
 		service.validate_onto_lifecycle_batch(tenant_id, "bytewax", 0)
@@ -516,3 +547,15 @@ def test_onto_service_enforces_policy_guardrails():
 
 	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
 		service.validate_onto_lifecycle_batch(tenant_id, "legacy_queue", 1, "ontology_agent_batch")
+
+	pending_reviews = service.list_pending_reviews(tenant_id)
+	assert {item["id"] for item in pending_reviews} >= {
+		"breaking-no-review",
+		"low-confidence",
+		"pending-duplicate-parent",
+		"deprecate-no-review",
+		"validation-with-duplicates",
+		"agent-publication",
+	}
+	assert service.dashboard_summary(tenant_id)["pending_review_count"] >= 6
+	assert governance_model(service, tenant_id)["pending_reviews"]

@@ -24,6 +24,7 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"mapping_count": summary["mapping_count"],
 		"publication_count": summary["publication_count"],
 		"ontology_agent_count": summary["ontology_agent_count"],
+		"pending_review_count": summary["pending_review_count"],
 		"lifecycle_batch_count": summary["lifecycle_batch_count"],
 	}
 
@@ -209,6 +210,14 @@ def list_ontology_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
 
 def list_lifecycle_batches(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_lifecycle_batches(tenant_id)
+
+
+def list_pending_reviews(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_pending_reviews(tenant_id)
+
+
+def ontology_package(tenant_id: str | None = None) -> dict[str, Any]:
+	return SERVICE.ontology_package(tenant_id)
 
 
 def dashboard_summary(tenant_id: str = "default") -> dict[str, Any]:

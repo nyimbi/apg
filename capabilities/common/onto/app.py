@@ -74,6 +74,12 @@ def semantic_model() -> dict[str, Any]:
 					"publication": "OntologyPublication",
 					"ontology_agent": "OntologyAgentRecord",
 				},
+				"review_evidence": {
+					"durable_status": "pending_review",
+					"policy_fields": ["decision", "matched_rules", "review_reasons", "audit_evidence"],
+					"pending_queues": ["terms", "mappings", "curation_reviews", "validation_reports", "ontology_agents"],
+					"deny_behavior": "PermissionError for hard deny decisions only",
+				},
 				"ontology_lifecycle": {
 					"ontology": "Ontology",
 					"namespace": "OntologyNamespace",
@@ -191,6 +197,8 @@ def self_test() -> dict[str, Any]:
 		errors.append("ONTO lifecycle stream must require Bytewax")
 	if capability.get("runtime", {}).get("service") != "service.OntoService":
 		errors.append("ONTO generated-app runtime is missing")
+	if "review_evidence" not in capability:
+		errors.append("ONTO semantic model must expose durable review evidence")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

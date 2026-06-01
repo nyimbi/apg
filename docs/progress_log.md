@@ -18,6 +18,64 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ### 2026-06-01 00:00 EAT
 
+ONTO review-evidence lifecycle packet:
+
+- Extended ontology, namespace, term, taxonomy edge, mapping, curation review,
+  validation, publication, export, ontology-agent, lifecycle-batch, and audit
+  records with durable policy evidence fields: decision, matched rules, review
+  reasons, and audit evidence.
+- Changed review-required duplicate terms, breaking curation requests,
+  deprecations, low-confidence mappings, issue-bearing validations, and
+  privileged ontology-agent registrations to persist `pending_review` records
+  while keeping true deny outcomes hard-blocking.
+- Added pending-review queues to ONTO dashboard, term editor, mapping
+  workbench, validation, publication, governance, API, package, and semantic
+  model surfaces.
+- Updated focused ONTO tests so review-required lifecycle outcomes prove
+  durable evidence instead of transient exceptions.
+- Updated ONTO README, specification, plan, and capability pointer to document
+  the review queue lifecycle and deny/review distinction.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for ONTO modules and tests passed.
+- `./.venv/bin/pytest -q capabilities/common/onto/test_capability_contract.py
+  capabilities/common/onto/tests/test_package_contract.py` passed with 10
+  tests and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.onto import app; ..."`
+  passed package self-test.
+- `./.venv/bin/python -m json.tool capabilities/common/onto/semantic_model.json`
+  passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/onto --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, and no warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/onto --json`
+  passed with no warnings and side-effect-free publish planning.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/common/onto --json` passed with complete lifecycle evidence.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed with 109 operable contracts/packages and no warnings or errors.
+- Service smoke executed ontology -> duplicate term -> low-confidence external
+  mapping -> issue-bearing validation -> privileged ontology agent and printed
+  `pending_review pending_review pending_review pending_review 4`.
+- ONTO stale-marker scan returned no TODO/FIXME/placeholder/stub/baseline or
+  Kafka markers across the edited ONTO packet.
+- `git diff --check -- capabilities/common/onto docs/progress_log.md` passed.
+- Inline code review found and fixed one evidence-preservation issue where
+  adding a synonym could overwrite a pending term's policy evidence; no
+  blocking findings remain.
+
+Known gaps:
+
+- Full repository tests, rendered browser UI checks, live RDF/OWL/SKOS parsers,
+  graph/vector/search stores, durable Bytewax topology, external Codex/Claude
+  Code/OpenCode/Pi clients, live KNGR/META/NLPC/GRPH/SRCH/AICR/AUDL adapters,
+  load checks, migrations, model-provider calls, ontology quality benchmarks,
+  and approval-workflow integrations still need later verification outside
+  this battery-conscious slice.
+
+### 2026-06-01 00:00 EAT
+
 GRAG review-evidence lifecycle packet:
 
 - Extended GRAG records, GraphRAG-agent records, lifecycle batches, and audit

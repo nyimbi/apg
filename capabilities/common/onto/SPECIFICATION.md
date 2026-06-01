@@ -65,11 +65,11 @@ The generated-app runtime uses these record types:
 - `OntoLifecycleBatchRecord`
 - `OntoAuditEvent`
 
-Records are tenant-scoped and exposed as dictionaries for generated applications.
+Records are tenant-scoped and exposed as dictionaries for generated applications. Persisted lifecycle records carry policy evidence fields: `decision`, `matched_rules`, `review_reasons`, and `audit_evidence`.
 
 ## Rule Engine
 
-The deterministic rule engine returns `allow`, `require_review`, or `deny`. Runtime methods raise `PermissionError` when rules deny an operation or require review evidence that is absent.
+The deterministic rule engine returns `allow`, `require_review`, or `deny`. Runtime methods raise `PermissionError` for hard deny decisions. Review-required ontology outcomes are preserved as `pending_review` records with policy evidence so generated applications can compose approval queues instead of losing the attempted change as a transient exception.
 
 Rules cover:
 
@@ -87,6 +87,8 @@ Rules cover:
 - Ontology-agent runtime, role, scope, owner, purpose, contribution-disclosure, and human-review gates.
 - Bytewax lifecycle batch processor and operation gates.
 - Bytewax event-stream, audit, and tenant isolation requirements.
+
+Review-required outcomes currently persisted as durable evidence include duplicate term submissions, breaking term-curation requests with evidence but no recorded review, term deprecation without review, low-confidence mappings, validation reports with unresolved issues, and privileged ontology-agent registration without human approval.
 
 ## UI Requirements
 
@@ -116,6 +118,7 @@ Theme components cover ontology cards, namespace panels, term cards, taxonomy tr
 - Contract exposes at least 55 deterministic rules, at least 15 routes, first-class ontology agents, Bytewax streaming metadata, Bytewax adapters, and theme metadata.
 - Runtime executes ontology registration, namespace registration, term lifecycle, taxonomy edges, mappings, validation, publication, export, and audit.
 - Runtime executes provider-neutral ontology-agent registration and Bytewax lifecycle-batch validation.
-- Guardrails block missing tenant context, ownerless terms, duplicate prefixes, taxonomy cycles, low-confidence unreviewed mappings, publication without validation or approval, invalid export formats, unsupported ontology-agent runtimes or roles, missing agent scope/owner/purpose, undisclosed machine contribution, non-Bytewax lifecycle batches, unsupported lifecycle operations, and cross-tenant access.
+- Guardrails block missing tenant context, ownerless terms, duplicate prefixes, taxonomy cycles, publication without validation or approval, invalid export formats, unsupported ontology-agent runtimes or roles, missing agent scope/owner/purpose, undisclosed machine contribution, non-Bytewax lifecycle batches, unsupported lifecycle operations, and cross-tenant access.
+- Review-required duplicate terms, breaking curation requests, deprecations, low-confidence mappings, issue-bearing validations, and privileged ontology agents persist as `pending_review` records with durable policy evidence.
 - Package semantic evidence is generated from the current contract.
 - Focused tests cover the lifecycle, agent guardrails, Bytewax lifecycle batches, views, package evidence, and import-light API.

@@ -384,6 +384,23 @@
         "auth",
         "audl"
       ],
+      "review_evidence": {
+        "deny_behavior": "PermissionError for hard deny decisions only",
+        "durable_status": "pending_review",
+        "pending_queues": [
+          "terms",
+          "mappings",
+          "curation_reviews",
+          "validation_reports",
+          "ontology_agents"
+        ],
+        "policy_fields": [
+          "decision",
+          "matched_rules",
+          "review_reasons",
+          "audit_evidence"
+        ]
+      },
       "rule_engine": {
         "rules": [
           {

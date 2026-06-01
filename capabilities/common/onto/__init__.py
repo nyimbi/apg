@@ -52,6 +52,7 @@ def register_capability() -> dict[str, Any]:
 			"ontology_exchange": "Prepare ontology export artifacts in configured interchange formats",
 			"ontology_agent_composition": "Compose Codex, Claude Code, opencode, and Pi style ontology agents behind provider-neutral guardrails",
 			"bytewax_lifecycle_batches": "Validate ontology lifecycle batches through Bytewax-first processor contracts",
+			"review_evidence": "Persist review-required ontology lifecycle outcomes as pending-review records with policy evidence",
 			"term_curation": "Govern term ownership, status, synonyms, and publication",
 			"capability_rules": "Evaluate deterministic ontology-governance rules",
 			"visual_theming": "Apply ontology-workbench theme tokens and components"
@@ -68,6 +69,7 @@ def register_capability() -> dict[str, Any]:
 			"publication": "/onto/api/v1/publication",
 			"agents": "/onto/api/v1/agents",
 			"lifecycle": "/onto/api/v1/lifecycle",
+			"pending_reviews": "/onto/api/v1/pending-reviews",
 			"audit": "/onto/api/v1/audit"
 		},
 		"adapters": contract["configuration"]["adapters"],

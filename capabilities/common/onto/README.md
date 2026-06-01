@@ -12,6 +12,7 @@ The generated-app surface is dependency-light. It uses in-process domain records
 - Taxonomy edge management with self-relation and cycle prevention.
 - Semantic mappings to metadata, graph, search, external ontology, or application concepts.
 - Review gates for duplicate terms, breaking changes, low-confidence mappings, external mappings, deprecations, imports, and validation issues.
+- Durable pending-review records with policy evidence for review-required lifecycle outcomes.
 - Validation reports for publication readiness.
 - Publication lifecycle with approval, duplicate checks, draft-term checks, mapping-review checks, and version bumps.
 - Export records for RDF, OWL, JSON-LD, SKOS, and CSV style interchange.
@@ -75,6 +76,25 @@ service.create_mapping(
 	"exact",
 	0.96,
 )
+
+pending_mapping = service.create_mapping(
+	"map-account-external-review",
+	"tenant-a",
+	account["id"],
+	"external:sales.account",
+	"close",
+	0.62,
+)
+assert pending_mapping["status"] == "pending_review"
+assert pending_mapping["decision"] == "require_review"
+service.review_mapping(
+	"review-account-external",
+	"tenant-a",
+	pending_mapping["id"],
+	"chief-steward",
+	"Approved after source-system review.",
+)
+
 service.validate_ontology("validation-customer", "tenant-a", ontology["id"])
 publication = service.publish_ontology(
 	"publication-customer",
@@ -111,6 +131,8 @@ Use `capability_contract.py` for compiler and composition metadata. Use `api.py`
 
 ONTO exposes deterministic rules for tenant context, ontology identity, namespace uniqueness, term ownership, term status, duplicate review, deprecation replacement, synonym values, taxonomy integrity, mapping confidence, external mapping review, breaking change review, curation evidence, validation, publication readiness, import/export controls, first-class ontology-agent governance, Bytewax lifecycle batches, tenant isolation, and audit evidence.
 
+Hard deny decisions raise `PermissionError`. Review-required decisions persist the attempted ontology object as `pending_review` with `decision`, `matched_rules`, `review_reasons`, and `audit_evidence`, so generated applications can render approval queues and human review workflows.
+
 ## Files
 
 - `SPECIFICATION.md` defines the capability behavior and boundaries.
@@ -122,3 +144,28 @@ ONTO exposes deterministic rules for tenant context, ontology identity, namespac
 - `api.py` exposes payload helper functions.
 - `views.py` exposes generated-app UI models.
 - `app.py` emits semantic package evidence and self-test results.
+
+## Focused Verification
+
+```bash
+./.venv/bin/python -m py_compile \
+  capabilities/common/onto/__init__.py \
+  capabilities/common/onto/capability_contract.py \
+  capabilities/common/onto/models.py \
+  capabilities/common/onto/ontology_runtime.py \
+  capabilities/common/onto/service.py \
+  capabilities/common/onto/api.py \
+  capabilities/common/onto/views.py \
+  capabilities/common/onto/app.py \
+  capabilities/common/onto/test_capability_contract.py \
+  capabilities/common/onto/tests/test_package_contract.py
+
+./.venv/bin/pytest -q \
+  capabilities/common/onto/test_capability_contract.py \
+  capabilities/common/onto/tests/test_package_contract.py
+
+./.venv/bin/python -c "from capabilities.common.onto import app; r=app.self_test(); print(r); assert r['passed']"
+./.venv/bin/apg capabilities implementation-audit --root capabilities/common/onto --json
+./.venv/bin/apg capabilities publish-plan capabilities/common/onto --json
+./.venv/bin/apg capabilities lifecycle-audit --root capabilities/common/onto --json
+```

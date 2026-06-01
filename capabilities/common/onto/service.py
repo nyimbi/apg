@@ -94,9 +94,10 @@ class OntoService:
 			domain=domain,
 			description=description,
 			metadata=dict(metadata or {}),
+			**self._policy_fields(result),
 		)
 		self._ontologies[ontology.id] = ontology
-		self._audit(tenant_id, "ontology_registered", ontology.id, f"Registered ontology {name}")
+		self._audit(tenant_id, "ontology_registered", ontology.id, f"Registered ontology {name}", result=result)
 		return ontology.to_dict()
 
 	def register_namespace(
@@ -135,10 +136,11 @@ class OntoService:
 			uri=uri,
 			owner=owner,
 			metadata=dict(metadata or {}),
+			**self._policy_fields(result),
 		)
 		self._namespaces[namespace.id] = namespace
 		self._touch_ontology(ontology)
-		self._audit(tenant_id, "namespace_registered", namespace.id, f"Registered namespace {prefix}")
+		self._audit(tenant_id, "namespace_registered", namespace.id, f"Registered namespace {prefix}", result=result)
 		return namespace.to_dict()
 
 	def create_term(
@@ -173,7 +175,7 @@ class OntoService:
 			"duplicate_term_detected": duplicate,
 			"review_recorded": bool(review_recorded),
 		})
-		self._raise_if_review_required(result)
+		self._raise_if_denied(result)
 		term = OntologyTerm(
 			id=term_id,
 			tenant_id=tenant_id,
@@ -181,14 +183,15 @@ class OntoService:
 			label=label,
 			owner=owner,
 			definition=definition,
-			status=normalize_term_status(status),
 			synonyms=list(synonyms or []),
 			external_refs=list(external_refs or []),
-			metadata=dict(metadata or {}),
+			metadata=dict(metadata or {}) | {"duplicate_term_detected": duplicate},
+			status=self._status_after_review(result, normalize_term_status(status)),
+			**self._policy_fields(result, review_recorded),
 		)
 		self._terms[term.id] = term
 		self._touch_ontology(ontology)
-		self._audit(tenant_id, "term_created", term.id, f"Created term {label}")
+		self._audit(tenant_id, "term_created", term.id, f"Created term {label}", result=result)
 		return term.to_dict()
 
 	def curate_term(
@@ -213,7 +216,6 @@ class OntoService:
 			"review_recorded": review_recorded,
 		})
 		self._raise_if_denied(result)
-		self._raise_if_review_required(result)
 		review = CurationReview(
 			id=review_id,
 			tenant_id=tenant_id,
@@ -222,12 +224,15 @@ class OntoService:
 			review_type=change_type,
 			reviewer=reviewer,
 			notes=notes,
+			status=self._status_after_review(result, "approved"),
+			**self._policy_fields(result, review_recorded),
 		)
 		self._reviews[review.id] = review
-		term.status = normalize_term_status(status)
-		term.updated_at = utc_now_iso()
-		self._touch_ontology(self._ontologies[term.ontology_id])
-		self._audit(tenant_id, "term_curated", term.id, f"Curated term {term.label}")
+		if review.status != "pending_review":
+			term.status = normalize_term_status(status)
+			term.updated_at = utc_now_iso()
+			self._touch_ontology(self._ontologies[term.ontology_id])
+		self._audit(tenant_id, "term_curated", term.id, f"Curated term {term.label}", result=result)
 		return review.to_dict()
 
 	def add_synonym(
@@ -249,7 +254,7 @@ class OntoService:
 			term.synonyms.append(synonym)
 		term.updated_at = utc_now_iso()
 		self._touch_ontology(self._ontologies[term.ontology_id])
-		self._audit(tenant_id, "synonym_added", term.id, f"Added synonym {synonym}")
+		self._audit(tenant_id, "synonym_added", term.id, f"Added synonym {synonym}", result=result)
 		return term.to_dict()
 
 	def add_taxonomy_edge(
@@ -283,10 +288,11 @@ class OntoService:
 			parent_term_id=parent_term_id,
 			child_term_id=child_term_id,
 			relationship_type=relationship_type,
+			**self._policy_fields(result),
 		)
 		self._taxonomy_edges[edge.id] = edge
 		self._touch_ontology(ontology)
-		self._audit(tenant_id, "taxonomy_edge_added", edge.id, "Added taxonomy edge")
+		self._audit(tenant_id, "taxonomy_edge_added", edge.id, "Added taxonomy edge", result=result)
 		return edge.to_dict()
 
 	def create_mapping(
@@ -317,7 +323,6 @@ class OntoService:
 			"review_recorded": review_recorded,
 		})
 		self._raise_if_denied(result)
-		self._raise_if_review_required(result)
 		mapping = SemanticMapping(
 			id=mapping_id,
 			tenant_id=tenant_id,
@@ -328,12 +333,16 @@ class OntoService:
 			confidence=normalized_confidence,
 			review_recorded=review_recorded,
 			review_ref=review_ref,
-			status="reviewed" if mapping_requires_review(normalized_confidence, self.confidence_threshold) else "active",
+			status=self._status_after_review(
+				result,
+				"reviewed" if mapping_requires_review(normalized_confidence, self.confidence_threshold) else "active",
+			),
 			metadata=dict(metadata or {}),
+			**self._policy_fields(result, review_recorded),
 		)
 		self._mappings[mapping.id] = mapping
 		self._touch_ontology(self._ontologies[term.ontology_id])
-		self._audit(tenant_id, "semantic_mapping_created", mapping.id, f"Mapped term {term.label}")
+		self._audit(tenant_id, "semantic_mapping_created", mapping.id, f"Mapped term {term.label}", result=result)
 		return mapping.to_dict()
 
 	def deprecate_term(
@@ -355,7 +364,7 @@ class OntoService:
 			"replacement_term_present": bool(replacement),
 			"review_recorded": bool(review_recorded),
 		})
-		self._raise_if_review_required(result)
+		self._raise_if_denied(result)
 		review = CurationReview(
 			id=review_id,
 			tenant_id=tenant_id,
@@ -364,13 +373,16 @@ class OntoService:
 			review_type="deprecation",
 			reviewer=reviewer,
 			notes=notes,
+			status=self._status_after_review(result, "approved"),
+			**self._policy_fields(result, review_recorded),
 		)
 		self._reviews[review.id] = review
-		term.status = "deprecated"
-		term.metadata["replacement_term_id"] = replacement_term_id
-		term.updated_at = utc_now_iso()
-		self._touch_ontology(self._ontologies[term.ontology_id])
-		self._audit(tenant_id, "term_deprecated", term.id, f"Deprecated term {term.label}")
+		if review.status != "pending_review":
+			term.status = "deprecated"
+			term.metadata["replacement_term_id"] = replacement_term_id
+			term.updated_at = utc_now_iso()
+			self._touch_ontology(self._ontologies[term.ontology_id])
+		self._audit(tenant_id, "term_deprecated", term.id, f"Deprecated term {term.label}", result=result)
 		return review.to_dict()
 
 	def validate_ontology(
@@ -394,19 +406,20 @@ class OntoService:
 			"issue_count": len(issues),
 			"review_recorded": bool(review_recorded),
 		})
-		self._raise_if_review_required(result)
+		self._raise_if_denied(result)
 		report = ValidationReport(
 			id=report_id,
 			tenant_id=tenant_id,
 			ontology_id=ontology.id,
 			issue_count=len(issues),
 			issues=issues,
-			status="passed" if ready else "issues_found",
+			status=self._status_after_review(result, "passed" if ready else "issues_found"),
 			review_recorded=review_recorded,
 			review_ref=review_ref,
+			**self._policy_fields(result, review_recorded),
 		)
 		self._validation_reports[report.id] = report
-		self._audit(tenant_id, "ontology_validated", report.id, f"Validated ontology {ontology.name}")
+		self._audit(tenant_id, "ontology_validated", report.id, f"Validated ontology {ontology.name}", result=result)
 		return report.to_dict()
 
 	def review_mapping(
@@ -427,11 +440,16 @@ class OntoService:
 			review_type="mapping",
 			reviewer=reviewer,
 			notes=notes,
+			**self._policy_fields({"decision": "allow", "matched_rules": [], "actions": []}, True),
 		)
 		self._reviews[review.id] = review
 		mapping.review_recorded = True
 		mapping.review_ref = review.id
 		mapping.status = "reviewed"
+		mapping.decision = "allow"
+		mapping.matched_rules = ()
+		mapping.review_reasons = ()
+		mapping.audit_evidence = self._audit_evidence({"decision": "allow", "matched_rules": [], "actions": []}, True)
 		self._audit(tenant_id, "mapping_reviewed", mapping.id, "Reviewed semantic mapping")
 		return review.to_dict()
 
@@ -484,9 +502,10 @@ class OntoService:
 			duplicate_count=len(duplicates),
 			term_count=len(terms),
 			mapping_count=len(mappings),
+			**self._policy_fields(result, approval_recorded),
 		)
 		self._publications[publication.id] = publication
-		self._audit(tenant_id, "ontology_published", publication.id, f"Published ontology {ontology.name}")
+		self._audit(tenant_id, "ontology_published", publication.id, f"Published ontology {ontology.name}", result=result)
 		return publication.to_dict()
 
 	def export_ontology(
@@ -512,9 +531,10 @@ class OntoService:
 			format=export_format,
 			version=ontology.version,
 			artifact_ref=f"onto://{tenant_id}/{ontology.id}/{ontology.version}.{export_format}",
+			**self._policy_fields(result),
 		)
 		self._exports[export.id] = export
-		self._audit(tenant_id, "ontology_exported", export.id, f"Exported ontology {ontology.name}")
+		self._audit(tenant_id, "ontology_exported", export.id, f"Exported ontology {ontology.name}", result=result)
 		return export.to_dict()
 
 	def register_ontology_agent(
@@ -562,9 +582,10 @@ class OntoService:
 			contribution_disclosed=bool(contribution_disclosed),
 			human_approval_required=bool(human_approval_required),
 			status=status,
+			**self._policy_fields(result, human_approval_required),
 		)
 		self._ontology_agents[self._tenant_record_key(tenant_id, record.id)] = record
-		self._audit(tenant_id, "ontology_agent_registered", record.id, f"Registered ontology agent {record.name}", metadata={"decision": result["decision"], "matched_rules": result["matched_rules"]})
+		self._audit(tenant_id, "ontology_agent_registered", record.id, f"Registered ontology agent {record.name}", result=result)
 		return record.to_dict()
 
 	def validate_onto_lifecycle_batch(
@@ -597,10 +618,12 @@ class OntoService:
 			accepted=accepted,
 			decision=result["decision"],
 			matched_rules=list(result["matched_rules"]),
+			review_reasons=tuple(self._review_reasons(result)),
+			audit_evidence=self._audit_evidence(result),
 			status="accepted" if accepted else "denied",
 		)
 		self._lifecycle_batches[self._tenant_record_key(tenant_id, record.id)] = record
-		self._audit(tenant_id, f"onto_lifecycle_batch_{record.status}", record.id, f"Validated ontology lifecycle batch {record.id}", metadata={"decision": result["decision"], "matched_rules": result["matched_rules"]})
+		self._audit(tenant_id, f"onto_lifecycle_batch_{record.status}", record.id, f"Validated ontology lifecycle batch {record.id}", result=result)
 		if not accepted:
 			self._raise_if_denied(result)
 		return record.to_dict()
@@ -662,10 +685,30 @@ class OntoService:
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events, tenant_id)
 
+	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return [
+			item
+			for item in (
+				self.list_ontologies(tenant_id)
+				+ self.list_namespaces(tenant_id)
+				+ self.list_terms(tenant_id)
+				+ self.list_taxonomy_edges(tenant_id)
+				+ self.list_mappings(tenant_id)
+				+ self.list_reviews(tenant_id)
+				+ self.list_validation_reports(tenant_id)
+				+ self.list_publications(tenant_id)
+				+ self.list_exports(tenant_id)
+				+ self.list_ontology_agents(tenant_id)
+				+ self.list_lifecycle_batches(tenant_id)
+			)
+			if item["status"] == "pending_review"
+		]
+
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		terms = [item for item in self._terms.values() if item.tenant_id == tenant_id]
 		mappings = [item for item in self._mappings.values() if item.tenant_id == tenant_id]
+		pending_reviews = self.list_pending_reviews(tenant_id)
 		return {
 			"tenant_id": tenant_id,
 			"ontology_count": len(self.list_ontologies(tenant_id)),
@@ -679,10 +722,34 @@ class OntoService:
 			"publication_count": len(self.list_publications(tenant_id)),
 			"export_count": len(self.list_exports(tenant_id)),
 			"ontology_agent_count": len(self.list_ontology_agents(tenant_id)),
+			"pending_review_count": len(pending_reviews),
+			"pending_term_review_count": len([item for item in self.list_terms(tenant_id) if item["status"] == "pending_review"]),
+			"pending_mapping_review_count": len([item for item in self.list_mappings(tenant_id) if item["status"] == "pending_review"]),
+			"pending_curation_review_count": len([item for item in self.list_reviews(tenant_id) if item["status"] == "pending_review"]),
+			"pending_validation_review_count": len([item for item in self.list_validation_reports(tenant_id) if item["status"] == "pending_review"]),
 			"pending_agent_review_count": len([item for item in self.list_ontology_agents(tenant_id) if item["status"] == "pending_review"]),
 			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
 			"denied_lifecycle_batch_count": len([item for item in self.list_lifecycle_batches(tenant_id) if item["status"] == "denied"]),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
+		}
+
+	def ontology_package(self, tenant_id: str | None = None) -> dict[str, Any]:
+		return {
+			"tenant_id": tenant_id,
+			"ontologies": self.list_ontologies(tenant_id),
+			"namespaces": self.list_namespaces(tenant_id),
+			"terms": self.list_terms(tenant_id),
+			"taxonomy_edges": self.list_taxonomy_edges(tenant_id),
+			"mappings": self.list_mappings(tenant_id),
+			"reviews": self.list_reviews(tenant_id),
+			"validation_reports": self.list_validation_reports(tenant_id),
+			"publications": self.list_publications(tenant_id),
+			"exports": self.list_exports(tenant_id),
+			"ontology_agents": self.list_ontology_agents(tenant_id),
+			"lifecycle_batches": self.list_lifecycle_batches(tenant_id),
+			"pending_reviews": self.list_pending_reviews(tenant_id),
+			"audit_events": self.list_audit_events(tenant_id),
+			"summary": self.dashboard_summary(tenant_id or "default"),
 		}
 
 	def _require_tenant(self, tenant_id: str) -> None:
@@ -725,10 +792,29 @@ class OntoService:
 		if result["decision"] == "deny":
 			raise PermissionError(self._reasons(result))
 
-	def _raise_if_review_required(self, result: dict[str, Any]) -> None:
-		self._raise_if_denied(result)
+	def _status_after_review(self, result: dict[str, Any], accepted_status: str) -> str:
 		if result["decision"] == "require_review":
-			raise PermissionError(self._reasons(result))
+			return "pending_review"
+		return accepted_status
+
+	def _policy_fields(self, result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+		return {
+			"decision": result["decision"],
+			"matched_rules": tuple(result["matched_rules"]),
+			"review_reasons": tuple(self._review_reasons(result)),
+			"audit_evidence": self._audit_evidence(result, review_recorded),
+		}
+
+	def _audit_evidence(self, result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+		return {
+			"required_actions": [
+				action["required_action"]
+				for action in result.get("actions", ())
+				if action.get("required_action")
+			],
+			"reasons": self._reason_list(result),
+			"review_recorded": bool(review_recorded),
+		}
 
 	def _audit(
 		self,
@@ -738,7 +824,9 @@ class OntoService:
 		message: str,
 		severity: str = "info",
 		metadata: dict[str, Any] | None = None,
+		result: dict[str, Any] | None = None,
 	) -> None:
+		result = result or {"decision": "allow", "matched_rules": [], "actions": []}
 		event = OntoAuditEvent(
 			id=stable_id("ontoaudit", tenant_id, event_type, subject_id, len(self._audit_events)),
 			tenant_id=tenant_id,
@@ -747,6 +835,7 @@ class OntoService:
 			message=message,
 			severity=severity,
 			metadata=dict(metadata or {}),
+			**self._policy_fields(result),
 		)
 		self._audit_events[event.id] = event
 
@@ -760,10 +849,18 @@ class OntoService:
 		return f"{tenant_id}:{record_id}"
 
 	def _reasons(self, result: dict[str, Any]) -> str:
-		return ", ".join(
+		return ", ".join(self._reason_list(result)) or "capability_policy_blocked"
+
+	def _reason_list(self, result: dict[str, Any]) -> list[str]:
+		return [
 			action.get("reason", "capability_policy_blocked")
 			for action in result.get("actions", [])
-		) or "capability_policy_blocked"
+		]
+
+	def _review_reasons(self, result: dict[str, Any]) -> tuple[str, ...]:
+		if result["decision"] != "require_review":
+			return ()
+		return tuple(self._reason_list(result))
 
 
 def _normalize_token(value: str) -> str:
