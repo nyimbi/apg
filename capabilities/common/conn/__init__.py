@@ -39,6 +39,7 @@ def register_capability() -> dict:
 		'rule_engine': contract['rule_engine'],
 		'agents': contract['agents'],
 		'streaming': contract['streaming'],
+		'review_evidence': contract['review_evidence'],
 		'capabilities': {
 			'connectors': 'Register local Singer, APG, HTTP, database, file, and stream connectors',
 			'connections': 'Manage tenant-scoped data source and target connections',
@@ -50,6 +51,7 @@ def register_capability() -> dict:
 			'capability_rules': 'Capability-specific rule evaluation',
 			'connector_agent_composition': 'Govern AI and automation agents that review or mutate connector state',
 			'bytewax_lifecycle_batches': 'Validate connector lifecycle mutation batches through Bytewax',
+			'review_evidence': 'Preserve policy decisions, matched rules, review reasons, and review evidence for generated connector governance queues',
 			'visual_theming': 'Tenant-aware UI theme tokens and components'
 		},
 		'endpoints': {

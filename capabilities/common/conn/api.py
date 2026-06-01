@@ -1097,6 +1097,11 @@ def list_generated_lifecycle_batches(tenant_id: str | None = None) -> List[Dict[
 	return generated_conn_service.list_lifecycle_batches(tenant_id)
 
 
+def list_generated_pending_reviews(tenant_id: str | None = None) -> List[Dict[str, Any]]:
+	"""Return generated-app connector records awaiting review."""
+	return generated_conn_service.list_pending_reviews(tenant_id)
+
+
 def list_generated_audit_events(tenant_id: str | None = None) -> List[Dict[str, Any]]:
 	return generated_conn_service.list_audit_events(tenant_id)
 

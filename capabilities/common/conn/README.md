@@ -36,6 +36,9 @@ CONN is intentionally split into two layers:
   disclosure, and human approval for privileged connector roles.
 - Bytewax lifecycle batch validation for connector, connection, flow, sync,
   schedule, review, and connector-agent mutation streams.
+- Durable review evidence for generated-app governance queues, including
+  policy decisions, matched rules, review reasons, required actions, and
+  persisted denial evidence for non-Bytewax lifecycle batches.
 - Deterministic rule decisions that return `allow`, `deny`, or
   `require_review`.
 - UI view models for dashboard, connectors, connections, visual design, sync
@@ -117,6 +120,18 @@ assert agent["status"] == "active"
 assert batch["status"] == "accepted"
 ```
 
+## Review Evidence
+
+Every generated-app lifecycle record carries `policy_decision`,
+`matched_rules`, `review_reasons`, and `review_evidence` fields so generated
+connector consoles can render why a connector, connection, flow, sync,
+schedule, review, connector-agent registration, or lifecycle batch is allowed,
+denied, or awaiting review. `list_pending_reviews()` returns the composed
+queue across connectors, connections, flows, sync runs, schedules, reviews,
+connector agents, and lifecycle batches. Denied non-Bytewax lifecycle batches
+are stored with `status="denied"` and `required_processor="bytewax"` before
+the guardrail raises `PermissionError`.
+
 ## UI Composition
 
 ```python
@@ -164,5 +179,7 @@ honor CONN guardrail decisions before side effects.
   capabilities/common/conn/tests/test_package_contract.py
 
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/common/conn --json
+./.venv/bin/apg capabilities implementation-audit --root capabilities/common/conn --strict --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/conn --json
+./.venv/bin/apg capabilities lifecycle-audit --root capabilities/common/conn --json
 ```

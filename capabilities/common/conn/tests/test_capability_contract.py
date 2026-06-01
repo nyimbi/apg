@@ -12,6 +12,7 @@ from capabilities.common.conn.view_models import (
 	dashboard_model,
 	flow_designer_model,
 	lifecycle_batch_model,
+	settings_model,
 )
 
 
@@ -37,12 +38,14 @@ def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
 		"theme",
 	]
 	assert len(contract["rule_engine"]["rules"]) >= 39
-	assert contract["provides"] == ["connector_management", "connection_orchestration", "connector_agent_composition"]
+	assert contract["provides"] == ["connector_management", "connection_orchestration", "connector_agent_composition", "review_evidence"]
 	assert contract["requires"] == ["apig", "auth", "encr", "audl"]
 	assert contract["agents"]["first_class"] is True
 	assert "codex" in contract["agents"]["supported_runtimes"]
 	assert "connector_reviewer" in contract["agents"]["supported_roles"]
 	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert "connector_agents" in contract["review_evidence"]["pending_queues"]
+	assert "policy_decision" in contract["review_evidence"]["policy_fields"]
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "conn_runtime.ConnService"
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
@@ -166,6 +169,8 @@ def test_conn_runtime_records_reviews_schedule_replay_and_retirement():
 	service = ConnService()
 	connector = service.register_connector("tap-custom", "tenant-a", "Custom", "singer", "local/custom", "sha256:abc", "platform", verified_source=False)
 	assert connector["status"] == "pending_review"
+	assert connector["policy_decision"] == "require_review"
+	assert connector["review_reasons"] == ["marketplace_review_required"]
 	assert any(review["review_type"] == "marketplace" for review in service.list_reviews("tenant-a"))
 
 	service.register_connector("tap-postgres", "tenant-a", "Postgres", "singer", "src", "sha256:def", "platform")
@@ -175,6 +180,8 @@ def test_conn_runtime_records_reviews_schedule_replay_and_retirement():
 		service.record_connection_test("tenant-a", connection_id, True)
 		activation = service.activate_connection("tenant-a", connection_id, secret_rotation_recorded=True, activation_review_recorded=False)
 		assert activation["status"] == "pending_review"
+		assert activation["policy_decision"] == "require_review"
+		assert activation["review_reasons"] == ["activation_review_required"]
 		service.activate_connection("tenant-a", connection_id, secret_rotation_recorded=True, activation_review_recorded=True)
 
 	service.create_flow("orders-flow", "tenant-a", "Orders Flow", "orders-db", "warehouse", "data", "maps/orders.json", quality_gate_ref="quality/orders")
@@ -184,6 +191,8 @@ def test_conn_runtime_records_reviews_schedule_replay_and_retirement():
 		service.start_sync("run-mode", "tenant-a", "orders-flow", mode="unsafe_copy")
 	schema_run = service.start_sync("run-schema", "tenant-a", "orders-flow", batch_size=1000, schema_change_detected=True, schema_review_recorded=False)
 	assert schema_run["status"] == "pending_review"
+	assert schema_run["policy_decision"] == "require_review"
+	assert schema_run["review_reasons"] == ["schema_review_required"]
 	assert any(review["review_type"] == "schema_change" for review in service.list_reviews("tenant-a"))
 	with pytest.raises(PermissionError, match="sync_run_not_running"):
 		service.complete_sync("tenant-a", "run-schema", records_processed=1, quality_score=1.0)
@@ -247,14 +256,27 @@ def test_conn_runtime_governs_agents_and_lifecycle_batches():
 		service.validate_conn_lifecycle_batch("tenant-a", "legacy_queue", 2)
 	batch = service.validate_conn_lifecycle_batch("tenant-a", "bytewax", 4)
 	summary = service.dashboard_summary("tenant-a")
+	denied_batch = [
+		record
+		for record in service.list_lifecycle_batches("tenant-a")
+		if record["status"] == "denied"
+	][0]
 
 	assert pending["status"] == "pending_review"
 	assert pending["runtime"] == "claude_code"
+	assert pending["policy_decision"] == "require_review"
+	assert pending["review_reasons"] == ["connector_agent_human_approval_required"]
 	assert active["status"] == "active"
 	assert batch["status"] == "accepted"
+	assert denied_batch["policy_decision"] == "deny"
+	assert denied_batch["required_processor"] == "bytewax"
+	assert denied_batch["review_reasons"] == ["bytewax_lifecycle_stream_required"]
 	assert summary["connector_agent_count"] == 2
+	assert summary["pending_connector_agent_review_count"] == 1
+	assert summary["review_count"] >= 1
 	assert summary["lifecycle_batch_count"] == 2
 	assert summary["denied_lifecycle_batch_count"] == 1
+	assert service.list_pending_reviews("tenant-a")
 
 
 def test_registration_includes_full_capability_contract():
@@ -269,6 +291,9 @@ def test_registration_includes_full_capability_contract():
 	assert "keym" in registration["optional_dependencies"]
 	assert registration["agents"]["first_class"] is True
 	assert registration["streaming"]["required_processor"] == "bytewax"
+	assert "review_evidence" in registration["provides"]
+	assert "connector_agents" in registration["review_evidence"]["pending_queues"]
+	assert "review_evidence" in registration["capabilities"]
 
 
 def test_generated_ui_models_are_composable():
@@ -291,10 +316,15 @@ def test_generated_ui_models_are_composable():
 	service.validate_conn_lifecycle_batch("tenant-a", "bytewax", 1)
 	agents = connector_agent_roster_model(service, "tenant-a")
 	batches = lifecycle_batch_model(service, "tenant-a")
+	settings = settings_model(service, "tenant-a")
 
 	assert dashboard["summary"]["connector_count"] == 1
+	assert "pending_reviews" in dashboard
+	assert "review_evidence" in dashboard
 	assert catalog["connectors"][0]["id"] == "tap-postgres"
 	assert "register_connection" in workbench["actions"]
 	assert designer["defaults"]["mapping_required"] is True
 	assert agents["agents"][0]["runtime"] == "codex"
+	assert "pending_reviews" in agents
 	assert batches["required_processor"] == "bytewax"
+	assert "review_evidence" in settings

@@ -31,6 +31,8 @@ CONN owns:
   review, or local Singer tap stewardship;
 - Bytewax lifecycle batch validation for connector mutation streams;
 - connector audit events;
+- durable review evidence for policy decisions, matched rules, review reasons,
+  required actions, pending review queues, and denial records;
 - generated application API helpers, UI view models, theme tokens, and package
   evidence.
 
@@ -109,6 +111,16 @@ CONN must validate lifecycle mutation batches before adapter side effects.
 Accepted lifecycle batches must use Bytewax as the required processor. Non-
 Bytewax batches are recorded as denied evidence and blocked.
 
+### Durable Review Evidence
+
+CONN must persist policy decisions on all generated-app connector lifecycle
+records. Connectors, connections, flows, sync runs, schedules, reviews,
+connector agents, lifecycle batches, and audit events carry `policy_decision`,
+`matched_rules`, `review_reasons`, and `review_evidence` fields. Generated
+applications must be able to compose a single pending-review queue from those
+records, and denied non-Bytewax lifecycle batches must remain visible as
+auditable evidence after the blocking exception.
+
 ### UI and Theme
 
 CONN must expose generated UI models for dashboard, connectors, connections,
@@ -147,6 +159,8 @@ that must honor CONN decisions before side effects.
 - Contract exposes configuration, rules, adapters, UI, theme, and package
   evidence for connector, connection, flow, sync, schedule, replay, review,
   connector-agent, lifecycle-batch, retirement, and audit workflows.
+- Contract exposes `review_evidence` metadata, and API/view-model surfaces
+  expose pending review queues for generated applications.
 - Generated apps can use a dependency-light service for connector lifecycle
   workflows without optional production dependencies.
 - Focused tests cover positive and negative guardrail paths.

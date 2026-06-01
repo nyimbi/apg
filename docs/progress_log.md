@@ -16,6 +16,77 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-06-01 10:27 EAT
+
+CONN durable review-evidence packet:
+
+- Extended connector, connection, flow, sync run, schedule, review,
+  connector-agent, lifecycle-batch, and audit records with durable policy
+  evidence: policy decision, matched rules, review reasons, and review
+  evidence.
+- Added contract-level `review_evidence` metadata and exposed it through
+  registration metadata, API helpers, view models, semantic model, release
+  evidence, package tests, and app self-test.
+- Added a composed generated-app pending-review queue across connectors,
+  connections, flows, sync runs, schedules, reviews, connector agents, and
+  lifecycle batches.
+- Preserved marketplace connector reviews, production activation reviews,
+  schema-change reviews, owner-transfer reviews, and privileged connector
+  agents as reviewable evidence-bearing records when guardrails require human
+  review.
+- Preserved denied non-Bytewax CONN lifecycle batch validations as `denied`
+  evidence before raising `PermissionError`, including the required Bytewax
+  processor evidence.
+- Kept connector agents provider-neutral for Codex, Claude Code, OpenCode, Pi,
+  and future connector-governance runtimes while retaining human approval
+  controls for privileged roles and Bytewax-first lifecycle processing.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for CONN package init, models,
+  connector runtime, API helpers, contract, app, view models, and focused tests
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/conn/tests/test_capability_contract.py
+  capabilities/common/conn/tests/test_package_contract.py` passed with 12 tests
+  and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "import importlib; app =
+  importlib.import_module('capabilities.common.conn.app'); ..."` passed package
+  self-test.
+- `./.venv/bin/python -m json.tool
+  capabilities/common/conn/semantic_model.json` passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/conn --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/conn --strict --json` passed with no warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/conn --json`
+  passed with no warnings and side-effect-free publish planning.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/common/conn --json` passed with complete lifecycle evidence,
+  release evidence, review evidence, and 39 rules.
+- CONN stale-marker scan returned no TODO/FIXME/stub/placeholder, Kafka,
+  materialized-baseline, contract-only, or not-implemented markers across the
+  edited CONN packet.
+- Service smoke executed marketplace review evidence, production activation
+  review evidence, schema-change review evidence, privileged connector-agent
+  review evidence, accepted Bytewax batch evidence, and denied non-Bytewax
+  batch persistence, printing `pending_review require_review pending_review
+  accepted deny bytewax_lifecycle_stream_required 7`.
+- `git diff --check -- capabilities/common/conn docs/progress_log.md` passed.
+
+Known gaps:
+
+- Full repository tests, rendered CONN UI/frontend, live Singer tap execution,
+  external SaaS/database calls, credential vault access, live lineage/data
+  quality adapters, durable Bytewax workers and dataflows, benchmark and load
+  checks, runtime SLO validation, and live AI runtime adapters still need later
+  verification.
+
+Next capability:
+
+- Continue the ordered common capability sequence with `imex` unless current
+  filesystem evidence shows a higher-priority incomplete packet.
+
 ### 2026-06-01 10:17 EAT
 
 REGY durable review-evidence packet:

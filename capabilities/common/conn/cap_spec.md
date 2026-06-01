@@ -4,6 +4,8 @@ CONN provides APG applications with a governed connector and data-flow control
 plane for local Singer taps, secured connections, flow composition, sync runs,
 schedules, replays, lineage, quality gates, first-class connector-agent
 composition, Bytewax lifecycle batches, and audit evidence.
+It also preserves durable review evidence so generated connector consoles can
+compose pending queues and explain every allow, review, or denial decision.
 
 ## Runtime Shape
 
@@ -33,7 +35,9 @@ composition, Bytewax lifecycle batches, and audit evidence.
 8. Validate connector lifecycle mutation batches through Bytewax before adapter
    side effects.
 9. Retire connections only after impact review evidence.
-10. Emit audit events for lifecycle decisions.
+10. Preserve policy decisions, matched rules, review reasons, and review
+    evidence on lifecycle records, pending queues, and audit events.
+11. Emit audit events for lifecycle decisions.
 
 ## Guardrails
 

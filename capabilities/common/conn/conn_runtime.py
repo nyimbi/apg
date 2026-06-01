@@ -26,6 +26,11 @@ class ConnectorRecord:
 	owner: str
 	verified_source: bool = True
 	status: str = "registered"
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	metadata: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=lambda: _now())
 
@@ -44,6 +49,11 @@ class ConnectionRecord:
 	secret_rotation_recorded: bool = False
 	last_test_passed: bool = False
 	status: str = "registered"
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	metadata: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=lambda: _now())
 
@@ -61,6 +71,11 @@ class FlowRecord:
 	quality_gate_ref: str = ""
 	pii_detected: bool = False
 	status: str = "created"
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=lambda: _now())
 
 
@@ -72,6 +87,11 @@ class SyncRunRecord:
 	mode: str
 	batch_size: int
 	status: str
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	records_processed: int = 0
 	quality_score: float | None = None
 	created_at: str = field(default_factory=lambda: _now())
@@ -85,6 +105,11 @@ class ScheduleRecord:
 	cron: str
 	timezone: str
 	status: str = "scheduled"
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=lambda: _now())
 
 
@@ -95,6 +120,11 @@ class ReviewRecord:
 	subject_id: str
 	review_type: str
 	status: str = "pending"
+	decision: str = "pending"
+	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "require_review"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	requester: str = ""
 	notes: str = ""
 	created_at: str = field(default_factory=lambda: _now())
@@ -107,6 +137,10 @@ class ConnectorAuditEvent:
 	event_type: str
 	subject_id: str
 	message: str
+	policy_decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=lambda: _now())
 
@@ -124,6 +158,11 @@ class ConnectorAgentRecord:
 	status: str
 	contribution_disclosed: bool
 	human_approval_required: bool
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=lambda: _now())
 
 
@@ -135,6 +174,12 @@ class ConnectorLifecycleBatchRecord:
 	operation: str
 	mutation_count: int
 	status: str
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
+	required_processor: str = "bytewax"
 	created_at: str = field(default_factory=lambda: _now())
 
 
@@ -204,12 +249,13 @@ class ConnService:
 			owner=owner,
 			verified_source=verified_source,
 			status="pending_review" if result["decision"] == "require_review" else "registered",
+			**_policy_kwargs(result, marketplace_review_recorded),
 			metadata=dict(metadata or {}),
 		)
 		self._connectors[self._tenant_key(tenant_id, connector_id)] = record
-		self._record_event(tenant_id, "connector_registered", connector_id, f"Registered connector {name}.", {"matched_rules": result["matched_rules"], "status": record.status})
+		self._record_event(tenant_id, "connector_registered", connector_id, f"Registered connector {name}.", {"matched_rules": result["matched_rules"], "status": record.status}, result, marketplace_review_recorded)
 		if result["decision"] == "require_review":
-			self._create_review(tenant_id, f"marketplace:{connector_id}", connector_id, "marketplace", owner, "Unverified connector source requires review.")
+			self._create_review(tenant_id, f"marketplace:{connector_id}", connector_id, "marketplace", owner, "Unverified connector source requires review.", result, marketplace_review_recorded)
 		return _dump(record)
 
 	def register_connection(
@@ -255,10 +301,11 @@ class ConnService:
 			contains_credentials=contains_credentials,
 			credential_vault_ref=credential_vault_ref,
 			credentials_encrypted=credentials_encrypted,
+			**_policy_kwargs(result),
 			metadata=dict(metadata or {}),
 		)
 		self._connections[self._tenant_key(tenant_id, connection_id)] = record
-		self._record_event(tenant_id, "connection_registered", connection_id, f"Registered connection {name}.", {"connector_id": connector_id, "matched_rules": result["matched_rules"]})
+		self._record_event(tenant_id, "connection_registered", connection_id, f"Registered connection {name}.", {"connector_id": connector_id, "matched_rules": result["matched_rules"]}, result)
 		return _dump(record)
 
 	def record_connection_test(self, tenant_id: str, connection_id: str, passed: bool, evidence: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -287,12 +334,12 @@ class ConnService:
 		if result["decision"] == "deny":
 			_raise_if_blocked(result)
 		if result["decision"] == "require_review":
-			self._create_review(tenant_id, f"activation:{connection_id}", connection_id, "activation", connection.owner, "Production connection activation requires review.")
-			record = self._replace_connection(connection, status="pending_review", secret_rotation_recorded=secret_rotation_recorded)
+			self._create_review(tenant_id, f"activation:{connection_id}", connection_id, "activation", connection.owner, "Production connection activation requires review.", result, activation_review_recorded)
+			record = self._replace_connection(connection, status="pending_review", secret_rotation_recorded=secret_rotation_recorded, **_policy_kwargs(result, activation_review_recorded))
 		else:
-			record = self._replace_connection(connection, status="active", secret_rotation_recorded=secret_rotation_recorded)
+			record = self._replace_connection(connection, status="active", secret_rotation_recorded=secret_rotation_recorded, **_policy_kwargs(result, activation_review_recorded))
 		self._connections[self._tenant_key(tenant_id, connection_id)] = record
-		self._record_event(tenant_id, "connection_activation_requested", connection_id, f"Connection activation decision: {record.status}.", {"matched_rules": result["matched_rules"]})
+		self._record_event(tenant_id, "connection_activation_requested", connection_id, f"Connection activation decision: {record.status}.", {"matched_rules": result["matched_rules"]}, result, activation_review_recorded)
 		return _dump(record)
 
 	def create_flow(
@@ -335,9 +382,10 @@ class ConnService:
 			lineage_enabled=lineage_enabled,
 			quality_gate_ref=quality_gate_ref,
 			pii_detected=pii_detected,
+			**_policy_kwargs(result),
 		)
 		self._flows[self._tenant_key(tenant_id, flow_id)] = record
-		self._record_event(tenant_id, "flow_created", flow_id, f"Created flow {name}.", {"matched_rules": result["matched_rules"]})
+		self._record_event(tenant_id, "flow_created", flow_id, f"Created flow {name}.", {"matched_rules": result["matched_rules"]}, result)
 		return _dump(record)
 
 	def start_sync(
@@ -366,10 +414,10 @@ class ConnService:
 			_raise_if_blocked(result)
 		status = "pending_review" if result["decision"] == "require_review" else "running"
 		if result["decision"] == "require_review":
-			self._create_review(tenant_id, f"schema:{run_id}", run_id, "schema_change", flow_id, "Schema change requires review before sync.")
-		record = SyncRunRecord(id=run_id, tenant_id=tenant_id, flow_id=flow_id, mode=mode, batch_size=batch_size, status=status)
+			self._create_review(tenant_id, f"schema:{run_id}", run_id, "schema_change", flow_id, "Schema change requires review before sync.", result, schema_review_recorded)
+		record = SyncRunRecord(id=run_id, tenant_id=tenant_id, flow_id=flow_id, mode=mode, batch_size=batch_size, status=status, **_policy_kwargs(result, schema_review_recorded))
 		self._runs[self._tenant_key(tenant_id, run_id)] = record
-		self._record_event(tenant_id, "sync_started", run_id, f"Started sync run {run_id}.", {"matched_rules": result["matched_rules"], "status": status})
+		self._record_event(tenant_id, "sync_started", run_id, f"Started sync run {run_id}.", {"matched_rules": result["matched_rules"], "status": status}, result, schema_review_recorded)
 		return _dump(record)
 
 	def complete_sync(self, tenant_id: str, run_id: str, records_processed: int, quality_score: float) -> dict[str, Any]:
@@ -383,6 +431,11 @@ class ConnService:
 			mode=run.mode,
 			batch_size=run.batch_size,
 			status="completed",
+			decision=run.decision,
+			matched_rules=list(run.matched_rules),
+			policy_decision=run.policy_decision,
+			review_reasons=list(run.review_reasons),
+			review_evidence=dict(run.review_evidence),
 			records_processed=records_processed,
 			quality_score=quality_score,
 			created_at=run.created_at,
@@ -400,9 +453,9 @@ class ConnService:
 		})
 		if result["decision"] == "deny":
 			_raise_if_blocked(result)
-		record = ScheduleRecord(id=schedule_id, tenant_id=tenant_id, flow_id=flow_id, cron=cron, timezone=timezone)
+		record = ScheduleRecord(id=schedule_id, tenant_id=tenant_id, flow_id=flow_id, cron=cron, timezone=timezone, **_policy_kwargs(result))
 		self._schedules[self._tenant_key(tenant_id, schedule_id)] = record
-		self._record_event(tenant_id, "flow_scheduled", schedule_id, f"Scheduled flow {flow_id}.", {"cron": cron, "timezone": timezone})
+		self._record_event(tenant_id, "flow_scheduled", schedule_id, f"Scheduled flow {flow_id}.", {"cron": cron, "timezone": timezone}, result)
 		return _dump(record)
 
 	def replay_sync(self, tenant_id: str, run_id: str, replay_id: str, idempotency_key: str) -> dict[str, Any]:
@@ -414,9 +467,9 @@ class ConnService:
 		})
 		if result["decision"] == "deny":
 			_raise_if_blocked(result)
-		record = SyncRunRecord(id=replay_id, tenant_id=tenant_id, flow_id=run.flow_id, mode=run.mode, batch_size=run.batch_size, status="queued")
+		record = SyncRunRecord(id=replay_id, tenant_id=tenant_id, flow_id=run.flow_id, mode=run.mode, batch_size=run.batch_size, status="queued", **_policy_kwargs(result))
 		self._runs[self._tenant_key(tenant_id, replay_id)] = record
-		self._record_event(tenant_id, "sync_replay_queued", replay_id, f"Queued replay for {run_id}.", {"idempotency_key": idempotency_key})
+		self._record_event(tenant_id, "sync_replay_queued", replay_id, f"Queued replay for {run_id}.", {"idempotency_key": idempotency_key}, result)
 		return _dump(record)
 
 	def transfer_owner(self, tenant_id: str, connection_id: str, new_owner: str, actor: str, owner_transfer_review_recorded: bool = False) -> dict[str, Any]:
@@ -431,11 +484,11 @@ class ConnService:
 		if not new_owner:
 			raise ValueError("new_owner is required")
 		if result["decision"] == "require_review":
-			review = self._create_review(tenant_id, f"owner:{connection_id}", connection_id, "owner_transfer", actor, f"Transfer owner to {new_owner}.")
+			review = self._create_review(tenant_id, f"owner:{connection_id}", connection_id, "owner_transfer", actor, f"Transfer owner to {new_owner}.", result, owner_transfer_review_recorded)
 			return _dump(review)
-		record = self._replace_connection(connection, owner=new_owner)
+		record = self._replace_connection(connection, owner=new_owner, **_policy_kwargs(result, owner_transfer_review_recorded))
 		self._connections[self._tenant_key(tenant_id, connection_id)] = record
-		self._record_event(tenant_id, "connection_owner_transferred", connection_id, f"Transferred owner to {new_owner}.", {"actor": actor})
+		self._record_event(tenant_id, "connection_owner_transferred", connection_id, f"Transferred owner to {new_owner}.", {"actor": actor}, result, owner_transfer_review_recorded)
 		return _dump(record)
 
 	def retire_connection(self, tenant_id: str, connection_id: str, actor: str, impact_review_recorded: bool) -> dict[str, Any]:
@@ -447,9 +500,9 @@ class ConnService:
 		})
 		if result["decision"] == "deny":
 			_raise_if_blocked(result)
-		record = self._replace_connection(connection, status="retired")
+		record = self._replace_connection(connection, status="retired", **_policy_kwargs(result, impact_review_recorded))
 		self._connections[self._tenant_key(tenant_id, connection_id)] = record
-		self._record_event(tenant_id, "connection_retired", connection_id, f"Retired connection {connection.name}.", {"actor": actor})
+		self._record_event(tenant_id, "connection_retired", connection_id, f"Retired connection {connection.name}.", {"actor": actor}, result, impact_review_recorded)
 		return _dump(record)
 
 	def register_connector_agent(
@@ -483,7 +536,7 @@ class ConnService:
 			"human_approval_required": human_approval_required,
 		})
 		if result["decision"] == "deny":
-			self._record_event(tenant_id, "connector_agent_registration_denied", agent_id, f"Denied connector agent {name}.", {"matched_rules": result["matched_rules"]})
+			self._record_event(tenant_id, "connector_agent_registration_denied", agent_id, f"Denied connector agent {name}.", {"matched_rules": result["matched_rules"]}, result)
 			_raise_if_blocked(result)
 		if self._tenant_key(tenant_id, agent_id) in self._connector_agents:
 			raise ValueError(f"connector agent already exists for tenant: {agent_id}")
@@ -499,9 +552,10 @@ class ConnService:
 			status=_status_for_decision(result),
 			contribution_disclosed=contribution_disclosed,
 			human_approval_required=human_approval_required,
+			**_policy_kwargs(result, human_approval_required),
 		)
 		self._connector_agents[self._tenant_key(tenant_id, agent_id)] = record
-		self._record_event(tenant_id, "connector_agent_registered", agent_id, f"Registered connector agent {name}.", {"matched_rules": result["matched_rules"], "status": record.status})
+		self._record_event(tenant_id, "connector_agent_registered", agent_id, f"Registered connector agent {name}.", {"matched_rules": result["matched_rules"], "status": record.status}, result, human_approval_required)
 		return _dump(record)
 
 	def validate_conn_lifecycle_batch(
@@ -528,9 +582,10 @@ class ConnService:
 			operation=operation,
 			mutation_count=mutation_count,
 			status="denied" if result["decision"] == "deny" else "accepted",
+			**_policy_kwargs(result),
 		)
 		self._lifecycle_batches[self._tenant_key(tenant_id, resolved_batch_id)] = record
-		self._record_event(tenant_id, "conn_lifecycle_batch_validated", resolved_batch_id, f"Validated CONN lifecycle batch through {normalized_stream}.", {"matched_rules": result["matched_rules"], "status": record.status})
+		self._record_event(tenant_id, "conn_lifecycle_batch_validated", resolved_batch_id, f"Validated CONN lifecycle batch through {normalized_stream}.", {"matched_rules": result["matched_rules"], "status": record.status}, result)
 		if result["decision"] == "deny":
 			_raise_if_blocked(result)
 		return _dump(record)
@@ -546,6 +601,8 @@ class ConnService:
 			"flow_count": len([flow for flow in self._flows.values() if flow.tenant_id == tenant_id]),
 			"sync_run_count": len([run for run in self._runs.values() if run.tenant_id == tenant_id]),
 			"pending_review_count": len([review for review in self._reviews.values() if review.tenant_id == tenant_id and review.status == "pending"]),
+			"pending_connector_agent_review_count": len([agent for agent in self._connector_agents.values() if agent.tenant_id == tenant_id and agent.status == "pending_review"]),
+			"review_count": len(self.list_pending_reviews(tenant_id)),
 			"connector_agent_count": len([agent for agent in self._connector_agents.values() if agent.tenant_id == tenant_id]),
 			"lifecycle_batch_count": len(lifecycle_batches),
 			"denied_lifecycle_batch_count": len([batch for batch in lifecycle_batches if batch.status == "denied"]),
@@ -579,10 +636,51 @@ class ConnService:
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return [_dump(event) for event in self._events if tenant_id is None or event.tenant_id == tenant_id]
 
-	def _create_review(self, tenant_id: str, review_id: str, subject_id: str, review_type: str, requester: str, notes: str) -> ReviewRecord:
-		review = ReviewRecord(id=review_id, tenant_id=tenant_id, subject_id=subject_id, review_type=review_type, requester=requester, notes=notes)
+	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		"""Return connector records awaiting governance review."""
+		items = (
+			self.list_connectors(tenant_id)
+			+ self.list_connections(tenant_id)
+			+ self.list_flows(tenant_id)
+			+ self.list_sync_runs(tenant_id)
+			+ self.list_schedules(tenant_id)
+			+ self.list_reviews(tenant_id)
+			+ self.list_connector_agents(tenant_id)
+			+ self.list_lifecycle_batches(tenant_id)
+		)
+		return [
+			record
+			for record in items
+			if record.get("status") in {"pending", "pending_review", "review_required"}
+			or record.get("decision") == "pending"
+		]
+
+	def _create_review(
+		self,
+		tenant_id: str,
+		review_id: str,
+		subject_id: str,
+		review_type: str,
+		requester: str,
+		notes: str,
+		policy_result: dict[str, Any] | None = None,
+		review_recorded: bool = False,
+	) -> ReviewRecord:
+		result = policy_result or _allow_result()
+		review = ReviewRecord(
+			id=review_id,
+			tenant_id=tenant_id,
+			subject_id=subject_id,
+			review_type=review_type,
+			matched_rules=list(result["matched_rules"]),
+			policy_decision=result["decision"],
+			review_reasons=_reasons(result),
+			review_evidence=_review_evidence(result, review_recorded),
+			requester=requester,
+			notes=notes,
+		)
 		self._reviews[self._tenant_key(tenant_id, review_id)] = review
-		self._record_event(tenant_id, f"{review_type}_review_requested", review_id, f"Requested {review_type} review.", {"subject_id": subject_id})
+		self._record_event(tenant_id, f"{review_type}_review_requested", review_id, f"Requested {review_type} review.", {"subject_id": subject_id}, result, review_recorded)
 		return review
 
 	def _replace_connection(self, connection: ConnectionRecord, **changes: Any) -> ConnectionRecord:
@@ -614,13 +712,27 @@ class ConnService:
 			raise KeyError(f"unknown sync run for tenant: {run_id}")
 		return record
 
-	def _record_event(self, tenant_id: str, event_type: str, subject_id: str, message: str, evidence: dict[str, Any] | None = None) -> None:
+	def _record_event(
+		self,
+		tenant_id: str,
+		event_type: str,
+		subject_id: str,
+		message: str,
+		evidence: dict[str, Any] | None = None,
+		policy_result: dict[str, Any] | None = None,
+		review_recorded: bool = False,
+	) -> None:
+		result = policy_result or _allow_result()
 		self._events.append(ConnectorAuditEvent(
 			id=f"event:{len(self._events) + 1}",
 			tenant_id=tenant_id,
 			event_type=event_type,
 			subject_id=subject_id,
 			message=message,
+			policy_decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=_reasons(result),
+			review_evidence=_review_evidence(result, review_recorded),
 			evidence=dict(evidence or {}),
 		))
 
@@ -637,6 +749,40 @@ class ConnService:
 
 def _dump(record: Any) -> dict[str, Any]:
 	return asdict(record)
+
+
+def _allow_result() -> dict[str, Any]:
+	return {"decision": "allow", "matched_rules": [], "actions": []}
+
+
+def _reasons(result: dict[str, Any]) -> list[str]:
+	return list(dict.fromkeys(
+		str(action["reason"])
+		for action in result.get("actions", [])
+		if action.get("reason")
+	))
+
+
+def _review_evidence(result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+	return {
+		"required_actions": list(dict.fromkeys(
+			str(action.get("required_action"))
+			for action in result.get("actions", [])
+			if action.get("required_action")
+		)),
+		"reasons": _reasons(result),
+		"review_recorded": bool(review_recorded),
+	}
+
+
+def _policy_kwargs(result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+	return {
+		"decision": result["decision"],
+		"matched_rules": list(result["matched_rules"]),
+		"policy_decision": result["decision"],
+		"review_reasons": _reasons(result),
+		"review_evidence": _review_evidence(result, review_recorded),
+	}
 
 
 def _raise_if_blocked(result: dict[str, Any]) -> None:

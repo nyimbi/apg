@@ -16,6 +16,8 @@ def dashboard_model(service: ConnService, tenant_id: str = "default") -> dict[st
 		"summary": service.dashboard_summary(tenant_id),
 		"connector_agents": service.list_connector_agents(tenant_id),
 		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
+		"review_evidence": contract["review_evidence"],
 		"routes": contract["ui"]["routes"],
 		"theme": contract["theme"],
 	}
@@ -101,6 +103,11 @@ def connector_agent_roster_model(service: ConnService, tenant_id: str = "default
 	return {
 		"tenant_id": tenant_id,
 		"agents": service.list_connector_agents(tenant_id),
+		"pending_reviews": [
+			record
+			for record in service.list_pending_reviews(tenant_id)
+			if record.get("role") in contract["agents"]["supported_roles"]
+		],
 		"agent_contract": contract["agents"],
 		"supported_runtimes": contract["agents"]["supported_runtimes"],
 		"supported_roles": contract["agents"]["supported_roles"],
@@ -129,5 +136,6 @@ def settings_model(service: ConnService, tenant_id: str = "default") -> dict[str
 		"adapters": contract["configuration"]["adapters"],
 		"agents": contract["agents"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"theme": contract["theme"],
 	}

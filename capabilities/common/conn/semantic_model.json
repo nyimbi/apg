@@ -299,7 +299,8 @@
       "provides": [
         "connector_management",
         "connection_orchestration",
-        "connector_agent_composition"
+        "connector_agent_composition",
+        "review_evidence"
       ],
       "requires": [
         "apig",
@@ -307,6 +308,39 @@
         "encr",
         "audl"
       ],
+      "review_evidence": {
+        "deny_behavior": "Denied CONN lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "pending",
+          "pending_review",
+          "review_required",
+          "review_denied",
+          "denied",
+          "accepted",
+          "registered",
+          "active",
+          "running",
+          "queued",
+          "completed",
+          "retired"
+        ],
+        "pending_queues": [
+          "connectors",
+          "connections",
+          "flows",
+          "sync_runs",
+          "schedules",
+          "reviews",
+          "connector_agents",
+          "lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "review_evidence"
+        ]
+      },
       "rule_engine": {
         "rules": [
           {
@@ -1869,7 +1903,8 @@
       "provides": [
         "connector_management",
         "connection_orchestration",
-        "connector_agent_composition"
+        "connector_agent_composition",
+        "review_evidence"
       ],
       "requires": [
         "apig",
@@ -1877,6 +1912,39 @@
         "encr",
         "audl"
       ],
+      "review_evidence": {
+        "deny_behavior": "Denied CONN lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "pending",
+          "pending_review",
+          "review_required",
+          "review_denied",
+          "denied",
+          "accepted",
+          "registered",
+          "active",
+          "running",
+          "queued",
+          "completed",
+          "retired"
+        ],
+        "pending_queues": [
+          "connectors",
+          "connections",
+          "flows",
+          "sync_runs",
+          "schedules",
+          "reviews",
+          "connector_agents",
+          "lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "review_evidence"
+        ]
+      },
       "streaming": {
         "engine": "bytewax",
         "lifecycle_stream": "conn.lifecycle",

@@ -35,7 +35,9 @@ def test_package_contract_shape_is_valid():
 	assert contract["theme"]["tokens"]["border.radius"]
 	assert contract["agents"]["first_class"] is True
 	assert contract["streaming"]["required_processor"] == "bytewax"
-	assert contract["provides"] == ["connector_management", "connection_orchestration", "connector_agent_composition"]
+	assert contract["provides"] == ["connector_management", "connection_orchestration", "connector_agent_composition", "review_evidence"]
+	assert "connector_agents" in contract["review_evidence"]["pending_queues"]
+	assert "policy_decision" in contract["review_evidence"]["policy_fields"]
 	assert contract["requires"] == ["apig", "auth", "encr", "audl"]
 
 
@@ -58,3 +60,5 @@ def test_package_app_entrypoint_is_publishable():
 	assert model["capabilities"]["conn"]["streaming"]["engine"] == "bytewax"
 	assert model["capabilities"]["conn"]["streaming"]["required_processor"] == "bytewax"
 	assert model["capabilities"]["conn"]["agents"]["first_class"] is True
+	assert model["capabilities"]["conn"]["review_evidence"]["deny_behavior"]
+	assert model["contracts"]["conn"]["review_evidence"]["pending_queues"]

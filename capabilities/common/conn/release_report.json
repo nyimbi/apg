@@ -19,6 +19,11 @@
       "service": "conn_runtime.py",
       "views": "view_models.py"
     },
+    "review_evidence": {
+      "deny_behavior": "Denied CONN lifecycle batches persist evidence before PermissionError",
+      "pending_queue_count": 8,
+      "policy_field_count": 4
+    },
     "self_test": {
       "capability": "conn",
       "errors": [],
