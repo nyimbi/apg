@@ -25324,6 +25324,44 @@ Known gaps:
 - Next ordered capability work should continue from the repository development
   order after IMEX, verifying the current order before editing the next package.
 
+### 2026-06-01 10:47 EAT
+
+Catalog-wide capability checkpoint:
+
+- Finished and pushed the IMEX durable review-evidence lifecycle slice as
+  commit `9628d3fb`.
+- Rechecked the declared development order after IMEX. AICR, MLCM, FEDL, NLPC,
+  CVSN, GRPH, KNGR, and RAGN all passed focused lifecycle checks; MLCM, FEDL,
+  GRPH, and KNGR also passed strict implementation checks during this pass.
+- Ran full catalog lifecycle, implementation, and operability audits to avoid
+  duplicating already completed packages before starting another slice.
+
+Catalog evidence:
+
+- `./.venv/bin/apg capabilities lifecycle-audit --json` passed with 109
+  capabilities, 109 complete lifecycle records, 109 specifications, 109 plans,
+  109 README files, 109 cap specs, 109 implementation surfaces, 109 test
+  surfaces, 109 release-evidence surfaces, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --strict --json` passed
+  with 109 domain-specific capability packages, 0 contract-only packages, 0
+  materialized baselines, 0 mixed implementations, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed with 109 operable contracts, 109 complete package artifact sets, 0
+  package gaps, 0 warnings, and 0 errors.
+- `capabilities/README.md` exists and documents capability purpose, catalog
+  snapshot, package shape, usage flow, CLI commands, rule evaluation, generated
+  application composition, and contributor expectations.
+
+Known gaps:
+
+- This checkpoint did not run the full repository pytest suite, rendered UI
+  checks, live provider/adapter integrations, performance/load tests, or
+  physical workflow execution across every capability because the current work
+  remains battery-conscious.
+- The global audits prove the repository's package lifecycle and operability
+  contracts, but they do not replace future deep domain QA for live enterprise
+  deployments.
+
 ### 2026-06-01 02:53 EAT
 
 AGNT governed execution run lifecycle slice:
