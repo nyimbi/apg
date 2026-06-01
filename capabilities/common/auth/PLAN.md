@@ -16,6 +16,11 @@ declare the Bytewax lifecycle stream; denied non-Bytewax batch mutation attempts
 must persist denial evidence; and package documentation must describe how
 builders compose AUTH into executable applications.
 
+The current contextual-risk extension removes process-hash and unconditional
+mock decisions from adaptive authentication. It adds configurable local risk
+intelligence for CIDR/IP reputation, VPN/Tor, network type, device posture,
+holidays, distance, impossible travel, and severe-factor risk floors.
+
 ## Packet: Security-Agent And Bytewax Governance
 
 Deliver a focused lifecycle and guardrail packet:
@@ -70,6 +75,19 @@ Deliver a focused lifecycle and guardrail packet:
 13. Run focused compile, package tests, self-test, implementation audit,
     publish-plan, stale-marker scan for touched files, and diff checks.
 
+14. Extend contextual risk executability:
+   - add configurable global/tenant risk-intelligence policy;
+   - replace randomized/process-hash IP reputation with SHA-stable scoring;
+   - detect VPN, Tor, datacenter, corporate, and public-WiFi networks from
+     configured CIDRs;
+   - detect device jailbreak/root, malware, EDR, tamper, and automation
+     indicators from local posture evidence;
+   - support configured holiday dates and recurring holiday month-days;
+   - estimate distance and impossible-travel risk from country centroids or
+     supplied latitude/longitude;
+   - apply high-risk single-factor floors before selecting auth requirements;
+   - add focused contextual-risk tests.
+
 ## Review Checklist
 
 - Security-agent runtime and role values normalize predictable CLI/provider
@@ -96,12 +114,14 @@ Deliver a focused lifecycle and guardrail packet:
   metadata.
 - Production JWT, biometric, behavioral, cryptographic, federation, and web
   stacks remain adapter boundaries.
+- Live threat-intelligence, geo-IP, MDM, EDR, VPN, Tor, and holiday-calendar
+  adapters remain adapter boundaries.
 
 ## Verification Commands
 
 ```bash
-./.venv/bin/python -m py_compile capabilities/common/auth/models.py capabilities/common/auth/service.py capabilities/common/auth/api_helpers.py capabilities/common/auth/view_models.py capabilities/common/auth/capability_contract.py capabilities/common/auth/app.py capabilities/common/auth/tests/test_capability_contract.py capabilities/common/auth/tests/test_package_contract.py
-./.venv/bin/pytest -q capabilities/common/auth/tests/test_capability_contract.py capabilities/common/auth/tests/test_package_contract.py
+./.venv/bin/python -m py_compile capabilities/common/auth/models.py capabilities/common/auth/service.py capabilities/common/auth/api_helpers.py capabilities/common/auth/view_models.py capabilities/common/auth/capability_contract.py capabilities/common/auth/contextual_risk.py capabilities/common/auth/app.py capabilities/common/auth/tests/test_capability_contract.py capabilities/common/auth/tests/test_package_contract.py capabilities/common/auth/tests/test_contextual_risk.py
+./.venv/bin/pytest -q capabilities/common/auth/tests/test_capability_contract.py capabilities/common/auth/tests/test_package_contract.py capabilities/common/auth/tests/test_contextual_risk.py
 ./.venv/bin/python -c "from capabilities.common.auth import app; r=app.self_test(); print(r); assert r['passed']"
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/common/auth --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/auth --json

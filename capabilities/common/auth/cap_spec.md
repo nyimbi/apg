@@ -14,11 +14,16 @@ The current executable packet adds durable AUTH review evidence for role
 approvals, privacy approvals, privacy queries, privileged security-agent
 review, denied Bytewax batch mutation routing, and audit events.
 
+The current contextual-risk packet adds dependency-light local risk
+intelligence for CIDR/IP reputation, VPN/Tor, datacenter/corporate/public-WiFi
+network classification, device posture, browser integrity, holiday calendars,
+country-distance velocity checks, and high-risk single-factor floors.
+
 Focused proof commands:
 
 ```bash
-./.venv/bin/python -m py_compile capabilities/common/auth/models.py capabilities/common/auth/service.py capabilities/common/auth/api_helpers.py capabilities/common/auth/view_models.py capabilities/common/auth/capability_contract.py capabilities/common/auth/app.py capabilities/common/auth/tests/test_capability_contract.py capabilities/common/auth/tests/test_package_contract.py
-./.venv/bin/pytest -q capabilities/common/auth/tests/test_capability_contract.py capabilities/common/auth/tests/test_package_contract.py
+./.venv/bin/python -m py_compile capabilities/common/auth/models.py capabilities/common/auth/service.py capabilities/common/auth/api_helpers.py capabilities/common/auth/view_models.py capabilities/common/auth/capability_contract.py capabilities/common/auth/contextual_risk.py capabilities/common/auth/app.py capabilities/common/auth/tests/test_capability_contract.py capabilities/common/auth/tests/test_package_contract.py capabilities/common/auth/tests/test_contextual_risk.py
+./.venv/bin/pytest -q capabilities/common/auth/tests/test_capability_contract.py capabilities/common/auth/tests/test_package_contract.py capabilities/common/auth/tests/test_contextual_risk.py
 ./.venv/bin/python -c "from capabilities.common.auth import app; r=app.self_test(); print(r); assert r['passed']"
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/common/auth --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/auth --json

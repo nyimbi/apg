@@ -25,6 +25,9 @@ audit surfaces.
 - Access decisions that combine role permissions, session evidence, MFA,
   federation trust, tenant membership, risk level, and inferred privileged
   tiers.
+- Contextual risk intelligence that runs locally with configurable CIDR lists,
+  exact IP scores, device reputation, browser-integrity heuristics, holiday
+  calendars, country distance estimates, and severe single-factor risk floors.
 - Security-agent registration for `codex`, `claude_code`, `opencode`, and `pi`
   runtimes with explicit role, owner, purpose, scope, disclosure, approval, and
   policy evidence.
@@ -140,6 +143,37 @@ assert agent["human_approval_required"] is True
 Privileged agent roles, including `role_reviewer`, `privacy_reviewer`, and
 `federation_reviewer`, are retained as `pending_review` evidence when
 `human_approval_required` is false.
+
+## Contextual Risk Intelligence
+
+`contextual_risk.py` provides dependency-light adaptive authentication
+evidence. Generated applications can configure local intelligence from a
+security feed, tenant policy, or static deployment data without requiring a
+live threat-intelligence service:
+
+```python
+from capabilities.common.auth.contextual_risk import ContextualRiskEngine
+
+engine = ContextualRiskEngine()
+engine.configure_risk_intelligence({
+    "vpn_cidrs": ["203.0.113.0/24"],
+    "tor_exit_cidrs": ["198.51.100.10/32"],
+    "threat_ip_scores": {"198.51.100.10": 0.93},
+    "trusted_device_ids": ["managed-laptop-1"],
+    "holiday_dates": ["2026-06-01"],
+})
+
+location = await engine.assess_location_risk(
+    "alice",
+    {"ip_address": "198.51.100.10", "country": "KE", "city": "Nairobi"},
+)
+```
+
+The engine uses real CIDR matching, stable SHA-based scoring for unknown public
+IPs/devices, local holiday evidence, browser/device posture signals, and
+country-centroid distance estimates. Severe evidence such as Tor usage,
+impossible travel, malware indicators, or high threat scores cannot be averaged
+away by otherwise low-risk factors.
 
 ## Durable Review Evidence
 

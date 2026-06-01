@@ -26233,3 +26233,72 @@ Known gaps:
   outside this battery-conscious slice.
 - Existing SQLAlchemy and Pydantic deprecation warnings surfaced by focused
   tests remain outside this slice.
+
+### 2026-06-01 12:27 EAT
+
+AUTH contextual-risk executability slice:
+
+- Replaced process-local contextual-risk decisions with configurable,
+  dependency-light risk intelligence that generated applications can run
+  without live geo-IP, threat-feed, MDM, EDR, VPN, or Tor services.
+- Added deterministic local policy inputs for exact IP reputation and threat
+  scores, blocked/VPN/Tor/datacenter/corporate/public-WiFi CIDRs, trusted and
+  blocked device IDs, holidays, high-risk countries, and country centroids.
+- Added SHA-stable public-IP and device scoring, local CIDR classification,
+  browser-integrity scoring, device posture detection, holiday checks, and
+  haversine/country-centroid distance calculation.
+- Added severe-factor risk floors so Tor usage, impossible travel, malware,
+  jailbroken devices, and high threat intelligence cannot be averaged away by
+  otherwise low contextual factors.
+- Added focused contextual-risk regression coverage for configured IP
+  intelligence, device/calendar evidence, and impossible travel with high
+  network threat plus step-up/MFA requirements.
+- Updated AUTH `README.md`, `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md`
+  with the contextual-risk policy, provider-adapter boundary, acceptance
+  evidence, and focused proof commands.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/auth/models.py capabilities/common/auth/service.py capabilities/common/auth/api_helpers.py capabilities/common/auth/view_models.py capabilities/common/auth/capability_contract.py capabilities/common/auth/contextual_risk.py capabilities/common/auth/app.py capabilities/common/auth/tests/test_capability_contract.py capabilities/common/auth/tests/test_package_contract.py capabilities/common/auth/tests/test_contextual_risk.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/auth/tests/test_capability_contract.py capabilities/common/auth/tests/test_package_contract.py capabilities/common/auth/tests/test_contextual_risk.py`
+  passed with 16 tests and 10 pre-existing SQLAlchemy/Pydantic deprecation
+  warnings from imported shared modules.
+- `./.venv/bin/python -c "from capabilities.common.auth import app; r=app.self_test(); print(r); assert r['passed']"`
+  passed with `self_test()` status `ok`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/auth --json`
+  passed with one domain-specific AUTH implementation, 0 baseline markers, 0
+  warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/common/auth --json`
+  passed with one complete lifecycle record, 17 rules, 21 routes, 11 theme
+  tokens, and 0 warnings/errors.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/auth --json`
+  passed and showed side-effect-free publish evidence, Bytewax event-stream
+  configuration, first-class security-agent runtimes, review evidence, rules,
+  routes, and no warnings.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 109 operable contracts, 109 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Focused stale-marker scan returned only documentation lines describing the
+  removed process-hash/mock behavior; no implementation stale marker remained
+  in the contextual-risk code or tests.
+
+Code review:
+
+- Reviewed policy merge and cache invalidation behavior for global and tenant
+  risk-intelligence configuration.
+- Reviewed IP parsing failure paths and local/private/reserved address handling
+  so invalid or special-purpose addresses do not receive accidental high trust.
+- Reviewed severe-factor floors and reason generation so dangerous signals are
+  both enforced and visible to generated application UIs.
+- Kept live provider feeds behind a normalizable policy adapter boundary rather
+  than adding network dependencies to AUTH.
+
+Known gaps:
+
+- Did not run the full repository test suite, rendered AUTH UI checks, live
+  geo-IP, live threat-intelligence, live MDM/EDR, live VPN/Tor feeds, durable
+  Bytewax topology, or performance/load checks during this battery-conscious
+  slice.
+- Existing SQLAlchemy and Pydantic deprecation warnings surfaced by focused
+  tests remain outside this slice.

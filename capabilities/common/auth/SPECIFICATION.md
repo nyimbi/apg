@@ -36,6 +36,10 @@ state, role/session/access decisions, and composition behavior.
   independent reviewer evidence instead of trusting caller-supplied booleans.
 - Runtime services can deny locked accounts, untrusted federation, high-risk
   sessions without step-up, and privileged access without MFA.
+- Adaptive authentication can calculate contextual risk locally from
+  configured CIDR intelligence, exact IP scores, device posture, browser
+  integrity, holiday calendars, country distance estimates, network type, and
+  severe risk-factor floors.
 - Data and privacy teams can meter privacy-preserving analytics against
   tenant-scoped privacy budgets.
 - Security owners can register AI security agents for identity, role, session,
@@ -111,6 +115,9 @@ The focused lifecycle is:
     generated review consoles.
 14. Emit tenant-scoped audit events for identity, role, approval, assignment,
     session, access, privacy, and revocation lifecycle changes.
+15. Assess contextual risk using dependency-light local intelligence before
+    choosing password-only, MFA, biometric, security-question, administrator
+    approval, or denial requirements.
 
 ## Rules And Guardrails
 
@@ -154,6 +161,37 @@ Approval, review, and assignment actors must be real tenant actors with the
 required `auth:manage_roles`, `auth:approve_roles`, `auth:manage_privacy`, or
 `auth:approve_privacy` permissions. The only bootstrap exception is the
 platform actor `system`.
+
+## Contextual Risk Intelligence
+
+The contextual risk engine must remain executable without live security feeds.
+Production adapters may normalize commercial threat-intelligence, MDM, EDR,
+geo-IP, VPN, Tor, and calendar data into the local policy surface, but the
+engine itself must be deterministic and testable.
+
+The policy surface supports:
+
+- `vpn_cidrs`, `tor_exit_cidrs`, `datacenter_cidrs`, `corporate_cidrs`,
+  `public_wifi_cidrs`, and `blocked_cidrs`;
+- exact `ip_reputation_scores` and `threat_ip_scores`;
+- `trusted_device_ids` and `blocked_device_ids`;
+- `holiday_dates` and recurring `holiday_month_days`;
+- `country_centroids` for dependency-light distance and velocity estimates;
+- `high_risk_countries`.
+
+Risk scoring requirements:
+
+- IP, VPN, Tor, network-type, threat-intelligence, device, and holiday
+  outcomes must come from configured policy, local address classification, or
+  stable deterministic scoring, not random or process-hash values.
+- Browser integrity must penalize headless, automation, command-line, and
+  malformed user agents.
+- Device posture must recognize jailbreak/root, malware, EDR, tamper, debugger,
+  and security-indicator evidence.
+- Impossible-travel, Tor, malware, and high threat-intelligence signals must
+  impose a minimum risk floor so severe single-factor evidence is not averaged
+  away.
+- Local risk intelligence configuration must clear stale IP and threat caches.
 
 ## UI And Theme
 
@@ -261,6 +299,8 @@ These integrations remain replaceable:
 - neuromorphic decision processors;
 - audit, notification, key management, multi-tenancy, and security services.
 - live Bytewax topology execution.
+- live threat-intelligence, geo-IP, MDM, EDR, VPN, Tor, and holiday-calendar
+  adapters.
 
 Local package tests must not require those systems.
 
@@ -292,6 +332,8 @@ Local package tests must not require those systems.
   contribution fails closed.
 - Batch AUTH mutation validation accepts Bytewax and denies other stream
   providers while preserving denied validation evidence.
+- Contextual risk uses configured CIDR/IP/device/calendar evidence, stable
+  scoring, and severe-factor risk floors for adaptive authentication.
 - Generated semantic model exposes the current login/dashboard route names,
   security-agent route, provides/requires metadata, review-evidence metadata,
   and Bytewax stream metadata.
@@ -301,8 +343,8 @@ Local package tests must not require those systems.
 ## Focused Proof Commands
 
 ```bash
-./.venv/bin/python -m py_compile capabilities/common/auth/models.py capabilities/common/auth/service.py capabilities/common/auth/api_helpers.py capabilities/common/auth/view_models.py capabilities/common/auth/capability_contract.py capabilities/common/auth/app.py capabilities/common/auth/tests/test_capability_contract.py capabilities/common/auth/tests/test_package_contract.py
-./.venv/bin/pytest -q capabilities/common/auth/tests/test_capability_contract.py capabilities/common/auth/tests/test_package_contract.py
+./.venv/bin/python -m py_compile capabilities/common/auth/models.py capabilities/common/auth/service.py capabilities/common/auth/api_helpers.py capabilities/common/auth/view_models.py capabilities/common/auth/capability_contract.py capabilities/common/auth/contextual_risk.py capabilities/common/auth/app.py capabilities/common/auth/tests/test_capability_contract.py capabilities/common/auth/tests/test_package_contract.py capabilities/common/auth/tests/test_contextual_risk.py
+./.venv/bin/pytest -q capabilities/common/auth/tests/test_capability_contract.py capabilities/common/auth/tests/test_package_contract.py capabilities/common/auth/tests/test_contextual_risk.py
 ./.venv/bin/python -c "from capabilities.common.auth import app; r=app.self_test(); print(r); assert r['passed']"
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/common/auth --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/auth --json

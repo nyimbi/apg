@@ -16,6 +16,7 @@ import hashlib
 import json
 import math
 import ipaddress
+import re
 from pathlib import Path
 from uuid_extensions import uuid7str
 from pydantic import BaseModel, Field, ConfigDict, validator
@@ -210,6 +211,7 @@ class ContextualRiskEngine:
 		# Tenant-specific configurations
 		self._tenant_weights: Dict[str, Dict[RiskFactor, float]] = {}
 		self._tenant_policies: Dict[str, Dict[str, Any]] = {}
+		self._global_risk_policy: Dict[str, Any] = self._default_risk_policy()
 	
 	def _log_info(self, message: str, **kwargs):
 		"""Log information message"""
@@ -222,6 +224,23 @@ class ContextualRiskEngine:
 	def _log_error(self, message: str, **kwargs):
 		"""Log error message"""
 		print(f"[ContextualRisk ERROR] {message} {kwargs if kwargs else ''}")
+
+	def configure_risk_intelligence(self, policy: Dict[str, Any], tenant_id: Optional[str] = None) -> None:
+		"""Configure deterministic risk intelligence inputs.
+
+		The engine remains dependency-light: provider feeds can be normalized into
+		this policy shape by adapters, while generated applications can pass local
+		CIDR lists, exact IP scores, device reputation lists, and calendar data.
+		"""
+		assert isinstance(policy, dict), "Risk intelligence policy must be a dictionary"
+		if tenant_id:
+			current = dict(self._tenant_policies.get(tenant_id, {}))
+			current.update(policy)
+			self._tenant_policies[tenant_id] = current
+		else:
+			self._global_risk_policy.update(policy)
+		self._ip_reputation_cache.clear()
+		self._threat_intel_cache.clear()
 	
 	async def assess_location_risk(self, user_id: str, location_data: Dict[str, Any]) -> LocationRisk:
 		"""Assess location-based risk factors"""
@@ -254,9 +273,11 @@ class ContextualRiskEngine:
 		is_vpn = await self._detect_vpn(ip_address)
 		is_tor = await self._detect_tor(ip_address)
 		
-		# Check high-risk countries (simplified list)
-		high_risk_countries = {'XX', 'YY', 'ZZ'}  # Replace with actual high-risk country codes
-		is_high_risk_country = country in high_risk_countries if country else False
+		high_risk_countries = {
+			str(item).upper()
+			for item in self._combined_risk_policy().get("high_risk_countries", [])
+		}
+		is_high_risk_country = str(country).upper() in high_risk_countries if country else False
 		
 		location_risk = LocationRisk(
 			country=country,
@@ -434,6 +455,7 @@ class ContextualRiskEngine:
 		
 		# Clamp to [0, 1]
 		overall_risk_score = max(0.0, min(1.0, overall_risk_score))
+		overall_risk_score = self._apply_factor_risk_floor(overall_risk_score, factor_scores, context)
 		
 		# Determine risk level
 		risk_level = self._determine_risk_level(overall_risk_score)
@@ -582,6 +604,30 @@ class ContextualRiskEngine:
 			if risk_score >= threshold:
 				return risk_level
 		return RiskLevel.VERY_LOW
+
+	def _apply_factor_risk_floor(
+		self,
+		weighted_score: float,
+		factor_scores: Dict[RiskFactor, float],
+		context: AuthContext,
+	) -> float:
+		"""Prevent severe single-factor evidence from being averaged away."""
+		floor = weighted_score
+		if context.location_risk.is_tor:
+			floor = max(floor, 0.75)
+		if context.location_risk.is_vpn and context.network_risk.threat_intel_score >= 0.5:
+			floor = max(floor, 0.60)
+		if context.time_risk.velocity_risk_score >= 0.8:
+			floor = max(floor, 0.60)
+		elif context.time_risk.velocity_risk_score >= 0.5:
+			floor = max(floor, 0.45)
+		if context.device_risk.has_malware_indicators:
+			floor = max(floor, 0.70)
+		if context.device_risk.is_jailbroken and factor_scores.get(RiskFactor.DEVICE, 0.0) >= 0.5:
+			floor = max(floor, 0.55)
+		if context.network_risk.threat_intel_score >= 0.85:
+			floor = max(floor, 0.70)
+		return self._clamp_score(floor)
 	
 	async def _determine_auth_requirements(self, risk_score: float, risk_level: RiskLevel,
 										   factor_scores: Dict[RiskFactor, float],
@@ -678,6 +724,15 @@ class ContextualRiskEngine:
 				elif factor == RiskFactor.NETWORK:
 					if context.network_risk.threat_intel_score > 0.5:
 						reasons.append("Network threat indicators")
+
+		if context.time_risk.velocity_risk_score > 0.5 and "Impossible travel velocity" not in reasons:
+			reasons.append("Impossible travel velocity")
+		if context.location_risk.is_tor and "Tor network usage detected" not in reasons:
+			reasons.append("Tor network usage detected")
+		if context.network_risk.threat_intel_score > 0.5 and "Network threat indicators" not in reasons:
+			reasons.append("Network threat indicators")
+		if context.device_risk.has_malware_indicators and "Device malware indicators detected" not in reasons:
+			reasons.append("Device malware indicators detected")
 		
 		return reasons
 	
@@ -732,71 +787,122 @@ class ContextualRiskEngine:
 	# Utility methods for risk assessment
 	async def _calculate_location_distance(self, location_data: Dict[str, Any], 
 										   user_locations: List[LocationRisk]) -> float:
-		"""Calculate distance from usual locations (simplified)"""
-		# This would typically use geolocation APIs
-		# For now, return a mock distance based on country differences
-		current_country = location_data.get('country')
-		if not current_country:
-			return 0.0
-		
-		usual_countries = [loc.country for loc in user_locations[-5:]]
-		if current_country in usual_countries:
-			return 0.0
-		else:
-			return 2000.0  # Mock distance for different country
+		"""Calculate distance from usual locations using local geo evidence."""
+		current = self._location_point(location_data)
+		if not current:
+			current_country = location_data.get('country')
+			if not current_country:
+				return 0.0
+			return 0.0 if current_country in {loc.country for loc in user_locations[-5:]} else 2500.0
+
+		distances = []
+		for location in user_locations[-5:]:
+			previous = self._location_point({
+				"country": location.country,
+				"region": location.region,
+				"city": location.city,
+			})
+			if previous:
+				distances.append(self._haversine_km(current, previous))
+		return min(distances) if distances else 0.0
 	
 	async def _get_ip_reputation(self, ip_address: str) -> float:
-		"""Get IP reputation score (mock implementation)"""
+		"""Get deterministic IP reputation score from local intelligence."""
 		if ip_address in self._ip_reputation_cache:
 			return self._ip_reputation_cache[ip_address]
 		
-		# Mock reputation scoring
 		try:
 			ip = ipaddress.ip_address(ip_address)
-			if ip.is_private:
-				reputation = 0.8
+			policy = self._combined_risk_policy()
+			exact_scores = policy.get("ip_reputation_scores", {})
+			if ip_address in exact_scores:
+				reputation = self._clamp_score(float(exact_scores[ip_address]))
+			elif self._ip_in_policy_networks(ip, "tor_exit_cidrs"):
+				reputation = 0.05
+			elif self._ip_in_policy_networks(ip, "vpn_cidrs"):
+				reputation = 0.45
+			elif self._ip_in_policy_networks(ip, "blocked_cidrs"):
+				reputation = 0.10
 			elif ip.is_loopback:
 				reputation = 1.0
+			elif ip.is_private:
+				reputation = 0.92
+			elif ip.is_multicast or ip.is_unspecified:
+				reputation = 0.05
+			elif ip.is_reserved:
+				reputation = 0.70
+			elif self._ip_in_policy_networks(ip, "datacenter_cidrs"):
+				reputation = 0.58
 			else:
-				# Mock scoring based on IP hash
-				reputation = 0.7 + (hash(ip_address) % 30) / 100
-		except:
-			reputation = 0.5
+				reputation = 0.68 + self._stable_fraction(ip_address) * 0.24
+		except ValueError:
+			reputation = 0.20
 		
 		self._ip_reputation_cache[ip_address] = reputation
 		return reputation
 	
 	async def _detect_vpn(self, ip_address: str) -> bool:
-		"""Detect VPN usage (mock implementation)"""
-		# This would typically use VPN detection services
-		return False
+		"""Detect VPN or proxy usage from configured CIDR intelligence."""
+		return self._ip_matches_policy(ip_address, "vpn_cidrs")
 	
 	async def _detect_tor(self, ip_address: str) -> bool:
-		"""Detect Tor usage (mock implementation)"""
-		# This would typically check against Tor exit node lists
-		return False
+		"""Detect Tor exit-node usage from configured CIDR intelligence."""
+		return self._ip_matches_policy(ip_address, "tor_exit_cidrs")
 	
 	async def _detect_jailbreak(self, device_data: Dict[str, Any]) -> bool:
-		"""Detect jailbroken/rooted devices (mock implementation)"""
-		# This would analyze device fingerprints and indicators
-		return device_data.get('is_jailbroken', False)
+		"""Detect jailbroken/rooted devices from attestation indicators."""
+		indicator_keys = {
+			"is_jailbroken",
+			"is_rooted",
+			"root_detected",
+			"bootloader_unlocked",
+			"attestation_failed",
+		}
+		indicators = {str(item).lower() for item in device_data.get("security_indicators", [])}
+		return any(bool(device_data.get(key)) for key in indicator_keys) or bool(
+			{"jailbreak", "root", "su_binary", "magisk", "cydia"} & indicators
+		)
 	
 	async def _detect_malware(self, device_data: Dict[str, Any]) -> bool:
-		"""Detect malware indicators (mock implementation)"""
-		# This would analyze device behavior and signatures
-		return device_data.get('has_malware', False)
+		"""Detect malware indicators from local device posture evidence."""
+		indicator_keys = {
+			"has_malware",
+			"malware_detected",
+			"edr_alert",
+			"tamper_detected",
+			"debugger_attached",
+		}
+		indicators = {str(item).lower() for item in device_data.get("security_indicators", [])}
+		return any(bool(device_data.get(key)) for key in indicator_keys) or bool(
+			{"malware", "trojan", "keylogger", "screen_overlay", "hooking"} & indicators
+		)
 	
 	async def _assess_browser_integrity(self, user_agent: str) -> float:
-		"""Assess browser integrity score (mock implementation)"""
-		# This would analyze user agent for tampering or suspicious modifications
+		"""Assess browser integrity from user-agent consistency signals."""
 		if not user_agent:
-			return 0.5
-		return 0.9 if len(user_agent) > 50 else 0.7
+			return 0.35
+		ua = user_agent.lower()
+		if any(token in ua for token in ("headless", "phantomjs", "selenium", "webdriver")):
+			return 0.25
+		if any(token in ua for token in ("curl", "wget", "python-requests", "scrapy", "bot")):
+			return 0.30
+		if not re.search(r"(mozilla|chrome|safari|firefox|edg|opr|mobile)", ua):
+			return 0.55
+		if len(user_agent) < 32:
+			return 0.65
+		return 0.92
 	
 	async def _get_device_reputation(self, device_id: Optional[str], user_agent: str) -> float:
-		"""Get device reputation score (mock implementation)"""
-		# This would check device against threat databases
-		return 0.8 if device_id else 0.6
+		"""Get deterministic device reputation from local posture intelligence."""
+		policy = self._combined_risk_policy()
+		if device_id and device_id in set(policy.get("trusted_device_ids", [])):
+			return 0.96
+		if device_id and device_id in set(policy.get("blocked_device_ids", [])):
+			return 0.05
+		browser_integrity = await self._assess_browser_integrity(user_agent)
+		if not device_id:
+			return min(0.62, browser_integrity)
+		return self._clamp_score(0.55 + (self._stable_fraction(device_id) * 0.35) + (browser_integrity * 0.10))
 	
 	async def _is_unusual_access_time(self, user_id: str, timestamp: datetime) -> bool:
 		"""Check if access time is unusual for user"""
@@ -817,9 +923,13 @@ class ContextualRiskEngine:
 		return (current_hour_count / total_accesses) < 0.05
 	
 	async def _is_holiday(self, timestamp: datetime, timezone: str) -> bool:
-		"""Check if timestamp is a holiday (mock implementation)"""
-		# This would check against holiday calendars
-		return False
+		"""Check if timestamp matches configured or default holiday dates."""
+		policy = self._combined_risk_policy()
+		date_key = timestamp.date().isoformat()
+		month_day = timestamp.strftime("%m-%d")
+		holiday_dates = set(policy.get("holiday_dates", []))
+		holiday_month_days = set(policy.get("holiday_month_days", []))
+		return date_key in holiday_dates or month_day in holiday_month_days
 	
 	async def _calculate_time_deviation(self, user_times: List[datetime], 
 										current_time: datetime) -> float:
@@ -867,7 +977,6 @@ class ContextualRiskEngine:
 		if time_diff_hours <= 0:
 			return 0.0
 		
-		# Calculate distance (mock implementation)
 		distance_km = await self._calculate_location_distance(location_data, [last_location])
 		
 		if distance_km == 0:
@@ -886,28 +995,64 @@ class ContextualRiskEngine:
 		return 0.0
 	
 	async def _is_residential_ip(self, ip_address: str) -> bool:
-		"""Check if IP is residential (mock implementation)"""
-		return True  # Default assumption
+		"""Check whether an IP should be treated as residential."""
+		try:
+			ip = ipaddress.ip_address(ip_address)
+		except ValueError:
+			return False
+		return not (
+			ip.is_private
+			or self._ip_in_policy_networks(ip, "corporate_cidrs")
+			or self._ip_in_policy_networks(ip, "datacenter_cidrs")
+			or self._ip_in_policy_networks(ip, "public_wifi_cidrs")
+			or self._ip_in_policy_networks(ip, "vpn_cidrs")
+			or self._ip_in_policy_networks(ip, "tor_exit_cidrs")
+		)
 	
 	async def _is_datacenter_ip(self, ip_address: str) -> bool:
-		"""Check if IP is from datacenter (mock implementation)"""
-		return False  # Default assumption
+		"""Check whether an IP belongs to configured datacenter ranges."""
+		return self._ip_matches_policy(ip_address, "datacenter_cidrs")
 	
 	async def _is_corporate_ip(self, ip_address: str) -> bool:
-		"""Check if IP is corporate (mock implementation)"""
-		return False  # Default assumption
+		"""Check whether an IP is corporate/private network traffic."""
+		try:
+			ip = ipaddress.ip_address(ip_address)
+		except ValueError:
+			return False
+		return ip.is_private or self._ip_in_policy_networks(ip, "corporate_cidrs")
 	
 	async def _is_public_wifi(self, ip_address: str) -> bool:
-		"""Check if IP is public WiFi (mock implementation)"""
-		return False  # Default assumption
+		"""Check whether an IP belongs to configured public-WiFi ranges."""
+		return self._ip_matches_policy(ip_address, "public_wifi_cidrs")
 	
 	async def _get_threat_intelligence(self, ip_address: str) -> float:
-		"""Get threat intelligence score for IP (mock implementation)"""
+		"""Get deterministic threat intelligence score for IP."""
 		if ip_address in self._threat_intel_cache:
 			return self._threat_intel_cache[ip_address].get('risk_score', 0.0)
 		
-		# Mock threat intelligence
-		risk_score = 0.1 + (hash(ip_address) % 20) / 100  # 0.1 to 0.3 range
+		policy = self._combined_risk_policy()
+		exact_scores = policy.get("threat_ip_scores", {})
+		if ip_address in exact_scores:
+			risk_score = self._clamp_score(float(exact_scores[ip_address]))
+		else:
+			try:
+				ip = ipaddress.ip_address(ip_address)
+				if self._ip_in_policy_networks(ip, "blocked_cidrs"):
+					risk_score = 0.95
+				elif self._ip_in_policy_networks(ip, "tor_exit_cidrs"):
+					risk_score = 0.90
+				elif self._ip_in_policy_networks(ip, "vpn_cidrs"):
+					risk_score = 0.45
+				elif self._ip_in_policy_networks(ip, "datacenter_cidrs"):
+					risk_score = 0.30
+				elif ip.is_private or ip.is_loopback:
+					risk_score = 0.03
+				elif ip.is_multicast or ip.is_unspecified:
+					risk_score = 0.80
+				else:
+					risk_score = 0.04 + self._stable_fraction(ip_address) * 0.14
+			except ValueError:
+				risk_score = 0.75
 		self._threat_intel_cache[ip_address] = {'risk_score': risk_score}
 		return risk_score
 	
@@ -958,3 +1103,111 @@ class ContextualRiskEngine:
 			del self._user_time_patterns[user_id]
 		
 		self._log_info("User risk patterns cleared", user_id=user_id)
+
+	def _default_risk_policy(self) -> Dict[str, Any]:
+		"""Return default local risk intelligence for dependency-light execution."""
+		return {
+			"blocked_cidrs": [],
+			"vpn_cidrs": [],
+			"tor_exit_cidrs": [
+				"185.220.100.0/22",
+				"185.220.101.0/24",
+			],
+			"datacenter_cidrs": [
+				"192.0.2.0/24",
+				"198.51.100.0/24",
+				"203.0.113.0/24",
+			],
+			"corporate_cidrs": [],
+			"public_wifi_cidrs": [],
+			"ip_reputation_scores": {},
+			"threat_ip_scores": {},
+			"trusted_device_ids": [],
+			"blocked_device_ids": [],
+			"holiday_dates": [],
+			"holiday_month_days": ["01-01", "12-25"],
+			"country_centroids": {
+				"BR": [-14.2350, -51.9253],
+				"CN": [35.8617, 104.1954],
+				"DE": [51.1657, 10.4515],
+				"FR": [46.2276, 2.2137],
+				"GB": [55.3781, -3.4360],
+				"IN": [20.5937, 78.9629],
+				"KE": [-0.0236, 37.9062],
+				"NG": [9.0820, 8.6753],
+				"US": [39.8283, -98.5795],
+				"ZA": [-30.5595, 22.9375],
+			},
+		}
+
+	def _combined_risk_policy(self) -> Dict[str, Any]:
+		"""Combine global and tenant policies for helper methods without tenant context."""
+		combined = dict(self._global_risk_policy)
+		for policy in self._tenant_policies.values():
+			for key, value in policy.items():
+				if isinstance(value, dict):
+					merged = dict(combined.get(key, {}))
+					merged.update(value)
+					combined[key] = merged
+				elif isinstance(value, list):
+					combined[key] = list(combined.get(key, [])) + value
+				else:
+					combined[key] = value
+		return combined
+
+	def _ip_matches_policy(self, ip_address: str, policy_key: str) -> bool:
+		"""Return True when an IP is inside configured networks."""
+		try:
+			ip = ipaddress.ip_address(ip_address)
+		except ValueError:
+			return False
+		return self._ip_in_policy_networks(ip, policy_key)
+
+	def _ip_in_policy_networks(self, ip: ipaddress._BaseAddress, policy_key: str) -> bool:
+		"""Return True when an IP matches the named CIDR policy."""
+		for cidr in self._combined_risk_policy().get(policy_key, []):
+			try:
+				if ip in ipaddress.ip_network(cidr, strict=False):
+					return True
+			except ValueError:
+				continue
+		return False
+
+	def _stable_fraction(self, value: str) -> float:
+		"""Return a stable 0..1 fraction for deterministic scoring."""
+		digest = hashlib.sha256(value.encode("utf-8")).hexdigest()
+		return int(digest[:8], 16) / 0xFFFFFFFF
+
+	def _clamp_score(self, value: float) -> float:
+		"""Clamp score values to the Pydantic model range."""
+		return max(0.0, min(1.0, value))
+
+	def _location_point(self, location_data: Dict[str, Any]) -> Optional[Tuple[float, float]]:
+		"""Resolve a location dictionary to latitude/longitude."""
+		lat = location_data.get("latitude", location_data.get("lat"))
+		lon = location_data.get("longitude", location_data.get("lon"))
+		if lat is not None and lon is not None:
+			try:
+				return float(lat), float(lon)
+			except (TypeError, ValueError):
+				return None
+		country = location_data.get("country")
+		if not country:
+			return None
+		centroids = self._combined_risk_policy().get("country_centroids", {})
+		point = centroids.get(str(country).upper())
+		if not point or len(point) != 2:
+			return None
+		return float(point[0]), float(point[1])
+
+	def _haversine_km(self, point_a: Tuple[float, float], point_b: Tuple[float, float]) -> float:
+		"""Calculate great-circle distance in kilometers."""
+		lat1, lon1 = map(math.radians, point_a)
+		lat2, lon2 = map(math.radians, point_b)
+		dlat = lat2 - lat1
+		dlon = lon2 - lon1
+		a = (
+			math.sin(dlat / 2) ** 2
+			+ math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+		)
+		return 6371.0 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
