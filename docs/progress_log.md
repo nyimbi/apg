@@ -27684,3 +27684,92 @@ Known gaps:
   routing, live market-data ingestion, official tax-lot accounting, statement
   rendering, billing collection, regulator filing, durable Bytewax topology, or
   performance/load checks during this battery-conscious slice.
+
+## 2026-06-01 - FinTech Algorithmic Trading executable capability
+
+- Promoted `capabilities/fintech/trading` from a placeholder package into a
+  first-class APG capability with `README.md`, `SPECIFICATION.md`, `PLAN.md`,
+  `cap_spec.md`, contract, models, service, API helpers, view models, app
+  entrypoint, semantic/package/release evidence, and focused tests.
+- Added strategy registration, signal-source lineage, backtest runs, risk
+  limits, order-intent staging, execution records, position snapshots,
+  surveillance alerts, review records, dashboard summaries, Bytewax batch
+  validation, and provider-neutral trading agent registration.
+- Added deterministic Algorithmic Trading guardrails for tenant context, write
+  policy, owner/type/asset-class controls, strategy policy reference, signal
+  source/freshness evidence, backtest period/trade-count/source evidence, risk
+  limit metric/approval evidence, order type/instrument/risk-limit/quantity
+  approval controls, execution venue/fill/source evidence, position as-of/source
+  evidence, surveillance severity/evidence, review status/evidence, Bytewax
+  lifecycle events, supported AI-agent runtimes/roles, and privileged-agent
+  approval.
+- Updated fintech capability metadata so `trading` is listed as an implemented
+  sub-capability.
+- Updated `capabilities/README.md` so the catalog snapshot reports 127 valid
+  contracts, 127 domain-specific packages, 127 strict complete package artifact
+  sets, and 19 fintech packages.
+- Removed the empty `_Algorithmic_Trading` marker file and published
+  `semantic_model.json`, `package_manifest.json`, and `release_report.json`.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/fintech/trading/__init__.py
+  capabilities/fintech/trading/capability_contract.py
+  capabilities/fintech/trading/models.py
+  capabilities/fintech/trading/trading_runtime.py
+  capabilities/fintech/trading/service.py capabilities/fintech/trading/api.py
+  capabilities/fintech/trading/views.py capabilities/fintech/trading/app.py
+  capabilities/fintech/trading/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/fintech/trading/tests/test_package_contract.py` passed with 6
+  tests.
+- `./.venv/bin/python capabilities/fintech/trading/app.py` passed self-test
+  with `passed: true` and `status: ok`.
+- `./.venv/bin/apg capabilities inspect fintech_trading --json` passed with 38
+  rules, 12 UI routes, theme `algorithmic_trading_control`, shell
+  `apg_python`, and Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan capabilities/fintech/trading
+  --json` passed with `side_effect_free: true` and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/fintech/trading --json` passed with 1 domain-specific
+  capability, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/fintech/trading --json` passed with 1 complete lifecycle, 38
+  rules, 12 UI routes, 11 theme tokens, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 127 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 127 operable contracts, 127 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/fintech/trading`, `capabilities/fintech/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed strategy, signal, backtest, risk-limit, order, execution, position,
+  surveillance, review, and AI-agent lifecycle paths so rule evaluation happens
+  before state mutation.
+- Tightened order-intent staging so a valid strategy, risk limit, supported
+  order type, instrument, positive quantity, and approval evidence are required
+  before orders are staged.
+- Reviewed backtest, risk, execution, and position workflows so source,
+  approval, period, venue, and as-of evidence is required before records are
+  accepted.
+- Reviewed provider-neutral trading agent behavior so Codex, Claude Code,
+  OpenCode, and Pi runtimes remain first-class configuration choices and
+  privileged actions require human approval.
+- Kept live market-data ingestion, venue connectivity, smart order routing,
+  official performance attribution, custody settlement, transaction-cost
+  analysis, regulator filing, and durable Bytewax workers behind adapter
+  boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live market-data
+  ingestion, venue connectivity, smart order routing, custody settlement,
+  transaction-cost analysis, regulator filing, durable Bytewax topology, or
+  performance/load checks during this battery-conscious slice.

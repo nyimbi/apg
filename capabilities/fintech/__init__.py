@@ -79,6 +79,7 @@ CAPABILITY_META = {
 		'wealth',        # Wealth Management
 		'robo',          # Robo Advisory
 		'portfolio',     # Portfolio Management
+		'trading',       # Algorithmic Trading
 		'neobanking',    # Neo Banking
 		'lending',       # Digital Lending
 		'bnpl',          # Buy Now Pay Later

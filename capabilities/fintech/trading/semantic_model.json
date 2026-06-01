@@ -1,0 +1,1618 @@
+{
+  "app": {
+    "description": "Algorithmic Trading package-backed APG capability",
+    "entity_count": 10,
+    "name": "fintech_trading",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "fintech_trading": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "analytics": "bia",
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "market_data": "market_data",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "portfolio": "fintech_portfolio",
+          "reporting": "fin_rpt",
+          "robo": "fintech_robo",
+          "wallets": "fintech_wallets",
+          "wealth": "fintech_wealth"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "strategy_reviewer",
+            "signal_quality_reviewer",
+            "backtest_reviewer",
+            "risk_limit_reviewer",
+            "order_intent_reviewer",
+            "surveillance_reviewer",
+            "trading_compliance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "backtests": {
+          "data_source_required": true,
+          "period_required": true,
+          "positive_trade_count_required": true,
+          "strategy_required": true
+        },
+        "executions": {
+          "order_required": true,
+          "positive_filled_quantity_required": true,
+          "source_required": true,
+          "supported_venues": [
+            "exchange",
+            "ats",
+            "otc",
+            "dark_pool",
+            "internal_cross"
+          ],
+          "venue_required": true
+        },
+        "governance": {
+          "audit_events": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "observability": {
+          "event_stream": "apg.fintech.trading.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "orders": {
+          "approval_required": true,
+          "instrument_required": true,
+          "positive_quantity_required": true,
+          "risk_limit_required": true,
+          "strategy_required": true,
+          "supported_order_types": [
+            "market",
+            "limit",
+            "stop",
+            "twap",
+            "vwap",
+            "iceberg"
+          ]
+        },
+        "positions": {
+          "as_of_date_required": true,
+          "source_required": true,
+          "strategy_required": true
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "risk_limits": {
+          "approval_required": true,
+          "metric_required": true,
+          "positive_limit_required": true,
+          "strategy_required": true
+        },
+        "signals": {
+          "freshness_required": true,
+          "lineage_required": true,
+          "source_required": true,
+          "strategy_required": true
+        },
+        "strategies": {
+          "owner_required": true,
+          "policy_reference_required": true,
+          "supported_asset_classes": [
+            "equity",
+            "fixed_income",
+            "fx",
+            "fund",
+            "commodity",
+            "crypto"
+          ],
+          "supported_types": [
+            "mean_reversion",
+            "momentum",
+            "market_making",
+            "pairs",
+            "arbitrage",
+            "hedging",
+            "execution_algo"
+          ]
+        },
+        "surveillance": {
+          "evidence_required": true,
+          "review_required": true,
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "algorithmic_trading_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_backtests": true,
+          "enable_dashboard": true,
+          "enable_executions": true,
+          "enable_orders": true,
+          "enable_positions": true,
+          "enable_reviews": true,
+          "enable_risk": true,
+          "enable_signals": true,
+          "enable_strategies": true,
+          "enable_surveillance": true
+        }
+      },
+      "name": "Algorithmic Trading",
+      "provides": [
+        "trading_strategy_workflow",
+        "trading_signal_workflow",
+        "trading_backtest_workflow",
+        "trading_risk_limit_workflow",
+        "trading_order_intent_workflow",
+        "trading_execution_workflow",
+        "trading_position_workflow",
+        "trading_surveillance_workflow",
+        "trading_review_workflow",
+        "trading_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_portfolio",
+        "fintech_wealth",
+        "fintech_robo",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "bia",
+        "fin_rpt"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "policy_evidence_required",
+              "required_action": "attach_policy_evidence"
+            },
+            "name": "trading_write_requires_policy"
+          },
+          {
+            "condition": {
+              "operation": "register_strategy",
+              "owner_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "strategy_owner_required",
+              "required_action": "select_owner"
+            },
+            "name": "strategy_owner_required"
+          },
+          {
+            "condition": {
+              "operation": "register_strategy",
+              "strategy_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "strategy_type_not_supported",
+              "required_action": "select_supported_strategy_type"
+            },
+            "name": "strategy_type_supported"
+          },
+          {
+            "condition": {
+              "asset_class_supported": false,
+              "operation": "register_strategy"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "asset_class_not_supported",
+              "required_action": "select_supported_asset_class"
+            },
+            "name": "strategy_asset_class_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_strategy",
+              "policy_reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "strategy_policy_reference_required",
+              "required_action": "attach_policy_reference"
+            },
+            "name": "strategy_policy_reference_required"
+          },
+          {
+            "condition": {
+              "operation": "attach_signal_source",
+              "strategy_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "signal_strategy_required",
+              "required_action": "select_strategy"
+            },
+            "name": "signal_strategy_required"
+          },
+          {
+            "condition": {
+              "operation": "attach_signal_source",
+              "source_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "signal_source_required",
+              "required_action": "attach_signal_source"
+            },
+            "name": "signal_source_required"
+          },
+          {
+            "condition": {
+              "freshness_present": false,
+              "operation": "attach_signal_source"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "signal_freshness_required",
+              "required_action": "set_freshness_sla"
+            },
+            "name": "signal_freshness_required"
+          },
+          {
+            "condition": {
+              "operation": "record_backtest",
+              "strategy_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "backtest_strategy_required",
+              "required_action": "select_strategy"
+            },
+            "name": "backtest_strategy_required"
+          },
+          {
+            "condition": {
+              "operation": "record_backtest",
+              "period_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "backtest_period_required",
+              "required_action": "set_backtest_period"
+            },
+            "name": "backtest_period_required"
+          },
+          {
+            "condition": {
+              "operation": "record_backtest",
+              "positive_trade_count": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_trade_count_required",
+              "required_action": "record_trade_count"
+            },
+            "name": "backtest_positive_trade_count"
+          },
+          {
+            "condition": {
+              "data_source_present": false,
+              "operation": "record_backtest"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "backtest_data_source_required",
+              "required_action": "attach_data_source"
+            },
+            "name": "backtest_data_source_required"
+          },
+          {
+            "condition": {
+              "operation": "set_risk_limit",
+              "strategy_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_strategy_required",
+              "required_action": "select_strategy"
+            },
+            "name": "risk_strategy_required"
+          },
+          {
+            "condition": {
+              "metric_present": false,
+              "operation": "set_risk_limit"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_metric_required",
+              "required_action": "set_risk_metric"
+            },
+            "name": "risk_metric_required"
+          },
+          {
+            "condition": {
+              "operation": "set_risk_limit",
+              "positive_limit": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_risk_limit_required",
+              "required_action": "set_positive_limit"
+            },
+            "name": "risk_positive_limit"
+          },
+          {
+            "condition": {
+              "approval_present": false,
+              "operation": "set_risk_limit"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_approval_required",
+              "required_action": "attach_risk_approval"
+            },
+            "name": "risk_approval_required"
+          },
+          {
+            "condition": {
+              "operation": "stage_order_intent",
+              "strategy_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "order_strategy_required",
+              "required_action": "select_strategy"
+            },
+            "name": "order_strategy_required"
+          },
+          {
+            "condition": {
+              "operation": "stage_order_intent",
+              "risk_limit_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "order_risk_limit_required",
+              "required_action": "set_risk_limit"
+            },
+            "name": "order_risk_limit_required"
+          },
+          {
+            "condition": {
+              "operation": "stage_order_intent",
+              "order_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "order_type_not_supported",
+              "required_action": "select_supported_order_type"
+            },
+            "name": "order_type_supported"
+          },
+          {
+            "condition": {
+              "instrument_present": false,
+              "operation": "stage_order_intent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "order_instrument_required",
+              "required_action": "select_instrument"
+            },
+            "name": "order_instrument_required"
+          },
+          {
+            "condition": {
+              "operation": "stage_order_intent",
+              "positive_quantity": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_order_quantity_required",
+              "required_action": "set_positive_quantity"
+            },
+            "name": "order_positive_quantity"
+          },
+          {
+            "condition": {
+              "approval_present": false,
+              "operation": "stage_order_intent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "order_approval_required",
+              "required_action": "attach_order_approval"
+            },
+            "name": "order_approval_required"
+          },
+          {
+            "condition": {
+              "operation": "record_execution",
+              "order_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "execution_order_required",
+              "required_action": "select_order"
+            },
+            "name": "execution_order_required"
+          },
+          {
+            "condition": {
+              "operation": "record_execution",
+              "venue_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "execution_venue_not_supported",
+              "required_action": "select_supported_venue"
+            },
+            "name": "execution_venue_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_execution",
+              "positive_filled_quantity": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_filled_quantity_required",
+              "required_action": "set_filled_quantity"
+            },
+            "name": "execution_positive_filled_quantity"
+          },
+          {
+            "condition": {
+              "operation": "record_execution",
+              "source_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "execution_source_required",
+              "required_action": "attach_execution_source"
+            },
+            "name": "execution_source_required"
+          },
+          {
+            "condition": {
+              "operation": "record_position_snapshot",
+              "strategy_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "position_strategy_required",
+              "required_action": "select_strategy"
+            },
+            "name": "position_strategy_required"
+          },
+          {
+            "condition": {
+              "as_of_date_present": false,
+              "operation": "record_position_snapshot"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "position_as_of_date_required",
+              "required_action": "set_as_of_date"
+            },
+            "name": "position_as_of_required"
+          },
+          {
+            "condition": {
+              "operation": "record_position_snapshot",
+              "source_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "position_source_required",
+              "required_action": "attach_position_source"
+            },
+            "name": "position_source_required"
+          },
+          {
+            "condition": {
+              "operation": "record_surveillance_alert",
+              "severity_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "surveillance_severity_not_supported",
+              "required_action": "select_supported_severity"
+            },
+            "name": "surveillance_severity_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_surveillance_alert"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "surveillance_evidence_required",
+              "required_action": "attach_alert_evidence"
+            },
+            "name": "surveillance_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "status_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_status_not_supported",
+              "required_action": "select_supported_status"
+            },
+            "name": "review_status_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_review"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_evidence_required",
+              "required_action": "attach_review_evidence"
+            },
+            "name": "review_evidence_required"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "trading_batch"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_trading_batch_to_bytewax"
+            },
+            "name": "trading_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_trading_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "trading_agent_runtime_not_supported",
+              "required_action": "select_supported_runtime"
+            },
+            "name": "trading_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_trading_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "trading_agent_role_not_supported",
+              "required_action": "select_supported_role"
+            },
+            "name": "trading_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "trading_agent_action",
+              "privileged_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_trading_agent_action_requires_human_approval"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "policy_evidence_required",
+            "required_action": "attach_policy_evidence"
+          },
+          "name": "trading_write_requires_policy"
+        },
+        {
+          "condition": {
+            "operation": "register_strategy",
+            "owner_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "strategy_owner_required",
+            "required_action": "select_owner"
+          },
+          "name": "strategy_owner_required"
+        },
+        {
+          "condition": {
+            "operation": "register_strategy",
+            "strategy_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "strategy_type_not_supported",
+            "required_action": "select_supported_strategy_type"
+          },
+          "name": "strategy_type_supported"
+        },
+        {
+          "condition": {
+            "asset_class_supported": false,
+            "operation": "register_strategy"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "asset_class_not_supported",
+            "required_action": "select_supported_asset_class"
+          },
+          "name": "strategy_asset_class_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_strategy",
+            "policy_reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "strategy_policy_reference_required",
+            "required_action": "attach_policy_reference"
+          },
+          "name": "strategy_policy_reference_required"
+        },
+        {
+          "condition": {
+            "operation": "attach_signal_source",
+            "strategy_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "signal_strategy_required",
+            "required_action": "select_strategy"
+          },
+          "name": "signal_strategy_required"
+        },
+        {
+          "condition": {
+            "operation": "attach_signal_source",
+            "source_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "signal_source_required",
+            "required_action": "attach_signal_source"
+          },
+          "name": "signal_source_required"
+        },
+        {
+          "condition": {
+            "freshness_present": false,
+            "operation": "attach_signal_source"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "signal_freshness_required",
+            "required_action": "set_freshness_sla"
+          },
+          "name": "signal_freshness_required"
+        },
+        {
+          "condition": {
+            "operation": "record_backtest",
+            "strategy_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "backtest_strategy_required",
+            "required_action": "select_strategy"
+          },
+          "name": "backtest_strategy_required"
+        },
+        {
+          "condition": {
+            "operation": "record_backtest",
+            "period_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "backtest_period_required",
+            "required_action": "set_backtest_period"
+          },
+          "name": "backtest_period_required"
+        },
+        {
+          "condition": {
+            "operation": "record_backtest",
+            "positive_trade_count": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_trade_count_required",
+            "required_action": "record_trade_count"
+          },
+          "name": "backtest_positive_trade_count"
+        },
+        {
+          "condition": {
+            "data_source_present": false,
+            "operation": "record_backtest"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "backtest_data_source_required",
+            "required_action": "attach_data_source"
+          },
+          "name": "backtest_data_source_required"
+        },
+        {
+          "condition": {
+            "operation": "set_risk_limit",
+            "strategy_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_strategy_required",
+            "required_action": "select_strategy"
+          },
+          "name": "risk_strategy_required"
+        },
+        {
+          "condition": {
+            "metric_present": false,
+            "operation": "set_risk_limit"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_metric_required",
+            "required_action": "set_risk_metric"
+          },
+          "name": "risk_metric_required"
+        },
+        {
+          "condition": {
+            "operation": "set_risk_limit",
+            "positive_limit": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_risk_limit_required",
+            "required_action": "set_positive_limit"
+          },
+          "name": "risk_positive_limit"
+        },
+        {
+          "condition": {
+            "approval_present": false,
+            "operation": "set_risk_limit"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_approval_required",
+            "required_action": "attach_risk_approval"
+          },
+          "name": "risk_approval_required"
+        },
+        {
+          "condition": {
+            "operation": "stage_order_intent",
+            "strategy_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "order_strategy_required",
+            "required_action": "select_strategy"
+          },
+          "name": "order_strategy_required"
+        },
+        {
+          "condition": {
+            "operation": "stage_order_intent",
+            "risk_limit_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "order_risk_limit_required",
+            "required_action": "set_risk_limit"
+          },
+          "name": "order_risk_limit_required"
+        },
+        {
+          "condition": {
+            "operation": "stage_order_intent",
+            "order_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "order_type_not_supported",
+            "required_action": "select_supported_order_type"
+          },
+          "name": "order_type_supported"
+        },
+        {
+          "condition": {
+            "instrument_present": false,
+            "operation": "stage_order_intent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "order_instrument_required",
+            "required_action": "select_instrument"
+          },
+          "name": "order_instrument_required"
+        },
+        {
+          "condition": {
+            "operation": "stage_order_intent",
+            "positive_quantity": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_order_quantity_required",
+            "required_action": "set_positive_quantity"
+          },
+          "name": "order_positive_quantity"
+        },
+        {
+          "condition": {
+            "approval_present": false,
+            "operation": "stage_order_intent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "order_approval_required",
+            "required_action": "attach_order_approval"
+          },
+          "name": "order_approval_required"
+        },
+        {
+          "condition": {
+            "operation": "record_execution",
+            "order_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "execution_order_required",
+            "required_action": "select_order"
+          },
+          "name": "execution_order_required"
+        },
+        {
+          "condition": {
+            "operation": "record_execution",
+            "venue_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "execution_venue_not_supported",
+            "required_action": "select_supported_venue"
+          },
+          "name": "execution_venue_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_execution",
+            "positive_filled_quantity": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_filled_quantity_required",
+            "required_action": "set_filled_quantity"
+          },
+          "name": "execution_positive_filled_quantity"
+        },
+        {
+          "condition": {
+            "operation": "record_execution",
+            "source_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "execution_source_required",
+            "required_action": "attach_execution_source"
+          },
+          "name": "execution_source_required"
+        },
+        {
+          "condition": {
+            "operation": "record_position_snapshot",
+            "strategy_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "position_strategy_required",
+            "required_action": "select_strategy"
+          },
+          "name": "position_strategy_required"
+        },
+        {
+          "condition": {
+            "as_of_date_present": false,
+            "operation": "record_position_snapshot"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "position_as_of_date_required",
+            "required_action": "set_as_of_date"
+          },
+          "name": "position_as_of_required"
+        },
+        {
+          "condition": {
+            "operation": "record_position_snapshot",
+            "source_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "position_source_required",
+            "required_action": "attach_position_source"
+          },
+          "name": "position_source_required"
+        },
+        {
+          "condition": {
+            "operation": "record_surveillance_alert",
+            "severity_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "surveillance_severity_not_supported",
+            "required_action": "select_supported_severity"
+          },
+          "name": "surveillance_severity_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_surveillance_alert"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "surveillance_evidence_required",
+            "required_action": "attach_alert_evidence"
+          },
+          "name": "surveillance_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "status_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_status_not_supported",
+            "required_action": "select_supported_status"
+          },
+          "name": "review_status_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_review"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_evidence_required",
+            "required_action": "attach_review_evidence"
+          },
+          "name": "review_evidence_required"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "trading_batch"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_trading_batch_to_bytewax"
+          },
+          "name": "trading_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_trading_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "trading_agent_runtime_not_supported",
+            "required_action": "select_supported_runtime"
+          },
+          "name": "trading_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_trading_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "trading_agent_role_not_supported",
+            "required_action": "select_supported_role"
+          },
+          "name": "trading_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "trading_agent_action",
+            "privileged_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_trading_agent_action_requires_human_approval"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "agents": {
+          "component": "TradingAgentWorkbench",
+          "permission": "fintech_trading:admin",
+          "route": "/fintech-trading/agents"
+        },
+        "backtests": {
+          "component": "BacktestWorkbench",
+          "permission": "fintech_trading:backtests",
+          "route": "/fintech-trading/backtests"
+        },
+        "dashboard": {
+          "component": "TradingDashboard",
+          "permission": "fintech_trading:view",
+          "route": "/fintech-trading/dashboard"
+        },
+        "executions": {
+          "component": "ExecutionLedger",
+          "permission": "fintech_trading:executions",
+          "route": "/fintech-trading/executions"
+        },
+        "orders": {
+          "component": "OrderIntentWorkbench",
+          "permission": "fintech_trading:orders",
+          "route": "/fintech-trading/orders"
+        },
+        "positions": {
+          "component": "PositionSnapshotConsole",
+          "permission": "fintech_trading:positions",
+          "route": "/fintech-trading/positions"
+        },
+        "reviews": {
+          "component": "TradingReviewConsole",
+          "permission": "fintech_trading:reviews",
+          "route": "/fintech-trading/reviews"
+        },
+        "risk": {
+          "component": "TradingRiskConsole",
+          "permission": "fintech_trading:risk",
+          "route": "/fintech-trading/risk"
+        },
+        "settings": {
+          "component": "TradingSettings",
+          "permission": "fintech_trading:admin",
+          "route": "/fintech-trading/settings"
+        },
+        "signals": {
+          "component": "SignalSourceConsole",
+          "permission": "fintech_trading:signals",
+          "route": "/fintech-trading/signals"
+        },
+        "strategies": {
+          "component": "StrategyConsole",
+          "permission": "fintech_trading:strategies",
+          "route": "/fintech-trading/strategies"
+        },
+        "surveillance": {
+          "component": "TradingSurveillanceConsole",
+          "permission": "fintech_trading:surveillance",
+          "route": "/fintech-trading/surveillance"
+        }
+      },
+      "streaming": {
+        "events": [
+          "trading_strategy_registered",
+          "signal_source_attached",
+          "backtest_recorded",
+          "risk_limit_set",
+          "order_intent_staged",
+          "execution_recorded",
+          "position_snapshot_recorded",
+          "surveillance_alert_recorded",
+          "trading_review_recorded",
+          "trading_agent_registered"
+        ],
+        "guardrails": [
+          "trading_batch_requires_bytewax",
+          "privileged_trading_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.fintech.trading.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "backtests": {
+            "icon": "history",
+            "status_indicator": "backtest-chip"
+          },
+          "executions": {
+            "icon": "receipt-text",
+            "status_indicator": "execution-chip"
+          },
+          "orders": {
+            "icon": "send-horizontal",
+            "status_indicator": "order-chip"
+          },
+          "positions": {
+            "icon": "chart-candlestick",
+            "status_indicator": "position-chip"
+          },
+          "reviews": {
+            "icon": "clipboard-check",
+            "status_indicator": "review-chip"
+          },
+          "risk": {
+            "icon": "shield-alert",
+            "status_indicator": "risk-chip"
+          },
+          "signals": {
+            "icon": "radio-tower",
+            "status_indicator": "signal-chip"
+          },
+          "strategies": {
+            "icon": "workflow",
+            "status_indicator": "strategy-chip"
+          },
+          "surveillance": {
+            "icon": "scan-eye",
+            "status_indicator": "alert-chip"
+          }
+        },
+        "name": "algorithmic_trading_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#4F46E5",
+          "color.danger": "#B91C1C",
+          "color.primary": "#0E7490",
+          "color.success": "#15803D",
+          "color.warning": "#A16207",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/fintech-trading/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "TradingDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/fintech-trading/dashboard",
+            "permission": "fintech_trading:view"
+          },
+          {
+            "component": "StrategyConsole",
+            "name": "strategies",
+            "nav_group": "Strategies",
+            "path": "/fintech-trading/strategies",
+            "permission": "fintech_trading:strategies"
+          },
+          {
+            "component": "SignalSourceConsole",
+            "name": "signals",
+            "nav_group": "Strategies",
+            "path": "/fintech-trading/signals",
+            "permission": "fintech_trading:signals"
+          },
+          {
+            "component": "BacktestWorkbench",
+            "name": "backtests",
+            "nav_group": "Validation",
+            "path": "/fintech-trading/backtests",
+            "permission": "fintech_trading:backtests"
+          },
+          {
+            "component": "TradingRiskConsole",
+            "name": "risk",
+            "nav_group": "Risk",
+            "path": "/fintech-trading/risk",
+            "permission": "fintech_trading:risk"
+          },
+          {
+            "component": "OrderIntentWorkbench",
+            "name": "orders",
+            "nav_group": "Trading",
+            "path": "/fintech-trading/orders",
+            "permission": "fintech_trading:orders"
+          },
+          {
+            "component": "ExecutionLedger",
+            "name": "executions",
+            "nav_group": "Trading",
+            "path": "/fintech-trading/executions",
+            "permission": "fintech_trading:executions"
+          },
+          {
+            "component": "PositionSnapshotConsole",
+            "name": "positions",
+            "nav_group": "Risk",
+            "path": "/fintech-trading/positions",
+            "permission": "fintech_trading:positions"
+          },
+          {
+            "component": "TradingSurveillanceConsole",
+            "name": "surveillance",
+            "nav_group": "Governance",
+            "path": "/fintech-trading/surveillance",
+            "permission": "fintech_trading:surveillance"
+          },
+          {
+            "component": "TradingReviewConsole",
+            "name": "reviews",
+            "nav_group": "Governance",
+            "path": "/fintech-trading/reviews",
+            "permission": "fintech_trading:reviews"
+          },
+          {
+            "component": "TradingAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/fintech-trading/agents",
+            "permission": "fintech_trading:admin"
+          },
+          {
+            "component": "TradingSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/fintech-trading/settings",
+            "permission": "fintech_trading:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "trading_review": {
+        "roles": [
+          "strategy_reviewer",
+          "signal_quality_reviewer",
+          "backtest_reviewer",
+          "risk_limit_reviewer",
+          "order_intent_reviewer",
+          "surveillance_reviewer",
+          "trading_compliance_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "fintech_trading": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_portfolio",
+        "fintech_wealth",
+        "fintech_robo",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "bia",
+        "fin_rpt"
+      ]
+    }
+  },
+  "contracts": {
+    "fintech_trading": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "analytics": "bia",
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "market_data": "market_data",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "portfolio": "fintech_portfolio",
+          "reporting": "fin_rpt",
+          "robo": "fintech_robo",
+          "wallets": "fintech_wallets",
+          "wealth": "fintech_wealth"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "strategy_reviewer",
+            "signal_quality_reviewer",
+            "backtest_reviewer",
+            "risk_limit_reviewer",
+            "order_intent_reviewer",
+            "surveillance_reviewer",
+            "trading_compliance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "backtests": {
+          "data_source_required": true,
+          "period_required": true,
+          "positive_trade_count_required": true,
+          "strategy_required": true
+        },
+        "executions": {
+          "order_required": true,
+          "positive_filled_quantity_required": true,
+          "source_required": true,
+          "supported_venues": [
+            "exchange",
+            "ats",
+            "otc",
+            "dark_pool",
+            "internal_cross"
+          ],
+          "venue_required": true
+        },
+        "governance": {
+          "audit_events": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "observability": {
+          "event_stream": "apg.fintech.trading.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "orders": {
+          "approval_required": true,
+          "instrument_required": true,
+          "positive_quantity_required": true,
+          "risk_limit_required": true,
+          "strategy_required": true,
+          "supported_order_types": [
+            "market",
+            "limit",
+            "stop",
+            "twap",
+            "vwap",
+            "iceberg"
+          ]
+        },
+        "positions": {
+          "as_of_date_required": true,
+          "source_required": true,
+          "strategy_required": true
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "risk_limits": {
+          "approval_required": true,
+          "metric_required": true,
+          "positive_limit_required": true,
+          "strategy_required": true
+        },
+        "signals": {
+          "freshness_required": true,
+          "lineage_required": true,
+          "source_required": true,
+          "strategy_required": true
+        },
+        "strategies": {
+          "owner_required": true,
+          "policy_reference_required": true,
+          "supported_asset_classes": [
+            "equity",
+            "fixed_income",
+            "fx",
+            "fund",
+            "commodity",
+            "crypto"
+          ],
+          "supported_types": [
+            "mean_reversion",
+            "momentum",
+            "market_making",
+            "pairs",
+            "arbitrage",
+            "hedging",
+            "execution_algo"
+          ]
+        },
+        "surveillance": {
+          "evidence_required": true,
+          "review_required": true,
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "algorithmic_trading_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_backtests": true,
+          "enable_dashboard": true,
+          "enable_executions": true,
+          "enable_orders": true,
+          "enable_positions": true,
+          "enable_reviews": true,
+          "enable_risk": true,
+          "enable_signals": true,
+          "enable_strategies": true,
+          "enable_surveillance": true
+        }
+      },
+      "id": "fintech_trading",
+      "provides": [
+        "trading_strategy_workflow",
+        "trading_signal_workflow",
+        "trading_backtest_workflow",
+        "trading_risk_limit_workflow",
+        "trading_order_intent_workflow",
+        "trading_execution_workflow",
+        "trading_position_workflow",
+        "trading_surveillance_workflow",
+        "trading_review_workflow",
+        "trading_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_portfolio",
+        "fintech_wealth",
+        "fintech_robo",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "bia",
+        "fin_rpt"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 15,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "fintech_trading": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}
