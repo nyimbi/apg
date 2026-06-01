@@ -91,6 +91,7 @@ CAPABILITY_META = {
 		'kyc',           # Know Your Customer
 		'aml',           # Anti Money Laundering
 		'fraud',         # Fraud Detection
+		'compliance',    # Compliance Automation
 		'tms',           # Treasury Management System (existing)
 		'gateway',       # Payment Gateway (existing)
 		'switch',        # Payment Switch (existing)

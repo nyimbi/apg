@@ -28055,3 +28055,97 @@ Known gaps:
   payment capture, market-data feeds, model training, regulator filing,
   document signing, durable Bytewax topology, or performance/load checks during
   this battery-conscious slice.
+
+## 2026-06-01 - FinTech Compliance Automation executable capability
+
+Completed:
+
+- Promoted `capabilities/fintech/compliance` from placeholder into a
+  first-class executable APG capability with README, specification, plan,
+  capability spec, package manifest, semantic model, release evidence, focused
+  tests, and code-review notes.
+- Added executable obligation registration, control mapping, compliance check
+  recording, evidence attachment, attestation recording, issue intake,
+  remediation recording, report publishing, review recording, dashboard
+  summary, Bytewax batch validation, and provider-neutral compliance agent
+  registration workflows.
+- Added deterministic guardrails for tenant context, write policy evidence,
+  obligation framework/type/owner/evidence/effective date, control
+  obligation/type/owner/evidence/frequency, check obligation/control/type/
+  subject/result/failure evidence, evidence reference/type/source/retention,
+  attestation obligation/attestor/status/evidence, issue obligation/severity/
+  owner/evidence/due date, remediation issue/owner/plan/high-impact approval,
+  report type/framework/period/evidence/approver, review status/reviewer/
+  evidence, Bytewax lifecycle events, supported AI-agent runtimes/roles, and
+  privileged AI-agent approval.
+- Added compact UI/view models and theme tokens for dashboards, obligations,
+  controls, checks, evidence, attestations, issues, reports, reviews, agents,
+  and settings.
+- Updated fintech capability metadata so `compliance` is listed as an
+  implemented sub-capability.
+- Updated `capabilities/README.md` so the catalog snapshot reports 131 valid
+  contracts, 131 domain-specific packages, 131 strict complete package artifact
+  sets, and 23 fintech packages.
+- Removed the empty `_Compliance_Automation` marker file and regenerated
+  `semantic_model.json` from the executable application.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/fintech/compliance/__init__.py
+  capabilities/fintech/compliance/capability_contract.py
+  capabilities/fintech/compliance/models.py
+  capabilities/fintech/compliance/compliance_runtime.py
+  capabilities/fintech/compliance/service.py
+  capabilities/fintech/compliance/api.py
+  capabilities/fintech/compliance/views.py
+  capabilities/fintech/compliance/app.py
+  capabilities/fintech/compliance/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/fintech/compliance/tests/test_package_contract.py` passed with
+  6 tests.
+- `./.venv/bin/python capabilities/fintech/compliance/app.py` passed self-test
+  with `passed: true` and `status: ok`.
+- `./.venv/bin/apg capabilities inspect fintech_compliance --json` passed with
+  47 rules, 11 UI routes, theme `fintech_compliance_control`, shell
+  `apg_python`, and Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/fintech/compliance --json` passed with `side_effect_free: true`
+  and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/fintech/compliance --json` passed with 1 domain-specific
+  capability, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/fintech/compliance --json` passed with 1 complete lifecycle, 47
+  rules, 11 UI routes, 11 theme tokens, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 131 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 131 operable contracts, 131 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/fintech/compliance`, `capabilities/fintech/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed obligation, control, check, evidence, attestation, issue,
+  remediation, report, review, and AI-agent lifecycle paths so rule evaluation
+  happens before state mutation.
+- Tightened failed-check handling so failure records require evidence before
+  acceptance and high-impact remediation requires approval evidence.
+- Reviewed provider-neutral compliance agent behavior so Codex, Claude Code,
+  OpenCode, and Pi runtimes remain first-class configuration choices and
+  privileged actions require human approval.
+- Kept live regulator filing, document signing, external GRC suites, live
+  ledgers, and durable Bytewax workers behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live regulator filing,
+  document signing, external GRC integration, live ledger posting, durable
+  Bytewax topology, or performance/load checks during this battery-conscious
+  slice.

@@ -1,0 +1,24 @@
+{
+  "base_target": "python",
+  "display_name": "FinTech Compliance Automation",
+  "format": "apg.package-manifest.v1",
+  "generated_artifacts": [
+    "__init__.py",
+    "cap_spec.md",
+    "capability_contract.py",
+    "models.py",
+    "compliance_runtime.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py",
+    "semantic_model.json",
+    "release_report.json"
+  ],
+  "name": "fintech_compliance",
+  "profile": "capability",
+  "profile_artifacts": [
+    "package_manifest.json"
+  ],
+  "version": "1.1.0"
+}
