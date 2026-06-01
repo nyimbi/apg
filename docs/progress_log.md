@@ -26060,3 +26060,55 @@ Known gaps:
   checks during this battery-conscious capability slice.
 - Existing SQLAlchemy and Pydantic deprecation warnings surfaced by focused
   tests remain outside this slice.
+
+### 2026-06-01 11:36 EAT
+
+NLPC advanced-pipeline executability slice:
+
+- Replaced advanced-pipeline placeholder model-processing responses with
+  deterministic content-aware handlers for every legacy public `NLPTaskType`.
+- Added package-safe imports to `processing_pipeline.py` so generated
+  applications can import it as `capabilities.common.nlpc.processing_pipeline`
+  while older direct validation scripts can still import local `models`.
+- Covered sentiment, entity extraction, classification, summarization,
+  language detection, text similarity, question answering, generation, POS
+  tags, dependency hints, topics, keywords, and clustering without requiring
+  live provider SDKs.
+- Added focused regression coverage proving content-aware sentiment, entity,
+  and QA output, plus successful dispatch across all public legacy task types.
+- Updated NLPC `README.md`, `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md`
+  to record the executable advanced-pipeline baseline.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/nlpc/__init__.py capabilities/common/nlpc/capability_contract.py capabilities/common/nlpc/nlpc_runtime.py capabilities/common/nlpc/processing_pipeline.py capabilities/common/nlpc/view_models.py capabilities/common/nlpc/app.py capabilities/common/nlpc/test_capability_contract.py capabilities/common/nlpc/test_language_codes.py capabilities/common/nlpc/tests/test_package_contract.py capabilities/common/nlpc/tests/test_processing_pipeline_deterministic.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/nlpc/test_capability_contract.py capabilities/common/nlpc/test_language_codes.py capabilities/common/nlpc/tests/test_package_contract.py capabilities/common/nlpc/tests/test_processing_pipeline_deterministic.py`
+  passed with 13 tests and 10 pre-existing SQLAlchemy/Pydantic deprecation
+  warnings from imported shared modules.
+- `./.venv/bin/python capabilities/common/nlpc/app.py` passed with
+  `self_test()` status `ok`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/nlpc --json`
+  passed with one domain-specific NLPC implementation, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/nlpc --json`
+  passed and showed side-effect-free publish evidence, Bytewax streaming,
+  first-class agent metadata, 38 rules, 16 routes, and no warnings.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/common/nlpc --json`
+  passed with one complete lifecycle record, 38 rules, 16 routes, and 0
+  warnings/errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 109 operable contracts, 109 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Focused stale-marker scan for the replaced advanced-pipeline branch returned
+  no `Mock model processing`, `mock implementation`, `NotImplemented`, `not
+  implemented`, `"result": "processed"`, or `quality_score` matches.
+- `git diff --check -- capabilities/common/nlpc docs/progress_log.md` passed.
+
+Known gaps:
+
+- Live provider-backed AICR/model-registry execution, live Bytewax topology,
+  rendered UI checks, full repository tests, and performance/load checks remain
+  outside this battery-conscious slice.
+- Existing SQLAlchemy and Pydantic deprecation warnings surfaced by focused
+  tests remain outside this slice.

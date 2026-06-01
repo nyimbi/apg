@@ -38,10 +38,14 @@ evidence through a deterministic rule engine.
 - `capability_contract.py` - executable configuration, rules, UI, adapters, and
   theme contract.
 - `nlpc_runtime.py` - `NlpcService`, the dependency-light generated-app runtime.
+- `processing_pipeline.py` - the advanced dependency-light processing pipeline
+  with deterministic handlers for every legacy public `NLPTaskType`.
 - `view_models.py` - semantic UI view models for generated applications.
 - `app.py` - dynamic package evidence and self-test.
 - `test_capability_contract.py` - focused executable contract coverage.
 - `tests/test_package_contract.py` - package evidence and compatibility tests.
+- `tests/test_processing_pipeline_deterministic.py` - regression coverage for
+  content-aware advanced-pipeline task dispatch.
 
 ## Generated-App Usage
 
@@ -161,11 +165,22 @@ NLP-agent batches. Generated applications validate those batches with
 `validate_nlpc_lifecycle_batch()` and inspect accepted or denied evidence
 through `list_lifecycle_batches()` or the `/nlpc/lifecycle` route metadata.
 
+## Advanced Pipeline Baseline
+
+`AdvancedProcessingPipeline.process_single()` is executable without live model
+services. It dispatches every legacy public `NLPTaskType` to deterministic local
+handlers for sentiment, entity extraction, classification, summarization,
+language detection, text similarity, question answering, generation, POS tags,
+dependency hints, topic extraction, keyword extraction, and clustering. This is
+the generated-app baseline: provider-backed AICR or model-registry execution can
+replace handlers later, but apps receive content-aware structured output today
+instead of placeholder `processed` responses.
+
 ## Focused Verification
 
 ```bash
-./.venv/bin/python -m py_compile capabilities/common/nlpc/__init__.py capabilities/common/nlpc/capability_contract.py capabilities/common/nlpc/nlpc_runtime.py capabilities/common/nlpc/view_models.py capabilities/common/nlpc/app.py capabilities/common/nlpc/test_capability_contract.py capabilities/common/nlpc/test_language_codes.py capabilities/common/nlpc/tests/test_package_contract.py
-./.venv/bin/pytest -q capabilities/common/nlpc/test_capability_contract.py capabilities/common/nlpc/test_language_codes.py capabilities/common/nlpc/tests/test_package_contract.py
+./.venv/bin/python -m py_compile capabilities/common/nlpc/__init__.py capabilities/common/nlpc/capability_contract.py capabilities/common/nlpc/nlpc_runtime.py capabilities/common/nlpc/processing_pipeline.py capabilities/common/nlpc/view_models.py capabilities/common/nlpc/app.py capabilities/common/nlpc/test_capability_contract.py capabilities/common/nlpc/test_language_codes.py capabilities/common/nlpc/tests/test_package_contract.py capabilities/common/nlpc/tests/test_processing_pipeline_deterministic.py
+./.venv/bin/pytest -q capabilities/common/nlpc/test_capability_contract.py capabilities/common/nlpc/test_language_codes.py capabilities/common/nlpc/tests/test_package_contract.py capabilities/common/nlpc/tests/test_processing_pipeline_deterministic.py
 ./.venv/bin/python capabilities/common/nlpc/app.py
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/common/nlpc --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/nlpc --json

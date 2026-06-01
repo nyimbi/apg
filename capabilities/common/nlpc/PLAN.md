@@ -18,6 +18,8 @@
   project, annotation, lexicon, NLP-agent, lifecycle-batch, and audit records.
 - Add deterministic NLP task behavior so applications are executable before
   external providers are wired.
+- Replace advanced-pipeline placeholder model results with content-aware local
+  handlers for every legacy public `NLPTaskType`.
 - Preserve processing guardrail decisions, matched rules, and review reasons so
   low-confidence and budget-incomplete runs are routed into pending-review state
   instead of being silently accepted or treated as hard denials.
@@ -53,9 +55,9 @@
 
 ## Current Packet Focus
 
-The current coherent slice is processing review governance. It keeps denial
-rules as pre-execution blocks, but records review-required processing outcomes
-as `pending_review` `NlpcProcessingRun` evidence with matched rules and review
-reasons. It updates review-console and processing-console view models, package
-semantic evidence, and focused regression coverage while leaving live provider
-SDKs and Bytewax topology execution behind adapter boundaries.
+The current coherent slice is advanced-pipeline executability. It replaces the
+placeholder model-processing branch in `processing_pipeline.py` with
+deterministic content-aware handlers for all public legacy `NLPTaskType` values,
+keeps package-safe imports for generated apps and direct validation scripts, and
+adds focused regression coverage. Live provider SDKs, model-registry execution,
+and Bytewax topology execution remain behind adapter boundaries.

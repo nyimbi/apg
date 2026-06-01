@@ -27,10 +27,16 @@ import hashlib
 from contextlib import asynccontextmanager
 from uuid_extensions import uuid7str
 
-from models import (
-	ProcessingRequest, ProcessingResult, StreamingChunk, StreamingSession,
-	NLPTaskType, ModelProvider, QualityLevel, LanguageCode, ProcessingStatus
-)
+try:
+	from .models import (
+		ProcessingRequest, ProcessingResult, StreamingChunk, StreamingSession,
+		NLPTaskType, ModelProvider, QualityLevel, LanguageCode, ProcessingStatus
+	)
+except ImportError:  # pragma: no cover - supports direct validation scripts.
+	from models import (
+		ProcessingRequest, ProcessingResult, StreamingChunk, StreamingSession,
+		NLPTaskType, ModelProvider, QualityLevel, LanguageCode, ProcessingStatus
+	)
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -845,7 +851,7 @@ class AdvancedProcessingPipeline:
 				language_info = await self._language_detection_stage(preprocessed_text, context)
 				context.intermediate_results["language_info"] = language_info
 			
-			# Stage 3: Model Processing (mock)
+			# Stage 3: Model Processing
 			context.current_stage = PipelineStage.MODEL_PROCESSING
 			model_results = await self._model_processing_stage(request, preprocessed_text, context)
 			context.intermediate_results["model_results"] = model_results
@@ -871,7 +877,6 @@ class AdvancedProcessingPipeline:
 				total_time_ms=total_time,
 				results=validated_results,
 				confidence_score=validated_results.get("confidence", 0.8),
-				quality_score=validated_results.get("quality", 0.8),
 				status="completed"
 			)
 			
@@ -931,27 +936,281 @@ class AdvancedProcessingPipeline:
 	
 	async def _model_processing_stage(self, request: ProcessingRequest, 
 									  text: str, context: ProcessingContext) -> Dict[str, Any]:
-		"""Execute model processing stage (mock implementation)"""
-		# Mock model processing based on task type
-		await asyncio.sleep(0.01)  # Simulate processing time
-		
-		if request.task_type == NLPTaskType.SENTIMENT_ANALYSIS:
-			return {
-				"sentiment": "positive",
-				"confidence": 0.85,
-				"scores": {"positive": 0.85, "negative": 0.10, "neutral": 0.05}
-			}
-		elif request.task_type == NLPTaskType.NAMED_ENTITY_RECOGNITION:
-			return {
-				"entities": [
-					{"text": "test", "label": "MISC", "start": 0, "end": 4, "confidence": 0.9}
-				]
-			}
+		"""Execute deterministic local model processing for every public task."""
+		task_value = self._task_value(request.task_type)
+		parameters = self._task_parameters(request)
+		handlers = {
+			NLPTaskType.SENTIMENT_ANALYSIS.value: self._process_sentiment,
+			NLPTaskType.ENTITY_EXTRACTION.value: self._process_entities,
+			NLPTaskType.NAMED_ENTITY_RECOGNITION.value: self._process_entities,
+			NLPTaskType.TEXT_CLASSIFICATION.value: self._process_classification,
+			NLPTaskType.TEXT_SUMMARIZATION.value: self._process_summary,
+			NLPTaskType.LANGUAGE_DETECTION.value: self._process_language_detection,
+			NLPTaskType.TEXT_SIMILARITY.value: self._process_similarity,
+			NLPTaskType.QUESTION_ANSWERING.value: self._process_question_answering,
+			NLPTaskType.TEXT_GENERATION.value: self._process_generation,
+			NLPTaskType.PART_OF_SPEECH_TAGGING.value: self._process_pos_tags,
+			NLPTaskType.DEPENDENCY_PARSING.value: self._process_dependencies,
+			NLPTaskType.TOPIC_MODELING.value: self._process_topics,
+			NLPTaskType.KEYWORD_EXTRACTION.value: self._process_keywords,
+			NLPTaskType.TEXT_CLUSTERING.value: self._process_clusters,
+		}
+		handler = handlers.get(task_value, self._process_generic)
+		result = handler(text, parameters, context)
+		result.setdefault("task_type", task_value)
+		result.setdefault("model_type", "deterministic_pipeline")
+		result.setdefault("confidence", 0.65)
+		return result
+
+	def _task_value(self, task_type: Any) -> str:
+		"""Return a stable string value for enum or raw string task identifiers."""
+		return getattr(task_type, "value", task_type) or NLPTaskType.TEXT_CLASSIFICATION.value
+
+	def _task_parameters(self, request: ProcessingRequest) -> Dict[str, Any]:
+		"""Merge modern and legacy task parameters without mutating the request."""
+		parameters = dict(getattr(request, "options", {}) or {})
+		parameters.update(getattr(request, "parameters", {}) or {})
+		return parameters
+
+	def _content_terms(self, text: str) -> List[str]:
+		stop_words = {
+			"the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
+			"of", "with", "by", "is", "are", "was", "were", "be", "been", "this",
+			"that", "these", "those", "from", "into", "about", "over", "under",
+		}
+		return [
+			token.lower()
+			for token in re.findall(r"\b[\w'-]+\b", text or "", flags=re.UNICODE)
+			if len(token) > 2 and token.lower() not in stop_words
+		]
+
+	def _split_sentences(self, text: str) -> List[str]:
+		return [sentence.strip() for sentence in re.split(r"(?<=[.!?])\s+", text or "") if sentence.strip()]
+
+	def _process_sentiment(self, text: str, parameters: Dict[str, Any], context: ProcessingContext) -> Dict[str, Any]:
+		positive = {"excellent", "amazing", "love", "outstanding", "great", "good", "reliable", "approved", "success"}
+		negative = {"bad", "poor", "terrible", "failed", "failure", "angry", "hate", "broken", "rejected", "risk"}
+		terms = self._content_terms(text)
+		pos_count = sum(1 for term in terms if term in positive)
+		neg_count = sum(1 for term in terms if term in negative)
+		total = max(1, pos_count + neg_count)
+		polarity = (pos_count - neg_count) / max(1, len(terms))
+		if pos_count > neg_count:
+			sentiment = "positive"
+		elif neg_count > pos_count:
+			sentiment = "negative"
 		else:
-			return {
-				"result": "processed",
-				"confidence": 0.8
-			}
+			sentiment = "neutral"
+		confidence = 0.55 if total == 1 and sentiment == "neutral" else min(0.92, 0.55 + abs(pos_count - neg_count) * 0.12)
+		return {
+			"sentiment": sentiment,
+			"polarity": polarity,
+			"scores": {
+				"positive": pos_count / total,
+				"negative": neg_count / total,
+				"neutral": 1.0 if pos_count == neg_count else 0.0,
+			},
+			"confidence": confidence,
+		}
+
+	def _process_entities(self, text: str, parameters: Dict[str, Any], context: ProcessingContext) -> Dict[str, Any]:
+		patterns = {
+			"EMAIL": r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b",
+			"URL": r"https?://[^\s]+",
+			"DATE": r"\b\d{4}-\d{2}-\d{2}\b|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\s+\d{1,2}(?:,\s+\d{4})?\b",
+			"REFERENCE": r"\b[A-Z]{2,}-\d+\b",
+			"PERSON_OR_ORG": r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b",
+		}
+		entities: List[Dict[str, Any]] = []
+		seen = set()
+		for label, pattern in patterns.items():
+			for match in re.finditer(pattern, text or ""):
+				key = (match.start(), match.end(), label)
+				if key in seen:
+					continue
+				seen.add(key)
+				entities.append({
+					"text": match.group(),
+					"label": label,
+					"start": match.start(),
+					"end": match.end(),
+					"confidence": 0.86 if label != "PERSON_OR_ORG" else 0.62,
+				})
+		entities.sort(key=lambda item: (item["start"], item["end"]))
+		return {
+			"entities": entities,
+			"entity_count": len(entities),
+			"confidence": 0.82 if entities else 0.45,
+		}
+
+	def _process_classification(self, text: str, parameters: Dict[str, Any], context: ProcessingContext) -> Dict[str, Any]:
+		categories = [str(category) for category in parameters.get("categories", ["general", "finance", "support", "risk"])]
+		terms = self._content_terms(text)
+		scores = {
+			category: sum(1 for term in terms if category.lower() in term or term in self._category_keywords(category))
+			for category in categories
+		}
+		predicted = max(scores, key=scores.get) if scores and any(scores.values()) else categories[0]
+		confidence = min(0.9, 0.45 + scores.get(predicted, 0) * 0.15)
+		return {
+			"predicted_category": predicted,
+			"category_scores": scores,
+			"categories": categories,
+			"confidence": confidence,
+		}
+
+	def _category_keywords(self, category: str) -> Set[str]:
+		keywords = {
+			"finance": {"invoice", "payment", "ledger", "cash", "account", "tax"},
+			"support": {"ticket", "customer", "service", "support", "issue", "request"},
+			"risk": {"risk", "failed", "breach", "fraud", "warning", "incident"},
+			"operations": {"workflow", "shipment", "stock", "process", "queue", "approval"},
+		}
+		return keywords.get(category.lower(), {category.lower()})
+
+	def _process_summary(self, text: str, parameters: Dict[str, Any], context: ProcessingContext) -> Dict[str, Any]:
+		sentences = self._split_sentences(text)
+		max_sentences = max(1, int(parameters.get("max_sentences", parameters.get("summary_sentences", 2))))
+		summary_sentences = sentences[:max_sentences]
+		summary = " ".join(summary_sentences) if summary_sentences else text[:240]
+		return {
+			"summary": summary,
+			"original_length": len(text or ""),
+			"summary_length": len(summary),
+			"selected_sentences": len(summary_sentences),
+			"compression_ratio": len(summary) / max(1, len(text or "")),
+			"confidence": 0.7 if summary else 0.0,
+		}
+
+	def _process_language_detection(self, text: str, parameters: Dict[str, Any], context: ProcessingContext) -> Dict[str, Any]:
+		if "detected_language" in context.metadata:
+			language = context.metadata["detected_language"]
+			confidence = context.metadata.get("language_confidence", 0.75)
+		else:
+			language = "en"
+			confidence = 0.55
+		return {
+			"detected_language": language,
+			"language": language,
+			"confidence": confidence,
+		}
+
+	def _process_similarity(self, text: str, parameters: Dict[str, Any], context: ProcessingContext) -> Dict[str, Any]:
+		reference_text = str(parameters.get("reference_text") or parameters.get("reference") or "")
+		left = set(self._content_terms(text))
+		right = set(self._content_terms(reference_text))
+		score = len(left & right) / len(left | right) if left or right else 0.0
+		return {
+			"reference_text": reference_text,
+			"similarity_score": score,
+			"confidence": 0.75 if reference_text else 0.0,
+		}
+
+	def _process_question_answering(self, text: str, parameters: Dict[str, Any], context: ProcessingContext) -> Dict[str, Any]:
+		question = str(parameters.get("question") or parameters.get("query") or "")
+		question_terms = set(self._content_terms(question))
+		answer = ""
+		best_score = 0.0
+		for sentence in self._split_sentences(text):
+			sentence_terms = set(self._content_terms(sentence))
+			score = len(question_terms & sentence_terms) / len(question_terms | sentence_terms) if question_terms or sentence_terms else 0.0
+			if score > best_score:
+				answer = sentence
+				best_score = score
+		return {
+			"question": question,
+			"answer": answer,
+			"confidence": min(0.85, best_score + 0.2) if answer else 0.0,
+		}
+
+	def _process_generation(self, text: str, parameters: Dict[str, Any], context: ProcessingContext) -> Dict[str, Any]:
+		prefix = str(parameters.get("prefix") or "").strip()
+		sentences = self._split_sentences(str(parameters.get("prompt") or text))
+		generated_text = " ".join(sentences[: max(1, int(parameters.get("max_sentences", 2)))])
+		if prefix:
+			generated_text = f"{prefix} {generated_text}".strip()
+		return {
+			"generated_text": generated_text,
+			"confidence": 0.55 if generated_text else 0.0,
+		}
+
+	def _process_pos_tags(self, text: str, parameters: Dict[str, Any], context: ProcessingContext) -> Dict[str, Any]:
+		tags = []
+		for token in re.findall(r"\b[\w'-]+\b|[.,!?;]", text or ""):
+			if re.fullmatch(r"[.,!?;]", token):
+				tag = "PUNCT"
+			elif token[:1].isupper():
+				tag = "PROPN"
+			elif token.lower().endswith("ing") or token.lower() in {"is", "are", "was", "were", "be", "approved", "failed"}:
+				tag = "VERB"
+			elif token.lower() in {"the", "a", "an"}:
+				tag = "DET"
+			else:
+				tag = "NOUN"
+			tags.append({"token": token, "pos": tag, "confidence": 0.58})
+		return {"pos_tags": tags, "token_count": len(tags), "confidence": 0.58 if tags else 0.0}
+
+	def _process_dependencies(self, text: str, parameters: Dict[str, Any], context: ProcessingContext) -> Dict[str, Any]:
+		tokens = re.findall(r"\b[\w'-]+\b", text or "")
+		dependencies = []
+		root_index = 0
+		for index, token in enumerate(tokens):
+			if token.lower().endswith("ed") or token.lower() in {"is", "are", "was", "were", "approved", "failed"}:
+				root_index = index
+				break
+		for index, token in enumerate(tokens):
+			dependencies.append({
+				"token": token,
+				"index": index,
+				"head": tokens[root_index] if tokens else "",
+				"relation": "ROOT" if index == root_index else ("subject" if index < root_index else "dependent"),
+			})
+		return {"dependencies": dependencies, "confidence": 0.5 if dependencies else 0.0}
+
+	def _process_topics(self, text: str, parameters: Dict[str, Any], context: ProcessingContext) -> Dict[str, Any]:
+		keywords = self._keyword_counts(text)
+		num_topics = max(1, int(parameters.get("num_topics", 3)))
+		topics = [
+			{"topic_id": index, "label": word, "terms": [word], "weight": count / max(1, sum(keywords.values()))}
+			for index, (word, count) in enumerate(list(keywords.items())[:num_topics])
+		]
+		return {"topics": topics, "topic_count": len(topics), "confidence": 0.62 if topics else 0.0}
+
+	def _process_keywords(self, text: str, parameters: Dict[str, Any], context: ProcessingContext) -> Dict[str, Any]:
+		counts = self._keyword_counts(text)
+		total_count = max(1, sum(counts.values()))
+		keywords = [
+			{"keyword": word, "score": count / total_count}
+			for word, count in counts.items()
+		]
+		return {"keywords": keywords[: int(parameters.get("max_keywords", 10))], "confidence": 0.68 if keywords else 0.0}
+
+	def _keyword_counts(self, text: str) -> Dict[str, int]:
+		counts: Dict[str, int] = {}
+		for term in self._content_terms(text):
+			counts[term] = counts.get(term, 0) + 1
+		return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
+
+	def _process_clusters(self, text: str, parameters: Dict[str, Any], context: ProcessingContext) -> Dict[str, Any]:
+		max_clusters = max(1, int(parameters.get("max_clusters", 3)))
+		clusters: Dict[str, List[str]] = {}
+		for sentence in self._split_sentences(text):
+			label = next(iter(self._content_terms(sentence)), "misc")
+			if len(clusters) >= max_clusters and label not in clusters:
+				label = "misc"
+			clusters.setdefault(label, []).append(sentence)
+		payload = [
+			{"cluster_id": index, "label": label, "items": items, "size": len(items)}
+			for index, (label, items) in enumerate(sorted(clusters.items()))
+		]
+		return {"clusters": payload, "cluster_count": len(payload), "confidence": 0.55 if payload else 0.0}
+
+	def _process_generic(self, text: str, parameters: Dict[str, Any], context: ProcessingContext) -> Dict[str, Any]:
+		return {
+			"result": text,
+			"token_count": len(self._content_terms(text)),
+			"confidence": 0.5,
+		}
 	
 	async def _postprocessing_stage(self, results: Dict[str, Any], 
 									context: ProcessingContext) -> Dict[str, Any]:

@@ -13,6 +13,10 @@ The executable source of truth is `capability_contract.py`, supported by
 
 Current packet additions:
 
+- Advanced-pipeline executability for every legacy public `NLPTaskType`, with
+  deterministic content-aware local handlers replacing placeholder responses.
+- Package-safe `processing_pipeline.py` imports for generated apps and direct
+  validation scripts.
 - Processing review governance that stores low-confidence and
   budget-incomplete runs as `pending_review` evidence with `decision`,
   `matched_rules`, and `review_reasons`.

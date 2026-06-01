@@ -59,6 +59,13 @@ applications quickly and replace internals behind stable contracts later.
 - Support sentiment analysis, entity recognition, PII detection, summarization,
   semantic search, translation, classification, topic modeling, keyword
   extraction, and governed text generation.
+- Provide an executable advanced pipeline baseline for every legacy public
+  `NLPTaskType`, including sentiment, entity extraction, classification,
+  summarization, language detection, text similarity, question answering,
+  generation, POS tagging, dependency hints, topic modeling, keyword
+  extraction, and text clustering.
+- Return content-aware structured outputs from local deterministic handlers
+  when live provider or model-registry execution is not configured.
 - Enforce task enablement, language support, PII redaction policy, generation
   safety policy, generation model policy, search index binding, translation
   language pair evidence, length budgets, and review requirements.
@@ -145,8 +152,8 @@ applications quickly and replace internals behind stable contracts later.
 - Live external AI-agent runtime execution.
 - Load, latency, drift, and throughput benchmarking.
 
-These are later integration and hardening tasks once the executable baseline is
-stable.
+These are later integration and hardening tasks once the deterministic
+executable baseline is stable.
 
 ## Acceptance Criteria
 
@@ -157,6 +164,9 @@ stable.
 - `NlpcService` executes document, processing, pipeline, model, annotation,
   lexicon, NLP-agent, lifecycle-batch, list, dashboard, and compatibility
   flows.
+- `AdvancedProcessingPipeline.process_single()` completes every public
+  `NLPTaskType` with content-aware structured output and no placeholder
+  response.
 - Guardrail tests prove denied cases fail before state is accepted and
   review-required processing cases become pending review evidence.
 - `app.self_test()` passes and fails if route, rule, Bytewax, or runtime
