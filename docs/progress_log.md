@@ -16,6 +16,66 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-06-01 08:04 EAT
+
+MQEB durable review-evidence packet:
+
+- Extended review-required messages, priority quota exceptions, replay
+  requests, privileged event agents, lifecycle batch evidence, delivery
+  attempts, and audit events with durable policy evidence: policy decision,
+  matched rules, review reasons, and review evidence.
+- Added contract-level `review_evidence` metadata and exposed it through
+  registration metadata, API helpers, view models, semantic model, package
+  tests, and app self-test.
+- Preserved privileged event agents without human approval as
+  `pending_review` records instead of discarding registration evidence.
+- Preserved denied non-Bytewax lifecycle batch validations as `denied`
+  evidence before raising `PermissionError`.
+- Added pending-review queue composition for messages, priority exceptions,
+  replay requests, event agents, and lifecycle batches.
+- Kept MQEB event agents provider-neutral for Codex, Claude Code, OpenCode,
+  Pi, and future event-governance runtimes while retaining human approval
+  controls for privileged roles and Bytewax-first lifecycle processing.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for MQEB package init, models,
+  service, API helpers, contract, app, view models, and focused tests passed.
+- `./.venv/bin/pytest -q capabilities/common/mqeb/tests/test_capability_contract.py
+  capabilities/common/mqeb/tests/test_package_contract.py` passed with 13 tests
+  and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.mqeb import app; ..."`
+  passed package self-test.
+- `./.venv/bin/python -m json.tool
+  capabilities/common/mqeb/semantic_model.json` passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/mqeb --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/mqeb --strict --json` passed with no warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/mqeb --json`
+  passed with no warnings and side-effect-free publish planning.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/common/mqeb --json` passed with complete lifecycle evidence and
+  23 rules.
+- MQEB stale-marker scan returned no TODO/FIXME/stub/placeholder, Kafka,
+  materialized-baseline, contract-only, or not-implemented markers across the
+  edited MQEB packet.
+- Service smoke executed priority quota review evidence, priority exception
+  approval evidence, privileged event-agent review evidence, accepted Bytewax
+  batch evidence, and denied non-Bytewax batch persistence, printing
+  `require_review allow pending_review require_review accepted denied
+  bytewax_event_stream_required 1`.
+
+Known gaps:
+
+- Full repository tests, rendered MQEB UI, live Bytewax workers and dataflows,
+  live brokers and cloud queue adapters, schema registry, SIEM, SOAR, DLP,
+  GRC, notification and incident systems, live APG AUTH, MTEN, AUDL, CONF,
+  KEYM, ENCR, SECU, MONI, and HLTH adapters, production persistence and
+  migrations, and load checks still need later verification outside this
+  battery-conscious slice.
+
 ### 2026-06-01 07:52 EAT
 
 KEYM durable review-evidence packet:

@@ -28,9 +28,11 @@ def dashboard_model(service: MqebService | None = None, tenant_id: str = "defaul
 		"replay_requests": service.list_replay_requests(tenant_id),
 		"event_agents": service.list_event_agents(tenant_id),
 		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"agents": contract["agents"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"theme": contract["theme"],
 	}
 
@@ -121,6 +123,10 @@ def event_agent_roster_model(service: MqebService | None = None, tenant_id: str 
 		"route": "/mqeb/agents",
 		"tenant_id": tenant_id,
 		"event_agents": service.list_event_agents(tenant_id),
+		"pending_reviews": [
+			agent for agent in service.list_event_agents(tenant_id)
+			if agent["status"] == "pending_review"
+		],
 		"supported_runtimes": contract["agents"]["supported_runtimes"],
 		"supported_roles": contract["agents"]["supported_roles"],
 		"privileged_roles": contract["agents"]["privileged_roles"],
@@ -145,5 +151,6 @@ def settings_model(tenant_id: str = "default") -> dict[str, object]:
 		"configuration": contract["configuration"],
 		"agents": contract["agents"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"theme": contract["theme"],
 	}

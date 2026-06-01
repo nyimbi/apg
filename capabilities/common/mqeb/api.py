@@ -61,7 +61,9 @@ def capability_status(tenant_id: str = "default") -> Dict[str, Any]:
 		"pending_priority_exception_count": summary["pending_priority_exception_count"],
 		"pending_replay_count": summary["pending_replay_count"],
 		"event_agent_count": summary["event_agent_count"],
+		"pending_event_agent_review_count": summary["pending_event_agent_review_count"],
 		"lifecycle_batch_count": summary["lifecycle_batch_count"],
+		"pending_review_count": summary["pending_review_count"],
 	}
 
 
@@ -206,6 +208,14 @@ def validate_event_lifecycle_batch(payload: Dict[str, Any]) -> Dict[str, Any]:
 	)
 
 
+def list_lifecycle_batches(tenant_id: str | None = None) -> list[Dict[str, Any]]:
+	return SERVICE.list_lifecycle_batches(tenant_id)
+
+
+def list_pending_reviews(tenant_id: str | None = None) -> list[Dict[str, Any]]:
+	return SERVICE.list_pending_reviews(tenant_id)
+
+
 def create_record(payload: Dict[str, Any]) -> Dict[str, Any]:
 	return SERVICE.create_record(
 		record_id=str(payload["id"]),
@@ -229,6 +239,7 @@ def list_event_fabric(tenant_id: str = "default") -> Dict[str, Any]:
 		"replay_requests": SERVICE.list_replay_requests(tenant_id),
 		"event_agents": SERVICE.list_event_agents(tenant_id),
 		"lifecycle_batches": SERVICE.list_lifecycle_batches(tenant_id),
+		"pending_reviews": SERVICE.list_pending_reviews(tenant_id),
 		"audit_events": SERVICE.list_audit_events(tenant_id),
 		"summary": SERVICE.dashboard_summary(tenant_id),
 	}

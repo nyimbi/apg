@@ -6,7 +6,8 @@ Build one coherent lifecycle and guardrail packet for Message Queue Event Bus:
 tenant topics, governed publish decisions, subscription lifecycle, delivery
 attempt and dead-letter evidence, priority quota exception review, replay
 review, first-class event-agent composition, Bytewax lifecycle-batch validation,
-UI view models, contract evidence, tests, and publish proof.
+durable review evidence, UI view models, contract evidence, tests, and publish
+proof.
 
 ## Steps
 
@@ -16,7 +17,8 @@ UI view models, contract evidence, tests, and publish proof.
 2. Add a dependency-light MQEB package service layer in `service.py` without
    disturbing the existing async `MQEBService`.
 3. Add package API helpers in `api.py` and dependency-light UI models in a new
-   `view_models.py`.
+   `view_models.py`, including pending review queues and lifecycle batch
+   evidence.
 4. Extend `capability_contract.py` with delivery governance, first-class event
    agents, Bytewax streaming configuration, topic/subscription/dead-letter/
    replay/quota/agent routes, additional deterministic rules, and theme
@@ -46,9 +48,10 @@ UI view models, contract evidence, tests, and publish proof.
   configuration.
 - Do not allow replay without a bounded range, reason, reviewer, and evidence.
 - Do not register event agents without supported runtimes/roles, owner,
-  purpose, scope, contribution disclosure, and human approval for privileged
-  roles.
+  purpose, scope, and contribution disclosure.
+- Preserve privileged event-agent roles without explicit human approval as
+  pending-review evidence.
 - Do not compose MQEB lifecycle batches unless they declare Bytewax as the
-  stream processor.
+  stream processor; preserve denied routing evidence before raising.
 - Keep live brokers, cloud queues, SIEM/SOAR, schema registries, and Bytewax
   workers behind adapters that honor MQEB guardrails.

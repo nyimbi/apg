@@ -22,6 +22,9 @@ optional compatibility bridge, but it is not the MQEB core dependency.
 - Priority quota exception request and independent-review workflows.
 - Replay request and independent-review workflows with bounded ranges and
   evidence.
+- Durable review evidence for review-required messages, priority quota
+  exceptions, replay requests, privileged event agents, denied lifecycle
+  batches, delivery attempts, and audit events.
 - First-class event-agent registration for Codex, Claude Code, opencode, and
   Pi with supported roles, owner, purpose, scope, contribution disclosure, and
   human approval guardrails.
@@ -126,8 +129,34 @@ MQEB fails closed for:
 - replay requests without bounded range and reason;
 - self-reviewed or note-less quota/replay reviews;
 - event-agent registration without supported runtime/role, owner, purpose,
-  scope, contribution disclosure, or privileged-role human approval;
+  scope, or contribution disclosure;
 - lifecycle mutation batches that do not use Bytewax.
+
+Privileged event agents without human approval are retained as
+`pending_review` evidence so generated governance consoles can decide them
+instead of losing the registration attempt as a transient exception.
+
+## Durable Review Evidence
+
+MQEB preserves review state for generated event-governance consoles.
+Review-required messages, priority quota exceptions, replay requests,
+privileged event-agent registrations, lifecycle batch validations, delivery
+attempts, and audit events carry the same evidence fields:
+
+- `policy_decision`;
+- `matched_rules`;
+- `review_reasons`;
+- `review_evidence`.
+
+Generated applications can compose the active review queue:
+
+```python
+pending = service.list_pending_reviews("tenant-a")
+```
+
+Denied non-Bytewax lifecycle batches are stored through
+`list_lifecycle_batches()` before `PermissionError` is raised, so operators can
+see and remediate routing violations.
 
 ## API Helpers
 
@@ -145,6 +174,8 @@ MQEB fails closed for:
 - `decide_replay`
 - `register_event_agent`
 - `validate_event_lifecycle_batch`
+- `list_lifecycle_batches`
+- `list_pending_reviews`
 - `list_event_fabric`
 - `capability_status`
 

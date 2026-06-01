@@ -226,6 +226,7 @@ def register_capability() -> dict:
             "bytewax_event_fabric": "Expose Bytewax-first adapter boundaries for APG event flows",
             "event_agent_composition": "Register first-class event agents with runtime, role, owner, purpose, scope, disclosure, and approval guardrails",
             "lifecycle_batch_validation": "Validate MQEB lifecycle mutation batches against Bytewax-first stream rules",
+            "review_evidence": "Compose pending message, quota, replay, agent, and lifecycle batch review evidence",
             "predictive_scaling": "Scale messaging infrastructure from demand signals",
             "capability_rules": "Evaluate deterministic message governance rules",
             "visual_theming": "Apply event-fabric theme tokens and components"
@@ -252,6 +253,7 @@ def register_capability() -> dict:
         "ui_manifest": contract["ui"],
         "agents": contract["agents"],
         "streaming": contract["streaming"],
+        "review_evidence": contract["review_evidence"],
         "theme": contract["theme"],
         "permissions": [
             "mqeb:view",

@@ -63,6 +63,7 @@ def semantic_model() -> dict[str, Any]:
 					"mqeb_agent_contract": contract["agents"],
 				},
 				"streaming": contract["streaming"],
+				"review_evidence": contract["review_evidence"],
 				"theme": contract["theme"],
 				"runtime": {
 					"api": "api.py",
@@ -99,6 +100,7 @@ def semantic_model() -> dict[str, Any]:
 				"requires": contract["requires"],
 				"agents": contract["agents"],
 				"streaming": contract["streaming"],
+				"review_evidence": contract["review_evidence"],
 			}
 		},
 		"rules": {
@@ -196,6 +198,10 @@ def self_test() -> dict[str, Any]:
 		errors.append("MQEB event agents must remain first-class")
 	if streaming.get("engine") != "bytewax":
 		errors.append("MQEB streaming manifest must remain Bytewax-first")
+	if "review_evidence" not in capability.get("provides", []):
+		errors.append("MQEB review evidence provide is missing")
+	if "review_evidence" not in capability:
+		errors.append("MQEB durable review evidence is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

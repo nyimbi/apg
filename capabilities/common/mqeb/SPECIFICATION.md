@@ -46,9 +46,18 @@ applications can depend on it safely.
 - **Lifecycle batch**: tenant-scoped MQEB mutation batch that must declare
   Bytewax as the event-stream processor before generated applications compose
   it into event-fabric flows.
+- **Lifecycle batch evidence**: accepted or denied batch validation record for
+  grouped MQEB lifecycle mutations.
 - **Operational audit event**: immutable package evidence for topic,
   subscription, publish, delivery, exception, replay, pause, resume, event
   agent, lifecycle batch, and dead-letter decisions.
+
+Reviewable records expose a consistent evidence shape:
+
+- `policy_decision`
+- `matched_rules`
+- `review_reasons`
+- `review_evidence`
 
 ## Functional Requirements
 
@@ -81,11 +90,12 @@ applications can depend on it safely.
     opencode, and Pi.
 14. Event agents must fail closed when runtime, role, owner, purpose, scope, or
     machine contribution disclosure is missing or unsupported.
-15. Event agents in privileged roles must require human approval. Privileged
-    roles include quota review, replay review, Bytewax topology review, and
-    dead-letter triage.
-16. Lifecycle batches must validate that the event stream processor is Bytewax
-    and must reject empty batches.
+15. Event agents in privileged roles without human approval must be retained as
+    `pending_review` evidence. Privileged roles include quota review, replay
+    review, Bytewax topology review, and dead-letter triage.
+16. Lifecycle batches must validate that the event stream processor is Bytewax,
+    reject empty batches, and persist denied non-Bytewax evidence before
+    raising.
 
 ## Rule Engine Requirements
 
@@ -178,8 +188,10 @@ The first coherent MQEB packet will implement:
 - priority quota exception request and independent review;
 - replay request scheduling and review evidence;
 - event-agent registration with runtime, role, owner, purpose, scope,
-  contribution disclosure, and human approval guardrails;
+  contribution disclosure, and human approval or pending-review guardrails;
 - Bytewax lifecycle-batch validation;
+- pending message, quota exception, replay, event-agent, and lifecycle batch
+  review composition for generated governance consoles;
 - operational audit events;
 - dependency-light API helpers and view models;
 - contract-derived semantic evidence and package proof.

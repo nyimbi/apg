@@ -500,10 +500,10 @@ def default_rules() -> list[CapabilityRule]:
 		),
 		CapabilityRule(
 			name="event_agent_privileged_role_requires_human_approval",
-			description="Privileged MQEB event-agent roles require human approval.",
+			description="Privileged MQEB event-agent roles require human approval evidence or review.",
 			condition={"operation": "register_event_agent", "privileged_agent_role": True, "human_approval_required": False},
 			effect={
-				"decision": "deny",
+				"decision": "require_review",
 				"reason": "event_agent_human_approval_required",
 				"required_action": "require_human_approval_for_agent"
 			}
@@ -599,7 +599,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "mqeb",
 		"display_name": "Message Queue Event Bus",
-		"provides": ["mqeb_event_fabric", "message_governance", "event_agent_composition"],
+		"provides": ["mqeb_event_fabric", "message_governance", "event_agent_composition", "review_evidence"],
 		"requires": ["conf", "auth", "audl", "secu"],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
@@ -614,6 +614,30 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"name": theme.name,
 			"tokens": theme.tokens,
 			"components": theme.components
+		},
+		"review_evidence": {
+			"durable_statuses": [
+				"pending",
+				"pending_review",
+				"review_required",
+				"denied",
+				"published",
+				"delivered",
+				"retry",
+				"dead_letter",
+				"approved",
+				"rejected",
+				"accepted",
+			],
+			"policy_fields": ["policy_decision", "matched_rules", "review_reasons", "review_evidence"],
+			"pending_queues": [
+				"messages",
+				"priority_exceptions",
+				"replay_requests",
+				"event_agents",
+				"lifecycle_batches",
+			],
+			"deny_behavior": "Denied MQEB lifecycle batches persist evidence before PermissionError",
 		}
 	}
 

@@ -86,6 +86,9 @@ class MessageRecord:
 	decision: str
 	matched_rules: list[str]
 	required_actions: list[str]
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	idempotency_key: str = ""
 	schema_ref: str = ""
 	created_at: str = field(default_factory=_utc_now)
@@ -122,6 +125,10 @@ class DeliveryAttemptRecord:
 	retry_count: int
 	reason: str
 	status: str
+	policy_decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=_utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -139,6 +146,10 @@ class PriorityQuotaExceptionRecord:
 	decision: str = ""
 	reviewer: str = ""
 	notes: str = ""
+	policy_decision: str = "require_review"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=lambda: ["priority_quota_exception_review_required"])
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=_utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -158,6 +169,10 @@ class ReplayRequestRecord:
 	decision: str = ""
 	reviewer: str = ""
 	evidence: str = ""
+	policy_decision: str = "require_review"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=lambda: ["replay_review_required"])
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=_utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -177,6 +192,10 @@ class MqebAgentRecord:
 	contribution_disclosed: bool
 	human_approval_required: bool
 	status: str = "active"
+	policy_decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=_utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -193,6 +212,9 @@ class EventLifecycleBatchRecord:
 	decision: str
 	matched_rules: list[str]
 	required_actions: list[str]
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	required_processor: str = "bytewax"
 	status: str = "accepted"
 	created_at: str = field(default_factory=_utc_now)
@@ -210,6 +232,10 @@ class MqebAuditEventRecord:
 	message: str
 	actor: str
 	severity: str = "info"
+	policy_decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=_utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -350,12 +376,23 @@ class MqebService:
 			decision=result["decision"],
 			matched_rules=list(result["matched_rules"]),
 			required_actions=_required_actions(result),
+			policy_decision=result["decision"],
+			review_reasons=self._reasons(result),
+			review_evidence=self._review_evidence(result),
 			idempotency_key=str(idempotency_key or "").strip(),
 			schema_ref=schema_value,
 		)
 		self.messages[record.id] = record
 		severity = "high" if status == "denied" else "medium" if status == "review_required" else "info"
-		self._record_event(tenant_id, f"message_{status}", record.id, f"Message {status}: {topic.name}", producer, severity)
+		self._record_event(
+			tenant_id,
+			f"message_{status}",
+			record.id,
+			f"Message {status}: {topic.name}",
+			producer,
+			severity,
+			policy_result=result,
+		)
 		return record.to_dict()
 
 	def create_subscription(
@@ -451,12 +488,24 @@ class MqebService:
 			retry_count=max(0, int(retry_count)),
 			reason=str(reason or "").strip(),
 			status="dead_letter" if outcome_value == "dead_letter" else outcome_value,
+			policy_decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._reasons(result),
+			review_evidence=self._review_evidence(result),
 		)
 		self.delivery_attempts[record.id] = record
 		subscription.lag_messages = max(0, subscription.lag_messages - 1) if outcome_value == "delivered" else subscription.lag_messages + 1
 		if outcome_value == "dead_letter":
 			message.status = "dead_letter"
-		self._record_event(tenant_id, f"delivery_{outcome_value}", record.id, f"Delivery {outcome_value}: {subscription.name}", subscription.consumer, "medium")
+		self._record_event(
+			tenant_id,
+			f"delivery_{outcome_value}",
+			record.id,
+			f"Delivery {outcome_value}: {subscription.name}",
+			subscription.consumer,
+			"medium",
+			policy_result=result,
+		)
 		return record.to_dict()
 
 	def request_priority_exception(self, tenant_id: str, exception_id: str, topic_id: str, requested_by: str, reason: str) -> dict[str, Any]:
@@ -471,15 +520,50 @@ class MqebService:
 		record_id = _stable_id("mqeb_priority_exception", tenant_id, exception_id)
 		if record_id in self.priority_exceptions:
 			raise ValueError(f"priority_exception_already_exists:{exception_id}")
-		record = PriorityQuotaExceptionRecord(record_id, tenant_id, topic.id, str(requested_by).strip(), str(reason).strip())
+		policy_result = _review_result("priority_quota_exception_review_required", "review_priority_quota_exception")
+		record = PriorityQuotaExceptionRecord(
+			record_id,
+			tenant_id,
+			topic.id,
+			str(requested_by).strip(),
+			str(reason).strip(),
+			policy_decision=policy_result["decision"],
+			matched_rules=list(policy_result["matched_rules"]),
+			review_reasons=self._reasons(policy_result),
+			review_evidence=self._review_evidence(policy_result),
+		)
 		self.priority_exceptions[record.id] = record
-		self._record_event(tenant_id, "priority_exception_requested", record.id, f"Priority exception requested: {topic.name}", requested_by, "medium")
+		self._record_event(
+			tenant_id,
+			"priority_exception_requested",
+			record.id,
+			f"Priority exception requested: {topic.name}",
+			requested_by,
+			"medium",
+			policy_result=policy_result,
+		)
 		return record.to_dict()
 
 	def decide_priority_exception(self, tenant_id: str, exception_id: str, reviewer: str, decision: str, notes: str) -> dict[str, Any]:
 		record = self._get_priority_exception(tenant_id, exception_id)
-		self._decide_review_record(record, "decide_priority_exception", reviewer, decision, notes, "independent_priority_exception_reviewer_required")
-		self._record_event(tenant_id, "priority_exception_decided", record.id, f"Priority exception {record.status}: {record.topic_id}", reviewer, "medium")
+		result = self._decide_review_record(record, "decide_priority_exception", reviewer, decision, notes, "independent_priority_exception_reviewer_required")
+		if record.status == "approved":
+			for message in self.messages.values():
+				if message.tenant_id == tenant_id and message.topic_id == record.topic_id and message.status == "review_required":
+					message.status = "published"
+					message.decision = "allow"
+					message.policy_decision = "allow"
+					message.required_actions = []
+					message.review_evidence = self._review_evidence(result, review_recorded=True)
+		self._record_event(
+			tenant_id,
+			"priority_exception_decided",
+			record.id,
+			f"Priority exception {record.status}: {record.topic_id}",
+			reviewer,
+			"medium",
+			policy_result=result,
+		)
 		return record.to_dict()
 
 	def request_replay(self, tenant_id: str, replay_id: str, topic_id: str, requested_by: str, reason: str, range_start: str, range_end: str) -> dict[str, Any]:
@@ -508,15 +592,35 @@ class MqebService:
 			reason=str(reason).strip(),
 			range_start=str(range_start).strip(),
 			range_end=str(range_end).strip(),
+			policy_decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._reasons(result),
+			review_evidence=self._review_evidence(result),
 		)
 		self.replay_requests[record.id] = record
-		self._record_event(tenant_id, "replay_requested", record.id, f"Replay requested: {topic.name}", requested_by, "medium")
+		self._record_event(
+			tenant_id,
+			"replay_requested",
+			record.id,
+			f"Replay requested: {topic.name}",
+			requested_by,
+			"medium",
+			policy_result=result,
+		)
 		return record.to_dict()
 
 	def decide_replay(self, tenant_id: str, replay_id: str, reviewer: str, decision: str, evidence: str) -> dict[str, Any]:
 		record = self._get_replay(tenant_id, replay_id)
-		self._decide_review_record(record, "decide_replay", reviewer, decision, evidence, "independent_replay_reviewer_required", notes_field="evidence")
-		self._record_event(tenant_id, "replay_decided", record.id, f"Replay {record.status}: {record.topic_id}", reviewer, "medium")
+		result = self._decide_review_record(record, "decide_replay", reviewer, decision, evidence, "independent_replay_reviewer_required", notes_field="evidence")
+		self._record_event(
+			tenant_id,
+			"replay_decided",
+			record.id,
+			f"Replay {record.status}: {record.topic_id}",
+			reviewer,
+			"medium",
+			policy_result=result,
+		)
 		return record.to_dict()
 
 	def register_event_agent(
@@ -568,9 +672,21 @@ class MqebService:
 			purpose=str(purpose).strip(),
 			contribution_disclosed=bool(contribution_disclosed),
 			human_approval_required=bool(human_approval_required),
+			status="pending_review" if result["decision"] == "require_review" else "active",
+			policy_decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._reasons(result),
+			review_evidence=self._review_evidence(result, review_recorded=bool(human_approval_required)),
 		)
 		self.event_agents[record.id] = record
-		self._record_event(tenant_id, "event_agent_registered", record.id, f"Event agent registered: {record.name}", record.owner)
+		self._record_event(
+			tenant_id,
+			"event_agent_registered",
+			record.id,
+			f"Event agent registered: {record.name}",
+			record.owner,
+			policy_result=result,
+		)
 		return record.to_dict()
 
 	def validate_event_lifecycle_batch(self, tenant_id: str, event_stream: str, mutation_count: int) -> dict[str, Any]:
@@ -594,11 +710,22 @@ class MqebService:
 			decision=result["decision"],
 			matched_rules=list(result["matched_rules"]),
 			required_actions=_required_actions(result),
+			policy_decision=result["decision"],
+			review_reasons=self._reasons(result),
+			review_evidence=self._review_evidence(result),
 			status="accepted" if accepted else "denied",
 		)
 		self.lifecycle_batches[record.id] = record
 		severity = "info" if accepted else "high"
-		self._record_event(tenant_id, f"event_lifecycle_batch_{record.status}", record.id, f"Lifecycle batch {record.status}: {stream_value}", "mqeb", severity)
+		self._record_event(
+			tenant_id,
+			f"event_lifecycle_batch_{record.status}",
+			record.id,
+			f"Lifecycle batch {record.status}: {stream_value}",
+			"mqeb",
+			severity,
+			policy_result=result,
+		)
 		if not accepted:
 			raise PermissionError(self._first_reason(result))
 		return record.to_dict()
@@ -649,6 +776,20 @@ class MqebService:
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.audit_events, tenant_id)
 
+	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		items = (
+			self.list_messages(tenant_id)
+			+ self.list_priority_exceptions(tenant_id)
+			+ self.list_replay_requests(tenant_id)
+			+ self.list_event_agents(tenant_id)
+			+ self.list_lifecycle_batches(tenant_id)
+		)
+		return [
+			item
+			for item in items
+			if item.get("status") in {"pending", "pending_review", "review_required"}
+		]
+
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		messages = self.list_messages(tenant_id)
 		subscriptions = self.list_subscriptions(tenant_id)
@@ -664,8 +805,10 @@ class MqebService:
 			"pending_priority_exception_count": sum(1 for item in self.list_priority_exceptions(tenant_id) if item["status"] == "pending"),
 			"pending_replay_count": sum(1 for item in self.list_replay_requests(tenant_id) if item["status"] == "pending"),
 			"event_agent_count": len(self.list_event_agents(tenant_id)),
+			"pending_event_agent_review_count": sum(1 for item in self.list_event_agents(tenant_id) if item["status"] == "pending_review"),
 			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
 			"denied_lifecycle_batch_count": sum(1 for item in self.list_lifecycle_batches(tenant_id) if not item["accepted"]),
+			"pending_review_count": len(self.list_pending_reviews(tenant_id)),
 			"recent_events": self.list_audit_events(tenant_id)[-5:],
 		}
 
@@ -715,7 +858,7 @@ class MqebService:
 		notes: str,
 		self_review_reason: str,
 		notes_field: str = "notes",
-	) -> None:
+	) -> dict[str, Any]:
 		if record.status != "pending":
 			raise ValueError("review_already_decided")
 		decision_value = str(decision or "").strip().lower()
@@ -740,8 +883,23 @@ class MqebService:
 		record.decision = decision_value
 		record.reviewer = reviewer_value
 		setattr(record, notes_field, notes_value)
+		record.policy_decision = result["decision"]
+		record.matched_rules = list(result["matched_rules"])
+		record.review_reasons = self._reasons(result)
+		record.review_evidence = self._review_evidence(result, review_recorded=True)
+		return result
 
-	def _record_event(self, tenant_id: str, event_type: str, subject_id: str, message: str, actor: str, severity: str = "info") -> dict[str, Any]:
+	def _record_event(
+		self,
+		tenant_id: str,
+		event_type: str,
+		subject_id: str,
+		message: str,
+		actor: str,
+		severity: str = "info",
+		policy_result: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		policy_result = policy_result or _allow_result()
 		record = MqebAuditEventRecord(
 			id=_stable_id("mqeb_event", tenant_id, event_type, subject_id, len(self.audit_events)),
 			tenant_id=tenant_id,
@@ -750,6 +908,10 @@ class MqebService:
 			message=message,
 			actor=actor,
 			severity=severity,
+			policy_decision=policy_result["decision"],
+			matched_rules=list(policy_result["matched_rules"]),
+			review_reasons=self._reasons(policy_result),
+			review_evidence=self._review_evidence(policy_result),
 		)
 		self.audit_events[record.id] = record
 		return record.to_dict()
@@ -760,6 +922,24 @@ class MqebService:
 				return str(action["reason"])
 		return "message_operation_denied"
 
+	def _reasons(self, result: dict[str, Any]) -> list[str]:
+		return [
+			str(action["reason"])
+			for action in result.get("actions", [])
+			if action.get("reason")
+		]
+
+	def _review_evidence(self, result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+		return {
+			"required_actions": [
+				str(action.get("required_action"))
+				for action in result.get("actions", [])
+				if action.get("required_action")
+			],
+			"reasons": self._reasons(result),
+			"review_recorded": bool(review_recorded),
+		}
+
 	def _normalize_agent_token(self, value: str) -> str:
 		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
 
@@ -768,6 +948,18 @@ class MqebService:
 		if tenant_id is not None:
 			items = [item for item in items if item["tenant_id"] == tenant_id]
 		return sorted(items, key=lambda item: item["id"])
+
+
+def _allow_result() -> dict[str, Any]:
+	return {"decision": "allow", "matched_rules": [], "actions": []}
+
+
+def _review_result(reason: str, required_action: str) -> dict[str, Any]:
+	return {
+		"decision": "require_review",
+		"matched_rules": [],
+		"actions": [{"reason": reason, "required_action": required_action}],
+	}
 
 
 class MQEBService:

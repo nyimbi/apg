@@ -38,6 +38,8 @@ def test_contract_shape_is_valid():
 	assert contract["configuration"]["operation_governance"]["broker_core_dependency_allowed"] is False
 	assert contract["agents"]["first_class"] is True
 	assert contract["streaming"]["engine"] == "bytewax"
+	assert "review_evidence" in contract["provides"]
+	assert contract["review_evidence"]["pending_queues"]
 
 
 def test_app_entrypoint_is_publishable():
@@ -58,6 +60,8 @@ def test_app_entrypoint_is_publishable():
 	assert capability["approvals"]["event_agent"] == "MqebAgentRecord"
 	assert capability["agents"]["mqeb_agent_contract"]["first_class"] is True
 	assert capability["streaming"]["engine"] == "bytewax"
+	assert "review_evidence" in capability["provides"]
+	assert capability["review_evidence"]["pending_queues"]
 
 
 def test_event_fabric_lifecycle_records_publish_delivery_replay_and_audit_state():
@@ -111,11 +115,15 @@ def test_event_fabric_lifecycle_records_publish_delivery_replay_and_audit_state(
 	summary = service.dashboard_summary("tenant-a")
 
 	assert message["status"] == "published"
+	assert message["policy_decision"] == "allow"
 	assert delivered["status"] == "delivered"
+	assert delivered["policy_decision"] == "allow"
 	assert replay_approved["status"] == "approved"
+	assert replay_approved["policy_decision"] == "allow"
 	assert summary["topic_count"] == 1
 	assert summary["message_count"] == 1
 	assert summary["subscription_count"] == 1
+	assert summary["pending_review_count"] == 0
 	assert {event["event_type"] for event in service.list_audit_events("tenant-a")} >= {
 		"topic_created",
 		"message_published",
@@ -144,19 +152,21 @@ def test_event_agents_and_bytewax_lifecycle_batches_are_first_class_state():
 			contribution_disclosed=True,
 			human_approval_required=True,
 		)
-	with pytest.raises(PermissionError, match="event_agent_human_approval_required"):
-		service.register_event_agent(
-			tenant_id="tenant-a",
-			agent_id="privileged",
-			name="Privileged",
-			runtime="codex",
-			role="bytewax-topology-reviewer",
-			scope="bytewax topology review",
-			owner="platform",
-			purpose="review stream topology changes",
-			contribution_disclosed=True,
-			human_approval_required=False,
-		)
+	review_agent = service.register_event_agent(
+		tenant_id="tenant-a",
+		agent_id="privileged",
+		name="Privileged",
+		runtime="codex",
+		role="bytewax-topology-reviewer",
+		scope="bytewax topology review",
+		owner="platform",
+		purpose="review stream topology changes",
+		contribution_disclosed=True,
+		human_approval_required=False,
+	)
+	assert review_agent["status"] == "pending_review"
+	assert review_agent["policy_decision"] == "require_review"
+	assert review_agent["review_reasons"] == ["event_agent_human_approval_required"]
 	agent = service.register_event_agent(
 		tenant_id="tenant-a",
 		agent_id="replay-agent",
@@ -172,6 +182,10 @@ def test_event_agents_and_bytewax_lifecycle_batches_are_first_class_state():
 	batch = service.validate_event_lifecycle_batch("tenant-a", "ByteWax", 3)
 	with pytest.raises(PermissionError, match="bytewax_event_stream_required"):
 		service.validate_event_lifecycle_batch("tenant-a", "custom-broker", 1)
+	denied_batch = [
+		item for item in service.list_lifecycle_batches("tenant-a")
+		if item["status"] == "denied"
+	][0]
 	with pytest.raises(ValueError, match="event_lifecycle_batch_empty"):
 		service.validate_event_lifecycle_batch("tenant-a", "bytewax", 0)
 	summary = service.dashboard_summary("tenant-a")
@@ -182,9 +196,14 @@ def test_event_agents_and_bytewax_lifecycle_batches_are_first_class_state():
 	assert batch["event_stream"] == "bytewax"
 	assert batch["required_processor"] == "bytewax"
 	assert batch["accepted"] is True
-	assert summary["event_agent_count"] == 1
+	assert batch["policy_decision"] == "allow"
+	assert denied_batch["policy_decision"] == "deny"
+	assert denied_batch["review_reasons"] == ["bytewax_event_stream_required"]
+	assert summary["event_agent_count"] == 2
+	assert summary["pending_event_agent_review_count"] == 1
 	assert summary["lifecycle_batch_count"] == 2
 	assert summary["denied_lifecycle_batch_count"] == 1
+	assert summary["pending_review_count"] == 1
 	assert {event["event_type"] for event in service.list_audit_events("tenant-a")} >= {
 		"event_agent_registered",
 		"event_lifecycle_batch_accepted",
@@ -260,6 +279,7 @@ def test_mqeb_guardrails_fail_closed():
 		priority_messages_per_minute=20000,
 	)
 	assert quota_review["status"] == "review_required"
+	assert quota_review["policy_decision"] == "require_review"
 	with pytest.raises(ValueError, match="priority_exception_reason_required"):
 		service.request_priority_exception("tenant-a", "quota", exactly_once["id"], "owner", "")
 	exception = service.request_priority_exception("tenant-a", "quota", exactly_once["id"], "owner", "Seasonal peak.")
@@ -269,6 +289,7 @@ def test_mqeb_guardrails_fail_closed():
 		service.decide_priority_exception("tenant-a", exception["id"], "reviewer", "approved", "")
 	approved = service.decide_priority_exception("tenant-a", exception["id"], "reviewer", "approved", "Approved for migration.")
 	assert approved["status"] == "approved"
+	assert approved["policy_decision"] == "allow"
 	allowed = service.publish_message(
 		"tenant-a",
 		"msg-quota-approved",
@@ -305,19 +326,19 @@ def test_api_and_view_models_expose_event_fabric_surfaces():
 
 	with pytest.raises(PermissionError, match="tenant_context_required"):
 		api.create_topic_record({"id": "missing-tenant", "name": "Missing", "owner": "ops"})
-	with pytest.raises(PermissionError, match="event_agent_human_approval_required"):
-		api.register_event_agent({
-			"tenant_id": "tenant-b",
-			"id": "privileged-string-bool",
-			"name": "Privileged String Bool",
-			"runtime": "codex",
-			"role": "replay-reviewer",
-			"scope": "replay review",
-			"owner": "platform",
-			"purpose": "review replay decisions",
-			"contribution_disclosed": "true",
-			"human_approval_required": "false",
-		})
+	pending_agent = api.register_event_agent({
+		"tenant_id": "tenant-b",
+		"id": "privileged-string-bool",
+		"name": "Privileged String Bool",
+		"runtime": "codex",
+		"role": "replay-reviewer",
+		"scope": "replay review",
+		"owner": "platform",
+		"purpose": "review replay decisions",
+		"contribution_disclosed": "true",
+		"human_approval_required": "false",
+	})
+	assert pending_agent["status"] == "pending_review"
 	topic = api.create_topic_record({
 		"tenant_id": "tenant-b",
 		"id": "orders",
@@ -381,11 +402,15 @@ def test_api_and_view_models_expose_event_fabric_surfaces():
 	settings = view_models.settings_model("tenant-b")
 
 	assert status["topic_count"] == 1
-	assert status["event_agent_count"] == 1
+	assert status["event_agent_count"] == 2
+	assert status["pending_event_agent_review_count"] == 1
+	assert status["pending_review_count"] == 1
 	assert fabric["summary"]["message_count"] == 1
-	assert fabric["event_agents"][0]["runtime"] == "opencode"
+	assert len(fabric["event_agents"]) == 2
+	assert fabric["pending_reviews"][0]["status"] == "pending_review"
 	assert dashboard["summary"]["subscription_count"] == 1
-	assert dashboard["event_agents"][0]["role"] == "routing_reviewer"
+	assert dashboard["review_evidence"]["deny_behavior"] == "Denied MQEB lifecycle batches persist evidence before PermissionError"
+	assert any(agent["role"] == "routing_reviewer" for agent in dashboard["event_agents"])
 	assert topics["classifications"][-1] == "regulated"
 	assert publish["messages"][0]["status"] == "published"
 	assert subscriptions["protocols"][0] == "bytewax"
@@ -393,10 +418,12 @@ def test_api_and_view_models_expose_event_fabric_surfaces():
 	assert quota["pending"] == []
 	assert replay["pending"] == []
 	assert agents["supported_runtimes"][0] == "codex"
-	assert agents["event_agents"][0]["name"] == "Routing Agent"
+	assert agents["pending_reviews"][0]["status"] == "pending_review"
+	assert any(agent["name"] == "Routing Agent" for agent in agents["event_agents"])
 	assert bytewax["preferred_runtime"] == "bytewax"
 	assert bytewax["lifecycle_batches"][0]["accepted"] is True
 	assert audit["events"]
 	assert settings["configuration"]["operation_governance"]["bytewax_first_runtime"] is True
 	assert settings["agents"]["first_class"] is True
 	assert settings["streaming"]["engine"] == "bytewax"
+	assert settings["review_evidence"]["pending_queues"]

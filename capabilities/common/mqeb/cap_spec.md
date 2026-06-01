@@ -19,6 +19,11 @@ MQEB is APG's package-backed event fabric. It provides:
 - dependency-light service, API helper, view-model, semantic-model, release,
   and manifest evidence for generated APG applications.
 
+The current review-evidence packet adds durable policy evidence for
+review-required messages, priority quota exceptions, replay requests,
+privileged event-agent review, denied Bytewax lifecycle batch routing, delivery
+attempts, and audit events.
+
 ## Development Rule
 
 Update `SPECIFICATION.md` first, then `PLAN.md`, then implementation, tests, and

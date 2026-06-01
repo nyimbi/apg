@@ -38,6 +38,15 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert "bytewax_topology_reviewer" in contract["agents"]["privileged_roles"]
 	assert contract["streaming"]["engine"] == "bytewax"
 	assert contract["streaming"]["broker_core_dependency_allowed"] is False
+	assert "review_evidence" in contract["provides"]
+	assert contract["review_evidence"]["pending_queues"] == [
+		"messages",
+		"priority_exceptions",
+		"replay_requests",
+		"event_agents",
+		"lifecycle_batches",
+	]
+	assert "policy_decision" in contract["review_evidence"]["policy_fields"]
 	assert len(contract["rule_engine"]["rules"]) >= 22
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
@@ -160,6 +169,23 @@ def test_rule_engine_enforces_event_agent_and_bytewax_guardrails():
 	assert stream["actions"][0]["reason"] == "bytewax_event_stream_required"
 
 
+def test_rule_engine_preserves_privileged_event_agent_review_state():
+	result = evaluate_capability_rules({
+		"operation": "register_event_agent",
+		"agent_runtime_supported": True,
+		"agent_role_supported": True,
+		"agent_scope_present": True,
+		"agent_owner_present": True,
+		"agent_purpose_present": True,
+		"contribution_disclosed": True,
+		"privileged_agent_role": True,
+		"human_approval_required": False,
+	})
+
+	assert result["decision"] == "require_review"
+	assert result["actions"][0]["reason"] == "event_agent_human_approval_required"
+
+
 def test_registration_includes_full_capability_contract():
 	registration = register_capability()
 
@@ -172,6 +198,7 @@ def test_registration_includes_full_capability_contract():
 	assert registration["ui_components"]["agents"] == "/mqeb/agents"
 	assert registration["agents"]["first_class"] is True
 	assert registration["streaming"]["engine"] == "bytewax"
+	assert registration["review_evidence"]["deny_behavior"] == "Denied MQEB lifecycle batches persist evidence before PermissionError"
 	assert "mqeb:review_quota" in registration["permissions"]
 	assert "mqeb:manage_bytewax" in registration["permissions"]
 	assert "mqeb:manage_agents" in registration["permissions"]
