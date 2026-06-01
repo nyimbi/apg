@@ -46,6 +46,7 @@ def test_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "wflo" in model["capabilities"]
+	assert model["capabilities"]["wflo"]["review_evidence"]["durable_statuses"] == ["review_required", "pending_review", "denied"]
 
 
 def test_definition_publish_execution_task_approval_and_completion_lifecycle_executes():
@@ -179,6 +180,10 @@ def test_workflow_guardrails_require_tenant_owner_policies_approval_and_open_wor
 	)
 	assert long_running["status"] == "review_required"
 	assert long_running["required_actions"] == ["review_runtime"]
+	assert long_running["decision"] == "require_review"
+	assert long_running["review_reasons"] == ["long_running_execution_review_required"]
+	assert long_running["audit_evidence"]["required_actions"] == ["review_runtime"]
+	assert service.list_pending_reviews("tenant-a")[0]["id"] == long_running["id"]
 
 	definition = service.create_workflow_definition(
 		"tenant-a",
@@ -320,6 +325,10 @@ def test_task_approval_compensation_agent_and_stream_guardrails():
 		human_approval_required=False,
 	)
 	assert review_agent["status"] == "pending_review"
+	assert review_agent["decision"] == "require_review"
+	assert review_agent["review_reasons"] == ["workflow_agent_human_approval_required"]
+	assert review_agent["audit_evidence"]["required_actions"] == ["record_workflow_agent_human_approval"]
+	assert service.list_pending_reviews("tenant-c")[0]["id"] == review_agent["id"]
 
 	try:
 		service.validate_batch_mutation("legacy_queue")
@@ -335,6 +344,11 @@ def test_task_approval_compensation_agent_and_stream_guardrails():
 		assert str(exc) == "bytewax_lifecycle_stream_required"
 	else:
 		raise AssertionError("non-Bytewax lifecycle batch accepted")
+	denied_batch = service.list_lifecycle_batches("tenant-c")[0]
+	assert denied_batch["status"] == "denied"
+	assert denied_batch["decision"] == "deny"
+	assert denied_batch["review_reasons"] == ["bytewax_lifecycle_stream_required"]
+	assert denied_batch["audit_evidence"]["required_actions"] == ["route_wflo_lifecycle_batch_to_bytewax"]
 
 	try:
 		service.validate_lifecycle_batch("tenant-c", "bytewax", 0, "workflow_agent_batch")
@@ -344,6 +358,7 @@ def test_task_approval_compensation_agent_and_stream_guardrails():
 		raise AssertionError("empty lifecycle batch accepted")
 
 	assert service.validate_lifecycle_batch("tenant-c", "bytewax", 2, "approval_batch")["status"] == "accepted"
+	assert service.list_audit_events("tenant-c")[-1]["policy_decision"] == "allow"
 
 
 def test_api_and_view_models_expose_workflow_surfaces():
@@ -446,17 +461,25 @@ def test_api_and_view_models_expose_workflow_surfaces():
 	settings = views.settings_model("tenant-b")
 
 	assert status["definition_count"] == 1
+	assert status["pending_review_count"] == 0
 	assert system["summary"]["completed_execution_count"] == 1
+	assert system["pending_reviews"] == []
+	assert api.list_pending_reviews("tenant-b") == []
 	assert dashboard["summary"]["event_count"] >= 5
+	assert dashboard["pending_reviews"] == []
 	assert designer["step_types"]
 	assert library["definitions"][0]["status"] == "published"
+	assert library["pending_reviews"] == []
 	assert monitor["executions"][0]["status"] == "completed"
 	assert tasks["tasks"][0]["status"] == "completed"
 	assert approvals["approvals"][0]["status"] == "approved"
 	assert agent["role"] == "runtime_observer"
 	assert agents["agents"][0]["runtime"] == "codex"
+	assert agents["pending_reviews"] == []
 	assert batch["processor"] == "bytewax"
 	assert lifecycle["batches"][0]["status"] == "accepted"
+	assert lifecycle["denied"] == []
 	assert audit["audit_events"]
 	assert analytics["review_required_definitions"] == []
+	assert analytics["pending_reviews"] == []
 	assert settings["configuration"]["tenant_id"] == "tenant-b"

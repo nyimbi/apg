@@ -11,6 +11,7 @@
 - Approval lifecycle with approver, reason, decision evidence, delegation, decision state, and execution status updates.
 - First-class workflow agents with provider-neutral runtime (`codex`, `claude_code`, `opencode`, `pi`), governance role, owner, purpose, scope, disclosure, privileged-role review, and audit events.
 - Bytewax lifecycle batch validation for definition, publication, execution, task, approval, compensation, workflow-agent, and audit mutations.
+- Durable review evidence for review-required workflow definitions, privileged workflow agents, denied lifecycle batches, approval decisions, and audit events.
 - Deterministic rule decisions for workflow authoring, runtime, approvals, tasks, compensation, agents, tenant isolation, and batch mutation policy.
 - Dependency-light API helpers, UI view models, package manifest, semantic model, and release evidence.
 
@@ -37,6 +38,7 @@ Primary methods:
 - `register_workflow_agent(...)`
 - `validate_batch_mutation(...)`
 - `validate_lifecycle_batch(...)`
+- `list_pending_reviews(...)`
 - `dashboard_summary(...)`
 
 ## Configuration And Rules
@@ -52,6 +54,19 @@ Primary methods:
 - Bytewax streaming contract
 
 The rule engine returns `allow`, `require_review`, or `deny` decisions with matched rules and required actions. Runtime methods enforce the same guardrails used by the contract.
+
+## Review Evidence
+
+WFLO persists review and denial evidence instead of leaving it only in transient
+rule-engine responses. Long-running definitions and privileged workflow agents
+carry `decision`, `matched_rules`, `review_reasons`, and `audit_evidence`.
+Denied lifecycle batches are stored as `denied` before `PermissionError` is
+raised so generated applications can inspect rejected Bytewax lifecycle
+mutations.
+
+Use `list_pending_reviews()` or the dashboard, definition library, agent panel,
+lifecycle monitor, and analytics view models to compose workflow approval
+queues without replaying rules.
 
 ## Workflow Agents
 

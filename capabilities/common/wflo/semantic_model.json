@@ -293,6 +293,7 @@
         "approval_flows",
         "execution_monitoring",
         "workflow_agent_composition",
+        "review_evidence",
         "compensation_controls",
         "bytewax_workflow_lifecycle"
       ],
@@ -302,6 +303,26 @@
         "audl",
         "aicr"
       ],
+      "review_evidence": {
+        "deny_behavior": "Denied WFLO lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "review_required",
+          "pending_review",
+          "denied"
+        ],
+        "pending_queues": [
+          "workflow_definitions",
+          "workflow_agents",
+          "lifecycle_batches"
+        ],
+        "policy_fields": [
+          "decision",
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "audit_evidence"
+        ]
+      },
       "rule_engine": {
         "rules": [
           {
@@ -1960,6 +1981,7 @@
         "approval_flows",
         "execution_monitoring",
         "workflow_agent_composition",
+        "review_evidence",
         "compensation_controls",
         "bytewax_workflow_lifecycle"
       ],
@@ -1969,6 +1991,26 @@
         "audl",
         "aicr"
       ],
+      "review_evidence": {
+        "deny_behavior": "Denied WFLO lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "review_required",
+          "pending_review",
+          "denied"
+        ],
+        "pending_queues": [
+          "workflow_definitions",
+          "workflow_agents",
+          "lifecycle_batches"
+        ],
+        "policy_fields": [
+          "decision",
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "audit_evidence"
+        ]
+      },
       "streaming": {
         "batch_mutation_guardrail": "batch_workflow_mutation_requires_bytewax",
         "broker_core_dependency_allowed": false,

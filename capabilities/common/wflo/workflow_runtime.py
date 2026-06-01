@@ -78,6 +78,9 @@ class WorkflowDefinitionRecord:
 	status: str = "draft"
 	required_actions: list[str] = field(default_factory=list)
 	matched_rules: list[str] = field(default_factory=list)
+	decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now)
 	published_at: str | None = None
 	published_by: str | None = None
@@ -143,6 +146,10 @@ class WorkflowApprovalRecord:
 	decision_by: str | None = None
 	decision_evidence_ref: str = ""
 	delegated_to: str = ""
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 
 	def to_dict(self) -> dict[str, Any]:
 		return serialize(self)
@@ -170,6 +177,10 @@ class WorkflowAuditEventRecord:
 	message: str
 	actor: str
 	severity: str = "low"
+	policy_decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -190,6 +201,10 @@ class WorkflowAgentRecord:
 	purpose: str
 	human_approval_required: bool = False
 	status: str = "active"
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -207,6 +222,9 @@ class WfloLifecycleBatchRecord:
 	status: str = "accepted"
 	matched_rules: list[str] = field(default_factory=list)
 	required_actions: list[str] = field(default_factory=list)
+	decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now)
 
 	def to_dict(self) -> dict[str, Any]:

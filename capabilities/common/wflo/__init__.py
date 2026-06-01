@@ -49,6 +49,7 @@ def register_capability() -> dict[str, Any]:
 			"task_routing": "Assign human and automated work with due dates, ownership, and escalation",
 			"approval_flows": "Enforce policy-backed approval gates for risky workflow paths",
 			"workflow_agent_composition": "Register first-class provider-neutral workflow agents for design, execution, approval, compensation, integration, lifecycle, and runtime observation",
+			"review_evidence": "Persist review-required definitions, workflow agents, lifecycle batches, and audit events with policy evidence",
 			"compensation_controls": "Cancel, fail, and compensate executions through governed runtime state changes",
 			"bytewax_workflow_lifecycle": "Validate workflow lifecycle batches through Bytewax-only processor metadata",
 			"capability_rules": "Evaluate deterministic workflow-governance rules",
@@ -60,6 +61,7 @@ def register_capability() -> dict[str, Any]:
 			"tasks": "/wflo/api/v1/tasks",
 			"approvals": "/wflo/api/v1/approvals",
 			"agents": "/wflo/api/v1/agents",
+			"pending_reviews": "/wflo/api/v1/pending-reviews",
 			"lifecycle": "/wflo/api/v1/lifecycle",
 			"events": "/wflo/api/v1/events",
 			"streaming": "/wflo/api/v1/streaming"

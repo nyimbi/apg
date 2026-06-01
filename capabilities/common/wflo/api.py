@@ -24,6 +24,7 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"open_task_count": summary["open_task_count"],
 		"pending_approval_count": summary["pending_approval_count"],
 		"agent_count": summary["agent_count"],
+		"pending_review_count": summary["pending_review_count"],
 		"lifecycle_batch_count": summary["lifecycle_batch_count"],
 		"agents": contract["agents"],
 		"streaming": contract["streaming"],
@@ -211,6 +212,10 @@ def list_records(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_records(tenant_id)
 
 
+def list_pending_reviews(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_pending_reviews(tenant_id)
+
+
 def list_workflow_orchestration(tenant_id: str = "default") -> dict[str, Any]:
 	return {
 		"definitions": SERVICE.list_definitions(tenant_id),
@@ -219,6 +224,7 @@ def list_workflow_orchestration(tenant_id: str = "default") -> dict[str, Any]:
 		"approvals": SERVICE.list_approvals(tenant_id),
 		"agents": SERVICE.list_agents(tenant_id),
 		"lifecycle_batches": SERVICE.list_lifecycle_batches(tenant_id),
+		"pending_reviews": SERVICE.list_pending_reviews(tenant_id),
 		"events": SERVICE.list_events(tenant_id),
 		"audit_events": SERVICE.list_audit_events(tenant_id),
 		"summary": SERVICE.dashboard_summary(tenant_id),

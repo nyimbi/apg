@@ -16,6 +16,75 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-06-01 06:09 EAT
+
+WFLO review-evidence lifecycle packet:
+
+- Extended workflow definitions, approvals, workflow agents, lifecycle batch
+  records, and audit events with durable policy evidence fields: decision or
+  policy decision, matched rules, review reasons, and audit evidence.
+- Preserved `review_required` workflow definitions for long-running workflows
+  and `pending_review` workflow agents for privileged provider-neutral agent
+  roles before generated workflow consoles need to replay rules.
+- Changed denied WFLO lifecycle batches to persist `denied` records before
+  raising `PermissionError`, preserving the Bytewax lifecycle-stream failure
+  reason and required remediation action.
+- Added consolidated pending-review queues to the WFLO service, API helpers,
+  dashboard, definition library, workflow-agent panel, lifecycle batch model,
+  analytics view, registration metadata, package contract, and semantic model.
+- Kept workflow agents first-class and provider-neutral for Codex, Claude Code,
+  OpenCode, Pi, and future orchestration runtimes while retaining human review
+  controls for privileged roles.
+- Updated focused WFLO tests and package contract tests to prove durable review
+  evidence for long-running definitions, privileged workflow agents, denied
+  lifecycle batches, audit events, API helpers, view models, and semantic model
+  evidence.
+- Updated WFLO README, specification, plan, and capability pointer to document
+  pending review queues, review evidence fields, and denied lifecycle evidence.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for WFLO modules and tests passed.
+- `./.venv/bin/pytest -q capabilities/common/wflo/test_capability_contract.py
+  capabilities/common/wflo/tests/test_package_contract.py` passed with 9 tests
+  and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.wflo import app; ..."`
+  passed package self-test.
+- `./.venv/bin/python -m json.tool
+  capabilities/common/wflo/semantic_model.json` passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/wflo --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/wflo --strict --json` passed with no warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/wflo --json`
+  passed with no warnings and side-effect-free publish planning.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/common/wflo --json` passed with complete lifecycle evidence and
+  43 rules.
+- WFLO stale-marker scan returned no TODO/FIXME/stub/placeholder, Kafka,
+  materialized-baseline, contract-only, or not-implemented markers across the
+  edited WFLO packet.
+- Service smoke executed long-running definition review evidence, privileged
+  workflow-agent review evidence, and denied non-Bytewax lifecycle persistence,
+  printing `review_required pending_review denied
+  bytewax_lifecycle_stream_required 2 PermissionError`.
+- `git diff --check -- capabilities/common/wflo docs/progress_log.md` passed
+  before commit staging.
+- Inline code review found no blocking issues; residual risks remain around
+  rendered workflow studio UI, live event bus and distributed executor, live
+  schedulers, live notifications, live script runtimes, live AI providers,
+  durable workflow database and migrations, live Bytewax workers, production
+  adapters, and load checks.
+
+Known gaps:
+
+- Full repository tests, rendered workflow studio UI, live event bus and
+  distributed executor, live schedulers, live notifications, live script
+  runtimes, live Codex/Claude Code/OpenCode/Pi providers, durable workflow
+  database and migrations, live Bytewax workers, production adapters, and load
+  checks still need later verification outside this battery-conscious slice.
+
 ### 2026-06-01 05:57 EAT
 
 WSBL review-evidence lifecycle packet:

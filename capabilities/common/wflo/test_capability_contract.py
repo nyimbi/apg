@@ -40,6 +40,7 @@ def test_contract_exposes_configuration_rules_ui_theme_and_streaming():
 	assert contract["streaming"]["processor"] == "bytewax"
 	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert contract["streaming"]["broker_core_dependency_allowed"] is False
+	assert "review_evidence" in contract["provides"]
 
 
 def test_rule_engine_enforces_workflow_guardrails():
@@ -137,6 +138,8 @@ def test_registration_includes_full_capability_contract():
 	assert registration["ui_components"]["lifecycle"] == "/wflo/lifecycle"
 	assert registration["agents"]["first_class"] is True
 	assert registration["streaming"]["required_processor"] == "bytewax"
+	assert "review_evidence" in registration["capabilities"]
+	assert registration["endpoints"]["pending_reviews"] == "/wflo/api/v1/pending-reviews"
 	assert "mqeb" in registration["dependencies"]
 	assert "them" in registration["optional_dependencies"]
 	assert "wflo:audit" in registration["permissions"]

@@ -16,6 +16,7 @@ The capability must support:
 - Approval requests with approver and reason, plus decisions with evidence, rejection, and delegation support.
 - AI workflow agents as first-class records, with stable ID, readable name, supported runtime, supported workflow-governance role, owner, purpose, scope, visible contribution disclosure, and human-review treatment for privileged roles.
 - Bytewax-backed event-stream configuration for batch workflow mutations, runtime events, and lifecycle batches across definitions, publications, executions, tasks, approvals, compensation, workflow agents, and audit.
+- Durable review evidence for review-required definitions, privileged workflow agents, denied lifecycle batches, approval decisions, and audit events.
 - UI route contracts and dependency-light view models for generated applications.
 
 ## Dependencies
@@ -84,6 +85,12 @@ The deterministic rule engine covers:
 
 The runtime enforces the same guardrails exposed by the contract rule engine and keeps live providers behind adapter boundaries.
 
+Review-required definitions, pending-review workflow agents, approval
+decisions, lifecycle batches, and audit events expose `decision` or
+`policy_decision`, `matched_rules`, `review_reasons`, and `audit_evidence`.
+Denied lifecycle batches must be persisted before the service raises
+`PermissionError`.
+
 ## UI
 
 The UI contract exposes:
@@ -99,6 +106,10 @@ The UI contract exposes:
 - audit
 - analytics
 - settings
+
+Dashboard, definition-library, agent-panel, lifecycle, and analytics view
+models expose pending-review queues or denied lifecycle evidence for generated
+approval consoles.
 
 ## Production Boundary
 

@@ -41,9 +41,16 @@ def semantic_model() -> dict[str, Any]:
 		"approval_flows",
 		"execution_monitoring",
 		"workflow_agent_composition",
+		"review_evidence",
 		"compensation_controls",
 		"bytewax_workflow_lifecycle",
 	]
+	review_evidence = {
+		"durable_statuses": ["review_required", "pending_review", "denied"],
+		"policy_fields": ["decision", "policy_decision", "matched_rules", "review_reasons", "audit_evidence"],
+		"pending_queues": ["workflow_definitions", "workflow_agents", "lifecycle_batches"],
+		"deny_behavior": "Denied WFLO lifecycle batches persist evidence before PermissionError",
+	}
 	return {
 		"format": "apg.semantic-model.v1",
 		"ok": True,
@@ -81,6 +88,7 @@ def semantic_model() -> dict[str, Any]:
 					"lifecycle_batch": "WfloLifecycleBatchRecord",
 					"audit": "WorkflowAuditEventRecord",
 				},
+				"review_evidence": review_evidence,
 				"adapters": contract["configuration"]["adapters"],
 				"business_rules": [],
 				"components": {},
@@ -102,6 +110,7 @@ def semantic_model() -> dict[str, Any]:
 				"requires": dependencies,
 				"agents": contract["agents"],
 				"streaming": contract["streaming"],
+				"review_evidence": review_evidence,
 			}
 		},
 		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
@@ -181,6 +190,8 @@ def self_test() -> dict[str, Any]:
 		errors.append("WFLO lifecycle streaming must require Bytewax")
 	if capability.get("runtime", {}).get("service") != "service.WfloService":
 		errors.append("WFLO generated-app runtime is missing")
+	if "review_evidence" not in capability:
+		errors.append("WFLO semantic model must expose durable review evidence")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

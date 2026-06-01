@@ -8,9 +8,10 @@ Build one coherent lifecycle and guardrail packet that makes `wflo` usable by ge
 2. Expand the executable contract with definition, step, execution, task, approval, first-class workflow-agent, governance, observability, adapter, UI, theme, and Bytewax streaming surfaces.
 3. Extend runtime models for step policies, execution state-change reasons, compensation state, task claim/escalation data, approval decision evidence, workflow agents, and lifecycle batch records.
 4. Enforce workflow lifecycle guardrails in `WfloService`: retry policy, trigger policy, AI/automation/event step policies, published execution, correlation ID, Bytewax events, task claims, approval evidence, cancellation/failure reason, compensation plan, provider-neutral agent registration, privileged-agent review, and lifecycle batch validation.
-5. Expose dependency-light API helpers and view models for the new lifecycle surfaces, including the workflow-agent roster and lifecycle batch monitor.
-6. Refresh package semantic evidence from the live contract.
-7. Run focused verification only, preserving battery.
+5. Preserve durable review evidence on review-required definitions, privileged workflow agents, lifecycle batches, approval decisions, and audit events.
+6. Expose dependency-light API helpers and view models for the new lifecycle surfaces, including pending-review queues, the workflow-agent roster, and lifecycle batch monitor.
+7. Refresh package semantic evidence from the live contract.
+8. Run focused verification only, preserving battery.
 
 ## Review Checklist
 
@@ -23,6 +24,7 @@ Build one coherent lifecycle and guardrail packet that makes `wflo` usable by ge
 - Cancellation, failure, escalation, and compensation cannot omit required reason or plan evidence.
 - AI workflow agents cannot be registered without stable ID, readable name, supported runtime, supported role, scope, owner, purpose, and disclosure.
 - Privileged workflow-agent roles require human approval evidence or remain in `pending_review`.
+- Review-required definitions, pending-review agents, and denied lifecycle batches expose matched rules, review reasons, and audit evidence.
 - Lifecycle batches cannot be accepted without Bytewax routing, supported lifecycle operation, and at least one mutation.
 - UI routes and view models expose all user-visible lifecycle surfaces.
 - Documentation explains production adapter boundaries instead of implying external services run locally.

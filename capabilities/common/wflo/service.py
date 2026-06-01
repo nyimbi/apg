@@ -114,9 +114,12 @@ class WfloService:
 			status=status,
 			required_actions=workflow_required_actions(result),
 			matched_rules=list(result["matched_rules"]),
+			decision=result["decision"],
+			review_reasons=self._review_reasons(result),
+			audit_evidence=self._audit_evidence(result, runtime_review_recorded),
 		)
 		self.definitions[record.id] = record
-		self._record_audit(tenant_id, "workflow_created", record.id, f"Workflow definition {status}: {name}", actor)
+		self._record_audit(tenant_id, "workflow_created", record.id, f"Workflow definition {status}: {name}", actor, policy_result=result)
 		return record.to_dict()
 
 	def publish_workflow(
@@ -141,7 +144,11 @@ class WfloService:
 		definition.status = "published"
 		definition.published_at = utc_now()
 		definition.published_by = published_by
-		self._record_audit(tenant_id, "workflow_published", definition.id, f"Workflow published: {definition.name}", published_by)
+		definition.decision = "allow"
+		definition.matched_rules = []
+		definition.review_reasons = []
+		definition.audit_evidence = {"required_actions": [], "reasons": [], "review_recorded": True}
+		self._record_audit(tenant_id, "workflow_published", definition.id, f"Workflow published: {definition.name}", published_by, policy_result=result)
 		return definition.to_dict()
 
 	def retire_workflow(
@@ -163,7 +170,7 @@ class WfloService:
 		if result["decision"] == "deny":
 			self._raise_policy(result)
 		definition.status = "retired"
-		self._record_audit(tenant_id, "workflow_retired", definition.id, f"Workflow retired: {definition.name}", retired_by)
+		self._record_audit(tenant_id, "workflow_retired", definition.id, f"Workflow retired: {definition.name}", retired_by, policy_result=result)
 		return definition.to_dict()
 
 	def start_execution(
@@ -200,7 +207,7 @@ class WfloService:
 		)
 		self.executions[record.id] = record
 		self.emit_event(tenant_id, record.id, "workflow_started", {"definition_id": definition.id, "correlation_id": correlation_id}, event_stream=event_stream)
-		self._record_audit(tenant_id, "execution_started", record.id, f"Workflow execution started: {definition.name}", started_by)
+		self._record_audit(tenant_id, "execution_started", record.id, f"Workflow execution started: {definition.name}", started_by, policy_result=result)
 		return record.to_dict()
 
 	def create_task(
@@ -316,6 +323,10 @@ class WfloService:
 			subject_ref=subject_ref,
 			approver_ref=approver_ref,
 			reason=reason,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._review_reasons(result),
+			audit_evidence=self._audit_evidence(result),
 		)
 		self.approvals[record.id] = record
 		execution.status = "waiting_approval"
@@ -352,6 +363,10 @@ class WfloService:
 		approval.decision_by = decision_by
 		approval.decision_evidence_ref = decision_evidence_ref
 		approval.delegated_to = delegated_to
+		approval.decision = result["decision"]
+		approval.matched_rules = list(result["matched_rules"])
+		approval.review_reasons = self._review_reasons(result)
+		approval.audit_evidence = self._audit_evidence(result, True)
 		execution = self._get_execution(tenant_id, approval.execution_id)
 		execution.status = "running" if decision_value in {"approved", "delegated"} else "failed"
 		self.emit_event(tenant_id, execution.id, f"approval_{decision_value}", {"approval_id": approval.id})
@@ -518,9 +533,13 @@ class WfloService:
 			purpose=purpose_value,
 			human_approval_required=approval_recorded,
 			status="pending_review" if result["decision"] == "require_review" else "active",
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._review_reasons(result),
+			audit_evidence=self._audit_evidence(result, approval_recorded),
 		)
 		self.agents[self._tenant_key(tenant_id, agent_id)] = record
-		self._record_audit(tenant_id, "workflow_agent_registered", agent_id, f"Workflow agent registered: {name}", registered_by)
+		self._record_audit(tenant_id, "workflow_agent_registered", agent_id, f"Workflow agent registered: {name}", registered_by, policy_result=result)
 		return record.to_dict()
 
 	def validate_batch_mutation(self, event_stream: str) -> dict[str, Any]:
@@ -548,8 +567,6 @@ class WfloService:
 			"state_change_requested": True,
 			"audit_event_recorded": True,
 		})
-		if result["decision"] == "deny":
-			self._raise_policy(result)
 		record_id = batch_id or stable_id("wflo_lifecycle_batch", tenant_id, operation_value, len(self.lifecycle_batches))
 		record = WfloLifecycleBatchRecord(
 			id=record_id,
@@ -557,12 +574,17 @@ class WfloService:
 			event_stream=self._normalize_token(event_stream),
 			operation=operation_value,
 			mutation_count=int(mutation_count),
-			status="accepted" if result["decision"] == "allow" else "review_required",
+			status="denied" if result["decision"] == "deny" else "accepted" if result["decision"] == "allow" else "review_required",
 			matched_rules=list(result["matched_rules"]),
 			required_actions=workflow_required_actions(result),
+			decision=result["decision"],
+			review_reasons=self._review_reasons(result),
+			audit_evidence=self._audit_evidence(result),
 		)
 		self.lifecycle_batches[self._tenant_key(tenant_id, record_id)] = record
-		self._record_audit(tenant_id, "wflo_lifecycle_batch_validated", record.id, f"WFLO lifecycle batch {record.status}: {operation_value}", "wflo")
+		self._record_audit(tenant_id, "wflo_lifecycle_batch_validated", record.id, f"WFLO lifecycle batch {record.status}: {operation_value}", "wflo", policy_result=result)
+		if result["decision"] == "deny":
+			self._raise_policy(result)
 		return record.to_dict()
 
 	def create_record(
@@ -621,11 +643,23 @@ class WfloService:
 	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.lifecycle_batches, tenant_id)
 
+	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return [
+			item
+			for item in (
+				self.list_definitions(tenant_id)
+				+ self.list_agents(tenant_id)
+				+ self.list_lifecycle_batches(tenant_id)
+			)
+			if item.get("status") == "review_required" or item.get("status") == "pending_review"
+		]
+
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		definitions = self.list_definitions(tenant_id)
 		executions = self.list_executions(tenant_id)
 		tasks = self.list_tasks(tenant_id)
 		approvals = self.list_approvals(tenant_id)
+		pending_reviews = self.list_pending_reviews(tenant_id)
 		return {
 			"tenant_id": tenant_id,
 			"definition_count": len(definitions),
@@ -638,6 +672,7 @@ class WfloService:
 			"pending_approval_count": sum(1 for item in approvals if item["status"] == "pending"),
 			"agent_count": len(self.list_agents(tenant_id)),
 			"pending_agent_review_count": sum(1 for item in self.list_agents(tenant_id) if item["status"] == "pending_review"),
+			"pending_review_count": len(pending_reviews),
 			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
 			"denied_lifecycle_batch_count": sum(1 for item in self.list_lifecycle_batches(tenant_id) if item["status"] not in {"accepted", "review_required"}),
 			"cancelled_execution_count": sum(1 for item in executions if item["status"] == "cancelled"),
@@ -737,7 +772,9 @@ class WfloService:
 		message: str,
 		actor: str,
 		severity: str = "low",
+		policy_result: dict[str, Any] | None = None,
 	) -> dict[str, Any]:
+		policy_result = policy_result or {"decision": "allow", "matched_rules": [], "actions": []}
 		record = WorkflowAuditEventRecord(
 			id=stable_id("wflo_audit", tenant_id, event_type, subject_id, len(self.audit_events)),
 			tenant_id=tenant_id,
@@ -746,9 +783,31 @@ class WfloService:
 			message=message,
 			actor=actor,
 			severity=severity,
+			policy_decision=policy_result["decision"],
+			matched_rules=list(policy_result["matched_rules"]),
+			review_reasons=self._review_reasons(policy_result),
+			audit_evidence=self._audit_evidence(policy_result),
 		)
 		self.audit_events[record.id] = record
 		return record.to_dict()
+
+	def _review_reasons(self, result: dict[str, Any]) -> list[str]:
+		if result["decision"] == "allow":
+			return []
+		return [
+			action.get("reason", "workflow_policy_blocked")
+			for action in result.get("actions", [])
+		]
+
+	def _audit_evidence(self, result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+		return {
+			"required_actions": workflow_required_actions(result),
+			"reasons": [
+				action.get("reason", "workflow_policy_blocked")
+				for action in result.get("actions", [])
+			],
+			"review_recorded": bool(review_recorded),
+		}
 
 	def _list(self, records: dict[str, Any], tenant_id: str | None = None) -> list[dict[str, Any]]:
 		items = [record.to_dict() for record in records.values()]

@@ -337,7 +337,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "wflo",
 		"display_name": "Workflow Orchestration",
-		"provides": ["workflow_definitions", "event_orchestration", "task_routing", "approval_flows", "execution_monitoring", "workflow_agent_composition", "compensation_controls", "bytewax_workflow_lifecycle"],
+		"provides": ["workflow_definitions", "event_orchestration", "task_routing", "approval_flows", "execution_monitoring", "workflow_agent_composition", "review_evidence", "compensation_controls", "bytewax_workflow_lifecycle"],
 		"requires": ["mqeb", "auth", "audl", "aicr"],
 		"configuration": config,
 		"configuration_schema": CONFIGURATION_SCHEMA,

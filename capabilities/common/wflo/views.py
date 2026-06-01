@@ -22,6 +22,7 @@ def dashboard_model(
 		"tenant_id": tenant_id,
 		"routes": capability_routes(tenant_id),
 		"summary": service.dashboard_summary(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
 		"agents": contract["agents"],
@@ -53,6 +54,11 @@ def definition_library_model(
 		"route": "/wflo/definitions",
 		"tenant_id": tenant_id,
 		"definitions": service.list_definitions(tenant_id),
+		"pending_reviews": [
+			definition
+			for definition in service.list_pending_reviews(tenant_id)
+			if definition.get("trigger_type")
+		],
 		"statuses": ["draft", "review_required", "published", "retired"],
 	}
 
@@ -110,6 +116,11 @@ def agent_panel_model(
 		"route": "/wflo/agents",
 		"tenant_id": tenant_id,
 		"agents": service.list_agents(tenant_id),
+		"pending_reviews": [
+			agent
+			for agent in service.list_agents(tenant_id)
+			if agent["status"] == "pending_review"
+		],
 		"supported_runtimes": contract["agents"]["supported_runtimes"],
 		"supported_roles": contract["agents"]["supported_roles"],
 		"privileged_roles": contract["agents"]["privileged_roles"],
@@ -128,6 +139,11 @@ def lifecycle_batch_model(
 		"route": "/wflo/lifecycle",
 		"tenant_id": tenant_id,
 		"batches": service.list_lifecycle_batches(tenant_id),
+		"denied": [
+			batch
+			for batch in service.list_lifecycle_batches(tenant_id)
+			if batch["status"] == "denied"
+		],
 		"streaming": contract["streaming"],
 		"required_processor": contract["streaming"]["required_processor"],
 		"required_operations": contract["streaming"]["required_operations"],
@@ -157,6 +173,7 @@ def analytics_model(
 		"route": "/wflo/analytics",
 		"tenant_id": tenant_id,
 		"summary": service.dashboard_summary(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
 		"review_required_definitions": [
 			definition
 			for definition in service.list_definitions(tenant_id)

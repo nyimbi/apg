@@ -16,5 +16,9 @@ readers that still look for `cap_spec.md`. Runtime behavior is defined by:
 The current packet adds first-class provider-neutral workflow agents and
 Bytewax lifecycle-batch guardrails on top of the existing workflow definition,
 execution, task, approval, compensation, event, audit, UI, and theming runtime.
+It also preserves durable review evidence for review-required definitions,
+pending-review workflow agents, denied lifecycle batches, approval decisions,
+and audit events so generated applications can compose approval consoles
+without replaying rules.
 
 Use the focused verification commands in `PLAN.md` after changing this package.
