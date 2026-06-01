@@ -1,0 +1,1340 @@
+{
+  "app": {
+    "description": "Anti Money Laundering package-backed APG capability",
+    "entity_count": 5,
+    "name": "fintech_aml",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "fintech_aml": {
+      "configuration": {
+        "adapters": {
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "aml_ops_reviewer",
+            "transaction_monitoring_analyst",
+            "sanctions_reviewer",
+            "case_investigator",
+            "sar_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "alerts": {
+          "auto_close_allowed": false,
+          "disposition_required_to_close": true,
+          "evidence_required": true,
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "supported_types": [
+            "large_transaction",
+            "velocity",
+            "structuring",
+            "sanctions",
+            "pep",
+            "high_risk_kyc",
+            "mule_account",
+            "agent_review"
+          ]
+        },
+        "cases": {
+          "evidence_required": true,
+          "investigator_required_for_escalation": true,
+          "sar_allowed_statuses": [
+            "escalated",
+            "under_investigation",
+            "confirmed_suspicious"
+          ],
+          "supported_types": [
+            "transaction_monitoring",
+            "sanctions_alert",
+            "structuring_alert",
+            "mule_account",
+            "high_risk_customer",
+            "suspicious_activity_report"
+          ]
+        },
+        "governance": {
+          "audit_aml_events": true,
+          "human_approval_required_for_sar": true,
+          "kyc_link_required": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "monitoring": {
+          "high_risk_score_threshold": 75,
+          "large_transaction_threshold": 10000.0,
+          "structuring_count_threshold": 3,
+          "structuring_threshold": 9500.0,
+          "velocity_amount_threshold": 25000.0,
+          "velocity_count_threshold": 5,
+          "velocity_window_minutes": 60
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_alert_events": true,
+          "emit_case_events": true,
+          "emit_sar_events": true,
+          "emit_transaction_events": true,
+          "event_stream": "apg.fintech.aml.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "sar": {
+          "evidence_required": true,
+          "human_approval_required": true,
+          "jurisdiction_required": true,
+          "narrative_required": true,
+          "subject_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_aml_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_alerts": true,
+          "enable_cases": true,
+          "enable_dashboard": true,
+          "enable_monitoring": true,
+          "enable_sar": true,
+          "enable_typologies": true
+        }
+      },
+      "name": "Anti Money Laundering",
+      "provides": [
+        "transaction_monitoring",
+        "aml_alert_triage",
+        "sanctions_pep_escalation",
+        "suspicious_activity_case_management",
+        "sar_workflow",
+        "typology_rule_engine",
+        "aml_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_kyc"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "AML operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "description": "AML writes require policy evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "aml_policy_required",
+              "required_action": "attach_aml_policy"
+            },
+            "name": "aml_write_requires_policy"
+          },
+          {
+            "condition": {
+              "operation": "monitor_transaction",
+              "subject_present": false
+            },
+            "description": "Monitored transactions require a subject reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "transaction_subject_required",
+              "required_action": "attach_subject_reference"
+            },
+            "name": "transaction_subject_required"
+          },
+          {
+            "condition": {
+              "operation": "monitor_transaction",
+              "positive_amount": false
+            },
+            "description": "Monitored transactions require a positive amount.",
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_amount_required",
+              "required_action": "set_positive_amount"
+            },
+            "name": "transaction_amount_required"
+          },
+          {
+            "condition": {
+              "currency_present": false,
+              "operation": "monitor_transaction"
+            },
+            "description": "Monitored transactions require currency.",
+            "effect": {
+              "decision": "deny",
+              "reason": "currency_required",
+              "required_action": "set_currency"
+            },
+            "name": "transaction_currency_required"
+          },
+          {
+            "condition": {
+              "operation": "monitor_transaction",
+              "source_reference_present": false
+            },
+            "description": "Monitored transactions require source capability reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_reference_required",
+              "required_action": "attach_source_reference"
+            },
+            "name": "transaction_source_required"
+          },
+          {
+            "condition": {
+              "kyc_link_present": false,
+              "operation": "monitor_transaction"
+            },
+            "description": "AML monitoring requires linked KYC profile evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "kyc_link_required",
+              "required_action": "attach_kyc_profile"
+            },
+            "name": "transaction_requires_kyc_link"
+          },
+          {
+            "condition": {
+              "large_transaction": true,
+              "operation": "monitor_transaction",
+              "review_recorded": false
+            },
+            "description": "Large transactions require AML review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "large_transaction_review_required",
+              "required_action": "review_large_transaction"
+            },
+            "name": "large_transaction_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "monitor_transaction",
+              "review_recorded": false,
+              "velocity_indicator": true
+            },
+            "description": "Velocity indicators require AML review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "velocity_review_required",
+              "required_action": "review_velocity_pattern"
+            },
+            "name": "velocity_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "monitor_transaction",
+              "review_recorded": false,
+              "structuring_indicator": true
+            },
+            "description": "Structuring indicators require AML review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "structuring_review_required",
+              "required_action": "review_structuring_pattern"
+            },
+            "name": "structuring_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "monitor_transaction",
+              "review_recorded": false,
+              "sanctions_hit": true
+            },
+            "description": "Sanctions indicators require escalation.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "sanctions_escalation_required",
+              "required_action": "escalate_sanctions_hit"
+            },
+            "name": "sanctions_requires_escalation"
+          },
+          {
+            "condition": {
+              "high_risk_kyc": true,
+              "operation": "monitor_transaction",
+              "review_recorded": false
+            },
+            "description": "High-risk KYC subjects require AML review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "high_risk_kyc_review_required",
+              "required_action": "review_high_risk_subject"
+            },
+            "name": "high_risk_kyc_requires_review"
+          },
+          {
+            "condition": {
+              "alert_type_supported": false,
+              "operation": "create_alert"
+            },
+            "description": "AML alert type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "aml_alert_type_not_supported",
+              "required_action": "select_supported_alert_type"
+            },
+            "name": "alert_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "create_alert",
+              "severity_supported": false
+            },
+            "description": "AML alert severity must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "aml_severity_not_supported",
+              "required_action": "select_supported_severity"
+            },
+            "name": "alert_severity_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "create_alert"
+            },
+            "description": "AML alerts require evidence references.",
+            "effect": {
+              "decision": "deny",
+              "reason": "aml_alert_evidence_required",
+              "required_action": "attach_alert_evidence"
+            },
+            "name": "alert_evidence_required"
+          },
+          {
+            "condition": {
+              "closing_alert": true,
+              "disposition_present": false,
+              "operation": "triage_alert"
+            },
+            "description": "Closing AML alerts requires disposition.",
+            "effect": {
+              "decision": "deny",
+              "reason": "alert_disposition_required",
+              "required_action": "record_alert_disposition"
+            },
+            "name": "alert_close_requires_disposition"
+          },
+          {
+            "condition": {
+              "escalating_alert": true,
+              "operation": "triage_alert",
+              "reviewer_present": false
+            },
+            "description": "Escalated alerts require reviewer evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "alert_reviewer_required",
+              "required_action": "assign_aml_reviewer"
+            },
+            "name": "alert_escalation_requires_reviewer"
+          },
+          {
+            "condition": {
+              "alert_present": false,
+              "operation": "open_case"
+            },
+            "description": "AML cases require an alert reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "aml_alert_required",
+              "required_action": "select_alert"
+            },
+            "name": "case_alert_required"
+          },
+          {
+            "condition": {
+              "case_type_supported": false,
+              "operation": "open_case"
+            },
+            "description": "AML case type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "aml_case_type_not_supported",
+              "required_action": "select_supported_case_type"
+            },
+            "name": "case_type_supported"
+          },
+          {
+            "condition": {
+              "investigator_present": false,
+              "operation": "open_case"
+            },
+            "description": "AML cases require an investigator.",
+            "effect": {
+              "decision": "deny",
+              "reason": "case_investigator_required",
+              "required_action": "assign_investigator"
+            },
+            "name": "case_investigator_required"
+          },
+          {
+            "condition": {
+              "case_present": false,
+              "operation": "draft_sar"
+            },
+            "description": "SAR drafts require a case.",
+            "effect": {
+              "decision": "deny",
+              "reason": "sar_case_required",
+              "required_action": "select_case"
+            },
+            "name": "sar_case_required"
+          },
+          {
+            "condition": {
+              "operation": "draft_sar",
+              "subject_present": false
+            },
+            "description": "SAR drafts require subject reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "sar_subject_required",
+              "required_action": "attach_subject_reference"
+            },
+            "name": "sar_subject_required"
+          },
+          {
+            "condition": {
+              "jurisdiction_present": false,
+              "operation": "draft_sar"
+            },
+            "description": "SAR drafts require jurisdiction.",
+            "effect": {
+              "decision": "deny",
+              "reason": "sar_jurisdiction_required",
+              "required_action": "set_jurisdiction"
+            },
+            "name": "sar_jurisdiction_required"
+          },
+          {
+            "condition": {
+              "narrative_present": false,
+              "operation": "draft_sar"
+            },
+            "description": "SAR drafts require a narrative.",
+            "effect": {
+              "decision": "deny",
+              "reason": "sar_narrative_required",
+              "required_action": "write_sar_narrative"
+            },
+            "name": "sar_narrative_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "draft_sar"
+            },
+            "description": "SAR drafts require evidence references.",
+            "effect": {
+              "decision": "deny",
+              "reason": "sar_evidence_required",
+              "required_action": "attach_sar_evidence"
+            },
+            "name": "sar_evidence_required"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "draft_sar"
+            },
+            "description": "SAR drafts require human approval before filing.",
+            "effect": {
+              "decision": "deny",
+              "reason": "sar_human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "sar_human_approval_required"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "aml_batch"
+            },
+            "description": "AML batches require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_aml_batch_to_bytewax"
+            },
+            "name": "aml_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "aml_event"
+            },
+            "description": "AML events require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_aml_event_to_bytewax"
+            },
+            "name": "aml_event_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_aml_agent"
+            },
+            "description": "AML agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "aml_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "aml_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_aml_agent"
+            },
+            "description": "AML agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "aml_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "aml_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "aml_agent_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged AML-agent actions require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_aml_agent_action_requires_human_approval"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "AML operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "description": "AML writes require policy evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "aml_policy_required",
+            "required_action": "attach_aml_policy"
+          },
+          "name": "aml_write_requires_policy"
+        },
+        {
+          "condition": {
+            "operation": "monitor_transaction",
+            "subject_present": false
+          },
+          "description": "Monitored transactions require a subject reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "transaction_subject_required",
+            "required_action": "attach_subject_reference"
+          },
+          "name": "transaction_subject_required"
+        },
+        {
+          "condition": {
+            "operation": "monitor_transaction",
+            "positive_amount": false
+          },
+          "description": "Monitored transactions require a positive amount.",
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_amount_required",
+            "required_action": "set_positive_amount"
+          },
+          "name": "transaction_amount_required"
+        },
+        {
+          "condition": {
+            "currency_present": false,
+            "operation": "monitor_transaction"
+          },
+          "description": "Monitored transactions require currency.",
+          "effect": {
+            "decision": "deny",
+            "reason": "currency_required",
+            "required_action": "set_currency"
+          },
+          "name": "transaction_currency_required"
+        },
+        {
+          "condition": {
+            "operation": "monitor_transaction",
+            "source_reference_present": false
+          },
+          "description": "Monitored transactions require source capability reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_reference_required",
+            "required_action": "attach_source_reference"
+          },
+          "name": "transaction_source_required"
+        },
+        {
+          "condition": {
+            "kyc_link_present": false,
+            "operation": "monitor_transaction"
+          },
+          "description": "AML monitoring requires linked KYC profile evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "kyc_link_required",
+            "required_action": "attach_kyc_profile"
+          },
+          "name": "transaction_requires_kyc_link"
+        },
+        {
+          "condition": {
+            "large_transaction": true,
+            "operation": "monitor_transaction",
+            "review_recorded": false
+          },
+          "description": "Large transactions require AML review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "large_transaction_review_required",
+            "required_action": "review_large_transaction"
+          },
+          "name": "large_transaction_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "monitor_transaction",
+            "review_recorded": false,
+            "velocity_indicator": true
+          },
+          "description": "Velocity indicators require AML review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "velocity_review_required",
+            "required_action": "review_velocity_pattern"
+          },
+          "name": "velocity_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "monitor_transaction",
+            "review_recorded": false,
+            "structuring_indicator": true
+          },
+          "description": "Structuring indicators require AML review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "structuring_review_required",
+            "required_action": "review_structuring_pattern"
+          },
+          "name": "structuring_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "monitor_transaction",
+            "review_recorded": false,
+            "sanctions_hit": true
+          },
+          "description": "Sanctions indicators require escalation.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "sanctions_escalation_required",
+            "required_action": "escalate_sanctions_hit"
+          },
+          "name": "sanctions_requires_escalation"
+        },
+        {
+          "condition": {
+            "high_risk_kyc": true,
+            "operation": "monitor_transaction",
+            "review_recorded": false
+          },
+          "description": "High-risk KYC subjects require AML review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "high_risk_kyc_review_required",
+            "required_action": "review_high_risk_subject"
+          },
+          "name": "high_risk_kyc_requires_review"
+        },
+        {
+          "condition": {
+            "alert_type_supported": false,
+            "operation": "create_alert"
+          },
+          "description": "AML alert type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "aml_alert_type_not_supported",
+            "required_action": "select_supported_alert_type"
+          },
+          "name": "alert_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "create_alert",
+            "severity_supported": false
+          },
+          "description": "AML alert severity must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "aml_severity_not_supported",
+            "required_action": "select_supported_severity"
+          },
+          "name": "alert_severity_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "create_alert"
+          },
+          "description": "AML alerts require evidence references.",
+          "effect": {
+            "decision": "deny",
+            "reason": "aml_alert_evidence_required",
+            "required_action": "attach_alert_evidence"
+          },
+          "name": "alert_evidence_required"
+        },
+        {
+          "condition": {
+            "closing_alert": true,
+            "disposition_present": false,
+            "operation": "triage_alert"
+          },
+          "description": "Closing AML alerts requires disposition.",
+          "effect": {
+            "decision": "deny",
+            "reason": "alert_disposition_required",
+            "required_action": "record_alert_disposition"
+          },
+          "name": "alert_close_requires_disposition"
+        },
+        {
+          "condition": {
+            "escalating_alert": true,
+            "operation": "triage_alert",
+            "reviewer_present": false
+          },
+          "description": "Escalated alerts require reviewer evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "alert_reviewer_required",
+            "required_action": "assign_aml_reviewer"
+          },
+          "name": "alert_escalation_requires_reviewer"
+        },
+        {
+          "condition": {
+            "alert_present": false,
+            "operation": "open_case"
+          },
+          "description": "AML cases require an alert reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "aml_alert_required",
+            "required_action": "select_alert"
+          },
+          "name": "case_alert_required"
+        },
+        {
+          "condition": {
+            "case_type_supported": false,
+            "operation": "open_case"
+          },
+          "description": "AML case type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "aml_case_type_not_supported",
+            "required_action": "select_supported_case_type"
+          },
+          "name": "case_type_supported"
+        },
+        {
+          "condition": {
+            "investigator_present": false,
+            "operation": "open_case"
+          },
+          "description": "AML cases require an investigator.",
+          "effect": {
+            "decision": "deny",
+            "reason": "case_investigator_required",
+            "required_action": "assign_investigator"
+          },
+          "name": "case_investigator_required"
+        },
+        {
+          "condition": {
+            "case_present": false,
+            "operation": "draft_sar"
+          },
+          "description": "SAR drafts require a case.",
+          "effect": {
+            "decision": "deny",
+            "reason": "sar_case_required",
+            "required_action": "select_case"
+          },
+          "name": "sar_case_required"
+        },
+        {
+          "condition": {
+            "operation": "draft_sar",
+            "subject_present": false
+          },
+          "description": "SAR drafts require subject reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "sar_subject_required",
+            "required_action": "attach_subject_reference"
+          },
+          "name": "sar_subject_required"
+        },
+        {
+          "condition": {
+            "jurisdiction_present": false,
+            "operation": "draft_sar"
+          },
+          "description": "SAR drafts require jurisdiction.",
+          "effect": {
+            "decision": "deny",
+            "reason": "sar_jurisdiction_required",
+            "required_action": "set_jurisdiction"
+          },
+          "name": "sar_jurisdiction_required"
+        },
+        {
+          "condition": {
+            "narrative_present": false,
+            "operation": "draft_sar"
+          },
+          "description": "SAR drafts require a narrative.",
+          "effect": {
+            "decision": "deny",
+            "reason": "sar_narrative_required",
+            "required_action": "write_sar_narrative"
+          },
+          "name": "sar_narrative_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "draft_sar"
+          },
+          "description": "SAR drafts require evidence references.",
+          "effect": {
+            "decision": "deny",
+            "reason": "sar_evidence_required",
+            "required_action": "attach_sar_evidence"
+          },
+          "name": "sar_evidence_required"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "draft_sar"
+          },
+          "description": "SAR drafts require human approval before filing.",
+          "effect": {
+            "decision": "deny",
+            "reason": "sar_human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "sar_human_approval_required"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "aml_batch"
+          },
+          "description": "AML batches require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_aml_batch_to_bytewax"
+          },
+          "name": "aml_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "aml_event"
+          },
+          "description": "AML events require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_aml_event_to_bytewax"
+          },
+          "name": "aml_event_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_aml_agent"
+          },
+          "description": "AML agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "aml_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "aml_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_aml_agent"
+          },
+          "description": "AML agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "aml_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "aml_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "aml_agent_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged AML-agent actions require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_aml_agent_action_requires_human_approval"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "agents": {
+          "component": "AmlAgentWorkbench",
+          "permission": "fintech_aml:admin",
+          "route": "/fintech-aml/agents"
+        },
+        "alerts": {
+          "component": "AmlAlertQueue",
+          "permission": "fintech_aml:triage",
+          "route": "/fintech-aml/alerts"
+        },
+        "cases": {
+          "component": "AmlCaseWorkbench",
+          "permission": "fintech_aml:investigate",
+          "route": "/fintech-aml/cases"
+        },
+        "dashboard": {
+          "component": "AmlDashboard",
+          "permission": "fintech_aml:view",
+          "route": "/fintech-aml/dashboard"
+        },
+        "monitoring": {
+          "component": "AmlMonitoringConsole",
+          "permission": "fintech_aml:monitor",
+          "route": "/fintech-aml/monitoring"
+        },
+        "sar": {
+          "component": "AmlSarWorkflow",
+          "permission": "fintech_aml:file_sar",
+          "route": "/fintech-aml/sar"
+        },
+        "settings": {
+          "component": "AmlSettings",
+          "permission": "fintech_aml:admin",
+          "route": "/fintech-aml/settings"
+        },
+        "typologies": {
+          "component": "AmlTypologyRules",
+          "permission": "fintech_aml:admin",
+          "route": "/fintech-aml/typologies"
+        }
+      },
+      "streaming": {
+        "events": [
+          "aml_transaction_monitored",
+          "aml_alert_created",
+          "aml_alert_triaged",
+          "aml_case_opened",
+          "aml_sar_drafted",
+          "aml_agent_registered"
+        ],
+        "guardrails": [
+          "aml_batch_requires_bytewax",
+          "aml_event_requires_bytewax",
+          "privileged_aml_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.fintech.aml.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "alerts": {
+            "icon": "shield-alert",
+            "status_indicator": "aml-severity-chip"
+          },
+          "cases": {
+            "icon": "folder-search",
+            "status_indicator": "case-status-chip"
+          },
+          "monitoring": {
+            "icon": "activity",
+            "visual": "transaction-lane"
+          },
+          "sar": {
+            "icon": "file-warning",
+            "status_indicator": "sar-approval-chip"
+          },
+          "typologies": {
+            "icon": "list-checks",
+            "visual": "rule-matrix"
+          }
+        },
+        "name": "fintech_aml_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#0F766E",
+          "color.danger": "#B91C1C",
+          "color.primary": "#27374D",
+          "color.success": "#166534",
+          "color.warning": "#B45309",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/fintech-aml/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "AmlDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/fintech-aml/dashboard",
+            "permission": "fintech_aml:view"
+          },
+          {
+            "component": "AmlAlertQueue",
+            "name": "alerts",
+            "nav_group": "Alerts",
+            "path": "/fintech-aml/alerts",
+            "permission": "fintech_aml:triage"
+          },
+          {
+            "component": "AmlMonitoringConsole",
+            "name": "monitoring",
+            "nav_group": "Monitoring",
+            "path": "/fintech-aml/monitoring",
+            "permission": "fintech_aml:monitor"
+          },
+          {
+            "component": "AmlCaseWorkbench",
+            "name": "cases",
+            "nav_group": "Cases",
+            "path": "/fintech-aml/cases",
+            "permission": "fintech_aml:investigate"
+          },
+          {
+            "component": "AmlSarWorkflow",
+            "name": "sar",
+            "nav_group": "Regulatory",
+            "path": "/fintech-aml/sar",
+            "permission": "fintech_aml:file_sar"
+          },
+          {
+            "component": "AmlTypologyRules",
+            "name": "typologies",
+            "nav_group": "Rules",
+            "path": "/fintech-aml/typologies",
+            "permission": "fintech_aml:admin"
+          },
+          {
+            "component": "AmlAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/fintech-aml/agents",
+            "permission": "fintech_aml:admin"
+          },
+          {
+            "component": "AmlSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/fintech-aml/settings",
+            "permission": "fintech_aml:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "aml_review": {
+        "roles": [
+          "aml_ops_reviewer",
+          "transaction_monitoring_analyst",
+          "sanctions_reviewer",
+          "case_investigator",
+          "sar_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "fintech_aml": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_kyc"
+      ]
+    }
+  },
+  "contracts": {
+    "fintech_aml": {
+      "configuration": {
+        "adapters": {
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "aml_ops_reviewer",
+            "transaction_monitoring_analyst",
+            "sanctions_reviewer",
+            "case_investigator",
+            "sar_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "alerts": {
+          "auto_close_allowed": false,
+          "disposition_required_to_close": true,
+          "evidence_required": true,
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "supported_types": [
+            "large_transaction",
+            "velocity",
+            "structuring",
+            "sanctions",
+            "pep",
+            "high_risk_kyc",
+            "mule_account",
+            "agent_review"
+          ]
+        },
+        "cases": {
+          "evidence_required": true,
+          "investigator_required_for_escalation": true,
+          "sar_allowed_statuses": [
+            "escalated",
+            "under_investigation",
+            "confirmed_suspicious"
+          ],
+          "supported_types": [
+            "transaction_monitoring",
+            "sanctions_alert",
+            "structuring_alert",
+            "mule_account",
+            "high_risk_customer",
+            "suspicious_activity_report"
+          ]
+        },
+        "governance": {
+          "audit_aml_events": true,
+          "human_approval_required_for_sar": true,
+          "kyc_link_required": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "monitoring": {
+          "high_risk_score_threshold": 75,
+          "large_transaction_threshold": 10000.0,
+          "structuring_count_threshold": 3,
+          "structuring_threshold": 9500.0,
+          "velocity_amount_threshold": 25000.0,
+          "velocity_count_threshold": 5,
+          "velocity_window_minutes": 60
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_alert_events": true,
+          "emit_case_events": true,
+          "emit_sar_events": true,
+          "emit_transaction_events": true,
+          "event_stream": "apg.fintech.aml.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "sar": {
+          "evidence_required": true,
+          "human_approval_required": true,
+          "jurisdiction_required": true,
+          "narrative_required": true,
+          "subject_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_aml_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_alerts": true,
+          "enable_cases": true,
+          "enable_dashboard": true,
+          "enable_monitoring": true,
+          "enable_sar": true,
+          "enable_typologies": true
+        }
+      },
+      "id": "fintech_aml",
+      "provides": [
+        "transaction_monitoring",
+        "aml_alert_triage",
+        "sanctions_pep_escalation",
+        "suspicious_activity_case_management",
+        "sar_workflow",
+        "typology_rule_engine",
+        "aml_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_kyc"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 8,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "fintech_aml": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}

@@ -26516,3 +26516,76 @@ Known gaps:
   flows, live biometric checks, live sanctions/PEP/adverse-media feeds, live
   government-registry checks, durable Bytewax topology, or performance/load
   checks during this battery-conscious slice.
+
+### 2026-06-01 13:31 EAT
+
+Fintech Anti Money Laundering executable capability slice:
+
+- Promoted `capabilities/fintech/aml` from a placeholder package into a
+  first-class APG capability with `README.md`, `SPECIFICATION.md`, `PLAN.md`,
+  `cap_spec.md`, contract, models, service, API helpers, view models, app
+  entrypoint, semantic/package/release evidence, and focused tests.
+- Added tenant-scoped transaction monitoring, AML alert creation, alert triage,
+  case investigation, SAR/STR draft workflow, dashboard summaries, Bytewax batch
+  validation, and provider-neutral AML-agent registration.
+- Added deterministic AML guardrails for tenant context, write policy, subject,
+  positive amount, currency, source reference, KYC linkage, large transactions,
+  velocity, structuring, sanctions escalation, high-risk KYC, supported alert
+  types and severities, alert evidence, alert close disposition, reviewer
+  assignment, case alert evidence, supported case types, investigator assignment,
+  SAR case/subject/jurisdiction/narrative/evidence/human approval, Bytewax
+  lifecycle events, supported AI-agent runtimes and roles, and privileged-agent
+  human approval.
+- Added `aml_runtime.py` domain helpers for normalized codes, currency values,
+  monetary amounts, risk scores, severity bands, and typology flags.
+- Updated fintech capability metadata so `aml` is listed as an implemented
+  sub-capability.
+- Removed the empty `_Anti_Money_Laundering` marker file and refreshed
+  `semantic_model.json`, `package_manifest.json`, and `release_report.json`.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/fintech/aml/__init__.py capabilities/fintech/aml/capability_contract.py capabilities/fintech/aml/models.py capabilities/fintech/aml/aml_runtime.py capabilities/fintech/aml/service.py capabilities/fintech/aml/api.py capabilities/fintech/aml/views.py capabilities/fintech/aml/app.py capabilities/fintech/aml/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/fintech/aml/tests/test_package_contract.py`
+  passed with 6 tests.
+- `./.venv/bin/python capabilities/fintech/aml/app.py` passed with
+  `self_test()` status `ok`.
+- `./.venv/bin/apg capabilities inspect fintech_aml --json` passed with 31
+  rules, 8 routes, Bytewax streaming, and provider-neutral AML-agent runtimes.
+- `./.venv/bin/apg capabilities publish-plan capabilities/fintech/aml --json`
+  passed with side-effect-free publish evidence and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/fintech/aml --json`
+  passed with one domain-specific fintech AML implementation, 0 baseline
+  markers, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/fintech/aml --json`
+  passed with one complete lifecycle record, 31 rules, 8 routes, 11 theme
+  tokens, and 0 warnings/errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 113 operable contracts, 113 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+
+Code review:
+
+- Reviewed monitoring guardrails so transactions cannot be monitored without
+  tenant, policy, subject, KYC link, positive amount, currency, and source
+  evidence.
+- Reviewed typology guardrails so large transactions, velocity, structuring,
+  sanctions, and high-risk KYC activity require review evidence before local
+  acceptance.
+- Reviewed alert and case guardrails so unsupported alert/case types, missing
+  evidence, missing close disposition, missing reviewer assignment, and missing
+  investigator assignment deny before state changes.
+- Reviewed SAR guardrails so regulatory drafts require case, subject,
+  jurisdiction, narrative, evidence, and human approval.
+- Kept live payment rails, wallets, KYC systems, sanctions/PEP feeds,
+  adverse-media services, regulator submission, NLP providers, key management,
+  audit sinks, notifications, and durable Bytewax workers behind adapter
+  boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live sanctions/PEP or
+  adverse-media feeds, live regulator SAR/STR submission, durable Bytewax
+  topology, entity-resolution graph analytics, ML training, or performance/load
+  checks during this battery-conscious slice.

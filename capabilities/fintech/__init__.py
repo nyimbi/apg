@@ -73,6 +73,7 @@ CAPABILITY_META = {
 		'payments',      # Digital Payments
 		'wallets',       # Digital Wallets
 		'kyc',           # Know Your Customer
+		'aml',           # Anti Money Laundering
 		'tms',           # Treasury Management System (existing)
 		'gateway',       # Payment Gateway (existing)
 		'switch',        # Payment Switch (existing)
