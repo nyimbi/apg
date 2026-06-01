@@ -1,0 +1,2332 @@
+{
+  "app": {
+    "description": "Intelligence Dashboard package-backed APG capability",
+    "entity_count": 11,
+    "name": "intel_dashboard",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "intel_dashboard": {
+      "configuration": {
+        "adapters": {
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "geospatial": "geos",
+          "graph": "grph",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "rag": "ragn"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "name_required": true,
+          "scope_required": true,
+          "supported_roles": [
+            "layout_designer",
+            "metric_steward",
+            "source_reviewer",
+            "access_reviewer",
+            "theme_reviewer",
+            "briefing_preparer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "authorities": {
+          "approver_required": true,
+          "evidence_required": true,
+          "expiry_required": true,
+          "supported_authority_types": [
+            "mission_order",
+            "legal_mandate",
+            "partner_authority",
+            "consent",
+            "incident_response_authority",
+            "public_interest_authority"
+          ],
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ]
+        },
+        "dashboards": {
+          "classification_required": true,
+          "evidence_required": true,
+          "owner_required": true,
+          "supported_dashboard_types": [
+            "operational",
+            "strategic",
+            "threat",
+            "incident",
+            "investigative",
+            "executive",
+            "partner"
+          ],
+          "workspace_required": true
+        },
+        "filters": {
+          "dashboard_required": true,
+          "evidence_required": true,
+          "supported_filter_types": [
+            "time_range",
+            "classification",
+            "geography",
+            "source",
+            "risk_level",
+            "owner",
+            "status"
+          ]
+        },
+        "governance": {
+          "audit_events": true,
+          "autonomous_share_denied": true,
+          "classification_leak_denied": true,
+          "cross_tenant_dashboard_denied": true,
+          "lawful_authority_required": true,
+          "policy_attached_for_writes": true,
+          "privacy_bypass_denied": true,
+          "require_tenant_context": true,
+          "source_tampering_denied": true,
+          "unapproved_public_view_denied": true,
+          "uncited_metric_denied": true
+        },
+        "metrics": {
+          "confidence_required": true,
+          "evidence_required": true,
+          "source_required": true,
+          "supported_metric_types": [
+            "count",
+            "rate",
+            "risk_score",
+            "trend",
+            "status",
+            "coverage",
+            "latency",
+            "confidence"
+          ]
+        },
+        "observability": {
+          "event_stream": "apg.intel.dashboard.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "shares": {
+          "approval_required": true,
+          "dashboard_required": true,
+          "evidence_required": true,
+          "recipient_required": true,
+          "supported_share_types": [
+            "internal",
+            "partner",
+            "executive",
+            "field_team",
+            "watch_center",
+            "case_team"
+          ]
+        },
+        "sources": {
+          "custodian_required": true,
+          "dashboard_required": true,
+          "evidence_required": true,
+          "supported_source_types": [
+            "capability_summary",
+            "graph_query",
+            "rag_extract",
+            "geospatial_layer",
+            "alert_feed",
+            "reporting_product",
+            "prediction_projection",
+            "threat_assessment"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "intel_dashboard_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_authorities": true,
+          "enable_dashboard": true,
+          "enable_dashboards": true,
+          "enable_filters": true,
+          "enable_metrics": true,
+          "enable_reviews": true,
+          "enable_shares": true,
+          "enable_sources": true,
+          "enable_views": true,
+          "enable_widgets": true,
+          "enable_workspaces": true
+        },
+        "views": {
+          "dashboard_required": true,
+          "evidence_required": true,
+          "supported_view_types": [
+            "analyst",
+            "supervisor",
+            "executive",
+            "partner",
+            "field",
+            "public_safety"
+          ],
+          "viewer_role_required": true
+        },
+        "widgets": {
+          "dashboard_required": true,
+          "evidence_required": true,
+          "metric_required": true,
+          "supported_widget_types": [
+            "kpi_tile",
+            "trend_chart",
+            "map",
+            "network_graph",
+            "table",
+            "timeline",
+            "watchlist",
+            "status_board"
+          ]
+        },
+        "workspaces": {
+          "authority_required": true,
+          "evidence_required": true,
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ],
+          "supported_workspace_types": [
+            "operations_center",
+            "threat_watch",
+            "executive_overview",
+            "investigation_room",
+            "incident_room",
+            "partner_view",
+            "field_dashboard"
+          ]
+        }
+      },
+      "name": "Intelligence Dashboard",
+      "provides": [
+        "dashboard_authority_workflow",
+        "dashboard_workspace_workflow",
+        "dashboard_composition_workflow",
+        "dashboard_source_workflow",
+        "dashboard_metric_workflow",
+        "dashboard_widget_workflow",
+        "dashboard_filter_workflow",
+        "dashboard_view_workflow",
+        "dashboard_share_workflow",
+        "dashboard_review_workflow",
+        "dashboard_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "grph",
+        "ragn",
+        "geos"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "dashboard_policy_required",
+              "required_action": "attach_dashboard_policy"
+            },
+            "name": "dashboard_write_requires_policy"
+          },
+          {
+            "condition": {
+              "authority_type_supported": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_type_not_supported",
+              "required_action": "select_supported_authority_type"
+            },
+            "name": "authority_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_authority",
+              "scope_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_scope_required",
+              "required_action": "attach_scope_reference"
+            },
+            "name": "authority_scope_required"
+          },
+          {
+            "condition": {
+              "classification_supported": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "classification_not_supported",
+              "required_action": "select_supported_classification"
+            },
+            "name": "authority_classification_supported"
+          },
+          {
+            "condition": {
+              "approver_present": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_approver_required",
+              "required_action": "record_approver"
+            },
+            "name": "authority_approver_required"
+          },
+          {
+            "condition": {
+              "expiry_present": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_expiry_required",
+              "required_action": "set_expiry"
+            },
+            "name": "authority_expiry_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_evidence_required",
+              "required_action": "attach_authority_evidence"
+            },
+            "name": "authority_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_workspace",
+              "workspace_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "workspace_type_not_supported",
+              "required_action": "select_supported_workspace_type"
+            },
+            "name": "workspace_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_workspace",
+              "workspace_name_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "workspace_name_required",
+              "required_action": "name_workspace"
+            },
+            "name": "workspace_name_required"
+          },
+          {
+            "condition": {
+              "classification_supported": false,
+              "operation": "record_workspace"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "classification_not_supported",
+              "required_action": "select_supported_classification"
+            },
+            "name": "workspace_classification_supported"
+          },
+          {
+            "condition": {
+              "authority_present": false,
+              "operation": "record_workspace"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "lawful_authority_required",
+              "required_action": "select_authority"
+            },
+            "name": "workspace_authority_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_workspace"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "workspace_evidence_required",
+              "required_action": "attach_workspace_evidence"
+            },
+            "name": "workspace_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_dashboard",
+              "workspace_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "workspace_required",
+              "required_action": "select_workspace"
+            },
+            "name": "dashboard_workspace_required"
+          },
+          {
+            "condition": {
+              "dashboard_type_supported": false,
+              "operation": "record_dashboard"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "dashboard_type_not_supported",
+              "required_action": "select_supported_dashboard_type"
+            },
+            "name": "dashboard_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_dashboard",
+              "title_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "dashboard_title_required",
+              "required_action": "title_dashboard"
+            },
+            "name": "dashboard_title_required"
+          },
+          {
+            "condition": {
+              "operation": "record_dashboard",
+              "owner_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "dashboard_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "dashboard_owner_required"
+          },
+          {
+            "condition": {
+              "classification_supported": false,
+              "operation": "record_dashboard"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "classification_not_supported",
+              "required_action": "select_supported_classification"
+            },
+            "name": "dashboard_classification_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_dashboard"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "dashboard_evidence_required",
+              "required_action": "attach_dashboard_evidence"
+            },
+            "name": "dashboard_evidence_required"
+          },
+          {
+            "condition": {
+              "dashboard_present": false,
+              "operation": "record_source"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "dashboard_required",
+              "required_action": "select_dashboard"
+            },
+            "name": "source_dashboard_required"
+          },
+          {
+            "condition": {
+              "operation": "record_source",
+              "source_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_type_not_supported",
+              "required_action": "select_supported_source_type"
+            },
+            "name": "source_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_source",
+              "source_reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_reference_required",
+              "required_action": "attach_source_reference"
+            },
+            "name": "source_reference_required"
+          },
+          {
+            "condition": {
+              "custodian_present": false,
+              "operation": "record_source"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_custodian_required",
+              "required_action": "assign_custodian"
+            },
+            "name": "source_custodian_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_source"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_evidence_required",
+              "required_action": "attach_source_evidence"
+            },
+            "name": "source_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_metric",
+              "source_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_required",
+              "required_action": "select_source"
+            },
+            "name": "metric_source_required"
+          },
+          {
+            "condition": {
+              "metric_type_supported": false,
+              "operation": "record_metric"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "metric_type_not_supported",
+              "required_action": "select_supported_metric_type"
+            },
+            "name": "metric_type_supported"
+          },
+          {
+            "condition": {
+              "metric_reference_present": false,
+              "operation": "record_metric"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "metric_reference_required",
+              "required_action": "attach_metric_reference"
+            },
+            "name": "metric_reference_required"
+          },
+          {
+            "condition": {
+              "confidence_valid": false,
+              "operation": "record_metric"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "confidence_score_invalid",
+              "required_action": "set_confidence_0_to_1"
+            },
+            "name": "metric_confidence_valid"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_metric"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "metric_evidence_required",
+              "required_action": "attach_metric_evidence"
+            },
+            "name": "metric_evidence_required"
+          },
+          {
+            "condition": {
+              "dashboard_present": false,
+              "operation": "record_widget"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "dashboard_required",
+              "required_action": "select_dashboard"
+            },
+            "name": "widget_dashboard_required"
+          },
+          {
+            "condition": {
+              "metric_present": false,
+              "operation": "record_widget"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "metric_required",
+              "required_action": "select_metric"
+            },
+            "name": "widget_metric_required"
+          },
+          {
+            "condition": {
+              "operation": "record_widget",
+              "widget_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "widget_type_not_supported",
+              "required_action": "select_supported_widget_type"
+            },
+            "name": "widget_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_widget",
+              "widget_reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "widget_reference_required",
+              "required_action": "attach_widget_reference"
+            },
+            "name": "widget_reference_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_widget"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "widget_evidence_required",
+              "required_action": "attach_widget_evidence"
+            },
+            "name": "widget_evidence_required"
+          },
+          {
+            "condition": {
+              "dashboard_present": false,
+              "operation": "record_filter"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "dashboard_required",
+              "required_action": "select_dashboard"
+            },
+            "name": "filter_dashboard_required"
+          },
+          {
+            "condition": {
+              "filter_type_supported": false,
+              "operation": "record_filter"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "filter_type_not_supported",
+              "required_action": "select_supported_filter_type"
+            },
+            "name": "filter_type_supported"
+          },
+          {
+            "condition": {
+              "filter_reference_present": false,
+              "operation": "record_filter"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "filter_reference_required",
+              "required_action": "attach_filter_reference"
+            },
+            "name": "filter_reference_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_filter"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "filter_evidence_required",
+              "required_action": "attach_filter_evidence"
+            },
+            "name": "filter_evidence_required"
+          },
+          {
+            "condition": {
+              "dashboard_present": false,
+              "operation": "record_view"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "dashboard_required",
+              "required_action": "select_dashboard"
+            },
+            "name": "view_dashboard_required"
+          },
+          {
+            "condition": {
+              "operation": "record_view",
+              "view_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "view_type_not_supported",
+              "required_action": "select_supported_view_type"
+            },
+            "name": "view_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_view",
+              "view_reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "view_reference_required",
+              "required_action": "attach_view_reference"
+            },
+            "name": "view_reference_required"
+          },
+          {
+            "condition": {
+              "operation": "record_view",
+              "viewer_role_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "viewer_role_required",
+              "required_action": "attach_viewer_role"
+            },
+            "name": "view_role_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_view"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "view_evidence_required",
+              "required_action": "attach_view_evidence"
+            },
+            "name": "view_evidence_required"
+          },
+          {
+            "condition": {
+              "dashboard_present": false,
+              "operation": "record_share"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "dashboard_required",
+              "required_action": "select_dashboard"
+            },
+            "name": "share_dashboard_required"
+          },
+          {
+            "condition": {
+              "operation": "record_share",
+              "share_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "share_type_not_supported",
+              "required_action": "select_supported_share_type"
+            },
+            "name": "share_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_share",
+              "recipient_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "recipient_reference_required",
+              "required_action": "attach_recipient_reference"
+            },
+            "name": "share_recipient_required"
+          },
+          {
+            "condition": {
+              "approval_present": false,
+              "operation": "record_share"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "share_approval_required",
+              "required_action": "attach_share_approval"
+            },
+            "name": "share_approval_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_share"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "share_evidence_required",
+              "required_action": "attach_share_evidence"
+            },
+            "name": "share_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "status_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_status_not_supported",
+              "required_action": "select_supported_status"
+            },
+            "name": "review_status_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "reviewer_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "reviewer_required",
+              "required_action": "assign_reviewer"
+            },
+            "name": "review_reviewer_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_review"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_evidence_required",
+              "required_action": "attach_review_evidence"
+            },
+            "name": "review_evidence_required"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "dashboard_batch"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_dashboard_batch_to_bytewax"
+            },
+            "name": "dashboard_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_dashboard_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "dashboard_agent_runtime_not_supported",
+              "required_action": "select_supported_runtime"
+            },
+            "name": "dashboard_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_dashboard_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "dashboard_agent_role_not_supported",
+              "required_action": "select_supported_role"
+            },
+            "name": "dashboard_agent_role_supported"
+          },
+          {
+            "condition": {
+              "agent_name_present": false,
+              "operation": "register_dashboard_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "dashboard_agent_name_required",
+              "required_action": "name_dashboard_agent"
+            },
+            "name": "dashboard_agent_name_required"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "operation": "register_dashboard_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "dashboard_agent_scope_required",
+              "required_action": "bound_dashboard_agent_scope"
+            },
+            "name": "dashboard_agent_scope_required"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "dashboard_agent_action",
+              "privileged_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_dashboard_agent_action_requires_human_approval"
+          },
+          {
+            "condition": {
+              "operation": "dashboard_agent_action",
+              "uncited_metric_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "uncited_metric_scope_denied",
+              "required_action": "remove_uncited_metric_scope"
+            },
+            "name": "uncited_metric_action_denied"
+          },
+          {
+            "condition": {
+              "classification_leak_scope": true,
+              "operation": "dashboard_agent_action"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "classification_leak_scope_denied",
+              "required_action": "remove_classification_leak_scope"
+            },
+            "name": "classification_leak_action_denied"
+          },
+          {
+            "condition": {
+              "operation": "dashboard_agent_action",
+              "source_tampering_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_tampering_scope_denied",
+              "required_action": "remove_source_tampering_scope"
+            },
+            "name": "source_tampering_action_denied"
+          },
+          {
+            "condition": {
+              "operation": "dashboard_agent_action",
+              "privacy_bypass_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "privacy_bypass_scope_denied",
+              "required_action": "remove_privacy_bypass_scope"
+            },
+            "name": "privacy_bypass_action_denied"
+          },
+          {
+            "condition": {
+              "autonomous_share_scope": true,
+              "operation": "dashboard_agent_action"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "autonomous_share_scope_denied",
+              "required_action": "remove_autonomous_share_scope"
+            },
+            "name": "autonomous_share_action_denied"
+          },
+          {
+            "condition": {
+              "operation": "dashboard_agent_action",
+              "unapproved_public_view_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "unapproved_public_view_scope_denied",
+              "required_action": "remove_unapproved_public_view_scope"
+            },
+            "name": "unapproved_public_view_action_denied"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "dashboard_policy_required",
+            "required_action": "attach_dashboard_policy"
+          },
+          "name": "dashboard_write_requires_policy"
+        },
+        {
+          "condition": {
+            "authority_type_supported": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_type_not_supported",
+            "required_action": "select_supported_authority_type"
+          },
+          "name": "authority_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_authority",
+            "scope_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_scope_required",
+            "required_action": "attach_scope_reference"
+          },
+          "name": "authority_scope_required"
+        },
+        {
+          "condition": {
+            "classification_supported": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "classification_not_supported",
+            "required_action": "select_supported_classification"
+          },
+          "name": "authority_classification_supported"
+        },
+        {
+          "condition": {
+            "approver_present": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_approver_required",
+            "required_action": "record_approver"
+          },
+          "name": "authority_approver_required"
+        },
+        {
+          "condition": {
+            "expiry_present": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_expiry_required",
+            "required_action": "set_expiry"
+          },
+          "name": "authority_expiry_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_evidence_required",
+            "required_action": "attach_authority_evidence"
+          },
+          "name": "authority_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_workspace",
+            "workspace_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "workspace_type_not_supported",
+            "required_action": "select_supported_workspace_type"
+          },
+          "name": "workspace_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_workspace",
+            "workspace_name_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "workspace_name_required",
+            "required_action": "name_workspace"
+          },
+          "name": "workspace_name_required"
+        },
+        {
+          "condition": {
+            "classification_supported": false,
+            "operation": "record_workspace"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "classification_not_supported",
+            "required_action": "select_supported_classification"
+          },
+          "name": "workspace_classification_supported"
+        },
+        {
+          "condition": {
+            "authority_present": false,
+            "operation": "record_workspace"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "lawful_authority_required",
+            "required_action": "select_authority"
+          },
+          "name": "workspace_authority_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_workspace"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "workspace_evidence_required",
+            "required_action": "attach_workspace_evidence"
+          },
+          "name": "workspace_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_dashboard",
+            "workspace_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "workspace_required",
+            "required_action": "select_workspace"
+          },
+          "name": "dashboard_workspace_required"
+        },
+        {
+          "condition": {
+            "dashboard_type_supported": false,
+            "operation": "record_dashboard"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "dashboard_type_not_supported",
+            "required_action": "select_supported_dashboard_type"
+          },
+          "name": "dashboard_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_dashboard",
+            "title_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "dashboard_title_required",
+            "required_action": "title_dashboard"
+          },
+          "name": "dashboard_title_required"
+        },
+        {
+          "condition": {
+            "operation": "record_dashboard",
+            "owner_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "dashboard_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "dashboard_owner_required"
+        },
+        {
+          "condition": {
+            "classification_supported": false,
+            "operation": "record_dashboard"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "classification_not_supported",
+            "required_action": "select_supported_classification"
+          },
+          "name": "dashboard_classification_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_dashboard"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "dashboard_evidence_required",
+            "required_action": "attach_dashboard_evidence"
+          },
+          "name": "dashboard_evidence_required"
+        },
+        {
+          "condition": {
+            "dashboard_present": false,
+            "operation": "record_source"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "dashboard_required",
+            "required_action": "select_dashboard"
+          },
+          "name": "source_dashboard_required"
+        },
+        {
+          "condition": {
+            "operation": "record_source",
+            "source_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_type_not_supported",
+            "required_action": "select_supported_source_type"
+          },
+          "name": "source_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_source",
+            "source_reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_reference_required",
+            "required_action": "attach_source_reference"
+          },
+          "name": "source_reference_required"
+        },
+        {
+          "condition": {
+            "custodian_present": false,
+            "operation": "record_source"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_custodian_required",
+            "required_action": "assign_custodian"
+          },
+          "name": "source_custodian_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_source"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_evidence_required",
+            "required_action": "attach_source_evidence"
+          },
+          "name": "source_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_metric",
+            "source_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_required",
+            "required_action": "select_source"
+          },
+          "name": "metric_source_required"
+        },
+        {
+          "condition": {
+            "metric_type_supported": false,
+            "operation": "record_metric"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "metric_type_not_supported",
+            "required_action": "select_supported_metric_type"
+          },
+          "name": "metric_type_supported"
+        },
+        {
+          "condition": {
+            "metric_reference_present": false,
+            "operation": "record_metric"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "metric_reference_required",
+            "required_action": "attach_metric_reference"
+          },
+          "name": "metric_reference_required"
+        },
+        {
+          "condition": {
+            "confidence_valid": false,
+            "operation": "record_metric"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "confidence_score_invalid",
+            "required_action": "set_confidence_0_to_1"
+          },
+          "name": "metric_confidence_valid"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_metric"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "metric_evidence_required",
+            "required_action": "attach_metric_evidence"
+          },
+          "name": "metric_evidence_required"
+        },
+        {
+          "condition": {
+            "dashboard_present": false,
+            "operation": "record_widget"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "dashboard_required",
+            "required_action": "select_dashboard"
+          },
+          "name": "widget_dashboard_required"
+        },
+        {
+          "condition": {
+            "metric_present": false,
+            "operation": "record_widget"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "metric_required",
+            "required_action": "select_metric"
+          },
+          "name": "widget_metric_required"
+        },
+        {
+          "condition": {
+            "operation": "record_widget",
+            "widget_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "widget_type_not_supported",
+            "required_action": "select_supported_widget_type"
+          },
+          "name": "widget_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_widget",
+            "widget_reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "widget_reference_required",
+            "required_action": "attach_widget_reference"
+          },
+          "name": "widget_reference_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_widget"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "widget_evidence_required",
+            "required_action": "attach_widget_evidence"
+          },
+          "name": "widget_evidence_required"
+        },
+        {
+          "condition": {
+            "dashboard_present": false,
+            "operation": "record_filter"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "dashboard_required",
+            "required_action": "select_dashboard"
+          },
+          "name": "filter_dashboard_required"
+        },
+        {
+          "condition": {
+            "filter_type_supported": false,
+            "operation": "record_filter"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "filter_type_not_supported",
+            "required_action": "select_supported_filter_type"
+          },
+          "name": "filter_type_supported"
+        },
+        {
+          "condition": {
+            "filter_reference_present": false,
+            "operation": "record_filter"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "filter_reference_required",
+            "required_action": "attach_filter_reference"
+          },
+          "name": "filter_reference_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_filter"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "filter_evidence_required",
+            "required_action": "attach_filter_evidence"
+          },
+          "name": "filter_evidence_required"
+        },
+        {
+          "condition": {
+            "dashboard_present": false,
+            "operation": "record_view"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "dashboard_required",
+            "required_action": "select_dashboard"
+          },
+          "name": "view_dashboard_required"
+        },
+        {
+          "condition": {
+            "operation": "record_view",
+            "view_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "view_type_not_supported",
+            "required_action": "select_supported_view_type"
+          },
+          "name": "view_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_view",
+            "view_reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "view_reference_required",
+            "required_action": "attach_view_reference"
+          },
+          "name": "view_reference_required"
+        },
+        {
+          "condition": {
+            "operation": "record_view",
+            "viewer_role_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "viewer_role_required",
+            "required_action": "attach_viewer_role"
+          },
+          "name": "view_role_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_view"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "view_evidence_required",
+            "required_action": "attach_view_evidence"
+          },
+          "name": "view_evidence_required"
+        },
+        {
+          "condition": {
+            "dashboard_present": false,
+            "operation": "record_share"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "dashboard_required",
+            "required_action": "select_dashboard"
+          },
+          "name": "share_dashboard_required"
+        },
+        {
+          "condition": {
+            "operation": "record_share",
+            "share_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "share_type_not_supported",
+            "required_action": "select_supported_share_type"
+          },
+          "name": "share_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_share",
+            "recipient_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "recipient_reference_required",
+            "required_action": "attach_recipient_reference"
+          },
+          "name": "share_recipient_required"
+        },
+        {
+          "condition": {
+            "approval_present": false,
+            "operation": "record_share"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "share_approval_required",
+            "required_action": "attach_share_approval"
+          },
+          "name": "share_approval_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_share"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "share_evidence_required",
+            "required_action": "attach_share_evidence"
+          },
+          "name": "share_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "status_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_status_not_supported",
+            "required_action": "select_supported_status"
+          },
+          "name": "review_status_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "reviewer_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "reviewer_required",
+            "required_action": "assign_reviewer"
+          },
+          "name": "review_reviewer_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_review"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_evidence_required",
+            "required_action": "attach_review_evidence"
+          },
+          "name": "review_evidence_required"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "dashboard_batch"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_dashboard_batch_to_bytewax"
+          },
+          "name": "dashboard_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_dashboard_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "dashboard_agent_runtime_not_supported",
+            "required_action": "select_supported_runtime"
+          },
+          "name": "dashboard_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_dashboard_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "dashboard_agent_role_not_supported",
+            "required_action": "select_supported_role"
+          },
+          "name": "dashboard_agent_role_supported"
+        },
+        {
+          "condition": {
+            "agent_name_present": false,
+            "operation": "register_dashboard_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "dashboard_agent_name_required",
+            "required_action": "name_dashboard_agent"
+          },
+          "name": "dashboard_agent_name_required"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "operation": "register_dashboard_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "dashboard_agent_scope_required",
+            "required_action": "bound_dashboard_agent_scope"
+          },
+          "name": "dashboard_agent_scope_required"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "dashboard_agent_action",
+            "privileged_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_dashboard_agent_action_requires_human_approval"
+        },
+        {
+          "condition": {
+            "operation": "dashboard_agent_action",
+            "uncited_metric_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "uncited_metric_scope_denied",
+            "required_action": "remove_uncited_metric_scope"
+          },
+          "name": "uncited_metric_action_denied"
+        },
+        {
+          "condition": {
+            "classification_leak_scope": true,
+            "operation": "dashboard_agent_action"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "classification_leak_scope_denied",
+            "required_action": "remove_classification_leak_scope"
+          },
+          "name": "classification_leak_action_denied"
+        },
+        {
+          "condition": {
+            "operation": "dashboard_agent_action",
+            "source_tampering_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_tampering_scope_denied",
+            "required_action": "remove_source_tampering_scope"
+          },
+          "name": "source_tampering_action_denied"
+        },
+        {
+          "condition": {
+            "operation": "dashboard_agent_action",
+            "privacy_bypass_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "privacy_bypass_scope_denied",
+            "required_action": "remove_privacy_bypass_scope"
+          },
+          "name": "privacy_bypass_action_denied"
+        },
+        {
+          "condition": {
+            "autonomous_share_scope": true,
+            "operation": "dashboard_agent_action"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "autonomous_share_scope_denied",
+            "required_action": "remove_autonomous_share_scope"
+          },
+          "name": "autonomous_share_action_denied"
+        },
+        {
+          "condition": {
+            "operation": "dashboard_agent_action",
+            "unapproved_public_view_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "unapproved_public_view_scope_denied",
+            "required_action": "remove_unapproved_public_view_scope"
+          },
+          "name": "unapproved_public_view_action_denied"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "agents": {
+          "component": "DashboardAgentWorkbench",
+          "permission": "intel_dashboard:admin",
+          "route": "/intel-dashboard/agents"
+        },
+        "authorities": {
+          "component": "DashboardAuthorityConsole",
+          "permission": "intel_dashboard:authorities",
+          "route": "/intel-dashboard/authorities"
+        },
+        "dashboard": {
+          "component": "IntelligenceDashboardHome",
+          "permission": "intel_dashboard:view",
+          "route": "/intel-dashboard/dashboard"
+        },
+        "dashboards": {
+          "component": "DashboardComposer",
+          "permission": "intel_dashboard:dashboards",
+          "route": "/intel-dashboard/dashboards"
+        },
+        "filters": {
+          "component": "DashboardFilterConsole",
+          "permission": "intel_dashboard:filters",
+          "route": "/intel-dashboard/filters"
+        },
+        "metrics": {
+          "component": "DashboardMetricLibrary",
+          "permission": "intel_dashboard:metrics",
+          "route": "/intel-dashboard/metrics"
+        },
+        "reviews": {
+          "component": "DashboardReviewConsole",
+          "permission": "intel_dashboard:reviews",
+          "route": "/intel-dashboard/reviews"
+        },
+        "settings": {
+          "component": "DashboardSettings",
+          "permission": "intel_dashboard:admin",
+          "route": "/intel-dashboard/settings"
+        },
+        "shares": {
+          "component": "DashboardShareConsole",
+          "permission": "intel_dashboard:shares",
+          "route": "/intel-dashboard/shares"
+        },
+        "sources": {
+          "component": "DashboardSourceLedger",
+          "permission": "intel_dashboard:sources",
+          "route": "/intel-dashboard/sources"
+        },
+        "views": {
+          "component": "DashboardViewConsole",
+          "permission": "intel_dashboard:views",
+          "route": "/intel-dashboard/views"
+        },
+        "widgets": {
+          "component": "DashboardWidgetWorkbench",
+          "permission": "intel_dashboard:widgets",
+          "route": "/intel-dashboard/widgets"
+        },
+        "workspaces": {
+          "component": "DashboardWorkspaceConsole",
+          "permission": "intel_dashboard:workspaces",
+          "route": "/intel-dashboard/workspaces"
+        }
+      },
+      "streaming": {
+        "events": [
+          "dashboard_authority_recorded",
+          "dashboard_workspace_recorded",
+          "dashboard_recorded",
+          "dashboard_source_recorded",
+          "dashboard_metric_recorded",
+          "dashboard_widget_recorded",
+          "dashboard_filter_recorded",
+          "dashboard_view_recorded",
+          "dashboard_share_recorded",
+          "dashboard_review_recorded",
+          "dashboard_agent_registered"
+        ],
+        "guardrails": [
+          "dashboard_batch_requires_bytewax",
+          "privileged_dashboard_agent_action_requires_human_approval",
+          "uncited_metric_action_denied",
+          "classification_leak_action_denied",
+          "source_tampering_action_denied",
+          "privacy_bypass_action_denied",
+          "autonomous_share_action_denied",
+          "unapproved_public_view_action_denied"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.intel.dashboard.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "authorities": {
+            "icon": "shield-check",
+            "status_indicator": "authority-chip"
+          },
+          "dashboards": {
+            "icon": "panels-top-left",
+            "status_indicator": "dashboard-chip"
+          },
+          "filters": {
+            "icon": "sliders-horizontal",
+            "status_indicator": "filter-chip"
+          },
+          "metrics": {
+            "icon": "gauge",
+            "status_indicator": "metric-chip"
+          },
+          "reviews": {
+            "icon": "clipboard-check",
+            "status_indicator": "review-chip"
+          },
+          "shares": {
+            "icon": "send",
+            "status_indicator": "share-chip"
+          },
+          "sources": {
+            "icon": "database",
+            "status_indicator": "source-chip"
+          },
+          "views": {
+            "icon": "eye",
+            "status_indicator": "view-chip"
+          },
+          "widgets": {
+            "icon": "chart-no-axes-combined",
+            "status_indicator": "widget-chip"
+          },
+          "workspaces": {
+            "icon": "layout-dashboard",
+            "status_indicator": "workspace-chip"
+          }
+        },
+        "name": "intel_dashboard_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#7C2D12",
+          "color.danger": "#B91C1C",
+          "color.primary": "#0F766E",
+          "color.success": "#166534",
+          "color.warning": "#A16207",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/intel-dashboard/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "IntelligenceDashboardHome",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/intel-dashboard/dashboard",
+            "permission": "intel_dashboard:view"
+          },
+          {
+            "component": "DashboardAuthorityConsole",
+            "name": "authorities",
+            "nav_group": "Governance",
+            "path": "/intel-dashboard/authorities",
+            "permission": "intel_dashboard:authorities"
+          },
+          {
+            "component": "DashboardWorkspaceConsole",
+            "name": "workspaces",
+            "nav_group": "Planning",
+            "path": "/intel-dashboard/workspaces",
+            "permission": "intel_dashboard:workspaces"
+          },
+          {
+            "component": "DashboardComposer",
+            "name": "dashboards",
+            "nav_group": "Composition",
+            "path": "/intel-dashboard/dashboards",
+            "permission": "intel_dashboard:dashboards"
+          },
+          {
+            "component": "DashboardSourceLedger",
+            "name": "sources",
+            "nav_group": "Data",
+            "path": "/intel-dashboard/sources",
+            "permission": "intel_dashboard:sources"
+          },
+          {
+            "component": "DashboardMetricLibrary",
+            "name": "metrics",
+            "nav_group": "Data",
+            "path": "/intel-dashboard/metrics",
+            "permission": "intel_dashboard:metrics"
+          },
+          {
+            "component": "DashboardWidgetWorkbench",
+            "name": "widgets",
+            "nav_group": "Composition",
+            "path": "/intel-dashboard/widgets",
+            "permission": "intel_dashboard:widgets"
+          },
+          {
+            "component": "DashboardFilterConsole",
+            "name": "filters",
+            "nav_group": "Composition",
+            "path": "/intel-dashboard/filters",
+            "permission": "intel_dashboard:filters"
+          },
+          {
+            "component": "DashboardViewConsole",
+            "name": "views",
+            "nav_group": "Access",
+            "path": "/intel-dashboard/views",
+            "permission": "intel_dashboard:views"
+          },
+          {
+            "component": "DashboardShareConsole",
+            "name": "shares",
+            "nav_group": "Access",
+            "path": "/intel-dashboard/shares",
+            "permission": "intel_dashboard:shares"
+          },
+          {
+            "component": "DashboardReviewConsole",
+            "name": "reviews",
+            "nav_group": "Governance",
+            "path": "/intel-dashboard/reviews",
+            "permission": "intel_dashboard:reviews"
+          },
+          {
+            "component": "DashboardAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/intel-dashboard/agents",
+            "permission": "intel_dashboard:admin"
+          },
+          {
+            "component": "DashboardSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/intel-dashboard/settings",
+            "permission": "intel_dashboard:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "dashboard_operations": {
+        "roles": [
+          "layout_designer",
+          "metric_steward",
+          "source_reviewer",
+          "access_reviewer",
+          "theme_reviewer",
+          "briefing_preparer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "intel_dashboard": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "grph",
+        "ragn",
+        "geos"
+      ]
+    }
+  },
+  "contracts": {
+    "intel_dashboard": {
+      "configuration": {
+        "adapters": {
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "geospatial": "geos",
+          "graph": "grph",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "rag": "ragn"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "name_required": true,
+          "scope_required": true,
+          "supported_roles": [
+            "layout_designer",
+            "metric_steward",
+            "source_reviewer",
+            "access_reviewer",
+            "theme_reviewer",
+            "briefing_preparer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "authorities": {
+          "approver_required": true,
+          "evidence_required": true,
+          "expiry_required": true,
+          "supported_authority_types": [
+            "mission_order",
+            "legal_mandate",
+            "partner_authority",
+            "consent",
+            "incident_response_authority",
+            "public_interest_authority"
+          ],
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ]
+        },
+        "dashboards": {
+          "classification_required": true,
+          "evidence_required": true,
+          "owner_required": true,
+          "supported_dashboard_types": [
+            "operational",
+            "strategic",
+            "threat",
+            "incident",
+            "investigative",
+            "executive",
+            "partner"
+          ],
+          "workspace_required": true
+        },
+        "filters": {
+          "dashboard_required": true,
+          "evidence_required": true,
+          "supported_filter_types": [
+            "time_range",
+            "classification",
+            "geography",
+            "source",
+            "risk_level",
+            "owner",
+            "status"
+          ]
+        },
+        "governance": {
+          "audit_events": true,
+          "autonomous_share_denied": true,
+          "classification_leak_denied": true,
+          "cross_tenant_dashboard_denied": true,
+          "lawful_authority_required": true,
+          "policy_attached_for_writes": true,
+          "privacy_bypass_denied": true,
+          "require_tenant_context": true,
+          "source_tampering_denied": true,
+          "unapproved_public_view_denied": true,
+          "uncited_metric_denied": true
+        },
+        "metrics": {
+          "confidence_required": true,
+          "evidence_required": true,
+          "source_required": true,
+          "supported_metric_types": [
+            "count",
+            "rate",
+            "risk_score",
+            "trend",
+            "status",
+            "coverage",
+            "latency",
+            "confidence"
+          ]
+        },
+        "observability": {
+          "event_stream": "apg.intel.dashboard.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "shares": {
+          "approval_required": true,
+          "dashboard_required": true,
+          "evidence_required": true,
+          "recipient_required": true,
+          "supported_share_types": [
+            "internal",
+            "partner",
+            "executive",
+            "field_team",
+            "watch_center",
+            "case_team"
+          ]
+        },
+        "sources": {
+          "custodian_required": true,
+          "dashboard_required": true,
+          "evidence_required": true,
+          "supported_source_types": [
+            "capability_summary",
+            "graph_query",
+            "rag_extract",
+            "geospatial_layer",
+            "alert_feed",
+            "reporting_product",
+            "prediction_projection",
+            "threat_assessment"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "intel_dashboard_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_authorities": true,
+          "enable_dashboard": true,
+          "enable_dashboards": true,
+          "enable_filters": true,
+          "enable_metrics": true,
+          "enable_reviews": true,
+          "enable_shares": true,
+          "enable_sources": true,
+          "enable_views": true,
+          "enable_widgets": true,
+          "enable_workspaces": true
+        },
+        "views": {
+          "dashboard_required": true,
+          "evidence_required": true,
+          "supported_view_types": [
+            "analyst",
+            "supervisor",
+            "executive",
+            "partner",
+            "field",
+            "public_safety"
+          ],
+          "viewer_role_required": true
+        },
+        "widgets": {
+          "dashboard_required": true,
+          "evidence_required": true,
+          "metric_required": true,
+          "supported_widget_types": [
+            "kpi_tile",
+            "trend_chart",
+            "map",
+            "network_graph",
+            "table",
+            "timeline",
+            "watchlist",
+            "status_board"
+          ]
+        },
+        "workspaces": {
+          "authority_required": true,
+          "evidence_required": true,
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ],
+          "supported_workspace_types": [
+            "operations_center",
+            "threat_watch",
+            "executive_overview",
+            "investigation_room",
+            "incident_room",
+            "partner_view",
+            "field_dashboard"
+          ]
+        }
+      },
+      "id": "intel_dashboard",
+      "provides": [
+        "dashboard_authority_workflow",
+        "dashboard_workspace_workflow",
+        "dashboard_composition_workflow",
+        "dashboard_source_workflow",
+        "dashboard_metric_workflow",
+        "dashboard_widget_workflow",
+        "dashboard_filter_workflow",
+        "dashboard_view_workflow",
+        "dashboard_share_workflow",
+        "dashboard_review_workflow",
+        "dashboard_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "grph",
+        "ragn",
+        "geos"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 7,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "intel_dashboard": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}

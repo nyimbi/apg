@@ -30267,3 +30267,115 @@ Known gaps:
   live notifications, case-file writes, external portal publication, graph/RAG
   writes, persistent document stores, export pipelines, durable Bytewax
   topology, or performance/load checks during this battery-conscious slice.
+
+## 2026-06-01 - Intel Dashboard executable package
+
+Implemented and reviewed `capabilities/intel/dashboard` as a complete
+executable APG package for governed, evidence-backed intelligence dashboards.
+
+What changed:
+
+- Replaced the placeholder marker with an executable package exporting
+  `IntelligenceDashboardService`, `IntelDashboardService`, and
+  `get_capability_contract`.
+- Added a detailed `SPECIFICATION.md`, `PLAN.md`, `README.md`, and
+  `cap_spec.md` defining the authority, workspace, dashboard, source, metric,
+  widget, filter, view, share, review, Bytewax lifecycle, AI-agent, UI, theme,
+  and adapter-boundary model.
+- Added `capability_contract.py` with 63 deterministic rules, 13 UI routes,
+  compact `intel_dashboard_control` theme tokens, APG dependencies, Bytewax
+  lifecycle metadata, and provider-neutral AI-agent runtimes for `codex`,
+  `claude_code`, `opencode`, and `pi`.
+- Added in-memory domain models and a tenant-scoped service for lawful
+  authority records, dashboard workspaces, dashboards, data sources, metrics,
+  widgets, filters, views, shares, reviews, Bytewax batch validation, and
+  AI-agent guardrails.
+- Added API helpers, dashboard/console/agent view models, and a publishable
+  `app.py` entrypoint with self-test, component manifest, and semantic-model
+  generation.
+- Added package manifest, release evidence, generated semantic model, and
+  focused tests for contract shape, rule-engine denial paths, full dashboard
+  lifecycle execution, tenant isolation, guardrail rejection, API helpers, view
+  models, and app entrypoint.
+- Updated `capabilities/intel/__init__.py` so `dashboard` is listed as an
+  implemented sub-capability.
+- Updated `capabilities/README.md` so the catalog snapshot reports 153 valid
+  contracts, 153 domain-specific packages, 153 strict complete package artifact
+  sets, and 19 Intel packages.
+
+Focused verification:
+
+- Generated `capabilities/intel/dashboard/semantic_model.json` from
+  `app.semantic_model()`.
+- `./.venv/bin/python -m py_compile
+  capabilities/intel/dashboard/__init__.py
+  capabilities/intel/dashboard/capability_contract.py
+  capabilities/intel/dashboard/models.py
+  capabilities/intel/dashboard/dashboard_runtime.py
+  capabilities/intel/dashboard/service.py
+  capabilities/intel/dashboard/api.py
+  capabilities/intel/dashboard/views.py
+  capabilities/intel/dashboard/app.py
+  capabilities/intel/dashboard/tests/test_package_contract.py` passed.
+- `./.venv/bin/python capabilities/intel/dashboard/app.py` passed self-test
+  with `passed: true` and `status: ok`.
+- `./.venv/bin/python -m json.tool
+  capabilities/intel/dashboard/package_manifest.json` passed.
+- `./.venv/bin/python -m json.tool
+  capabilities/intel/dashboard/release_report.json` passed.
+- `./.venv/bin/python -m json.tool
+  capabilities/intel/dashboard/semantic_model.json` passed.
+- `./.venv/bin/pytest -q
+  capabilities/intel/dashboard/tests/test_package_contract.py` passed with 7
+  tests.
+- `./.venv/bin/apg capabilities inspect intel_dashboard --json` passed with
+  63 rules, 13 UI routes, theme `intel_dashboard_control`, shell
+  `apg_python`, and Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/intel/dashboard --json` passed with `side_effect_free: true`
+  and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/intel/dashboard --json` passed with 1 domain-specific
+  capability, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/intel/dashboard --json` passed with 1 complete lifecycle, 0
+  warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 153 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 153 operable contracts, 153 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/intel/dashboard`, `capabilities/intel/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed authority, workspace, dashboard, source, metric, widget, filter,
+  view, share, review, Bytewax batch, and AI-agent lifecycle paths so rule
+  evaluation happens before state mutation.
+- Confirmed service state is keyed by tenant plus record ID and covered by a
+  regression test with shared authority/workspace IDs across tenants.
+- Confirmed dashboards require existing tenant workspaces, supported dashboard
+  type, owner, classification, title, and evidence before sources can be added.
+- Confirmed sources require custodians, metrics require bounded confidence,
+  widgets require existing metrics, and shares require approval before
+  mutation.
+- Confirmed AI-agent registration requires supported runtime, supported role,
+  name, and bounded operational scope.
+- Confirmed AI-agent actions deny uncited metrics, classification leaks, source
+  tampering, privacy bypass, autonomous shares, unapproved public views, and
+  privileged scopes without human approval.
+- Kept rendered UI frameworks, live query engines, persistent layout stores,
+  graph/RAG writes, map rendering, notification delivery, and durable Bytewax
+  workers behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live query engines,
+  persistent layout stores, graph/RAG writes, map rendering, notification
+  delivery, durable Bytewax topology, or performance/load checks during this
+  battery-conscious slice.
