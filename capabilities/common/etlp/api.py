@@ -1514,16 +1514,27 @@ def list_records(tenant_id: str = "default", record_type: str | None = None) -> 
 	return SERVICE.list_records(tenant_id, record_type)
 
 
+def list_pending_reviews(tenant_id: str = "default") -> List[Dict[str, Any]]:
+	"""List dependency-light ETLP records awaiting review."""
+	return SERVICE.list_pending_reviews(tenant_id)
+
+
 def list_metadata(tenant_id: str = "default") -> Dict[str, Any]:
 	"""Return ETLP metadata for generated application composition."""
 	return {
 		"status": capability_status(tenant_id),
 		"pipelines": SERVICE.list_records(tenant_id, "pipelines"),
 		"datasources": SERVICE.list_records(tenant_id, "datasources"),
+		"mappings": SERVICE.list_records(tenant_id, "mappings"),
 		"executions": SERVICE.list_records(tenant_id, "executions"),
+		"quality_results": SERVICE.list_records(tenant_id, "quality_results"),
+		"schedules": SERVICE.list_records(tenant_id, "schedules"),
 		"publish_reviews": SERVICE.list_records(tenant_id, "publish_reviews"),
+		"replay_requests": SERVICE.list_records(tenant_id, "replay_requests"),
 		"pipeline_agents": SERVICE.list_records(tenant_id, "pipeline_agents"),
 		"lifecycle_batches": SERVICE.list_records(tenant_id, "lifecycle_batches"),
+		"pending_reviews": SERVICE.list_pending_reviews(tenant_id),
+		"audit_events": SERVICE.list_records(tenant_id, "audit_events"),
 	}
 
 

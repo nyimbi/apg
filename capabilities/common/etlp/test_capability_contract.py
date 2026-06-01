@@ -45,7 +45,7 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"ui",
 		"theme"
 	]
-	assert contract["provides"] == ["pipeline_lifecycle", "data_integration_governance", "pipeline_agent_composition"]
+	assert contract["provides"] == ["pipeline_lifecycle", "data_integration_governance", "pipeline_agent_composition", "review_evidence"]
 	assert contract["requires"] == ["mdm", "meta", "mqeb", "moni"]
 	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
 	assert "publish_gate_reviewer" in contract["agents"]["privileged_roles"]
@@ -77,6 +77,8 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert "pipeline_agent_roster" in contract["theme"]["components"]
 	assert "bytewax_lifecycle_panel" in contract["theme"]["components"]
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert "pipeline_agents" in contract["review_evidence"]["pending_queues"]
+	assert "policy_decision" in contract["review_evidence"]["policy_fields"]
 
 
 def test_rule_engine_enforces_pipeline_guardrails():
@@ -171,6 +173,7 @@ def test_registration_includes_full_capability_contract():
 	assert registration["ui_components"]["agents"] == "/etlp/agents"
 	assert registration["agents"]["first_class"] is True
 	assert registration["streaming"]["required_processor"] == "bytewax"
+	assert registration["review_evidence"]["deny_behavior"].startswith("Denied ETLP")
 	assert "meta" in registration["dependencies"]
 
 
@@ -268,18 +271,16 @@ def test_lifecycle_service_enforces_datasource_mapping_execution_and_publish_gua
 		publish_approval_recorded=True,
 		review_notes="Quality and lineage accepted.",
 	)
-	with pytest.raises(PermissionError, match="pipeline_agent_human_approval_required"):
-		service.register_pipeline_agent(
-			tenant_id="tenant-data",
-			agent_id="agent-denied",
-			name="Denied Publish Agent",
-			runtime="codex",
-			role="publish_gate_reviewer",
-			scope="production publish",
-			owner="pipeline-office",
-			purpose="review publish gates",
-		)
-	assert any(event.event_type == "agent.registration_denied" for event in service.audit_events)
+	review_agent = service.register_pipeline_agent(
+		tenant_id="tenant-data",
+		agent_id="agent-review",
+		name="Review Publish Agent",
+		runtime="codex",
+		role="publish_gate_reviewer",
+		scope="production publish",
+		owner="pipeline-office",
+		purpose="review publish gates",
+	)
 	agent = service.register_pipeline_agent(
 		tenant_id="tenant-data",
 		agent_id="agent-execute",
@@ -302,6 +303,8 @@ def test_lifecycle_service_enforces_datasource_mapping_execution_and_publish_gua
 		"datasource_requires_secret_reference",
 		"datasource_secrets_must_use_reference",
 	]
+	assert denied_secret.policy_decision == "deny"
+	assert denied_secret.review_reasons == ["secret_reference_required", "embedded_secret_denied"]
 	assert mapping.status == "active"
 	assert blocked_execution.status == "denied"
 	assert set(blocked_execution.matched_rules) == {
@@ -309,18 +312,26 @@ def test_lifecycle_service_enforces_datasource_mapping_execution_and_publish_gua
 		"execution_requires_idempotency_key",
 		"high_cost_execution_requires_review",
 	}
+	assert blocked_execution.policy_decision == "deny"
+	assert "production_approval_required" in blocked_execution.review_reasons
 	assert allowed_execution_initial_status == "queued"
 	assert low_quality.gate_passed is False
 	assert blocked_publish.status == "denied"
 	assert "publish_requires_quality_gate" in blocked_publish.matched_rules
+	assert blocked_publish.policy_decision == "deny"
 	assert high_quality.gate_passed is True
 	assert published.status == "published"
 	assert allowed_execution.status == "published"
+	assert review_agent.status == "pending_review"
+	assert review_agent.policy_decision == "require_review"
+	assert review_agent.review_reasons == ["pipeline_agent_human_approval_required"]
 	assert agent.runtime == "claude_code"
 	assert agent.role == "execution_reviewer"
 	assert batch.accepted is True
 	assert batch.required_processor == "bytewax"
-	assert service.dashboard_summary("tenant-data")["pipeline_agent_count"] == 1
+	assert service.dashboard_summary("tenant-data")["pipeline_agent_count"] == 2
+	assert service.dashboard_summary("tenant-data")["pending_pipeline_agent_review_count"] == 1
+	assert service.dashboard_summary("tenant-data")["pending_review_count"] == 1
 
 
 def test_lifecycle_service_replay_retry_retire_and_view_models_are_composable():
@@ -383,6 +394,10 @@ def test_lifecycle_service_replay_retry_retire_and_view_models_are_composable():
 			event_stream="legacy_broker",
 			mutation_count=1,
 		)
+	denied_batch = [
+		row for row in service.list_records("tenant-data", "lifecycle_batches")
+		if row["status"] == "denied"
+	][0]
 	service.register_pipeline_agent(
 		tenant_id="tenant-data",
 		agent_id="mapping-agent",
@@ -401,13 +416,22 @@ def test_lifecycle_service_replay_retry_retire_and_view_models_are_composable():
 
 	assert retry.status == "pending_review"
 	assert retry.matched_rules == ["retry_limit_requires_review"]
+	assert retry.policy_decision == "require_review"
+	assert retry.review_reasons == ["retry_review_required"]
 	assert replay.status == "denied"
 	assert "replay_requires_reason" in replay.matched_rules
+	assert replay.policy_decision == "deny"
 	assert blocked_retire.status != "retired"
 	assert blocked_retire.matched_rules == ["destructive_delete_requires_review"]
+	assert blocked_retire.policy_decision == "deny"
 	assert schedule.status == "pending_review"
 	assert schedule.matched_rules == ["production_schedule_requires_review"]
+	assert schedule.policy_decision == "require_review"
+	assert denied_batch["policy_decision"] == "deny"
+	assert denied_batch["review_reasons"] == ["bytewax_etlp_stream_required"]
 	assert dashboard_model(service, "tenant-data")["summary"]["pipeline_count"] == 1
+	assert dashboard_model(service, "tenant-data")["pending_reviews"]
+	assert dashboard_model(service, "tenant-data")["review_evidence"]["pending_queues"]
 	assert pipeline_workbench_model(service, "tenant-data")["rows"][0]["pipeline_id"] == "orders-sync"
 	assert datasource_manager_model(service, "tenant-data")["columns"][0] == "datasource_id"
 	assert execution_monitor_model(service, "tenant-data")["rows"][0]["execution_id"] == execution.execution_id
@@ -415,6 +439,8 @@ def test_lifecycle_service_replay_retry_retire_and_view_models_are_composable():
 	assert publish_review_model(service, "tenant-data")["columns"][0] == "created_at"
 	assert replay_console_model(service, "tenant-data")["rows"][0]["replay_type"] == "backfill"
 	assert pipeline_agent_roster_model(service, "tenant-data")["rows"][0]["role"] == "mapping_reviewer"
+	assert pipeline_agent_roster_model(service, "tenant-data")["pending_reviews"] == []
 	assert lifecycle_batch_model(service, "tenant-data")["streaming"]["required_processor"] == "bytewax"
 	assert adapter_health_model("tenant-data")["event_stream"] == "bytewax"
+	assert settings_model("tenant-data")["review_evidence"]["pending_queues"]
 	assert settings_model("tenant-data")["routes"]

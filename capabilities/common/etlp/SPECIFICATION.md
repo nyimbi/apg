@@ -110,6 +110,9 @@ ETLP must support first-class AI/pipeline-agent contributors:
 - Require human approval for privileged roles that can influence datasource,
   execution, quality, publish, or replay decisions.
 - Persist pipeline-agent records for UI display and audit evidence.
+- Preserve otherwise valid privileged pipeline agents without approval as
+  `pending_review` records with policy decision, matched rules, review reasons,
+  and review evidence.
 - Surface pipeline-agent registration failures as matched guardrails.
 
 ### Bytewax Lifecycle Batches
@@ -119,6 +122,8 @@ ETLP must support lifecycle-batch validation:
 - Require lifecycle processors to declare the `bytewax` event stream.
 - Track batch status, mutation count, and matched guardrails for UI/runtime
   evidence.
+- Persist denied non-Bytewax lifecycle batches as `denied` records before
+  raising `PermissionError`.
 - Keep event brokers out of the core lifecycle contract. Brokers may exist
   behind adapters, but Bytewax is the required lifecycle processing engine for
   this packet.
@@ -132,6 +137,19 @@ context and return:
 - `matched_rules`: ordered rule names.
 - `actions`: required actions and reasons.
 - `context`: evaluated context.
+
+### Durable Review Evidence
+
+ETLP must persist durable review evidence on generated-application lifecycle
+records and audit events:
+
+- Persist `policy_decision`, `matched_rules`, `review_reasons`, and
+  `review_evidence`.
+- Expose pending-review queues for pipelines, datasources, mappings,
+  executions, quality results, schedules, publish reviews, replay requests,
+  pipeline agents, and lifecycle batches.
+- Expose review evidence through registration metadata, semantic model output,
+  API helpers, view models, settings, release evidence, and package tests.
 
 Minimum guardrails:
 
@@ -150,7 +168,8 @@ Minimum guardrails:
 - Pipeline-agent runtime and role must be supported.
 - Pipeline-agent scope, owner, purpose, and machine-contribution disclosure are
   required.
-- Privileged pipeline-agent roles require human approval.
+- Privileged pipeline-agent roles require human approval evidence or pending
+  review.
 - ETLP lifecycle batches must use Bytewax.
 
 ### UI and Theming
@@ -204,6 +223,8 @@ These remain adapter-backed until the corresponding runtime packets are built.
   workflows.
 - Generated applications can register pipeline agents and validate Bytewax
   lifecycle batches through dependency-light helpers.
+- Generated applications can compose pending-review queues from durable review
+  evidence instead of transient exceptions.
 - Focused ETLP tests cover positive and negative guardrail paths.
 - `app.py`, `semantic_model.json`, `package_manifest.json`, and
   `release_report.json` reflect current contract-derived evidence.

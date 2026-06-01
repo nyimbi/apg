@@ -127,7 +127,8 @@ def register_capability() -> dict:
 			"capability_rules": "Evaluate deterministic pipeline governance rules",
 			"visual_theming": "Apply pipeline-console theme tokens and components",
 			"pipeline_agent_composition": "Register first-class pipeline agents across Codex, Claude Code, opencode, Pi, and future runtime adapters",
-			"lifecycle_batch_validation": "Validate ETLP lifecycle mutation batches against Bytewax-first stream rules"
+			"lifecycle_batch_validation": "Validate ETLP lifecycle mutation batches against Bytewax-first stream rules",
+			"review_evidence": "Preserve policy decisions, matched rules, review reasons, and review evidence for generated pipeline governance queues"
 		},
 		"endpoints": {
 			"pipelines": "/etlp/api/v1/pipelines",
@@ -146,6 +147,7 @@ def register_capability() -> dict:
 		"ui_manifest": contract["ui"],
 		"agents": contract["agents"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"theme": contract["theme"],
 		"permissions": APG_CAPABILITY_METADATA["permissions"]
 	}

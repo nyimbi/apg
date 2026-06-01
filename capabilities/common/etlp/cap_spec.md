@@ -21,6 +21,9 @@ The current packet provides:
   review, replay reason, replay window, and destructive retirement review.
 - First-class pipeline-agent guardrails for supported runtimes, roles, scope,
   owner, purpose, contribution disclosure, and privileged-role human approval.
+- Durable review evidence on pipelines, datasources, mappings, executions,
+  quality results, schedules, publish reviews, replay requests, pipeline
+  agents, lifecycle batches, and audit events.
 - Bytewax lifecycle-batch validation for generated applications and adapters.
 - FastAPI runtime controller with explicit adapter-boundary responses for
   persistence-backed operations that are not available without runtime storage.
@@ -39,6 +42,12 @@ The dependency-light `ETLPLifecycleService` is intentionally in-memory and
 side-effect free. It exists so generated applications can compose ETLP
 workflows, evaluate guardrails, and render UI state without a live database,
 connector registry, stream runtime, or orchestration engine.
+
+Reviewable records expose `policy_decision`, `matched_rules`,
+`review_reasons`, and `review_evidence`. Otherwise valid privileged
+pipeline-agent registrations without human approval are preserved as
+`pending_review` evidence. Denied non-Bytewax lifecycle batches persist
+`denied` evidence before raising `PermissionError`.
 
 ## Adapter Requirements
 

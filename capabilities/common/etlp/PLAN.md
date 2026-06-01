@@ -43,6 +43,8 @@ Known issues at packet start:
      lineage emission, cost review, and tenant context.
    - Add first-class pipeline-agent metadata and Bytewax lifecycle stream
      metadata.
+   - Add contract-level `review_evidence` metadata for durable statuses,
+     policy fields, pending-review queues, and denied lifecycle-batch behavior.
    - Expand UI routes and theme components for the full lifecycle,
      pipeline-agent roster, and lifecycle-batch monitor.
 
@@ -55,6 +57,12 @@ Known issues at packet start:
      retire.
    - Add helper methods for pipeline-agent registration and Bytewax
      lifecycle-batch validation.
+   - Persist `policy_decision`, `matched_rules`, `review_reasons`, and
+     `review_evidence` on reviewable lifecycle records and audit events.
+   - Preserve otherwise valid privileged pipeline agents without approval as
+     `pending_review` records instead of transient exceptions.
+   - Persist denied non-Bytewax lifecycle batches as `denied` evidence before
+     raising `PermissionError`.
    - Keep `ETLPService` as the production runtime and make adapter boundaries
      explicit.
 
@@ -64,6 +72,8 @@ Known issues at packet start:
      mapper, executions, quality, datasources, schedules, publish review,
      lineage, pipeline-agent roster, lifecycle-batch monitor, adapter health,
      audit, and settings.
+   - Add pending-review queue composition for dashboard, pipeline-agent roster,
+     API metadata, and settings surfaces.
 
 6. Package evidence
    - Replace static semantic JSON with contract-derived evidence.

@@ -304,7 +304,7 @@ def default_rules() -> list[CapabilityRule]:
 		CapabilityRule("pipeline_agent_requires_owner", "Pipeline agents require an accountable owner.", {"operation": "register_pipeline_agent", "agent_owner_present": False}, {"decision": "deny", "reason": "pipeline_agent_owner_required", "required_action": "attach_agent_owner"}),
 		CapabilityRule("pipeline_agent_requires_purpose", "Pipeline agents require a declared purpose.", {"operation": "register_pipeline_agent", "agent_purpose_present": False}, {"decision": "deny", "reason": "pipeline_agent_purpose_required", "required_action": "attach_agent_purpose"}),
 		CapabilityRule("pipeline_agent_requires_contribution_disclosure", "Pipeline agents must disclose machine contribution in pipeline decisions.", {"operation": "register_pipeline_agent", "contribution_disclosed": False}, {"decision": "deny", "reason": "pipeline_agent_contribution_disclosure_required", "required_action": "enable_agent_contribution_disclosure"}),
-		CapabilityRule("pipeline_agent_privileged_role_requires_human_approval", "Privileged pipeline-agent roles require human approval.", {"operation": "register_pipeline_agent", "privileged_agent_role": True, "human_approval_required": False}, {"decision": "deny", "reason": "pipeline_agent_human_approval_required", "required_action": "require_human_approval_for_agent"}),
+		CapabilityRule("pipeline_agent_privileged_role_requires_human_approval", "Privileged pipeline-agent roles require human approval evidence or review.", {"operation": "register_pipeline_agent", "privileged_agent_role": True, "human_approval_required": False}, {"decision": "require_review", "reason": "pipeline_agent_human_approval_required", "required_action": "require_human_approval_for_agent"}),
 		CapabilityRule("bytewax_etlp_stream_required", "ETLP lifecycle batches must declare Bytewax as the pipeline lifecycle processor.", {"operation": "validate_etlp_lifecycle_batch", "event_stream_ne": "bytewax"}, {"decision": "deny", "reason": "bytewax_etlp_stream_required", "required_action": "route_batch_through_bytewax"})
 	]
 
@@ -386,7 +386,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "etlp",
 		"display_name": "ETL/ELT Processing",
-		"provides": ["pipeline_lifecycle", "data_integration_governance", "pipeline_agent_composition"],
+		"provides": ["pipeline_lifecycle", "data_integration_governance", "pipeline_agent_composition", "review_evidence"],
 		"requires": ["mdm", "meta", "mqeb", "moni"],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
@@ -394,6 +394,40 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		"ui": ui_manifest(),
 		"agents": agent_manifest(),
 		"streaming": streaming_manifest(),
+		"review_evidence": {
+			"durable_statuses": [
+				"pending",
+				"pending_review",
+				"review_required",
+				"review_denied",
+				"denied",
+				"accepted",
+				"active",
+				"queued",
+				"retrying",
+				"published",
+				"retired"
+			],
+			"policy_fields": [
+				"policy_decision",
+				"matched_rules",
+				"review_reasons",
+				"review_evidence"
+			],
+			"pending_queues": [
+				"pipelines",
+				"datasources",
+				"mappings",
+				"executions",
+				"quality_results",
+				"schedules",
+				"publish_reviews",
+				"replay_requests",
+				"pipeline_agents",
+				"lifecycle_batches"
+			],
+			"deny_behavior": "Denied ETLP lifecycle batches persist evidence before PermissionError"
+		},
 		"theme": {"name": theme.name, "tokens": theme.tokens, "components": theme.components}
 	}
 

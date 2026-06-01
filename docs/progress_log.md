@@ -16,6 +16,70 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-06-01 09:14 EAT
+
+ETLP durable review-evidence packet:
+
+- Extended review-required pipelines, datasources, mappings, executions,
+  quality results, schedules, publish reviews, replay requests, privileged
+  pipeline agents, lifecycle batch evidence, and audit events with durable
+  policy evidence: policy decision, matched rules, review reasons, and review
+  evidence.
+- Added contract-level `review_evidence` metadata and exposed it through
+  registration metadata, API helpers, view models, semantic model, release
+  evidence, package tests, and app self-test.
+- Preserved privileged pipeline agents without human approval as
+  `pending_review` records instead of discarding registration evidence.
+- Preserved denied non-Bytewax ETLP lifecycle batch validations as `denied`
+  evidence before raising `PermissionError`.
+- Added pending-review queue composition for pipelines, datasources, mappings,
+  executions, quality results, schedules, publish reviews, replay requests,
+  pipeline agents, and lifecycle batches.
+- Kept ETLP pipeline agents provider-neutral for Codex, Claude Code, OpenCode,
+  Pi, and future pipeline-governance runtimes while retaining human approval
+  controls for privileged roles and Bytewax-first lifecycle processing.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for ETLP package init, models,
+  service, API helpers, contract, app, view models, and focused tests passed.
+- `./.venv/bin/pytest -q capabilities/common/etlp/test_capability_contract.py
+  capabilities/common/etlp/tests/test_package_contract.py` passed with 8 tests
+  and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "import importlib; app =
+  importlib.import_module('capabilities.common.etlp.app'); ..."` passed package
+  self-test.
+- `./.venv/bin/python -m json.tool
+  capabilities/common/etlp/semantic_model.json` passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/etlp --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/etlp --strict --json` passed with no warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/etlp --json`
+  passed with no warnings and side-effect-free publish planning.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/common/etlp --json` passed with complete lifecycle evidence,
+  release evidence, review evidence, and 31 rules.
+- ETLP stale-marker scan returned no TODO/FIXME/stub/placeholder, Kafka,
+  materialized-baseline, contract-only, or not-implemented markers across the
+  edited ETLP packet.
+- Service smoke executed privileged pipeline-agent review evidence, approved
+  production execution evidence, approved publish evidence, accepted Bytewax
+  batch evidence, and denied non-Bytewax batch persistence, printing
+  `pending_review require_review allow allow accepted denied
+  bytewax_etlp_stream_required 1`.
+- `git diff --check -- capabilities/common/etlp docs/progress_log.md` passed.
+
+Known gaps:
+
+- Full repository tests, rendered ETLP UI, production database persistence and
+  migrations, live connector execution, durable Bytewax workers and dataflows,
+  physical pipeline execution, live quality and lineage adapters, APG AUTH,
+  MTEN, AUDL, CONF, MQEB, MONI, META, MDM, NTFY, and CACH adapters, benchmark
+  and load checks, runtime SLO validation, and live AI runtime adapters still
+  need later validation outside this battery-conscious slice.
+
 ### 2026-06-01 09:02 EAT
 
 META durable review-evidence packet:

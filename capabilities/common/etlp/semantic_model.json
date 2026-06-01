@@ -304,7 +304,8 @@
       "provides": [
         "pipeline_lifecycle",
         "data_integration_governance",
-        "pipeline_agent_composition"
+        "pipeline_agent_composition",
+        "review_evidence"
       ],
       "requires": [
         "mdm",
@@ -312,6 +313,40 @@
         "mqeb",
         "moni"
       ],
+      "review_evidence": {
+        "deny_behavior": "Denied ETLP lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "pending",
+          "pending_review",
+          "review_required",
+          "review_denied",
+          "denied",
+          "accepted",
+          "active",
+          "queued",
+          "retrying",
+          "published",
+          "retired"
+        ],
+        "pending_queues": [
+          "pipelines",
+          "datasources",
+          "mappings",
+          "executions",
+          "quality_results",
+          "schedules",
+          "publish_reviews",
+          "replay_requests",
+          "pipeline_agents",
+          "lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "review_evidence"
+        ]
+      },
       "rule_engine": {
         "rules": [
           {
@@ -702,9 +737,9 @@
               "operation": "register_pipeline_agent",
               "privileged_agent_role": true
             },
-            "description": "Privileged pipeline-agent roles require human approval.",
+            "description": "Privileged pipeline-agent roles require human approval evidence or review.",
             "effect": {
-              "decision": "deny",
+              "decision": "require_review",
               "reason": "pipeline_agent_human_approval_required",
               "required_action": "require_human_approval_for_agent"
             },
@@ -1115,9 +1150,9 @@
             "operation": "register_pipeline_agent",
             "privileged_agent_role": true
           },
-          "description": "Privileged pipeline-agent roles require human approval.",
+          "description": "Privileged pipeline-agent roles require human approval evidence or review.",
           "effect": {
-            "decision": "deny",
+            "decision": "require_review",
             "reason": "pipeline_agent_human_approval_required",
             "required_action": "require_human_approval_for_agent"
           },
@@ -1687,7 +1722,8 @@
       "provides": [
         "pipeline_lifecycle",
         "data_integration_governance",
-        "pipeline_agent_composition"
+        "pipeline_agent_composition",
+        "review_evidence"
       ],
       "requires": [
         "mdm",
@@ -1695,6 +1731,40 @@
         "mqeb",
         "moni"
       ],
+      "review_evidence": {
+        "deny_behavior": "Denied ETLP lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "pending",
+          "pending_review",
+          "review_required",
+          "review_denied",
+          "denied",
+          "accepted",
+          "active",
+          "queued",
+          "retrying",
+          "published",
+          "retired"
+        ],
+        "pending_queues": [
+          "pipelines",
+          "datasources",
+          "mappings",
+          "executions",
+          "quality_results",
+          "schedules",
+          "publish_reviews",
+          "replay_requests",
+          "pipeline_agents",
+          "lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "review_evidence"
+        ]
+      },
       "streaming": {
         "broker_core_dependency_allowed": false,
         "engine": "bytewax",
@@ -1918,9 +1988,9 @@
         "operation": "register_pipeline_agent",
         "privileged_agent_role": true
       },
-      "description": "Privileged pipeline-agent roles require human approval.",
+      "description": "Privileged pipeline-agent roles require human approval evidence or review.",
       "effect": {
-        "decision": "deny",
+        "decision": "require_review",
         "reason": "pipeline_agent_human_approval_required",
         "required_action": "require_human_approval_for_agent"
       },

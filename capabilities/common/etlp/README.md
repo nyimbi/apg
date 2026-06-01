@@ -28,6 +28,10 @@ applications can invoke ETLP without needing the full production runtime.
   and future APG-compatible runtimes.
 - Pipeline-agent guardrails for supported roles, declared scope, owner, purpose,
   machine-contribution disclosure, and human approval for privileged roles.
+- Durable review evidence for review-required pipelines, datasources,
+  mappings, executions, quality results, schedules, publish reviews, replay
+  requests, privileged pipeline agents, denied lifecycle batches, and audit
+  events.
 - Bytewax lifecycle batch validation for pipeline, datasource, mapping,
   execution, quality, publish, replay, and pipeline-agent streams.
 - UI routes for dashboard, workbench, designer, field mapper, executions,
@@ -108,6 +112,30 @@ assert batch.status == "accepted"
 Production deployments can continue to use `ETLPService` with injected auth,
 audit, metadata, notification, and collaboration services.
 
+## Durable Review Evidence
+
+ETLP preserves policy evidence directly on generated-application lifecycle
+records so operators can compose review queues without replaying transient
+exceptions. Reviewable records include pipelines, datasources, mappings,
+executions, quality results, schedules, publish reviews, replay requests,
+pipeline agents, lifecycle batches, and audit events.
+
+Each governed record exposes:
+
+- `policy_decision`
+- `matched_rules`
+- `review_reasons`
+- `review_evidence`
+
+Privileged pipeline agents without human approval are registered as
+`pending_review` records when their runtime, role, owner, scope, purpose, and
+contribution disclosure are otherwise valid. Invalid runtimes, unsupported
+roles, missing owner/scope/purpose, and missing contribution disclosure remain
+blocking denials.
+
+Denied non-Bytewax lifecycle batches are persisted as `denied` records before
+`PermissionError` is raised, giving operators durable remediation evidence.
+
 ## Guardrails
 
 ETLP guardrails must protect:
@@ -121,7 +149,7 @@ ETLP guardrails must protect:
 - Datasource approval, secret handling, retry policy, schedule review,
   backfill, replay, and destructive-delete controls as the packet is expanded.
 - Pipeline-agent runtime, role, scope, owner, purpose, contribution disclosure,
-  and privileged-role human approval.
+  and privileged-role human approval or pending review.
 - Bytewax lifecycle-batch validation.
 
 ## Adapter Boundaries

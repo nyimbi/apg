@@ -41,6 +41,9 @@ class ETLPPipelineRecord:
 	status: str = "draft"
 	decision: str = "allow"
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	tags: list[str] = field(default_factory=list)
 	metadata: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
@@ -59,6 +62,9 @@ class ETLPDatasourceRecord:
 	status: str
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	metadata: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -76,6 +82,9 @@ class ETLPMappingRecord:
 	status: str
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -91,6 +100,9 @@ class ETLPExecutionRecord:
 	status: str
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	mode: str = "elt"
 	records_processed: int = 0
 	records_failed: int = 0
@@ -110,6 +122,11 @@ class ETLPQualityRecord:
 	gate_passed: bool
 	assessor: str
 	status: str = "accepted"
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -124,6 +141,9 @@ class ETLPScheduleRecord:
 	decision: str
 	status: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -137,6 +157,9 @@ class ETLPPublishRecord:
 	decision: str
 	status: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	quality_score: float | None = None
 	review_notes: str | None = None
 	created_at: datetime = field(default_factory=datetime.utcnow)
@@ -153,6 +176,9 @@ class ETLPReplayRecord:
 	decision: str
 	status: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -169,6 +195,11 @@ class ETLPPipelineAgentRecord:
 	contribution_disclosed: bool
 	human_approval_required: bool
 	status: str = "active"
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -181,6 +212,9 @@ class ETLPLifecycleBatchRecord:
 	accepted: bool
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	required_processor: str = "bytewax"
 	status: str = "accepted"
 	created_at: datetime = field(default_factory=datetime.utcnow)
@@ -195,6 +229,9 @@ class ETLPAuditEventRecord:
 	actor: str
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	details: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -254,6 +291,9 @@ class ETLPLifecycleService:
 			status="draft" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
 			decision=decision["decision"],
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 			tags=list(tags or []),
 			metadata=dict(metadata or {}),
 		)
@@ -298,6 +338,9 @@ class ETLPLifecycleService:
 			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
 			decision=decision["decision"],
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 			metadata=dict(metadata or {}),
 		)
 		self.datasources[self._key(tenant_id, record.datasource_id)] = record
@@ -339,6 +382,9 @@ class ETLPLifecycleService:
 			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
 			decision=decision["decision"],
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 		)
 		self.mappings[self._key(tenant_id, record.mapping_id)] = record
 		self._audit(tenant_id, "mapping.registered", record.mapping_id, pipeline.owner or "system", decision, context)
@@ -384,6 +430,9 @@ class ETLPLifecycleService:
 			status="queued" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
 			decision=decision["decision"],
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision, approval_recorded or cost_review_recorded),
 			mode=pipeline.mode,
 		)
 		self.executions[self._key(tenant_id, record.execution_id)] = record
@@ -413,9 +462,14 @@ class ETLPLifecycleService:
 			dimensions=dict(dimensions),
 			gate_passed=score >= minimum,
 			assessor=self._require_text(assessor, "assessor"),
+			decision="allow",
+			matched_rules=[],
+			policy_decision="allow",
+			review_reasons=[],
+			review_evidence=self._review_evidence(_allow_result()),
 		)
 		self.quality_results[self._key(tenant_id, record.quality_id)] = record
-		self._audit(tenant_id, "quality.assessed", record.execution_id, record.assessor, {"decision": "allow", "matched_rules": []}, asdict(record))
+		self._audit(tenant_id, "quality.assessed", record.execution_id, record.assessor, _allow_result(), asdict(record))
 		return record
 
 	def schedule_pipeline(
@@ -447,6 +501,9 @@ class ETLPLifecycleService:
 			decision=decision["decision"],
 			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision, schedule_review_recorded),
 		)
 		self.schedules[self._key(tenant_id, record.schedule_id)] = record
 		self._audit(tenant_id, "pipeline.scheduled", record.pipeline_id, record.owner, decision, context)
@@ -481,6 +538,9 @@ class ETLPLifecycleService:
 			decision=decision["decision"],
 			status="published" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision, publish_approval_recorded),
 			quality_score=quality.score if quality else None,
 			review_notes=review_notes,
 		)
@@ -503,6 +563,9 @@ class ETLPLifecycleService:
 		decision = evaluate_capability_rules(context)
 		execution.decision = decision["decision"]
 		execution.matched_rules = decision["matched_rules"]
+		execution.policy_decision = decision["decision"]
+		execution.review_reasons = self._reasons(decision)
+		execution.review_evidence = self._review_evidence(decision, retry_review_recorded)
 		execution.status = "retrying" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"])
 		execution.updated_at = datetime.utcnow()
 		self._audit(tenant_id, "execution.retry_evaluated", execution.execution_id, execution.triggered_by, decision, context)
@@ -538,6 +601,9 @@ class ETLPLifecycleService:
 			decision=decision["decision"],
 			status="queued" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
 			matched_rules=decision["matched_rules"],
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision, replay_review_recorded),
 		)
 		self.replay_requests[self._key(tenant_id, record.replay_id)] = record
 		self._audit(tenant_id, "execution.replay_requested", record.execution_id, "system", decision, context)
@@ -554,6 +620,9 @@ class ETLPLifecycleService:
 		decision = evaluate_capability_rules(context)
 		pipeline.decision = decision["decision"]
 		pipeline.matched_rules = decision["matched_rules"]
+		pipeline.policy_decision = decision["decision"]
+		pipeline.review_reasons = self._reasons(decision)
+		pipeline.review_evidence = self._review_evidence(decision, impact_review_recorded)
 		if decision["decision"] == "allow":
 			pipeline.status = "retired"
 			pipeline.updated_at = datetime.utcnow()
@@ -616,6 +685,12 @@ class ETLPLifecycleService:
 			purpose=self._require_text(purpose, "purpose"),
 			contribution_disclosed=bool(contribution_disclosed),
 			human_approval_required=bool(human_approval_required),
+			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
+			decision=decision["decision"],
+			matched_rules=list(decision["matched_rules"]),
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision, bool(human_approval_required)),
 		)
 		self.pipeline_agents[record_key] = record
 		self._audit(tenant_id, "agent.registered", agent_id, record.owner, decision, asdict(record))
@@ -648,6 +723,9 @@ class ETLPLifecycleService:
 			accepted=accepted,
 			decision=decision["decision"],
 			matched_rules=list(decision["matched_rules"]),
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 			status="accepted" if accepted else "denied",
 		)
 		self.lifecycle_batches[self._key(tenant_id, record.batch_id)] = record
@@ -695,12 +773,35 @@ class ETLPLifecycleService:
 			"execution_count": len(self.list_records(tenant_id, "executions")),
 			"schedule_count": len(self.list_records(tenant_id, "schedules")),
 			"published_count": sum(1 for row in self.list_records(tenant_id, "publish_reviews") if row["status"] == "published"),
-			"review_count": sum(1 for record_type in ("datasources", "executions", "replay_requests") for row in self.list_records(tenant_id, record_type) if row["status"] == "pending_review"),
+			"review_count": len(self.list_pending_reviews(tenant_id)),
 			"pipeline_agent_count": len(self.list_records(tenant_id, "pipeline_agents")),
+			"pending_pipeline_agent_review_count": sum(1 for row in self.list_records(tenant_id, "pipeline_agents") if row["status"] == "pending_review"),
 			"lifecycle_batch_count": len(self.list_records(tenant_id, "lifecycle_batches")),
 			"denied_lifecycle_batch_count": sum(1 for row in self.list_records(tenant_id, "lifecycle_batches") if not row["accepted"]),
+			"pending_review_count": len(self.list_pending_reviews(tenant_id)),
 			"audit_event_count": len(self.list_records(tenant_id, "audit_events")),
 		}
+
+	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		"""Return all ETLP records awaiting operator, steward, or human review."""
+		tenant_id = tenant_id or self.tenant_id
+		items = (
+			self.list_records(tenant_id, "pipelines")
+			+ self.list_records(tenant_id, "datasources")
+			+ self.list_records(tenant_id, "mappings")
+			+ self.list_records(tenant_id, "executions")
+			+ self.list_records(tenant_id, "quality_results")
+			+ self.list_records(tenant_id, "schedules")
+			+ self.list_records(tenant_id, "publish_reviews")
+			+ self.list_records(tenant_id, "replay_requests")
+			+ self.list_records(tenant_id, "pipeline_agents")
+			+ self.list_records(tenant_id, "lifecycle_batches")
+		)
+		return [
+			item
+			for item in items
+			if item.get("status") in {"pending", "pending_review", "review_required"}
+		]
 
 	def _audit(self, tenant_id: str, event_type: str, subject: str, actor: str, decision: dict[str, Any], details: dict[str, Any]) -> None:
 		self.audit_events.append(ETLPAuditEventRecord(
@@ -711,8 +812,29 @@ class ETLPLifecycleService:
 			actor=actor,
 			decision=decision["decision"],
 			matched_rules=list(decision["matched_rules"]),
+			policy_decision=decision["decision"],
+			review_reasons=self._reasons(decision),
+			review_evidence=self._review_evidence(decision),
 			details=details,
 		))
+
+	def _reasons(self, result: dict[str, Any]) -> list[str]:
+		return list(dict.fromkeys(
+			str(action["reason"])
+			for action in result.get("actions", [])
+			if action.get("reason")
+		))
+
+	def _review_evidence(self, result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+		return {
+			"required_actions": list(dict.fromkeys(
+				str(action.get("required_action"))
+				for action in result.get("actions", [])
+				if action.get("required_action")
+			)),
+			"reasons": self._reasons(result),
+			"review_recorded": bool(review_recorded),
+		}
 
 	def _require_pipeline(self, tenant_id: str, pipeline_id: str) -> ETLPPipelineRecord:
 		pipeline_id = self._require_text(pipeline_id, "pipeline_id")
@@ -771,6 +893,10 @@ class ETLPLifecycleService:
 	@staticmethod
 	def _key(tenant_id: str, record_id: str) -> str:
 		return f"{tenant_id}:{record_id}"
+
+
+def _allow_result() -> dict[str, Any]:
+	return {"decision": "allow", "matched_rules": [], "actions": []}
 
 
 class ETLPService:
