@@ -80,6 +80,7 @@ CAPABILITY_META = {
 		'robo',          # Robo Advisory
 		'portfolio',     # Portfolio Management
 		'trading',       # Algorithmic Trading
+		'crowdfunding',  # Crowdfunding Platform
 		'neobanking',    # Neo Banking
 		'lending',       # Digital Lending
 		'bnpl',          # Buy Now Pay Later

@@ -1,0 +1,1579 @@
+{
+  "app": {
+    "description": "Crowdfunding Platform package-backed APG capability",
+    "entity_count": 11,
+    "name": "fintech_crowdfunding",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "fintech_crowdfunding": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "analytics": "bia",
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "portfolio": "fintech_portfolio",
+          "reporting": "fin_rpt",
+          "wallets": "fintech_wallets",
+          "wealth": "fintech_wealth"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "issuer_due_diligence_reviewer",
+            "campaign_disclosure_reviewer",
+            "investor_commitment_reviewer",
+            "escrow_release_reviewer",
+            "crowdfunding_compliance_reviewer",
+            "investor_update_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "campaigns": {
+          "disclosure_required": true,
+          "issuer_required": true,
+          "positive_target_required": true,
+          "supported_currencies": [
+            "USD",
+            "KES",
+            "EUR",
+            "GBP",
+            "NGN",
+            "GHS",
+            "ZAR"
+          ],
+          "supported_types": [
+            "equity",
+            "debt",
+            "reward",
+            "donation",
+            "revenue_share"
+          ]
+        },
+        "commitments": {
+          "campaign_required": true,
+          "investor_kyc_required": true,
+          "positive_amount_required": true,
+          "risk_acknowledgement_required": true,
+          "supported_statuses": [
+            "pledged",
+            "funded",
+            "cancelled",
+            "refunded"
+          ]
+        },
+        "compliance": {
+          "evidence_required": true,
+          "review_required": true,
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "disclosures": {
+          "campaign_required": true,
+          "evidence_required": true,
+          "review_required": true,
+          "supported_types": [
+            "offering_memo",
+            "risk_factors",
+            "financials",
+            "use_of_funds",
+            "issuer_update"
+          ]
+        },
+        "escrow": {
+          "funded_commitment_required": true,
+          "positive_amount_required": true,
+          "wallet_reference_required": true
+        },
+        "governance": {
+          "audit_events": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "investor_updates": {
+          "campaign_required": true,
+          "disclosure_reference_required": true,
+          "recipient_scope_required": true
+        },
+        "issuers": {
+          "beneficial_owner_required": true,
+          "kyc_required": true,
+          "risk_rating_required": true
+        },
+        "milestones": {
+          "campaign_required": true,
+          "evidence_required": true,
+          "review_required": true
+        },
+        "observability": {
+          "event_stream": "apg.fintech.crowdfunding.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "payouts": {
+          "approval_required": true,
+          "campaign_required": true,
+          "milestone_required": true,
+          "positive_amount_required": true
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "crowdfunding_platform_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_campaigns": true,
+          "enable_commitments": true,
+          "enable_compliance": true,
+          "enable_dashboard": true,
+          "enable_disclosures": true,
+          "enable_escrow": true,
+          "enable_issuers": true,
+          "enable_milestones": true,
+          "enable_payouts": true,
+          "enable_reviews": true,
+          "enable_updates": true
+        }
+      },
+      "name": "Crowdfunding Platform",
+      "provides": [
+        "crowdfunding_issuer_workflow",
+        "crowdfunding_campaign_workflow",
+        "crowdfunding_disclosure_workflow",
+        "crowdfunding_commitment_workflow",
+        "crowdfunding_escrow_workflow",
+        "crowdfunding_milestone_workflow",
+        "crowdfunding_payout_workflow",
+        "crowdfunding_investor_update_workflow",
+        "crowdfunding_compliance_workflow",
+        "crowdfunding_review_workflow",
+        "crowdfunding_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "fintech_portfolio",
+        "fintech_wealth",
+        "bia",
+        "fin_rpt"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "policy_evidence_required",
+              "required_action": "attach_policy_evidence"
+            },
+            "name": "crowdfunding_write_requires_policy"
+          },
+          {
+            "condition": {
+              "kyc_present": false,
+              "operation": "onboard_issuer"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "issuer_kyc_required",
+              "required_action": "attach_issuer_kyc"
+            },
+            "name": "issuer_kyc_required"
+          },
+          {
+            "condition": {
+              "beneficial_owner_present": false,
+              "operation": "onboard_issuer"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "beneficial_owner_required",
+              "required_action": "attach_beneficial_owner"
+            },
+            "name": "issuer_owner_required"
+          },
+          {
+            "condition": {
+              "operation": "onboard_issuer",
+              "risk_rating_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "issuer_risk_rating_required",
+              "required_action": "attach_risk_rating"
+            },
+            "name": "issuer_risk_rating_required"
+          },
+          {
+            "condition": {
+              "issuer_present": false,
+              "operation": "publish_campaign"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "campaign_issuer_required",
+              "required_action": "select_issuer"
+            },
+            "name": "campaign_issuer_required"
+          },
+          {
+            "condition": {
+              "campaign_type_supported": false,
+              "operation": "publish_campaign"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "campaign_type_not_supported",
+              "required_action": "select_supported_campaign_type"
+            },
+            "name": "campaign_type_supported"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "publish_campaign"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "campaign_currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "campaign_currency_supported"
+          },
+          {
+            "condition": {
+              "operation": "publish_campaign",
+              "positive_target": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_campaign_target_required",
+              "required_action": "set_positive_target"
+            },
+            "name": "campaign_positive_target"
+          },
+          {
+            "condition": {
+              "disclosure_present": false,
+              "operation": "publish_campaign"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "campaign_disclosure_required",
+              "required_action": "attach_disclosure"
+            },
+            "name": "campaign_disclosure_required"
+          },
+          {
+            "condition": {
+              "campaign_present": false,
+              "operation": "record_disclosure"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "disclosure_campaign_required",
+              "required_action": "select_campaign"
+            },
+            "name": "disclosure_campaign_required"
+          },
+          {
+            "condition": {
+              "disclosure_type_supported": false,
+              "operation": "record_disclosure"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "disclosure_type_not_supported",
+              "required_action": "select_supported_disclosure_type"
+            },
+            "name": "disclosure_type_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_disclosure"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "disclosure_evidence_required",
+              "required_action": "attach_disclosure_evidence"
+            },
+            "name": "disclosure_evidence_required"
+          },
+          {
+            "condition": {
+              "campaign_present": false,
+              "operation": "record_commitment"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "commitment_campaign_required",
+              "required_action": "select_campaign"
+            },
+            "name": "commitment_campaign_required"
+          },
+          {
+            "condition": {
+              "investor_kyc_present": false,
+              "operation": "record_commitment"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "investor_kyc_required",
+              "required_action": "attach_investor_kyc"
+            },
+            "name": "commitment_investor_kyc_required"
+          },
+          {
+            "condition": {
+              "operation": "record_commitment",
+              "positive_amount": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_commitment_amount_required",
+              "required_action": "set_positive_commitment_amount"
+            },
+            "name": "commitment_positive_amount"
+          },
+          {
+            "condition": {
+              "operation": "record_commitment",
+              "risk_ack_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_acknowledgement_required",
+              "required_action": "record_risk_acknowledgement"
+            },
+            "name": "commitment_risk_ack_required"
+          },
+          {
+            "condition": {
+              "funded_commitment_present": false,
+              "operation": "record_escrow_funding"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "funded_commitment_required",
+              "required_action": "select_funded_commitment"
+            },
+            "name": "escrow_commitment_required"
+          },
+          {
+            "condition": {
+              "operation": "record_escrow_funding",
+              "wallet_reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "escrow_wallet_reference_required",
+              "required_action": "attach_wallet_reference"
+            },
+            "name": "escrow_wallet_required"
+          },
+          {
+            "condition": {
+              "operation": "record_escrow_funding",
+              "positive_amount": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_escrow_amount_required",
+              "required_action": "set_positive_amount"
+            },
+            "name": "escrow_positive_amount"
+          },
+          {
+            "condition": {
+              "campaign_present": false,
+              "operation": "record_milestone"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "milestone_campaign_required",
+              "required_action": "select_campaign"
+            },
+            "name": "milestone_campaign_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_milestone"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "milestone_evidence_required",
+              "required_action": "attach_milestone_evidence"
+            },
+            "name": "milestone_evidence_required"
+          },
+          {
+            "condition": {
+              "campaign_present": false,
+              "operation": "authorize_payout"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "payout_campaign_required",
+              "required_action": "select_campaign"
+            },
+            "name": "payout_campaign_required"
+          },
+          {
+            "condition": {
+              "milestone_present": false,
+              "operation": "authorize_payout"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "payout_milestone_required",
+              "required_action": "select_milestone"
+            },
+            "name": "payout_milestone_required"
+          },
+          {
+            "condition": {
+              "operation": "authorize_payout",
+              "positive_amount": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_payout_amount_required",
+              "required_action": "set_positive_payout"
+            },
+            "name": "payout_positive_amount"
+          },
+          {
+            "condition": {
+              "approval_present": false,
+              "operation": "authorize_payout"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "payout_approval_required",
+              "required_action": "attach_payout_approval"
+            },
+            "name": "payout_approval_required"
+          },
+          {
+            "condition": {
+              "campaign_present": false,
+              "operation": "publish_investor_update"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "update_campaign_required",
+              "required_action": "select_campaign"
+            },
+            "name": "update_campaign_required"
+          },
+          {
+            "condition": {
+              "disclosure_reference_present": false,
+              "operation": "publish_investor_update"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "update_disclosure_reference_required",
+              "required_action": "attach_disclosure_reference"
+            },
+            "name": "update_disclosure_required"
+          },
+          {
+            "condition": {
+              "operation": "record_compliance_alert",
+              "severity_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "compliance_severity_not_supported",
+              "required_action": "select_supported_severity"
+            },
+            "name": "compliance_severity_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_compliance_alert"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "compliance_evidence_required",
+              "required_action": "attach_compliance_evidence"
+            },
+            "name": "compliance_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "status_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_status_not_supported",
+              "required_action": "select_supported_status"
+            },
+            "name": "review_status_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_review"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_evidence_required",
+              "required_action": "attach_review_evidence"
+            },
+            "name": "review_evidence_required"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "crowdfunding_batch"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_crowdfunding_batch_to_bytewax"
+            },
+            "name": "crowdfunding_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_crowdfunding_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "crowdfunding_agent_runtime_not_supported",
+              "required_action": "select_supported_runtime"
+            },
+            "name": "crowdfunding_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_crowdfunding_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "crowdfunding_agent_role_not_supported",
+              "required_action": "select_supported_role"
+            },
+            "name": "crowdfunding_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "crowdfunding_agent_action",
+              "privileged_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_crowdfunding_agent_action_requires_human_approval"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "policy_evidence_required",
+            "required_action": "attach_policy_evidence"
+          },
+          "name": "crowdfunding_write_requires_policy"
+        },
+        {
+          "condition": {
+            "kyc_present": false,
+            "operation": "onboard_issuer"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "issuer_kyc_required",
+            "required_action": "attach_issuer_kyc"
+          },
+          "name": "issuer_kyc_required"
+        },
+        {
+          "condition": {
+            "beneficial_owner_present": false,
+            "operation": "onboard_issuer"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "beneficial_owner_required",
+            "required_action": "attach_beneficial_owner"
+          },
+          "name": "issuer_owner_required"
+        },
+        {
+          "condition": {
+            "operation": "onboard_issuer",
+            "risk_rating_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "issuer_risk_rating_required",
+            "required_action": "attach_risk_rating"
+          },
+          "name": "issuer_risk_rating_required"
+        },
+        {
+          "condition": {
+            "issuer_present": false,
+            "operation": "publish_campaign"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "campaign_issuer_required",
+            "required_action": "select_issuer"
+          },
+          "name": "campaign_issuer_required"
+        },
+        {
+          "condition": {
+            "campaign_type_supported": false,
+            "operation": "publish_campaign"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "campaign_type_not_supported",
+            "required_action": "select_supported_campaign_type"
+          },
+          "name": "campaign_type_supported"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "publish_campaign"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "campaign_currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "campaign_currency_supported"
+        },
+        {
+          "condition": {
+            "operation": "publish_campaign",
+            "positive_target": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_campaign_target_required",
+            "required_action": "set_positive_target"
+          },
+          "name": "campaign_positive_target"
+        },
+        {
+          "condition": {
+            "disclosure_present": false,
+            "operation": "publish_campaign"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "campaign_disclosure_required",
+            "required_action": "attach_disclosure"
+          },
+          "name": "campaign_disclosure_required"
+        },
+        {
+          "condition": {
+            "campaign_present": false,
+            "operation": "record_disclosure"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "disclosure_campaign_required",
+            "required_action": "select_campaign"
+          },
+          "name": "disclosure_campaign_required"
+        },
+        {
+          "condition": {
+            "disclosure_type_supported": false,
+            "operation": "record_disclosure"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "disclosure_type_not_supported",
+            "required_action": "select_supported_disclosure_type"
+          },
+          "name": "disclosure_type_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_disclosure"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "disclosure_evidence_required",
+            "required_action": "attach_disclosure_evidence"
+          },
+          "name": "disclosure_evidence_required"
+        },
+        {
+          "condition": {
+            "campaign_present": false,
+            "operation": "record_commitment"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "commitment_campaign_required",
+            "required_action": "select_campaign"
+          },
+          "name": "commitment_campaign_required"
+        },
+        {
+          "condition": {
+            "investor_kyc_present": false,
+            "operation": "record_commitment"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "investor_kyc_required",
+            "required_action": "attach_investor_kyc"
+          },
+          "name": "commitment_investor_kyc_required"
+        },
+        {
+          "condition": {
+            "operation": "record_commitment",
+            "positive_amount": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_commitment_amount_required",
+            "required_action": "set_positive_commitment_amount"
+          },
+          "name": "commitment_positive_amount"
+        },
+        {
+          "condition": {
+            "operation": "record_commitment",
+            "risk_ack_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_acknowledgement_required",
+            "required_action": "record_risk_acknowledgement"
+          },
+          "name": "commitment_risk_ack_required"
+        },
+        {
+          "condition": {
+            "funded_commitment_present": false,
+            "operation": "record_escrow_funding"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "funded_commitment_required",
+            "required_action": "select_funded_commitment"
+          },
+          "name": "escrow_commitment_required"
+        },
+        {
+          "condition": {
+            "operation": "record_escrow_funding",
+            "wallet_reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "escrow_wallet_reference_required",
+            "required_action": "attach_wallet_reference"
+          },
+          "name": "escrow_wallet_required"
+        },
+        {
+          "condition": {
+            "operation": "record_escrow_funding",
+            "positive_amount": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_escrow_amount_required",
+            "required_action": "set_positive_amount"
+          },
+          "name": "escrow_positive_amount"
+        },
+        {
+          "condition": {
+            "campaign_present": false,
+            "operation": "record_milestone"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "milestone_campaign_required",
+            "required_action": "select_campaign"
+          },
+          "name": "milestone_campaign_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_milestone"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "milestone_evidence_required",
+            "required_action": "attach_milestone_evidence"
+          },
+          "name": "milestone_evidence_required"
+        },
+        {
+          "condition": {
+            "campaign_present": false,
+            "operation": "authorize_payout"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "payout_campaign_required",
+            "required_action": "select_campaign"
+          },
+          "name": "payout_campaign_required"
+        },
+        {
+          "condition": {
+            "milestone_present": false,
+            "operation": "authorize_payout"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "payout_milestone_required",
+            "required_action": "select_milestone"
+          },
+          "name": "payout_milestone_required"
+        },
+        {
+          "condition": {
+            "operation": "authorize_payout",
+            "positive_amount": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_payout_amount_required",
+            "required_action": "set_positive_payout"
+          },
+          "name": "payout_positive_amount"
+        },
+        {
+          "condition": {
+            "approval_present": false,
+            "operation": "authorize_payout"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "payout_approval_required",
+            "required_action": "attach_payout_approval"
+          },
+          "name": "payout_approval_required"
+        },
+        {
+          "condition": {
+            "campaign_present": false,
+            "operation": "publish_investor_update"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "update_campaign_required",
+            "required_action": "select_campaign"
+          },
+          "name": "update_campaign_required"
+        },
+        {
+          "condition": {
+            "disclosure_reference_present": false,
+            "operation": "publish_investor_update"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "update_disclosure_reference_required",
+            "required_action": "attach_disclosure_reference"
+          },
+          "name": "update_disclosure_required"
+        },
+        {
+          "condition": {
+            "operation": "record_compliance_alert",
+            "severity_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "compliance_severity_not_supported",
+            "required_action": "select_supported_severity"
+          },
+          "name": "compliance_severity_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_compliance_alert"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "compliance_evidence_required",
+            "required_action": "attach_compliance_evidence"
+          },
+          "name": "compliance_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "status_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_status_not_supported",
+            "required_action": "select_supported_status"
+          },
+          "name": "review_status_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_review"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_evidence_required",
+            "required_action": "attach_review_evidence"
+          },
+          "name": "review_evidence_required"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "crowdfunding_batch"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_crowdfunding_batch_to_bytewax"
+          },
+          "name": "crowdfunding_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_crowdfunding_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "crowdfunding_agent_runtime_not_supported",
+            "required_action": "select_supported_runtime"
+          },
+          "name": "crowdfunding_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_crowdfunding_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "crowdfunding_agent_role_not_supported",
+            "required_action": "select_supported_role"
+          },
+          "name": "crowdfunding_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "crowdfunding_agent_action",
+            "privileged_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_crowdfunding_agent_action_requires_human_approval"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "agents": {
+          "component": "CrowdfundingAgentWorkbench",
+          "permission": "fintech_crowdfunding:admin",
+          "route": "/fintech-crowdfunding/agents"
+        },
+        "campaigns": {
+          "component": "CampaignConsole",
+          "permission": "fintech_crowdfunding:campaigns",
+          "route": "/fintech-crowdfunding/campaigns"
+        },
+        "commitments": {
+          "component": "InvestorCommitmentConsole",
+          "permission": "fintech_crowdfunding:commitments",
+          "route": "/fintech-crowdfunding/commitments"
+        },
+        "compliance": {
+          "component": "CrowdfundingComplianceConsole",
+          "permission": "fintech_crowdfunding:compliance",
+          "route": "/fintech-crowdfunding/compliance"
+        },
+        "dashboard": {
+          "component": "CrowdfundingDashboard",
+          "permission": "fintech_crowdfunding:view",
+          "route": "/fintech-crowdfunding/dashboard"
+        },
+        "disclosures": {
+          "component": "DisclosureWorkbench",
+          "permission": "fintech_crowdfunding:disclosures",
+          "route": "/fintech-crowdfunding/disclosures"
+        },
+        "escrow": {
+          "component": "EscrowFundingConsole",
+          "permission": "fintech_crowdfunding:escrow",
+          "route": "/fintech-crowdfunding/escrow"
+        },
+        "issuers": {
+          "component": "IssuerConsole",
+          "permission": "fintech_crowdfunding:issuers",
+          "route": "/fintech-crowdfunding/issuers"
+        },
+        "milestones": {
+          "component": "MilestoneConsole",
+          "permission": "fintech_crowdfunding:milestones",
+          "route": "/fintech-crowdfunding/milestones"
+        },
+        "payouts": {
+          "component": "PayoutWorkbench",
+          "permission": "fintech_crowdfunding:payouts",
+          "route": "/fintech-crowdfunding/payouts"
+        },
+        "reviews": {
+          "component": "CrowdfundingReviewConsole",
+          "permission": "fintech_crowdfunding:reviews",
+          "route": "/fintech-crowdfunding/reviews"
+        },
+        "settings": {
+          "component": "CrowdfundingSettings",
+          "permission": "fintech_crowdfunding:admin",
+          "route": "/fintech-crowdfunding/settings"
+        },
+        "updates": {
+          "component": "InvestorUpdateConsole",
+          "permission": "fintech_crowdfunding:updates",
+          "route": "/fintech-crowdfunding/updates"
+        }
+      },
+      "streaming": {
+        "events": [
+          "issuer_onboarded",
+          "campaign_published",
+          "disclosure_recorded",
+          "investor_commitment_recorded",
+          "escrow_funding_recorded",
+          "milestone_recorded",
+          "payout_authorized",
+          "investor_update_published",
+          "crowdfunding_compliance_alert_recorded",
+          "crowdfunding_review_recorded",
+          "crowdfunding_agent_registered"
+        ],
+        "guardrails": [
+          "crowdfunding_batch_requires_bytewax",
+          "privileged_crowdfunding_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.fintech.crowdfunding.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "campaigns": {
+            "icon": "megaphone",
+            "status_indicator": "campaign-chip"
+          },
+          "commitments": {
+            "icon": "hand-coins",
+            "status_indicator": "commitment-chip"
+          },
+          "compliance": {
+            "icon": "scale",
+            "status_indicator": "alert-chip"
+          },
+          "disclosures": {
+            "icon": "file-check-2",
+            "status_indicator": "disclosure-chip"
+          },
+          "escrow": {
+            "icon": "landmark",
+            "status_indicator": "escrow-chip"
+          },
+          "issuers": {
+            "icon": "building-2",
+            "status_indicator": "issuer-chip"
+          },
+          "milestones": {
+            "icon": "flag",
+            "status_indicator": "milestone-chip"
+          },
+          "payouts": {
+            "icon": "circle-dollar-sign",
+            "status_indicator": "payout-chip"
+          },
+          "reviews": {
+            "icon": "clipboard-check",
+            "status_indicator": "review-chip"
+          },
+          "updates": {
+            "icon": "send",
+            "status_indicator": "update-chip"
+          }
+        },
+        "name": "crowdfunding_platform_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#2563EB",
+          "color.danger": "#B91C1C",
+          "color.primary": "#047857",
+          "color.success": "#15803D",
+          "color.warning": "#A16207",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/fintech-crowdfunding/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "CrowdfundingDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/fintech-crowdfunding/dashboard",
+            "permission": "fintech_crowdfunding:view"
+          },
+          {
+            "component": "IssuerConsole",
+            "name": "issuers",
+            "nav_group": "Issuers",
+            "path": "/fintech-crowdfunding/issuers",
+            "permission": "fintech_crowdfunding:issuers"
+          },
+          {
+            "component": "CampaignConsole",
+            "name": "campaigns",
+            "nav_group": "Campaigns",
+            "path": "/fintech-crowdfunding/campaigns",
+            "permission": "fintech_crowdfunding:campaigns"
+          },
+          {
+            "component": "DisclosureWorkbench",
+            "name": "disclosures",
+            "nav_group": "Campaigns",
+            "path": "/fintech-crowdfunding/disclosures",
+            "permission": "fintech_crowdfunding:disclosures"
+          },
+          {
+            "component": "InvestorCommitmentConsole",
+            "name": "commitments",
+            "nav_group": "Investors",
+            "path": "/fintech-crowdfunding/commitments",
+            "permission": "fintech_crowdfunding:commitments"
+          },
+          {
+            "component": "EscrowFundingConsole",
+            "name": "escrow",
+            "nav_group": "Funds",
+            "path": "/fintech-crowdfunding/escrow",
+            "permission": "fintech_crowdfunding:escrow"
+          },
+          {
+            "component": "MilestoneConsole",
+            "name": "milestones",
+            "nav_group": "Funds",
+            "path": "/fintech-crowdfunding/milestones",
+            "permission": "fintech_crowdfunding:milestones"
+          },
+          {
+            "component": "PayoutWorkbench",
+            "name": "payouts",
+            "nav_group": "Funds",
+            "path": "/fintech-crowdfunding/payouts",
+            "permission": "fintech_crowdfunding:payouts"
+          },
+          {
+            "component": "InvestorUpdateConsole",
+            "name": "updates",
+            "nav_group": "Investors",
+            "path": "/fintech-crowdfunding/updates",
+            "permission": "fintech_crowdfunding:updates"
+          },
+          {
+            "component": "CrowdfundingComplianceConsole",
+            "name": "compliance",
+            "nav_group": "Governance",
+            "path": "/fintech-crowdfunding/compliance",
+            "permission": "fintech_crowdfunding:compliance"
+          },
+          {
+            "component": "CrowdfundingReviewConsole",
+            "name": "reviews",
+            "nav_group": "Governance",
+            "path": "/fintech-crowdfunding/reviews",
+            "permission": "fintech_crowdfunding:reviews"
+          },
+          {
+            "component": "CrowdfundingAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/fintech-crowdfunding/agents",
+            "permission": "fintech_crowdfunding:admin"
+          },
+          {
+            "component": "CrowdfundingSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/fintech-crowdfunding/settings",
+            "permission": "fintech_crowdfunding:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "crowdfunding_review": {
+        "roles": [
+          "issuer_due_diligence_reviewer",
+          "campaign_disclosure_reviewer",
+          "investor_commitment_reviewer",
+          "escrow_release_reviewer",
+          "crowdfunding_compliance_reviewer",
+          "investor_update_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "fintech_crowdfunding": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "fintech_portfolio",
+        "fintech_wealth",
+        "bia",
+        "fin_rpt"
+      ]
+    }
+  },
+  "contracts": {
+    "fintech_crowdfunding": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "analytics": "bia",
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "portfolio": "fintech_portfolio",
+          "reporting": "fin_rpt",
+          "wallets": "fintech_wallets",
+          "wealth": "fintech_wealth"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "issuer_due_diligence_reviewer",
+            "campaign_disclosure_reviewer",
+            "investor_commitment_reviewer",
+            "escrow_release_reviewer",
+            "crowdfunding_compliance_reviewer",
+            "investor_update_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "campaigns": {
+          "disclosure_required": true,
+          "issuer_required": true,
+          "positive_target_required": true,
+          "supported_currencies": [
+            "USD",
+            "KES",
+            "EUR",
+            "GBP",
+            "NGN",
+            "GHS",
+            "ZAR"
+          ],
+          "supported_types": [
+            "equity",
+            "debt",
+            "reward",
+            "donation",
+            "revenue_share"
+          ]
+        },
+        "commitments": {
+          "campaign_required": true,
+          "investor_kyc_required": true,
+          "positive_amount_required": true,
+          "risk_acknowledgement_required": true,
+          "supported_statuses": [
+            "pledged",
+            "funded",
+            "cancelled",
+            "refunded"
+          ]
+        },
+        "compliance": {
+          "evidence_required": true,
+          "review_required": true,
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "disclosures": {
+          "campaign_required": true,
+          "evidence_required": true,
+          "review_required": true,
+          "supported_types": [
+            "offering_memo",
+            "risk_factors",
+            "financials",
+            "use_of_funds",
+            "issuer_update"
+          ]
+        },
+        "escrow": {
+          "funded_commitment_required": true,
+          "positive_amount_required": true,
+          "wallet_reference_required": true
+        },
+        "governance": {
+          "audit_events": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "investor_updates": {
+          "campaign_required": true,
+          "disclosure_reference_required": true,
+          "recipient_scope_required": true
+        },
+        "issuers": {
+          "beneficial_owner_required": true,
+          "kyc_required": true,
+          "risk_rating_required": true
+        },
+        "milestones": {
+          "campaign_required": true,
+          "evidence_required": true,
+          "review_required": true
+        },
+        "observability": {
+          "event_stream": "apg.fintech.crowdfunding.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "payouts": {
+          "approval_required": true,
+          "campaign_required": true,
+          "milestone_required": true,
+          "positive_amount_required": true
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "crowdfunding_platform_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_campaigns": true,
+          "enable_commitments": true,
+          "enable_compliance": true,
+          "enable_dashboard": true,
+          "enable_disclosures": true,
+          "enable_escrow": true,
+          "enable_issuers": true,
+          "enable_milestones": true,
+          "enable_payouts": true,
+          "enable_reviews": true,
+          "enable_updates": true
+        }
+      },
+      "id": "fintech_crowdfunding",
+      "provides": [
+        "crowdfunding_issuer_workflow",
+        "crowdfunding_campaign_workflow",
+        "crowdfunding_disclosure_workflow",
+        "crowdfunding_commitment_workflow",
+        "crowdfunding_escrow_workflow",
+        "crowdfunding_milestone_workflow",
+        "crowdfunding_payout_workflow",
+        "crowdfunding_investor_update_workflow",
+        "crowdfunding_compliance_workflow",
+        "crowdfunding_review_workflow",
+        "crowdfunding_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "fintech_portfolio",
+        "fintech_wealth",
+        "bia",
+        "fin_rpt"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 14,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "fintech_crowdfunding": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}

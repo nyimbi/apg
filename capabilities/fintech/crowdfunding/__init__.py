@@ -1,11 +1,8 @@
-"""
-crowdfunding FinTech Capability
+"""APG Crowdfunding Platform capability package."""
 
-Placeholder for crowdfunding financial technology capability.
-To be implemented as part of the comprehensive APG FinTech platform.
-"""
+from __future__ import annotations
 
-# Placeholder implementation
-__version__ = "1.0.0"
-__status__ = "Development"
+from .capability_contract import CAPABILITY_ID, CAPABILITY_NAME, CAPABILITY_VERSION, get_capability_contract
+from .service import CrowdfundingPlatformService
 
+__all__ = ["CrowdfundingPlatformService", "CAPABILITY_ID", "CAPABILITY_NAME", "CAPABILITY_VERSION", "get_capability_contract"]

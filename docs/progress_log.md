@@ -27773,3 +27773,97 @@ Known gaps:
   ingestion, venue connectivity, smart order routing, custody settlement,
   transaction-cost analysis, regulator filing, durable Bytewax topology, or
   performance/load checks during this battery-conscious slice.
+
+## 2026-06-01 - FinTech Crowdfunding Platform executable capability
+
+- Promoted `capabilities/fintech/crowdfunding` from a placeholder package into
+  a first-class APG capability with `README.md`, `SPECIFICATION.md`, `PLAN.md`,
+  `cap_spec.md`, contract, models, service, API helpers, view models, app
+  entrypoint, semantic/package/release evidence, and focused tests.
+- Added issuer onboarding, campaign publishing, disclosure records, investor
+  commitments, escrow funding, milestone records, payout authorization,
+  investor updates, compliance alerts, review records, dashboard summaries,
+  Bytewax batch validation, and provider-neutral crowdfunding agent
+  registration.
+- Added deterministic Crowdfunding Platform guardrails for tenant context,
+  write policy, issuer KYC/beneficial-owner/risk evidence, campaign
+  issuer/type/currency/target/disclosure controls, disclosure type/evidence,
+  investor KYC/risk acknowledgement/positive commitment controls, escrow
+  wallet/funding evidence, milestone evidence, payout milestone/amount/approval
+  controls, investor-update disclosure evidence, compliance severity/evidence,
+  review status/evidence, Bytewax lifecycle events, supported AI-agent
+  runtimes/roles, and privileged-agent approval.
+- Updated fintech capability metadata so `crowdfunding` is listed as an
+  implemented sub-capability.
+- Updated `capabilities/README.md` so the catalog snapshot reports 128 valid
+  contracts, 128 domain-specific packages, 128 strict complete package artifact
+  sets, and 20 fintech packages.
+- Removed the empty `_Crowdfunding_Platform` marker file and published
+  `semantic_model.json`, `package_manifest.json`, and `release_report.json`.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/fintech/crowdfunding/__init__.py
+  capabilities/fintech/crowdfunding/capability_contract.py
+  capabilities/fintech/crowdfunding/models.py
+  capabilities/fintech/crowdfunding/crowdfunding_runtime.py
+  capabilities/fintech/crowdfunding/service.py
+  capabilities/fintech/crowdfunding/api.py
+  capabilities/fintech/crowdfunding/views.py
+  capabilities/fintech/crowdfunding/app.py
+  capabilities/fintech/crowdfunding/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/fintech/crowdfunding/tests/test_package_contract.py` passed
+  with 6 tests.
+- `./.venv/bin/python capabilities/fintech/crowdfunding/app.py` passed
+  self-test with `passed: true` and `status: ok`.
+- `./.venv/bin/apg capabilities inspect fintech_crowdfunding --json` passed
+  with 36 rules, 13 UI routes, theme `crowdfunding_platform_control`, shell
+  `apg_python`, and Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/fintech/crowdfunding --json` passed with `side_effect_free:
+  true` and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/fintech/crowdfunding --json` passed with 1 domain-specific
+  capability, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/fintech/crowdfunding --json` passed with 1 complete lifecycle,
+  36 rules, 13 UI routes, 11 theme tokens, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 128 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 128 operable contracts, 128 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/fintech/crowdfunding`, `capabilities/fintech/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed issuer, campaign, disclosure, commitment, escrow, milestone, payout,
+  investor-update, compliance, review, and AI-agent lifecycle paths so rule
+  evaluation happens before state mutation.
+- Tightened campaign publishing so issuer, supported type, supported currency,
+  positive target, and disclosure evidence are required before publication.
+- Reviewed commitment, escrow, milestone, and payout workflows so KYC, risk
+  acknowledgement, wallet, milestone, and approval evidence is required before
+  records are accepted.
+- Reviewed provider-neutral crowdfunding agent behavior so Codex, Claude Code,
+  OpenCode, and Pi runtimes remain first-class configuration choices and
+  privileged actions require human approval.
+- Kept live payment capture, wallet settlement, securities registration,
+  investor accreditation checks, document signing, regulator filing, tax
+  reporting, secondary trading, and durable Bytewax workers behind adapter
+  boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live payment capture,
+  wallet settlement, securities registration, investor accreditation checks,
+  document signing, regulator filing, tax reporting, secondary trading, durable
+  Bytewax topology, or performance/load checks during this battery-conscious
+  slice.
