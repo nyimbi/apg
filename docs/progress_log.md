@@ -26912,3 +26912,88 @@ Known gaps:
   disbursement rails, loan-management-system integration, collections agency
   integration, regulator filing, durable Bytewax topology, or performance/load
   checks during this battery-conscious slice.
+
+### 2026-06-01 15:26 EAT
+
+Fintech Digital Neobanking executable capability slice:
+
+- Promoted `capabilities/fintech/neobanking` from a placeholder package into a
+  first-class APG capability with `README.md`, `SPECIFICATION.md`, `PLAN.md`,
+  `cap_spec.md`, contract, models, service, API helpers, view models, app
+  entrypoint, semantic/package/release evidence, and focused tests.
+- Added tenant-scoped neobank program governance, customer onboarding, deposit
+  account opening, payment-rail linking, transaction posting, savings pots,
+  statement issuance, customer-service cases, dashboard summaries, Bytewax
+  batch validation, and provider-neutral neobanking-agent registration.
+- Added deterministic neobanking guardrails for tenant context, write policy,
+  program owner/country/currency/settlement evidence, customer reference/KYC/
+  AML/fraud/country/consent evidence, account program/customer/type/currency/
+  initial-balance controls, payment rail and provider evidence, transaction
+  account/type/amount/currency/risk/high-impact approval evidence, savings
+  target controls, statement period controls, service-case customer/account/
+  reason/reviewer/evidence controls, Bytewax lifecycle events, supported
+  AI-agent runtimes/roles, and privileged-agent approval.
+- Added `neobanking_runtime.py` domain helpers for normalized codes, countries,
+  currencies, amounts, account-number derivation, date stamping, and
+  transaction direction.
+- Updated fintech capability metadata so `neobanking` is listed as an
+  implemented sub-capability.
+- Removed the empty `_Neo_Banking` marker file and refreshed
+  `semantic_model.json`, `package_manifest.json`, and `release_report.json`.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/fintech/neobanking/__init__.py capabilities/fintech/neobanking/capability_contract.py capabilities/fintech/neobanking/models.py capabilities/fintech/neobanking/neobanking_runtime.py capabilities/fintech/neobanking/service.py capabilities/fintech/neobanking/api.py capabilities/fintech/neobanking/views.py capabilities/fintech/neobanking/app.py capabilities/fintech/neobanking/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/fintech/neobanking/tests/test_package_contract.py`
+  passed with 6 tests.
+- `./.venv/bin/python capabilities/fintech/neobanking/app.py` passed with
+  `self_test()` status `ok`.
+- `./.venv/bin/apg capabilities inspect fintech_neobanking --json` passed with
+  40 rules, 11 routes, Bytewax streaming, and provider-neutral neobanking-agent
+  runtimes.
+- `./.venv/bin/apg capabilities publish-plan capabilities/fintech/neobanking --json`
+  passed with side-effect-free publish evidence and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/fintech/neobanking --json`
+  passed with one domain-specific fintech neobanking implementation, 0 baseline
+  markers, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/fintech/neobanking --json`
+  passed with one complete lifecycle record, 40 rules, 11 routes, 11 theme
+  tokens, and 0 warnings/errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 118 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 118 operable contracts, 118 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/fintech/neobanking`, `capabilities/fintech/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed program, customer, and account guardrails so owner, country,
+  currency, settlement, customer, KYC, AML, fraud, consent, account type,
+  initial balance, tenant, and policy evidence are enforced before local state
+  changes.
+- Reviewed rail, transaction, savings, statement, and service-case guardrails
+  so provider references, risk references, high-impact transaction approvals,
+  savings targets, statement periods, reasons, reviewers, and evidence are
+  enforced before records are written.
+- Reviewed first-class neobanking-agent behavior so Codex, Claude Code,
+  OpenCode, and Pi runtimes remain provider-neutral and privileged actions
+  require human approval.
+- Kept live core banking ledgers, issuer processors, card networks, mobile
+  money operators, payment rails, customer support systems, audit sinks,
+  notifications, key management, regulator filing, and durable Bytewax workers
+  behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live core-banking
+  posting, live issuer-processor or card-network flows, live payment-rail or
+  mobile-money integration, live customer-support integration, regulator
+  filing, durable Bytewax topology, or performance/load checks during this
+  battery-conscious slice.

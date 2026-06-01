@@ -73,6 +73,7 @@ CAPABILITY_META = {
 		'payments',      # Digital Payments
 		'cards',         # Digital Cards
 		'wallets',       # Digital Wallets
+		'neobanking',    # Neo Banking
 		'lending',       # Digital Lending
 		'remittance',    # Cross-Border Remittance
 		'kyc',           # Know Your Customer

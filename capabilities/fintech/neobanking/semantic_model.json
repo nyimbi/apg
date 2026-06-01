@@ -1,0 +1,1773 @@
+{
+  "app": {
+    "description": "Digital Neobanking package-backed APG capability",
+    "entity_count": 9,
+    "name": "fintech_neobanking",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "fintech_neobanking": {
+      "configuration": {
+        "accounts": {
+          "customer_required": true,
+          "program_required": true,
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ],
+          "supported_types": [
+            "current",
+            "savings",
+            "joint",
+            "business",
+            "youth",
+            "merchant"
+          ]
+        },
+        "adapters": {
+          "aml": "fintech_aml",
+          "audit": "audl",
+          "auth": "auth",
+          "cards": "fintech_cards",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "lending": "fintech_lending",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "remittance": "fintech_remittance",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "neobank_ops_reviewer",
+            "account_risk_reviewer",
+            "payments_reviewer",
+            "customer_service_reviewer",
+            "compliance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "customers": {
+          "aml_required": true,
+          "consent_required": true,
+          "fraud_required": true,
+          "kyc_required": true,
+          "supported_countries": [
+            "KE",
+            "UG",
+            "TZ",
+            "RW",
+            "GH",
+            "NG",
+            "ZA",
+            "GB",
+            "US",
+            "AE"
+          ]
+        },
+        "governance": {
+          "audit_neobanking_events": true,
+          "customer_consent_required": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "observability": {
+          "emit_account_events": true,
+          "emit_agent_events": true,
+          "emit_case_events": true,
+          "emit_customer_events": true,
+          "emit_program_events": true,
+          "emit_rail_events": true,
+          "emit_savings_events": true,
+          "emit_statement_events": true,
+          "emit_transaction_events": true,
+          "event_stream": "apg.fintech.neobanking.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "programs": {
+          "owner_required": true,
+          "settlement_account_required": true,
+          "supported_countries": [
+            "KE",
+            "UG",
+            "TZ",
+            "RW",
+            "GH",
+            "NG",
+            "ZA",
+            "GB",
+            "US",
+            "AE"
+          ],
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ]
+        },
+        "rails": {
+          "provider_reference_required": true,
+          "supported_rails": [
+            "bank_transfer",
+            "card",
+            "wallet",
+            "mobile_money",
+            "internal_transfer"
+          ],
+          "wallet_or_card_reference_supported": true
+        },
+        "savings": {
+          "source_account_required": true,
+          "target_amount_required": true
+        },
+        "service_cases": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_reasons": [
+            "account_access",
+            "card_issue",
+            "payment_dispute",
+            "kyc_review",
+            "fraud_review",
+            "fee_query",
+            "statement_query"
+          ]
+        },
+        "statements": {
+          "audit_statement_events": true,
+          "period_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_neobanking_control"
+        },
+        "transactions": {
+          "high_value_threshold": 100000,
+          "human_approval_required_for_high_impact": true,
+          "positive_amount_required": true,
+          "risk_reference_required": true,
+          "supported_types": [
+            "deposit",
+            "withdrawal",
+            "transfer_in",
+            "transfer_out",
+            "card_purchase",
+            "fee",
+            "refund",
+            "interest"
+          ]
+        },
+        "ui": {
+          "enable_accounts": true,
+          "enable_agents": true,
+          "enable_cases": true,
+          "enable_customers": true,
+          "enable_dashboard": true,
+          "enable_programs": true,
+          "enable_rails": true,
+          "enable_savings": true,
+          "enable_statements": true,
+          "enable_transactions": true
+        }
+      },
+      "name": "Digital Neobanking",
+      "provides": [
+        "neobank_program_governance",
+        "digital_customer_onboarding",
+        "deposit_account_lifecycle",
+        "payment_rail_linking",
+        "account_transaction_posting",
+        "savings_pot_workflow",
+        "statement_workflow",
+        "customer_service_case_workflow",
+        "neobanking_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_cards",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "fintech_lending",
+        "fintech_remittance"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "Neobanking operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "description": "Neobanking writes require policy evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "neobanking_policy_required",
+              "required_action": "attach_neobanking_policy"
+            },
+            "name": "neobanking_write_requires_policy"
+          },
+          {
+            "condition": {
+              "operation": "register_program",
+              "owner_present": false
+            },
+            "description": "Bank programs require owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "program_owner_required",
+              "required_action": "assign_program_owner"
+            },
+            "name": "program_owner_required"
+          },
+          {
+            "condition": {
+              "country_supported": false,
+              "operation": "register_program"
+            },
+            "description": "Bank program country must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "program_country_not_supported",
+              "required_action": "select_supported_country"
+            },
+            "name": "program_country_supported"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "register_program"
+            },
+            "description": "Bank program currency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "program_currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "program_currency_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_program",
+              "settlement_account_present": false
+            },
+            "description": "Bank programs require settlement account.",
+            "effect": {
+              "decision": "deny",
+              "reason": "settlement_account_required",
+              "required_action": "attach_settlement_account"
+            },
+            "name": "program_settlement_required"
+          },
+          {
+            "condition": {
+              "customer_present": false,
+              "operation": "onboard_customer"
+            },
+            "description": "Digital customers require customer reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_reference_required",
+              "required_action": "attach_customer_reference"
+            },
+            "name": "customer_reference_required"
+          },
+          {
+            "condition": {
+              "kyc_present": false,
+              "operation": "onboard_customer"
+            },
+            "description": "Digital customers require KYC evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_kyc_required",
+              "required_action": "attach_kyc_profile"
+            },
+            "name": "customer_kyc_required"
+          },
+          {
+            "condition": {
+              "aml_present": false,
+              "operation": "onboard_customer"
+            },
+            "description": "Digital customers require AML evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_aml_required",
+              "required_action": "attach_aml_evidence"
+            },
+            "name": "customer_aml_required"
+          },
+          {
+            "condition": {
+              "fraud_present": false,
+              "operation": "onboard_customer"
+            },
+            "description": "Digital customers require fraud evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_fraud_required",
+              "required_action": "attach_fraud_evidence"
+            },
+            "name": "customer_fraud_required"
+          },
+          {
+            "condition": {
+              "country_supported": false,
+              "operation": "onboard_customer"
+            },
+            "description": "Customer country must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_country_not_supported",
+              "required_action": "select_supported_country"
+            },
+            "name": "customer_country_supported"
+          },
+          {
+            "condition": {
+              "consent_present": false,
+              "operation": "onboard_customer"
+            },
+            "description": "Digital customers require consent.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_consent_required",
+              "required_action": "attach_customer_consent"
+            },
+            "name": "customer_consent_required"
+          },
+          {
+            "condition": {
+              "operation": "open_account",
+              "program_present": false
+            },
+            "description": "Account opening requires program.",
+            "effect": {
+              "decision": "deny",
+              "reason": "program_required",
+              "required_action": "select_bank_program"
+            },
+            "name": "account_program_required"
+          },
+          {
+            "condition": {
+              "customer_present": false,
+              "operation": "open_account"
+            },
+            "description": "Account opening requires customer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_required",
+              "required_action": "select_customer"
+            },
+            "name": "account_customer_required"
+          },
+          {
+            "condition": {
+              "account_type_supported": false,
+              "operation": "open_account"
+            },
+            "description": "Account type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "account_type_not_supported",
+              "required_action": "select_supported_account_type"
+            },
+            "name": "account_type_supported"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "open_account"
+            },
+            "description": "Account currency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "account_currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "account_currency_supported"
+          },
+          {
+            "condition": {
+              "initial_balance_non_negative": false,
+              "operation": "open_account"
+            },
+            "description": "Initial balance cannot be negative.",
+            "effect": {
+              "decision": "deny",
+              "reason": "initial_balance_negative",
+              "required_action": "set_non_negative_initial_balance"
+            },
+            "name": "account_initial_balance_non_negative"
+          },
+          {
+            "condition": {
+              "account_present": false,
+              "operation": "link_payment_rail"
+            },
+            "description": "Rail links require account.",
+            "effect": {
+              "decision": "deny",
+              "reason": "account_required",
+              "required_action": "select_account"
+            },
+            "name": "rail_account_required"
+          },
+          {
+            "condition": {
+              "operation": "link_payment_rail",
+              "rail_supported": false
+            },
+            "description": "Payment rail must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_rail_not_supported",
+              "required_action": "select_supported_payment_rail"
+            },
+            "name": "rail_supported"
+          },
+          {
+            "condition": {
+              "operation": "link_payment_rail",
+              "provider_reference_present": false
+            },
+            "description": "Payment rail links require provider reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "provider_reference_required",
+              "required_action": "attach_provider_reference"
+            },
+            "name": "rail_provider_reference_required"
+          },
+          {
+            "condition": {
+              "account_present": false,
+              "operation": "post_transaction"
+            },
+            "description": "Transactions require account.",
+            "effect": {
+              "decision": "deny",
+              "reason": "account_required",
+              "required_action": "select_account"
+            },
+            "name": "transaction_account_required"
+          },
+          {
+            "condition": {
+              "operation": "post_transaction",
+              "transaction_type_supported": false
+            },
+            "description": "Transaction type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "transaction_type_not_supported",
+              "required_action": "select_supported_transaction_type"
+            },
+            "name": "transaction_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "post_transaction",
+              "positive_amount": false
+            },
+            "description": "Transaction amount must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_amount_required",
+              "required_action": "set_positive_amount"
+            },
+            "name": "transaction_amount_positive"
+          },
+          {
+            "condition": {
+              "currency_matches_account": false,
+              "operation": "post_transaction"
+            },
+            "description": "Transaction currency must match account.",
+            "effect": {
+              "decision": "deny",
+              "reason": "transaction_currency_mismatch",
+              "required_action": "use_account_currency"
+            },
+            "name": "transaction_currency_matches_account"
+          },
+          {
+            "condition": {
+              "operation": "post_transaction",
+              "risk_reference_present": false
+            },
+            "description": "Transactions require AML/Fraud risk reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_reference_required",
+              "required_action": "attach_risk_reference"
+            },
+            "name": "transaction_risk_reference_required"
+          },
+          {
+            "condition": {
+              "high_impact": true,
+              "human_approval_recorded": false,
+              "operation": "post_transaction"
+            },
+            "description": "High-impact transactions require human approval.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "transaction_approval_required",
+              "required_action": "record_transaction_approval"
+            },
+            "name": "high_impact_transaction_requires_approval"
+          },
+          {
+            "condition": {
+              "account_present": false,
+              "operation": "create_savings_pot"
+            },
+            "description": "Savings pots require account.",
+            "effect": {
+              "decision": "deny",
+              "reason": "account_required",
+              "required_action": "select_account"
+            },
+            "name": "savings_account_required"
+          },
+          {
+            "condition": {
+              "name_present": false,
+              "operation": "create_savings_pot"
+            },
+            "description": "Savings pots require name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "savings_name_required",
+              "required_action": "set_savings_name"
+            },
+            "name": "savings_name_required"
+          },
+          {
+            "condition": {
+              "operation": "create_savings_pot",
+              "positive_target": false
+            },
+            "description": "Savings target must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_target_required",
+              "required_action": "set_positive_target"
+            },
+            "name": "savings_target_positive"
+          },
+          {
+            "condition": {
+              "account_present": false,
+              "operation": "issue_statement"
+            },
+            "description": "Statements require account.",
+            "effect": {
+              "decision": "deny",
+              "reason": "account_required",
+              "required_action": "select_account"
+            },
+            "name": "statement_account_required"
+          },
+          {
+            "condition": {
+              "operation": "issue_statement",
+              "period_present": false
+            },
+            "description": "Statements require period.",
+            "effect": {
+              "decision": "deny",
+              "reason": "statement_period_required",
+              "required_action": "set_statement_period"
+            },
+            "name": "statement_period_required"
+          },
+          {
+            "condition": {
+              "customer_present": false,
+              "operation": "open_service_case"
+            },
+            "description": "Service cases require customer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_required",
+              "required_action": "select_customer"
+            },
+            "name": "case_customer_required"
+          },
+          {
+            "condition": {
+              "account_present": false,
+              "operation": "open_service_case"
+            },
+            "description": "Service cases require account.",
+            "effect": {
+              "decision": "deny",
+              "reason": "account_required",
+              "required_action": "select_account"
+            },
+            "name": "case_account_required"
+          },
+          {
+            "condition": {
+              "case_reason_supported": false,
+              "operation": "open_service_case"
+            },
+            "description": "Case reason must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "case_reason_not_supported",
+              "required_action": "select_supported_case_reason"
+            },
+            "name": "case_reason_supported"
+          },
+          {
+            "condition": {
+              "operation": "open_service_case",
+              "reviewer_present": false
+            },
+            "description": "Service cases require reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "case_reviewer_required",
+              "required_action": "assign_case_reviewer"
+            },
+            "name": "case_reviewer_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "open_service_case"
+            },
+            "description": "Service cases require evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "case_evidence_required",
+              "required_action": "attach_case_evidence"
+            },
+            "name": "case_evidence_required"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "neobanking_batch"
+            },
+            "description": "Neobanking batches require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_neobanking_batch_to_bytewax"
+            },
+            "name": "neobanking_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_neobanking_agent"
+            },
+            "description": "Neobanking agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "neobanking_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "neobanking_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_neobanking_agent"
+            },
+            "description": "Neobanking agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "neobanking_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "neobanking_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "neobanking_agent_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged neobanking-agent actions require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_neobanking_agent_action_requires_human_approval"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "Neobanking operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "description": "Neobanking writes require policy evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "neobanking_policy_required",
+            "required_action": "attach_neobanking_policy"
+          },
+          "name": "neobanking_write_requires_policy"
+        },
+        {
+          "condition": {
+            "operation": "register_program",
+            "owner_present": false
+          },
+          "description": "Bank programs require owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "program_owner_required",
+            "required_action": "assign_program_owner"
+          },
+          "name": "program_owner_required"
+        },
+        {
+          "condition": {
+            "country_supported": false,
+            "operation": "register_program"
+          },
+          "description": "Bank program country must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "program_country_not_supported",
+            "required_action": "select_supported_country"
+          },
+          "name": "program_country_supported"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "register_program"
+          },
+          "description": "Bank program currency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "program_currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "program_currency_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_program",
+            "settlement_account_present": false
+          },
+          "description": "Bank programs require settlement account.",
+          "effect": {
+            "decision": "deny",
+            "reason": "settlement_account_required",
+            "required_action": "attach_settlement_account"
+          },
+          "name": "program_settlement_required"
+        },
+        {
+          "condition": {
+            "customer_present": false,
+            "operation": "onboard_customer"
+          },
+          "description": "Digital customers require customer reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_reference_required",
+            "required_action": "attach_customer_reference"
+          },
+          "name": "customer_reference_required"
+        },
+        {
+          "condition": {
+            "kyc_present": false,
+            "operation": "onboard_customer"
+          },
+          "description": "Digital customers require KYC evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_kyc_required",
+            "required_action": "attach_kyc_profile"
+          },
+          "name": "customer_kyc_required"
+        },
+        {
+          "condition": {
+            "aml_present": false,
+            "operation": "onboard_customer"
+          },
+          "description": "Digital customers require AML evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_aml_required",
+            "required_action": "attach_aml_evidence"
+          },
+          "name": "customer_aml_required"
+        },
+        {
+          "condition": {
+            "fraud_present": false,
+            "operation": "onboard_customer"
+          },
+          "description": "Digital customers require fraud evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_fraud_required",
+            "required_action": "attach_fraud_evidence"
+          },
+          "name": "customer_fraud_required"
+        },
+        {
+          "condition": {
+            "country_supported": false,
+            "operation": "onboard_customer"
+          },
+          "description": "Customer country must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_country_not_supported",
+            "required_action": "select_supported_country"
+          },
+          "name": "customer_country_supported"
+        },
+        {
+          "condition": {
+            "consent_present": false,
+            "operation": "onboard_customer"
+          },
+          "description": "Digital customers require consent.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_consent_required",
+            "required_action": "attach_customer_consent"
+          },
+          "name": "customer_consent_required"
+        },
+        {
+          "condition": {
+            "operation": "open_account",
+            "program_present": false
+          },
+          "description": "Account opening requires program.",
+          "effect": {
+            "decision": "deny",
+            "reason": "program_required",
+            "required_action": "select_bank_program"
+          },
+          "name": "account_program_required"
+        },
+        {
+          "condition": {
+            "customer_present": false,
+            "operation": "open_account"
+          },
+          "description": "Account opening requires customer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_required",
+            "required_action": "select_customer"
+          },
+          "name": "account_customer_required"
+        },
+        {
+          "condition": {
+            "account_type_supported": false,
+            "operation": "open_account"
+          },
+          "description": "Account type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "account_type_not_supported",
+            "required_action": "select_supported_account_type"
+          },
+          "name": "account_type_supported"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "open_account"
+          },
+          "description": "Account currency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "account_currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "account_currency_supported"
+        },
+        {
+          "condition": {
+            "initial_balance_non_negative": false,
+            "operation": "open_account"
+          },
+          "description": "Initial balance cannot be negative.",
+          "effect": {
+            "decision": "deny",
+            "reason": "initial_balance_negative",
+            "required_action": "set_non_negative_initial_balance"
+          },
+          "name": "account_initial_balance_non_negative"
+        },
+        {
+          "condition": {
+            "account_present": false,
+            "operation": "link_payment_rail"
+          },
+          "description": "Rail links require account.",
+          "effect": {
+            "decision": "deny",
+            "reason": "account_required",
+            "required_action": "select_account"
+          },
+          "name": "rail_account_required"
+        },
+        {
+          "condition": {
+            "operation": "link_payment_rail",
+            "rail_supported": false
+          },
+          "description": "Payment rail must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_rail_not_supported",
+            "required_action": "select_supported_payment_rail"
+          },
+          "name": "rail_supported"
+        },
+        {
+          "condition": {
+            "operation": "link_payment_rail",
+            "provider_reference_present": false
+          },
+          "description": "Payment rail links require provider reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "provider_reference_required",
+            "required_action": "attach_provider_reference"
+          },
+          "name": "rail_provider_reference_required"
+        },
+        {
+          "condition": {
+            "account_present": false,
+            "operation": "post_transaction"
+          },
+          "description": "Transactions require account.",
+          "effect": {
+            "decision": "deny",
+            "reason": "account_required",
+            "required_action": "select_account"
+          },
+          "name": "transaction_account_required"
+        },
+        {
+          "condition": {
+            "operation": "post_transaction",
+            "transaction_type_supported": false
+          },
+          "description": "Transaction type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "transaction_type_not_supported",
+            "required_action": "select_supported_transaction_type"
+          },
+          "name": "transaction_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "post_transaction",
+            "positive_amount": false
+          },
+          "description": "Transaction amount must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_amount_required",
+            "required_action": "set_positive_amount"
+          },
+          "name": "transaction_amount_positive"
+        },
+        {
+          "condition": {
+            "currency_matches_account": false,
+            "operation": "post_transaction"
+          },
+          "description": "Transaction currency must match account.",
+          "effect": {
+            "decision": "deny",
+            "reason": "transaction_currency_mismatch",
+            "required_action": "use_account_currency"
+          },
+          "name": "transaction_currency_matches_account"
+        },
+        {
+          "condition": {
+            "operation": "post_transaction",
+            "risk_reference_present": false
+          },
+          "description": "Transactions require AML/Fraud risk reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_reference_required",
+            "required_action": "attach_risk_reference"
+          },
+          "name": "transaction_risk_reference_required"
+        },
+        {
+          "condition": {
+            "high_impact": true,
+            "human_approval_recorded": false,
+            "operation": "post_transaction"
+          },
+          "description": "High-impact transactions require human approval.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "transaction_approval_required",
+            "required_action": "record_transaction_approval"
+          },
+          "name": "high_impact_transaction_requires_approval"
+        },
+        {
+          "condition": {
+            "account_present": false,
+            "operation": "create_savings_pot"
+          },
+          "description": "Savings pots require account.",
+          "effect": {
+            "decision": "deny",
+            "reason": "account_required",
+            "required_action": "select_account"
+          },
+          "name": "savings_account_required"
+        },
+        {
+          "condition": {
+            "name_present": false,
+            "operation": "create_savings_pot"
+          },
+          "description": "Savings pots require name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "savings_name_required",
+            "required_action": "set_savings_name"
+          },
+          "name": "savings_name_required"
+        },
+        {
+          "condition": {
+            "operation": "create_savings_pot",
+            "positive_target": false
+          },
+          "description": "Savings target must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_target_required",
+            "required_action": "set_positive_target"
+          },
+          "name": "savings_target_positive"
+        },
+        {
+          "condition": {
+            "account_present": false,
+            "operation": "issue_statement"
+          },
+          "description": "Statements require account.",
+          "effect": {
+            "decision": "deny",
+            "reason": "account_required",
+            "required_action": "select_account"
+          },
+          "name": "statement_account_required"
+        },
+        {
+          "condition": {
+            "operation": "issue_statement",
+            "period_present": false
+          },
+          "description": "Statements require period.",
+          "effect": {
+            "decision": "deny",
+            "reason": "statement_period_required",
+            "required_action": "set_statement_period"
+          },
+          "name": "statement_period_required"
+        },
+        {
+          "condition": {
+            "customer_present": false,
+            "operation": "open_service_case"
+          },
+          "description": "Service cases require customer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_required",
+            "required_action": "select_customer"
+          },
+          "name": "case_customer_required"
+        },
+        {
+          "condition": {
+            "account_present": false,
+            "operation": "open_service_case"
+          },
+          "description": "Service cases require account.",
+          "effect": {
+            "decision": "deny",
+            "reason": "account_required",
+            "required_action": "select_account"
+          },
+          "name": "case_account_required"
+        },
+        {
+          "condition": {
+            "case_reason_supported": false,
+            "operation": "open_service_case"
+          },
+          "description": "Case reason must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "case_reason_not_supported",
+            "required_action": "select_supported_case_reason"
+          },
+          "name": "case_reason_supported"
+        },
+        {
+          "condition": {
+            "operation": "open_service_case",
+            "reviewer_present": false
+          },
+          "description": "Service cases require reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "case_reviewer_required",
+            "required_action": "assign_case_reviewer"
+          },
+          "name": "case_reviewer_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "open_service_case"
+          },
+          "description": "Service cases require evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "case_evidence_required",
+            "required_action": "attach_case_evidence"
+          },
+          "name": "case_evidence_required"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "neobanking_batch"
+          },
+          "description": "Neobanking batches require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_neobanking_batch_to_bytewax"
+          },
+          "name": "neobanking_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_neobanking_agent"
+          },
+          "description": "Neobanking agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "neobanking_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "neobanking_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_neobanking_agent"
+          },
+          "description": "Neobanking agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "neobanking_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "neobanking_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "neobanking_agent_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged neobanking-agent actions require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_neobanking_agent_action_requires_human_approval"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "accounts": {
+          "component": "DepositAccountWorkbench",
+          "permission": "fintech_neobanking:manage_accounts",
+          "route": "/fintech-neobanking/accounts"
+        },
+        "agents": {
+          "component": "NeobankingAgentWorkbench",
+          "permission": "fintech_neobanking:admin",
+          "route": "/fintech-neobanking/agents"
+        },
+        "cases": {
+          "component": "ServiceCaseWorkbench",
+          "permission": "fintech_neobanking:cases",
+          "route": "/fintech-neobanking/cases"
+        },
+        "customers": {
+          "component": "DigitalCustomerWorkbench",
+          "permission": "fintech_neobanking:manage_customers",
+          "route": "/fintech-neobanking/customers"
+        },
+        "dashboard": {
+          "component": "NeobankingDashboard",
+          "permission": "fintech_neobanking:view",
+          "route": "/fintech-neobanking/dashboard"
+        },
+        "programs": {
+          "component": "BankProgramConsole",
+          "permission": "fintech_neobanking:manage_programs",
+          "route": "/fintech-neobanking/programs"
+        },
+        "rails": {
+          "component": "PaymentRailConsole",
+          "permission": "fintech_neobanking:manage_rails",
+          "route": "/fintech-neobanking/rails"
+        },
+        "savings": {
+          "component": "SavingsPotWorkbench",
+          "permission": "fintech_neobanking:savings",
+          "route": "/fintech-neobanking/savings"
+        },
+        "settings": {
+          "component": "NeobankingSettings",
+          "permission": "fintech_neobanking:admin",
+          "route": "/fintech-neobanking/settings"
+        },
+        "statements": {
+          "component": "StatementWorkbench",
+          "permission": "fintech_neobanking:statements",
+          "route": "/fintech-neobanking/statements"
+        },
+        "transactions": {
+          "component": "TransactionConsole",
+          "permission": "fintech_neobanking:post_transactions",
+          "route": "/fintech-neobanking/transactions"
+        }
+      },
+      "streaming": {
+        "events": [
+          "bank_program_registered",
+          "digital_customer_onboarded",
+          "deposit_account_opened",
+          "payment_rail_linked",
+          "account_transaction_posted",
+          "savings_pot_created",
+          "statement_issued",
+          "service_case_opened",
+          "neobanking_agent_registered"
+        ],
+        "guardrails": [
+          "neobanking_batch_requires_bytewax",
+          "privileged_neobanking_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.fintech.neobanking.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "accounts": {
+            "icon": "landmark",
+            "status_indicator": "account-chip"
+          },
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "cases": {
+            "icon": "life-buoy",
+            "status_indicator": "case-chip"
+          },
+          "customers": {
+            "icon": "user-check",
+            "status_indicator": "customer-chip"
+          },
+          "programs": {
+            "icon": "building-2",
+            "status_indicator": "program-chip"
+          },
+          "rails": {
+            "icon": "waypoints",
+            "status_indicator": "rail-chip"
+          },
+          "savings": {
+            "icon": "piggy-bank",
+            "status_indicator": "savings-chip"
+          },
+          "transactions": {
+            "icon": "receipt",
+            "status_indicator": "transaction-chip"
+          }
+        },
+        "name": "fintech_neobanking_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#059669",
+          "color.danger": "#B91C1C",
+          "color.primary": "#2563EB",
+          "color.success": "#15803D",
+          "color.warning": "#B45309",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/fintech-neobanking/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "NeobankingDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/fintech-neobanking/dashboard",
+            "permission": "fintech_neobanking:view"
+          },
+          {
+            "component": "BankProgramConsole",
+            "name": "programs",
+            "nav_group": "Programs",
+            "path": "/fintech-neobanking/programs",
+            "permission": "fintech_neobanking:manage_programs"
+          },
+          {
+            "component": "DigitalCustomerWorkbench",
+            "name": "customers",
+            "nav_group": "Customers",
+            "path": "/fintech-neobanking/customers",
+            "permission": "fintech_neobanking:manage_customers"
+          },
+          {
+            "component": "DepositAccountWorkbench",
+            "name": "accounts",
+            "nav_group": "Accounts",
+            "path": "/fintech-neobanking/accounts",
+            "permission": "fintech_neobanking:manage_accounts"
+          },
+          {
+            "component": "PaymentRailConsole",
+            "name": "rails",
+            "nav_group": "Payments",
+            "path": "/fintech-neobanking/rails",
+            "permission": "fintech_neobanking:manage_rails"
+          },
+          {
+            "component": "TransactionConsole",
+            "name": "transactions",
+            "nav_group": "Payments",
+            "path": "/fintech-neobanking/transactions",
+            "permission": "fintech_neobanking:post_transactions"
+          },
+          {
+            "component": "SavingsPotWorkbench",
+            "name": "savings",
+            "nav_group": "Accounts",
+            "path": "/fintech-neobanking/savings",
+            "permission": "fintech_neobanking:savings"
+          },
+          {
+            "component": "StatementWorkbench",
+            "name": "statements",
+            "nav_group": "Servicing",
+            "path": "/fintech-neobanking/statements",
+            "permission": "fintech_neobanking:statements"
+          },
+          {
+            "component": "ServiceCaseWorkbench",
+            "name": "cases",
+            "nav_group": "Servicing",
+            "path": "/fintech-neobanking/cases",
+            "permission": "fintech_neobanking:cases"
+          },
+          {
+            "component": "NeobankingAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/fintech-neobanking/agents",
+            "permission": "fintech_neobanking:admin"
+          },
+          {
+            "component": "NeobankingSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/fintech-neobanking/settings",
+            "permission": "fintech_neobanking:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "neobank_review": {
+        "roles": [
+          "neobank_ops_reviewer",
+          "account_risk_reviewer",
+          "payments_reviewer",
+          "customer_service_reviewer",
+          "compliance_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "fintech_neobanking": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_cards",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "fintech_lending",
+        "fintech_remittance"
+      ]
+    }
+  },
+  "contracts": {
+    "fintech_neobanking": {
+      "configuration": {
+        "accounts": {
+          "customer_required": true,
+          "program_required": true,
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ],
+          "supported_types": [
+            "current",
+            "savings",
+            "joint",
+            "business",
+            "youth",
+            "merchant"
+          ]
+        },
+        "adapters": {
+          "aml": "fintech_aml",
+          "audit": "audl",
+          "auth": "auth",
+          "cards": "fintech_cards",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "lending": "fintech_lending",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "remittance": "fintech_remittance",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "neobank_ops_reviewer",
+            "account_risk_reviewer",
+            "payments_reviewer",
+            "customer_service_reviewer",
+            "compliance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "customers": {
+          "aml_required": true,
+          "consent_required": true,
+          "fraud_required": true,
+          "kyc_required": true,
+          "supported_countries": [
+            "KE",
+            "UG",
+            "TZ",
+            "RW",
+            "GH",
+            "NG",
+            "ZA",
+            "GB",
+            "US",
+            "AE"
+          ]
+        },
+        "governance": {
+          "audit_neobanking_events": true,
+          "customer_consent_required": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "observability": {
+          "emit_account_events": true,
+          "emit_agent_events": true,
+          "emit_case_events": true,
+          "emit_customer_events": true,
+          "emit_program_events": true,
+          "emit_rail_events": true,
+          "emit_savings_events": true,
+          "emit_statement_events": true,
+          "emit_transaction_events": true,
+          "event_stream": "apg.fintech.neobanking.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "programs": {
+          "owner_required": true,
+          "settlement_account_required": true,
+          "supported_countries": [
+            "KE",
+            "UG",
+            "TZ",
+            "RW",
+            "GH",
+            "NG",
+            "ZA",
+            "GB",
+            "US",
+            "AE"
+          ],
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ]
+        },
+        "rails": {
+          "provider_reference_required": true,
+          "supported_rails": [
+            "bank_transfer",
+            "card",
+            "wallet",
+            "mobile_money",
+            "internal_transfer"
+          ],
+          "wallet_or_card_reference_supported": true
+        },
+        "savings": {
+          "source_account_required": true,
+          "target_amount_required": true
+        },
+        "service_cases": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_reasons": [
+            "account_access",
+            "card_issue",
+            "payment_dispute",
+            "kyc_review",
+            "fraud_review",
+            "fee_query",
+            "statement_query"
+          ]
+        },
+        "statements": {
+          "audit_statement_events": true,
+          "period_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_neobanking_control"
+        },
+        "transactions": {
+          "high_value_threshold": 100000,
+          "human_approval_required_for_high_impact": true,
+          "positive_amount_required": true,
+          "risk_reference_required": true,
+          "supported_types": [
+            "deposit",
+            "withdrawal",
+            "transfer_in",
+            "transfer_out",
+            "card_purchase",
+            "fee",
+            "refund",
+            "interest"
+          ]
+        },
+        "ui": {
+          "enable_accounts": true,
+          "enable_agents": true,
+          "enable_cases": true,
+          "enable_customers": true,
+          "enable_dashboard": true,
+          "enable_programs": true,
+          "enable_rails": true,
+          "enable_savings": true,
+          "enable_statements": true,
+          "enable_transactions": true
+        }
+      },
+      "id": "fintech_neobanking",
+      "provides": [
+        "neobank_program_governance",
+        "digital_customer_onboarding",
+        "deposit_account_lifecycle",
+        "payment_rail_linking",
+        "account_transaction_posting",
+        "savings_pot_workflow",
+        "statement_workflow",
+        "customer_service_case_workflow",
+        "neobanking_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_cards",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "fintech_lending",
+        "fintech_remittance"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 13,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "fintech_neobanking": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "evidence": {
+    "contracts": {
+      "capability_contract": {
+        "display_name": "Digital Neobanking",
+        "errors": []
+      }
+    },
+    "self_test": {
+      "capability": "fintech_neobanking",
+      "passed": true,
+      "status": "ok"
+    },
+    "semantic_model": {
+      "capability": "fintech_neobanking",
+      "format": "apg.semantic-model.v1"
+    }
+  },
+  "format": "apg.release-report.v1",
+  "ok": true,
+  "package": "fintech_neobanking",
+  "source": "capability_contract.py",
+  "target": "python"
+}
