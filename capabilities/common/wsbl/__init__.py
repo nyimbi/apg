@@ -57,6 +57,7 @@ def register_capability() -> dict[str, Any]:
 			"page_composition": "Build pages from governed no-code sections and content blocks",
 			"component_library": "Curate custom components with review and reuse controls",
 			"publishing_workflows": "Approve, schedule, publish, rollback, and audit site changes",
+			"review_evidence": "Persist review-required components, review-required publish requests, denied publish attempts, and policy audit evidence",
 			"capability_rules": "Evaluate deterministic site-governance rules",
 			"visual_theming": "Apply site-builder theme tokens and page components",
 			"wsbl_agents": "Govern site, component, accessibility, privacy, SEO, and publish review agents"
@@ -68,6 +69,7 @@ def register_capability() -> dict[str, Any]:
 			"publishing": "/wsbl/api/v1/publishing",
 			"analytics": "/wsbl/api/v1/analytics",
 			"agents": "/wsbl/api/v1/agents",
+			"pending_reviews": "/wsbl/api/v1/pending-reviews",
 			"policy": "/wsbl/api/v1/policy"
 		},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},

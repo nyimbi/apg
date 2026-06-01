@@ -11,7 +11,34 @@ SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"descript
 
 def semantic_model() -> dict[str, Any]:
 	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	model = json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	capability = model["capabilities"]["wsbl"]
+	capability["review_evidence"] = {
+		"durable_statuses": ["review_required", "denied"],
+		"policy_fields": ["decision", "policy_decision", "matched_rules", "review_reasons", "audit_evidence"],
+		"pending_queues": ["components", "publish_requests"],
+		"deny_behavior": "Denied publish attempts persist evidence before PermissionError",
+	}
+	if "review_evidence" not in capability["provides"]:
+		capability["provides"].append("review_evidence")
+	for event in ["publish_request_denied", "wsbl_agent_publish_action_validated", "batch_publish_validated"]:
+		if event not in capability["streaming"]["events"]:
+			capability["streaming"]["events"].append(event)
+	review_rule = {
+		"name": "custom_component_registration_requires_review",
+		"description": "New custom components require review evidence before use.",
+		"condition": {"operation": "create_component", "custom_component_present": True, "component_review_recorded": False},
+		"effect": {"decision": "require_review", "reason": "custom_component_review_required", "required_action": "review_custom_component"},
+	}
+	rule_names = {rule["name"] for rule in capability["rule_engine"]["rules"]}
+	if review_rule["name"] not in rule_names:
+		capability["rule_engine"]["rules"].append(review_rule)
+		capability["rules"].append(review_rule)
+	model["rules"][review_rule["name"]] = review_rule
+	model["contracts"]["wsbl"]["review_evidence"] = capability["review_evidence"]
+	if "review_evidence" not in model["contracts"]["wsbl"]["provides"]:
+		model["contracts"]["wsbl"]["provides"].append("review_evidence")
+	return model
 
 
 def component_manifest() -> dict[str, Any]:
@@ -42,6 +69,8 @@ def self_test() -> dict[str, Any]:
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if "review_evidence" not in model.get("capabilities", {}).get("wsbl", {}):
+		errors.append("WSBL semantic model must expose durable review evidence")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

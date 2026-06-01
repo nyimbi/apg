@@ -142,8 +142,15 @@ class WsblService:
 		metadata: dict[str, Any] | None = None,
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "create_component",
+			"custom_component_present": bool(custom),
+			"component_review_recorded": bool(reviewed),
+		})
+		self._raise_if_denied(result)
 		component_id = stable_id("component", tenant_id, component_key)
-		status = "approved" if custom and reviewed else "review_required" if custom else "available"
+		status = "approved" if custom and reviewed else "review_required" if result["decision"] == "require_review" else "available"
 		record = WebsiteComponentRecord(
 			id=component_id,
 			tenant_id=tenant_id,
@@ -154,10 +161,14 @@ class WsblService:
 			reviewed_by=reviewed_by if reviewed else None,
 			reviewed_at=utc_now() if reviewed else None,
 			policy_id=policy_id,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._review_reasons(result),
+			audit_evidence=self._audit_evidence(result, reviewed),
 			metadata=dict(metadata or {}),
 		)
 		self._components[component_id] = record
-		self._audit(tenant_id, "component_created", component_id, reviewed_by or "system", {"custom": custom, "status": status})
+		self._audit(tenant_id, "component_created", component_id, reviewed_by or "system", {"custom": custom, "status": status}, policy_result=result)
 		return record.to_dict()
 
 	def review_component(self, component_id: str, reviewer_id: str, policy_id: str | None = None) -> dict[str, Any]:
@@ -172,6 +183,10 @@ class WsblService:
 		component.reviewed_by = reviewer_id
 		component.reviewed_at = utc_now()
 		component.policy_id = policy_id or component.policy_id
+		component.decision = "allow"
+		component.matched_rules = []
+		component.review_reasons = []
+		component.audit_evidence = {"required_actions": [], "reasons": [], "review_recorded": True}
 		self._audit(component.tenant_id, "component_reviewed", component.id, reviewer_id, {"policy_id": component.policy_id})
 		return component.to_dict()
 
@@ -268,10 +283,12 @@ class WsblService:
 			"consent_policy_attached": consent_policy_attached,
 		})
 		deny_reasons = [action.get("reason", "capability_policy_blocked") for action in result["actions"] if action.get("decision") == "deny"]
-		if deny_reasons:
-			raise PermissionError(", ".join(deny_reasons))
-		required_actions = [action.get("required_action", "review_required") for action in result["actions"] if action.get("decision") == "require_review"]
-		status = "review_required" if required_actions else "approved"
+		required_actions = [
+			action.get("required_action", "review_required")
+			for action in result["actions"]
+			if action.get("required_action")
+		]
+		status = "denied" if deny_reasons else "review_required" if result["decision"] == "require_review" else "approved"
 		request_id = stable_id("publish", site.tenant_id, site.id, environment, site.published_version + 1)
 		record = WebsitePublishRequestRecord(
 			id=request_id,
@@ -284,15 +301,22 @@ class WsblService:
 			accessibility_passed=accessibility_passed,
 			consent_policy_attached=consent_policy_attached,
 			required_actions=required_actions,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=self._review_reasons(result),
+			audit_evidence=self._audit_evidence(result, approval_recorded and accessibility_passed and consent_policy_attached),
 		)
 		self._publish_requests[request_id] = record
 		self._audit(
 			site.tenant_id,
-			"publish_request_created",
+			"publish_request_denied" if deny_reasons else "publish_request_created",
 			request_id,
 			requested_by,
 			{"status": status, "required_actions": required_actions, "event_stream": self._normalize_token(event_stream)},
+			policy_result=result,
 		)
+		if deny_reasons:
+			raise PermissionError(", ".join(deny_reasons))
 		return record.to_dict()
 
 	def publish_site(self, publish_request_id: str, actor_id: str) -> dict[str, Any]:
@@ -357,6 +381,7 @@ class WsblService:
 			scope=scope,
 			owner=owner,
 			human_approval_required=bool(human_approval_required),
+			audit_evidence={"required_actions": [], "reasons": [], "review_recorded": bool(human_approval_required)},
 		)
 		self._agents[record.id] = record
 		self._audit(
@@ -389,7 +414,16 @@ class WsblService:
 			"privileged_scope": bool(privileged_scope),
 			"human_approval_recorded": bool(str(human_approval_ref or "").strip()),
 		}
-		return self.evaluate(context)
+		result = self.evaluate(context)
+		self._audit(
+			tenant_id,
+			"wsbl_agent_publish_action_validated",
+			agent_id,
+			agent.owner,
+			{"action": action, "privileged_scope": bool(privileged_scope), "human_approval_recorded": bool(str(human_approval_ref or "").strip())},
+			policy_result=result,
+		)
+		return self._policy_payload(result)
 
 	def validate_batch_publish(
 		self,
@@ -404,7 +438,16 @@ class WsblService:
 			"site_count": int(site_count),
 			"event_stream": self._normalize_token(event_stream),
 		}
-		return self.evaluate(context)
+		result = self.evaluate(context)
+		self._audit(
+			tenant_id,
+			"batch_publish_validated",
+			stable_id("batch_publish", tenant_id, site_count, self._normalize_token(event_stream)),
+			"system",
+			{"site_count": int(site_count), "event_stream": self._normalize_token(event_stream)},
+			policy_result=result,
+		)
+		return self._policy_payload(result)
 
 	def list_sites(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return [site.to_dict() for site in sorted(self._filter(self._sites.values(), tenant_id), key=lambda item: item.name)]
@@ -431,11 +474,19 @@ class WsblService:
 	def list_wsbl_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return [agent.to_dict() for agent in sorted(self._filter(self._agents.values(), tenant_id), key=lambda item: item.name)]
 
+	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return [
+			item
+			for item in (self.list_components(tenant_id) + self.list_publish_requests(tenant_id))
+			if item.get("status") == "review_required"
+		]
+
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		sites = self.list_sites(tenant_id)
 		pages = self.list_pages(tenant_id)
 		components = self.list_components(tenant_id)
 		requests = self.list_publish_requests(tenant_id)
+		pending_reviews = self.list_pending_reviews(tenant_id)
 		return {
 			"tenant_id": tenant_id,
 			"site_count": len(sites),
@@ -446,6 +497,8 @@ class WsblService:
 			"pending_component_review_count": sum(1 for component in components if component["status"] == "review_required"),
 			"publish_request_count": len(requests),
 			"publish_review_count": sum(1 for request in requests if request["status"] == "review_required"),
+			"denied_publish_request_count": sum(1 for request in requests if request["status"] == "denied"),
+			"pending_review_count": len(pending_reviews),
 			"wsbl_agent_count": len(self.list_wsbl_agents(tenant_id)),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 			"streaming": streaming_manifest(),
@@ -473,9 +526,13 @@ class WsblService:
 
 	def _enforce_context(self, context: dict[str, Any]) -> None:
 		result = self.evaluate(context)
-		if result["decision"] == "deny":
-			reasons = [action.get("reason", "capability_policy_blocked") for action in result["actions"]]
-			raise PermissionError(", ".join(reasons) or "capability_policy_blocked")
+		self._raise_if_denied(result)
+
+	def _raise_if_denied(self, result: dict[str, Any]) -> None:
+		if result["decision"] != "deny":
+			return
+		reasons = [action.get("reason", "capability_policy_blocked") for action in result["actions"]]
+		raise PermissionError(", ".join(reasons) or "capability_policy_blocked")
 
 	def _require_tenant(self, tenant_id: str) -> None:
 		self._enforce_context({"tenant_context_present": bool(tenant_id)})
@@ -510,7 +567,16 @@ class WsblService:
 		except KeyError as exc:
 			raise KeyError(f"publish_request_not_found:{request_id}") from exc
 
-	def _audit(self, tenant_id: str, action: str, subject_id: str, actor_id: str, details: dict[str, Any] | None = None) -> None:
+	def _audit(
+		self,
+		tenant_id: str,
+		action: str,
+		subject_id: str,
+		actor_id: str,
+		details: dict[str, Any] | None = None,
+		policy_result: dict[str, Any] | None = None,
+	) -> None:
+		policy_result = policy_result or {"decision": "allow", "matched_rules": [], "actions": []}
 		event = WebsiteAuditEventRecord(
 			id=stable_id("audit", tenant_id, action, subject_id, len(self._audit_events) + 1),
 			tenant_id=tenant_id,
@@ -518,8 +584,42 @@ class WsblService:
 			subject_id=subject_id,
 			actor_id=actor_id,
 			details=dict(details or {}),
+			policy_decision=policy_result["decision"],
+			matched_rules=list(policy_result["matched_rules"]),
+			review_reasons=self._review_reasons(policy_result),
+			audit_evidence=self._audit_evidence(policy_result),
 		)
 		self._audit_events.append(event)
+
+	def _policy_payload(self, result: dict[str, Any]) -> dict[str, Any]:
+		payload = dict(result)
+		payload["matched_rules"] = list(result.get("matched_rules", []))
+		payload["actions"] = [dict(action) for action in result.get("actions", [])]
+		payload["review_reasons"] = self._review_reasons(result)
+		payload["audit_evidence"] = self._audit_evidence(result)
+		return payload
+
+	def _review_reasons(self, result: dict[str, Any]) -> list[str]:
+		if result["decision"] == "allow":
+			return []
+		return [
+			action.get("reason", "website_builder_policy_blocked")
+			for action in result.get("actions", [])
+		]
+
+	def _audit_evidence(self, result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+		return {
+			"required_actions": [
+				action["required_action"]
+				for action in result.get("actions", [])
+				if action.get("required_action")
+			],
+			"reasons": [
+				action.get("reason", "website_builder_policy_blocked")
+				for action in result.get("actions", [])
+			],
+			"review_recorded": bool(review_recorded),
+		}
 
 	@staticmethod
 	def _filter(records: Any, tenant_id: str | None) -> list[Any]:

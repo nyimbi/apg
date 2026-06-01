@@ -102,7 +102,8 @@
         "publishing_workflows",
         "site_theming",
         "website_governance",
-        "wsbl_agents"
+        "wsbl_agents",
+        "review_evidence"
       ],
       "requires": [
         "them",
@@ -111,6 +112,24 @@
         "accs",
         "cons"
       ],
+      "review_evidence": {
+        "deny_behavior": "Denied publish attempts persist evidence before PermissionError",
+        "durable_statuses": [
+          "review_required",
+          "denied"
+        ],
+        "pending_queues": [
+          "components",
+          "publish_requests"
+        ],
+        "policy_fields": [
+          "decision",
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "audit_evidence"
+        ]
+      },
       "rule_engine": {
         "rules": [
           {
@@ -324,6 +343,20 @@
               "required_action": "record_human_approval"
             },
             "name": "privileged_agent_publish_action_requires_human_approval"
+          },
+          {
+            "condition": {
+              "component_review_recorded": false,
+              "custom_component_present": true,
+              "operation": "create_component"
+            },
+            "description": "New custom components require review evidence before use.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "custom_component_review_required",
+              "required_action": "review_custom_component"
+            },
+            "name": "custom_component_registration_requires_review"
           }
         ],
         "type": "deterministic"
@@ -540,6 +573,20 @@
             "required_action": "record_human_approval"
           },
           "name": "privileged_agent_publish_action_requires_human_approval"
+        },
+        {
+          "condition": {
+            "component_review_recorded": false,
+            "custom_component_present": true,
+            "operation": "create_component"
+          },
+          "description": "New custom components require review evidence before use.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "custom_component_review_required",
+            "required_action": "review_custom_component"
+          },
+          "name": "custom_component_registration_requires_review"
         }
       ],
       "runtime": {
@@ -612,7 +659,10 @@
           "publish_request_created",
           "site_published",
           "site_rolled_back",
-          "wsbl_agent_registered"
+          "wsbl_agent_registered",
+          "publish_request_denied",
+          "wsbl_agent_publish_action_validated",
+          "batch_publish_validated"
         ],
         "guardrails": [
           "publish_requires_bytewax_stream",
@@ -862,7 +912,8 @@
         "publishing_workflows",
         "site_theming",
         "website_governance",
-        "wsbl_agents"
+        "wsbl_agents",
+        "review_evidence"
       ],
       "requires": [
         "them",
@@ -870,7 +921,25 @@
         "ncod",
         "accs",
         "cons"
-      ]
+      ],
+      "review_evidence": {
+        "deny_behavior": "Denied publish attempts persist evidence before PermissionError",
+        "durable_statuses": [
+          "review_required",
+          "denied"
+        ],
+        "pending_queues": [
+          "components",
+          "publish_requests"
+        ],
+        "policy_fields": [
+          "decision",
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "audit_evidence"
+        ]
+      }
     }
   },
   "deployment": {
@@ -915,6 +984,20 @@
         "required_action": "route_batch_publish_to_bytewax"
       },
       "name": "batch_publish_requires_bytewax"
+    },
+    "custom_component_registration_requires_review": {
+      "condition": {
+        "component_review_recorded": false,
+        "custom_component_present": true,
+        "operation": "create_component"
+      },
+      "description": "New custom components require review evidence before use.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "custom_component_review_required",
+        "required_action": "review_custom_component"
+      },
+      "name": "custom_component_registration_requires_review"
     },
     "custom_component_requires_policy": {
       "condition": {

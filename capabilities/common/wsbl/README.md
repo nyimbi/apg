@@ -17,6 +17,9 @@ composition to controlled publication without skipping governance evidence.
 - Custom component review and policy attribution.
 - Publication requests with approval, domain, section, preview, accessibility,
   and privacy-consent gates.
+- Durable review evidence for custom components, publish requests, denied
+  publish attempts, agent publish checks, batch publish checks, and audit
+  events.
 - Rollback of published site versions.
 - First-class WSBL agents for Codex, Claude Code, OpenCode, and Pi based review
   lanes.
@@ -125,6 +128,18 @@ decision = service.validate_agent_publish_action(
 assert decision["decision"] == "allow"
 ```
 
+## Review Evidence
+
+WSBL keeps review and denial evidence durable. Custom components created
+without review are stored as `review_required` with `decision`,
+`matched_rules`, `review_reasons`, and `audit_evidence`. Publish requests that
+need consent-policy review are stored the same way, while hard-denied publish
+attempts are persisted as `denied` before `PermissionError` is raised.
+
+Generated applications can call `list_pending_reviews()` or use the dashboard,
+component library, publish queue, and policy-center view models to compose
+approval queues without replaying policy rules.
+
 ## Batch Publish Guardrail
 
 Batch publishing must use Bytewax stream coordination.
@@ -174,6 +189,7 @@ WSBL enforces:
 - `register_wsbl_agent()`
 - `validate_agent_publish_action()`
 - `validate_batch_publish()`
+- `list_pending_reviews()`
 - `create_record()`
 - `list_records()`
 - `list_website_builder()`

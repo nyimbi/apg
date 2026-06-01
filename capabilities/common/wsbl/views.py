@@ -23,6 +23,7 @@ def dashboard_model(
 		"summary": service.dashboard_summary(tenant_id),
 		"routes": capability_routes(tenant_id),
 		"recent_audit_events": service.list_audit_events(tenant_id)[-10:],
+		"pending_reviews": service.list_pending_reviews(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
 		"streaming": contract["streaming"],
@@ -72,6 +73,11 @@ def component_library_model(service: WsblService | None = None, tenant_id: str =
 		"tenant_id": tenant_id,
 		"components": components,
 		"pending_review": [component for component in components if component["status"] == "review_required"],
+		"pending_reviews": [
+			component
+			for component in service.list_pending_reviews(tenant_id)
+			if component.get("component_type")
+		],
 		"actions": ["create_component", "review_component", "retire_component"],
 	}
 
@@ -84,6 +90,12 @@ def publish_queue_model(service: WsblService | None = None, tenant_id: str = "de
 		"tenant_id": tenant_id,
 		"publish_requests": requests,
 		"review_required": [request for request in requests if request["status"] == "review_required"],
+		"denied": [request for request in requests if request["status"] == "denied"],
+		"pending_reviews": [
+			request
+			for request in service.list_pending_reviews(tenant_id)
+			if request.get("environment")
+		],
 		"actions": ["request_publish", "publish_site", "rollback_site"],
 		"streaming": service.describe(tenant_id)["streaming"],
 	}
@@ -126,6 +138,12 @@ def policy_center_model(service: WsblService | None = None, tenant_id: str = "de
 		"rules": contract["rule_engine"]["rules"],
 		"streaming": contract["streaming"],
 		"publish_requests": service.list_publish_requests(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
+		"denied_publish_requests": [
+			request
+			for request in service.list_publish_requests(tenant_id)
+			if request["status"] == "denied"
+		],
 		"pending_components": [
 			component
 			for component in service.list_components(tenant_id)

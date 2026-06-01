@@ -22,7 +22,9 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"site_count": summary["site_count"],
 		"page_count": summary["page_count"],
 		"component_count": summary["component_count"],
+		"pending_review_count": summary["pending_review_count"],
 		"publish_request_count": summary["publish_request_count"],
+		"denied_publish_request_count": summary["denied_publish_request_count"],
 		"wsbl_agent_count": summary["wsbl_agent_count"],
 		"audit_event_count": summary["audit_event_count"],
 		"streaming": summary["streaming"],
@@ -137,6 +139,10 @@ def validate_batch_publish(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def list_pending_reviews(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_pending_reviews(tenant_id)
+
+
 def list_website_builder(tenant_id: str | None = None) -> dict[str, list[dict[str, Any]]]:
 	return {
 		"sites": SERVICE.list_sites(tenant_id),
@@ -146,6 +152,7 @@ def list_website_builder(tenant_id: str | None = None) -> dict[str, list[dict[st
 		"publish_requests": SERVICE.list_publish_requests(tenant_id),
 		"wsbl_agents": SERVICE.list_wsbl_agents(tenant_id),
 		"audit_events": SERVICE.list_audit_events(tenant_id),
+		"pending_reviews": SERVICE.list_pending_reviews(tenant_id),
 		"summary": SERVICE.dashboard_summary(tenant_id),
 	}
 

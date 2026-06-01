@@ -16,6 +16,76 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-06-01 05:57 EAT
+
+WSBL review-evidence lifecycle packet:
+
+- Extended website components, publish requests, website-builder agents, and
+  audit events with durable policy evidence fields: decision or policy
+  decision, matched rules, review reasons, and audit evidence.
+- Added a deterministic rule for custom component registration review so new
+  custom components are persisted as `review_required` with inspectable policy
+  evidence before page use.
+- Changed denied publish attempts to persist `denied` publish-request records
+  before raising `PermissionError`, preserving matched rules and required
+  actions for generated operator consoles.
+- Added pending-review queues to the WSBL service, API helper, dashboard,
+  component library, publish queue, policy center, registration metadata,
+  package, and semantic model surfaces.
+- Added policy-evidence audit events for privileged agent publish checks and
+  batch publish checks while keeping Bytewax as the required stream processor.
+- Kept WSBL agents provider-neutral for Codex, Claude Code, OpenCode, Pi, and
+  future site-builder review runtimes.
+- Updated focused WSBL tests and package contract tests to prove durable review
+  evidence for custom components, publish reviews, denied publish attempts,
+  agent checks, batch publish checks, API helpers, views, and semantic model
+  evidence.
+- Updated WSBL README, specification, plan, and capability pointer to document
+  review queues and denied publish evidence.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for WSBL modules and tests passed.
+- `./.venv/bin/pytest -q capabilities/common/wsbl/test_capability_contract.py
+  capabilities/common/wsbl/tests/test_package_contract.py` passed with 14 tests
+  and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.wsbl import app; ..."`
+  passed package self-test.
+- `./.venv/bin/python -m json.tool
+  capabilities/common/wsbl/semantic_model.json` passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/wsbl --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/wsbl --strict --json` passed with no warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/wsbl --json`
+  passed with no warnings and side-effect-free publish planning.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/common/wsbl --json` passed with complete lifecycle evidence and
+  17 rules.
+- WSBL stale-marker scan returned no TODO/FIXME/stub/placeholder, Kafka,
+  materialized-baseline, contract-only, or not-implemented markers across the
+  edited WSBL packet.
+- Service smoke executed custom component review evidence and denied publish
+  persistence, printing `review_required custom_component_review_required 1`
+  and `denied structured_sections_required PermissionError`.
+- `git diff --check -- capabilities/common/wsbl docs/progress_log.md` passed
+  before commit staging.
+- Inline code review found no blocking issues; residual risks remain around
+  rendered page-editor UI, live visual editor adapters, asset storage, preview
+  rendering, accessibility scanner adapters, consent platform adapters, CDN or
+  static-host deployment, analytics collectors, live Bytewax workers, and load
+  checks.
+
+Known gaps:
+
+- Full repository tests, rendered browser UI, live visual editor, live asset
+  store, live preview renderer, live accessibility scanner, live consent
+  platform, live analytics collector, live CDN/static-host deployment, live
+  search/sitemap integration, live audit sink, live Bytewax workers, migration
+  checks, and load checks still need later verification outside this
+  battery-conscious slice.
+
 ### 2026-06-01 05:44 EAT
 
 MLCM review-evidence lifecycle packet:

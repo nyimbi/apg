@@ -11,7 +11,7 @@ from typing import Any
 SITE_STATUSES = {"draft", "domain_pending", "ready", "published", "archived"}
 PAGE_STATUSES = {"draft", "review_ready", "published", "archived"}
 COMPONENT_STATUSES = {"available", "review_required", "approved", "retired"}
-PUBLISH_STATUSES = {"approved", "review_required", "published", "rolled_back"}
+PUBLISH_STATUSES = {"approved", "review_required", "denied", "published", "rolled_back"}
 AGENT_STATUSES = {"active", "disabled"}
 
 
@@ -109,6 +109,10 @@ class WebsiteComponentRecord:
 	reviewed_by: str | None = None
 	reviewed_at: str | None = None
 	policy_id: str | None = None
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	metadata: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now)
 
@@ -123,6 +127,10 @@ class WebsiteComponentRecord:
 			"reviewed_by": self.reviewed_by,
 			"reviewed_at": self.reviewed_at,
 			"policy_id": self.policy_id,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"metadata": dict(self.metadata),
 			"created_at": self.created_at,
 		}
@@ -174,6 +182,10 @@ class WebsitePublishRequestRecord:
 	accessibility_passed: bool = False
 	consent_policy_attached: bool = False
 	required_actions: list[str] = field(default_factory=list)
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	published_version: int | None = None
 	created_at: str = field(default_factory=utc_now)
 	published_at: str | None = None
@@ -190,6 +202,10 @@ class WebsitePublishRequestRecord:
 			"accessibility_passed": self.accessibility_passed,
 			"consent_policy_attached": self.consent_policy_attached,
 			"required_actions": list(self.required_actions),
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"published_version": self.published_version,
 			"created_at": self.created_at,
 			"published_at": self.published_at,
@@ -206,6 +222,10 @@ class WebsiteAuditEventRecord:
 	subject_id: str
 	actor_id: str
 	details: dict[str, Any] = field(default_factory=dict)
+	policy_decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -216,6 +236,10 @@ class WebsiteAuditEventRecord:
 			"subject_id": self.subject_id,
 			"actor_id": self.actor_id,
 			"details": dict(self.details),
+			"policy_decision": self.policy_decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"created_at": self.created_at,
 		}
 
@@ -233,6 +257,10 @@ class WebsiteAgentRecord:
 	owner: str
 	status: str = "active"
 	human_approval_required: bool = True
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	audit_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -246,5 +274,9 @@ class WebsiteAgentRecord:
 			"owner": self.owner,
 			"status": self.status,
 			"human_approval_required": self.human_approval_required,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"audit_evidence": dict(self.audit_evidence),
 			"created_at": self.created_at,
 		}

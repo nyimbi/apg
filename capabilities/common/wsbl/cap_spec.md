@@ -22,6 +22,7 @@ keeping publication controls explicit.
 - `site_theming`
 - `website_governance`
 - `wsbl_agents`
+- `review_evidence`
 
 ## Requires
 
@@ -40,6 +41,9 @@ WSBL configuration is defined by `capability_contract.py` and covers:
 - page sections, custom component review, autosave, and versioning;
 - publishing approval, accessibility pass, privacy consent policy, rollback, and stream routing;
 - first-class website-builder agent runtimes, roles, and human approval;
+- durable review evidence for custom components, publish requests, denied
+  publish attempts, agent publish checks, batch publish checks, and audit
+  events;
 - audit, component policy, and public-site governance;
 - Bytewax lifecycle-stream observability;
 - adapter boundaries for theming, authorization, consent, accessibility, analytics, and event streaming;
@@ -58,6 +62,8 @@ WSBL supports the following lifecycle:
 7. Publish approved requests and version the site/pages.
 8. Roll back through Bytewax-governed lifecycle metadata.
 9. Register governed AI agents that review sites, components, accessibility, privacy, publishing, and SEO evidence.
+10. Compose pending review queues from persisted component and publish request
+    policy evidence.
 
 ## Deterministic Rules
 
@@ -68,6 +74,7 @@ WSBL supports the following lifecycle:
 - `preview_requires_evidence`
 - `publish_requires_approval`
 - `publish_requires_bytewax_stream`
+- `custom_component_registration_requires_review`
 - `custom_component_requires_review`
 - `custom_component_requires_policy`
 - `public_site_requires_accessibility_pass`
@@ -83,6 +90,10 @@ WSBL supports the following lifecycle:
 WSBL exposes APG Python view models for dashboard, site console, page library,
 page editor, component library, publish queue, analytics, agent workbench,
 policy center, and settings.
+
+The dashboard, component library, publish queue, and policy center expose
+pending review queues and denied publish evidence so generated applications can
+render approval workbenches directly from service state.
 
 ## Theme
 

@@ -31,15 +31,19 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["theme"]["name"] == "wsbl_site_builder"
 	assert contract["streaming"]["processor"] == "bytewax"
 	assert "wsbl_agents" in contract["provides"]
+	assert "review_evidence" in contract["provides"]
 
 
 def test_rule_engine_enforces_wsbl_guardrails():
 	result = evaluate_capability_rules({"tenant_context_present": False, "operation": "create_site", "site_owner_assigned": False})
 	component_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "add_page_section", "custom_component_present": True, "component_review_recorded": False})
+	component_registration_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "create_component", "custom_component_present": True, "component_review_recorded": False})
 	publish_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "publish_site", "domain_validation_complete": False, "structured_sections_present": False, "preview_evidence_present": False, "approval_recorded": False, "event_stream": "local", "public_site": True, "accessibility_passed": False, "privacy_banner_required": True, "consent_policy_attached": False})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) == {"tenant_context_required", "site_requires_owner"}
+	assert component_registration_result["decision"] == "require_review"
+	assert component_registration_result["matched_rules"] == ["custom_component_registration_requires_review"]
 	assert component_result["matched_rules"] == ["custom_component_requires_review"]
 	assert set(publish_result["matched_rules"]) == {"domain_requires_validation_before_publish", "page_requires_structured_sections", "preview_requires_evidence", "publish_requires_approval", "publish_requires_bytewax_stream", "public_site_requires_accessibility_pass", "privacy_banner_requires_consent_policy"}
 
@@ -64,4 +68,6 @@ def test_registration_includes_full_capability_contract():
 	assert registration["ui_components"]["editor"] == "/wsbl/editor"
 	assert registration["ui_components"]["agents"] == "/wsbl/agents"
 	assert registration["streaming"]["processor"] == "bytewax"
+	assert "review_evidence" in registration["capabilities"]
+	assert registration["endpoints"]["pending_reviews"] == "/wsbl/api/v1/pending-reviews"
 	assert "wsbl:publish" in registration["permissions"]

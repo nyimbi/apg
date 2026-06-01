@@ -66,7 +66,8 @@ creation timestamp, and validation timestamp.
 ### Component
 
 A component contains tenant, name, type, custom flag, review state, reviewer,
-policy, metadata, and timestamp.
+policy, policy decision, matched rules, review reasons, audit evidence,
+metadata, and timestamp.
 
 ### Page
 
@@ -77,12 +78,13 @@ sections, metadata, and timestamps.
 
 A publish request contains tenant, site, requester, environment, status,
 approval state, accessibility state, consent-policy state, required actions,
-published version, and timestamps.
+policy decision, matched rules, review reasons, audit evidence, published
+version, and timestamps.
 
 ### WSBL Agent
 
 A WSBL agent is a first-class composition element with tenant, name, runtime,
-role, scope, owner, status, and human approval policy.
+role, scope, owner, status, human approval policy, and policy evidence fields.
 
 Supported runtimes:
 
@@ -123,6 +125,7 @@ Publish states:
 - `review_required`
 - `published`
 - `rolled_back`
+- `denied`
 
 Lifecycle stream states:
 
@@ -146,6 +149,7 @@ The deterministic rule engine must enforce:
 - preview evidence before publish;
 - approval before publish;
 - Bytewax stream metadata for publish;
+- review evidence for custom component registration;
 - review before custom component use;
 - policy attribution for custom component review;
 - accessibility pass for public sites;
@@ -175,8 +179,15 @@ The deterministic rule engine must enforce:
 - `register_wsbl_agent()`
 - `validate_agent_publish_action()`
 - `validate_batch_publish()`
+- `list_pending_reviews()`
 - list helpers for every record type;
 - `dashboard_summary()`.
+
+Review-required components and publish requests must expose `decision`,
+`matched_rules`, `review_reasons`, and `audit_evidence`. Denied publish
+requests must persist the same evidence before the service raises a hard
+`PermissionError`. Agent publish-action and batch-publish validations must
+write audit events with policy evidence.
 
 ## API Requirements
 
@@ -201,7 +212,7 @@ WSBL exposes APG Python view models for:
 - `/wsbl/settings`
 
 The UI contract must expose rules, summaries, agent policy, Bytewax streaming,
-and visual theme tokens.
+pending review queues, denied publish requests, and visual theme tokens.
 
 ## Visual Theming
 

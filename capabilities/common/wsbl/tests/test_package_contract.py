@@ -69,6 +69,7 @@ def test_package_contract_shape_and_entrypoint_are_publishable():
 	assert manifest["kind"] == "apg.generated_application"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "wsbl" in model["capabilities"]
+	assert model["capabilities"]["wsbl"]["review_evidence"]["durable_statuses"] == ["review_required", "denied"]
 
 
 def test_site_page_component_publish_lifecycle_executes():
@@ -131,6 +132,12 @@ def test_custom_components_require_review_before_page_use():
 	component = service.create_component("custom-nav", "tenant-wsbl", "Custom Nav", custom=True)
 	page = service.create_page(site["id"], "docs", "Docs", tenant_id="tenant-wsbl")
 
+	assert component["status"] == "review_required"
+	assert component["decision"] == "require_review"
+	assert component["review_reasons"] == ["custom_component_review_required"]
+	assert component["audit_evidence"]["required_actions"] == ["review_custom_component"]
+	assert service.list_pending_reviews("tenant-wsbl")[0]["id"] == component["id"]
+
 	with pytest.raises(PermissionError, match="component_review_required"):
 		service.add_page_section(page["id"], component["id"], {"links": []}, actor_id="editor-1")
 
@@ -141,6 +148,7 @@ def test_custom_components_require_review_before_page_use():
 	updated_page = service.add_page_section(page["id"], component["id"], {"links": []}, actor_id="editor-1")
 
 	assert reviewed["status"] == "approved"
+	assert reviewed["review_reasons"] == []
 	assert updated_page["sections"][0]["component_id"] == component["id"]
 
 
@@ -150,6 +158,11 @@ def test_publish_requires_approval_accessibility_and_consent_policy():
 
 	with pytest.raises(PermissionError, match="site_publish_approval_required"):
 		service.create_publish_request(site["id"], "publisher-1", accessibility_passed=True, consent_policy_attached=True)
+	denied = service.list_publish_requests("tenant-wsbl")[0]
+	assert denied["status"] == "denied"
+	assert denied["decision"] == "deny"
+	assert "site_publish_approval_required" in denied["review_reasons"]
+	assert "record_publish_approval" in denied["audit_evidence"]["required_actions"]
 	with pytest.raises(PermissionError, match="accessibility_pass_required"):
 		service.create_publish_request(site["id"], "publisher-1", approval_recorded=True, consent_policy_attached=True)
 	with pytest.raises(PermissionError, match="preview_evidence_required"):
@@ -167,6 +180,10 @@ def test_publish_requires_approval_accessibility_and_consent_policy():
 
 	assert review["status"] == "review_required"
 	assert review["required_actions"] == ["attach_consent_policy"]
+	assert review["decision"] == "require_review"
+	assert review["matched_rules"] == ["privacy_banner_requires_consent_policy"]
+	assert review["review_reasons"] == ["consent_policy_required"]
+	assert service.list_pending_reviews("tenant-wsbl")[0]["id"] == review["id"]
 	with pytest.raises(PermissionError, match="publish_request_not_approved"):
 		service.publish_site(review["id"], actor_id="publisher-1")
 
@@ -220,9 +237,13 @@ def test_wsbl_agents_and_batch_publish_guardrails_execute():
 	assert agent["runtime"] == "codex"
 	assert privileged["decision"] == "deny"
 	assert privileged["matched_rules"] == ["privileged_agent_publish_action_requires_human_approval"]
+	assert privileged["review_reasons"] == ["human_approval_required"]
+	assert privileged["audit_evidence"]["required_actions"] == ["record_human_approval"]
 	assert approved["decision"] == "allow"
 	assert batch_block["decision"] == "deny"
 	assert batch_block["matched_rules"] == ["batch_publish_requires_bytewax"]
+	assert batch_block["audit_evidence"]["required_actions"] == ["route_batch_publish_to_bytewax"]
+	assert service.list_audit_events("tenant-wsbl")[-1]["policy_decision"] == "deny"
 
 	with pytest.raises(PermissionError, match="wsbl_agent_runtime_not_supported"):
 		service.register_wsbl_agent("tenant-wsbl", "Unsupported", "unknown", "publish_reviewer", "review")
@@ -260,8 +281,10 @@ def test_api_helpers_expose_website_builder_lifecycle():
 	assert status["site_count"] == 1
 	assert status["wsbl_agent_count"] == 1
 	assert status["page_count"] == 1
+	assert api.list_pending_reviews("tenant-api") == []
 	assert listing["components"][0]["name"] == "Product List"
 	assert listing["wsbl_agents"][0]["id"] == agent["id"]
+	assert listing["pending_reviews"] == []
 
 
 def test_view_models_match_routes_theme_and_builder_state():
@@ -282,9 +305,14 @@ def test_view_models_match_routes_theme_and_builder_state():
 	assert editor["selected_page"]["id"] == page["id"]
 	assert editor["component_palette"][0]["id"] == component["id"]
 	assert components["pending_review"] == []
+	assert components["pending_reviews"] == []
 	assert publishing["publish_requests"][0]["id"] == request["id"]
+	assert publishing["denied"] == []
+	assert publishing["pending_reviews"] == []
 	assert analytics["signals"]["published_site_ratio"] == 0.0
 	assert agents["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
 	assert policy["streaming"]["processor"] == "bytewax"
+	assert policy["pending_reviews"] == []
+	assert policy["denied_publish_requests"] == []
 	assert settings["theme"]["name"] == "wsbl_site_builder"
 	assert settings["streaming"]["processor"] == "bytewax"

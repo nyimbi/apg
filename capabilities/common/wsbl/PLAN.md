@@ -23,6 +23,8 @@ verification.
    - Add deterministic rules for domain validation, structured sections,
      preview evidence, publish streams, component policy, rollback streams,
      batch publishing, agents, and privileged agent actions.
+   - Add durable review-evidence rules for custom component registration and
+     publish review queues.
    - Add `/wsbl/agents` and `/wsbl/policy` UI routes.
 
 3. Runtime expansion
@@ -30,11 +32,16 @@ verification.
    - Extend `WsblService` with agent registration, privileged agent-action
      validation, batch publish validation, Bytewax lifecycle metadata, and
      stronger publish/component/rollback guardrails.
+   - Preserve policy decisions, matched rules, review reasons, and audit
+     evidence on custom components, publish requests, denied publish attempts,
+     agent publish checks, batch publish checks, and audit events.
    - Keep production integration behind adapters.
 
 4. API and views
    - Expose agent and batch validation helpers.
    - Add agent workbench and policy center view models.
+   - Add pending-review queues and denied publish evidence to service, API, and
+     view model surfaces.
    - Include streaming metadata and policy guardrails in dashboard,
      publishing, analytics, settings, and status surfaces.
 
@@ -59,6 +66,8 @@ verification.
   evidence, approval, accessibility pass, and Bytewax routing.
 - Privacy banners route to consent-policy review.
 - Custom components require review and policy attribution.
+- Pending components and publish requests carry durable review evidence without
+  requiring generated applications to replay rules.
 - Rollbacks require Bytewax routing.
 - WSBL agents are first-class and constrained by runtime, role, and human
   approval policy.
