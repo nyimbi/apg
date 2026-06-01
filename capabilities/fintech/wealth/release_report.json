@@ -1,0 +1,24 @@
+{
+  "evidence": {
+    "contracts": {
+      "capability_contract": {
+        "display_name": "Wealth Management",
+        "errors": []
+      }
+    },
+    "self_test": {
+      "capability": "fintech_wealth",
+      "passed": true,
+      "status": "ok"
+    },
+    "semantic_model": {
+      "capability": "fintech_wealth",
+      "format": "apg.semantic-model.v1"
+    }
+  },
+  "format": "apg.release-report.v1",
+  "ok": true,
+  "package": "fintech_wealth",
+  "source": "capability_contract.py",
+  "target": "python"
+}

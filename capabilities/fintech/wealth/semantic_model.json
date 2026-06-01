@@ -1,0 +1,1537 @@
+{
+  "app": {
+    "description": "Wealth Management package-backed APG capability",
+    "entity_count": 9,
+    "name": "fintech_wealth",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "fintech_wealth": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "analytics": "bia",
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "reporting": "fin_rpt",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "advisor_reviewer",
+            "suitability_reviewer",
+            "portfolio_reviewer",
+            "order_reviewer",
+            "fee_reviewer",
+            "wealth_compliance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "clients": {
+          "kyc_required": true,
+          "risk_evidence_required": true,
+          "tax_required": true
+        },
+        "fees": {
+          "contract_required": true,
+          "maximum_percent": 100,
+          "minimum_percent": 0
+        },
+        "governance": {
+          "audit_events": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "mandates": {
+          "policy_required": true,
+          "suitability_required": true,
+          "supported_types": [
+            "advisory",
+            "discretionary",
+            "model",
+            "execution_only"
+          ]
+        },
+        "observability": {
+          "event_stream": "apg.fintech.wealth.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "orders": {
+          "large_order_threshold_minor": 10000000,
+          "risk_reference_required": true,
+          "supported_sides": [
+            "buy",
+            "sell",
+            "switch"
+          ]
+        },
+        "performance": {
+          "benchmark_required": true,
+          "valuation_required": true
+        },
+        "portfolios": {
+          "advisor_required": true,
+          "investment_policy_required": true,
+          "supported_currencies": [
+            "USD",
+            "KES",
+            "EUR",
+            "GBP",
+            "NGN",
+            "GHS",
+            "ZAR"
+          ]
+        },
+        "rebalances": {
+          "allocation_total_percent": 100,
+          "analysis_required": true
+        },
+        "suitability": {
+          "goals_required": true,
+          "supported_horizons": [
+            "one_year",
+            "three_years",
+            "five_years",
+            "ten_years",
+            "retirement"
+          ],
+          "supported_risk_profiles": [
+            "conservative",
+            "balanced",
+            "growth",
+            "aggressive"
+          ],
+          "supported_tolerances": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "wealth_management_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_clients": true,
+          "enable_dashboard": true,
+          "enable_fees": true,
+          "enable_mandates": true,
+          "enable_orders": true,
+          "enable_performance": true,
+          "enable_portfolios": true,
+          "enable_rebalances": true,
+          "enable_suitability": true
+        }
+      },
+      "name": "Wealth Management",
+      "provides": [
+        "wealth_client_profile_workflow",
+        "suitability_profile_workflow",
+        "portfolio_management_workflow",
+        "advisory_mandate_workflow",
+        "portfolio_rebalance_workflow",
+        "wealth_order_workflow",
+        "performance_reporting_workflow",
+        "wealth_fee_workflow",
+        "wealth_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "fintech_payments",
+        "fintech_wallets",
+        "bia",
+        "fin_rpt"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "policy_evidence_required",
+              "required_action": "attach_policy_evidence"
+            },
+            "name": "wealth_write_requires_policy"
+          },
+          {
+            "condition": {
+              "kyc_present": false,
+              "operation": "register_client_profile"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "client_kyc_required",
+              "required_action": "attach_kyc_evidence"
+            },
+            "name": "client_kyc_required"
+          },
+          {
+            "condition": {
+              "operation": "register_client_profile",
+              "tax_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "client_tax_profile_required",
+              "required_action": "attach_tax_profile"
+            },
+            "name": "client_tax_required"
+          },
+          {
+            "condition": {
+              "operation": "register_client_profile",
+              "risk_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "client_risk_evidence_required",
+              "required_action": "attach_risk_evidence"
+            },
+            "name": "client_risk_required"
+          },
+          {
+            "condition": {
+              "client_present": false,
+              "operation": "capture_suitability_profile"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "suitability_client_required",
+              "required_action": "select_client"
+            },
+            "name": "suitability_client_required"
+          },
+          {
+            "condition": {
+              "operation": "capture_suitability_profile",
+              "risk_profile_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_profile_not_supported",
+              "required_action": "select_supported_risk_profile"
+            },
+            "name": "suitability_risk_supported"
+          },
+          {
+            "condition": {
+              "operation": "capture_suitability_profile",
+              "tolerance_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_tolerance_not_supported",
+              "required_action": "select_supported_tolerance"
+            },
+            "name": "suitability_tolerance_supported"
+          },
+          {
+            "condition": {
+              "horizon_supported": false,
+              "operation": "capture_suitability_profile"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "investment_horizon_not_supported",
+              "required_action": "select_supported_horizon"
+            },
+            "name": "suitability_horizon_supported"
+          },
+          {
+            "condition": {
+              "goals_present": false,
+              "operation": "capture_suitability_profile"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "investment_goals_required",
+              "required_action": "attach_goals"
+            },
+            "name": "suitability_goals_required"
+          },
+          {
+            "condition": {
+              "client_present": false,
+              "operation": "create_portfolio"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "portfolio_client_required",
+              "required_action": "select_client"
+            },
+            "name": "portfolio_client_required"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "create_portfolio"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "portfolio_currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "portfolio_currency_supported"
+          },
+          {
+            "condition": {
+              "advisor_present": false,
+              "operation": "create_portfolio"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "portfolio_advisor_required",
+              "required_action": "assign_advisor"
+            },
+            "name": "portfolio_advisor_required"
+          },
+          {
+            "condition": {
+              "operation": "create_portfolio",
+              "policy_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "investment_policy_required",
+              "required_action": "attach_policy_statement"
+            },
+            "name": "portfolio_policy_required"
+          },
+          {
+            "condition": {
+              "operation": "create_advisory_mandate",
+              "portfolio_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "mandate_portfolio_required",
+              "required_action": "select_portfolio"
+            },
+            "name": "mandate_portfolio_required"
+          },
+          {
+            "condition": {
+              "operation": "create_advisory_mandate",
+              "suitability_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "mandate_suitability_required",
+              "required_action": "select_suitability_profile"
+            },
+            "name": "mandate_suitability_required"
+          },
+          {
+            "condition": {
+              "mandate_type_supported": false,
+              "operation": "create_advisory_mandate"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "mandate_type_not_supported",
+              "required_action": "select_supported_mandate"
+            },
+            "name": "mandate_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "create_advisory_mandate",
+              "policy_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "mandate_policy_required",
+              "required_action": "attach_mandate_policy"
+            },
+            "name": "mandate_policy_required"
+          },
+          {
+            "condition": {
+              "operation": "propose_rebalance",
+              "portfolio_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "rebalance_portfolio_required",
+              "required_action": "select_portfolio"
+            },
+            "name": "rebalance_portfolio_required"
+          },
+          {
+            "condition": {
+              "mandate_present": false,
+              "operation": "propose_rebalance"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "rebalance_mandate_required",
+              "required_action": "select_mandate"
+            },
+            "name": "rebalance_mandate_required"
+          },
+          {
+            "condition": {
+              "mandate_matches_portfolio": false,
+              "operation": "propose_rebalance"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "rebalance_mandate_portfolio_mismatch",
+              "required_action": "select_portfolio_mandate"
+            },
+            "name": "rebalance_mandate_matches_portfolio"
+          },
+          {
+            "condition": {
+              "allocation_totals_100": false,
+              "operation": "propose_rebalance"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "allocation_total_must_equal_100",
+              "required_action": "rebalance_allocation"
+            },
+            "name": "rebalance_allocation_total"
+          },
+          {
+            "condition": {
+              "analysis_present": false,
+              "operation": "propose_rebalance"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "rebalance_analysis_required",
+              "required_action": "attach_analysis"
+            },
+            "name": "rebalance_analysis_required"
+          },
+          {
+            "condition": {
+              "operation": "stage_order",
+              "portfolio_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "order_portfolio_required",
+              "required_action": "select_portfolio"
+            },
+            "name": "order_portfolio_required"
+          },
+          {
+            "condition": {
+              "operation": "stage_order",
+              "side_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "order_side_not_supported",
+              "required_action": "select_supported_side"
+            },
+            "name": "order_side_supported"
+          },
+          {
+            "condition": {
+              "operation": "stage_order",
+              "positive_quantity": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_order_quantity_required",
+              "required_action": "set_positive_quantity"
+            },
+            "name": "order_quantity_positive"
+          },
+          {
+            "condition": {
+              "operation": "stage_order",
+              "risk_reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "order_risk_reference_required",
+              "required_action": "attach_risk_reference"
+            },
+            "name": "order_risk_required"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "large_order": true,
+              "operation": "stage_order"
+            },
+            "effect": {
+              "decision": "require_review",
+              "reason": "large_order_approval_required",
+              "required_action": "record_order_approval"
+            },
+            "name": "large_order_requires_approval"
+          },
+          {
+            "condition": {
+              "operation": "record_performance",
+              "portfolio_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "performance_portfolio_required",
+              "required_action": "select_portfolio"
+            },
+            "name": "performance_portfolio_required"
+          },
+          {
+            "condition": {
+              "operation": "record_performance",
+              "valuation_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "performance_valuation_required",
+              "required_action": "attach_valuation"
+            },
+            "name": "performance_valuation_required"
+          },
+          {
+            "condition": {
+              "benchmark_present": false,
+              "operation": "record_performance"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "performance_benchmark_required",
+              "required_action": "attach_benchmark"
+            },
+            "name": "performance_benchmark_required"
+          },
+          {
+            "condition": {
+              "operation": "record_fee_schedule",
+              "portfolio_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "fee_portfolio_required",
+              "required_action": "select_portfolio"
+            },
+            "name": "fee_portfolio_required"
+          },
+          {
+            "condition": {
+              "operation": "record_fee_schedule",
+              "percent_bounded": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "fee_percent_out_of_bounds",
+              "required_action": "set_valid_fee_percent"
+            },
+            "name": "fee_percent_bounded"
+          },
+          {
+            "condition": {
+              "contract_present": false,
+              "operation": "record_fee_schedule"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "fee_contract_required",
+              "required_action": "attach_fee_contract"
+            },
+            "name": "fee_contract_required"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "wealth_batch"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_wealth_batch_to_bytewax"
+            },
+            "name": "wealth_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_wealth_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "wealth_agent_runtime_not_supported",
+              "required_action": "select_supported_runtime"
+            },
+            "name": "wealth_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_wealth_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "wealth_agent_role_not_supported",
+              "required_action": "select_supported_role"
+            },
+            "name": "wealth_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "wealth_agent_action",
+              "privileged_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_wealth_agent_action_requires_human_approval"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "policy_evidence_required",
+            "required_action": "attach_policy_evidence"
+          },
+          "name": "wealth_write_requires_policy"
+        },
+        {
+          "condition": {
+            "kyc_present": false,
+            "operation": "register_client_profile"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "client_kyc_required",
+            "required_action": "attach_kyc_evidence"
+          },
+          "name": "client_kyc_required"
+        },
+        {
+          "condition": {
+            "operation": "register_client_profile",
+            "tax_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "client_tax_profile_required",
+            "required_action": "attach_tax_profile"
+          },
+          "name": "client_tax_required"
+        },
+        {
+          "condition": {
+            "operation": "register_client_profile",
+            "risk_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "client_risk_evidence_required",
+            "required_action": "attach_risk_evidence"
+          },
+          "name": "client_risk_required"
+        },
+        {
+          "condition": {
+            "client_present": false,
+            "operation": "capture_suitability_profile"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "suitability_client_required",
+            "required_action": "select_client"
+          },
+          "name": "suitability_client_required"
+        },
+        {
+          "condition": {
+            "operation": "capture_suitability_profile",
+            "risk_profile_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_profile_not_supported",
+            "required_action": "select_supported_risk_profile"
+          },
+          "name": "suitability_risk_supported"
+        },
+        {
+          "condition": {
+            "operation": "capture_suitability_profile",
+            "tolerance_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_tolerance_not_supported",
+            "required_action": "select_supported_tolerance"
+          },
+          "name": "suitability_tolerance_supported"
+        },
+        {
+          "condition": {
+            "horizon_supported": false,
+            "operation": "capture_suitability_profile"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "investment_horizon_not_supported",
+            "required_action": "select_supported_horizon"
+          },
+          "name": "suitability_horizon_supported"
+        },
+        {
+          "condition": {
+            "goals_present": false,
+            "operation": "capture_suitability_profile"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "investment_goals_required",
+            "required_action": "attach_goals"
+          },
+          "name": "suitability_goals_required"
+        },
+        {
+          "condition": {
+            "client_present": false,
+            "operation": "create_portfolio"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "portfolio_client_required",
+            "required_action": "select_client"
+          },
+          "name": "portfolio_client_required"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "create_portfolio"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "portfolio_currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "portfolio_currency_supported"
+        },
+        {
+          "condition": {
+            "advisor_present": false,
+            "operation": "create_portfolio"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "portfolio_advisor_required",
+            "required_action": "assign_advisor"
+          },
+          "name": "portfolio_advisor_required"
+        },
+        {
+          "condition": {
+            "operation": "create_portfolio",
+            "policy_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "investment_policy_required",
+            "required_action": "attach_policy_statement"
+          },
+          "name": "portfolio_policy_required"
+        },
+        {
+          "condition": {
+            "operation": "create_advisory_mandate",
+            "portfolio_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "mandate_portfolio_required",
+            "required_action": "select_portfolio"
+          },
+          "name": "mandate_portfolio_required"
+        },
+        {
+          "condition": {
+            "operation": "create_advisory_mandate",
+            "suitability_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "mandate_suitability_required",
+            "required_action": "select_suitability_profile"
+          },
+          "name": "mandate_suitability_required"
+        },
+        {
+          "condition": {
+            "mandate_type_supported": false,
+            "operation": "create_advisory_mandate"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "mandate_type_not_supported",
+            "required_action": "select_supported_mandate"
+          },
+          "name": "mandate_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "create_advisory_mandate",
+            "policy_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "mandate_policy_required",
+            "required_action": "attach_mandate_policy"
+          },
+          "name": "mandate_policy_required"
+        },
+        {
+          "condition": {
+            "operation": "propose_rebalance",
+            "portfolio_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "rebalance_portfolio_required",
+            "required_action": "select_portfolio"
+          },
+          "name": "rebalance_portfolio_required"
+        },
+        {
+          "condition": {
+            "mandate_present": false,
+            "operation": "propose_rebalance"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "rebalance_mandate_required",
+            "required_action": "select_mandate"
+          },
+          "name": "rebalance_mandate_required"
+        },
+        {
+          "condition": {
+            "mandate_matches_portfolio": false,
+            "operation": "propose_rebalance"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "rebalance_mandate_portfolio_mismatch",
+            "required_action": "select_portfolio_mandate"
+          },
+          "name": "rebalance_mandate_matches_portfolio"
+        },
+        {
+          "condition": {
+            "allocation_totals_100": false,
+            "operation": "propose_rebalance"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "allocation_total_must_equal_100",
+            "required_action": "rebalance_allocation"
+          },
+          "name": "rebalance_allocation_total"
+        },
+        {
+          "condition": {
+            "analysis_present": false,
+            "operation": "propose_rebalance"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "rebalance_analysis_required",
+            "required_action": "attach_analysis"
+          },
+          "name": "rebalance_analysis_required"
+        },
+        {
+          "condition": {
+            "operation": "stage_order",
+            "portfolio_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "order_portfolio_required",
+            "required_action": "select_portfolio"
+          },
+          "name": "order_portfolio_required"
+        },
+        {
+          "condition": {
+            "operation": "stage_order",
+            "side_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "order_side_not_supported",
+            "required_action": "select_supported_side"
+          },
+          "name": "order_side_supported"
+        },
+        {
+          "condition": {
+            "operation": "stage_order",
+            "positive_quantity": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_order_quantity_required",
+            "required_action": "set_positive_quantity"
+          },
+          "name": "order_quantity_positive"
+        },
+        {
+          "condition": {
+            "operation": "stage_order",
+            "risk_reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "order_risk_reference_required",
+            "required_action": "attach_risk_reference"
+          },
+          "name": "order_risk_required"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "large_order": true,
+            "operation": "stage_order"
+          },
+          "effect": {
+            "decision": "require_review",
+            "reason": "large_order_approval_required",
+            "required_action": "record_order_approval"
+          },
+          "name": "large_order_requires_approval"
+        },
+        {
+          "condition": {
+            "operation": "record_performance",
+            "portfolio_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "performance_portfolio_required",
+            "required_action": "select_portfolio"
+          },
+          "name": "performance_portfolio_required"
+        },
+        {
+          "condition": {
+            "operation": "record_performance",
+            "valuation_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "performance_valuation_required",
+            "required_action": "attach_valuation"
+          },
+          "name": "performance_valuation_required"
+        },
+        {
+          "condition": {
+            "benchmark_present": false,
+            "operation": "record_performance"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "performance_benchmark_required",
+            "required_action": "attach_benchmark"
+          },
+          "name": "performance_benchmark_required"
+        },
+        {
+          "condition": {
+            "operation": "record_fee_schedule",
+            "portfolio_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "fee_portfolio_required",
+            "required_action": "select_portfolio"
+          },
+          "name": "fee_portfolio_required"
+        },
+        {
+          "condition": {
+            "operation": "record_fee_schedule",
+            "percent_bounded": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "fee_percent_out_of_bounds",
+            "required_action": "set_valid_fee_percent"
+          },
+          "name": "fee_percent_bounded"
+        },
+        {
+          "condition": {
+            "contract_present": false,
+            "operation": "record_fee_schedule"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "fee_contract_required",
+            "required_action": "attach_fee_contract"
+          },
+          "name": "fee_contract_required"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "wealth_batch"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_wealth_batch_to_bytewax"
+          },
+          "name": "wealth_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_wealth_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "wealth_agent_runtime_not_supported",
+            "required_action": "select_supported_runtime"
+          },
+          "name": "wealth_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_wealth_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "wealth_agent_role_not_supported",
+            "required_action": "select_supported_role"
+          },
+          "name": "wealth_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "wealth_agent_action",
+            "privileged_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_wealth_agent_action_requires_human_approval"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "agents": {
+          "component": "WealthAgentWorkbench",
+          "permission": "fintech_wealth:admin",
+          "route": "/fintech-wealth/agents"
+        },
+        "clients": {
+          "component": "ClientProfileConsole",
+          "permission": "fintech_wealth:clients",
+          "route": "/fintech-wealth/clients"
+        },
+        "dashboard": {
+          "component": "WealthDashboard",
+          "permission": "fintech_wealth:view",
+          "route": "/fintech-wealth/dashboard"
+        },
+        "fees": {
+          "component": "FeeScheduleConsole",
+          "permission": "fintech_wealth:fees",
+          "route": "/fintech-wealth/fees"
+        },
+        "mandates": {
+          "component": "MandateConsole",
+          "permission": "fintech_wealth:mandates",
+          "route": "/fintech-wealth/mandates"
+        },
+        "orders": {
+          "component": "OrderBlotter",
+          "permission": "fintech_wealth:orders",
+          "route": "/fintech-wealth/orders"
+        },
+        "performance": {
+          "component": "PerformanceConsole",
+          "permission": "fintech_wealth:performance",
+          "route": "/fintech-wealth/performance"
+        },
+        "portfolios": {
+          "component": "PortfolioConsole",
+          "permission": "fintech_wealth:portfolios",
+          "route": "/fintech-wealth/portfolios"
+        },
+        "rebalances": {
+          "component": "RebalanceWorkbench",
+          "permission": "fintech_wealth:rebalances",
+          "route": "/fintech-wealth/rebalances"
+        },
+        "settings": {
+          "component": "WealthSettings",
+          "permission": "fintech_wealth:admin",
+          "route": "/fintech-wealth/settings"
+        },
+        "suitability": {
+          "component": "SuitabilityWorkbench",
+          "permission": "fintech_wealth:suitability",
+          "route": "/fintech-wealth/suitability"
+        }
+      },
+      "streaming": {
+        "events": [
+          "client_profile_registered",
+          "suitability_profile_captured",
+          "portfolio_created",
+          "advisory_mandate_created",
+          "rebalance_proposed",
+          "order_staged",
+          "performance_recorded",
+          "fee_schedule_recorded",
+          "wealth_agent_registered"
+        ],
+        "guardrails": [
+          "wealth_batch_requires_bytewax",
+          "privileged_wealth_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.fintech.wealth.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "clients": {
+            "icon": "users",
+            "status_indicator": "client-chip"
+          },
+          "fees": {
+            "icon": "percent",
+            "status_indicator": "fee-chip"
+          },
+          "mandates": {
+            "icon": "file-signature",
+            "status_indicator": "mandate-chip"
+          },
+          "orders": {
+            "icon": "list-ordered",
+            "status_indicator": "order-chip"
+          },
+          "performance": {
+            "icon": "line-chart",
+            "status_indicator": "performance-chip"
+          },
+          "portfolios": {
+            "icon": "pie-chart",
+            "status_indicator": "portfolio-chip"
+          },
+          "rebalances": {
+            "icon": "scale",
+            "status_indicator": "rebalance-chip"
+          },
+          "suitability": {
+            "icon": "clipboard-check",
+            "status_indicator": "suitability-chip"
+          }
+        },
+        "name": "wealth_management_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#1D4ED8",
+          "color.danger": "#B91C1C",
+          "color.primary": "#166534",
+          "color.success": "#15803D",
+          "color.warning": "#A16207",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/fintech-wealth/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "WealthDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/fintech-wealth/dashboard",
+            "permission": "fintech_wealth:view"
+          },
+          {
+            "component": "ClientProfileConsole",
+            "name": "clients",
+            "nav_group": "Clients",
+            "path": "/fintech-wealth/clients",
+            "permission": "fintech_wealth:clients"
+          },
+          {
+            "component": "SuitabilityWorkbench",
+            "name": "suitability",
+            "nav_group": "Clients",
+            "path": "/fintech-wealth/suitability",
+            "permission": "fintech_wealth:suitability"
+          },
+          {
+            "component": "PortfolioConsole",
+            "name": "portfolios",
+            "nav_group": "Portfolios",
+            "path": "/fintech-wealth/portfolios",
+            "permission": "fintech_wealth:portfolios"
+          },
+          {
+            "component": "MandateConsole",
+            "name": "mandates",
+            "nav_group": "Portfolios",
+            "path": "/fintech-wealth/mandates",
+            "permission": "fintech_wealth:mandates"
+          },
+          {
+            "component": "RebalanceWorkbench",
+            "name": "rebalances",
+            "nav_group": "Portfolios",
+            "path": "/fintech-wealth/rebalances",
+            "permission": "fintech_wealth:rebalances"
+          },
+          {
+            "component": "OrderBlotter",
+            "name": "orders",
+            "nav_group": "Trading",
+            "path": "/fintech-wealth/orders",
+            "permission": "fintech_wealth:orders"
+          },
+          {
+            "component": "PerformanceConsole",
+            "name": "performance",
+            "nav_group": "Reporting",
+            "path": "/fintech-wealth/performance",
+            "permission": "fintech_wealth:performance"
+          },
+          {
+            "component": "FeeScheduleConsole",
+            "name": "fees",
+            "nav_group": "Operations",
+            "path": "/fintech-wealth/fees",
+            "permission": "fintech_wealth:fees"
+          },
+          {
+            "component": "WealthAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/fintech-wealth/agents",
+            "permission": "fintech_wealth:admin"
+          },
+          {
+            "component": "WealthSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/fintech-wealth/settings",
+            "permission": "fintech_wealth:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "wealth_review": {
+        "roles": [
+          "advisor_reviewer",
+          "suitability_reviewer",
+          "portfolio_reviewer",
+          "order_reviewer",
+          "fee_reviewer",
+          "wealth_compliance_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "fintech_wealth": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "fintech_payments",
+        "fintech_wallets",
+        "bia",
+        "fin_rpt"
+      ]
+    }
+  },
+  "contracts": {
+    "fintech_wealth": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "analytics": "bia",
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "reporting": "fin_rpt",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "advisor_reviewer",
+            "suitability_reviewer",
+            "portfolio_reviewer",
+            "order_reviewer",
+            "fee_reviewer",
+            "wealth_compliance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "clients": {
+          "kyc_required": true,
+          "risk_evidence_required": true,
+          "tax_required": true
+        },
+        "fees": {
+          "contract_required": true,
+          "maximum_percent": 100,
+          "minimum_percent": 0
+        },
+        "governance": {
+          "audit_events": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "mandates": {
+          "policy_required": true,
+          "suitability_required": true,
+          "supported_types": [
+            "advisory",
+            "discretionary",
+            "model",
+            "execution_only"
+          ]
+        },
+        "observability": {
+          "event_stream": "apg.fintech.wealth.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "orders": {
+          "large_order_threshold_minor": 10000000,
+          "risk_reference_required": true,
+          "supported_sides": [
+            "buy",
+            "sell",
+            "switch"
+          ]
+        },
+        "performance": {
+          "benchmark_required": true,
+          "valuation_required": true
+        },
+        "portfolios": {
+          "advisor_required": true,
+          "investment_policy_required": true,
+          "supported_currencies": [
+            "USD",
+            "KES",
+            "EUR",
+            "GBP",
+            "NGN",
+            "GHS",
+            "ZAR"
+          ]
+        },
+        "rebalances": {
+          "allocation_total_percent": 100,
+          "analysis_required": true
+        },
+        "suitability": {
+          "goals_required": true,
+          "supported_horizons": [
+            "one_year",
+            "three_years",
+            "five_years",
+            "ten_years",
+            "retirement"
+          ],
+          "supported_risk_profiles": [
+            "conservative",
+            "balanced",
+            "growth",
+            "aggressive"
+          ],
+          "supported_tolerances": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "wealth_management_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_clients": true,
+          "enable_dashboard": true,
+          "enable_fees": true,
+          "enable_mandates": true,
+          "enable_orders": true,
+          "enable_performance": true,
+          "enable_portfolios": true,
+          "enable_rebalances": true,
+          "enable_suitability": true
+        }
+      },
+      "id": "fintech_wealth",
+      "provides": [
+        "wealth_client_profile_workflow",
+        "suitability_profile_workflow",
+        "portfolio_management_workflow",
+        "advisory_mandate_workflow",
+        "portfolio_rebalance_workflow",
+        "wealth_order_workflow",
+        "performance_reporting_workflow",
+        "wealth_fee_workflow",
+        "wealth_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "fintech_payments",
+        "fintech_wallets",
+        "bia",
+        "fin_rpt"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 12,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "fintech_wealth": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}

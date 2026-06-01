@@ -27428,3 +27428,88 @@ Known gaps:
   processor issuance, loan booking, settlement network submission, regulator
   filing, durable Bytewax topology, or performance/load checks during this
   battery-conscious slice.
+
+## 2026-06-01 - FinTech Wealth Management executable capability
+
+- Promoted `capabilities/fintech/wealth` from a placeholder package into a
+  first-class APG capability with `README.md`, `SPECIFICATION.md`, `PLAN.md`,
+  `cap_spec.md`, contract, models, service, API helpers, view models, app
+  entrypoint, semantic/package/release evidence, and focused tests.
+- Added client profile onboarding, suitability capture, portfolio creation,
+  advisory mandates, rebalance proposals, trade order staging, performance
+  snapshots, fee schedules, dashboard summaries, Bytewax batch validation, and
+  provider-neutral wealth agent registration.
+- Added deterministic Wealth Management guardrails for tenant context, write
+  policy, client KYC/tax/risk evidence, suitability client/risk/tolerance/
+  horizon/goals evidence, portfolio client/currency/advisor/policy evidence,
+  mandate portfolio/suitability/type/policy controls, rebalance mandate and
+  allocation controls, order side/quantity/risk/large-order review controls,
+  performance valuation/benchmark evidence, fee bounds/contracts, Bytewax
+  lifecycle events, supported AI-agent runtimes/roles, and privileged-agent
+  approval.
+- Updated fintech capability metadata so `wealth` is listed as an implemented
+  sub-capability.
+- Removed the empty `_Wealth_Management` marker file and published
+  `semantic_model.json`, `package_manifest.json`, and `release_report.json`.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/fintech/wealth/__init__.py
+  capabilities/fintech/wealth/capability_contract.py
+  capabilities/fintech/wealth/models.py
+  capabilities/fintech/wealth/wealth_runtime.py
+  capabilities/fintech/wealth/service.py capabilities/fintech/wealth/api.py
+  capabilities/fintech/wealth/views.py capabilities/fintech/wealth/app.py
+  capabilities/fintech/wealth/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/fintech/wealth/tests/test_package_contract.py` passed with 6
+  tests.
+- `./.venv/bin/python capabilities/fintech/wealth/app.py` passed self-test
+  with `passed: true` and `status: ok`.
+- `./.venv/bin/apg capabilities inspect fintech_wealth --json` passed with 38
+  rules, 11 UI routes, theme `wealth_management_control`, shell `apg_python`,
+  and Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan capabilities/fintech/wealth
+  --json` passed with `side_effect_free: true` and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/fintech/wealth --json` passed with 1 domain-specific capability,
+  0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/fintech/wealth --json` passed with 1 complete lifecycle, 38
+  rules, 11 UI routes, 11 theme tokens, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 124 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 124 operable contracts, 124 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/fintech/wealth`, `capabilities/fintech/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed client profile, suitability, portfolio, advisory mandate, rebalance,
+  order, performance, fee, and AI-agent lifecycle paths so rule evaluation
+  happens before state mutation.
+- Tightened mandate and rebalance workflows so suitability evidence exists
+  before mandates and rebalances use the selected portfolio mandate.
+- Reviewed rebalance allocations so target weights must total 100 percent
+  before proposals are recorded.
+- Reviewed order staging so large orders require human approval before they are
+  accepted into the order blotter.
+- Reviewed provider-neutral wealth agent behavior so Codex, Claude Code,
+  OpenCode, and Pi runtimes remain first-class configuration choices and
+  privileged actions require human approval.
+- Kept live custody, broker routing, market data, account aggregation, tax-lot
+  accounting, billing collection, statement rendering, regulator filing, and
+  durable Bytewax workers behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live custody/broker
+  routing, live market-data ingestion, account aggregation, tax-lot accounting,
+  billing collection, statement rendering, regulator filing, durable Bytewax
+  topology, or performance/load checks during this battery-conscious slice.
