@@ -29495,3 +29495,111 @@ Known gaps:
   notification delivery, case-management writes, dissemination delivery, durable
   Bytewax topology, or performance/load checks during this battery-conscious
   slice.
+
+## 2026-06-01 - Intel Real-Time Monitoring executable capability
+
+Slice goal: replace the `capabilities/intel/monitoring` placeholder with a
+package-backed, executable APG capability for lawful defensive real-time
+monitoring that can be composed into generated applications.
+
+Implemented:
+
+- Added `capabilities/intel/monitoring/SPECIFICATION.md` defining lawful
+  authority, monitoring policies, authorized sources, watches, events, signals,
+  incidents, referrals, dissemination, reviews, UI/theming, AI agents,
+  lifecycle semantics, rule guardrails, and adapter boundaries.
+- Added `PLAN.md`, `README.md`, `cap_spec.md`, `package_manifest.json`,
+  `release_report.json`, and generated `semantic_model.json`.
+- Replaced the placeholder `__init__.py` with executable package exports and
+  removed the empty `_Real_Time_Monitoring` marker.
+- Added domain models for authorities, monitoring policies, sources, watches,
+  events, signals, incidents, referrals, dissemination, reviews, and monitoring
+  agents.
+- Added a deterministic capability contract with tenant-safe configuration, 69
+  rules, 13 UI routes, compact theme tokens, Bytewax lifecycle metadata, and
+  provider-neutral AI-agent runtimes: `codex`, `claude_code`, `opencode`, and
+  `pi`.
+- Added the `RealTimeMonitoringService` executable runtime with tenant-keyed
+  state, rule-before-mutation enforcement, Bytewax audit events, source access
+  review requirements, policy/source authority alignment, watch retention,
+  event fingerprint/confidence evidence, signal and incident validation,
+  referral and dissemination approvals, review evidence, batch validation, and
+  AI-agent action guardrails.
+- Added API helpers, dashboard/console/agent view models, and a publishable
+  `app.py` entrypoint with self-test, component manifest, and semantic-model
+  generation.
+- Added focused package tests for contract shape, rule-engine denial paths,
+  full real-time-monitoring lifecycle execution, tenant isolation, guardrail
+  rejection, API helpers, view models, and app entrypoint.
+- Updated `capabilities/intel/__init__.py` so `monitoring` is listed as an
+  implemented sub-capability.
+- Updated `capabilities/README.md` so the catalog snapshot reports 146 valid
+  contracts, 146 domain-specific packages, 146 strict complete package artifact
+  sets, and 12 Intel packages.
+
+Focused verification:
+
+- Generated `capabilities/intel/monitoring/semantic_model.json` from
+  `app.semantic_model()`.
+- `./.venv/bin/python -m py_compile
+  capabilities/intel/monitoring/__init__.py
+  capabilities/intel/monitoring/capability_contract.py
+  capabilities/intel/monitoring/models.py
+  capabilities/intel/monitoring/monitoring_runtime.py
+  capabilities/intel/monitoring/service.py
+  capabilities/intel/monitoring/api.py
+  capabilities/intel/monitoring/views.py
+  capabilities/intel/monitoring/app.py
+  capabilities/intel/monitoring/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/intel/monitoring/tests/test_package_contract.py` passed with 7
+  tests.
+- `./.venv/bin/python capabilities/intel/monitoring/app.py` passed self-test
+  with `passed: true` and `status: ok`.
+- `./.venv/bin/apg capabilities inspect intel_monitoring --json` passed with
+  69 rules, 13 UI routes, theme `intel_monitoring_control`, shell
+  `apg_python`, and Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/intel/monitoring --json` passed with `side_effect_free: true`
+  and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/intel/monitoring --json` passed with 1 domain-specific
+  capability, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/intel/monitoring --json` passed with 1 complete lifecycle, 69
+  rules, 13 UI routes, 11 theme tokens, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 146 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 146 operable contracts, 146 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/intel/monitoring`, `capabilities/intel/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed authority, policy, source, watch, event, signal, incident, referral,
+  dissemination, review, Bytewax batch, and AI-agent lifecycle paths so rule
+  evaluation happens before state mutation.
+- Confirmed service state is keyed by tenant plus record ID and covered by a
+  regression test with shared authority/policy IDs across tenants.
+- Tightened real-time-monitoring semantics around lawful authority, source
+  access review, policy/source authority alignment, watch expression and
+  retention, event fingerprinting, confidence validation, analyst evidence,
+  approval gates, tenant isolation, and privileged or prohibited AI-agent
+  actions.
+- Kept live collectors, stream connectors, storage backends, notification
+  delivery, case-management writes, response automation, GraphRAG projection,
+  and durable Bytewax workers behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live event collectors,
+  log collectors, metric collectors, telemetry connectors, partner feeds,
+  stream persistence, notification delivery, case-management writes, GraphRAG
+  projection, response automation, dissemination delivery, durable Bytewax
+  topology, or performance/load checks during this battery-conscious slice.

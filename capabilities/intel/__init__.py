@@ -68,6 +68,7 @@ CAPABILITY_META = {
 		'darkweb',     # Dark Web Monitoring
 		'radio',       # Radio Intelligence Listener
 		'surveillance', # Digital Surveillance
+		'monitoring',  # Real-Time Monitoring
 	],
 	'security_requirements': {
 		'classification_handling': True,

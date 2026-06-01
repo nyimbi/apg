@@ -1,11 +1,16 @@
-"""
-monitoring Intelligence Capability
+"""APG Real-Time Monitoring executable capability package."""
 
-Placeholder for monitoring intelligence gathering, analysis and management capability.
-To be implemented as part of the comprehensive APG Intelligence platform.
-"""
+from .capability_contract import CAPABILITY_ID, CAPABILITY_NAME, CAPABILITY_VERSION, get_capability_contract
+from .service import IntelMonitoringService, RealTimeMonitoringService
 
-# Placeholder implementation
-__version__ = "1.0.0"
-__status__ = "Development"
+__all__ = [
+	"CAPABILITY_ID",
+	"CAPABILITY_NAME",
+	"CAPABILITY_VERSION",
+	"IntelMonitoringService",
+	"RealTimeMonitoringService",
+	"get_capability_contract",
+]
 
+__version__ = CAPABILITY_VERSION
+__status__ = "Executable"
