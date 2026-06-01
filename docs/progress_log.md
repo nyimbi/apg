@@ -28514,3 +28514,92 @@ Known gaps:
   liquidation execution, bridge execution, governance submission, MEV
   protection, durable Bytewax topology, or performance/load checks during this
   battery-conscious slice.
+
+## 2026-06-01 - Intel Open Source Intelligence executable capability
+
+- Promoted `capabilities/intel/osint` from placeholder into a first-class
+  executable APG capability with README, specification, plan, capability spec,
+  package manifest, release evidence, focused tests, and code-review notes.
+- Added executable requirement registration, source registration, collection
+  plan recording, evidence capture, triage, assessment, dissemination, review,
+  Bytewax batch validation, dashboard summary, and provider-neutral OSINT agent
+  registration workflows.
+- Added deterministic guardrails for tenant context, write policy evidence,
+  requirement topic/priority/requester/classification/evidence, source type/
+  reference/owner/source-terms review/risk/evidence, collection requirement/
+  source/method/cadence/high-risk approval/evidence, evidence plan/content/
+  fingerprint/confidence/evidence reference, triage evidence/decision/analyst/
+  evidence reference, assessment requirement/type/confidence/analyst/evidence,
+  dissemination assessment/audience/release marking/approval/evidence, review
+  status/reviewer/evidence, Bytewax lifecycle events, supported AI-agent
+  runtimes/roles, and privileged AI-agent approval.
+- Added compact UI/view models and theme tokens for dashboards, requirements,
+  sources, collection plans, evidence, triage, assessments, dissemination,
+  reviews, agents, and settings.
+- Updated intelligence capability metadata so `osint` is listed as an
+  implemented sub-capability.
+- Updated `capabilities/README.md` so the catalog snapshot reports 136 valid
+  contracts, 136 domain-specific packages, 136 strict complete package artifact
+  sets, and 2 Intel packages.
+- Removed the empty `_Open_Source_Intelligence` marker file and added a
+  generated `semantic_model.json` from the executable application.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/intel/osint/__init__.py
+  capabilities/intel/osint/capability_contract.py
+  capabilities/intel/osint/models.py
+  capabilities/intel/osint/osint_runtime.py
+  capabilities/intel/osint/service.py
+  capabilities/intel/osint/api.py
+  capabilities/intel/osint/views.py
+  capabilities/intel/osint/app.py
+  capabilities/intel/osint/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/intel/osint/tests/test_package_contract.py` passed with 6 tests.
+- `./.venv/bin/python capabilities/intel/osint/app.py` passed self-test with
+  `passed: true` and `status: ok`.
+- `./.venv/bin/apg capabilities inspect intel_osint --json` passed with 45
+  rules, 11 UI routes, theme `intel_osint_control`, shell `apg_python`, and
+  Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/intel/osint --json` passed with `side_effect_free: true` and 0
+  warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/intel/osint --json` passed with 1 domain-specific capability, 0
+  warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/intel/osint --json` passed with 1 complete lifecycle, 45 rules,
+  11 UI routes, 11 theme tokens, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 136 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 136 operable contracts, 136 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/intel/osint`, `capabilities/intel/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed requirement, source, collection plan, evidence, triage, assessment,
+  dissemination, review, and AI-agent lifecycle paths so rule evaluation
+  happens before state mutation.
+- Tightened OSINT semantics around source-term review, source-plan relationships,
+  high-risk source approval, confidence bounds, release marking, evidence
+  capture, and privileged AI-agent approval.
+- Kept live crawler execution, paid source APIs, social-platform access,
+  search-index queries, GraphRAG projections, storage, source-term verification,
+  release distribution, and durable Bytewax workers behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live crawler execution,
+  paid source APIs, social-platform access, search-index queries, GraphRAG
+  projections, storage adapters, source-term verification, release distribution,
+  durable Bytewax topology, or performance/load checks during this
+  battery-conscious slice.

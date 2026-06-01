@@ -1,0 +1,1741 @@
+{
+  "app": {
+    "description": "Open Source Intelligence package-backed APG capability",
+    "entity_count": 9,
+    "name": "intel_osint",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "intel_osint": {
+      "configuration": {
+        "adapters": {
+          "audit": "audl",
+          "auth": "auth",
+          "crawler": "intel_crawler",
+          "event_stream": "bytewax",
+          "graph": "grph",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "rag": "ragn",
+          "search": "srch"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "source_scout",
+            "collection_planner",
+            "evidence_triage_agent",
+            "assessment_drafter",
+            "watchlist_monitor",
+            "dissemination_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "assessments": {
+          "analyst_required": true,
+          "confidence_score_required": true,
+          "evidence_required": true,
+          "supported_types": [
+            "threat",
+            "opportunity",
+            "entity_profile",
+            "event_summary",
+            "trend",
+            "watchlist"
+          ]
+        },
+        "collection_plans": {
+          "approval_required_for_high_risk": true,
+          "cadence_required": true,
+          "evidence_required": true,
+          "requirement_required": true,
+          "source_required": true,
+          "supported_methods": [
+            "manual_review",
+            "crawler",
+            "api_feed",
+            "rss_feed",
+            "upload",
+            "partner_feed"
+          ]
+        },
+        "dissemination": {
+          "approval_required": true,
+          "audience_required": true,
+          "evidence_required": true,
+          "release_marking_required": true
+        },
+        "evidence": {
+          "confidence_score_required": true,
+          "content_reference_required": true,
+          "evidence_required": true,
+          "fingerprint_required": true
+        },
+        "governance": {
+          "audit_events": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "respect_source_terms": true
+        },
+        "observability": {
+          "event_stream": "apg.intel.osint.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "requirements": {
+          "evidence_required": true,
+          "requester_required": true,
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ],
+          "supported_priorities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "sources": {
+          "evidence_required": true,
+          "owner_required": true,
+          "supported_risk_tiers": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "supported_source_types": [
+            "news",
+            "web",
+            "social",
+            "registry",
+            "document",
+            "forum",
+            "broadcast",
+            "dataset"
+          ],
+          "terms_review_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "intel_osint_control"
+        },
+        "triage": {
+          "analyst_required": true,
+          "evidence_required": true,
+          "supported_decisions": [
+            "relevant",
+            "irrelevant",
+            "duplicate",
+            "needs_review",
+            "escalated"
+          ]
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_assessments": true,
+          "enable_collection_plans": true,
+          "enable_dashboard": true,
+          "enable_dissemination": true,
+          "enable_evidence": true,
+          "enable_requirements": true,
+          "enable_reviews": true,
+          "enable_sources": true,
+          "enable_triage": true
+        }
+      },
+      "name": "Open Source Intelligence",
+      "provides": [
+        "osint_requirement_workflow",
+        "osint_source_workflow",
+        "osint_collection_plan_workflow",
+        "osint_evidence_workflow",
+        "osint_triage_workflow",
+        "osint_assessment_workflow",
+        "osint_dissemination_workflow",
+        "osint_review_workflow",
+        "osint_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "intel_crawler",
+        "srch",
+        "grph",
+        "ragn"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "osint_policy_required",
+              "required_action": "attach_osint_policy"
+            },
+            "name": "osint_write_requires_policy"
+          },
+          {
+            "condition": {
+              "operation": "register_requirement",
+              "topic_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "requirement_topic_required",
+              "required_action": "attach_topic"
+            },
+            "name": "requirement_topic_required"
+          },
+          {
+            "condition": {
+              "operation": "register_requirement",
+              "priority_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "priority_not_supported",
+              "required_action": "select_supported_priority"
+            },
+            "name": "requirement_priority_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_requirement",
+              "requester_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "requester_required",
+              "required_action": "record_requester"
+            },
+            "name": "requirement_requester_required"
+          },
+          {
+            "condition": {
+              "classification_supported": false,
+              "operation": "register_requirement"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "classification_not_supported",
+              "required_action": "select_supported_classification"
+            },
+            "name": "requirement_classification_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "register_requirement"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "requirement_evidence_required",
+              "required_action": "attach_requirement_evidence"
+            },
+            "name": "requirement_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "source_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_type_not_supported",
+              "required_action": "select_supported_source_type"
+            },
+            "name": "source_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "source_reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_reference_required",
+              "required_action": "attach_source_reference"
+            },
+            "name": "source_reference_required"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "owner_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_owner_required",
+              "required_action": "assign_source_owner"
+            },
+            "name": "source_owner_required"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "terms_review_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "terms_review_required",
+              "required_action": "record_terms_review"
+            },
+            "name": "source_terms_review_required"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "risk_tier_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_tier_not_supported",
+              "required_action": "select_supported_risk_tier"
+            },
+            "name": "source_risk_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "register_source"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_evidence_required",
+              "required_action": "attach_source_evidence"
+            },
+            "name": "source_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_collection_plan",
+              "requirement_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "requirement_required",
+              "required_action": "select_requirement"
+            },
+            "name": "plan_requirement_required"
+          },
+          {
+            "condition": {
+              "operation": "record_collection_plan",
+              "source_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "source_required",
+              "required_action": "select_source"
+            },
+            "name": "plan_source_required"
+          },
+          {
+            "condition": {
+              "method_supported": false,
+              "operation": "record_collection_plan"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "collection_method_not_supported",
+              "required_action": "select_supported_collection_method"
+            },
+            "name": "plan_method_supported"
+          },
+          {
+            "condition": {
+              "cadence_present": false,
+              "operation": "record_collection_plan"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "cadence_required",
+              "required_action": "set_cadence"
+            },
+            "name": "plan_cadence_required"
+          },
+          {
+            "condition": {
+              "approval_present": false,
+              "high_risk_source": true,
+              "operation": "record_collection_plan"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "collection_approval_required",
+              "required_action": "attach_approval"
+            },
+            "name": "high_risk_plan_requires_approval"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_collection_plan"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "collection_plan_evidence_required",
+              "required_action": "attach_plan_evidence"
+            },
+            "name": "plan_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_evidence",
+              "plan_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "collection_plan_required",
+              "required_action": "select_collection_plan"
+            },
+            "name": "evidence_plan_required"
+          },
+          {
+            "condition": {
+              "content_present": false,
+              "operation": "record_evidence"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "content_reference_required",
+              "required_action": "attach_content_reference"
+            },
+            "name": "evidence_content_required"
+          },
+          {
+            "condition": {
+              "fingerprint_present": false,
+              "operation": "record_evidence"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "fingerprint_required",
+              "required_action": "attach_fingerprint"
+            },
+            "name": "evidence_fingerprint_required"
+          },
+          {
+            "condition": {
+              "confidence_valid": false,
+              "operation": "record_evidence"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "confidence_score_invalid",
+              "required_action": "set_confidence_0_to_1"
+            },
+            "name": "evidence_confidence_valid"
+          },
+          {
+            "condition": {
+              "evidence_reference_present": false,
+              "operation": "record_evidence"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "evidence_reference_required",
+              "required_action": "attach_evidence_reference"
+            },
+            "name": "evidence_record_evidence_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_triage"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "evidence_required",
+              "required_action": "select_evidence"
+            },
+            "name": "triage_evidence_required"
+          },
+          {
+            "condition": {
+              "decision_supported": false,
+              "operation": "record_triage"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "triage_decision_not_supported",
+              "required_action": "select_supported_decision"
+            },
+            "name": "triage_decision_supported"
+          },
+          {
+            "condition": {
+              "analyst_present": false,
+              "operation": "record_triage"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "analyst_required",
+              "required_action": "assign_analyst"
+            },
+            "name": "triage_analyst_required"
+          },
+          {
+            "condition": {
+              "evidence_reference_present": false,
+              "operation": "record_triage"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "triage_evidence_required",
+              "required_action": "attach_triage_evidence"
+            },
+            "name": "triage_evidence_reference_required"
+          },
+          {
+            "condition": {
+              "operation": "record_assessment",
+              "requirement_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "requirement_required",
+              "required_action": "select_requirement"
+            },
+            "name": "assessment_requirement_required"
+          },
+          {
+            "condition": {
+              "assessment_type_supported": false,
+              "operation": "record_assessment"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "assessment_type_not_supported",
+              "required_action": "select_supported_assessment_type"
+            },
+            "name": "assessment_type_supported"
+          },
+          {
+            "condition": {
+              "confidence_valid": false,
+              "operation": "record_assessment"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "confidence_score_invalid",
+              "required_action": "set_confidence_0_to_1"
+            },
+            "name": "assessment_confidence_valid"
+          },
+          {
+            "condition": {
+              "analyst_present": false,
+              "operation": "record_assessment"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "analyst_required",
+              "required_action": "assign_analyst"
+            },
+            "name": "assessment_analyst_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_assessment"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "assessment_evidence_required",
+              "required_action": "attach_assessment_evidence"
+            },
+            "name": "assessment_evidence_required"
+          },
+          {
+            "condition": {
+              "assessment_present": false,
+              "operation": "record_dissemination"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "assessment_required",
+              "required_action": "select_assessment"
+            },
+            "name": "dissemination_assessment_required"
+          },
+          {
+            "condition": {
+              "audience_present": false,
+              "operation": "record_dissemination"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "audience_required",
+              "required_action": "select_audience"
+            },
+            "name": "dissemination_audience_required"
+          },
+          {
+            "condition": {
+              "operation": "record_dissemination",
+              "release_marking_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "release_marking_required",
+              "required_action": "set_release_marking"
+            },
+            "name": "dissemination_release_marking_required"
+          },
+          {
+            "condition": {
+              "approval_present": false,
+              "operation": "record_dissemination"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "dissemination_approval_required",
+              "required_action": "attach_approval"
+            },
+            "name": "dissemination_approval_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_dissemination"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "dissemination_evidence_required",
+              "required_action": "attach_dissemination_evidence"
+            },
+            "name": "dissemination_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "status_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_status_not_supported",
+              "required_action": "select_supported_status"
+            },
+            "name": "review_status_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "reviewer_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "reviewer_required",
+              "required_action": "assign_reviewer"
+            },
+            "name": "review_reviewer_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_review"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_evidence_required",
+              "required_action": "attach_review_evidence"
+            },
+            "name": "review_evidence_required"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "osint_batch"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_osint_batch_to_bytewax"
+            },
+            "name": "osint_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_osint_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "osint_agent_runtime_not_supported",
+              "required_action": "select_supported_runtime"
+            },
+            "name": "osint_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_osint_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "osint_agent_role_not_supported",
+              "required_action": "select_supported_role"
+            },
+            "name": "osint_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "osint_agent_action",
+              "privileged_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_osint_agent_action_requires_human_approval"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "osint_policy_required",
+            "required_action": "attach_osint_policy"
+          },
+          "name": "osint_write_requires_policy"
+        },
+        {
+          "condition": {
+            "operation": "register_requirement",
+            "topic_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "requirement_topic_required",
+            "required_action": "attach_topic"
+          },
+          "name": "requirement_topic_required"
+        },
+        {
+          "condition": {
+            "operation": "register_requirement",
+            "priority_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "priority_not_supported",
+            "required_action": "select_supported_priority"
+          },
+          "name": "requirement_priority_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_requirement",
+            "requester_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "requester_required",
+            "required_action": "record_requester"
+          },
+          "name": "requirement_requester_required"
+        },
+        {
+          "condition": {
+            "classification_supported": false,
+            "operation": "register_requirement"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "classification_not_supported",
+            "required_action": "select_supported_classification"
+          },
+          "name": "requirement_classification_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "register_requirement"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "requirement_evidence_required",
+            "required_action": "attach_requirement_evidence"
+          },
+          "name": "requirement_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "source_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_type_not_supported",
+            "required_action": "select_supported_source_type"
+          },
+          "name": "source_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "source_reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_reference_required",
+            "required_action": "attach_source_reference"
+          },
+          "name": "source_reference_required"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "owner_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_owner_required",
+            "required_action": "assign_source_owner"
+          },
+          "name": "source_owner_required"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "terms_review_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "terms_review_required",
+            "required_action": "record_terms_review"
+          },
+          "name": "source_terms_review_required"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "risk_tier_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_tier_not_supported",
+            "required_action": "select_supported_risk_tier"
+          },
+          "name": "source_risk_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "register_source"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_evidence_required",
+            "required_action": "attach_source_evidence"
+          },
+          "name": "source_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_collection_plan",
+            "requirement_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "requirement_required",
+            "required_action": "select_requirement"
+          },
+          "name": "plan_requirement_required"
+        },
+        {
+          "condition": {
+            "operation": "record_collection_plan",
+            "source_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "source_required",
+            "required_action": "select_source"
+          },
+          "name": "plan_source_required"
+        },
+        {
+          "condition": {
+            "method_supported": false,
+            "operation": "record_collection_plan"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "collection_method_not_supported",
+            "required_action": "select_supported_collection_method"
+          },
+          "name": "plan_method_supported"
+        },
+        {
+          "condition": {
+            "cadence_present": false,
+            "operation": "record_collection_plan"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "cadence_required",
+            "required_action": "set_cadence"
+          },
+          "name": "plan_cadence_required"
+        },
+        {
+          "condition": {
+            "approval_present": false,
+            "high_risk_source": true,
+            "operation": "record_collection_plan"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "collection_approval_required",
+            "required_action": "attach_approval"
+          },
+          "name": "high_risk_plan_requires_approval"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_collection_plan"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "collection_plan_evidence_required",
+            "required_action": "attach_plan_evidence"
+          },
+          "name": "plan_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_evidence",
+            "plan_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "collection_plan_required",
+            "required_action": "select_collection_plan"
+          },
+          "name": "evidence_plan_required"
+        },
+        {
+          "condition": {
+            "content_present": false,
+            "operation": "record_evidence"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "content_reference_required",
+            "required_action": "attach_content_reference"
+          },
+          "name": "evidence_content_required"
+        },
+        {
+          "condition": {
+            "fingerprint_present": false,
+            "operation": "record_evidence"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "fingerprint_required",
+            "required_action": "attach_fingerprint"
+          },
+          "name": "evidence_fingerprint_required"
+        },
+        {
+          "condition": {
+            "confidence_valid": false,
+            "operation": "record_evidence"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "confidence_score_invalid",
+            "required_action": "set_confidence_0_to_1"
+          },
+          "name": "evidence_confidence_valid"
+        },
+        {
+          "condition": {
+            "evidence_reference_present": false,
+            "operation": "record_evidence"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "evidence_reference_required",
+            "required_action": "attach_evidence_reference"
+          },
+          "name": "evidence_record_evidence_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_triage"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "evidence_required",
+            "required_action": "select_evidence"
+          },
+          "name": "triage_evidence_required"
+        },
+        {
+          "condition": {
+            "decision_supported": false,
+            "operation": "record_triage"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "triage_decision_not_supported",
+            "required_action": "select_supported_decision"
+          },
+          "name": "triage_decision_supported"
+        },
+        {
+          "condition": {
+            "analyst_present": false,
+            "operation": "record_triage"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "analyst_required",
+            "required_action": "assign_analyst"
+          },
+          "name": "triage_analyst_required"
+        },
+        {
+          "condition": {
+            "evidence_reference_present": false,
+            "operation": "record_triage"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "triage_evidence_required",
+            "required_action": "attach_triage_evidence"
+          },
+          "name": "triage_evidence_reference_required"
+        },
+        {
+          "condition": {
+            "operation": "record_assessment",
+            "requirement_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "requirement_required",
+            "required_action": "select_requirement"
+          },
+          "name": "assessment_requirement_required"
+        },
+        {
+          "condition": {
+            "assessment_type_supported": false,
+            "operation": "record_assessment"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "assessment_type_not_supported",
+            "required_action": "select_supported_assessment_type"
+          },
+          "name": "assessment_type_supported"
+        },
+        {
+          "condition": {
+            "confidence_valid": false,
+            "operation": "record_assessment"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "confidence_score_invalid",
+            "required_action": "set_confidence_0_to_1"
+          },
+          "name": "assessment_confidence_valid"
+        },
+        {
+          "condition": {
+            "analyst_present": false,
+            "operation": "record_assessment"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "analyst_required",
+            "required_action": "assign_analyst"
+          },
+          "name": "assessment_analyst_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_assessment"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "assessment_evidence_required",
+            "required_action": "attach_assessment_evidence"
+          },
+          "name": "assessment_evidence_required"
+        },
+        {
+          "condition": {
+            "assessment_present": false,
+            "operation": "record_dissemination"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "assessment_required",
+            "required_action": "select_assessment"
+          },
+          "name": "dissemination_assessment_required"
+        },
+        {
+          "condition": {
+            "audience_present": false,
+            "operation": "record_dissemination"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "audience_required",
+            "required_action": "select_audience"
+          },
+          "name": "dissemination_audience_required"
+        },
+        {
+          "condition": {
+            "operation": "record_dissemination",
+            "release_marking_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "release_marking_required",
+            "required_action": "set_release_marking"
+          },
+          "name": "dissemination_release_marking_required"
+        },
+        {
+          "condition": {
+            "approval_present": false,
+            "operation": "record_dissemination"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "dissemination_approval_required",
+            "required_action": "attach_approval"
+          },
+          "name": "dissemination_approval_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_dissemination"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "dissemination_evidence_required",
+            "required_action": "attach_dissemination_evidence"
+          },
+          "name": "dissemination_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "status_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_status_not_supported",
+            "required_action": "select_supported_status"
+          },
+          "name": "review_status_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "reviewer_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "reviewer_required",
+            "required_action": "assign_reviewer"
+          },
+          "name": "review_reviewer_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_review"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_evidence_required",
+            "required_action": "attach_review_evidence"
+          },
+          "name": "review_evidence_required"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "osint_batch"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_osint_batch_to_bytewax"
+          },
+          "name": "osint_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_osint_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "osint_agent_runtime_not_supported",
+            "required_action": "select_supported_runtime"
+          },
+          "name": "osint_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_osint_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "osint_agent_role_not_supported",
+            "required_action": "select_supported_role"
+          },
+          "name": "osint_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "osint_agent_action",
+            "privileged_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_osint_agent_action_requires_human_approval"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "agents": {
+          "component": "OSINTAgentWorkbench",
+          "permission": "intel_osint:admin",
+          "route": "/intel-osint/agents"
+        },
+        "assessments": {
+          "component": "OSINTAssessmentWorkbench",
+          "permission": "intel_osint:assessments",
+          "route": "/intel-osint/assessments"
+        },
+        "collection_plans": {
+          "component": "OSINTCollectionPlanner",
+          "permission": "intel_osint:collection",
+          "route": "/intel-osint/collection-plans"
+        },
+        "dashboard": {
+          "component": "OSINTDashboard",
+          "permission": "intel_osint:view",
+          "route": "/intel-osint/dashboard"
+        },
+        "dissemination": {
+          "component": "OSINTDisseminationConsole",
+          "permission": "intel_osint:disseminate",
+          "route": "/intel-osint/dissemination"
+        },
+        "evidence": {
+          "component": "OSINTEvidenceLedger",
+          "permission": "intel_osint:evidence",
+          "route": "/intel-osint/evidence"
+        },
+        "requirements": {
+          "component": "OSINTRequirementConsole",
+          "permission": "intel_osint:requirements",
+          "route": "/intel-osint/requirements"
+        },
+        "reviews": {
+          "component": "OSINTReviewConsole",
+          "permission": "intel_osint:reviews",
+          "route": "/intel-osint/reviews"
+        },
+        "settings": {
+          "component": "OSINTSettings",
+          "permission": "intel_osint:admin",
+          "route": "/intel-osint/settings"
+        },
+        "sources": {
+          "component": "OSINTSourceRegistry",
+          "permission": "intel_osint:sources",
+          "route": "/intel-osint/sources"
+        },
+        "triage": {
+          "component": "OSINTTriageWorkbench",
+          "permission": "intel_osint:triage",
+          "route": "/intel-osint/triage"
+        }
+      },
+      "streaming": {
+        "events": [
+          "osint_requirement_registered",
+          "osint_source_registered",
+          "osint_collection_plan_recorded",
+          "osint_evidence_recorded",
+          "osint_triage_recorded",
+          "osint_assessment_recorded",
+          "osint_dissemination_recorded",
+          "osint_review_recorded",
+          "osint_agent_registered"
+        ],
+        "guardrails": [
+          "osint_batch_requires_bytewax",
+          "privileged_osint_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.intel.osint.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "assessments": {
+            "icon": "brain-circuit",
+            "status_indicator": "assessment-chip"
+          },
+          "collection_plans": {
+            "icon": "route",
+            "status_indicator": "method-chip"
+          },
+          "dissemination": {
+            "icon": "send",
+            "status_indicator": "release-chip"
+          },
+          "evidence": {
+            "icon": "fingerprint",
+            "status_indicator": "confidence-chip"
+          },
+          "requirements": {
+            "icon": "clipboard-list",
+            "status_indicator": "priority-chip"
+          },
+          "reviews": {
+            "icon": "clipboard-check",
+            "status_indicator": "review-chip"
+          },
+          "sources": {
+            "icon": "radar",
+            "status_indicator": "source-risk-chip"
+          },
+          "triage": {
+            "icon": "list-checks",
+            "status_indicator": "decision-chip"
+          }
+        },
+        "name": "intel_osint_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#C44536",
+          "color.danger": "#C53030",
+          "color.primary": "#28536B",
+          "color.success": "#2F855A",
+          "color.warning": "#B7791F",
+          "density": "compact",
+          "surface.canvas": "#F7F8FA",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#172033",
+          "text.secondary": "#52606D"
+        }
+      },
+      "ui": {
+        "api_prefix": "/intel-osint/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "OSINTDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/intel-osint/dashboard",
+            "permission": "intel_osint:view"
+          },
+          {
+            "component": "OSINTRequirementConsole",
+            "name": "requirements",
+            "nav_group": "Planning",
+            "path": "/intel-osint/requirements",
+            "permission": "intel_osint:requirements"
+          },
+          {
+            "component": "OSINTSourceRegistry",
+            "name": "sources",
+            "nav_group": "Collection",
+            "path": "/intel-osint/sources",
+            "permission": "intel_osint:sources"
+          },
+          {
+            "component": "OSINTCollectionPlanner",
+            "name": "collection_plans",
+            "nav_group": "Collection",
+            "path": "/intel-osint/collection-plans",
+            "permission": "intel_osint:collection"
+          },
+          {
+            "component": "OSINTEvidenceLedger",
+            "name": "evidence",
+            "nav_group": "Processing",
+            "path": "/intel-osint/evidence",
+            "permission": "intel_osint:evidence"
+          },
+          {
+            "component": "OSINTTriageWorkbench",
+            "name": "triage",
+            "nav_group": "Processing",
+            "path": "/intel-osint/triage",
+            "permission": "intel_osint:triage"
+          },
+          {
+            "component": "OSINTAssessmentWorkbench",
+            "name": "assessments",
+            "nav_group": "Analysis",
+            "path": "/intel-osint/assessments",
+            "permission": "intel_osint:assessments"
+          },
+          {
+            "component": "OSINTDisseminationConsole",
+            "name": "dissemination",
+            "nav_group": "Delivery",
+            "path": "/intel-osint/dissemination",
+            "permission": "intel_osint:disseminate"
+          },
+          {
+            "component": "OSINTReviewConsole",
+            "name": "reviews",
+            "nav_group": "Governance",
+            "path": "/intel-osint/reviews",
+            "permission": "intel_osint:reviews"
+          },
+          {
+            "component": "OSINTAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/intel-osint/agents",
+            "permission": "intel_osint:admin"
+          },
+          {
+            "component": "OSINTSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/intel-osint/settings",
+            "permission": "intel_osint:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "osint_operations": {
+        "roles": [
+          "source_scout",
+          "collection_planner",
+          "evidence_triage_agent",
+          "assessment_drafter",
+          "watchlist_monitor",
+          "dissemination_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "intel_osint": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "intel_crawler",
+        "srch",
+        "grph",
+        "ragn"
+      ]
+    }
+  },
+  "contracts": {
+    "intel_osint": {
+      "configuration": {
+        "adapters": {
+          "audit": "audl",
+          "auth": "auth",
+          "crawler": "intel_crawler",
+          "event_stream": "bytewax",
+          "graph": "grph",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "rag": "ragn",
+          "search": "srch"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "source_scout",
+            "collection_planner",
+            "evidence_triage_agent",
+            "assessment_drafter",
+            "watchlist_monitor",
+            "dissemination_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "assessments": {
+          "analyst_required": true,
+          "confidence_score_required": true,
+          "evidence_required": true,
+          "supported_types": [
+            "threat",
+            "opportunity",
+            "entity_profile",
+            "event_summary",
+            "trend",
+            "watchlist"
+          ]
+        },
+        "collection_plans": {
+          "approval_required_for_high_risk": true,
+          "cadence_required": true,
+          "evidence_required": true,
+          "requirement_required": true,
+          "source_required": true,
+          "supported_methods": [
+            "manual_review",
+            "crawler",
+            "api_feed",
+            "rss_feed",
+            "upload",
+            "partner_feed"
+          ]
+        },
+        "dissemination": {
+          "approval_required": true,
+          "audience_required": true,
+          "evidence_required": true,
+          "release_marking_required": true
+        },
+        "evidence": {
+          "confidence_score_required": true,
+          "content_reference_required": true,
+          "evidence_required": true,
+          "fingerprint_required": true
+        },
+        "governance": {
+          "audit_events": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "respect_source_terms": true
+        },
+        "observability": {
+          "event_stream": "apg.intel.osint.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "requirements": {
+          "evidence_required": true,
+          "requester_required": true,
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ],
+          "supported_priorities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "sources": {
+          "evidence_required": true,
+          "owner_required": true,
+          "supported_risk_tiers": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "supported_source_types": [
+            "news",
+            "web",
+            "social",
+            "registry",
+            "document",
+            "forum",
+            "broadcast",
+            "dataset"
+          ],
+          "terms_review_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "intel_osint_control"
+        },
+        "triage": {
+          "analyst_required": true,
+          "evidence_required": true,
+          "supported_decisions": [
+            "relevant",
+            "irrelevant",
+            "duplicate",
+            "needs_review",
+            "escalated"
+          ]
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_assessments": true,
+          "enable_collection_plans": true,
+          "enable_dashboard": true,
+          "enable_dissemination": true,
+          "enable_evidence": true,
+          "enable_requirements": true,
+          "enable_reviews": true,
+          "enable_sources": true,
+          "enable_triage": true
+        }
+      },
+      "id": "intel_osint",
+      "provides": [
+        "osint_requirement_workflow",
+        "osint_source_workflow",
+        "osint_collection_plan_workflow",
+        "osint_evidence_workflow",
+        "osint_triage_workflow",
+        "osint_assessment_workflow",
+        "osint_dissemination_workflow",
+        "osint_review_workflow",
+        "osint_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "intel_crawler",
+        "srch",
+        "grph",
+        "ragn"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 8,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "intel_osint": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}
