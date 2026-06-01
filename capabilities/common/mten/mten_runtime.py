@@ -21,6 +21,7 @@ from .models import (
 	TenantAgentRecord,
 	TenantEnvironmentRecord,
 	TenantGovernanceEvent,
+	TenantLifecycleBatchEvidence,
 )
 
 
@@ -33,6 +34,7 @@ class MtenService:
 		self._isolation_incidents: dict[tuple[str, str], IsolationIncidentRecord] = {}
 		self._migrations: dict[tuple[str, str], LiveMigrationRecord] = {}
 		self._agents: dict[tuple[str, str], TenantAgentRecord] = {}
+		self._batches: dict[tuple[str, str], TenantLifecycleBatchEvidence] = {}
 		self._governance_events: dict[tuple[str, str], TenantGovernanceEvent] = {}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -94,6 +96,10 @@ class MtenService:
 			isolation_boundary_encrypted=isolation_boundary_encrypted,
 			capacity_approval_id=approved_capacity.id if approved_capacity else "",
 			metadata=dict(metadata or {}),
+			policy_decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=tuple(self._reasons(result)),
+			governance_evidence=self._governance_evidence(result),
 		)
 		self._tenants[self._tenant_key(tenant_id, target_tenant_id)] = record
 		self._record_governance(
@@ -123,14 +129,34 @@ class MtenService:
 			"requested_operation": "tenant_lifecycle_batch",
 			"event_stream": stream_name if stream_name == "bytewax" else "non_bytewax",
 		})
-		_raise_if_denied(result)
-		return {
-			"tenant_id": tenant_id,
-			"record_count": record_count,
-			"event_stream": "bytewax",
-			"accepted": True,
-			"matched_rules": result["matched_rules"],
-		}
+		batch = TenantLifecycleBatchEvidence(
+			id=uuid7str(),
+			tenant_id=tenant_id,
+			record_count=record_count,
+			event_stream=stream_name,
+			status="denied" if result["decision"] == "deny" else "accepted",
+			policy_decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=tuple(self._reasons(result)),
+			governance_evidence=self._governance_evidence(result),
+		)
+		self._batches[self._tenant_key(tenant_id, batch.id)] = batch
+		self._record_governance(
+			tenant_id=tenant_id,
+			subject_id=batch.id,
+			event_type="tenant_lifecycle_batch_validated",
+			actor="mten",
+			decision=batch.status,
+			reasons=self._reasons(result),
+			metadata={"event_stream": stream_name, "record_count": record_count},
+			policy_result=result,
+		)
+		if result["decision"] == "deny":
+			_raise_if_denied(result)
+		payload = batch.to_dict()
+		payload["accepted"] = True
+		payload["event_stream"] = "bytewax"
+		return payload
 
 	def register_tenant_agent(
 		self,
@@ -172,7 +198,12 @@ class MtenService:
 			purpose=purpose,
 			owner=owner,
 			human_approval_required=human_approval_required,
+			status="pending_review" if result["decision"] == "require_review" else "active",
 			configuration=dict(configuration or {}),
+			policy_decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=tuple(self._reasons(result)),
+			governance_evidence=self._governance_evidence(result, review_recorded=human_approval_required),
 		)
 		self._agents[self._tenant_key(tenant_id, agent_id)] = record
 		self._record_governance(
@@ -187,6 +218,7 @@ class MtenService:
 				"role": role,
 				"human_approval_required": human_approval_required,
 			},
+			policy_result=result,
 		)
 		return record.to_dict()
 
@@ -235,6 +267,7 @@ class MtenService:
 			raise ValueError("capacity_requester_required")
 		if not justification:
 			raise ValueError("capacity_justification_required")
+		review_result = _review_result("capacity_review_required", "review_capacity_approval")
 		record = CapacityApprovalRecord(
 			id=approval_id,
 			tenant_id=tenant_id,
@@ -242,6 +275,10 @@ class MtenService:
 			requested_by=requested_by,
 			projected_compute_units=int(projected_compute_units),
 			justification=justification,
+			policy_decision=review_result["decision"],
+			matched_rules=tuple(review_result["matched_rules"]),
+			review_reasons=tuple(self._reasons(review_result)),
+			governance_evidence=self._governance_evidence(review_result),
 		)
 		self._capacity_approvals[self._tenant_key(tenant_id, approval_id)] = record
 		self._record_governance(
@@ -249,8 +286,10 @@ class MtenService:
 			subject_id=approval_id,
 			event_type="capacity_approval_requested",
 			actor=requested_by,
-			decision="require_review",
+			decision=review_result["decision"],
+			reasons=self._reasons(review_result),
 			metadata={"target_tenant_id": target_tenant_id, "projected_compute_units": projected_compute_units},
+			policy_result=review_result,
 		)
 		return record.to_dict()
 
@@ -278,6 +317,13 @@ class MtenService:
 		})
 		_raise_if_denied(result)
 		decided = replace(record, status=decision, decision=decision, reviewer=reviewer, notes=notes)
+		decided = replace(
+			decided,
+			policy_decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=tuple(self._reasons(result)),
+			governance_evidence=self._governance_evidence(result, review_recorded=True),
+		)
 		self._capacity_approvals[self._tenant_key(tenant_id, approval_id)] = decided
 		self._record_governance(
 			tenant_id=tenant_id,
@@ -287,6 +333,7 @@ class MtenService:
 			decision=decision,
 			reasons=self._reasons(result),
 			metadata={"target_tenant_id": record.target_tenant_id},
+			policy_result=result,
 		)
 		return decided.to_dict()
 
@@ -319,6 +366,10 @@ class MtenService:
 			detected_by=detected_by,
 			breach_summary=breach_summary,
 			severity=severity,
+			policy_decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=tuple(self._reasons(result)),
+			governance_evidence=self._governance_evidence(result),
 		)
 		self._isolation_incidents[self._tenant_key(tenant_id, incident_id)] = incident
 		self._tenants[self._tenant_key(tenant_id, target_tenant_id)] = replace(record, status="suspended")
@@ -330,6 +381,7 @@ class MtenService:
 			decision="suspend",
 			reasons=self._reasons(result),
 			metadata={"target_tenant_id": target_tenant_id, "severity": severity},
+			policy_result=result,
 		)
 		return incident.to_dict()
 
@@ -379,6 +431,7 @@ class MtenService:
 			"runbook_attached": bool(runbook),
 		})
 		_raise_if_denied(result)
+		review_result = _review_result("live_migration_review_required", "review_live_migration")
 		migration = LiveMigrationRecord(
 			id=migration_id,
 			tenant_id=tenant_id,
@@ -387,6 +440,10 @@ class MtenService:
 			source_provider=source_provider,
 			target_provider=target_provider,
 			runbook=runbook,
+			policy_decision=review_result["decision"],
+			matched_rules=tuple(review_result["matched_rules"]),
+			review_reasons=tuple(self._reasons(review_result)),
+			governance_evidence=self._governance_evidence(review_result),
 		)
 		self._migrations[self._tenant_key(tenant_id, migration_id)] = migration
 		self._record_governance(
@@ -394,9 +451,10 @@ class MtenService:
 			subject_id=migration_id,
 			event_type="live_migration_requested",
 			actor=requested_by,
-			decision="require_review",
-			reasons=self._reasons(result),
+			decision=review_result["decision"],
+			reasons=self._reasons(review_result),
 			metadata={"target_tenant_id": target_tenant_id, "target_provider": target_provider},
+			policy_result=review_result,
 		)
 		return migration.to_dict()
 
@@ -424,6 +482,13 @@ class MtenService:
 		})
 		_raise_if_denied(result)
 		decided = replace(migration, status=decision, decision=decision, reviewer=reviewer, notes=notes)
+		decided = replace(
+			decided,
+			policy_decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=tuple(self._reasons(result)),
+			governance_evidence=self._governance_evidence(result, review_recorded=True),
+		)
 		self._migrations[self._tenant_key(tenant_id, migration_id)] = decided
 		self._record_governance(
 			tenant_id=tenant_id,
@@ -433,6 +498,7 @@ class MtenService:
 			decision=decision,
 			reasons=self._reasons(result),
 			metadata={"target_tenant_id": migration.target_tenant_id},
+			policy_result=result,
 		)
 		return decided.to_dict()
 
@@ -469,8 +535,24 @@ class MtenService:
 	def list_tenant_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._agents.values(), tenant_id)
 
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._batches.values(), tenant_id)
+
 	def list_governance_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._governance_events.values(), tenant_id)
+
+	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		items = (
+			self.list_capacity_approvals(tenant_id)
+			+ self.list_live_migrations(tenant_id)
+			+ self.list_tenant_agents(tenant_id)
+			+ self.list_lifecycle_batches(tenant_id)
+		)
+		return [
+			item
+			for item in items
+			if item.get("status") in {"pending", "pending_review", "review_required"}
+		]
 
 	def portfolio_summary(self, tenant_id: str | None = None) -> dict[str, int]:
 		tenants = self.list_tenants(tenant_id)
@@ -478,6 +560,7 @@ class MtenService:
 		incidents = self.list_isolation_incidents(tenant_id)
 		migrations = self.list_live_migrations(tenant_id)
 		agents = self.list_tenant_agents(tenant_id)
+		batches = self.list_lifecycle_batches(tenant_id)
 		events = self.list_governance_events(tenant_id)
 		return {
 			"tenant_count": len(tenants),
@@ -487,6 +570,10 @@ class MtenService:
 			"isolation_incident_count": len(incidents),
 			"live_migration_count": len(migrations),
 			"agent_count": len(agents),
+			"batch_count": len(batches),
+			"denied_batch_count": len([item for item in batches if item["status"] == "denied"]),
+			"pending_agent_review_count": len([item for item in agents if item["status"] == "pending_review"]),
+			"pending_review_count": len(self.list_pending_reviews(tenant_id)),
 			"governance_event_count": len(events),
 		}
 
@@ -549,7 +636,9 @@ class MtenService:
 		decision: str = "allow",
 		reasons: list[str] | tuple[str, ...] | None = None,
 		metadata: dict[str, Any] | None = None,
+		policy_result: dict[str, Any] | None = None,
 	) -> None:
+		policy_result = policy_result or _allow_result()
 		event_id = uuid7str()
 		event = TenantGovernanceEvent(
 			id=event_id,
@@ -560,6 +649,10 @@ class MtenService:
 			decision=decision,
 			reasons=tuple(reasons or ()),
 			metadata=dict(metadata or {}),
+			policy_decision=policy_result["decision"],
+			matched_rules=tuple(policy_result["matched_rules"]),
+			review_reasons=tuple(self._reasons(policy_result)),
+			governance_evidence=self._governance_evidence(policy_result),
 		)
 		self._governance_events[self._tenant_key(tenant_id, event_id)] = event
 
@@ -569,6 +662,17 @@ class MtenService:
 			for action in result.get("actions", [])
 			if action.get("reason")
 		]
+
+	def _governance_evidence(self, result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+		return {
+			"required_actions": [
+				str(action.get("required_action"))
+				for action in result.get("actions", [])
+				if action.get("required_action")
+			],
+			"reasons": self._reasons(result),
+			"review_recorded": bool(review_recorded),
+		}
 
 	def _list(self, values: Any, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return [
@@ -586,3 +690,15 @@ def _raise_if_denied(result: dict[str, Any]) -> None:
 			if action.get("reason")
 		]
 		raise PermissionError(reasons[0] if reasons else "tenant_operation_denied")
+
+
+def _allow_result() -> dict[str, Any]:
+	return {"decision": "allow", "matched_rules": [], "actions": []}
+
+
+def _review_result(reason: str, required_action: str) -> dict[str, Any]:
+	return {
+		"decision": "require_review",
+		"matched_rules": [],
+		"actions": [{"reason": reason, "required_action": required_action}],
+	}

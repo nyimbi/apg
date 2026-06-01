@@ -90,6 +90,10 @@ class TenantEnvironmentRecord:
 	capacity_approval_id: str = ""
 	status: str = "provisioning"
 	metadata: Dict[str, Any] = field(default_factory=dict)
+	policy_decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
+	governance_evidence: Dict[str, Any] = field(default_factory=dict)
 
 	def to_dict(self) -> Dict[str, Any]:
 		return {
@@ -106,6 +110,10 @@ class TenantEnvironmentRecord:
 			"capacity_approval_id": self.capacity_approval_id,
 			"status": self.status,
 			"metadata": dict(self.metadata),
+			"policy_decision": self.policy_decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"governance_evidence": dict(self.governance_evidence),
 		}
 
 
@@ -123,6 +131,10 @@ class CapacityApprovalRecord:
 	decision: str = ""
 	reviewer: str = ""
 	notes: str = ""
+	policy_decision: str = "require_review"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ("capacity_review_required",)
+	governance_evidence: Dict[str, Any] = field(default_factory=dict)
 
 	def to_dict(self) -> Dict[str, Any]:
 		return {
@@ -136,6 +148,10 @@ class CapacityApprovalRecord:
 			"decision": self.decision,
 			"reviewer": self.reviewer,
 			"notes": self.notes,
+			"policy_decision": self.policy_decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"governance_evidence": dict(self.governance_evidence),
 		}
 
 
@@ -151,6 +167,10 @@ class IsolationIncidentRecord:
 	severity: str = "high"
 	status: str = "open"
 	suspended: bool = True
+	policy_decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
+	governance_evidence: Dict[str, Any] = field(default_factory=dict)
 
 	def to_dict(self) -> Dict[str, Any]:
 		return {
@@ -162,6 +182,10 @@ class IsolationIncidentRecord:
 			"severity": self.severity,
 			"status": self.status,
 			"suspended": self.suspended,
+			"policy_decision": self.policy_decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"governance_evidence": dict(self.governance_evidence),
 		}
 
 
@@ -180,6 +204,10 @@ class LiveMigrationRecord:
 	decision: str = ""
 	reviewer: str = ""
 	notes: str = ""
+	policy_decision: str = "require_review"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ("live_migration_review_required",)
+	governance_evidence: Dict[str, Any] = field(default_factory=dict)
 
 	def to_dict(self) -> Dict[str, Any]:
 		return {
@@ -194,6 +222,10 @@ class LiveMigrationRecord:
 			"decision": self.decision,
 			"reviewer": self.reviewer,
 			"notes": self.notes,
+			"policy_decision": self.policy_decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"governance_evidence": dict(self.governance_evidence),
 		}
 
 
@@ -209,6 +241,10 @@ class TenantGovernanceEvent:
 	decision: str = "allow"
 	reasons: tuple[str, ...] = ()
 	metadata: Dict[str, Any] = field(default_factory=dict)
+	policy_decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
+	governance_evidence: Dict[str, Any] = field(default_factory=dict)
 
 	def to_dict(self) -> Dict[str, Any]:
 		return {
@@ -220,6 +256,10 @@ class TenantGovernanceEvent:
 			"decision": self.decision,
 			"reasons": list(self.reasons),
 			"metadata": dict(self.metadata),
+			"policy_decision": self.policy_decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"governance_evidence": dict(self.governance_evidence),
 		}
 
 
@@ -237,6 +277,10 @@ class TenantAgentRecord:
 	human_approval_required: bool = True
 	status: str = "active"
 	configuration: Dict[str, Any] = field(default_factory=dict)
+	policy_decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
+	governance_evidence: Dict[str, Any] = field(default_factory=dict)
 
 	def to_dict(self) -> Dict[str, Any]:
 		return {
@@ -250,6 +294,40 @@ class TenantAgentRecord:
 			"human_approval_required": self.human_approval_required,
 			"status": self.status,
 			"configuration": dict(self.configuration),
+			"policy_decision": self.policy_decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"governance_evidence": dict(self.governance_evidence),
+		}
+
+
+@dataclass(frozen=True)
+class TenantLifecycleBatchEvidence:
+	"""Bytewax tenant lifecycle batch routing evidence."""
+
+	id: str
+	tenant_id: str
+	record_count: int
+	event_stream: str
+	status: str = "accepted"
+	processor: str = "bytewax"
+	policy_decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
+	governance_evidence: Dict[str, Any] = field(default_factory=dict)
+
+	def to_dict(self) -> Dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"record_count": self.record_count,
+			"event_stream": self.event_stream,
+			"status": self.status,
+			"processor": self.processor,
+			"policy_decision": self.policy_decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
+			"governance_evidence": dict(self.governance_evidence),
 		}
 
 

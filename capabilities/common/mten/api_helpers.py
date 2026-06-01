@@ -161,6 +161,14 @@ def list_tenant_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_tenant_agents(tenant_id)
 
 
+def list_lifecycle_batches(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_lifecycle_batches(tenant_id)
+
+
+def list_pending_reviews(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_pending_reviews(tenant_id)
+
+
 def list_governance_events(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_governance_events(tenant_id)
 

@@ -398,14 +398,14 @@ def default_rules() -> list[CapabilityRule]:
 		),
 		CapabilityRule(
 			name="tenant_agent_privileged_action_requires_approval",
-			description="Privileged tenant-agent roles require human approval.",
+			description="Privileged tenant-agent roles require human approval evidence or review.",
 			condition={
 				"requested_operation": "register_tenant_agent",
 				"privileged_action": True,
 				"human_approval_required": False
 			},
 			effect={
-				"decision": "deny",
+				"decision": "require_review",
 				"reason": "tenant_agent_human_approval_required",
 				"required_action": "enable_human_approval_for_privileged_tenant_agent"
 			}
@@ -484,6 +484,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "mten",
 		"display_name": "Multi-Tenant Management",
+		"provides": ["mten_operations", "tenant_agents", "review_evidence"],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
 		"rule_engine": {
@@ -497,7 +498,13 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"components": theme.components
 		},
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest()
+		"streaming": streaming_manifest(),
+		"review_evidence": {
+			"durable_statuses": ["pending", "pending_review", "denied", "approved", "rejected", "accepted"],
+			"policy_fields": ["policy_decision", "matched_rules", "review_reasons", "governance_evidence"],
+			"pending_queues": ["capacity_approvals", "live_migrations", "tenant_agents", "tenant_lifecycle_batches"],
+			"deny_behavior": "Denied tenant lifecycle batches and unsafe decisions persist governance evidence before PermissionError",
+		},
 	}
 
 

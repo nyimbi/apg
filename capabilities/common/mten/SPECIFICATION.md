@@ -134,6 +134,27 @@ Required evidence:
 - `human_approval_required`
 - `status`
 - `configuration`
+- `policy_decision`
+- `matched_rules`
+- `review_reasons`
+- `governance_evidence`
+
+### Tenant Lifecycle Batch Evidence
+
+Bytewax routing proof for tenant lifecycle batches.
+
+Required evidence:
+
+- `id`
+- `tenant_id`
+- `record_count`
+- `event_stream`
+- `status`
+- `processor`
+- `policy_decision`
+- `matched_rules`
+- `review_reasons`
+- `governance_evidence`
 
 ## Lifecycle Requirements
 
@@ -185,6 +206,8 @@ Required evidence:
   `capacity_reviewer`, `migration_reviewer`, `resource_optimizer`,
   `compliance_reviewer`, and `tenant_support`.
 - Privileged roles require `human_approval_required`.
+- Privileged roles without human approval are preserved as `pending_review`
+  tenant agents with policy evidence.
 - Tenant agent registration emits governance evidence.
 
 ### Lifecycle Streaming
@@ -194,6 +217,21 @@ Required evidence:
 - The stream topics are `mten.tenants`, `mten.governance`, and `mten.agents`.
 - Local package proof validates routing and metadata without starting a live
   Bytewax worker.
+- Denied non-Bytewax batch validations preserve durable batch and governance
+  evidence before raising `PermissionError`.
+
+### Durable Review Evidence
+
+MTEN records policy decisions, matched rules, review reasons, and governance
+evidence on tenant environments, capacity approvals, isolation incidents, live
+migrations, tenant agents, lifecycle batches, and governance events.
+
+Pending review queues must be composable for:
+
+- capacity approvals;
+- live migrations;
+- tenant agents;
+- tenant lifecycle batches.
 
 ## Rules
 

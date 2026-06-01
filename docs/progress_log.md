@@ -16,6 +16,63 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-06-01 06:54 EAT
+
+MTEN durable review-evidence packet:
+
+- Extended tenant environments, capacity approvals, isolation incidents, live
+  migrations, tenant agents, tenant lifecycle batch evidence, and governance
+  events with durable policy evidence: policy decision, matched rules, review
+  reasons, and governance evidence.
+- Added contract-level `review_evidence` metadata and exposed it through
+  registration, semantic model, package tests, API helpers, and view models.
+- Preserved privileged tenant agents without human approval as
+  `pending_review` records instead of discarding registration evidence.
+- Preserved denied non-Bytewax tenant lifecycle batch validations as `denied`
+  evidence before raising `PermissionError`.
+- Added pending-review queue composition for capacity approvals, live
+  migrations, tenant agents, and tenant lifecycle batches.
+- Kept tenant agents provider-neutral for Codex, Claude Code, OpenCode, Pi,
+  and future tenant-control runtimes while retaining human approval controls
+  for privileged roles.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for MTEN models, contract,
+  runtime, API helpers, view models, app, and focused tests passed.
+- `./.venv/bin/pytest -q capabilities/common/mten/tests/test_capability_contract.py
+  capabilities/common/mten/tests/test_package_contract.py` passed with 9 tests
+  and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.mten import app; ..."`
+  passed package self-test.
+- `./.venv/bin/python -m json.tool
+  capabilities/common/mten/semantic_model.json` passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/mten --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/mten --strict --json` passed with no warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/mten --json`
+  passed with no warnings and side-effect-free publish planning.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/common/mten --json` passed with complete lifecycle evidence and
+  14 rules.
+- MTEN stale-marker scan returned no TODO/FIXME/stub/placeholder, Kafka,
+  materialized-baseline, contract-only, or not-implemented markers across the
+  edited MTEN packet.
+- Service smoke executed capacity approval review evidence, live migration
+  review evidence, privileged tenant-agent review evidence, and denied
+  non-Bytewax lifecycle batch persistence, printing `require_review require_review
+  pending_review denied bytewax_tenant_stream_required 3`.
+
+Known gaps:
+
+- Full repository tests, rendered tenant-control UI, live cloud provisioning,
+  live DNS validation, live service mesh/IAM mutation, live Bytewax workers,
+  billing adapters, production persistence and migrations, AI optimization
+  execution, and load checks still need later verification outside this
+  battery-conscious slice.
+
 ### 2026-06-01 06:36 EAT
 
 AUDL review-evidence lifecycle packet:

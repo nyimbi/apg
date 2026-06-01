@@ -191,9 +191,34 @@
       "master_data": {},
       "name": "Multi-Tenant Management",
       "provides": [
-        "mten_operations"
+        "mten_operations",
+        "tenant_agents",
+        "review_evidence"
       ],
       "requires": [],
+      "review_evidence": {
+        "deny_behavior": "Denied tenant lifecycle batches and unsafe decisions persist governance evidence before PermissionError",
+        "durable_statuses": [
+          "pending",
+          "pending_review",
+          "denied",
+          "approved",
+          "rejected",
+          "accepted"
+        ],
+        "pending_queues": [
+          "capacity_approvals",
+          "live_migrations",
+          "tenant_agents",
+          "tenant_lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "governance_evidence"
+        ]
+      },
       "rule_engine": {
         "rules": [
           {
@@ -369,9 +394,9 @@
               "privileged_action": true,
               "requested_operation": "register_tenant_agent"
             },
-            "description": "Privileged tenant-agent roles require human approval.",
+            "description": "Privileged tenant-agent roles require human approval evidence or review.",
             "effect": {
-              "decision": "deny",
+              "decision": "require_review",
               "reason": "tenant_agent_human_approval_required",
               "required_action": "enable_human_approval_for_privileged_tenant_agent"
             },
@@ -554,9 +579,9 @@
             "privileged_action": true,
             "requested_operation": "register_tenant_agent"
           },
-          "description": "Privileged tenant-agent roles require human approval.",
+          "description": "Privileged tenant-agent roles require human approval evidence or review.",
           "effect": {
-            "decision": "deny",
+            "decision": "require_review",
             "reason": "tenant_agent_human_approval_required",
             "required_action": "enable_human_approval_for_privileged_tenant_agent"
           },
@@ -942,9 +967,34 @@
       },
       "id": "mten",
       "provides": [
-        "mten_operations"
+        "mten_operations",
+        "tenant_agents",
+        "review_evidence"
       ],
-      "requires": []
+      "requires": [],
+      "review_evidence": {
+        "deny_behavior": "Denied tenant lifecycle batches and unsafe decisions persist governance evidence before PermissionError",
+        "durable_statuses": [
+          "pending",
+          "pending_review",
+          "denied",
+          "approved",
+          "rejected",
+          "accepted"
+        ],
+        "pending_queues": [
+          "capacity_approvals",
+          "live_migrations",
+          "tenant_agents",
+          "tenant_lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "governance_evidence"
+        ]
+      }
     }
   },
   "deployment": {
@@ -1112,9 +1162,9 @@
         "privileged_action": true,
         "requested_operation": "register_tenant_agent"
       },
-      "description": "Privileged tenant-agent roles require human approval.",
+      "description": "Privileged tenant-agent roles require human approval evidence or review.",
       "effect": {
-        "decision": "deny",
+        "decision": "require_review",
         "reason": "tenant_agent_human_approval_required",
         "required_action": "enable_human_approval_for_privileged_tenant_agent"
       },

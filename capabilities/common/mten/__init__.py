@@ -182,6 +182,7 @@ def register_capability() -> dict:
 		'theme': contract['theme'],
 		'agents': contract['agents'],
 		'streaming': contract['streaming'],
+		'review_evidence': contract['review_evidence'],
 		'permissions': [
 			'mten:view',
 			'mten:create',

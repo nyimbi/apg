@@ -13,4 +13,6 @@ Current executable slice:
   `opencode`, and `pi` runtimes;
 - privileged tenant-agent approval guardrails;
 - Bytewax lifecycle-stream metadata and batch-routing guardrails;
+- durable review evidence for capacity approvals, live migrations, privileged
+  tenant agents, denied lifecycle batches, and governance events;
 - dependency-light API helpers and view models for generated APG applications.

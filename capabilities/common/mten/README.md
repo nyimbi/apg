@@ -24,6 +24,8 @@ It currently provides:
   `opencode`, and `pi`;
 - role and approval guardrails for tenant agents;
 - Bytewax lifecycle-stream metadata and batch validation guardrails;
+- durable review evidence for capacity approvals, live migrations, privileged
+  tenant agents, denied lifecycle batches, and governance events;
 - UI/view-model surfaces for tenant portfolio, provisioning, capacity,
   isolation, migration, agents, governance, analytics, optimization, and
   settings.
@@ -64,6 +66,21 @@ tenant = service.register_tenant(
 
 Use `service.describe("platform")` to inspect configuration, rules, UI routes,
 theme tokens, tenant-agent metadata, and Bytewax stream metadata.
+
+### Review Evidence
+
+MTEN records `policy_decision`, `matched_rules`, `review_reasons`, and
+`governance_evidence` on executable tenant-control records. Generated
+applications can compose review queues through:
+
+```python
+service.list_pending_reviews("platform")
+service.list_lifecycle_batches("platform")
+```
+
+Privileged tenant agents without human approval are retained as
+`pending_review` records. Denied non-Bytewax lifecycle batches are retained as
+`denied` evidence before `PermissionError` is raised.
 
 ## Features
 

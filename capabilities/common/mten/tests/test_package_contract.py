@@ -33,6 +33,13 @@ def test_package_contract_shape_is_valid():
 	assert contract["theme"]["tokens"]["border.radius"]
 	assert contract["agents"]["first_class"] is True
 	assert contract["streaming"]["engine"] == "bytewax"
+	assert "review_evidence" in contract["provides"]
+	assert contract["review_evidence"]["policy_fields"] == [
+		"policy_decision",
+		"matched_rules",
+		"review_reasons",
+		"governance_evidence",
+	]
 
 
 def test_package_app_entrypoint_is_publishable():
@@ -50,3 +57,12 @@ def test_package_app_entrypoint_is_publishable():
 	assert "capacity" in model["capabilities"]["mten"]["approvals"]
 	assert model["agents"]["mten_agent_contract"]["first_class"] is True
 	assert model["capabilities"]["mten"]["streaming"]["engine"] == "bytewax"
+	assert "review_evidence" in model["capabilities"]["mten"]["provides"]
+	assert model["capabilities"]["mten"]["review_evidence"]["durable_statuses"] == [
+		"pending",
+		"pending_review",
+		"denied",
+		"approved",
+		"rejected",
+		"accepted",
+	]

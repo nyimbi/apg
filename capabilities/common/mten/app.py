@@ -25,6 +25,8 @@ except ImportError:  # pragma: no cover - standalone package loading path
 def semantic_model() -> dict[str, Any]:
 	"""Return the package semantic model from the current capability contract."""
 	contract = get_capability_contract("default")
+	provides = contract.get("provides", ["mten_operations", "tenant_agents", "review_evidence"])
+	review_evidence = contract["review_evidence"]
 	routes = {
 		route["name"]: {
 			"route": route["path"],
@@ -52,7 +54,7 @@ def semantic_model() -> dict[str, Any]:
 			"mten": {
 				"name": contract["display_name"],
 				"configuration": contract["configuration"],
-				"provides": ["mten_operations"],
+				"provides": provides,
 				"requires": [],
 				"erp_modules": ["common"],
 				"rule_engine": contract["rule_engine"],
@@ -61,6 +63,7 @@ def semantic_model() -> dict[str, Any]:
 				"screens": routes,
 				"theme": contract["theme"],
 				"agents": contract["agents"],
+				"review_evidence": review_evidence,
 				"runtime": {
 					"api": "api.py",
 					"api_helpers": "api_helpers.py",
@@ -85,8 +88,9 @@ def semantic_model() -> dict[str, Any]:
 			"mten": {
 				"id": "mten",
 				"configuration": contract["configuration"],
-				"provides": ["mten_operations"],
+				"provides": provides,
 				"requires": [],
+				"review_evidence": review_evidence,
 			}
 		},
 		"rules": {
@@ -176,6 +180,10 @@ def self_test() -> dict[str, Any]:
 		errors.append("MTEN semantic model agent manifest is stale")
 	if model.get("capabilities", {}).get("mten", {}).get("streaming", {}).get("engine") != "bytewax":
 		errors.append("MTEN semantic model Bytewax stream manifest is stale")
+	if "review_evidence" not in model.get("capabilities", {}).get("mten", {}).get("provides", []):
+		errors.append("MTEN review evidence provide is missing")
+	if "review_evidence" not in model.get("capabilities", {}).get("mten", {}):
+		errors.append("MTEN durable review evidence is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

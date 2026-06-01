@@ -87,6 +87,22 @@ composition and Bytewax lifecycle-stream guardrails.
 5. Run focused compile, pytest, self-test, inspect, implementation-audit,
    publish-plan, service smoke, stale-marker, package-doc, and diff checks.
 
+## Packet 3: Durable Review Evidence
+
+1. Extend executable records with `policy_decision`, `matched_rules`,
+   `review_reasons`, and `governance_evidence`.
+2. Preserve denied tenant lifecycle batch validations as durable Bytewax
+   evidence before raising `PermissionError`.
+3. Preserve privileged tenant agents without human approval as
+   `pending_review` records instead of dropping the registration attempt.
+4. Expose `review_evidence` in the contract, registration metadata, semantic
+   model, API helpers, view models, and package tests.
+5. Add pending-review queues for capacity approvals, live migrations, tenant
+   agents, and lifecycle batches.
+6. Re-run focused MTEN compile, pytest, self-test, semantic JSON, implementation
+   audit, lifecycle audit, publish plan, stale-marker, service-smoke, and diff
+   checks.
+
 ## Non-Goals For This Slice
 
 - Live cloud tenant provisioning.

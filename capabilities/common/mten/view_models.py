@@ -25,6 +25,8 @@ def dashboard_model(service: MtenService | None = None, tenant_id: str = "defaul
 		"isolation_incidents": service.list_isolation_incidents(tenant_id),
 		"live_migrations": service.list_live_migrations(tenant_id),
 		"agents": service.list_tenant_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
 		"governance_events": service.list_governance_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"streaming": contract["streaming"],
@@ -85,6 +87,11 @@ def tenant_agent_model(service: MtenService | None = None, tenant_id: str = "def
 	return {
 		"tenant_id": tenant_id,
 		"agents": service.list_tenant_agents(tenant_id),
+		"pending_reviews": [
+			agent
+			for agent in service.list_tenant_agents(tenant_id)
+			if agent["status"] == "pending_review"
+		],
 		"agent_contract": contract["agents"],
 		"streaming": contract["streaming"],
 		"supported_runtimes": contract["agents"]["supported_runtimes"],
@@ -100,4 +107,5 @@ def governance_model(service: MtenService | None = None, tenant_id: str = "defau
 	return {
 		"tenant_id": tenant_id,
 		"events": service.list_governance_events(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
 	}
