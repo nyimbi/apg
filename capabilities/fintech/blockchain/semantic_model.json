@@ -1,0 +1,1930 @@
+{
+  "app": {
+    "description": "Blockchain Services package-backed APG capability",
+    "entity_count": 9,
+    "name": "fintech_blockchain",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "fintech_blockchain": {
+      "configuration": {
+        "adapters": {
+          "audit": "audl",
+          "auth": "auth",
+          "compliance": "fintech_compliance",
+          "event_stream": "bytewax",
+          "keys": "keym",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "regtech": "fintech_regtech",
+          "risk": "fintech_risk",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "network_operator",
+            "contract_reviewer",
+            "transaction_reconciler",
+            "oracle_monitor",
+            "custody_policy_agent",
+            "evidence_anchor_agent"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "anchors": {
+          "anchored_at_required": true,
+          "evidence_required": true,
+          "network_required": true,
+          "payload_hash_required": true,
+          "reference_required": true
+        },
+        "contracts": {
+          "approval_required": true,
+          "artifact_required": true,
+          "evidence_required": true,
+          "network_required": true,
+          "owner_required": true,
+          "supported_types": [
+            "token",
+            "multisig",
+            "settlement",
+            "identity",
+            "oracle",
+            "bridge",
+            "escrow"
+          ]
+        },
+        "governance": {
+          "audit_events": true,
+          "high_value_transaction_requires_approval": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "networks": {
+          "chain_id_required": true,
+          "evidence_required": true,
+          "owner_required": true,
+          "rpc_reference_required": true,
+          "supported_environments": [
+            "mainnet",
+            "testnet",
+            "sandbox",
+            "consortium",
+            "private"
+          ],
+          "supported_types": [
+            "ethereum",
+            "polygon",
+            "solana",
+            "bitcoin",
+            "hyperledger_fabric",
+            "private_evm"
+          ]
+        },
+        "nodes": {
+          "block_height_non_negative": true,
+          "endpoint_required": true,
+          "evidence_required": true,
+          "network_required": true,
+          "supported_statuses": [
+            "healthy",
+            "degraded",
+            "offline",
+            "catching_up"
+          ]
+        },
+        "observability": {
+          "event_stream": "apg.fintech.blockchain.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "oracles": {
+          "evidence_required": true,
+          "network_required": true,
+          "owner_required": true,
+          "source_required": true,
+          "supported_feed_types": [
+            "price",
+            "identity",
+            "compliance",
+            "fx_rate",
+            "proof_of_reserve",
+            "risk_signal"
+          ]
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_blockchain_control"
+        },
+        "transactions": {
+          "amount_non_negative": true,
+          "asset_reference_required": true,
+          "evidence_required": true,
+          "network_required": true,
+          "signer_required": true,
+          "supported_settlement_statuses": [
+            "pending",
+            "confirmed",
+            "finalized",
+            "failed",
+            "reversed"
+          ],
+          "supported_types": [
+            "transfer",
+            "mint",
+            "burn",
+            "settlement",
+            "contract_call",
+            "anchoring",
+            "bridge"
+          ],
+          "transaction_hash_required": true
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_anchors": true,
+          "enable_contracts": true,
+          "enable_dashboard": true,
+          "enable_networks": true,
+          "enable_nodes": true,
+          "enable_oracles": true,
+          "enable_reviews": true,
+          "enable_transactions": true,
+          "enable_wallets": true
+        },
+        "wallets": {
+          "evidence_required": true,
+          "key_policy_required": true,
+          "network_required": true,
+          "owner_required": true,
+          "supported_custody_models": [
+            "self_custody",
+            "mpc",
+            "hsm",
+            "smart_contract",
+            "custodial"
+          ],
+          "wallet_reference_required": true
+        }
+      },
+      "name": "Blockchain Services",
+      "provides": [
+        "blockchain_network_workflow",
+        "blockchain_wallet_workflow",
+        "smart_contract_workflow",
+        "chain_transaction_workflow",
+        "evidence_anchor_workflow",
+        "oracle_feed_workflow",
+        "node_health_workflow",
+        "blockchain_review_workflow",
+        "blockchain_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_risk",
+        "fintech_compliance",
+        "fintech_regtech",
+        "fintech_wallets"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "blockchain_policy_required",
+              "required_action": "attach_blockchain_policy"
+            },
+            "name": "blockchain_write_requires_policy"
+          },
+          {
+            "condition": {
+              "network_type_supported": false,
+              "operation": "register_network"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "network_type_not_supported",
+              "required_action": "select_supported_network_type"
+            },
+            "name": "network_type_supported"
+          },
+          {
+            "condition": {
+              "environment_supported": false,
+              "operation": "register_network"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "network_environment_not_supported",
+              "required_action": "select_supported_environment"
+            },
+            "name": "network_environment_supported"
+          },
+          {
+            "condition": {
+              "chain_id_present": false,
+              "operation": "register_network"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "chain_id_required",
+              "required_action": "attach_chain_id"
+            },
+            "name": "network_chain_id_required"
+          },
+          {
+            "condition": {
+              "operation": "register_network",
+              "rpc_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "rpc_reference_required",
+              "required_action": "attach_rpc_reference"
+            },
+            "name": "network_rpc_required"
+          },
+          {
+            "condition": {
+              "operation": "register_network",
+              "owner_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "network_owner_required",
+              "required_action": "assign_network_owner"
+            },
+            "name": "network_owner_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "register_network"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "network_evidence_required",
+              "required_action": "attach_network_evidence"
+            },
+            "name": "network_evidence_required"
+          },
+          {
+            "condition": {
+              "network_present": false,
+              "operation": "register_wallet"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "network_required",
+              "required_action": "select_network"
+            },
+            "name": "wallet_network_required"
+          },
+          {
+            "condition": {
+              "operation": "register_wallet",
+              "wallet_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "wallet_reference_required",
+              "required_action": "attach_wallet_reference"
+            },
+            "name": "wallet_reference_required"
+          },
+          {
+            "condition": {
+              "custody_model_supported": false,
+              "operation": "register_wallet"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "custody_model_not_supported",
+              "required_action": "select_supported_custody_model"
+            },
+            "name": "custody_model_supported"
+          },
+          {
+            "condition": {
+              "key_policy_present": false,
+              "operation": "register_wallet"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "key_policy_required",
+              "required_action": "attach_key_policy"
+            },
+            "name": "wallet_key_policy_required"
+          },
+          {
+            "condition": {
+              "operation": "register_wallet",
+              "owner_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "wallet_owner_required",
+              "required_action": "assign_wallet_owner"
+            },
+            "name": "wallet_owner_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "register_wallet"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "wallet_evidence_required",
+              "required_action": "attach_wallet_evidence"
+            },
+            "name": "wallet_evidence_required"
+          },
+          {
+            "condition": {
+              "network_present": false,
+              "operation": "deploy_contract"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "network_required",
+              "required_action": "select_network"
+            },
+            "name": "contract_network_required"
+          },
+          {
+            "condition": {
+              "contract_type_supported": false,
+              "operation": "deploy_contract"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "contract_type_not_supported",
+              "required_action": "select_supported_contract_type"
+            },
+            "name": "contract_type_supported"
+          },
+          {
+            "condition": {
+              "artifact_present": false,
+              "operation": "deploy_contract"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "contract_artifact_required",
+              "required_action": "attach_contract_artifact"
+            },
+            "name": "contract_artifact_required"
+          },
+          {
+            "condition": {
+              "operation": "deploy_contract",
+              "owner_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "contract_owner_required",
+              "required_action": "assign_contract_owner"
+            },
+            "name": "contract_owner_required"
+          },
+          {
+            "condition": {
+              "approval_present": false,
+              "operation": "deploy_contract"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "contract_approval_required",
+              "required_action": "attach_contract_approval"
+            },
+            "name": "contract_approval_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "deploy_contract"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "contract_evidence_required",
+              "required_action": "attach_contract_evidence"
+            },
+            "name": "contract_evidence_required"
+          },
+          {
+            "condition": {
+              "network_present": false,
+              "operation": "record_transaction"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "network_required",
+              "required_action": "select_network"
+            },
+            "name": "transaction_network_required"
+          },
+          {
+            "condition": {
+              "operation": "record_transaction",
+              "transaction_hash_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "transaction_hash_required",
+              "required_action": "attach_transaction_hash"
+            },
+            "name": "transaction_hash_required"
+          },
+          {
+            "condition": {
+              "operation": "record_transaction",
+              "transaction_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "transaction_type_not_supported",
+              "required_action": "select_supported_transaction_type"
+            },
+            "name": "transaction_type_supported"
+          },
+          {
+            "condition": {
+              "asset_present": false,
+              "operation": "record_transaction"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "asset_reference_required",
+              "required_action": "attach_asset_reference"
+            },
+            "name": "transaction_asset_required"
+          },
+          {
+            "condition": {
+              "amount_valid": false,
+              "operation": "record_transaction"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "transaction_amount_invalid",
+              "required_action": "set_non_negative_amount"
+            },
+            "name": "transaction_amount_required"
+          },
+          {
+            "condition": {
+              "operation": "record_transaction",
+              "signer_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "transaction_signer_required",
+              "required_action": "record_signer"
+            },
+            "name": "transaction_signer_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_transaction"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "transaction_evidence_required",
+              "required_action": "attach_transaction_evidence"
+            },
+            "name": "transaction_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_transaction",
+              "settlement_status_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "settlement_status_not_supported",
+              "required_action": "select_supported_status"
+            },
+            "name": "settlement_status_supported"
+          },
+          {
+            "condition": {
+              "approval_present": false,
+              "high_value": true,
+              "operation": "record_transaction"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "transaction_approval_required",
+              "required_action": "attach_transaction_approval"
+            },
+            "name": "high_value_transaction_requires_approval"
+          },
+          {
+            "condition": {
+              "network_present": false,
+              "operation": "anchor_evidence"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "network_required",
+              "required_action": "select_network"
+            },
+            "name": "anchor_network_required"
+          },
+          {
+            "condition": {
+              "operation": "anchor_evidence",
+              "payload_hash_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "payload_hash_required",
+              "required_action": "attach_payload_hash"
+            },
+            "name": "anchor_payload_required"
+          },
+          {
+            "condition": {
+              "operation": "anchor_evidence",
+              "reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "anchor_reference_required",
+              "required_action": "attach_reference"
+            },
+            "name": "anchor_reference_required"
+          },
+          {
+            "condition": {
+              "anchored_at_present": false,
+              "operation": "anchor_evidence"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "anchored_at_required",
+              "required_action": "record_anchor_time"
+            },
+            "name": "anchor_timestamp_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "anchor_evidence"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "anchor_evidence_required",
+              "required_action": "attach_anchor_evidence"
+            },
+            "name": "anchor_evidence_required"
+          },
+          {
+            "condition": {
+              "network_present": false,
+              "operation": "register_oracle_feed"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "network_required",
+              "required_action": "select_network"
+            },
+            "name": "oracle_network_required"
+          },
+          {
+            "condition": {
+              "feed_type_supported": false,
+              "operation": "register_oracle_feed"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "oracle_feed_type_not_supported",
+              "required_action": "select_supported_feed_type"
+            },
+            "name": "oracle_feed_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_oracle_feed",
+              "source_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "oracle_source_required",
+              "required_action": "attach_source"
+            },
+            "name": "oracle_source_required"
+          },
+          {
+            "condition": {
+              "operation": "register_oracle_feed",
+              "owner_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "oracle_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "oracle_owner_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "register_oracle_feed"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "oracle_evidence_required",
+              "required_action": "attach_evidence"
+            },
+            "name": "oracle_evidence_required"
+          },
+          {
+            "condition": {
+              "network_present": false,
+              "operation": "record_node_health"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "network_required",
+              "required_action": "select_network"
+            },
+            "name": "node_network_required"
+          },
+          {
+            "condition": {
+              "endpoint_present": false,
+              "operation": "record_node_health"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "node_endpoint_required",
+              "required_action": "attach_endpoint"
+            },
+            "name": "node_endpoint_required"
+          },
+          {
+            "condition": {
+              "node_status_supported": false,
+              "operation": "record_node_health"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "node_status_not_supported",
+              "required_action": "select_supported_node_status"
+            },
+            "name": "node_status_supported"
+          },
+          {
+            "condition": {
+              "block_height_valid": false,
+              "operation": "record_node_health"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "block_height_invalid",
+              "required_action": "set_non_negative_block_height"
+            },
+            "name": "node_block_height_valid"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_node_health"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "node_evidence_required",
+              "required_action": "attach_node_evidence"
+            },
+            "name": "node_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "status_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_status_not_supported",
+              "required_action": "select_supported_status"
+            },
+            "name": "review_status_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "reviewer_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "reviewer_required",
+              "required_action": "assign_reviewer"
+            },
+            "name": "review_reviewer_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_review"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_evidence_required",
+              "required_action": "attach_review_evidence"
+            },
+            "name": "review_evidence_required"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "blockchain_batch"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_blockchain_batch_to_bytewax"
+            },
+            "name": "blockchain_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_blockchain_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "blockchain_agent_runtime_not_supported",
+              "required_action": "select_supported_runtime"
+            },
+            "name": "blockchain_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_blockchain_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "blockchain_agent_role_not_supported",
+              "required_action": "select_supported_role"
+            },
+            "name": "blockchain_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "blockchain_agent_action",
+              "privileged_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_blockchain_agent_action_requires_human_approval"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "blockchain_policy_required",
+            "required_action": "attach_blockchain_policy"
+          },
+          "name": "blockchain_write_requires_policy"
+        },
+        {
+          "condition": {
+            "network_type_supported": false,
+            "operation": "register_network"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "network_type_not_supported",
+            "required_action": "select_supported_network_type"
+          },
+          "name": "network_type_supported"
+        },
+        {
+          "condition": {
+            "environment_supported": false,
+            "operation": "register_network"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "network_environment_not_supported",
+            "required_action": "select_supported_environment"
+          },
+          "name": "network_environment_supported"
+        },
+        {
+          "condition": {
+            "chain_id_present": false,
+            "operation": "register_network"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "chain_id_required",
+            "required_action": "attach_chain_id"
+          },
+          "name": "network_chain_id_required"
+        },
+        {
+          "condition": {
+            "operation": "register_network",
+            "rpc_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "rpc_reference_required",
+            "required_action": "attach_rpc_reference"
+          },
+          "name": "network_rpc_required"
+        },
+        {
+          "condition": {
+            "operation": "register_network",
+            "owner_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "network_owner_required",
+            "required_action": "assign_network_owner"
+          },
+          "name": "network_owner_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "register_network"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "network_evidence_required",
+            "required_action": "attach_network_evidence"
+          },
+          "name": "network_evidence_required"
+        },
+        {
+          "condition": {
+            "network_present": false,
+            "operation": "register_wallet"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "network_required",
+            "required_action": "select_network"
+          },
+          "name": "wallet_network_required"
+        },
+        {
+          "condition": {
+            "operation": "register_wallet",
+            "wallet_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "wallet_reference_required",
+            "required_action": "attach_wallet_reference"
+          },
+          "name": "wallet_reference_required"
+        },
+        {
+          "condition": {
+            "custody_model_supported": false,
+            "operation": "register_wallet"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "custody_model_not_supported",
+            "required_action": "select_supported_custody_model"
+          },
+          "name": "custody_model_supported"
+        },
+        {
+          "condition": {
+            "key_policy_present": false,
+            "operation": "register_wallet"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "key_policy_required",
+            "required_action": "attach_key_policy"
+          },
+          "name": "wallet_key_policy_required"
+        },
+        {
+          "condition": {
+            "operation": "register_wallet",
+            "owner_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "wallet_owner_required",
+            "required_action": "assign_wallet_owner"
+          },
+          "name": "wallet_owner_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "register_wallet"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "wallet_evidence_required",
+            "required_action": "attach_wallet_evidence"
+          },
+          "name": "wallet_evidence_required"
+        },
+        {
+          "condition": {
+            "network_present": false,
+            "operation": "deploy_contract"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "network_required",
+            "required_action": "select_network"
+          },
+          "name": "contract_network_required"
+        },
+        {
+          "condition": {
+            "contract_type_supported": false,
+            "operation": "deploy_contract"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "contract_type_not_supported",
+            "required_action": "select_supported_contract_type"
+          },
+          "name": "contract_type_supported"
+        },
+        {
+          "condition": {
+            "artifact_present": false,
+            "operation": "deploy_contract"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "contract_artifact_required",
+            "required_action": "attach_contract_artifact"
+          },
+          "name": "contract_artifact_required"
+        },
+        {
+          "condition": {
+            "operation": "deploy_contract",
+            "owner_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "contract_owner_required",
+            "required_action": "assign_contract_owner"
+          },
+          "name": "contract_owner_required"
+        },
+        {
+          "condition": {
+            "approval_present": false,
+            "operation": "deploy_contract"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "contract_approval_required",
+            "required_action": "attach_contract_approval"
+          },
+          "name": "contract_approval_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "deploy_contract"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "contract_evidence_required",
+            "required_action": "attach_contract_evidence"
+          },
+          "name": "contract_evidence_required"
+        },
+        {
+          "condition": {
+            "network_present": false,
+            "operation": "record_transaction"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "network_required",
+            "required_action": "select_network"
+          },
+          "name": "transaction_network_required"
+        },
+        {
+          "condition": {
+            "operation": "record_transaction",
+            "transaction_hash_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "transaction_hash_required",
+            "required_action": "attach_transaction_hash"
+          },
+          "name": "transaction_hash_required"
+        },
+        {
+          "condition": {
+            "operation": "record_transaction",
+            "transaction_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "transaction_type_not_supported",
+            "required_action": "select_supported_transaction_type"
+          },
+          "name": "transaction_type_supported"
+        },
+        {
+          "condition": {
+            "asset_present": false,
+            "operation": "record_transaction"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "asset_reference_required",
+            "required_action": "attach_asset_reference"
+          },
+          "name": "transaction_asset_required"
+        },
+        {
+          "condition": {
+            "amount_valid": false,
+            "operation": "record_transaction"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "transaction_amount_invalid",
+            "required_action": "set_non_negative_amount"
+          },
+          "name": "transaction_amount_required"
+        },
+        {
+          "condition": {
+            "operation": "record_transaction",
+            "signer_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "transaction_signer_required",
+            "required_action": "record_signer"
+          },
+          "name": "transaction_signer_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_transaction"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "transaction_evidence_required",
+            "required_action": "attach_transaction_evidence"
+          },
+          "name": "transaction_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_transaction",
+            "settlement_status_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "settlement_status_not_supported",
+            "required_action": "select_supported_status"
+          },
+          "name": "settlement_status_supported"
+        },
+        {
+          "condition": {
+            "approval_present": false,
+            "high_value": true,
+            "operation": "record_transaction"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "transaction_approval_required",
+            "required_action": "attach_transaction_approval"
+          },
+          "name": "high_value_transaction_requires_approval"
+        },
+        {
+          "condition": {
+            "network_present": false,
+            "operation": "anchor_evidence"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "network_required",
+            "required_action": "select_network"
+          },
+          "name": "anchor_network_required"
+        },
+        {
+          "condition": {
+            "operation": "anchor_evidence",
+            "payload_hash_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "payload_hash_required",
+            "required_action": "attach_payload_hash"
+          },
+          "name": "anchor_payload_required"
+        },
+        {
+          "condition": {
+            "operation": "anchor_evidence",
+            "reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "anchor_reference_required",
+            "required_action": "attach_reference"
+          },
+          "name": "anchor_reference_required"
+        },
+        {
+          "condition": {
+            "anchored_at_present": false,
+            "operation": "anchor_evidence"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "anchored_at_required",
+            "required_action": "record_anchor_time"
+          },
+          "name": "anchor_timestamp_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "anchor_evidence"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "anchor_evidence_required",
+            "required_action": "attach_anchor_evidence"
+          },
+          "name": "anchor_evidence_required"
+        },
+        {
+          "condition": {
+            "network_present": false,
+            "operation": "register_oracle_feed"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "network_required",
+            "required_action": "select_network"
+          },
+          "name": "oracle_network_required"
+        },
+        {
+          "condition": {
+            "feed_type_supported": false,
+            "operation": "register_oracle_feed"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "oracle_feed_type_not_supported",
+            "required_action": "select_supported_feed_type"
+          },
+          "name": "oracle_feed_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_oracle_feed",
+            "source_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "oracle_source_required",
+            "required_action": "attach_source"
+          },
+          "name": "oracle_source_required"
+        },
+        {
+          "condition": {
+            "operation": "register_oracle_feed",
+            "owner_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "oracle_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "oracle_owner_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "register_oracle_feed"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "oracle_evidence_required",
+            "required_action": "attach_evidence"
+          },
+          "name": "oracle_evidence_required"
+        },
+        {
+          "condition": {
+            "network_present": false,
+            "operation": "record_node_health"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "network_required",
+            "required_action": "select_network"
+          },
+          "name": "node_network_required"
+        },
+        {
+          "condition": {
+            "endpoint_present": false,
+            "operation": "record_node_health"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "node_endpoint_required",
+            "required_action": "attach_endpoint"
+          },
+          "name": "node_endpoint_required"
+        },
+        {
+          "condition": {
+            "node_status_supported": false,
+            "operation": "record_node_health"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "node_status_not_supported",
+            "required_action": "select_supported_node_status"
+          },
+          "name": "node_status_supported"
+        },
+        {
+          "condition": {
+            "block_height_valid": false,
+            "operation": "record_node_health"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "block_height_invalid",
+            "required_action": "set_non_negative_block_height"
+          },
+          "name": "node_block_height_valid"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_node_health"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "node_evidence_required",
+            "required_action": "attach_node_evidence"
+          },
+          "name": "node_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "status_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_status_not_supported",
+            "required_action": "select_supported_status"
+          },
+          "name": "review_status_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "reviewer_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "reviewer_required",
+            "required_action": "assign_reviewer"
+          },
+          "name": "review_reviewer_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_review"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_evidence_required",
+            "required_action": "attach_review_evidence"
+          },
+          "name": "review_evidence_required"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "blockchain_batch"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_blockchain_batch_to_bytewax"
+          },
+          "name": "blockchain_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_blockchain_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "blockchain_agent_runtime_not_supported",
+            "required_action": "select_supported_runtime"
+          },
+          "name": "blockchain_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_blockchain_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "blockchain_agent_role_not_supported",
+            "required_action": "select_supported_role"
+          },
+          "name": "blockchain_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "blockchain_agent_action",
+            "privileged_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_blockchain_agent_action_requires_human_approval"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "agents": {
+          "component": "BlockchainAgentWorkbench",
+          "permission": "fintech_blockchain:admin",
+          "route": "/fintech-blockchain/agents"
+        },
+        "anchors": {
+          "component": "EvidenceAnchorConsole",
+          "permission": "fintech_blockchain:anchors",
+          "route": "/fintech-blockchain/anchors"
+        },
+        "contracts": {
+          "component": "ContractDeploymentConsole",
+          "permission": "fintech_blockchain:contracts",
+          "route": "/fintech-blockchain/contracts"
+        },
+        "dashboard": {
+          "component": "BlockchainDashboard",
+          "permission": "fintech_blockchain:view",
+          "route": "/fintech-blockchain/dashboard"
+        },
+        "networks": {
+          "component": "NetworkConsole",
+          "permission": "fintech_blockchain:networks",
+          "route": "/fintech-blockchain/networks"
+        },
+        "nodes": {
+          "component": "NodeHealthConsole",
+          "permission": "fintech_blockchain:nodes",
+          "route": "/fintech-blockchain/nodes"
+        },
+        "oracles": {
+          "component": "OracleFeedMonitor",
+          "permission": "fintech_blockchain:oracles",
+          "route": "/fintech-blockchain/oracles"
+        },
+        "reviews": {
+          "component": "BlockchainReviewConsole",
+          "permission": "fintech_blockchain:reviews",
+          "route": "/fintech-blockchain/reviews"
+        },
+        "settings": {
+          "component": "BlockchainSettings",
+          "permission": "fintech_blockchain:admin",
+          "route": "/fintech-blockchain/settings"
+        },
+        "transactions": {
+          "component": "TransactionLedger",
+          "permission": "fintech_blockchain:transactions",
+          "route": "/fintech-blockchain/transactions"
+        },
+        "wallets": {
+          "component": "WalletRegistry",
+          "permission": "fintech_blockchain:wallets",
+          "route": "/fintech-blockchain/wallets"
+        }
+      },
+      "streaming": {
+        "events": [
+          "blockchain_network_registered",
+          "blockchain_wallet_registered",
+          "smart_contract_deployed",
+          "chain_transaction_recorded",
+          "evidence_anchor_recorded",
+          "oracle_feed_registered",
+          "node_health_recorded",
+          "blockchain_review_recorded",
+          "blockchain_agent_registered"
+        ],
+        "guardrails": [
+          "blockchain_batch_requires_bytewax",
+          "privileged_blockchain_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.fintech.blockchain.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "anchors": {
+            "icon": "fingerprint",
+            "status_indicator": "anchor-chip"
+          },
+          "contracts": {
+            "icon": "file-code-2",
+            "status_indicator": "contract-chip"
+          },
+          "networks": {
+            "icon": "network",
+            "status_indicator": "network-chip"
+          },
+          "nodes": {
+            "icon": "server-cog",
+            "status_indicator": "node-chip"
+          },
+          "oracles": {
+            "icon": "radio-tower",
+            "status_indicator": "oracle-chip"
+          },
+          "reviews": {
+            "icon": "clipboard-check",
+            "status_indicator": "review-chip"
+          },
+          "transactions": {
+            "icon": "blocks",
+            "status_indicator": "transaction-chip"
+          },
+          "wallets": {
+            "icon": "wallet-cards",
+            "status_indicator": "custody-chip"
+          }
+        },
+        "name": "fintech_blockchain_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#2563EB",
+          "color.danger": "#B91C1C",
+          "color.primary": "#0F766E",
+          "color.success": "#15803D",
+          "color.warning": "#A16207",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/fintech-blockchain/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "BlockchainDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/fintech-blockchain/dashboard",
+            "permission": "fintech_blockchain:view"
+          },
+          {
+            "component": "NetworkConsole",
+            "name": "networks",
+            "nav_group": "Networks",
+            "path": "/fintech-blockchain/networks",
+            "permission": "fintech_blockchain:networks"
+          },
+          {
+            "component": "WalletRegistry",
+            "name": "wallets",
+            "nav_group": "Custody",
+            "path": "/fintech-blockchain/wallets",
+            "permission": "fintech_blockchain:wallets"
+          },
+          {
+            "component": "ContractDeploymentConsole",
+            "name": "contracts",
+            "nav_group": "Contracts",
+            "path": "/fintech-blockchain/contracts",
+            "permission": "fintech_blockchain:contracts"
+          },
+          {
+            "component": "TransactionLedger",
+            "name": "transactions",
+            "nav_group": "Ledger",
+            "path": "/fintech-blockchain/transactions",
+            "permission": "fintech_blockchain:transactions"
+          },
+          {
+            "component": "EvidenceAnchorConsole",
+            "name": "anchors",
+            "nav_group": "Evidence",
+            "path": "/fintech-blockchain/anchors",
+            "permission": "fintech_blockchain:anchors"
+          },
+          {
+            "component": "OracleFeedMonitor",
+            "name": "oracles",
+            "nav_group": "Data",
+            "path": "/fintech-blockchain/oracles",
+            "permission": "fintech_blockchain:oracles"
+          },
+          {
+            "component": "NodeHealthConsole",
+            "name": "nodes",
+            "nav_group": "Operations",
+            "path": "/fintech-blockchain/nodes",
+            "permission": "fintech_blockchain:nodes"
+          },
+          {
+            "component": "BlockchainReviewConsole",
+            "name": "reviews",
+            "nav_group": "Governance",
+            "path": "/fintech-blockchain/reviews",
+            "permission": "fintech_blockchain:reviews"
+          },
+          {
+            "component": "BlockchainAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/fintech-blockchain/agents",
+            "permission": "fintech_blockchain:admin"
+          },
+          {
+            "component": "BlockchainSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/fintech-blockchain/settings",
+            "permission": "fintech_blockchain:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "chain_operations": {
+        "roles": [
+          "network_operator",
+          "contract_reviewer",
+          "transaction_reconciler",
+          "oracle_monitor",
+          "custody_policy_agent",
+          "evidence_anchor_agent"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "fintech_blockchain": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_risk",
+        "fintech_compliance",
+        "fintech_regtech",
+        "fintech_wallets"
+      ]
+    }
+  },
+  "contracts": {
+    "fintech_blockchain": {
+      "configuration": {
+        "adapters": {
+          "audit": "audl",
+          "auth": "auth",
+          "compliance": "fintech_compliance",
+          "event_stream": "bytewax",
+          "keys": "keym",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "regtech": "fintech_regtech",
+          "risk": "fintech_risk",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "network_operator",
+            "contract_reviewer",
+            "transaction_reconciler",
+            "oracle_monitor",
+            "custody_policy_agent",
+            "evidence_anchor_agent"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "anchors": {
+          "anchored_at_required": true,
+          "evidence_required": true,
+          "network_required": true,
+          "payload_hash_required": true,
+          "reference_required": true
+        },
+        "contracts": {
+          "approval_required": true,
+          "artifact_required": true,
+          "evidence_required": true,
+          "network_required": true,
+          "owner_required": true,
+          "supported_types": [
+            "token",
+            "multisig",
+            "settlement",
+            "identity",
+            "oracle",
+            "bridge",
+            "escrow"
+          ]
+        },
+        "governance": {
+          "audit_events": true,
+          "high_value_transaction_requires_approval": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "networks": {
+          "chain_id_required": true,
+          "evidence_required": true,
+          "owner_required": true,
+          "rpc_reference_required": true,
+          "supported_environments": [
+            "mainnet",
+            "testnet",
+            "sandbox",
+            "consortium",
+            "private"
+          ],
+          "supported_types": [
+            "ethereum",
+            "polygon",
+            "solana",
+            "bitcoin",
+            "hyperledger_fabric",
+            "private_evm"
+          ]
+        },
+        "nodes": {
+          "block_height_non_negative": true,
+          "endpoint_required": true,
+          "evidence_required": true,
+          "network_required": true,
+          "supported_statuses": [
+            "healthy",
+            "degraded",
+            "offline",
+            "catching_up"
+          ]
+        },
+        "observability": {
+          "event_stream": "apg.fintech.blockchain.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "oracles": {
+          "evidence_required": true,
+          "network_required": true,
+          "owner_required": true,
+          "source_required": true,
+          "supported_feed_types": [
+            "price",
+            "identity",
+            "compliance",
+            "fx_rate",
+            "proof_of_reserve",
+            "risk_signal"
+          ]
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_blockchain_control"
+        },
+        "transactions": {
+          "amount_non_negative": true,
+          "asset_reference_required": true,
+          "evidence_required": true,
+          "network_required": true,
+          "signer_required": true,
+          "supported_settlement_statuses": [
+            "pending",
+            "confirmed",
+            "finalized",
+            "failed",
+            "reversed"
+          ],
+          "supported_types": [
+            "transfer",
+            "mint",
+            "burn",
+            "settlement",
+            "contract_call",
+            "anchoring",
+            "bridge"
+          ],
+          "transaction_hash_required": true
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_anchors": true,
+          "enable_contracts": true,
+          "enable_dashboard": true,
+          "enable_networks": true,
+          "enable_nodes": true,
+          "enable_oracles": true,
+          "enable_reviews": true,
+          "enable_transactions": true,
+          "enable_wallets": true
+        },
+        "wallets": {
+          "evidence_required": true,
+          "key_policy_required": true,
+          "network_required": true,
+          "owner_required": true,
+          "supported_custody_models": [
+            "self_custody",
+            "mpc",
+            "hsm",
+            "smart_contract",
+            "custodial"
+          ],
+          "wallet_reference_required": true
+        }
+      },
+      "id": "fintech_blockchain",
+      "provides": [
+        "blockchain_network_workflow",
+        "blockchain_wallet_workflow",
+        "smart_contract_workflow",
+        "chain_transaction_workflow",
+        "evidence_anchor_workflow",
+        "oracle_feed_workflow",
+        "node_health_workflow",
+        "blockchain_review_workflow",
+        "blockchain_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_risk",
+        "fintech_compliance",
+        "fintech_regtech",
+        "fintech_wallets"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 9,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "fintech_blockchain": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}

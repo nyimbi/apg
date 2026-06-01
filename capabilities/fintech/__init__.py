@@ -93,6 +93,7 @@ CAPABILITY_META = {
 		'aml',           # Anti Money Laundering
 		'fraud',         # Fraud Detection
 		'compliance',    # Compliance Automation
+		'blockchain',    # Blockchain Services
 		'tms',           # Treasury Management System (existing)
 		'gateway',       # Payment Gateway (existing)
 		'switch',        # Payment Switch (existing)

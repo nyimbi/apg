@@ -28240,3 +28240,94 @@ Known gaps:
   submission, legal interpretation services, regulator identity federation,
   document signing, external GRC suites, durable Bytewax topology, or
   performance/load checks during this battery-conscious slice.
+
+## 2026-06-01 - FinTech Blockchain Services executable capability
+
+- Promoted `capabilities/fintech/blockchain` from placeholder into a
+  first-class executable APG capability with README, specification, plan,
+  capability spec, package manifest, semantic model, release evidence, focused
+  tests, and code-review notes.
+- Added executable blockchain network registration, wallet/custody registry,
+  smart contract deployment recording, chain transaction recording, evidence
+  anchoring, oracle feed registration, node-health recording, review recording,
+  Bytewax batch validation, dashboard summary, and provider-neutral blockchain
+  agent registration workflows.
+- Added deterministic guardrails for tenant context, write policy evidence,
+  network type/environment/chain ID/RPC/owner/evidence, wallet network/
+  reference/custody/key policy/owner/evidence, smart contract network/type/
+  artifact/owner/approval/evidence, transaction network/hash/type/asset/
+  amount/signer/evidence/status/high-value approval, anchor payload/reference/
+  timestamp/evidence, oracle feed type/source/owner/evidence, node endpoint/
+  status/block height/evidence, review status/reviewer/evidence, Bytewax
+  lifecycle events, supported AI-agent runtimes/roles, and privileged AI-agent
+  approval.
+- Added compact UI/view models and theme tokens for dashboards, networks,
+  wallets, smart contracts, transactions, evidence anchors, oracle feeds, node
+  health, reviews, agents, and settings.
+- Updated fintech capability metadata so `blockchain` is listed as an
+  implemented sub-capability.
+- Updated `capabilities/README.md` so the catalog snapshot reports 133 valid
+  contracts, 133 domain-specific packages, 133 strict complete package artifact
+  sets, and 25 fintech packages.
+- Removed the empty `_Blockchain_Services` marker file and regenerated
+  `semantic_model.json` from the executable application.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/fintech/blockchain/__init__.py
+  capabilities/fintech/blockchain/capability_contract.py
+  capabilities/fintech/blockchain/models.py
+  capabilities/fintech/blockchain/blockchain_runtime.py
+  capabilities/fintech/blockchain/service.py
+  capabilities/fintech/blockchain/api.py
+  capabilities/fintech/blockchain/views.py
+  capabilities/fintech/blockchain/app.py
+  capabilities/fintech/blockchain/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/fintech/blockchain/tests/test_package_contract.py` passed with 6
+  tests.
+- `./.venv/bin/python capabilities/fintech/blockchain/app.py` passed self-test
+  with `passed: true` and `status: ok`.
+- `./.venv/bin/apg capabilities inspect fintech_blockchain --json` passed with
+  51 rules, 11 UI routes, theme `fintech_blockchain_control`, shell
+  `apg_python`, and Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/fintech/blockchain --json` passed with `side_effect_free: true`
+  and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/fintech/blockchain --json` passed with 1 domain-specific
+  capability, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/fintech/blockchain --json` passed with 1 complete lifecycle, 51
+  rules, 11 UI routes, 11 theme tokens, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 133 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 133 operable contracts, 133 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/fintech/blockchain`, `capabilities/fintech/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed network, wallet, smart contract, transaction, evidence anchor,
+  oracle, node health, review, and AI-agent lifecycle paths so rule evaluation
+  happens before state mutation.
+- Tightened blockchain semantics around provider-neutral network configuration,
+  custody policy evidence, contract deployment approval, high-value transaction
+  approval, and operational evidence capture.
+- Kept live chain RPC calls, transaction signing, private-key custody, chain
+  indexing, bridge operation, oracle vendor connections, and durable Bytewax
+  workers behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live chain RPC calls,
+  transaction signing, private-key custody, chain indexing, bridge operation,
+  oracle vendor connections, durable Bytewax topology, or performance/load
+  checks during this battery-conscious slice.
