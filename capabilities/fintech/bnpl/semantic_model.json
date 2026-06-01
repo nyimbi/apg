@@ -1,0 +1,2519 @@
+{
+  "app": {
+    "description": "Buy Now Pay Later package-backed APG capability",
+    "entity_count": 10,
+    "name": "fintech_bnpl",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "fintech_bnpl": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "audit": "audl",
+          "auth": "auth",
+          "cards": "fintech_cards",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "lending": "fintech_lending",
+          "neobanking": "fintech_neobanking",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "wallets": "fintech_wallets"
+        },
+        "affordability": {
+          "adverse_reason_required_for_decline": true,
+          "human_approval_required_for_final_decisions": true,
+          "score_max": 1000,
+          "score_min": 0,
+          "supported_decisions": [
+            "approve",
+            "decline",
+            "refer"
+          ]
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "bnpl_ops_reviewer",
+            "affordability_reviewer",
+            "merchant_risk_reviewer",
+            "settlement_reviewer",
+            "dispute_reviewer",
+            "compliance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "checkout": {
+          "high_value_threshold": 100000,
+          "payment_reference_required": true,
+          "supported_categories": [
+            "retail",
+            "electronics",
+            "grocery",
+            "travel",
+            "education",
+            "medical",
+            "services",
+            "marketplace"
+          ],
+          "supported_channels": [
+            "web",
+            "mobile",
+            "pos",
+            "marketplace",
+            "api"
+          ],
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ]
+        },
+        "consumers": {
+          "aml_required": true,
+          "consent_required": true,
+          "fraud_required": true,
+          "kyc_required": true,
+          "supported_countries": [
+            "KE",
+            "UG",
+            "TZ",
+            "RW",
+            "GH",
+            "NG",
+            "ZA",
+            "GB",
+            "US",
+            "AE"
+          ]
+        },
+        "disputes": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_reasons": [
+            "goods_not_received",
+            "duplicate",
+            "refund_not_processed",
+            "fraud",
+            "quality_issue",
+            "merchant_error"
+          ]
+        },
+        "governance": {
+          "audit_bnpl_events": true,
+          "customer_consent_required": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "installments": {
+          "positive_due_amount_required": true,
+          "supported_statuses": [
+            "scheduled",
+            "due",
+            "paid",
+            "missed",
+            "waived"
+          ]
+        },
+        "merchants": {
+          "legal_entity_required": true,
+          "program_required": true,
+          "settlement_account_required": true,
+          "supported_categories": [
+            "retail",
+            "electronics",
+            "grocery",
+            "travel",
+            "education",
+            "medical",
+            "services",
+            "marketplace"
+          ]
+        },
+        "observability": {
+          "emit_affordability_events": true,
+          "emit_agent_events": true,
+          "emit_checkout_events": true,
+          "emit_consumer_events": true,
+          "emit_dispute_events": true,
+          "emit_installment_events": true,
+          "emit_merchant_events": true,
+          "emit_plan_events": true,
+          "emit_program_events": true,
+          "emit_settlement_events": true,
+          "event_stream": "apg.fintech.bnpl.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "plans": {
+          "customer_acceptance_required": true,
+          "fee_disclosure_required": true,
+          "max_term_days": 730,
+          "min_term_days": 1,
+          "supported_plan_types": [
+            "pay_in_3",
+            "pay_in_4",
+            "monthly_installments",
+            "invoice_split"
+          ]
+        },
+        "programs": {
+          "fee_disclosure_required": true,
+          "max_installment_count": 24,
+          "owner_required": true,
+          "supported_countries": [
+            "KE",
+            "UG",
+            "TZ",
+            "RW",
+            "GH",
+            "NG",
+            "ZA",
+            "GB",
+            "US",
+            "AE"
+          ],
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ]
+        },
+        "settlements": {
+          "high_value_threshold": 100000,
+          "human_approval_required_for_holds_and_high_value_releases": true,
+          "reconciliation_required": true,
+          "supported_statuses": [
+            "pending",
+            "released",
+            "held",
+            "reconciled"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_bnpl_control"
+        },
+        "ui": {
+          "enable_affordability": true,
+          "enable_agents": true,
+          "enable_checkouts": true,
+          "enable_consumers": true,
+          "enable_dashboard": true,
+          "enable_disputes": true,
+          "enable_installments": true,
+          "enable_merchants": true,
+          "enable_plans": true,
+          "enable_programs": true,
+          "enable_settlements": true
+        }
+      },
+      "name": "Buy Now Pay Later",
+      "provides": [
+        "bnpl_merchant_program_governance",
+        "consumer_bnpl_lifecycle",
+        "merchant_checkout_workflow",
+        "affordability_decisioning",
+        "bnpl_plan_workflow",
+        "installment_schedule_workflow",
+        "merchant_settlement_workflow",
+        "bnpl_dispute_workflow",
+        "bnpl_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_cards",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "fintech_lending",
+        "fintech_neobanking"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "BNPL operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "description": "BNPL writes require policy evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "policy_evidence_required",
+              "required_action": "attach_policy_evidence"
+            },
+            "name": "bnpl_write_requires_policy"
+          },
+          {
+            "condition": {
+              "operation": "register_merchant_program",
+              "owner_present": false
+            },
+            "description": "BNPL programs require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "program_owner_required",
+              "required_action": "assign_program_owner"
+            },
+            "name": "program_owner_required"
+          },
+          {
+            "condition": {
+              "country_supported": false,
+              "operation": "register_merchant_program"
+            },
+            "description": "BNPL program country must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "program_country_not_supported",
+              "required_action": "select_supported_country"
+            },
+            "name": "program_country_supported"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "register_merchant_program"
+            },
+            "description": "BNPL program currency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "program_currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "program_currency_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_merchant_program",
+              "settlement_policy_present": false
+            },
+            "description": "BNPL programs require settlement policy evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "settlement_policy_required",
+              "required_action": "attach_settlement_policy"
+            },
+            "name": "program_settlement_policy_required"
+          },
+          {
+            "condition": {
+              "fee_disclosure_present": false,
+              "operation": "register_merchant_program"
+            },
+            "description": "BNPL programs require fee disclosure.",
+            "effect": {
+              "decision": "deny",
+              "reason": "fee_disclosure_required",
+              "required_action": "attach_fee_disclosure"
+            },
+            "name": "program_fee_disclosure_required"
+          },
+          {
+            "condition": {
+              "installment_count_valid": false,
+              "operation": "register_merchant_program"
+            },
+            "description": "BNPL program installment count must be in range.",
+            "effect": {
+              "decision": "deny",
+              "reason": "installment_count_invalid",
+              "required_action": "set_valid_installment_count"
+            },
+            "name": "program_installment_count_valid"
+          },
+          {
+            "condition": {
+              "customer_present": false,
+              "operation": "onboard_consumer"
+            },
+            "description": "Consumers require customer reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_reference_required",
+              "required_action": "attach_customer_reference"
+            },
+            "name": "consumer_customer_required"
+          },
+          {
+            "condition": {
+              "kyc_present": false,
+              "operation": "onboard_consumer"
+            },
+            "description": "Consumers require KYC evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "consumer_kyc_required",
+              "required_action": "attach_kyc_profile"
+            },
+            "name": "consumer_kyc_required"
+          },
+          {
+            "condition": {
+              "country_supported": false,
+              "operation": "onboard_consumer"
+            },
+            "description": "Consumer country must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "consumer_country_not_supported",
+              "required_action": "select_supported_country"
+            },
+            "name": "consumer_country_supported"
+          },
+          {
+            "condition": {
+              "consent_present": false,
+              "operation": "onboard_consumer"
+            },
+            "description": "Consumers require consent.",
+            "effect": {
+              "decision": "deny",
+              "reason": "consumer_consent_required",
+              "required_action": "capture_consumer_consent"
+            },
+            "name": "consumer_consent_required"
+          },
+          {
+            "condition": {
+              "aml_present": false,
+              "operation": "onboard_consumer"
+            },
+            "description": "Consumers require AML evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "consumer_aml_required",
+              "required_action": "attach_aml_evidence"
+            },
+            "name": "consumer_aml_required"
+          },
+          {
+            "condition": {
+              "fraud_present": false,
+              "operation": "onboard_consumer"
+            },
+            "description": "Consumers require fraud evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "consumer_fraud_required",
+              "required_action": "attach_fraud_evidence"
+            },
+            "name": "consumer_fraud_required"
+          },
+          {
+            "condition": {
+              "operation": "register_merchant",
+              "program_present": false
+            },
+            "description": "Merchants require a BNPL program.",
+            "effect": {
+              "decision": "deny",
+              "reason": "merchant_program_required",
+              "required_action": "select_bnpl_program"
+            },
+            "name": "merchant_program_required"
+          },
+          {
+            "condition": {
+              "legal_entity_present": false,
+              "operation": "register_merchant"
+            },
+            "description": "Merchants require legal entity evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "merchant_legal_entity_required",
+              "required_action": "attach_legal_entity"
+            },
+            "name": "merchant_legal_entity_required"
+          },
+          {
+            "condition": {
+              "merchant_category_supported": false,
+              "operation": "register_merchant"
+            },
+            "description": "Merchant category must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "merchant_category_not_supported",
+              "required_action": "select_supported_merchant_category"
+            },
+            "name": "merchant_category_supported"
+          },
+          {
+            "condition": {
+              "country_supported": false,
+              "operation": "register_merchant"
+            },
+            "description": "Merchant country must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "merchant_country_not_supported",
+              "required_action": "select_supported_country"
+            },
+            "name": "merchant_country_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_merchant",
+              "risk_tier_present": false
+            },
+            "description": "Merchants require risk tier.",
+            "effect": {
+              "decision": "deny",
+              "reason": "merchant_risk_tier_required",
+              "required_action": "assign_risk_tier"
+            },
+            "name": "merchant_risk_tier_required"
+          },
+          {
+            "condition": {
+              "operation": "register_merchant",
+              "settlement_account_present": false
+            },
+            "description": "Merchants require settlement account.",
+            "effect": {
+              "decision": "deny",
+              "reason": "merchant_settlement_account_required",
+              "required_action": "attach_settlement_account"
+            },
+            "name": "merchant_settlement_account_required"
+          },
+          {
+            "condition": {
+              "merchant_present": false,
+              "operation": "create_checkout_session"
+            },
+            "description": "Checkout sessions require merchant.",
+            "effect": {
+              "decision": "deny",
+              "reason": "checkout_merchant_required",
+              "required_action": "select_merchant"
+            },
+            "name": "checkout_merchant_required"
+          },
+          {
+            "condition": {
+              "consumer_present": false,
+              "operation": "create_checkout_session"
+            },
+            "description": "Checkout sessions require consumer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "checkout_consumer_required",
+              "required_action": "select_consumer"
+            },
+            "name": "checkout_consumer_required"
+          },
+          {
+            "condition": {
+              "channel_supported": false,
+              "operation": "create_checkout_session"
+            },
+            "description": "Checkout channel must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "checkout_channel_not_supported",
+              "required_action": "select_supported_channel"
+            },
+            "name": "checkout_channel_supported"
+          },
+          {
+            "condition": {
+              "merchant_category_supported": false,
+              "operation": "create_checkout_session"
+            },
+            "description": "Checkout category must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "checkout_category_not_supported",
+              "required_action": "select_supported_category"
+            },
+            "name": "checkout_category_supported"
+          },
+          {
+            "condition": {
+              "operation": "create_checkout_session",
+              "positive_amount": false
+            },
+            "description": "Checkout amount must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "checkout_amount_positive_required",
+              "required_action": "set_positive_checkout_amount"
+            },
+            "name": "checkout_amount_positive"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "create_checkout_session"
+            },
+            "description": "Checkout currency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "checkout_currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "checkout_currency_supported"
+          },
+          {
+            "condition": {
+              "operation": "create_checkout_session",
+              "payment_reference_present": false
+            },
+            "description": "Checkout requires payment reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_reference_required",
+              "required_action": "attach_payment_reference"
+            },
+            "name": "checkout_payment_reference_required"
+          },
+          {
+            "condition": {
+              "fraud_present": false,
+              "operation": "create_checkout_session"
+            },
+            "description": "Checkout requires fraud evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "checkout_fraud_required",
+              "required_action": "attach_fraud_evidence"
+            },
+            "name": "checkout_fraud_required"
+          },
+          {
+            "condition": {
+              "aml_present": false,
+              "operation": "create_checkout_session"
+            },
+            "description": "Checkout requires AML evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "checkout_aml_required",
+              "required_action": "attach_aml_evidence"
+            },
+            "name": "checkout_aml_required"
+          },
+          {
+            "condition": {
+              "consent_present": false,
+              "operation": "create_checkout_session"
+            },
+            "description": "Checkout requires customer consent.",
+            "effect": {
+              "decision": "deny",
+              "reason": "checkout_customer_consent_required",
+              "required_action": "capture_customer_consent"
+            },
+            "name": "checkout_customer_consent_required"
+          },
+          {
+            "condition": {
+              "high_value": true,
+              "human_review_recorded": false,
+              "operation": "create_checkout_session"
+            },
+            "description": "High-value checkout requires review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "checkout_review_required",
+              "required_action": "record_checkout_review"
+            },
+            "name": "high_value_checkout_requires_review"
+          },
+          {
+            "condition": {
+              "checkout_present": false,
+              "operation": "record_affordability_decision"
+            },
+            "description": "Affordability requires checkout.",
+            "effect": {
+              "decision": "deny",
+              "reason": "affordability_checkout_required",
+              "required_action": "select_checkout"
+            },
+            "name": "affordability_checkout_required"
+          },
+          {
+            "condition": {
+              "decision_supported": false,
+              "operation": "record_affordability_decision"
+            },
+            "description": "Affordability decision must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "affordability_decision_not_supported",
+              "required_action": "select_supported_decision"
+            },
+            "name": "affordability_decision_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_affordability_decision",
+              "score_in_range": false
+            },
+            "description": "Affordability score must be in range.",
+            "effect": {
+              "decision": "deny",
+              "reason": "affordability_score_out_of_range",
+              "required_action": "set_score_0_to_1000"
+            },
+            "name": "affordability_score_in_range"
+          },
+          {
+            "condition": {
+              "decision_evidence_present": false,
+              "operation": "record_affordability_decision"
+            },
+            "description": "Affordability requires evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "affordability_evidence_required",
+              "required_action": "attach_decision_evidence"
+            },
+            "name": "affordability_evidence_required"
+          },
+          {
+            "condition": {
+              "adverse_decision": true,
+              "adverse_reason_present": false,
+              "operation": "record_affordability_decision"
+            },
+            "description": "Declines require adverse reason.",
+            "effect": {
+              "decision": "deny",
+              "reason": "adverse_reason_required",
+              "required_action": "record_adverse_reason"
+            },
+            "name": "declined_affordability_requires_adverse_reason"
+          },
+          {
+            "condition": {
+              "final_decision": true,
+              "human_approval_recorded": false,
+              "operation": "record_affordability_decision"
+            },
+            "description": "Final affordability decisions require approval.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "affordability_approval_required",
+              "required_action": "record_affordability_approval"
+            },
+            "name": "final_affordability_requires_approval"
+          },
+          {
+            "condition": {
+              "checkout_present": false,
+              "operation": "create_bnpl_plan"
+            },
+            "description": "Plans require checkout.",
+            "effect": {
+              "decision": "deny",
+              "reason": "plan_checkout_required",
+              "required_action": "select_checkout"
+            },
+            "name": "plan_checkout_required"
+          },
+          {
+            "condition": {
+              "affordability_approved": false,
+              "operation": "create_bnpl_plan"
+            },
+            "description": "Plans require approved affordability.",
+            "effect": {
+              "decision": "deny",
+              "reason": "affordability_approval_required",
+              "required_action": "record_approved_affordability"
+            },
+            "name": "plan_affordability_approved"
+          },
+          {
+            "condition": {
+              "operation": "create_bnpl_plan",
+              "plan_type_supported": false
+            },
+            "description": "Plan type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bnpl_plan_type_not_supported",
+              "required_action": "select_supported_plan_type"
+            },
+            "name": "plan_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "create_bnpl_plan",
+              "positive_principal": false
+            },
+            "description": "Plan principal must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_principal_required",
+              "required_action": "set_positive_principal"
+            },
+            "name": "plan_principal_positive"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "create_bnpl_plan"
+            },
+            "description": "Plan currency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "plan_currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "plan_currency_supported"
+          },
+          {
+            "condition": {
+              "operation": "create_bnpl_plan",
+              "term_valid": false
+            },
+            "description": "Plan term must be valid.",
+            "effect": {
+              "decision": "deny",
+              "reason": "plan_term_invalid",
+              "required_action": "set_valid_term"
+            },
+            "name": "plan_term_valid"
+          },
+          {
+            "condition": {
+              "down_payment_valid": false,
+              "operation": "create_bnpl_plan"
+            },
+            "description": "Plan down payment cannot exceed principal.",
+            "effect": {
+              "decision": "deny",
+              "reason": "down_payment_invalid",
+              "required_action": "set_valid_down_payment"
+            },
+            "name": "plan_down_payment_valid"
+          },
+          {
+            "condition": {
+              "fee_disclosure_present": false,
+              "operation": "create_bnpl_plan"
+            },
+            "description": "Plans require fee disclosure.",
+            "effect": {
+              "decision": "deny",
+              "reason": "plan_fee_disclosure_required",
+              "required_action": "attach_fee_disclosure"
+            },
+            "name": "plan_fee_disclosure_required"
+          },
+          {
+            "condition": {
+              "customer_acceptance_present": false,
+              "operation": "create_bnpl_plan"
+            },
+            "description": "Plans require customer acceptance.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_acceptance_required",
+              "required_action": "capture_customer_acceptance"
+            },
+            "name": "plan_customer_acceptance_required"
+          },
+          {
+            "condition": {
+              "operation": "schedule_installment",
+              "plan_present": false
+            },
+            "description": "Installments require plan.",
+            "effect": {
+              "decision": "deny",
+              "reason": "installment_plan_required",
+              "required_action": "select_plan"
+            },
+            "name": "installment_plan_required"
+          },
+          {
+            "condition": {
+              "operation": "schedule_installment",
+              "positive_due_amount": false
+            },
+            "description": "Installment due amount must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_due_amount_required",
+              "required_action": "set_positive_due_amount"
+            },
+            "name": "installment_due_amount_positive"
+          },
+          {
+            "condition": {
+              "due_date_present": false,
+              "operation": "schedule_installment"
+            },
+            "description": "Installments require due date.",
+            "effect": {
+              "decision": "deny",
+              "reason": "installment_due_date_required",
+              "required_action": "set_due_date"
+            },
+            "name": "installment_due_date_required"
+          },
+          {
+            "condition": {
+              "installment_status_supported": false,
+              "operation": "schedule_installment"
+            },
+            "description": "Installment status must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "installment_status_not_supported",
+              "required_action": "select_supported_status"
+            },
+            "name": "installment_status_supported"
+          },
+          {
+            "condition": {
+              "merchant_present": false,
+              "operation": "record_merchant_settlement"
+            },
+            "description": "Settlement requires merchant.",
+            "effect": {
+              "decision": "deny",
+              "reason": "settlement_merchant_required",
+              "required_action": "select_merchant"
+            },
+            "name": "settlement_merchant_required"
+          },
+          {
+            "condition": {
+              "operation": "record_merchant_settlement",
+              "plan_present": false
+            },
+            "description": "Settlement requires plan.",
+            "effect": {
+              "decision": "deny",
+              "reason": "settlement_plan_required",
+              "required_action": "select_plan"
+            },
+            "name": "settlement_plan_required"
+          },
+          {
+            "condition": {
+              "operation": "record_merchant_settlement",
+              "settlement_status_supported": false
+            },
+            "description": "Settlement status must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "settlement_status_not_supported",
+              "required_action": "select_supported_status"
+            },
+            "name": "settlement_status_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_merchant_settlement",
+              "settlement_amounts_valid": false
+            },
+            "description": "Settlement amounts must be valid.",
+            "effect": {
+              "decision": "deny",
+              "reason": "settlement_amounts_invalid",
+              "required_action": "set_valid_settlement_amounts"
+            },
+            "name": "settlement_amounts_valid"
+          },
+          {
+            "condition": {
+              "operation": "record_merchant_settlement",
+              "reconciliation_present": false
+            },
+            "description": "Settlement requires reconciliation evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "settlement_reconciliation_required",
+              "required_action": "attach_reconciliation_evidence"
+            },
+            "name": "settlement_reconciliation_required"
+          },
+          {
+            "condition": {
+              "operation": "record_merchant_settlement",
+              "payment_rail_present": false
+            },
+            "description": "Settlement requires payment rail reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "settlement_payment_rail_required",
+              "required_action": "attach_payment_rail_reference"
+            },
+            "name": "settlement_payment_rail_required"
+          },
+          {
+            "condition": {
+              "approval_required": true,
+              "human_approval_recorded": false,
+              "operation": "record_merchant_settlement"
+            },
+            "description": "Holds and high-value releases require approval.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "settlement_approval_required",
+              "required_action": "record_settlement_approval"
+            },
+            "name": "settlement_hold_or_high_value_release_requires_approval"
+          },
+          {
+            "condition": {
+              "operation": "open_bnpl_dispute",
+              "plan_present": false
+            },
+            "description": "Disputes require plan.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dispute_plan_required",
+              "required_action": "select_plan"
+            },
+            "name": "dispute_plan_required"
+          },
+          {
+            "condition": {
+              "dispute_reason_supported": false,
+              "operation": "open_bnpl_dispute"
+            },
+            "description": "Dispute reason must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dispute_reason_not_supported",
+              "required_action": "select_supported_dispute_reason"
+            },
+            "name": "dispute_reason_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "open_bnpl_dispute"
+            },
+            "description": "Disputes require evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dispute_evidence_required",
+              "required_action": "attach_dispute_evidence"
+            },
+            "name": "dispute_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "open_bnpl_dispute",
+              "reviewer_present": false
+            },
+            "description": "Disputes require reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dispute_reviewer_required",
+              "required_action": "assign_dispute_reviewer"
+            },
+            "name": "dispute_reviewer_required"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "bnpl_batch"
+            },
+            "description": "BNPL batches require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_bnpl_batch_to_bytewax"
+            },
+            "name": "bnpl_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_bnpl_agent"
+            },
+            "description": "BNPL agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bnpl_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "bnpl_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_bnpl_agent"
+            },
+            "description": "BNPL agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bnpl_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "bnpl_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "bnpl_agent_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged BNPL-agent actions require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_bnpl_agent_action_requires_human_approval"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "BNPL operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "description": "BNPL writes require policy evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "policy_evidence_required",
+            "required_action": "attach_policy_evidence"
+          },
+          "name": "bnpl_write_requires_policy"
+        },
+        {
+          "condition": {
+            "operation": "register_merchant_program",
+            "owner_present": false
+          },
+          "description": "BNPL programs require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "program_owner_required",
+            "required_action": "assign_program_owner"
+          },
+          "name": "program_owner_required"
+        },
+        {
+          "condition": {
+            "country_supported": false,
+            "operation": "register_merchant_program"
+          },
+          "description": "BNPL program country must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "program_country_not_supported",
+            "required_action": "select_supported_country"
+          },
+          "name": "program_country_supported"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "register_merchant_program"
+          },
+          "description": "BNPL program currency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "program_currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "program_currency_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_merchant_program",
+            "settlement_policy_present": false
+          },
+          "description": "BNPL programs require settlement policy evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "settlement_policy_required",
+            "required_action": "attach_settlement_policy"
+          },
+          "name": "program_settlement_policy_required"
+        },
+        {
+          "condition": {
+            "fee_disclosure_present": false,
+            "operation": "register_merchant_program"
+          },
+          "description": "BNPL programs require fee disclosure.",
+          "effect": {
+            "decision": "deny",
+            "reason": "fee_disclosure_required",
+            "required_action": "attach_fee_disclosure"
+          },
+          "name": "program_fee_disclosure_required"
+        },
+        {
+          "condition": {
+            "installment_count_valid": false,
+            "operation": "register_merchant_program"
+          },
+          "description": "BNPL program installment count must be in range.",
+          "effect": {
+            "decision": "deny",
+            "reason": "installment_count_invalid",
+            "required_action": "set_valid_installment_count"
+          },
+          "name": "program_installment_count_valid"
+        },
+        {
+          "condition": {
+            "customer_present": false,
+            "operation": "onboard_consumer"
+          },
+          "description": "Consumers require customer reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_reference_required",
+            "required_action": "attach_customer_reference"
+          },
+          "name": "consumer_customer_required"
+        },
+        {
+          "condition": {
+            "kyc_present": false,
+            "operation": "onboard_consumer"
+          },
+          "description": "Consumers require KYC evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "consumer_kyc_required",
+            "required_action": "attach_kyc_profile"
+          },
+          "name": "consumer_kyc_required"
+        },
+        {
+          "condition": {
+            "country_supported": false,
+            "operation": "onboard_consumer"
+          },
+          "description": "Consumer country must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "consumer_country_not_supported",
+            "required_action": "select_supported_country"
+          },
+          "name": "consumer_country_supported"
+        },
+        {
+          "condition": {
+            "consent_present": false,
+            "operation": "onboard_consumer"
+          },
+          "description": "Consumers require consent.",
+          "effect": {
+            "decision": "deny",
+            "reason": "consumer_consent_required",
+            "required_action": "capture_consumer_consent"
+          },
+          "name": "consumer_consent_required"
+        },
+        {
+          "condition": {
+            "aml_present": false,
+            "operation": "onboard_consumer"
+          },
+          "description": "Consumers require AML evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "consumer_aml_required",
+            "required_action": "attach_aml_evidence"
+          },
+          "name": "consumer_aml_required"
+        },
+        {
+          "condition": {
+            "fraud_present": false,
+            "operation": "onboard_consumer"
+          },
+          "description": "Consumers require fraud evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "consumer_fraud_required",
+            "required_action": "attach_fraud_evidence"
+          },
+          "name": "consumer_fraud_required"
+        },
+        {
+          "condition": {
+            "operation": "register_merchant",
+            "program_present": false
+          },
+          "description": "Merchants require a BNPL program.",
+          "effect": {
+            "decision": "deny",
+            "reason": "merchant_program_required",
+            "required_action": "select_bnpl_program"
+          },
+          "name": "merchant_program_required"
+        },
+        {
+          "condition": {
+            "legal_entity_present": false,
+            "operation": "register_merchant"
+          },
+          "description": "Merchants require legal entity evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "merchant_legal_entity_required",
+            "required_action": "attach_legal_entity"
+          },
+          "name": "merchant_legal_entity_required"
+        },
+        {
+          "condition": {
+            "merchant_category_supported": false,
+            "operation": "register_merchant"
+          },
+          "description": "Merchant category must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "merchant_category_not_supported",
+            "required_action": "select_supported_merchant_category"
+          },
+          "name": "merchant_category_supported"
+        },
+        {
+          "condition": {
+            "country_supported": false,
+            "operation": "register_merchant"
+          },
+          "description": "Merchant country must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "merchant_country_not_supported",
+            "required_action": "select_supported_country"
+          },
+          "name": "merchant_country_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_merchant",
+            "risk_tier_present": false
+          },
+          "description": "Merchants require risk tier.",
+          "effect": {
+            "decision": "deny",
+            "reason": "merchant_risk_tier_required",
+            "required_action": "assign_risk_tier"
+          },
+          "name": "merchant_risk_tier_required"
+        },
+        {
+          "condition": {
+            "operation": "register_merchant",
+            "settlement_account_present": false
+          },
+          "description": "Merchants require settlement account.",
+          "effect": {
+            "decision": "deny",
+            "reason": "merchant_settlement_account_required",
+            "required_action": "attach_settlement_account"
+          },
+          "name": "merchant_settlement_account_required"
+        },
+        {
+          "condition": {
+            "merchant_present": false,
+            "operation": "create_checkout_session"
+          },
+          "description": "Checkout sessions require merchant.",
+          "effect": {
+            "decision": "deny",
+            "reason": "checkout_merchant_required",
+            "required_action": "select_merchant"
+          },
+          "name": "checkout_merchant_required"
+        },
+        {
+          "condition": {
+            "consumer_present": false,
+            "operation": "create_checkout_session"
+          },
+          "description": "Checkout sessions require consumer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "checkout_consumer_required",
+            "required_action": "select_consumer"
+          },
+          "name": "checkout_consumer_required"
+        },
+        {
+          "condition": {
+            "channel_supported": false,
+            "operation": "create_checkout_session"
+          },
+          "description": "Checkout channel must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "checkout_channel_not_supported",
+            "required_action": "select_supported_channel"
+          },
+          "name": "checkout_channel_supported"
+        },
+        {
+          "condition": {
+            "merchant_category_supported": false,
+            "operation": "create_checkout_session"
+          },
+          "description": "Checkout category must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "checkout_category_not_supported",
+            "required_action": "select_supported_category"
+          },
+          "name": "checkout_category_supported"
+        },
+        {
+          "condition": {
+            "operation": "create_checkout_session",
+            "positive_amount": false
+          },
+          "description": "Checkout amount must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "checkout_amount_positive_required",
+            "required_action": "set_positive_checkout_amount"
+          },
+          "name": "checkout_amount_positive"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "create_checkout_session"
+          },
+          "description": "Checkout currency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "checkout_currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "checkout_currency_supported"
+        },
+        {
+          "condition": {
+            "operation": "create_checkout_session",
+            "payment_reference_present": false
+          },
+          "description": "Checkout requires payment reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_reference_required",
+            "required_action": "attach_payment_reference"
+          },
+          "name": "checkout_payment_reference_required"
+        },
+        {
+          "condition": {
+            "fraud_present": false,
+            "operation": "create_checkout_session"
+          },
+          "description": "Checkout requires fraud evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "checkout_fraud_required",
+            "required_action": "attach_fraud_evidence"
+          },
+          "name": "checkout_fraud_required"
+        },
+        {
+          "condition": {
+            "aml_present": false,
+            "operation": "create_checkout_session"
+          },
+          "description": "Checkout requires AML evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "checkout_aml_required",
+            "required_action": "attach_aml_evidence"
+          },
+          "name": "checkout_aml_required"
+        },
+        {
+          "condition": {
+            "consent_present": false,
+            "operation": "create_checkout_session"
+          },
+          "description": "Checkout requires customer consent.",
+          "effect": {
+            "decision": "deny",
+            "reason": "checkout_customer_consent_required",
+            "required_action": "capture_customer_consent"
+          },
+          "name": "checkout_customer_consent_required"
+        },
+        {
+          "condition": {
+            "high_value": true,
+            "human_review_recorded": false,
+            "operation": "create_checkout_session"
+          },
+          "description": "High-value checkout requires review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "checkout_review_required",
+            "required_action": "record_checkout_review"
+          },
+          "name": "high_value_checkout_requires_review"
+        },
+        {
+          "condition": {
+            "checkout_present": false,
+            "operation": "record_affordability_decision"
+          },
+          "description": "Affordability requires checkout.",
+          "effect": {
+            "decision": "deny",
+            "reason": "affordability_checkout_required",
+            "required_action": "select_checkout"
+          },
+          "name": "affordability_checkout_required"
+        },
+        {
+          "condition": {
+            "decision_supported": false,
+            "operation": "record_affordability_decision"
+          },
+          "description": "Affordability decision must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "affordability_decision_not_supported",
+            "required_action": "select_supported_decision"
+          },
+          "name": "affordability_decision_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_affordability_decision",
+            "score_in_range": false
+          },
+          "description": "Affordability score must be in range.",
+          "effect": {
+            "decision": "deny",
+            "reason": "affordability_score_out_of_range",
+            "required_action": "set_score_0_to_1000"
+          },
+          "name": "affordability_score_in_range"
+        },
+        {
+          "condition": {
+            "decision_evidence_present": false,
+            "operation": "record_affordability_decision"
+          },
+          "description": "Affordability requires evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "affordability_evidence_required",
+            "required_action": "attach_decision_evidence"
+          },
+          "name": "affordability_evidence_required"
+        },
+        {
+          "condition": {
+            "adverse_decision": true,
+            "adverse_reason_present": false,
+            "operation": "record_affordability_decision"
+          },
+          "description": "Declines require adverse reason.",
+          "effect": {
+            "decision": "deny",
+            "reason": "adverse_reason_required",
+            "required_action": "record_adverse_reason"
+          },
+          "name": "declined_affordability_requires_adverse_reason"
+        },
+        {
+          "condition": {
+            "final_decision": true,
+            "human_approval_recorded": false,
+            "operation": "record_affordability_decision"
+          },
+          "description": "Final affordability decisions require approval.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "affordability_approval_required",
+            "required_action": "record_affordability_approval"
+          },
+          "name": "final_affordability_requires_approval"
+        },
+        {
+          "condition": {
+            "checkout_present": false,
+            "operation": "create_bnpl_plan"
+          },
+          "description": "Plans require checkout.",
+          "effect": {
+            "decision": "deny",
+            "reason": "plan_checkout_required",
+            "required_action": "select_checkout"
+          },
+          "name": "plan_checkout_required"
+        },
+        {
+          "condition": {
+            "affordability_approved": false,
+            "operation": "create_bnpl_plan"
+          },
+          "description": "Plans require approved affordability.",
+          "effect": {
+            "decision": "deny",
+            "reason": "affordability_approval_required",
+            "required_action": "record_approved_affordability"
+          },
+          "name": "plan_affordability_approved"
+        },
+        {
+          "condition": {
+            "operation": "create_bnpl_plan",
+            "plan_type_supported": false
+          },
+          "description": "Plan type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bnpl_plan_type_not_supported",
+            "required_action": "select_supported_plan_type"
+          },
+          "name": "plan_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "create_bnpl_plan",
+            "positive_principal": false
+          },
+          "description": "Plan principal must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_principal_required",
+            "required_action": "set_positive_principal"
+          },
+          "name": "plan_principal_positive"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "create_bnpl_plan"
+          },
+          "description": "Plan currency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "plan_currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "plan_currency_supported"
+        },
+        {
+          "condition": {
+            "operation": "create_bnpl_plan",
+            "term_valid": false
+          },
+          "description": "Plan term must be valid.",
+          "effect": {
+            "decision": "deny",
+            "reason": "plan_term_invalid",
+            "required_action": "set_valid_term"
+          },
+          "name": "plan_term_valid"
+        },
+        {
+          "condition": {
+            "down_payment_valid": false,
+            "operation": "create_bnpl_plan"
+          },
+          "description": "Plan down payment cannot exceed principal.",
+          "effect": {
+            "decision": "deny",
+            "reason": "down_payment_invalid",
+            "required_action": "set_valid_down_payment"
+          },
+          "name": "plan_down_payment_valid"
+        },
+        {
+          "condition": {
+            "fee_disclosure_present": false,
+            "operation": "create_bnpl_plan"
+          },
+          "description": "Plans require fee disclosure.",
+          "effect": {
+            "decision": "deny",
+            "reason": "plan_fee_disclosure_required",
+            "required_action": "attach_fee_disclosure"
+          },
+          "name": "plan_fee_disclosure_required"
+        },
+        {
+          "condition": {
+            "customer_acceptance_present": false,
+            "operation": "create_bnpl_plan"
+          },
+          "description": "Plans require customer acceptance.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_acceptance_required",
+            "required_action": "capture_customer_acceptance"
+          },
+          "name": "plan_customer_acceptance_required"
+        },
+        {
+          "condition": {
+            "operation": "schedule_installment",
+            "plan_present": false
+          },
+          "description": "Installments require plan.",
+          "effect": {
+            "decision": "deny",
+            "reason": "installment_plan_required",
+            "required_action": "select_plan"
+          },
+          "name": "installment_plan_required"
+        },
+        {
+          "condition": {
+            "operation": "schedule_installment",
+            "positive_due_amount": false
+          },
+          "description": "Installment due amount must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_due_amount_required",
+            "required_action": "set_positive_due_amount"
+          },
+          "name": "installment_due_amount_positive"
+        },
+        {
+          "condition": {
+            "due_date_present": false,
+            "operation": "schedule_installment"
+          },
+          "description": "Installments require due date.",
+          "effect": {
+            "decision": "deny",
+            "reason": "installment_due_date_required",
+            "required_action": "set_due_date"
+          },
+          "name": "installment_due_date_required"
+        },
+        {
+          "condition": {
+            "installment_status_supported": false,
+            "operation": "schedule_installment"
+          },
+          "description": "Installment status must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "installment_status_not_supported",
+            "required_action": "select_supported_status"
+          },
+          "name": "installment_status_supported"
+        },
+        {
+          "condition": {
+            "merchant_present": false,
+            "operation": "record_merchant_settlement"
+          },
+          "description": "Settlement requires merchant.",
+          "effect": {
+            "decision": "deny",
+            "reason": "settlement_merchant_required",
+            "required_action": "select_merchant"
+          },
+          "name": "settlement_merchant_required"
+        },
+        {
+          "condition": {
+            "operation": "record_merchant_settlement",
+            "plan_present": false
+          },
+          "description": "Settlement requires plan.",
+          "effect": {
+            "decision": "deny",
+            "reason": "settlement_plan_required",
+            "required_action": "select_plan"
+          },
+          "name": "settlement_plan_required"
+        },
+        {
+          "condition": {
+            "operation": "record_merchant_settlement",
+            "settlement_status_supported": false
+          },
+          "description": "Settlement status must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "settlement_status_not_supported",
+            "required_action": "select_supported_status"
+          },
+          "name": "settlement_status_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_merchant_settlement",
+            "settlement_amounts_valid": false
+          },
+          "description": "Settlement amounts must be valid.",
+          "effect": {
+            "decision": "deny",
+            "reason": "settlement_amounts_invalid",
+            "required_action": "set_valid_settlement_amounts"
+          },
+          "name": "settlement_amounts_valid"
+        },
+        {
+          "condition": {
+            "operation": "record_merchant_settlement",
+            "reconciliation_present": false
+          },
+          "description": "Settlement requires reconciliation evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "settlement_reconciliation_required",
+            "required_action": "attach_reconciliation_evidence"
+          },
+          "name": "settlement_reconciliation_required"
+        },
+        {
+          "condition": {
+            "operation": "record_merchant_settlement",
+            "payment_rail_present": false
+          },
+          "description": "Settlement requires payment rail reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "settlement_payment_rail_required",
+            "required_action": "attach_payment_rail_reference"
+          },
+          "name": "settlement_payment_rail_required"
+        },
+        {
+          "condition": {
+            "approval_required": true,
+            "human_approval_recorded": false,
+            "operation": "record_merchant_settlement"
+          },
+          "description": "Holds and high-value releases require approval.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "settlement_approval_required",
+            "required_action": "record_settlement_approval"
+          },
+          "name": "settlement_hold_or_high_value_release_requires_approval"
+        },
+        {
+          "condition": {
+            "operation": "open_bnpl_dispute",
+            "plan_present": false
+          },
+          "description": "Disputes require plan.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dispute_plan_required",
+            "required_action": "select_plan"
+          },
+          "name": "dispute_plan_required"
+        },
+        {
+          "condition": {
+            "dispute_reason_supported": false,
+            "operation": "open_bnpl_dispute"
+          },
+          "description": "Dispute reason must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dispute_reason_not_supported",
+            "required_action": "select_supported_dispute_reason"
+          },
+          "name": "dispute_reason_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "open_bnpl_dispute"
+          },
+          "description": "Disputes require evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dispute_evidence_required",
+            "required_action": "attach_dispute_evidence"
+          },
+          "name": "dispute_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "open_bnpl_dispute",
+            "reviewer_present": false
+          },
+          "description": "Disputes require reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dispute_reviewer_required",
+            "required_action": "assign_dispute_reviewer"
+          },
+          "name": "dispute_reviewer_required"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "bnpl_batch"
+          },
+          "description": "BNPL batches require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_bnpl_batch_to_bytewax"
+          },
+          "name": "bnpl_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_bnpl_agent"
+          },
+          "description": "BNPL agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bnpl_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "bnpl_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_bnpl_agent"
+          },
+          "description": "BNPL agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bnpl_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "bnpl_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "bnpl_agent_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged BNPL-agent actions require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_bnpl_agent_action_requires_human_approval"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "affordability": {
+          "component": "AffordabilityDecisionWorkbench",
+          "permission": "fintech_bnpl:decisioning",
+          "route": "/fintech-bnpl/affordability"
+        },
+        "agents": {
+          "component": "BNPLAgentWorkbench",
+          "permission": "fintech_bnpl:admin",
+          "route": "/fintech-bnpl/agents"
+        },
+        "checkouts": {
+          "component": "CheckoutSessionConsole",
+          "permission": "fintech_bnpl:manage_checkouts",
+          "route": "/fintech-bnpl/checkouts"
+        },
+        "consumers": {
+          "component": "BNPLConsumerWorkbench",
+          "permission": "fintech_bnpl:manage_consumers",
+          "route": "/fintech-bnpl/consumers"
+        },
+        "dashboard": {
+          "component": "BNPLDashboard",
+          "permission": "fintech_bnpl:view",
+          "route": "/fintech-bnpl/dashboard"
+        },
+        "disputes": {
+          "component": "BNPLDisputeWorkbench",
+          "permission": "fintech_bnpl:disputes",
+          "route": "/fintech-bnpl/disputes"
+        },
+        "installments": {
+          "component": "InstallmentScheduleConsole",
+          "permission": "fintech_bnpl:installments",
+          "route": "/fintech-bnpl/installments"
+        },
+        "merchants": {
+          "component": "MerchantRiskConsole",
+          "permission": "fintech_bnpl:manage_merchants",
+          "route": "/fintech-bnpl/merchants"
+        },
+        "plans": {
+          "component": "BNPLPlanWorkbench",
+          "permission": "fintech_bnpl:plans",
+          "route": "/fintech-bnpl/plans"
+        },
+        "programs": {
+          "component": "BNPLProgramConsole",
+          "permission": "fintech_bnpl:manage_programs",
+          "route": "/fintech-bnpl/programs"
+        },
+        "settings": {
+          "component": "BNPLSettings",
+          "permission": "fintech_bnpl:admin",
+          "route": "/fintech-bnpl/settings"
+        },
+        "settlements": {
+          "component": "MerchantSettlementWorkbench",
+          "permission": "fintech_bnpl:settlements",
+          "route": "/fintech-bnpl/settlements"
+        }
+      },
+      "streaming": {
+        "events": [
+          "bnpl_program_registered",
+          "bnpl_consumer_onboarded",
+          "bnpl_merchant_registered",
+          "checkout_session_created",
+          "affordability_decision_recorded",
+          "bnpl_plan_created",
+          "installment_scheduled",
+          "merchant_settlement_recorded",
+          "bnpl_dispute_opened",
+          "bnpl_agent_registered"
+        ],
+        "guardrails": [
+          "bnpl_batch_requires_bytewax",
+          "privileged_bnpl_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.fintech.bnpl.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "affordability": {
+            "icon": "shield-check",
+            "status_indicator": "decision-chip"
+          },
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "checkouts": {
+            "icon": "shopping-cart",
+            "status_indicator": "checkout-chip"
+          },
+          "consumers": {
+            "icon": "user-check",
+            "status_indicator": "consumer-chip"
+          },
+          "disputes": {
+            "icon": "circle-alert",
+            "status_indicator": "dispute-chip"
+          },
+          "merchants": {
+            "icon": "store",
+            "status_indicator": "merchant-chip"
+          },
+          "plans": {
+            "icon": "calendar-clock",
+            "status_indicator": "plan-chip"
+          },
+          "programs": {
+            "icon": "badge-percent",
+            "status_indicator": "program-chip"
+          },
+          "settlements": {
+            "icon": "landmark",
+            "status_indicator": "settlement-chip"
+          }
+        },
+        "name": "fintech_bnpl_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#7C3AED",
+          "color.danger": "#B91C1C",
+          "color.primary": "#0F766E",
+          "color.success": "#15803D",
+          "color.warning": "#B45309",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/fintech-bnpl/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "BNPLDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/fintech-bnpl/dashboard",
+            "permission": "fintech_bnpl:view"
+          },
+          {
+            "component": "BNPLProgramConsole",
+            "name": "programs",
+            "nav_group": "Programs",
+            "path": "/fintech-bnpl/programs",
+            "permission": "fintech_bnpl:manage_programs"
+          },
+          {
+            "component": "BNPLConsumerWorkbench",
+            "name": "consumers",
+            "nav_group": "Consumers",
+            "path": "/fintech-bnpl/consumers",
+            "permission": "fintech_bnpl:manage_consumers"
+          },
+          {
+            "component": "MerchantRiskConsole",
+            "name": "merchants",
+            "nav_group": "Merchants",
+            "path": "/fintech-bnpl/merchants",
+            "permission": "fintech_bnpl:manage_merchants"
+          },
+          {
+            "component": "CheckoutSessionConsole",
+            "name": "checkouts",
+            "nav_group": "Checkout",
+            "path": "/fintech-bnpl/checkouts",
+            "permission": "fintech_bnpl:manage_checkouts"
+          },
+          {
+            "component": "AffordabilityDecisionWorkbench",
+            "name": "affordability",
+            "nav_group": "Risk",
+            "path": "/fintech-bnpl/affordability",
+            "permission": "fintech_bnpl:decisioning"
+          },
+          {
+            "component": "BNPLPlanWorkbench",
+            "name": "plans",
+            "nav_group": "Plans",
+            "path": "/fintech-bnpl/plans",
+            "permission": "fintech_bnpl:plans"
+          },
+          {
+            "component": "InstallmentScheduleConsole",
+            "name": "installments",
+            "nav_group": "Plans",
+            "path": "/fintech-bnpl/installments",
+            "permission": "fintech_bnpl:installments"
+          },
+          {
+            "component": "MerchantSettlementWorkbench",
+            "name": "settlements",
+            "nav_group": "Settlement",
+            "path": "/fintech-bnpl/settlements",
+            "permission": "fintech_bnpl:settlements"
+          },
+          {
+            "component": "BNPLDisputeWorkbench",
+            "name": "disputes",
+            "nav_group": "Servicing",
+            "path": "/fintech-bnpl/disputes",
+            "permission": "fintech_bnpl:disputes"
+          },
+          {
+            "component": "BNPLAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/fintech-bnpl/agents",
+            "permission": "fintech_bnpl:admin"
+          },
+          {
+            "component": "BNPLSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/fintech-bnpl/settings",
+            "permission": "fintech_bnpl:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "bnpl_review": {
+        "roles": [
+          "bnpl_ops_reviewer",
+          "affordability_reviewer",
+          "merchant_risk_reviewer",
+          "settlement_reviewer",
+          "dispute_reviewer",
+          "compliance_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "fintech_bnpl": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_cards",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "fintech_lending",
+        "fintech_neobanking"
+      ]
+    }
+  },
+  "contracts": {
+    "fintech_bnpl": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "audit": "audl",
+          "auth": "auth",
+          "cards": "fintech_cards",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "lending": "fintech_lending",
+          "neobanking": "fintech_neobanking",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "wallets": "fintech_wallets"
+        },
+        "affordability": {
+          "adverse_reason_required_for_decline": true,
+          "human_approval_required_for_final_decisions": true,
+          "score_max": 1000,
+          "score_min": 0,
+          "supported_decisions": [
+            "approve",
+            "decline",
+            "refer"
+          ]
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "bnpl_ops_reviewer",
+            "affordability_reviewer",
+            "merchant_risk_reviewer",
+            "settlement_reviewer",
+            "dispute_reviewer",
+            "compliance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "checkout": {
+          "high_value_threshold": 100000,
+          "payment_reference_required": true,
+          "supported_categories": [
+            "retail",
+            "electronics",
+            "grocery",
+            "travel",
+            "education",
+            "medical",
+            "services",
+            "marketplace"
+          ],
+          "supported_channels": [
+            "web",
+            "mobile",
+            "pos",
+            "marketplace",
+            "api"
+          ],
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ]
+        },
+        "consumers": {
+          "aml_required": true,
+          "consent_required": true,
+          "fraud_required": true,
+          "kyc_required": true,
+          "supported_countries": [
+            "KE",
+            "UG",
+            "TZ",
+            "RW",
+            "GH",
+            "NG",
+            "ZA",
+            "GB",
+            "US",
+            "AE"
+          ]
+        },
+        "disputes": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_reasons": [
+            "goods_not_received",
+            "duplicate",
+            "refund_not_processed",
+            "fraud",
+            "quality_issue",
+            "merchant_error"
+          ]
+        },
+        "governance": {
+          "audit_bnpl_events": true,
+          "customer_consent_required": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "installments": {
+          "positive_due_amount_required": true,
+          "supported_statuses": [
+            "scheduled",
+            "due",
+            "paid",
+            "missed",
+            "waived"
+          ]
+        },
+        "merchants": {
+          "legal_entity_required": true,
+          "program_required": true,
+          "settlement_account_required": true,
+          "supported_categories": [
+            "retail",
+            "electronics",
+            "grocery",
+            "travel",
+            "education",
+            "medical",
+            "services",
+            "marketplace"
+          ]
+        },
+        "observability": {
+          "emit_affordability_events": true,
+          "emit_agent_events": true,
+          "emit_checkout_events": true,
+          "emit_consumer_events": true,
+          "emit_dispute_events": true,
+          "emit_installment_events": true,
+          "emit_merchant_events": true,
+          "emit_plan_events": true,
+          "emit_program_events": true,
+          "emit_settlement_events": true,
+          "event_stream": "apg.fintech.bnpl.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "plans": {
+          "customer_acceptance_required": true,
+          "fee_disclosure_required": true,
+          "max_term_days": 730,
+          "min_term_days": 1,
+          "supported_plan_types": [
+            "pay_in_3",
+            "pay_in_4",
+            "monthly_installments",
+            "invoice_split"
+          ]
+        },
+        "programs": {
+          "fee_disclosure_required": true,
+          "max_installment_count": 24,
+          "owner_required": true,
+          "supported_countries": [
+            "KE",
+            "UG",
+            "TZ",
+            "RW",
+            "GH",
+            "NG",
+            "ZA",
+            "GB",
+            "US",
+            "AE"
+          ],
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ]
+        },
+        "settlements": {
+          "high_value_threshold": 100000,
+          "human_approval_required_for_holds_and_high_value_releases": true,
+          "reconciliation_required": true,
+          "supported_statuses": [
+            "pending",
+            "released",
+            "held",
+            "reconciled"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_bnpl_control"
+        },
+        "ui": {
+          "enable_affordability": true,
+          "enable_agents": true,
+          "enable_checkouts": true,
+          "enable_consumers": true,
+          "enable_dashboard": true,
+          "enable_disputes": true,
+          "enable_installments": true,
+          "enable_merchants": true,
+          "enable_plans": true,
+          "enable_programs": true,
+          "enable_settlements": true
+        }
+      },
+      "id": "fintech_bnpl",
+      "provides": [
+        "bnpl_merchant_program_governance",
+        "consumer_bnpl_lifecycle",
+        "merchant_checkout_workflow",
+        "affordability_decisioning",
+        "bnpl_plan_workflow",
+        "installment_schedule_workflow",
+        "merchant_settlement_workflow",
+        "bnpl_dispute_workflow",
+        "bnpl_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_cards",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud",
+        "fintech_lending",
+        "fintech_neobanking"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 13,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "fintech_bnpl": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}

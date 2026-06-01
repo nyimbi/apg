@@ -26997,3 +26997,85 @@ Known gaps:
   mobile-money integration, live customer-support integration, regulator
   filing, durable Bytewax topology, or performance/load checks during this
   battery-conscious slice.
+
+## 2026-06-01 - FinTech Buy Now Pay Later executable capability
+
+- Promoted `capabilities/fintech/bnpl` from a placeholder package into a
+  first-class APG capability with `README.md`, `SPECIFICATION.md`, `PLAN.md`,
+  `cap_spec.md`, contract, models, service, API helpers, view models, app
+  entrypoint, semantic/package/release evidence, and focused tests.
+- Added tenant-scoped merchant program governance, consumer onboarding,
+  merchant profiles, checkout sessions, affordability decisions, BNPL plan
+  creation, installment schedules, merchant settlements, disputes, dashboard
+  summaries, Bytewax batch validation, and provider-neutral BNPL-agent
+  registration.
+- Added deterministic BNPL guardrails for tenant context, write policy, program
+  owner/country/currency/settlement-policy/fee-disclosure/installment-count
+  evidence, consumer customer/KYC/country/consent/AML/fraud evidence, merchant
+  program/legal-entity/category/country/risk-tier/settlement-account controls,
+  checkout merchant/consumer/channel/category/amount/currency/payment/fraud/
+  AML/consent/high-value review evidence, affordability score/decision/evidence/
+  adverse-reason/approval controls, plan approval/type/principal/term/fee/
+  acceptance controls, installment due amount/date/status controls, settlement
+  amount/reconciliation/payment-rail/approval controls, dispute reason/reviewer/
+  evidence controls, Bytewax lifecycle events, supported AI-agent runtimes/roles,
+  and privileged-agent approval.
+- Added `bnpl_runtime.py` domain helpers for normalized codes, countries,
+  currencies, amounts, scores, plan installment counts, installment estimates,
+  and final/approved affordability decisions.
+- Updated fintech capability metadata so `bnpl` is listed as an implemented
+  sub-capability.
+- Removed the empty `_Buy_Now_Pay_Later` marker file and refreshed
+  `semantic_model.json`, `package_manifest.json`, and `release_report.json`.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/fintech/bnpl/__init__.py capabilities/fintech/bnpl/capability_contract.py capabilities/fintech/bnpl/models.py capabilities/fintech/bnpl/bnpl_runtime.py capabilities/fintech/bnpl/service.py capabilities/fintech/bnpl/api.py capabilities/fintech/bnpl/views.py capabilities/fintech/bnpl/app.py capabilities/fintech/bnpl/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/fintech/bnpl/tests/test_package_contract.py`
+  passed with 6 tests.
+- `./.venv/bin/python capabilities/fintech/bnpl/app.py` passed with
+  `self_test()` status `ok`.
+- `./.venv/bin/apg capabilities inspect fintech_bnpl --json` passed with 65
+  rules, 12 routes, Bytewax streaming, and provider-neutral BNPL-agent runtimes.
+- `./.venv/bin/apg capabilities publish-plan capabilities/fintech/bnpl --json`
+  passed with side-effect-free publish evidence and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/fintech/bnpl --json`
+  passed with one domain-specific fintech BNPL implementation, 0 baseline
+  markers, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/fintech/bnpl --json`
+  passed with one complete lifecycle record, 65 rules, 12 routes, 11 theme
+  tokens, and 0 warnings/errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 119 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 119 operable contracts, 119 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/fintech/bnpl`, `capabilities/fintech/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed program, consumer, merchant, checkout, affordability, plan,
+  installment, settlement, dispute, and AI-agent lifecycle paths so rule
+  evaluation happens before state mutation.
+- Tightened plan guardrails during review so unsupported currencies and invalid
+  down payments are rejected before plan records are written.
+- Reviewed first-class BNPL-agent behavior so Codex, Claude Code, OpenCode, and
+  Pi runtimes remain provider-neutral and privileged actions require human
+  approval.
+- Kept live checkout gateways, merchant acquirers, credit bureaus, payment
+  rails, collection providers, regulator filing, and durable Bytewax workers
+  behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live checkout
+  gateway/acquirer flows, live credit-bureau pulls, live payment-rail capture/
+  refund, live merchant settlement files, collection provider integration,
+  regulator filing, durable Bytewax topology, or performance/load checks during
+  this battery-conscious slice.
