@@ -10,9 +10,9 @@ audit evidence through deterministic guardrails.
 
 - Predictive model registration with owner, algorithm, target, environment,
   training history, features, approval state, explainability state, and audit
-  evidence.
+  evidence, including pending-review state for incomplete governance evidence.
 - Feature-set registration with owner, feature names, ETLP lineage references,
-  and source-system metadata.
+  source-system metadata, and pending-review evidence when lineage is missing.
 - Forecast runs with history-size checks, positive horizon checks, long-horizon
   review, confidence-interval metadata, deterministic forecast values, and
   audit events.
@@ -21,7 +21,8 @@ audit evidence through deterministic guardrails.
 - Scenario simulation with baseline, adjustments, assumptions, projected score,
   and delta output.
 - Drift reports with metric, threshold, score, review evidence, status, and
-  audit events.
+  audit events, including pending-review state for unreviewed above-threshold
+  drift.
 - First-class AI prediction-agent composition for `codex`, `claude_code`,
   `opencode`, and `pi`, with role, scope, owner, purpose, contribution
   disclosure, and privileged-role review guardrails.
@@ -83,6 +84,15 @@ forecast = service.create_forecast(
 	[100 + index for index in range(24)],
 	7,
 )
+review_forecast = service.create_forecast(
+	"forecast-long",
+	"tenant-a",
+	model["id"],
+	"daily demand",
+	[100 + index for index in range(24)],
+	366,
+)
+assert review_forecast["status"] == "pending_review"
 score = service.score_entity(
 	"score-order-1",
 	"tenant-a",
@@ -125,7 +135,9 @@ metric or threshold, non-Bytewax batch scoring streams, cross-tenant scoring,
 and prediction state changes without audit evidence. PRED requires review for
 short model training history, missing model feature metadata, model approval
 without explainability, long forecast horizons, missing feature lineage during
-feature registration, and above-threshold drift without review. AI
+feature registration, and above-threshold drift without review; those outcomes
+are persisted as `pending_review` records with matched rule and review-reason
+evidence for generated model, forecast, drift, and governance screens. AI
 prediction-agent guardrails also block unsupported runtimes, unsupported roles,
 missing scope, missing owner, missing purpose, missing machine-contribution
 disclosure, and route privileged roles through pending human review when

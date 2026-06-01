@@ -258,6 +258,10 @@ def test_service_runs_model_forecast_score_scenario_drift_and_audit_lifecycle():
 	assert summary["approved_model_count"] == 1
 	assert summary["prediction_agent_count"] == 1
 	assert summary["lifecycle_batch_count"] == 1
+	assert summary["pending_model_review_count"] == 0
+	assert summary["pending_feature_review_count"] == 0
+	assert summary["pending_forecast_review_count"] == 0
+	assert summary["pending_drift_review_count"] == 0
 	assert dashboard["summary"]["forecast_count"] == 1
 	assert score_monitor["scores"][0]["id"] == "score-order-1"
 	assert feature_registry["feature_sets"][0]["source_system"] == "etlp"
@@ -303,18 +307,6 @@ def test_service_enforces_predictive_governance_guardrails():
 			target="",
 		)
 
-	with pytest.raises(PermissionError, match="training_history_review_required"):
-		service.register_model(
-			model_id="short-training-history",
-			tenant_id=tenant_id,
-			name="Short Training History",
-			owner="analytics",
-			algorithm="linear",
-			target="risk",
-			training_history_points=12,
-			feature_names=["risk"],
-		)
-
 	with pytest.raises(PermissionError, match="feature_source_system_required"):
 		service.register_feature_set(
 			feature_set_id="features-no-source",
@@ -356,7 +348,36 @@ def test_service_enforces_predictive_governance_guardrails():
 		lineage_refs=[],
 		source_system="manual",
 	)
-	assert no_lineage["status"] == "review_required"
+	assert no_lineage["status"] == "pending_review"
+	assert no_lineage["decision"] == "require_review"
+	assert no_lineage["review_reasons"] == ["feature_lineage_review_required"]
+
+	short_history = service.register_model(
+		model_id="short-training-history",
+		tenant_id=tenant_id,
+		name="Short Training History",
+		owner="analytics",
+		algorithm="linear",
+		target="risk",
+		training_history_points=12,
+		feature_names=["risk"],
+	)
+	assert short_history["status"] == "pending_review"
+	assert short_history["decision"] == "require_review"
+	assert short_history["review_reasons"] == ["training_history_review_required"]
+
+	missing_features = service.register_model(
+		model_id="missing-feature-metadata",
+		tenant_id=tenant_id,
+		name="Missing Feature Metadata",
+		owner="analytics",
+		algorithm="linear",
+		target="risk",
+		training_history_points=24,
+		feature_names=[],
+	)
+	assert missing_features["status"] == "pending_review"
+	assert missing_features["review_reasons"] == ["model_feature_metadata_required"]
 
 	with pytest.raises(PermissionError, match="insufficient_history"):
 		service.create_forecast(
@@ -378,16 +399,18 @@ def test_service_enforces_predictive_governance_guardrails():
 			horizon_days=0,
 		)
 
-	with pytest.raises(PermissionError, match="long_horizon_review_required"):
-		service.create_forecast(
-			forecast_id="long-horizon",
-			tenant_id=tenant_id,
-			model_id=unapproved["id"],
-			series_name="risk",
-			history_values=[1.0] * 24,
-			horizon_days=366,
-			review_recorded=False,
-		)
+	long_horizon = service.create_forecast(
+		forecast_id="long-horizon",
+		tenant_id=tenant_id,
+		model_id=unapproved["id"],
+		series_name="risk",
+		history_values=[1.0] * 24,
+		horizon_days=366,
+		review_recorded=False,
+	)
+	assert long_horizon["status"] == "pending_review"
+	assert long_horizon["decision"] == "require_review"
+	assert long_horizon["review_reasons"] == ["long_horizon_review_required"]
 
 	with pytest.raises(PermissionError, match="approved_model_required"):
 		service.score_entity(
@@ -480,16 +503,35 @@ def test_service_enforces_predictive_governance_guardrails():
 			threshold=0.3,
 		)
 
-	with pytest.raises(PermissionError, match="drift_review_required"):
-		service.record_drift(
-			report_id="high-drift-no-review",
-			tenant_id=tenant_id,
-			model_id=unapproved["id"],
-			metric_name="population_stability_index",
-			drift_score=0.5,
-			threshold=0.3,
-			review_recorded=False,
-		)
+	approval_review = service.approve_model("missing-feature-metadata", tenant_id, approver="governance")
+	assert approval_review["status"] == "pending_review"
+	assert approval_review["review_reasons"] == ["model_explainability_review_required"]
+
+	high_drift = service.record_drift(
+		report_id="high-drift-no-review",
+		tenant_id=tenant_id,
+		model_id=unapproved["id"],
+		metric_name="population_stability_index",
+		drift_score=0.5,
+		threshold=0.3,
+		review_recorded=False,
+	)
+	assert high_drift["status"] == "pending_review"
+	assert high_drift["decision"] == "require_review"
+	assert high_drift["review_reasons"] == ["drift_review_required"]
+	summary = service.dashboard_summary(tenant_id)
+	assert summary["pending_model_review_count"] == 2
+	assert summary["pending_feature_review_count"] == 1
+	assert summary["pending_forecast_review_count"] == 1
+	assert summary["pending_drift_review_count"] == 1
+	assert views.forecast_console_model(service, tenant_id)["pending_review"][0]["id"] == "long-horizon"
+	assert views.feature_registry_model(service, tenant_id)["pending_review"][0]["id"] == "features-no-lineage"
+	assert {item["id"] for item in views.model_board_model(service, tenant_id)["pending_review"]} == {
+		"missing-feature-metadata",
+		"short-training-history",
+	}
+	assert views.drift_monitor_model(service, tenant_id)["pending_review"][0]["id"] == "high-drift-no-review"
+	assert views.governance_model(service, tenant_id)["pending_reviews"]["drift_reports"][0]["id"] == "high-drift-no-review"
 
 
 def test_service_preserves_compatibility_records_as_models():

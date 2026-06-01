@@ -37,6 +37,7 @@ def forecast_console_model(
 	return {
 		"tenant_id": tenant_id,
 		"forecasts": service.list_forecasts(tenant_id),
+		"pending_review": [item for item in service.list_forecasts(tenant_id) if item["status"] == "pending_review"],
 		"models": service.list_models(tenant_id),
 		"route": "/pred/forecasts",
 	}
@@ -64,6 +65,7 @@ def feature_registry_model(
 	return {
 		"tenant_id": tenant_id,
 		"feature_sets": service.list_feature_sets(tenant_id),
+		"pending_review": [item for item in service.list_feature_sets(tenant_id) if item["status"] == "pending_review"],
 		"lineage_required": service.describe(tenant_id)["configuration"]["feature_sets"]["lineage_required"],
 		"route": "/pred/features",
 	}
@@ -90,6 +92,7 @@ def model_board_model(
 	return {
 		"tenant_id": tenant_id,
 		"models": service.list_models(tenant_id),
+		"pending_review": [item for item in service.list_models(tenant_id) if item["status"] == "pending_review"],
 		"feature_sets": service.list_feature_sets(tenant_id),
 		"route": "/pred/models",
 	}
@@ -103,6 +106,7 @@ def drift_monitor_model(
 	return {
 		"tenant_id": tenant_id,
 		"drift_reports": service.list_drift_reports(tenant_id),
+		"pending_review": [item for item in service.list_drift_reports(tenant_id) if item["status"] == "pending_review"],
 		"threshold_required": service.describe(tenant_id)["configuration"]["drift"]["threshold_required"],
 		"route": "/pred/drift",
 	}
@@ -148,6 +152,13 @@ def governance_model(
 		"tenant_id": tenant_id,
 		"audit_events": service.list_audit_events(tenant_id),
 		"drift_reports": service.list_drift_reports(tenant_id),
+		"pending_reviews": {
+			"models": [item for item in service.list_models(tenant_id) if item["status"] == "pending_review"],
+			"feature_sets": [item for item in service.list_feature_sets(tenant_id) if item["status"] == "pending_review"],
+			"forecasts": [item for item in service.list_forecasts(tenant_id) if item["status"] == "pending_review"],
+			"drift_reports": [item for item in service.list_drift_reports(tenant_id) if item["status"] == "pending_review"],
+			"agents": [item for item in service.list_prediction_agents(tenant_id) if item["status"] == "pending_review"],
+		},
 		"agents": contract["agents"],
 		"streaming": contract["streaming"],
 		"prediction_agents": service.list_prediction_agents(tenant_id),

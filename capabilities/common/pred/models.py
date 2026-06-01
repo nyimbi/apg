@@ -29,6 +29,9 @@ class PredictiveModel:
 	training_history_points: int = 0
 	feature_names: tuple[str, ...] = ()
 	status: str = "registered"
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
 	metadata: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=utc_now)
 	updated_at: datetime = field(default_factory=utc_now)
@@ -47,6 +50,9 @@ class PredictiveModel:
 			"training_history_points": self.training_history_points,
 			"feature_names": list(self.feature_names),
 			"status": self.status,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
 			"metadata": dict(self.metadata),
 			"created_at": isoformat(self.created_at),
 			"updated_at": isoformat(self.updated_at),
@@ -63,6 +69,9 @@ class FeatureSet:
 	lineage_refs: tuple[str, ...]
 	source_system: str
 	status: str = "active"
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
 	created_at: datetime = field(default_factory=utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -75,6 +84,9 @@ class FeatureSet:
 			"lineage_refs": list(self.lineage_refs),
 			"source_system": self.source_system,
 			"status": self.status,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
 			"created_at": isoformat(self.created_at),
 		}
 
@@ -91,6 +103,9 @@ class ForecastRun:
 	forecast_values: tuple[float, ...]
 	review_recorded: bool = False
 	status: str = "forecasted"
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
 	created_at: datetime = field(default_factory=utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -105,6 +120,9 @@ class ForecastRun:
 			"forecast_values": list(self.forecast_values),
 			"review_recorded": self.review_recorded,
 			"status": self.status,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
 			"created_at": isoformat(self.created_at),
 		}
 
@@ -177,6 +195,9 @@ class DriftReport:
 	threshold: float
 	status: str
 	review_recorded: bool = False
+	decision: str = "allow"
+	matched_rules: tuple[str, ...] = ()
+	review_reasons: tuple[str, ...] = ()
 	created_at: datetime = field(default_factory=utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -189,6 +210,9 @@ class DriftReport:
 			"threshold": self.threshold,
 			"status": self.status,
 			"review_recorded": self.review_recorded,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
 			"created_at": isoformat(self.created_at),
 		}
 

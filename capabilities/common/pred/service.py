@@ -86,7 +86,7 @@ class PredService:
 			"training_history_points": max(0, int(training_history_points)),
 			"feature_names_present": bool(features),
 		})
-		self._raise_if_blocked(result)
+		self._raise_if_denied(result)
 		model = PredictiveModel(
 			id=model_id,
 			tenant_id=tenant_id,
@@ -99,11 +99,14 @@ class PredService:
 			explainability_attached=bool(explainability_attached),
 			training_history_points=max(0, int(training_history_points)),
 			feature_names=features,
-			status="approved" if approved else "registered",
+			status="pending_review" if result["decision"] == "require_review" else ("approved" if approved else "registered"),
+			decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=self._review_reasons(result),
 			metadata=dict(metadata or {}),
 		)
 		self._models[model.id] = model
-		self._record_audit(tenant_id, model.id, "model_registered", owner, "allow")
+		self._record_audit(tenant_id, model.id, "model_registered", owner, result["decision"], self._reasons(result))
 		return model.to_dict()
 
 	def approve_model(
@@ -121,12 +124,20 @@ class PredService:
 			"operation": "approve_model",
 			"explainability_attached": model.explainability_attached or bool(explainability_ref),
 		})
-		self._raise_if_blocked(result)
+		self._raise_if_denied(result)
+		model.decision = result["decision"]
+		model.matched_rules = tuple(result["matched_rules"])
+		model.review_reasons = self._review_reasons(result)
+		if result["decision"] == "require_review":
+			model.status = "pending_review"
+			model.updated_at = utc_now()
+			self._record_audit(tenant_id, model.id, "model_approval_review_required", approver, result["decision"], self._reasons(result))
+			return model.to_dict()
 		model.approved = True
 		model.explainability_attached = model.explainability_attached or bool(explainability_ref)
 		model.status = "approved"
 		model.updated_at = utc_now()
-		self._record_audit(tenant_id, model.id, "model_approved", approver, "allow")
+		self._record_audit(tenant_id, model.id, "model_approved", approver, result["decision"], self._reasons(result))
 		return model.to_dict()
 
 	def register_feature_set(
@@ -166,10 +177,13 @@ class PredService:
 			feature_names=features,
 			lineage_refs=lineage,
 			source_system=source_system,
-			status="review_required" if result["decision"] == "require_review" else "active",
+			status="pending_review" if result["decision"] == "require_review" else "active",
+			decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=self._review_reasons(result),
 		)
 		self._feature_sets[feature_set.id] = feature_set
-		self._record_audit(tenant_id, feature_set.id, "feature_set_registered", owner, "allow")
+		self._record_audit(tenant_id, feature_set.id, "feature_set_registered", owner, result["decision"], self._reasons(result))
 		return feature_set.to_dict()
 
 	def create_forecast(
@@ -197,7 +211,7 @@ class PredService:
 			"forecast_horizon_days": int(horizon_days),
 			"review_recorded": bool(review_recorded),
 		})
-		self._raise_if_blocked(result)
+		self._raise_if_denied(result)
 		values = forecast_series(history_values, int(horizon_days))
 		forecast = ForecastRun(
 			id=forecast_id,
@@ -209,9 +223,13 @@ class PredService:
 			confidence_interval=bool(confidence_interval),
 			forecast_values=values,
 			review_recorded=bool(review_recorded),
+			status="pending_review" if result["decision"] == "require_review" else "forecasted",
+			decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=self._review_reasons(result),
 		)
 		self._forecasts[forecast.id] = forecast
-		self._record_audit(tenant_id, forecast.id, "forecast_created", actor, "allow")
+		self._record_audit(tenant_id, forecast.id, "forecast_created", actor, result["decision"], self._reasons(result))
 		return forecast.to_dict()
 
 	def score_entity(
@@ -326,7 +344,7 @@ class PredService:
 			"drift_over_threshold": float(drift_score) > float(threshold),
 			"review_recorded": bool(review_recorded),
 		})
-		self._raise_if_blocked(result)
+		self._raise_if_denied(result)
 		report = DriftReport(
 			id=report_id,
 			tenant_id=tenant_id,
@@ -334,11 +352,14 @@ class PredService:
 			metric_name=metric_name,
 			drift_score=round(float(drift_score), 4),
 			threshold=round(float(threshold), 4),
-			status=drift_status(drift_score, threshold),
+			status="pending_review" if result["decision"] == "require_review" else drift_status(drift_score, threshold),
 			review_recorded=bool(review_recorded),
+			decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			review_reasons=self._review_reasons(result),
 		)
 		self._drift_reports[report.id] = report
-		self._record_audit(tenant_id, report.id, "drift_recorded", actor, report.status)
+		self._record_audit(tenant_id, report.id, "drift_recorded", actor, result["decision"], self._reasons(result))
 		return report.to_dict()
 
 	def register_prediction_agent(
@@ -490,7 +511,11 @@ class PredService:
 			"forecast_count": len(self.list_forecasts(tenant_id)),
 			"score_count": len(self.list_scores(tenant_id)),
 			"scenario_count": len(self.list_scenarios(tenant_id)),
-			"drift_review_count": sum(1 for report in self._drift_reports.values() if report.tenant_id == tenant_id and report.status == "review_required"),
+			"pending_model_review_count": len([item for item in self.list_models(tenant_id) if item["status"] == "pending_review"]),
+			"pending_feature_review_count": len([item for item in self.list_feature_sets(tenant_id) if item["status"] == "pending_review"]),
+			"pending_forecast_review_count": len([item for item in self.list_forecasts(tenant_id) if item["status"] == "pending_review"]),
+			"pending_drift_review_count": len([item for item in self.list_drift_reports(tenant_id) if item["status"] == "pending_review"]),
+			"drift_review_count": sum(1 for report in self._drift_reports.values() if report.tenant_id == tenant_id and report.status in {"review_required", "pending_review"}),
 			"prediction_agent_count": len(self.list_prediction_agents(tenant_id)),
 			"pending_agent_review_count": len([item for item in self.list_prediction_agents(tenant_id) if item["status"] == "pending_review"]),
 			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
@@ -551,6 +576,13 @@ class PredService:
 
 	def _reasons(self, result: dict[str, Any]) -> tuple[str, ...]:
 		return tuple(action.get("reason", "prediction_policy_blocked") for action in result["actions"])
+
+	def _review_reasons(self, result: dict[str, Any]) -> tuple[str, ...]:
+		return tuple(
+			action.get("reason", "prediction_review_required")
+			for action in result["actions"]
+			if action.get("decision") == "require_review"
+		)
 
 	def _normalize_token(self, value: str) -> str:
 		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")

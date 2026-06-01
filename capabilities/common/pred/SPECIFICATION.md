@@ -45,21 +45,25 @@ This packet establishes the executable baseline for PRED:
 - Approve models with an accountable approver.
 - Require owner, algorithm, target, and tenant context before model
   registration.
-- Require review for short training history and missing model feature metadata.
+- Preserve review-required short training history, missing feature metadata, and
+  missing explainability approval outcomes as `pending_review` model evidence
+  with matched rules and review reasons.
 
 ### Feature Lifecycle
 
 - Register feature sets with owner, feature names, lineage refs, and source
   system.
 - Deny missing owner, feature names, and source system.
-- Require review when lineage is missing at registration time.
+- Preserve missing-lineage review outcomes as `pending_review` feature-set
+  evidence with matched rules and review reasons.
 
 ### Forecast Lifecycle
 
 - Create forecasts from registered models, named series, history values, and a
   positive horizon.
 - Deny missing model, series, insufficient history, and invalid horizons.
-- Require review for horizons beyond the configured limit.
+- Preserve long-horizon review outcomes as `pending_review` forecast evidence
+  with matched rules and review reasons.
 
 ### Scoring Lifecycle
 
@@ -80,7 +84,8 @@ This packet establishes the executable baseline for PRED:
 
 - Record drift reports with metric, score, threshold, review evidence, status,
   and audit events.
-- Deny over-threshold drift persistence when no review evidence exists.
+- Preserve above-threshold drift without review evidence as `pending_review`
+  drift evidence with matched rules and review reasons.
 
 ### AI Agent Lifecycle
 
@@ -139,9 +144,9 @@ stable.
   metadata.
 - `PredService` executes model, feature set, forecast, score, scenario, drift,
   agent, lifecycle-batch, list, dashboard, and APG record compatibility flows.
-- Guardrail tests prove denied cases fail before state is accepted, and
-  review-required cases are surfaced through explicit review state or
-  PermissionError depending on the lifecycle stage.
+- Guardrail tests prove denied cases fail before state is accepted, while
+  review-required model, feature, forecast, and drift outcomes are retained as
+  `pending_review` records with deterministic policy evidence.
 - `app.self_test()` passes and fails if route, rule, Bytewax, or runtime
   evidence becomes stale.
 - Package JSON evidence can be regenerated from `app.semantic_model()` and

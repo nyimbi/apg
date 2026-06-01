@@ -23834,3 +23834,76 @@ Known gaps:
   battery-conscious capability slice.
 - Existing SQLAlchemy and Pydantic deprecation warnings surfaced by focused
   tests remain outside this slice.
+
+### 2026-06-01 03:44 EAT
+
+PRED review-evidence lifecycle slice:
+
+- Added executable pending-review state for predictive model, feature-set,
+  forecast, and drift lifecycle outcomes. Denial guardrails still block state
+  acceptance, while review-required outcomes now retain deterministic policy
+  evidence.
+- Extended PRED model records with `decision`, `matched_rules`, and
+  `review_reasons` for `PredictiveModel`, `FeatureSet`, `ForecastRun`, and
+  `DriftReport`.
+- Updated model registration and approval so short training history, missing
+  model feature metadata, and approval without explainability become
+  `pending_review` model evidence instead of discarded hard failures.
+- Updated feature registration, long-horizon forecasts, and above-threshold
+  drift recording so generated applications can show pending review queues
+  without rerunning analytics jobs.
+- Surfaced pending review queues through dashboard summary, forecast console,
+  feature registry, model board, drift monitor, and governance view models.
+- Updated PRED `SPECIFICATION.md`, `PLAN.md`, `README.md`, and `cap_spec.md`
+  to describe review-evidence lifecycle behavior.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/pred/__init__.py capabilities/common/pred/capability_contract.py capabilities/common/pred/models.py capabilities/common/pred/predictive_runtime.py capabilities/common/pred/service.py capabilities/common/pred/views.py capabilities/common/pred/app.py capabilities/common/pred/test_capability_contract.py capabilities/common/pred/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/pred/test_capability_contract.py capabilities/common/pred/tests/test_package_contract.py`
+  passed with 10 tests and 10 pre-existing SQLAlchemy/Pydantic deprecation
+  warnings from imported shared modules.
+- `./.venv/bin/python -c "from capabilities.common.pred import app; r=app.self_test(); print(r); assert r['passed']"`
+  passed.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/pred --json`
+  passed with one domain-specific PRED implementation, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/pred --json`
+  passed and showed 39 rules, 14 routes, Bytewax streaming, first-class
+  prediction-agent evidence, and side-effect-free publish evidence.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/common/pred --json`
+  passed with one complete lifecycle record, 39 rules, 14 routes, and 0
+  warnings/errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 109 operable contracts, 109 complete packages, 0
+  package gaps, 0 warnings, and 0 errors.
+- Focused stale-marker scan over touched PRED source, docs, and tests returned
+  no primary-slice stale markers.
+- `git diff --check -- capabilities/common/pred` passed.
+
+Code review:
+
+- Reviewed denial behavior: missing tenant context, model owner/target,
+  feature source system, insufficient forecast history, invalid horizons,
+  unapproved production scoring, missing scoring lineage, missing high-impact
+  explainability, missing scenario inputs, and missing drift metrics still fail
+  before accepting state.
+- Reviewed review behavior: model, feature, forecast, and drift review-required
+  outcomes now keep matched rules and review reasons on the domain record and
+  in audit events.
+- Reviewed tenant boundaries: model, feature, forecast, score, scenario, drift,
+  agent, lifecycle, and audit list surfaces remain tenant-filtered.
+- Reviewed UI surfacing: route-specific view models expose stored pending
+  review queues instead of re-evaluating historical predictions.
+- Kept live model providers, ETLP feature pipelines, MLCM integrations,
+  metrics sinks, caches, and Bytewax execution behind adapters.
+
+Known gaps:
+
+- Did not run the full repository test suite, rendered UI checks, live model
+  providers, live ETLP feature pipelines, live MLCM integrations, durable
+  metrics/cache sinks, live Bytewax topology, or performance/load checks during
+  this battery-conscious capability slice.
+- Existing SQLAlchemy and Pydantic deprecation warnings surfaced by focused
+  tests remain outside this slice.

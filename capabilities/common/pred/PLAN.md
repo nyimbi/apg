@@ -18,6 +18,9 @@
 - Keep `PredService` as the generated-app runtime.
 - Harden model, feature, forecast, score, scenario, and drift guardrails where
   the expanded contract needs executable evidence.
+- Preserve review-required model, feature-set, forecast, and drift outcomes as
+  `pending_review` records with matched rules and review reasons, while denial
+  guardrails continue to block state acceptance.
 - Add runtime records and operations for registering governed AI prediction
   agents and validating Bytewax lifecycle batches.
 - Keep deterministic helpers in `predictive_runtime.py` so generated
@@ -28,6 +31,8 @@
 - Extend route-specific view models for dashboard, forecasts, scores, features,
   scenarios, models, drift, batch scoring, explainability, agents, lifecycle,
   governance, and audit.
+- Surface pending review queues in model, feature, forecast, drift, dashboard,
+  and governance view models without re-evaluating historical predictions.
 - Ensure view models import only the contract and dependency-light runtime.
 
 ## Phase 4 - Package Evidence
