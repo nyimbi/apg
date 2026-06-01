@@ -71,6 +71,14 @@ def semantic_model() -> dict[str, Any]:
 					"schema_retire": "GraphSchema",
 					"graph_agent": "GraphAgentRecord",
 				},
+				"review_queues": {
+					"schemas": "GraphSchema.status == pending_review",
+					"nodes": "GraphNode.status == pending_review",
+					"edges": "GraphEdge.status == pending_review",
+					"traversals": "GraphTraversalResult.status == pending_review",
+					"quality_reports": "GraphQualityReport.status == pending_review",
+					"graph_agents": "GraphAgentRecord.status == pending_review",
+				},
 				"graph_lifecycle": {
 					"schema": "GraphSchema",
 					"node": "GraphNode",

@@ -41,6 +41,10 @@ class GraphSchema:
 	node_types: dict[str, list[str]] = field(default_factory=dict)
 	edge_types: dict[str, dict[str, Any]] = field(default_factory=dict)
 	source_asset_id: str | None = None
+	status: str = "active"
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
 	created_at: str = field(default_factory=utc_now_iso)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -53,6 +57,10 @@ class GraphSchema:
 			"node_types": {key: list(value) for key, value in self.node_types.items()},
 			"edge_types": {key: dict(value) for key, value in self.edge_types.items()},
 			"source_asset_id": self.source_asset_id,
+			"status": self.status,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
 			"created_at": self.created_at,
 		}
 
@@ -69,6 +77,10 @@ class GraphNode:
 	labels: list[str] = field(default_factory=list)
 	properties: dict[str, Any] = field(default_factory=dict)
 	source_asset_id: str | None = None
+	status: str = "active"
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
 	created_at: str = field(default_factory=utc_now_iso)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -82,6 +94,10 @@ class GraphNode:
 			"labels": list(self.labels),
 			"properties": dict(self.properties),
 			"source_asset_id": self.source_asset_id,
+			"status": self.status,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
 			"created_at": self.created_at,
 		}
 
@@ -99,6 +115,10 @@ class GraphEdge:
 	owner_id: str
 	classification: RelationshipClassification = RelationshipClassification.INTERNAL
 	properties: dict[str, Any] = field(default_factory=dict)
+	status: str = "active"
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
 	created_at: str = field(default_factory=utc_now_iso)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -113,6 +133,10 @@ class GraphEdge:
 			"owner_id": self.owner_id,
 			"classification": self.classification.value,
 			"properties": dict(self.properties),
+			"status": self.status,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
 			"created_at": self.created_at,
 		}
 
@@ -127,6 +151,10 @@ class GraphTraversalResult:
 	max_depth: int
 	node_ids: list[str]
 	edge_ids: list[str]
+	status: str = "completed"
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
 	created_at: str = field(default_factory=utc_now_iso)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -138,6 +166,10 @@ class GraphTraversalResult:
 			"max_depth": self.max_depth,
 			"node_ids": list(self.node_ids),
 			"edge_ids": list(self.edge_ids),
+			"status": self.status,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
 			"created_at": self.created_at,
 		}
 
@@ -152,11 +184,11 @@ class GraphQualityReport:
 	orphan_node_count: int
 	missing_owner_count: int
 	restricted_edge_count: int
+	status: str = "healthy"
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
 	created_at: str = field(default_factory=utc_now_iso)
-
-	@property
-	def status(self) -> str:
-		return "attention_required" if self.orphan_node_count or self.missing_owner_count else "healthy"
 
 	def to_dict(self) -> dict[str, Any]:
 		return {
@@ -168,6 +200,9 @@ class GraphQualityReport:
 			"missing_owner_count": self.missing_owner_count,
 			"restricted_edge_count": self.restricted_edge_count,
 			"status": self.status,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
 			"created_at": self.created_at,
 		}
 
@@ -187,6 +222,9 @@ class GraphAgentRecord:
 	contribution_disclosed: bool
 	human_approval_required: bool
 	status: str = "active"
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
 	created_at: str = field(default_factory=utc_now_iso)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -204,6 +242,9 @@ class GraphAgentRecord:
 			"contribution_disclosed": self.contribution_disclosed,
 			"human_approval_required": self.human_approval_required,
 			"status": self.status,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
 			"created_at": self.created_at,
 		}
 
@@ -220,6 +261,7 @@ class GrphLifecycleBatchRecord:
 	accepted: bool
 	decision: str
 	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
 	required_processor: str = "bytewax"
 	status: str = "accepted"
 	created_at: str = field(default_factory=utc_now_iso)
@@ -236,6 +278,7 @@ class GrphLifecycleBatchRecord:
 			"accepted": self.accepted,
 			"decision": self.decision,
 			"matched_rules": list(self.matched_rules),
+			"review_reasons": list(self.review_reasons),
 			"required_processor": self.required_processor,
 			"status": self.status,
 			"created_at": self.created_at,
@@ -253,6 +296,7 @@ class GraphAuditEventRecord:
 	message: str
 	actor: str
 	severity: str = "low"
+	evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now_iso)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -265,5 +309,6 @@ class GraphAuditEventRecord:
 			"message": self.message,
 			"actor": self.actor,
 			"severity": self.severity,
+			"evidence": dict(self.evidence),
 			"created_at": self.created_at,
 		}

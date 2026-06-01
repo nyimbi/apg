@@ -16,6 +16,58 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-06-01 00:00 EAT
+
+GRPH review-evidence lifecycle packet:
+
+- Extended `GraphSchema`, `GraphNode`, `GraphEdge`, `GraphTraversalResult`,
+  `GraphQualityReport`, `GraphAgentRecord`, `GrphLifecycleBatchRecord`, and
+  `GraphAuditEventRecord` with durable policy evidence fields where needed:
+  status, decision, matched rules, review reasons, and audit evidence.
+- Changed review-required schema, node, edge, traversal, quality, and
+  graph-agent paths to persist `pending_review` records while keeping true deny
+  outcomes hard-blocking.
+- Surfaced pending-review queues in the GRPH dashboard, schema manager, node
+  manager, edge manager, traversal workbench, quality console, governance
+  console, and semantic model.
+- Updated focused GRPH tests so review-required custom schema kinds, node
+  labels, restricted or unknown edges, deep traversals, and quality-threshold
+  breaches prove durable review evidence instead of transient exceptions.
+- Updated GRPH README, specification, plan, and capability pointer to document
+  the review queue lifecycle and deny/review distinction.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for GRPH modules and tests passed.
+- `./.venv/bin/pytest -q capabilities/common/grph/test_capability_contract.py
+  capabilities/common/grph/tests/test_package_contract.py` passed with 12 tests
+  and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.grph import app; ..."`
+  passed package self-test.
+- `./.venv/bin/python -m json.tool capabilities/common/grph/semantic_model.json`
+  passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/grph --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, and no warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/grph --json`
+  passed with no warnings and side-effect-free publish planning.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/common/grph --json` passed with complete lifecycle evidence.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed with 109 operable contracts/packages and no warnings or errors.
+- GRPH stale-marker scan returned no matches across the edited GRPH packet.
+- `git diff --check -- capabilities/common/grph docs/progress_log.md` passed.
+- Inline code review found and fixed missing schema/quality pending-review test
+  coverage and repeated view-model list calls; no blocking findings remain.
+
+Known gaps:
+
+- Did not run full repository tests, rendered browser UI checks, live graph
+  database adapters, durable Bytewax topology, external Codex/Claude
+  Code/OpenCode/Pi clients, SRCH/AICR/MDM/META/ETLP/CONF live adapters, load
+  checks, migration checks, or traversal-performance benchmarks during this
+  battery-conscious slice.
+
 ### 2026-05-31 08:11 EAT
 
 RAGN RAG-agent composition and Bytewax lifecycle guardrail packet:

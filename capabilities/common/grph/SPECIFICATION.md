@@ -19,6 +19,8 @@ GRPH must support:
 - Bounded traversal, lineage paths, impact analysis, and neighborhood views.
 - Quality reports and operational summaries.
 - Audit evidence for mutations, review decisions, and state changes.
+- Durable review queues for review-required schemas, nodes, edges, traversals,
+  quality reports, and graph agents.
 - First-class AI graph-agent composition for Codex, Claude Code, opencode,
   Pi, and future provider-neutral runtimes.
 - Bytewax-only lifecycle batch governance for schema, node, edge, traversal,
@@ -77,8 +79,11 @@ GRPH uses deterministic rules. Rules must cover:
 - audit evidence for state changes.
 
 Rules that require review must be executable by supplying explicit review
-evidence. They must not behave as permanent denials unless the rule explicitly
-declares a deny decision.
+evidence. When review evidence is not supplied, the service must still create a
+durable `pending_review` record with the decision, matched rule names, and
+review reasons whenever the operation is otherwise safe to persist. They must
+not behave as permanent denials unless the rule explicitly declares a deny
+decision.
 
 ## Runtime Behavior
 
@@ -94,6 +99,7 @@ The service runtime must:
 - record audit events,
 - register provider-neutral graph agents,
 - validate Bytewax graph lifecycle batches,
+- preserve pending-review evidence for review-required graph operations,
 - expose list and dashboard surfaces,
 - provide APG `create_record` compatibility, and
 - enforce the contract guardrails before mutating state.

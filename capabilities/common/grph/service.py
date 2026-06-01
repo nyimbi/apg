@@ -78,7 +78,8 @@ class GrphService:
 			"edge_type_count": edge_type_count,
 			"review_recorded": bool(review_recorded),
 		})
-		self._raise_if_blocked(result)
+		self._raise_if_denied(result)
+		status = "pending_review" if result["decision"] == "require_review" else "active"
 		schema = GraphSchema(
 			id=schema_id,
 			tenant_id=tenant_id,
@@ -87,9 +88,21 @@ class GrphService:
 			node_types={key: list(value) for key, value in (node_types or {}).items()},
 			edge_types={key: dict(value) for key, value in (edge_types or {}).items()},
 			source_asset_id=source_asset_id,
+			status=status,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=list(_review_reasons(result)),
 		)
 		self._schemas[schema_id] = schema
-		self._record_event(tenant_id, "schema_created", schema.id, f"Graph schema created: {name}", "system")
+		self._record_event(
+			tenant_id,
+			"schema_created",
+			schema.id,
+			f"Graph schema created: {name}",
+			"system",
+			"medium" if status == "pending_review" else "low",
+			_rule_evidence(result),
+		)
 		return schema.to_dict()
 
 	def create_node(
@@ -121,8 +134,9 @@ class GrphService:
 			"labels_allowed": labels_allowed,
 			"review_recorded": bool(review_recorded),
 		})
-		self._raise_if_blocked(result)
+		self._raise_if_denied(result)
 		assert schema is not None
+		status = "pending_review" if result["decision"] == "require_review" else "active"
 		node = GraphNode(
 			id=node_id,
 			tenant_id=tenant_id,
@@ -132,9 +146,21 @@ class GrphService:
 			labels=label_values,
 			properties=dict(properties or {}),
 			source_asset_id=source_asset_id,
+			status=status,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=list(_review_reasons(result)),
 		)
 		self._nodes[node_id] = node
-		self._record_event(tenant_id, "node_created", node.id, f"Graph node created: {node_id}", owner_id)
+		self._record_event(
+			tenant_id,
+			"node_created",
+			node.id,
+			f"Graph node created: {node_id}",
+			owner_id,
+			"medium" if status == "pending_review" else "low",
+			_rule_evidence(result),
+		)
 		return node.to_dict()
 
 	def create_edge(
@@ -182,8 +208,9 @@ class GrphService:
 			"self_edge": bool(from_node_id and from_node_id == to_node_id),
 			"review_recorded": bool(review_recorded),
 		})
-		self._raise_if_blocked(result)
+		self._raise_if_denied(result)
 		assert schema is not None
+		status = "pending_review" if result["decision"] == "require_review" else "active"
 		edge = GraphEdge(
 			id=edge_id,
 			tenant_id=tenant_id,
@@ -194,9 +221,21 @@ class GrphService:
 			owner_id=owner_id,
 			classification=RelationshipClassification(stored_classification),
 			properties=dict(properties or {}),
+			status=status,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=list(_review_reasons(result)),
 		)
 		self._edges[edge_id] = edge
-		self._record_event(tenant_id, "edge_created", edge.id, f"Graph edge created: {edge_type}", owner_id)
+		self._record_event(
+			tenant_id,
+			"edge_created",
+			edge.id,
+			f"Graph edge created: {edge_type}",
+			owner_id,
+			"medium" if status == "pending_review" else "low",
+			_rule_evidence(result),
+		)
 		return edge.to_dict()
 
 	def traverse(
@@ -222,7 +261,7 @@ class GrphService:
 			"restricted_relationships_in_scope": restricted_in_scope,
 			"rbac_filter_applied": bool(rbac_filter_applied),
 		})
-		self._raise_if_blocked(result)
+		self._raise_if_denied(result)
 		node_ids, edge_ids = self._traversal_planner.traverse(
 			tenant_id=tenant_id,
 			start_node_id=start_node_id,
@@ -236,9 +275,21 @@ class GrphService:
 			max_depth=max_depth,
 			node_ids=node_ids,
 			edge_ids=edge_ids,
+			status="pending_review" if result["decision"] == "require_review" else "completed",
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=list(_review_reasons(result)),
 		)
 		self._traversals[traversal_id] = traversal
-		self._record_event(tenant_id, "traversal_completed", traversal.id, f"Graph traversal completed: {traversal_id}", "system")
+		self._record_event(
+			tenant_id,
+			"traversal_completed",
+			traversal.id,
+			f"Graph traversal completed: {traversal_id}",
+			"system",
+			"medium" if traversal.status == "pending_review" else "low",
+			_rule_evidence(result),
+		)
 		return traversal.to_dict()
 
 	def lineage_path(
@@ -300,7 +351,10 @@ class GrphService:
 			"quality_issue_count": quality_issue_count,
 			"review_recorded": bool(review_recorded),
 		})
-		self._raise_if_blocked(result)
+		self._raise_if_denied(result)
+		status = "pending_review" if result["decision"] == "require_review" else (
+			"attention_required" if metrics["orphan_node_count"] or metrics["missing_owner_count"] else "healthy"
+		)
 		report = GraphQualityReport(
 			id=report_id,
 			tenant_id=tenant_id,
@@ -308,9 +362,21 @@ class GrphService:
 			orphan_node_count=metrics["orphan_node_count"],
 			missing_owner_count=metrics["missing_owner_count"],
 			restricted_edge_count=metrics["restricted_edge_count"],
+			status=status,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=list(_review_reasons(result)),
 		)
 		self._quality_reports[report_id] = report
-		self._record_event(tenant_id, "quality_report_created", report.id, f"Graph quality report created: {report_id}", "system")
+		self._record_event(
+			tenant_id,
+			"quality_report_created",
+			report.id,
+			f"Graph quality report created: {report_id}",
+			"system",
+			"medium" if status == "pending_review" else "low",
+			_rule_evidence(result),
+		)
 		return report.to_dict()
 
 	def retire_schema(self, tenant_id: str, schema_id: str, review_recorded: bool = False) -> dict[str, Any]:
@@ -402,6 +468,9 @@ class GrphService:
 			contribution_disclosed=bool(contribution_disclosed),
 			human_approval_required=bool(human_approval_required),
 			status=status,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=list(_review_reasons(result)),
 		)
 		self._graph_agents[self._tenant_record_key(tenant_id, record.id)] = record
 		self._record_event(
@@ -411,6 +480,7 @@ class GrphService:
 			f"Graph agent registered: {name}",
 			owner,
 			"medium" if status == "pending_review" else "low",
+			_rule_evidence(result),
 		)
 		return record.to_dict()
 
@@ -444,6 +514,7 @@ class GrphService:
 			accepted=accepted,
 			decision=result["decision"],
 			matched_rules=list(result["matched_rules"]),
+			review_reasons=list(_review_reasons(result)),
 			status="accepted" if accepted else "denied",
 		)
 		self._lifecycle_batches[self._tenant_record_key(tenant_id, record.id)] = record
@@ -454,6 +525,7 @@ class GrphService:
 			f"Validated GRPH lifecycle batch: {record.id}",
 			"grph",
 			"medium" if not accepted else "low",
+			_rule_evidence(result),
 		)
 		if not accepted:
 			self._raise_if_denied(result)
@@ -490,21 +562,31 @@ class GrphService:
 		return sorted(records, key=lambda item: (item["kind"], item["id"]))
 
 	def dashboard_summary(self, tenant_id: str | None = None) -> dict[str, Any]:
+		schemas = self.list_schemas(tenant_id)
 		nodes = self.list_nodes(tenant_id)
 		edges = self.list_edges(tenant_id)
+		traversals = self.list_traversals(tenant_id)
+		quality_reports = self.list_quality_reports(tenant_id)
+		agents = self.list_graph_agents(tenant_id)
+		lifecycle_batches = self.list_lifecycle_batches(tenant_id)
 		restricted_edges = [edge for edge in edges if edge["classification"] == RelationshipClassification.RESTRICTED.value]
 		return {
 			"tenant_id": tenant_id,
-			"schema_count": len(self.list_schemas(tenant_id)),
+			"schema_count": len(schemas),
 			"node_count": len(nodes),
 			"edge_count": len(edges),
 			"restricted_edge_count": len(restricted_edges),
-			"traversal_count": len(self.list_traversals(tenant_id)),
-			"quality_report_count": len(self.list_quality_reports(tenant_id)),
-			"graph_agent_count": len(self.list_graph_agents(tenant_id)),
-			"pending_agent_review_count": len([item for item in self.list_graph_agents(tenant_id) if item["status"] == "pending_review"]),
-			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
-			"denied_lifecycle_batch_count": len([item for item in self.list_lifecycle_batches(tenant_id) if item["status"] == "denied"]),
+			"traversal_count": len(traversals),
+			"quality_report_count": len(quality_reports),
+			"graph_agent_count": len(agents),
+			"pending_schema_review_count": len([item for item in schemas if item["status"] == "pending_review"]),
+			"pending_node_review_count": len([item for item in nodes if item["status"] == "pending_review"]),
+			"pending_edge_review_count": len([item for item in edges if item["status"] == "pending_review"]),
+			"pending_traversal_review_count": len([item for item in traversals if item["status"] == "pending_review"]),
+			"pending_quality_review_count": len([item for item in quality_reports if item["status"] == "pending_review"]),
+			"pending_agent_review_count": len([item for item in agents if item["status"] == "pending_review"]),
+			"lifecycle_batch_count": len(lifecycle_batches),
+			"denied_lifecycle_batch_count": len([item for item in lifecycle_batches if item["status"] == "denied"]),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 		}
 
@@ -527,6 +609,7 @@ class GrphService:
 		message: str,
 		actor: str,
 		severity: str = "low",
+		evidence: dict[str, Any] | None = None,
 	) -> None:
 		record = GraphAuditEventRecord(
 			id=f"grph_audit_{next(self._counter)}",
@@ -536,6 +619,7 @@ class GrphService:
 			message=message,
 			actor=actor,
 			severity=severity,
+			evidence=dict(evidence or {}),
 		)
 		self._audit_events[record.id] = record
 
@@ -551,3 +635,19 @@ class GrphService:
 
 def _normalize_token(value: str) -> str:
 	return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def _review_reasons(result: dict[str, Any]) -> tuple[str, ...]:
+	return tuple(
+		str(action["reason"])
+		for action in result.get("actions", [])
+		if action.get("decision") == "require_review" and action.get("reason")
+	)
+
+
+def _rule_evidence(result: dict[str, Any]) -> dict[str, Any]:
+	return {
+		"decision": result["decision"],
+		"matched_rules": list(result["matched_rules"]),
+		"review_reasons": list(_review_reasons(result)),
+	}

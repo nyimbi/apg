@@ -27,6 +27,9 @@ focused tests, review, and progress-log evidence.
 3. Harden runtime behavior.
    - Enforce required schema, node, edge, traversal, lineage, and audit inputs.
 	- Add executable review-evidence paths.
+	- Preserve review-required schemas, nodes, edges, traversals, quality
+	  reports, and graph agents as durable `pending_review` records with matched
+	  rules and review reasons while keeping deny decisions hard-blocking.
 	- Add provider-neutral graph-agent registration state.
 	- Add Bytewax lifecycle batch validation state.
 	- Record audit events for mutations and review-relevant actions.
@@ -36,6 +39,8 @@ focused tests, review, and progress-log evidence.
 	- Add route-aligned view models.
 	- Expose API helpers for schema, node, edge, traversal, lineage, quality,
 	  graph agents, lifecycle batches, audit, and summary surfaces.
+	- Expose pending-review queues in dashboard, governance, schema, node, edge,
+	  traversal, quality, and graph-agent view models.
 
 5. Refresh package evidence.
    - Replace static app evidence with contract-derived semantic models.

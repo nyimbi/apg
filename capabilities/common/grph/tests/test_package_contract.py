@@ -59,6 +59,7 @@ def test_app_entrypoint_is_publishable():
 	assert model["capabilities"]["grph"]["streaming"]["required_processor"] == "bytewax"
 	assert "audit" in model["capabilities"]["grph"]["screens"]
 	assert "agents" in model["capabilities"]["grph"]["screens"]
+	assert model["capabilities"]["grph"]["review_queues"]["edges"] == "GraphEdge.status == pending_review"
 	assert model["capabilities"]["grph"]["graph_lifecycle"]["lifecycle_batch"] == "GrphLifecycleBatchRecord"
 	assert model["composition"]["capability_dependencies"]["grph"] == ["mdm", "meta", "etlp", "srch", "aicr", "conf"]
 	assert committed_model == model

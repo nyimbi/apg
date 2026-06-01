@@ -307,6 +307,16 @@ def test_graph_service_enforces_policy_guardrails():
 		node_types={"Entity": []},
 		edge_types={"LINKS_TO": {}},
 	)
+	pending_schema = service.create_schema(
+		schema_id="schema-custom-kind",
+		tenant_id="tenant-graph",
+		name="Custom kind graph",
+		graph_kind="semantic-network",
+		node_types={"Entity": []},
+		edge_types={"LINKS_TO": {}},
+	)
+	assert pending_schema["status"] == "pending_review"
+	assert pending_schema["review_reasons"] == ["graph_kind_review_required"]
 
 	with pytest.raises(PermissionError, match="node_owner_required"):
 		service.create_node("node-no-owner", "tenant-graph", schema["id"], "Entity", "")
@@ -314,8 +324,10 @@ def test_graph_service_enforces_policy_guardrails():
 	with pytest.raises(PermissionError, match="node_type_not_in_schema"):
 		service.create_node("node-bad-type", "tenant-graph", schema["id"], "Unknown", "owner")
 
-	with pytest.raises(PermissionError, match="node_label_review_required"):
-		service.create_node("node-bad-label", "tenant-graph", schema["id"], "Entity", "owner", labels=["unreviewed"])
+	pending_node = service.create_node("node-bad-label", "tenant-graph", schema["id"], "Entity", "owner", labels=["unreviewed"])
+	assert pending_node["status"] == "pending_review"
+	assert pending_node["decision"] == "require_review"
+	assert pending_node["review_reasons"] == ["node_label_review_required"]
 
 	service.create_node("node-a", "tenant-graph", schema["id"], "Entity", "owner", labels=["entity-a"])
 	service.create_node("node-b", "tenant-graph", schema["id"], "Entity", "owner", labels=["entity-b"])
@@ -323,24 +335,34 @@ def test_graph_service_enforces_policy_guardrails():
 	with pytest.raises(PermissionError, match="edge_type_required"):
 		service.create_edge("edge-no-type", "tenant-graph", schema["id"], "node-a", "node-b", "", "owner")
 
-	with pytest.raises(PermissionError, match="restricted_relationship_review_required"):
-		service.create_edge(
-			edge_id="edge-restricted",
-			tenant_id="tenant-graph",
-			schema_id=schema["id"],
-			from_node_id="node-a",
-			to_node_id="node-b",
-			edge_type="LINKS_TO",
-			owner_id="owner",
-			classification="restricted",
-			review_recorded=False,
-		)
+	pending_edge = service.create_edge(
+		edge_id="edge-restricted",
+		tenant_id="tenant-graph",
+		schema_id=schema["id"],
+		from_node_id="node-a",
+		to_node_id="node-b",
+		edge_type="LINKS_TO",
+		owner_id="owner",
+		classification="restricted",
+		review_recorded=False,
+	)
+	assert pending_edge["status"] == "pending_review"
+	assert pending_edge["decision"] == "require_review"
+	assert pending_edge["review_reasons"] == ["restricted_relationship_review_required"]
 
-	with pytest.raises(PermissionError, match="deep_traversal_review_required"):
-		service.traverse("deep", "tenant-graph", "node-a", max_depth=12, review_recorded=False)
+	pending_traversal = service.traverse("deep", "tenant-graph", "node-a", max_depth=12, review_recorded=False)
+	assert pending_traversal["status"] == "pending_review"
+	assert pending_traversal["review_reasons"] == ["deep_traversal_review_required"]
 
 	with pytest.raises(PermissionError, match="start_node_required"):
 		service.traverse("missing-start", "tenant-graph", "missing", max_depth=1)
+
+	summary = service.dashboard_summary("tenant-graph")
+	assert summary["pending_schema_review_count"] == 1
+	assert summary["pending_node_review_count"] == 1
+	assert summary["pending_edge_review_count"] == 1
+	assert summary["pending_traversal_review_count"] == 1
+	assert views.dashboard_model(service, "tenant-graph")["pending_reviews"]["edges"][0]["id"] == "edge-restricted"
 
 
 def test_graph_agent_and_lifecycle_guardrails_execute():
@@ -429,8 +451,13 @@ def test_review_evidence_unlocks_review_required_paths():
 	assert node["labels"] == ["custom-label"]
 
 	service.create_edge("edge-internal", "tenant-graph", reviewed_schema["id"], node["id"], node["id"], "LINKS_TO", "owner", review_recorded=True)
-	with pytest.raises(PermissionError, match="edge_classification_review_required"):
-		service.create_edge("edge-unknown-class", "tenant-graph", reviewed_schema["id"], node["id"], node["id"], "LINKS_TO", "owner", classification="regulated", review_recorded=False)
+	pending_edge = service.create_edge("edge-unknown-class", "tenant-graph", reviewed_schema["id"], node["id"], node["id"], "LINKS_TO", "owner", classification="regulated", review_recorded=False)
+	assert pending_edge["status"] == "pending_review"
+	assert pending_edge["review_reasons"] == [
+		"edge_classification_review_required",
+		"restricted_relationship_review_required",
+		"self_edge_review_required",
+	]
 	reviewed_edge = service.create_edge("edge-reviewed-class", "tenant-graph", reviewed_schema["id"], node["id"], node["id"], "LINKS_TO", "owner", classification="regulated", review_recorded=True)
 	reviewed_traversal = service.traverse("deep-reviewed", "tenant-graph", node["id"], max_depth=12, review_recorded=True)
 	assert reviewed_edge["classification"] == "restricted"
@@ -443,6 +470,34 @@ def test_review_evidence_unlocks_review_required_paths():
 		"review_recorded": True,
 	})
 	assert quality_result["decision"] == "allow"
+
+
+def test_quality_threshold_review_is_durable():
+	service = GrphService()
+	schema = service.create_schema(
+		schema_id="schema-quality",
+		tenant_id="tenant-quality",
+		name="Quality graph",
+		node_types={"Entity": []},
+		edge_types={"LINKS_TO": {}},
+	)
+	for index in range(51):
+		service.create_node(
+			f"quality-node-{index}",
+			"tenant-quality",
+			schema["id"],
+			"Entity",
+			"owner",
+			labels=[f"entity-{index}"],
+		)
+
+	report = service.quality_report("quality-pending", "tenant-quality", schema["id"], review_recorded=False)
+
+	assert report["status"] == "pending_review"
+	assert report["decision"] == "require_review"
+	assert report["review_reasons"] == ["quality_review_required"]
+	assert service.dashboard_summary("tenant-quality")["pending_quality_review_count"] == 1
+	assert views.quality_console_model(service, "tenant-quality")["pending_review"][0]["id"] == "quality-pending"
 
 
 def test_api_helpers_expose_graph_surfaces():

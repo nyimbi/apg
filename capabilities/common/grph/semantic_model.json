@@ -343,6 +343,14 @@
         "aicr",
         "conf"
       ],
+      "review_queues": {
+        "edges": "GraphEdge.status == pending_review",
+        "graph_agents": "GraphAgentRecord.status == pending_review",
+        "nodes": "GraphNode.status == pending_review",
+        "quality_reports": "GraphQualityReport.status == pending_review",
+        "schemas": "GraphSchema.status == pending_review",
+        "traversals": "GraphTraversalResult.status == pending_review"
+      },
       "rule_engine": {
         "rules": [
           {

@@ -22,6 +22,9 @@ tests and offline composition.
 - Bounded traversal and lineage path queries.
 - Quality reporting for orphan nodes, missing owners, restricted edges, and
   graph health.
+- Durable pending-review records for review-required schemas, nodes, edges,
+  traversals, quality reports, and graph agents, including matched rules and
+  review reasons.
 - Provider-neutral AI graph-agent registration for Codex, Claude Code,
   opencode, Pi, and future runtimes.
 - Bytewax-only lifecycle batch validation for schema, node, edge, traversal,
@@ -48,7 +51,9 @@ tests and offline composition.
 2. Register typed nodes with owners and optional source assets.
 3. Register typed edges between tenant-local nodes.
 4. Run traversals, lineage paths, neighborhood views, or impact analysis.
-5. Generate quality reports and review restricted relationships.
+5. Generate quality reports and inspect pending-review queues for restricted
+   relationships, unusual labels, unknown graph kinds, deep traversals, and
+   quality-threshold breaches.
 6. Register graph agents for schema, relationship, traversal, lineage, impact,
    quality, and lifecycle governance work.
 7. Validate lifecycle batches through Bytewax processor policy.
@@ -125,12 +130,16 @@ batch = service.validate_grph_lifecycle_batch(
 
 GRPH denies graph operations without tenant context, required schema/node/edge
 identity, owners, source/target nodes, schema-defined types, or lineage source
-assets. It requires review evidence for restricted edges, deep traversals,
-unknown schema kinds, non-allowlisted labels/properties, high-volume mutation
-batches, privileged graph-agent roles, schema retirement, and state-changing
-operations without audit events. It denies graph-agent registrations that use an
-unsupported runtime or role, omit scope, owner, or purpose, or hide machine
-contribution. It denies lifecycle batches that are not routed through Bytewax.
+assets. Review-required operations are durable: unknown schema kinds,
+non-allowlisted node labels, unknown or restricted relationship
+classifications, self edges, deep traversals, quality-threshold breaches, and
+privileged graph-agent roles are stored with `pending_review` status, the
+matched rule names, and review reasons. True deny decisions still raise before
+mutation. Schema retirement and unaudited state changes remain deny-only
+guardrails. Graph-agent registrations that use an unsupported runtime or role,
+omit scope, owner, or purpose, or hide machine contribution are denied.
+Lifecycle batches that are not routed through Bytewax are denied and retained as
+denied batch evidence.
 
 ## Composition
 
