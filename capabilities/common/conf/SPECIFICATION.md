@@ -20,6 +20,10 @@ The capability must be executable without importing the full production automati
 - Persist review-required and denied lifecycle evidence so generated consoles
   can show pending decisions, matched rules, review reasons, and remediation
   actions without replaying policy rules.
+- Provide dependency-light local GitOps execution for generated applications:
+  initialize local repositories, write manifests, commit changes, record pull
+  request evidence, expose real commit SHAs, and execute deterministic pipeline
+  test/deploy stages without requiring GitHub, GitLab, or cloud CI services.
 
 ## First-Class Domain Concepts
 
@@ -234,6 +238,26 @@ Required evidence:
 - Denied non-Bytewax lifecycle batches must be persisted as `denied` before
   raising `PermissionError`.
 
+### Local GitOps Execution
+
+- A configured local GitOps repository must be initialized as a real Git
+  repository when no remote URL is provided.
+- Manifest writes must create YAML or JSON files under the repository working
+  tree.
+- Commit operations must stage requested manifest paths, create real local Git
+  commits, and return stable commit SHAs through `get_latest_commit_sha()`.
+- Pushes are attempted only when an `origin` remote exists; local generated
+  applications must remain executable without network access.
+- Pull-request creation must persist provider-neutral JSON evidence under
+  `.apg/pull_requests/` so live GitHub/GitLab adapters can later replace the
+  evidence writer without changing composition semantics.
+- CI/CD test stages must evaluate trigger context such as branch, commit SHA,
+  author, manifest presence, and artifacts rather than sleeping or reporting
+  unconditional success.
+- Deploy stages must create deployment evidence from explicit environment,
+  target, commit SHA, and manifest context; missing environment evidence must
+  fail the stage.
+
 ## Rules
 
 The deterministic rule engine must enforce at least:
@@ -274,7 +298,9 @@ CONF must expose routes and theme components for:
 
 ## Adapter Boundaries
 
-The executable package must not require live cloud, GitOps, database, AI, Flask-AppBuilder, or security framework services to satisfy its package contract. Those systems are adapters behind the lifecycle.
+The executable package must not require live cloud, remote Git provider,
+database, AI, Flask-AppBuilder, or security framework services to satisfy its
+package contract. Those systems are adapters behind the lifecycle.
 
 Production adapters must preserve the same guardrails:
 
@@ -290,7 +316,7 @@ Battery-conscious proof for this slice:
 
 ```bash
 ./.venv/bin/python -m py_compile capabilities/common/conf/__init__.py capabilities/common/conf/models.py capabilities/common/conf/service.py capabilities/common/conf/api.py capabilities/common/conf/views.py capabilities/common/conf/capability_contract.py capabilities/common/conf/app.py capabilities/common/conf/tests/test_capability_contract.py capabilities/common/conf/tests/test_package_contract.py
-./.venv/bin/pytest -q capabilities/common/conf/tests/test_capability_contract.py capabilities/common/conf/tests/test_package_contract.py
+./.venv/bin/pytest -q capabilities/common/conf/tests/test_capability_contract.py capabilities/common/conf/tests/test_package_contract.py capabilities/common/conf/tests/test_gitops_integration.py
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/common/conf --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/conf --json
 ```

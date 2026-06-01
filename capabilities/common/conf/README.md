@@ -21,6 +21,10 @@ The Configuration Management capability (`conf`) is the foundational capability 
 - **Durable Review Evidence**: Production changes, drift remediation, privileged
   configuration agents, lifecycle batches, and audit events retain policy
   decisions, matched rules, review reasons, and required actions.
+- **Local GitOps Execution**: Generated applications can initialize local Git
+  repositories, write manifests, create real commits, record pull-request
+  evidence, and evaluate context-backed pipeline stages without live GitHub,
+  GitLab, or cloud CI adapters.
 
 ## Features
 
@@ -63,6 +67,43 @@ dependency-light `ConfService`:
   matched rule, and remediation action.
 - `list_pending_reviews()` returns reviewable changes, drift remediations,
   agents, and batches without replaying rules.
+
+### Local GitOps Execution
+
+The optional `gitops_integration.py` surface is dependency-light and executable
+without a remote provider. When `GitRepository.url` is empty, CONF initializes a
+real local Git repository, writes YAML or JSON manifests, commits changed
+manifest paths, and returns the actual `HEAD` SHA.
+
+```python
+from capabilities.common.conf.gitops_integration import GitOpsRepository, GitRepository
+
+repository = GitRepository(
+    name="generated-app-config",
+    branch="main",
+    local_path="/tmp/generated-app-config",
+    sync_enabled=False,
+)
+gitops = GitOpsRepository(repository)
+
+await gitops.clone_or_pull()
+await gitops.write_manifest_file(
+    "environments/dev/resources/api.yaml",
+    {"kind": "Configuration", "spec": {"resources": {"replicas": 2}}},
+)
+await gitops.commit_and_push(["environments/dev/resources/api.yaml"], "Add API manifest")
+commit_sha = await gitops.get_latest_commit_sha()
+```
+
+Provider-neutral pull-request evidence is stored under
+`.apg/pull_requests/<id>.json`. Live GitHub or GitLab adapters can later replace
+that evidence writer without changing generated application behavior.
+
+Pipeline `test` stages evaluate explicit trigger context such as branch,
+commit SHA, author, manifest presence, and artifacts. Pipeline `deploy` stages
+prepare deployment evidence from environment, target, manifest, and commit
+context; missing environment evidence fails the stage instead of reporting
+unconditional success.
 
 ## Installation & Setup
 

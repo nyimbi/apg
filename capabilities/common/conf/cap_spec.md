@@ -27,3 +27,8 @@ Bytewax lifecycle stream metadata.
 The current review-evidence packet also covers durable pending-review and deny
 evidence for production changes, drift remediations, privileged configuration
 agents, configuration lifecycle batches, and audit events.
+
+The current GitOps execution packet covers dependency-light local Git
+repositories, manifest commits, real commit SHA lookup, provider-neutral pull
+request evidence, context-backed pipeline test checks, and deploy-stage evidence
+that fails when required environment context is missing.

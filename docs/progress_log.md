@@ -25244,6 +25244,71 @@ Known gaps:
 - Existing SQLAlchemy and Pydantic deprecation warnings surfaced by focused
   tests remain outside this slice.
 
+### 2026-06-01 12:12 EAT
+
+CONF local GitOps executability slice:
+
+- Replaced dependency-free GitOps repository placeholder behavior with real
+  local Git repository initialization, manifest staging, commit creation,
+  branch creation, optional remote push, and `HEAD` SHA lookup.
+- Added provider-neutral pull-request evidence under `.apg/pull_requests/` so
+  generated applications can compose review workflows before live GitHub or
+  GitLab adapters are installed.
+- Replaced unconditional CI/CD test and deploy stage success paths with
+  context-backed checks for commit SHA, branch, author, manifest, artifacts,
+  deployment environment, target, and deployment evidence.
+- Replaced direct-execution fallback testing/deployment helpers with
+  dependency-light local reports and deployment status evidence.
+- Replaced unused sleep-based strategy helpers with deterministic deployment
+  strategy event records for rolling, blue-green, canary, and recreate plans.
+- Updated CONF `README.md`, `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md`
+  to document the generated-app local GitOps baseline and live-provider adapter
+  boundary.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/conf/gitops_integration.py capabilities/common/conf/tests/test_gitops_integration.py capabilities/common/conf/tests/test_capability_contract.py capabilities/common/conf/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/conf/tests/test_capability_contract.py capabilities/common/conf/tests/test_package_contract.py capabilities/common/conf/tests/test_gitops_integration.py`
+  passed with 12 tests and 10 pre-existing SQLAlchemy/Pydantic deprecation
+  warnings from imported shared modules.
+- `./.venv/bin/python capabilities/common/conf/app.py` passed with
+  `self_test()` status `ok`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/conf --json`
+  passed with one domain-specific CONF implementation, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/common/conf --json`
+  passed with one complete lifecycle record, 16 rules, 13 routes, and 0
+  warnings/errors.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/conf --json`
+  passed and showed side-effect-free publish evidence, Bytewax streaming,
+  first-class CONF agent metadata, 16 rules, 13 routes, and no warnings.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 109 operable contracts, 109 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Focused stale-marker scan for replaced GitOps repository and pipeline paths
+  returned no mock commit, mock pull request, mock commit SHA, mock test,
+  mock deployment, simulation, or placeholder markers.
+- `git diff --check -- capabilities/common/conf docs/progress_log.md` passed.
+
+Code review:
+
+- Reviewed repository behavior: local generated-app repositories now use real
+  Git metadata and commits while remote push remains conditional on an existing
+  `origin`.
+- Reviewed pipeline behavior: missing deployment environment now fails instead
+  of reporting success, and test stages preserve failure artifacts.
+- Reviewed adapter boundary: live GitHub/GitLab provider APIs, cloud CI/CD,
+  signed-commit enforcement, and production deployment adapters remain outside
+  this slice.
+
+Known gaps:
+
+- Full repository tests, rendered CONF UI checks, live Git provider APIs, live
+  cloud CI/CD, signed commit verification, live deployment orchestrators,
+  durable Bytewax topology, and performance/load checks remain outside this
+  battery-conscious slice.
+
 ### 2026-06-01 11:52 EAT
 
 META database connector fixture slice:

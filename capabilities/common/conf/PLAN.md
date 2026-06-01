@@ -14,6 +14,11 @@ This slice also preserves durable review evidence for production changes, drift
 remediation, privileged configuration agents, configuration batches, and audit
 events so generated applications can compose review queues immediately.
 
+The current executable GitOps extension replaces dependency-free mock behavior
+with local Git commits, provider-neutral pull-request evidence, and
+context-backed pipeline stages so generated applications can promote manifests
+without live GitHub, GitLab, or cloud CI adapters.
+
 ## Implementation Steps
 
 1. Add package-local lifecycle models:
@@ -90,9 +95,17 @@ events so generated applications can compose review queues immediately.
    - denied non-Bytewax batches persist evidence before `PermissionError`
    - API helpers and view models expose pending review and batch evidence
 
+11. Extend local GitOps execution:
+   - initialize local repositories with real Git metadata
+   - write YAML/JSON manifests into the working tree
+   - commit manifest changes and expose real commit SHAs
+   - persist pull-request evidence under `.apg/pull_requests/`
+   - evaluate pipeline test stages from trigger context
+   - require explicit environment evidence for deploy stages
+
 ## Non-Goals For This Slice
 
-- Live GitOps repository mutation.
+- Live remote Git provider API mutation.
 - Live cloud provider deployment.
 - Production persistence.
 - Secret manager/HSM integration.
