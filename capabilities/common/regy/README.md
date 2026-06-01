@@ -35,6 +35,9 @@ REGY is intentionally split into two layers:
   guardrails, bounded scope, accountable owner, purpose, contribution
   disclosure, and human approval for privileged registry roles.
 - Bytewax lifecycle batch validation for registry mutation streams.
+- Durable review evidence for generated-app governance queues, including
+  policy decisions, matched rules, review reasons, required actions, and
+  persisted denial evidence for non-Bytewax lifecycle batches.
 - Deterministic rule decisions that return `allow`, `deny`, or
   `require_review`.
 - UI view models for dashboard, catalog, registration, discovery, instances,
@@ -117,6 +120,18 @@ assert agent["status"] == "active"
 assert batch["status"] == "accepted"
 ```
 
+## Review Evidence
+
+Every generated-app lifecycle record carries `policy_decision`,
+`matched_rules`, `review_reasons`, and `review_evidence` fields so generated
+registry consoles can render why a service, version, discovery request,
+owner-transfer, registry-agent registration, gateway publication, or lifecycle
+batch is allowed, denied, or awaiting review. `list_pending_reviews()` returns
+the composed queue across services, instances, versions, gateway publications,
+reviews, registry agents, and lifecycle batches. Denied non-Bytewax lifecycle
+batches are stored with `status="denied"` and `required_processor="bytewax"`
+before the guardrail raises `PermissionError`.
+
 ## UI Composition
 
 ```python
@@ -163,5 +178,7 @@ adapters must honor REGY guardrail decisions before side effects.
   capabilities/common/regy/tests/test_package_contract.py
 
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/common/regy --json
+./.venv/bin/apg capabilities implementation-audit --root capabilities/common/regy --strict --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/regy --json
+./.venv/bin/apg capabilities lifecycle-audit --root capabilities/common/regy --json
 ```

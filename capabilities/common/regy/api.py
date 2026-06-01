@@ -988,6 +988,11 @@ def list_generated_lifecycle_batches(tenant_id: str | None = None) -> List[Dict[
 	return generated_registry_service.list_lifecycle_batches(tenant_id)
 
 
+def list_generated_pending_reviews(tenant_id: str | None = None) -> List[Dict[str, Any]]:
+	"""Return generated-app registry records awaiting review."""
+	return generated_registry_service.list_pending_reviews(tenant_id)
+
+
 def _payload_bool(payload: Dict[str, Any], key: str, default: bool) -> bool:
 	value = payload.get(key, default)
 	if isinstance(value, str):
@@ -1013,5 +1018,6 @@ __all__ = [
 	'list_generated_instances',
 	'list_generated_registry_agents',
 	'list_generated_lifecycle_batches',
+	'list_generated_pending_reviews',
 	'list_generated_audit_events',
 ]

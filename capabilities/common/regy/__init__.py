@@ -46,7 +46,8 @@ APG_CAPABILITY_METADATA = {
 		"circuit_breaking",
 		"api_versioning",
 		"registry_agent_composition",
-		"bytewax_lifecycle_batches"
+		"bytewax_lifecycle_batches",
+		"review_evidence"
 	],
 	"integration_points": {
 		"auth": ["service_authentication", "rbac_policies"],
@@ -107,6 +108,7 @@ def register_capability() -> dict:
 		"rule_engine": contract["rule_engine"],
 		"agents": contract["agents"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"capabilities": {
 			"service_registration": "Register tenant-scoped services and API contracts",
 			"service_discovery": "Discover healthy service instances for callers and gateway sync",
@@ -118,6 +120,7 @@ def register_capability() -> dict:
 			"capability_rules": "Evaluate deterministic registry governance rules",
 			"registry_agent_composition": "Govern AI and automation agents that review or mutate registry state",
 			"bytewax_lifecycle_batches": "Validate registry lifecycle mutation batches through Bytewax",
+			"review_evidence": "Preserve policy decisions, matched rules, review reasons, and review evidence for generated registry governance queues",
 			"visual_theming": "Apply service-catalog theme tokens and components"
 		},
 		"endpoints": {

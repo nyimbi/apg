@@ -17,6 +17,8 @@ def dashboard_model(service: RegistryService, tenant_id: str = "default") -> dic
 		"summary": service.registry_summary(tenant_id),
 		"registry_agents": service.list_registry_agents(tenant_id),
 		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
+		"pending_reviews": service.list_pending_reviews(tenant_id),
+		"review_evidence": contract["review_evidence"],
 		"routes": contract["ui"]["routes"],
 		"theme": contract["theme"],
 	}
@@ -120,6 +122,11 @@ def registry_agent_roster_model(service: RegistryService, tenant_id: str = "defa
 	return {
 		"tenant_id": tenant_id,
 		"agents": service.list_registry_agents(tenant_id),
+		"pending_reviews": [
+			record
+			for record in service.list_pending_reviews(tenant_id)
+			if record.get("role") in contract["agents"]["supported_roles"]
+		],
 		"agent_contract": contract["agents"],
 		"supported_runtimes": contract["agents"]["supported_runtimes"],
 		"supported_roles": contract["agents"]["supported_roles"],
@@ -150,5 +157,6 @@ def settings_model(service: RegistryService, tenant_id: str = "default") -> dict
 		"adapters": contract["configuration"]["adapters"],
 		"agents": contract["agents"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"theme": contract["theme"],
 	}

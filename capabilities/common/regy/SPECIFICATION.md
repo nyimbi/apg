@@ -30,6 +30,8 @@ REGY owns:
   stewardship;
 - Bytewax lifecycle batch validation for registry mutation streams;
 - registry audit events;
+- durable review evidence for policy decisions, matched rules, review reasons,
+  required actions, pending review queues, and denial records;
 - generated application API helpers, UI view models, theme tokens, and package
   evidence.
 
@@ -107,6 +109,16 @@ REGY must validate lifecycle mutation batches before adapter side effects.
 Accepted lifecycle batches must use Bytewax as the required processor. Non-
 Bytewax batches are recorded as denied evidence and blocked.
 
+### Durable Review Evidence
+
+REGY must persist policy decisions on all generated-app registry lifecycle
+records. Services, instances, versions, gateway publications, reviews,
+registry agents, lifecycle batches, and audit events carry `policy_decision`,
+`matched_rules`, `review_reasons`, and `review_evidence` fields. Generated
+applications must be able to compose a single pending-review queue from those
+records, and denied non-Bytewax lifecycle batches must remain visible as
+auditable evidence after the blocking exception.
+
 ### UI and Theme
 
 REGY must expose generated UI models for dashboard, services, registration,
@@ -144,6 +156,8 @@ before performing side effects.
 - Contract exposes configuration, rules, adapters, UI, theme, and package
   evidence for service, instance, discovery, version, publication, retirement,
   registry-agent, lifecycle-batch, and audit workflows.
+- Contract exposes `review_evidence` metadata, and API/view-model surfaces
+  expose pending review queues for generated applications.
 - Generated apps can use a dependency-light service for registry lifecycle
   workflows without optional production dependencies.
 - Focused tests cover positive and negative guardrail paths.

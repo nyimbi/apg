@@ -16,6 +16,78 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-06-01 10:17 EAT
+
+REGY durable review-evidence packet:
+
+- Extended service, instance, version, gateway publication, review,
+  registry-agent, lifecycle-batch, and audit records with durable policy
+  evidence: policy decision, matched rules, review reasons, and review
+  evidence.
+- Added contract-level `review_evidence` metadata and exposed it through
+  registration metadata, API helpers, view models, semantic model, release
+  evidence, package tests, and app self-test.
+- Added a composed generated-app pending-review queue across services,
+  instances, versions, gateway publications, reviews, registry agents, and
+  lifecycle batches.
+- Preserved production service registrations, breaking version changes,
+  high-limit discovery requests, owner transfers, and privileged registry
+  agents as reviewable evidence-bearing records when guardrails require human
+  review.
+- Preserved denied non-Bytewax REGY lifecycle batch validations as `denied`
+  evidence before raising `PermissionError`, including the required Bytewax
+  processor evidence.
+- Kept registry agents provider-neutral for Codex, Claude Code, OpenCode, Pi,
+  and future registry-governance runtimes while retaining human approval
+  controls for privileged roles and Bytewax-first lifecycle processing.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for REGY package init, models,
+  registry runtime, API helpers, contract, app, view models, and focused tests
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/regy/test_capability_contract.py
+  capabilities/common/regy/tests/test_package_contract.py` passed with 11
+  tests and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "import importlib; app =
+  importlib.import_module('capabilities.common.regy.app'); ..."` passed package
+  self-test.
+- `./.venv/bin/python -m json.tool
+  capabilities/common/regy/semantic_model.json` passed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/regy --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/regy --strict --json` passed with no warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/regy --json`
+  passed with no warnings and side-effect-free publish planning.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/common/regy --json` passed with complete lifecycle evidence,
+  release evidence, review evidence, and 33 rules.
+- REGY stale-marker scan returned no TODO/FIXME/stub/placeholder, Kafka,
+  materialized-baseline, contract-only, or not-implemented markers across the
+  edited REGY packet.
+- Service smoke executed production registration review evidence, breaking
+  version review evidence, high-limit discovery review evidence, privileged
+  registry-agent review evidence, accepted Bytewax batch evidence, and denied
+  non-Bytewax batch persistence, printing `pending_review require_review
+  require_review pending_review accepted deny bytewax_lifecycle_stream_required
+  6`.
+- `git diff --check -- capabilities/common/regy docs/progress_log.md` passed.
+
+Known gaps:
+
+- Full repository tests, rendered REGY UI, production registry persistence and
+  migrations, live Flask-AppBuilder UI, live APIG/AUTH/CONF/MONI/AUDL/CACH
+  adapters, durable Bytewax workers and dataflows, production service mesh
+  behavior, benchmark and load checks, runtime SLO validation, and live AI
+  runtime adapters still need later verification.
+
+Next capability:
+
+- Continue the ordered common capability sequence unless current filesystem
+  evidence shows a higher-priority incomplete packet.
+
 ### 2026-06-01 10:01 EAT
 
 APIG durable review-evidence packet:

@@ -384,6 +384,41 @@ def streaming_manifest() -> dict[str, Any]:
 	}
 
 
+def review_evidence_manifest() -> dict[str, Any]:
+	"""Return durable REGY review-evidence metadata."""
+	return {
+		"durable_statuses": [
+			"pending",
+			"pending_review",
+			"review_required",
+			"review_denied",
+			"denied",
+			"accepted",
+			"registered",
+			"active",
+			"published",
+			"deprecated",
+			"retired",
+		],
+		"policy_fields": [
+			"policy_decision",
+			"matched_rules",
+			"review_reasons",
+			"review_evidence",
+		],
+		"pending_queues": [
+			"services",
+			"instances",
+			"versions",
+			"gateway_publications",
+			"reviews",
+			"registry_agents",
+			"lifecycle_batches",
+		],
+		"deny_behavior": "Denied REGY lifecycle batches persist evidence before PermissionError",
+	}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable REGY capability contract."""
 	config = CapabilityConfiguration()
@@ -391,13 +426,14 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "regy",
 		"display_name": "API/Service Registry",
-		"provides": ["service_registry", "service_discovery", "registry_agent_composition"],
+		"provides": ["service_registry", "service_discovery", "registry_agent_composition", "review_evidence"],
 		"requires": ["apig", "auth", "conf"],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
 		"rule_engine": {"type": "deterministic", "rules": [rule.__dict__ for rule in default_rules()]},
 		"agents": agent_manifest(),
 		"streaming": streaming_manifest(),
+		"review_evidence": review_evidence_manifest(),
 		"ui": ui_manifest(),
 		"theme": {"name": theme.name, "tokens": theme.tokens, "components": theme.components},
 	}

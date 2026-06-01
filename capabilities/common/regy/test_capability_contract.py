@@ -14,6 +14,7 @@ from capabilities.common.regy.view_models import (
 	lifecycle_batch_model,
 	registry_agent_roster_model,
 	service_catalog_model,
+	settings_model,
 )
 
 
@@ -40,12 +41,14 @@ def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
 		"theme",
 	]
 	assert len(contract["rule_engine"]["rules"]) >= 33
-	assert contract["provides"] == ["service_registry", "service_discovery", "registry_agent_composition"]
+	assert contract["provides"] == ["service_registry", "service_discovery", "registry_agent_composition", "review_evidence"]
 	assert contract["requires"] == ["apig", "auth", "conf"]
 	assert contract["agents"]["first_class"] is True
 	assert "codex" in contract["agents"]["supported_runtimes"]
 	assert "contract_reviewer" in contract["agents"]["supported_roles"]
 	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert "registry_agents" in contract["review_evidence"]["pending_queues"]
+	assert "policy_decision" in contract["review_evidence"]["policy_fields"]
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "registry_runtime.RegistryService"
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
@@ -227,16 +230,23 @@ def test_registry_runtime_records_reviews_and_retirement_evidence():
 	)
 
 	assert service["status"] == "pending_review"
+	assert service["policy_decision"] == "require_review"
+	assert service["review_reasons"] == ["production_registration_review_required"]
 	assert version["status"] == "pending_review"
+	assert version["policy_decision"] == "require_review"
+	assert version["review_reasons"] == ["compatibility_review_required"]
 	assert len(registry.list_reviews("tenant-a")) == 2
 	registry.register_instance("orders-1", "tenant-a", "orders", "https://orders.internal", "local", "/health")
 	with pytest.raises(PermissionError, match="service_review_required"):
 		registry.publish_to_gateway("orders-public", "tenant-a", "orders", "/orders")
 	discovery = registry.discover_services("tenant-a", requested_result_limit=1500)
 	assert discovery["decision"] == "require_review"
+	assert discovery["policy_decision"] == "require_review"
+	assert discovery["review_reasons"] == ["discovery_limit_review_required"]
 	assert any(review["review_type"] == "discovery_limit" for review in registry.list_reviews("tenant-a"))
 	owner_review = registry.transfer_owner("tenant-a", "orders", "api-platform", "platform", owner_transfer_review_recorded=False)
 	assert owner_review["review_type"] == "owner_transfer"
+	assert owner_review["policy_decision"] == "require_review"
 	transferred = registry.transfer_owner("tenant-a", "orders", "api-platform", "platform", owner_transfer_review_recorded=True)
 	assert transferred["owner"] == "api-platform"
 	with pytest.raises(PermissionError, match="impact_review_required"):
@@ -286,14 +296,27 @@ def test_registry_runtime_governs_agents_and_lifecycle_batches():
 		registry.validate_regy_lifecycle_batch("tenant-a", "legacy_queue", 2)
 	batch = registry.validate_regy_lifecycle_batch("tenant-a", "bytewax", 4)
 	summary = registry.registry_summary("tenant-a")
+	denied_batch = [
+		record
+		for record in registry.list_lifecycle_batches("tenant-a")
+		if record["status"] == "denied"
+	][0]
 
 	assert pending["status"] == "pending_review"
 	assert pending["runtime"] == "claude_code"
+	assert pending["policy_decision"] == "require_review"
+	assert pending["review_reasons"] == ["registry_agent_human_approval_required"]
 	assert active["status"] == "active"
 	assert batch["status"] == "accepted"
+	assert denied_batch["policy_decision"] == "deny"
+	assert denied_batch["required_processor"] == "bytewax"
+	assert denied_batch["review_reasons"] == ["bytewax_lifecycle_stream_required"]
 	assert summary["registry_agent_count"] == 2
+	assert summary["pending_registry_agent_review_count"] == 1
+	assert summary["review_count"] >= 1
 	assert summary["lifecycle_batch_count"] == 2
 	assert summary["denied_lifecycle_batch_count"] == 1
+	assert registry.list_pending_reviews("tenant-a")
 
 
 def test_registration_includes_full_capability_contract():
@@ -309,6 +332,9 @@ def test_registration_includes_full_capability_contract():
 	assert "cach" in registration["optional_dependencies"]
 	assert registration["agents"]["first_class"] is True
 	assert registration["streaming"]["required_processor"] == "bytewax"
+	assert "review_evidence" in registration["provides"]
+	assert "registry_agents" in registration["review_evidence"]["pending_queues"]
+	assert "review_evidence" in registration["capabilities"]
 
 
 def test_generated_ui_models_are_composable():
@@ -341,9 +367,14 @@ def test_generated_ui_models_are_composable():
 	registry.validate_regy_lifecycle_batch("tenant-a", "bytewax", 1)
 	agents = registry_agent_roster_model(registry, "tenant-a")
 	batches = lifecycle_batch_model(registry, "tenant-a")
+	settings = settings_model(registry, "tenant-a")
 
 	assert dashboard["summary"]["service_count"] == 1
+	assert "pending_reviews" in dashboard
+	assert "review_evidence" in dashboard
 	assert catalog["services"][0]["name"] == "orders"
 	assert discovery["defaults"]["service_discovery_enabled"] is True
 	assert agents["agents"][0]["runtime"] == "codex"
+	assert "pending_reviews" in agents
 	assert batches["required_processor"] == "bytewax"
+	assert "review_evidence" in settings

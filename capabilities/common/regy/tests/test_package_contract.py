@@ -37,7 +37,9 @@ def test_registry_contract_shape_is_valid():
 	assert contract["rule_engine"]["type"] == "deterministic"
 	assert contract["agents"]["first_class"] is True
 	assert contract["streaming"]["required_processor"] == "bytewax"
-	assert contract["provides"] == ["service_registry", "service_discovery", "registry_agent_composition"]
+	assert contract["provides"] == ["service_registry", "service_discovery", "registry_agent_composition", "review_evidence"]
+	assert "registry_agents" in contract["review_evidence"]["pending_queues"]
+	assert "policy_decision" in contract["review_evidence"]["policy_fields"]
 	assert contract["requires"] == ["apig", "auth", "conf"]
 
 
@@ -62,3 +64,5 @@ def test_registry_app_entrypoint_is_publishable():
 	assert model["capabilities"]["regy"]["streaming"]["engine"] == "bytewax"
 	assert model["capabilities"]["regy"]["streaming"]["required_processor"] == "bytewax"
 	assert model["capabilities"]["regy"]["agents"]["first_class"] is True
+	assert model["capabilities"]["regy"]["review_evidence"]["deny_behavior"]
+	assert model["contracts"]["regy"]["review_evidence"]["pending_queues"]

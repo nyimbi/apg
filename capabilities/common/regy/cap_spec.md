@@ -4,6 +4,8 @@ REGY provides APG applications with a governed registry control plane for
 service registration, instance registration, service discovery, version
 governance, gateway publication, first-class registry-agent composition,
 Bytewax lifecycle batches, retirement, and audit evidence.
+It also preserves durable review evidence so generated registry consoles can
+compose pending queues and explain every allow, review, or denial decision.
 
 ## Runtime Shape
 
@@ -29,7 +31,9 @@ Bytewax lifecycle batches, retirement, and audit evidence.
 7. Validate registry lifecycle mutation batches through Bytewax before adapter
    side effects.
 8. Retire services only after impact review and gateway unpublish evidence.
-9. Emit audit events for lifecycle decisions.
+9. Preserve policy decisions, matched rules, review reasons, and review
+   evidence on lifecycle records, pending queues, and audit events.
+10. Emit audit events for lifecycle decisions.
 
 ## Guardrails
 

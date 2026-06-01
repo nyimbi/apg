@@ -23,6 +23,8 @@ Known gaps addressed by this packet:
   guardrails, ownership, scope, purpose, contribution disclosure, approval
   state, UI, or audit evidence.
 - Lifecycle mutation batches did not have executable Bytewax validation.
+- Lifecycle records did not consistently expose durable policy/review evidence
+  or a composed pending-review queue for generated registry consoles.
 
 ## Build Sequence
 
@@ -44,6 +46,9 @@ Known gaps addressed by this packet:
      overrides, retirement, summaries, and audit events.
    - Add registry-agent records, lifecycle-batch records, guardrail-backed
      registration, Bytewax validation, summaries, and audit events.
+   - Preserve policy decisions, matched rules, review reasons, and required
+     actions across service, instance, version, publication, review,
+     registry-agent, lifecycle-batch, and audit records.
    - Keep production registry, service-mesh, gateway, cache, and monitoring
      behavior behind adapter boundaries.
 
@@ -53,6 +58,8 @@ Known gaps addressed by this packet:
      batches.
    - Add `view_models.py` surfaces for generated application UIs, including
      agent roster and lifecycle-batch monitor views.
+   - Add generated-app pending-review helpers and review-evidence metadata for
+     dashboards, rosters, and settings surfaces.
 
 5. Package evidence and tests
    - Replace static app semantic JSON with contract-derived evidence.

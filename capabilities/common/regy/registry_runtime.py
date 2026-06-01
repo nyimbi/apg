@@ -30,6 +30,11 @@ class RegistryServiceRecord:
 	contract_schema_ref: str
 	health_endpoint: str
 	status: str = "registered"
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	labels: dict[str, Any] = field(default_factory=dict)
 	routing_metadata: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=lambda: _now())
@@ -46,6 +51,11 @@ class RegistryInstanceRecord:
 	weight: int = 100
 	health: str = "healthy"
 	status: str = "active"
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	metadata: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=lambda: _now())
 
@@ -60,6 +70,11 @@ class RegistryVersionRecord:
 	breaking_change_detected: bool = False
 	compatibility_review_recorded: bool = False
 	status: str = "active"
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	migration_notes: str = ""
 	eol_date: str = ""
 	created_at: str = field(default_factory=lambda: _now())
@@ -73,6 +88,11 @@ class RegistryGatewayPublication:
 	route_path: str
 	strategy: str
 	status: str
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=lambda: _now())
 
 
@@ -83,6 +103,11 @@ class RegistryReviewRecord:
 	subject_id: str
 	review_type: str
 	status: str = "pending"
+	decision: str = "pending"
+	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "require_review"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	requester: str = ""
 	notes: str = ""
 	created_at: str = field(default_factory=lambda: _now())
@@ -95,6 +120,10 @@ class RegistryAuditEvent:
 	event_type: str
 	subject_id: str
 	message: str
+	policy_decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=lambda: _now())
 
@@ -112,6 +141,11 @@ class RegistryAgentRecord:
 	status: str
 	contribution_disclosed: bool
 	human_approval_required: bool
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=lambda: _now())
 
 
@@ -123,6 +157,12 @@ class RegistryLifecycleBatchRecord:
 	operation: str
 	mutation_count: int
 	status: str
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
+	required_processor: str = "bytewax"
 	created_at: str = field(default_factory=lambda: _now())
 
 
@@ -194,17 +234,22 @@ class RegistryService:
 			contract_schema_ref=contract_schema_ref,
 			health_endpoint=health_endpoint,
 			status="pending_review" if result["decision"] == "require_review" else "registered",
+			**_policy_kwargs(result, production_review_recorded),
 			labels=dict(labels or {}),
 			routing_metadata=dict(routing_metadata or {}),
 		)
 		self._services[self._tenant_key(tenant_id, service_id)] = record
-		self._record_event(tenant_id, "service_registered", service_id, f"Registered service {name}.", {"matched_rules": result["matched_rules"], "status": record.status})
+		self._record_event(tenant_id, "service_registered", service_id, f"Registered service {name}.", {"matched_rules": result["matched_rules"], "status": record.status}, result, production_review_recorded)
 		if result["decision"] == "require_review":
 			self._reviews[self._tenant_key(tenant_id, f"production:{service_id}")] = RegistryReviewRecord(
 				id=f"production:{service_id}",
 				tenant_id=tenant_id,
 				subject_id=service_id,
 				review_type="production_registration",
+				matched_rules=result["matched_rules"],
+				policy_decision=result["decision"],
+				review_reasons=_reasons(result),
+				review_evidence=_review_evidence(result, production_review_recorded),
 				requester=owner,
 				notes="Production service registration requires review.",
 			)
@@ -245,10 +290,11 @@ class RegistryService:
 			health_probe=health_probe,
 			weight=weight,
 			health=health,
+			**_policy_kwargs(result),
 			metadata=dict(metadata or {}),
 		)
 		self._instances[self._tenant_key(tenant_id, instance_id)] = record
-		self._record_event(tenant_id, "instance_registered", instance_id, f"Registered instance {instance_id}.", {"service_id": service_id, "matched_rules": result["matched_rules"]})
+		self._record_event(tenant_id, "instance_registered", instance_id, f"Registered instance {instance_id}.", {"service_id": service_id, "matched_rules": result["matched_rules"]}, result)
 		return _dump(record)
 
 	def discover_services(
@@ -278,10 +324,14 @@ class RegistryService:
 				tenant_id=tenant_id,
 				subject_id=tenant_id,
 				review_type="discovery_limit",
+				matched_rules=result["matched_rules"],
+				policy_decision=result["decision"],
+				review_reasons=_reasons(result),
+				review_evidence=_review_evidence(result, discovery_review_recorded),
 				requester=tenant_id,
 				notes=f"Discovery requested limit {requested_result_limit}.",
 			)
-			self._record_event(tenant_id, "discovery_review_requested", review_id, "Requested discovery limit review.", {"requested_result_limit": requested_result_limit, "matched_rules": result["matched_rules"]})
+			self._record_event(tenant_id, "discovery_review_requested", review_id, "Requested discovery limit review.", {"requested_result_limit": requested_result_limit, "matched_rules": result["matched_rules"]}, result, discovery_review_recorded)
 		target = target_tenant_id or tenant_id
 		services = [
 			_dump(service)
@@ -301,6 +351,9 @@ class RegistryService:
 			"target_tenant_id": target,
 			"decision": result["decision"],
 			"matched_rules": result["matched_rules"],
+			"policy_decision": result["decision"],
+			"review_reasons": _reasons(result),
+			"review_evidence": _review_evidence(result, discovery_review_recorded),
 			"total_count": len(services),
 			"services": services,
 			"instances": {service["id"]: instances_by_service.get(service["id"], []) for service in services},
@@ -335,6 +388,7 @@ class RegistryService:
 			breaking_change_detected=breaking_change_detected,
 			compatibility_review_recorded=compatibility_review_recorded,
 			status="pending_review" if result["decision"] == "require_review" else "active",
+			**_policy_kwargs(result, compatibility_review_recorded),
 		)
 		self._versions[self._tenant_key(tenant_id, version_id)] = record
 		if result["decision"] == "require_review":
@@ -343,10 +397,14 @@ class RegistryService:
 				tenant_id=tenant_id,
 				subject_id=version_id,
 				review_type="compatibility",
+				matched_rules=result["matched_rules"],
+				policy_decision=result["decision"],
+				review_reasons=_reasons(result),
+				review_evidence=_review_evidence(result, compatibility_review_recorded),
 				requester=self._get_service(tenant_id, service_id).owner,
 				notes="Breaking change requires compatibility review.",
 			)
-		self._record_event(tenant_id, "version_recorded", version_id, f"Recorded version {version}.", {"service_id": service_id, "matched_rules": result["matched_rules"]})
+		self._record_event(tenant_id, "version_recorded", version_id, f"Recorded version {version}.", {"service_id": service_id, "matched_rules": result["matched_rules"]}, result, compatibility_review_recorded)
 		return _dump(record)
 
 	def publish_to_gateway(
@@ -376,9 +434,10 @@ class RegistryService:
 			route_path=route_path,
 			strategy=strategy,
 			status="published",
+			**_policy_kwargs(result),
 		)
 		self._publications[self._tenant_key(tenant_id, publication_id)] = record
-		self._record_event(tenant_id, "gateway_publication_created", publication_id, f"Published {service.name} to gateway.", {"service_id": service_id, "matched_rules": result["matched_rules"]})
+		self._record_event(tenant_id, "gateway_publication_created", publication_id, f"Published {service.name} to gateway.", {"service_id": service_id, "matched_rules": result["matched_rules"]}, result)
 		return _dump(record)
 
 	def deprecate_version(
@@ -407,11 +466,12 @@ class RegistryService:
 			breaking_change_detected=version.breaking_change_detected,
 			compatibility_review_recorded=version.compatibility_review_recorded,
 			status="deprecated",
+			**_policy_kwargs(result),
 			migration_notes=migration_notes,
 			eol_date=eol_date,
 		)
 		self._versions[self._tenant_key(tenant_id, version_id)] = record
-		self._record_event(tenant_id, "version_deprecated", version_id, f"Deprecated version {version.version}.", {"eol_date": eol_date})
+		self._record_event(tenant_id, "version_deprecated", version_id, f"Deprecated version {version.version}.", {"eol_date": eol_date, "matched_rules": result["matched_rules"]}, result)
 		return _dump(record)
 
 	def override_health(self, tenant_id: str, instance_id: str, health: str, incident_reference: str) -> dict[str, Any]:
@@ -433,11 +493,12 @@ class RegistryService:
 			weight=instance.weight,
 			health=health,
 			status=instance.status,
+			**_policy_kwargs(result),
 			metadata=dict(instance.metadata),
 			created_at=instance.created_at,
 		)
 		self._instances[self._tenant_key(tenant_id, instance_id)] = record
-		self._record_event(tenant_id, "health_overridden", instance_id, f"Set instance health to {health}.", {"incident_reference": incident_reference})
+		self._record_event(tenant_id, "health_overridden", instance_id, f"Set instance health to {health}.", {"incident_reference": incident_reference, "matched_rules": result["matched_rules"]}, result)
 		return _dump(record)
 
 	def transfer_owner(
@@ -465,10 +526,14 @@ class RegistryService:
 				tenant_id=tenant_id,
 				subject_id=service_id,
 				review_type="owner_transfer",
+				matched_rules=result["matched_rules"],
+				policy_decision=result["decision"],
+				review_reasons=_reasons(result),
+				review_evidence=_review_evidence(result, owner_transfer_review_recorded),
 				requester=actor,
 				notes=f"Transfer owner from {service.owner} to {new_owner}.",
 			)
-			self._record_event(tenant_id, "owner_transfer_review_requested", review_id, "Requested owner transfer review.", {"service_id": service_id, "new_owner": new_owner, "matched_rules": result["matched_rules"]})
+			self._record_event(tenant_id, "owner_transfer_review_requested", review_id, "Requested owner transfer review.", {"service_id": service_id, "new_owner": new_owner, "matched_rules": result["matched_rules"]}, result, owner_transfer_review_recorded)
 			return _dump(self._reviews[self._tenant_key(tenant_id, review_id)])
 		transferred = RegistryServiceRecord(
 			id=service.id,
@@ -481,12 +546,13 @@ class RegistryService:
 			contract_schema_ref=service.contract_schema_ref,
 			health_endpoint=service.health_endpoint,
 			status=service.status,
+			**_policy_kwargs(result, owner_transfer_review_recorded),
 			labels=dict(service.labels),
 			routing_metadata=dict(service.routing_metadata),
 			created_at=service.created_at,
 		)
 		self._services[self._tenant_key(tenant_id, service_id)] = transferred
-		self._record_event(tenant_id, "owner_transferred", service_id, f"Transferred service owner to {new_owner}.", {"actor": actor, "previous_owner": service.owner})
+		self._record_event(tenant_id, "owner_transferred", service_id, f"Transferred service owner to {new_owner}.", {"actor": actor, "previous_owner": service.owner, "matched_rules": result["matched_rules"]}, result, owner_transfer_review_recorded)
 		return _dump(transferred)
 
 	def retire_service(
@@ -517,12 +583,13 @@ class RegistryService:
 			contract_schema_ref=service.contract_schema_ref,
 			health_endpoint=service.health_endpoint,
 			status="retired",
+			**_policy_kwargs(result, impact_review_recorded and gateway_unpublish_recorded),
 			labels=dict(service.labels),
 			routing_metadata=dict(service.routing_metadata),
 			created_at=service.created_at,
 		)
 		self._services[self._tenant_key(tenant_id, service_id)] = retired
-		self._record_event(tenant_id, "service_retired", service_id, f"Retired service {service.name}.", {"actor": actor})
+		self._record_event(tenant_id, "service_retired", service_id, f"Retired service {service.name}.", {"actor": actor, "matched_rules": result["matched_rules"]}, result, impact_review_recorded and gateway_unpublish_recorded)
 		return _dump(retired)
 
 	def register_registry_agent(
@@ -556,7 +623,7 @@ class RegistryService:
 			"human_approval_required": human_approval_required,
 		})
 		if result["decision"] == "deny":
-			self._record_event(tenant_id, "registry_agent_registration_denied", agent_id, f"Denied registry agent {name}.", {"matched_rules": result["matched_rules"]})
+			self._record_event(tenant_id, "registry_agent_registration_denied", agent_id, f"Denied registry agent {name}.", {"matched_rules": result["matched_rules"]}, result)
 			_raise_if_blocked(result)
 		if self._tenant_key(tenant_id, agent_id) in self._registry_agents:
 			raise ValueError(f"registry agent already exists for tenant: {agent_id}")
@@ -572,9 +639,10 @@ class RegistryService:
 			status=_status_for_decision(result),
 			contribution_disclosed=contribution_disclosed,
 			human_approval_required=human_approval_required,
+			**_policy_kwargs(result, human_approval_required),
 		)
 		self._registry_agents[self._tenant_key(tenant_id, agent_id)] = record
-		self._record_event(tenant_id, "registry_agent_registered", agent_id, f"Registered registry agent {name}.", {"matched_rules": result["matched_rules"], "status": record.status})
+		self._record_event(tenant_id, "registry_agent_registered", agent_id, f"Registered registry agent {name}.", {"matched_rules": result["matched_rules"], "status": record.status}, result, human_approval_required)
 		return _dump(record)
 
 	def validate_regy_lifecycle_batch(
@@ -601,9 +669,10 @@ class RegistryService:
 			operation=operation,
 			mutation_count=mutation_count,
 			status="denied" if result["decision"] == "deny" else "accepted",
+			**_policy_kwargs(result),
 		)
 		self._lifecycle_batches[self._tenant_key(tenant_id, resolved_batch_id)] = record
-		self._record_event(tenant_id, "regy_lifecycle_batch_validated", resolved_batch_id, f"Validated REGY lifecycle batch through {normalized_stream}.", {"matched_rules": result["matched_rules"], "status": record.status})
+		self._record_event(tenant_id, "regy_lifecycle_batch_validated", resolved_batch_id, f"Validated REGY lifecycle batch through {normalized_stream}.", {"matched_rules": result["matched_rules"], "status": record.status}, result)
 		if result["decision"] == "deny":
 			_raise_if_blocked(result)
 		return _dump(record)
@@ -620,6 +689,8 @@ class RegistryService:
 			"version_count": len([version for version in self._versions.values() if version.tenant_id == tenant_id]),
 			"publication_count": len([publication for publication in self._publications.values() if publication.tenant_id == tenant_id]),
 			"pending_review_count": len([review for review in self._reviews.values() if review.tenant_id == tenant_id and review.status == "pending"]),
+			"pending_registry_agent_review_count": len([agent for agent in self._registry_agents.values() if agent.tenant_id == tenant_id and agent.status == "pending_review"]),
+			"review_count": len(self.list_pending_reviews(tenant_id)),
 			"registry_agent_count": len([agent for agent in self._registry_agents.values() if agent.tenant_id == tenant_id]),
 			"lifecycle_batch_count": len(lifecycle_batches),
 			"denied_lifecycle_batch_count": len([batch for batch in lifecycle_batches if batch.status == "denied"]),
@@ -649,6 +720,24 @@ class RegistryService:
 
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return [_dump(event) for event in self._events if tenant_id is None or event.tenant_id == tenant_id]
+
+	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		"""Return registry records awaiting governance review."""
+		items = (
+			self.list_services(tenant_id)
+			+ self.list_instances(tenant_id)
+			+ self.list_versions(tenant_id)
+			+ self.list_gateway_publications(tenant_id)
+			+ self.list_reviews(tenant_id)
+			+ self.list_registry_agents(tenant_id)
+			+ self.list_lifecycle_batches(tenant_id)
+		)
+		return [
+			record
+			for record in items
+			if record.get("status") in {"pending", "pending_review", "review_required"}
+			or record.get("decision") == "pending"
+		]
 
 	def _has_service_name(self, tenant_id: str, name: str) -> bool:
 		return any(service.tenant_id == tenant_id and service.name == name for service in self._services.values())
@@ -681,13 +770,27 @@ class RegistryService:
 			raise KeyError(f"unknown version for tenant: {version_id}")
 		return record
 
-	def _record_event(self, tenant_id: str, event_type: str, subject_id: str, message: str, evidence: dict[str, Any] | None = None) -> None:
+	def _record_event(
+		self,
+		tenant_id: str,
+		event_type: str,
+		subject_id: str,
+		message: str,
+		evidence: dict[str, Any] | None = None,
+		policy_result: dict[str, Any] | None = None,
+		review_recorded: bool = False,
+	) -> None:
+		result = policy_result or _allow_result()
 		self._events.append(RegistryAuditEvent(
 			id=f"event:{len(self._events) + 1}",
 			tenant_id=tenant_id,
 			event_type=event_type,
 			subject_id=subject_id,
 			message=message,
+			policy_decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=_reasons(result),
+			review_evidence=_review_evidence(result, review_recorded),
 			evidence=dict(evidence or {}),
 		))
 
@@ -704,6 +807,40 @@ class RegistryService:
 
 def _dump(record: Any) -> dict[str, Any]:
 	return asdict(record)
+
+
+def _allow_result() -> dict[str, Any]:
+	return {"decision": "allow", "matched_rules": [], "actions": []}
+
+
+def _reasons(result: dict[str, Any]) -> list[str]:
+	return list(dict.fromkeys(
+		str(action["reason"])
+		for action in result.get("actions", [])
+		if action.get("reason")
+	))
+
+
+def _review_evidence(result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+	return {
+		"required_actions": list(dict.fromkeys(
+			str(action.get("required_action"))
+			for action in result.get("actions", [])
+			if action.get("required_action")
+		)),
+		"reasons": _reasons(result),
+		"review_recorded": bool(review_recorded),
+	}
+
+
+def _policy_kwargs(result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+	return {
+		"decision": result["decision"],
+		"matched_rules": list(result["matched_rules"]),
+		"policy_decision": result["decision"],
+		"review_reasons": _reasons(result),
+		"review_evidence": _review_evidence(result, review_recorded),
+	}
 
 
 def _raise_if_blocked(result: dict[str, Any]) -> None:

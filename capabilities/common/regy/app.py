@@ -63,6 +63,7 @@ def semantic_model() -> dict[str, Any]:
 				"ui": contract["ui"],
 				"screens": routes,
 				"theme": contract["theme"],
+				"review_evidence": contract["review_evidence"],
 				"runtime": {
 					"api": "api.py",
 					"entrypoint": "app.py",
@@ -104,6 +105,7 @@ def semantic_model() -> dict[str, Any]:
 				"requires": requires,
 				"agents": contract["agents"],
 				"streaming": contract["streaming"],
+				"review_evidence": contract["review_evidence"],
 			}
 		},
 		"rules": {
@@ -183,6 +185,7 @@ def self_test() -> dict[str, Any]:
 	routes = capability.get("ui", {}).get("routes", [])
 	rules = capability.get("rule_engine", {}).get("rules", [])
 	adapters = capability.get("adapters", {})
+	review_evidence = capability.get("review_evidence", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "regy" not in model.get("capabilities", {}):
@@ -201,6 +204,8 @@ def self_test() -> dict[str, Any]:
 		errors.append("REGY semantic model must expose first-class registry agents")
 	if capability.get("streaming", {}).get("required_processor") != "bytewax":
 		errors.append("REGY lifecycle batches must require Bytewax")
+	if "registry_agents" not in review_evidence.get("pending_queues", []):
+		errors.append("REGY semantic model must expose registry-agent pending review evidence")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

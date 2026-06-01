@@ -278,7 +278,8 @@
       "provides": [
         "service_registry",
         "service_discovery",
-        "registry_agent_composition"
+        "registry_agent_composition",
+        "review_evidence"
       ],
       "registry_lifecycle": {
         "audit": "RegistryAuditEvent",
@@ -295,6 +296,37 @@
         "auth",
         "conf"
       ],
+      "review_evidence": {
+        "deny_behavior": "Denied REGY lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "pending",
+          "pending_review",
+          "review_required",
+          "review_denied",
+          "denied",
+          "accepted",
+          "registered",
+          "active",
+          "published",
+          "deprecated",
+          "retired"
+        ],
+        "pending_queues": [
+          "services",
+          "instances",
+          "versions",
+          "gateway_publications",
+          "reviews",
+          "registry_agents",
+          "lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "review_evidence"
+        ]
+      },
       "rule_engine": {
         "rules": [
           {
@@ -1689,13 +1721,45 @@
       "provides": [
         "service_registry",
         "service_discovery",
-        "registry_agent_composition"
+        "registry_agent_composition",
+        "review_evidence"
       ],
       "requires": [
         "apig",
         "auth",
         "conf"
       ],
+      "review_evidence": {
+        "deny_behavior": "Denied REGY lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "pending",
+          "pending_review",
+          "review_required",
+          "review_denied",
+          "denied",
+          "accepted",
+          "registered",
+          "active",
+          "published",
+          "deprecated",
+          "retired"
+        ],
+        "pending_queues": [
+          "services",
+          "instances",
+          "versions",
+          "gateway_publications",
+          "reviews",
+          "registry_agents",
+          "lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "review_evidence"
+        ]
+      },
       "streaming": {
         "engine": "bytewax",
         "lifecycle_stream": "regy.lifecycle",
