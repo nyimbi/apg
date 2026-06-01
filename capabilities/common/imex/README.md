@@ -26,6 +26,9 @@ through policy-controlled adapters instead of untracked transfer scripts.
   disclosure, and human approval for privileged transfer roles.
 - Bytewax lifecycle batch validation for endpoint, mapping, job, run, artifact,
   review, and transfer-agent mutation streams.
+- Durable review evidence for generated-app governance queues, including
+  policy decisions, matched rules, review reasons, required actions, and
+  persisted denial evidence for non-Bytewax lifecycle batches.
 - UI model functions for dashboards, job design, mappings, transfer monitor,
   validation, import/export workbenches, approvals, artifacts, audit, and
   settings, plus transfer-agent roster and lifecycle-batch monitor surfaces.
@@ -111,6 +114,18 @@ assert agent["status"] == "active"
 assert batch["status"] == "accepted"
 ```
 
+## Review Evidence
+
+Every generated-app lifecycle record carries `policy_decision`,
+`matched_rules`, `review_reasons`, and `review_evidence` fields so generated
+transfer consoles can render why an endpoint, mapping, job, run, artifact,
+review, transfer-agent registration, or lifecycle batch is allowed, denied, or
+awaiting review. `list_pending_reviews()` returns the composed queue across
+endpoints, mappings, jobs, runs, artifacts, reviews, transfer agents, and
+lifecycle batches. Denied non-Bytewax lifecycle batches are stored with
+`status="denied"` and `required_processor="bytewax"` before the guardrail
+raises `PermissionError`.
+
 ## Guardrails
 
 IMEX blocks missing tenant context, unsupported formats, missing endpoints,
@@ -132,5 +147,7 @@ Use focused checks while developing on battery:
 ./.venv/bin/python -m py_compile capabilities/common/imex/__init__.py capabilities/common/imex/capability_contract.py capabilities/common/imex/imex_runtime.py capabilities/common/imex/api.py capabilities/common/imex/view_models.py capabilities/common/imex/app.py capabilities/common/imex/test_capability_contract.py capabilities/common/imex/tests/test_package_contract.py
 ./.venv/bin/pytest -q capabilities/common/imex/test_capability_contract.py capabilities/common/imex/tests/test_package_contract.py
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/common/imex --json
+./.venv/bin/apg capabilities implementation-audit --root capabilities/common/imex --strict --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/imex --json
+./.venv/bin/apg capabilities lifecycle-audit --root capabilities/common/imex --json
 ```

@@ -372,6 +372,44 @@ def streaming_manifest() -> dict[str, Any]:
 	}
 
 
+def review_evidence_manifest() -> dict[str, Any]:
+	"""Return durable IMEX review-evidence metadata."""
+	return {
+		"durable_statuses": [
+			"pending",
+			"pending_review",
+			"review_required",
+			"review_denied",
+			"denied",
+			"accepted",
+			"draft",
+			"validated",
+			"running",
+			"queued",
+			"completed",
+			"published",
+			"purged",
+		],
+		"policy_fields": [
+			"policy_decision",
+			"matched_rules",
+			"review_reasons",
+			"review_evidence",
+		],
+		"pending_queues": [
+			"endpoints",
+			"mappings",
+			"jobs",
+			"runs",
+			"artifacts",
+			"reviews",
+			"transfer_agents",
+			"lifecycle_batches",
+		],
+		"deny_behavior": "Denied IMEX lifecycle batches persist evidence before PermissionError",
+	}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable IMEX capability contract."""
 	config = CapabilityConfiguration()
@@ -379,13 +417,14 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "imex",
 		"display_name": "Import/Export",
-		"provides": ["import_export", "bulk_transfer", "transfer_agent_composition"],
+		"provides": ["import_export", "bulk_transfer", "transfer_agent_composition", "review_evidence"],
 		"requires": ["etlp", "conn", "auth", "audl"],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
 		"rule_engine": {"type": "deterministic", "rules": [rule.__dict__ for rule in default_rules()]},
 		"agents": agent_manifest(),
 		"streaming": streaming_manifest(),
+		"review_evidence": review_evidence_manifest(),
 		"ui": ui_manifest(),
 		"theme": {"name": theme.name, "tokens": theme.tokens, "components": theme.components},
 	}

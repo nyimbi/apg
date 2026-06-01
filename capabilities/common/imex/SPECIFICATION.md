@@ -24,6 +24,8 @@ The current executable packet covers:
   review, quality review, artifact review, retention review, transfer
   operation, or data stewardship.
 - Bytewax lifecycle batch validation for import/export mutation streams.
+- Durable review evidence for policy decisions, matched rules, review reasons,
+  required actions, pending review queues, and denial records.
 - Generated-app UI models and semantic package evidence.
 
 Out of scope for this packet:
@@ -48,7 +50,9 @@ Out of scope for this packet:
    disclosure, and human approval for privileged roles.
 9. Validate lifecycle mutation batches through Bytewax before adapter side
    effects.
-10. Replay, retry, purge, or review as needed.
+10. Preserve policy decisions, matched rules, review reasons, and review
+    evidence on lifecycle records, pending queues, and audit events.
+11. Replay, retry, purge, or review as needed.
 
 ## Configuration
 
@@ -69,6 +73,12 @@ purge review, owner transfer, ETLP plan linkage, CONN binding, audit evidence,
 final quality evidence, transfer-agent runtime, transfer-agent role, agent
 scope, agent owner, agent purpose, contribution disclosure, human approval for
 privileged agent roles, and Bytewax lifecycle processing.
+
+Every generated-app endpoint, mapping, job, run, artifact, review,
+transfer-agent, lifecycle-batch, and audit record exposes `policy_decision`,
+`matched_rules`, `review_reasons`, and `review_evidence`. Generated
+applications can compose one pending-review queue, and denied non-Bytewax
+lifecycle batches remain auditable after the blocking exception.
 
 ## UI Surfaces
 
@@ -96,4 +106,6 @@ IMEX exposes 14 generated-app UI routes:
 - Runtime can execute a source-to-destination happy path.
 - Runtime blocks unsafe missing-evidence paths.
 - Package evidence is generated from the live contract.
+- Contract exposes `review_evidence` metadata, and API/view-model surfaces
+  expose pending review queues for generated applications.
 - Primary docs do not contain stale baseline or marketing claims.

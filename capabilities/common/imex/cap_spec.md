@@ -2,6 +2,8 @@
 
 IMEX is the Import/Export capability for APG. It provides a governed transfer
 control plane for compiler-generated applications.
+It also preserves durable review evidence so generated transfer consoles can
+compose pending queues and explain every allow, review, or denial decision.
 
 ## Capability Contract
 
@@ -32,7 +34,9 @@ control plane for compiler-generated applications.
 7. Publish retained artifacts.
 8. Register governed transfer agents.
 9. Validate lifecycle batches through Bytewax.
-10. Replay or purge with guardrails.
+10. Preserve policy decisions, matched rules, review reasons, and review
+    evidence on lifecycle records, pending queues, and audit events.
+11. Replay or purge with guardrails.
 
 ## Guardrails
 

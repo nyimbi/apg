@@ -26,6 +26,11 @@ class TransferEndpoint:
 	external: bool = False
 	approved: bool = True
 	created_at: str = field(default_factory=lambda: _now())
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -37,6 +42,11 @@ class MappingProfile:
 	mapping_ref: str
 	quality_gate_ref: str
 	created_at: str = field(default_factory=lambda: _now())
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -60,6 +70,11 @@ class TransferJob:
 	preview_validated: bool = False
 	quality_score: float | None = None
 	created_at: str = field(default_factory=lambda: _now())
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -73,6 +88,11 @@ class TransferRun:
 	quality_score: float | None = None
 	records_processed: int = 0
 	created_at: str = field(default_factory=lambda: _now())
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -85,6 +105,11 @@ class TransferArtifact:
 	retention_policy: str
 	status: str = "published"
 	created_at: str = field(default_factory=lambda: _now())
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -97,6 +122,11 @@ class ReviewRecord:
 	requester: str = ""
 	notes: str = ""
 	created_at: str = field(default_factory=lambda: _now())
+	decision: str = "pending"
+	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "require_review"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -108,6 +138,10 @@ class TransferAuditEvent:
 	message: str
 	evidence: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=lambda: _now())
+	policy_decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -124,6 +158,11 @@ class TransferAgentRecord:
 	contribution_disclosed: bool
 	human_approval_required: bool
 	created_at: str = field(default_factory=lambda: _now())
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -135,6 +174,12 @@ class TransferLifecycleBatchRecord:
 	mutation_count: int
 	status: str
 	created_at: str = field(default_factory=lambda: _now())
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	policy_decision: str = "allow"
+	review_reasons: list[str] = field(default_factory=list)
+	review_evidence: dict[str, Any] = field(default_factory=dict)
+	required_processor: str = "bytewax"
 
 
 class ImexService:
@@ -178,9 +223,10 @@ class ImexService:
 			raise PermissionError("connector_binding_required")
 		if self._tenant_key(tenant_id, endpoint_id) in self._endpoints:
 			raise ValueError(f"endpoint already exists for tenant: {endpoint_id}")
-		record = TransferEndpoint(endpoint_id, tenant_id, name, endpoint_type, conn_binding_ref, owner, external, approved)
+		result = _allow_result()
+		record = TransferEndpoint(endpoint_id, tenant_id, name, endpoint_type, conn_binding_ref, owner, external, approved, **_policy_kwargs(result))
 		self._endpoints[self._tenant_key(tenant_id, endpoint_id)] = record
-		self._record_event(tenant_id, "endpoint_registered", endpoint_id, f"Registered endpoint {name}.", {"endpoint_type": endpoint_type})
+		self._record_event(tenant_id, "endpoint_registered", endpoint_id, f"Registered endpoint {name}.", {"endpoint_type": endpoint_type}, result)
 		return _dump(record)
 
 	def create_mapping_profile(
@@ -199,9 +245,10 @@ class ImexService:
 			raise PermissionError("schema_mapping_required")
 		if not quality_gate_ref:
 			raise PermissionError("quality_gate_required")
-		record = MappingProfile(mapping_id, tenant_id, name, source_profile_ref, mapping_ref, quality_gate_ref)
+		result = _allow_result()
+		record = MappingProfile(mapping_id, tenant_id, name, source_profile_ref, mapping_ref, quality_gate_ref, **_policy_kwargs(result))
 		self._mappings[self._tenant_key(tenant_id, mapping_id)] = record
-		self._record_event(tenant_id, "mapping_profile_created", mapping_id, f"Created mapping profile {name}.", {})
+		self._record_event(tenant_id, "mapping_profile_created", mapping_id, f"Created mapping profile {name}.", {}, result)
 		return _dump(record)
 
 	def create_job(
@@ -253,18 +300,19 @@ class ImexService:
 		if self._tenant_key(tenant_id, job_id) in self._jobs:
 			raise ValueError(f"job already exists for tenant: {job_id}")
 		status = "pending_review" if result["decision"] == "require_review" else "draft"
-		record = TransferJob(job_id, tenant_id, name, direction, source_endpoint_id, destination_endpoint_id, format, owner, environment, mapping_profile_id, checksum, data_classification, pii_detected, pii_policy_ref, etlp_plan_ref, status)
+		record = TransferJob(job_id, tenant_id, name, direction, source_endpoint_id, destination_endpoint_id, format, owner, environment, mapping_profile_id, checksum, data_classification, pii_detected, pii_policy_ref, etlp_plan_ref, status, **_policy_kwargs(result))
 		self._jobs[self._tenant_key(tenant_id, job_id)] = record
-		self._record_event(tenant_id, "job_created", job_id, f"Created {direction} job {name}.", {"matched_rules": result["matched_rules"], "status": status})
+		self._record_event(tenant_id, "job_created", job_id, f"Created {direction} job {name}.", {"matched_rules": result["matched_rules"], "status": status}, result)
 		if result["decision"] == "require_review":
-			self._create_review(tenant_id, f"destination:{job_id}", job_id, "destination", owner, "External destination approval required.")
+			self._create_review(tenant_id, f"destination:{job_id}", job_id, "destination", owner, "External destination approval required.", result)
 		return _dump(record)
 
 	def validate_preview(self, tenant_id: str, job_id: str, quality_score: float, invalid_records: int = 0) -> dict[str, Any]:
 		job = self._get_job(tenant_id, job_id)
-		record = self._replace_job(job, preview_validated=True, quality_score=quality_score, status="validated")
+		result = _allow_result()
+		record = self._replace_job(job, preview_validated=True, quality_score=quality_score, status="validated", **_policy_kwargs(result))
 		self._jobs[self._tenant_key(tenant_id, job_id)] = record
-		self._record_event(tenant_id, "preview_validated", job_id, f"Preview validation quality score {quality_score}.", {"invalid_records": invalid_records})
+		self._record_event(tenant_id, "preview_validated", job_id, f"Preview validation quality score {quality_score}.", {"invalid_records": invalid_records}, result)
 		return _dump(record)
 
 	def execute_job(
@@ -309,11 +357,12 @@ class ImexService:
 			raise ValueError(f"run already exists for tenant: {run_id}")
 		status = "pending_review" if result["decision"] == "require_review" else "running"
 		if result["decision"] == "require_review":
-			self._create_review(tenant_id, f"quality:{run_id}", job_id, "quality", job.owner, "Transfer requires review before execution.")
-		run = TransferRun(run_id, tenant_id, job_id, status, record_count, checkpoint_ref=f"checkpoint:{run_id}", quality_score=job.quality_score)
+			self._create_review(tenant_id, f"quality:{run_id}", job_id, "quality", job.owner, "Transfer requires review before execution.", result, quality_review_recorded or capacity_review_recorded)
+		review_recorded = quality_review_recorded or capacity_review_recorded or approval_recorded
+		run = TransferRun(run_id, tenant_id, job_id, status, record_count, checkpoint_ref=f"checkpoint:{run_id}", quality_score=job.quality_score, **_policy_kwargs(result, review_recorded))
 		self._runs[self._tenant_key(tenant_id, run_id)] = run
-		self._jobs[self._tenant_key(tenant_id, job_id)] = self._replace_job(job, status=status)
-		self._record_event(tenant_id, "job_execution_requested", run_id, f"Execution decision: {status}.", {"matched_rules": result["matched_rules"]})
+		self._jobs[self._tenant_key(tenant_id, job_id)] = self._replace_job(job, status=status, **_policy_kwargs(result, review_recorded))
+		self._record_event(tenant_id, "job_execution_requested", run_id, f"Execution decision: {status}.", {"matched_rules": result["matched_rules"]}, result, review_recorded)
 		return _dump(run)
 
 	def complete_run(self, tenant_id: str, run_id: str, records_processed: int, quality_score: float, audit_evidence_present: bool = True) -> dict[str, Any]:
@@ -328,10 +377,10 @@ class ImexService:
 			_raise_if_blocked(result)
 		if run.status != "running":
 			raise PermissionError("transfer_run_not_running")
-		record = TransferRun(run.id, run.tenant_id, run.job_id, "completed", run.record_count, run.checkpoint_ref, quality_score, records_processed, run.created_at)
+		record = TransferRun(run.id, run.tenant_id, run.job_id, "completed", run.record_count, run.checkpoint_ref, quality_score, records_processed, run.created_at, **_policy_kwargs(result, audit_evidence_present))
 		self._runs[self._tenant_key(tenant_id, run_id)] = record
-		self._jobs[self._tenant_key(tenant_id, run.job_id)] = self._replace_job(self._get_job(tenant_id, run.job_id), status="completed")
-		self._record_event(tenant_id, "run_completed", run_id, f"Completed transfer run {run_id}.", {"records_processed": records_processed, "quality_score": quality_score})
+		self._jobs[self._tenant_key(tenant_id, run.job_id)] = self._replace_job(self._get_job(tenant_id, run.job_id), status="completed", **_policy_kwargs(result, audit_evidence_present))
+		self._record_event(tenant_id, "run_completed", run_id, f"Completed transfer run {run_id}.", {"records_processed": records_processed, "quality_score": quality_score}, result, audit_evidence_present)
 		return _dump(record)
 
 	def publish_artifact(self, tenant_id: str, artifact_id: str, run_id: str, artifact_ref: str, checksum: str, retention_policy: str) -> dict[str, Any]:
@@ -346,9 +395,9 @@ class ImexService:
 		})
 		if result["decision"] == "deny":
 			_raise_if_blocked(result)
-		record = TransferArtifact(artifact_id, tenant_id, run_id, artifact_ref, checksum, retention_policy)
+		record = TransferArtifact(artifact_id, tenant_id, run_id, artifact_ref, checksum, retention_policy, **_policy_kwargs(result))
 		self._artifacts[self._tenant_key(tenant_id, artifact_id)] = record
-		self._record_event(tenant_id, "artifact_published", artifact_id, f"Published transfer artifact {artifact_ref}.", {})
+		self._record_event(tenant_id, "artifact_published", artifact_id, f"Published transfer artifact {artifact_ref}.", {}, result)
 		return _dump(record)
 
 	def replay_run(self, tenant_id: str, run_id: str, replay_id: str, idempotency_key: str) -> dict[str, Any]:
@@ -356,9 +405,9 @@ class ImexService:
 		result = self.evaluate({"tenant_context_present": bool(tenant_id), "operation": "replay_run", "idempotency_key_present": bool(idempotency_key)})
 		if result["decision"] == "deny":
 			_raise_if_blocked(result)
-		record = TransferRun(replay_id, tenant_id, run.job_id, "queued", run.record_count, checkpoint_ref=f"replay:{idempotency_key}", quality_score=run.quality_score)
+		record = TransferRun(replay_id, tenant_id, run.job_id, "queued", run.record_count, checkpoint_ref=f"replay:{idempotency_key}", quality_score=run.quality_score, **_policy_kwargs(result))
 		self._runs[self._tenant_key(tenant_id, replay_id)] = record
-		self._record_event(tenant_id, "run_replay_queued", replay_id, f"Queued replay for {run_id}.", {"idempotency_key": idempotency_key})
+		self._record_event(tenant_id, "run_replay_queued", replay_id, f"Queued replay for {run_id}.", {"idempotency_key": idempotency_key}, result)
 		return _dump(record)
 
 	def purge_artifact(self, tenant_id: str, artifact_id: str, actor: str, purge_review_recorded: bool) -> dict[str, Any]:
@@ -368,9 +417,9 @@ class ImexService:
 		result = self.evaluate({"tenant_context_present": bool(tenant_id), "operation": "purge_artifact", "destructive": True, "purge_review_recorded": purge_review_recorded})
 		if result["decision"] == "deny":
 			_raise_if_blocked(result)
-		record = TransferArtifact(artifact.id, artifact.tenant_id, artifact.run_id, artifact.artifact_ref, artifact.checksum, artifact.retention_policy, "purged", artifact.created_at)
+		record = TransferArtifact(artifact.id, artifact.tenant_id, artifact.run_id, artifact.artifact_ref, artifact.checksum, artifact.retention_policy, "purged", artifact.created_at, **_policy_kwargs(result, purge_review_recorded))
 		self._artifacts[self._tenant_key(tenant_id, artifact_id)] = record
-		self._record_event(tenant_id, "artifact_purged", artifact_id, f"Purged artifact {artifact_id}.", {"actor": actor})
+		self._record_event(tenant_id, "artifact_purged", artifact_id, f"Purged artifact {artifact_id}.", {"actor": actor}, result, purge_review_recorded)
 		return _dump(record)
 
 	def register_transfer_agent(
@@ -404,7 +453,7 @@ class ImexService:
 			"human_approval_required": human_approval_required,
 		})
 		if result["decision"] == "deny":
-			self._record_event(tenant_id, "transfer_agent_registration_denied", agent_id, f"Denied transfer agent {name}.", {"matched_rules": result["matched_rules"]})
+			self._record_event(tenant_id, "transfer_agent_registration_denied", agent_id, f"Denied transfer agent {name}.", {"matched_rules": result["matched_rules"]}, result)
 			_raise_if_blocked(result)
 		if self._tenant_key(tenant_id, agent_id) in self._transfer_agents:
 			raise ValueError(f"transfer agent already exists for tenant: {agent_id}")
@@ -420,9 +469,10 @@ class ImexService:
 			status=_status_for_decision(result),
 			contribution_disclosed=contribution_disclosed,
 			human_approval_required=human_approval_required,
+			**_policy_kwargs(result, human_approval_required),
 		)
 		self._transfer_agents[self._tenant_key(tenant_id, agent_id)] = record
-		self._record_event(tenant_id, "transfer_agent_registered", agent_id, f"Registered transfer agent {name}.", {"matched_rules": result["matched_rules"], "status": record.status})
+		self._record_event(tenant_id, "transfer_agent_registered", agent_id, f"Registered transfer agent {name}.", {"matched_rules": result["matched_rules"], "status": record.status}, result, human_approval_required)
 		return _dump(record)
 
 	def validate_imex_lifecycle_batch(
@@ -449,9 +499,10 @@ class ImexService:
 			operation=operation,
 			mutation_count=mutation_count,
 			status="denied" if result["decision"] == "deny" else "accepted",
+			**_policy_kwargs(result),
 		)
 		self._lifecycle_batches[self._tenant_key(tenant_id, resolved_batch_id)] = record
-		self._record_event(tenant_id, "imex_lifecycle_batch_validated", resolved_batch_id, f"Validated IMEX lifecycle batch through {normalized_stream}.", {"matched_rules": result["matched_rules"], "status": record.status})
+		self._record_event(tenant_id, "imex_lifecycle_batch_validated", resolved_batch_id, f"Validated IMEX lifecycle batch through {normalized_stream}.", {"matched_rules": result["matched_rules"], "status": record.status}, result)
 		if result["decision"] == "deny":
 			_raise_if_blocked(result)
 		return _dump(record)
@@ -469,6 +520,8 @@ class ImexService:
 			"completed_run_count": len([run for run in runs if run.status == "completed"]),
 			"artifact_count": len([artifact for artifact in self._artifacts.values() if artifact.tenant_id == tenant_id]),
 			"pending_review_count": len([review for review in self._reviews.values() if review.tenant_id == tenant_id and review.status == "pending"]),
+			"pending_transfer_agent_review_count": len([agent for agent in self._transfer_agents.values() if agent.tenant_id == tenant_id and agent.status == "pending_review"]),
+			"review_count": len(self.list_pending_reviews(tenant_id)),
 			"transfer_agent_count": len([agent for agent in self._transfer_agents.values() if agent.tenant_id == tenant_id]),
 			"lifecycle_batch_count": len(lifecycle_batches),
 			"denied_lifecycle_batch_count": len([batch for batch in lifecycle_batches if batch.status == "denied"]),
@@ -502,10 +555,51 @@ class ImexService:
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return [_dump(event) for event in self._events if tenant_id is None or event.tenant_id == tenant_id]
 
-	def _create_review(self, tenant_id: str, review_id: str, subject_id: str, review_type: str, requester: str, notes: str) -> ReviewRecord:
-		review = ReviewRecord(review_id, tenant_id, subject_id, review_type, requester=requester, notes=notes)
+	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		"""Return transfer records awaiting governance review."""
+		items = (
+			self.list_endpoints(tenant_id)
+			+ self.list_mappings(tenant_id)
+			+ self.list_jobs(tenant_id)
+			+ self.list_runs(tenant_id)
+			+ self.list_artifacts(tenant_id)
+			+ self.list_reviews(tenant_id)
+			+ self.list_transfer_agents(tenant_id)
+			+ self.list_lifecycle_batches(tenant_id)
+		)
+		return [
+			record
+			for record in items
+			if record.get("status") in {"pending", "pending_review", "review_required"}
+			or record.get("decision") == "pending"
+		]
+
+	def _create_review(
+		self,
+		tenant_id: str,
+		review_id: str,
+		subject_id: str,
+		review_type: str,
+		requester: str,
+		notes: str,
+		policy_result: dict[str, Any] | None = None,
+		review_recorded: bool = False,
+	) -> ReviewRecord:
+		result = policy_result or _allow_result()
+		review = ReviewRecord(
+			review_id,
+			tenant_id,
+			subject_id,
+			review_type,
+			requester=requester,
+			notes=notes,
+			matched_rules=list(result["matched_rules"]),
+			policy_decision=result["decision"],
+			review_reasons=_reasons(result),
+			review_evidence=_review_evidence(result, review_recorded),
+		)
 		self._reviews[self._tenant_key(tenant_id, review_id)] = review
-		self._record_event(tenant_id, f"{review_type}_review_requested", review_id, f"Requested {review_type} review.", {"subject_id": subject_id})
+		self._record_event(tenant_id, f"{review_type}_review_requested", review_id, f"Requested {review_type} review.", {"subject_id": subject_id}, result, review_recorded)
 		return review
 
 	def _replace_job(self, job: TransferJob, **changes: Any) -> TransferJob:
@@ -525,8 +619,29 @@ class ImexService:
 			raise KeyError(f"unknown transfer run for tenant: {run_id}")
 		return record
 
-	def _record_event(self, tenant_id: str, event_type: str, subject_id: str, message: str, evidence: dict[str, Any] | None = None) -> None:
-		self._events.append(TransferAuditEvent(f"event:{len(self._events) + 1}", tenant_id, event_type, subject_id, message, dict(evidence or {})))
+	def _record_event(
+		self,
+		tenant_id: str,
+		event_type: str,
+		subject_id: str,
+		message: str,
+		evidence: dict[str, Any] | None = None,
+		policy_result: dict[str, Any] | None = None,
+		review_recorded: bool = False,
+	) -> None:
+		result = policy_result or _allow_result()
+		self._events.append(TransferAuditEvent(
+			f"event:{len(self._events) + 1}",
+			tenant_id,
+			event_type,
+			subject_id,
+			message,
+			dict(evidence or {}),
+			policy_decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			review_reasons=_reasons(result),
+			review_evidence=_review_evidence(result, review_recorded),
+		))
 
 	def _list(self, store: dict[tuple[str, str], Any], tenant_id: str | None) -> list[dict[str, Any]]:
 		return [_dump(record) for record in store.values() if tenant_id is None or record.tenant_id == tenant_id]
@@ -541,6 +656,40 @@ class ImexService:
 
 def _dump(record: Any) -> dict[str, Any]:
 	return asdict(record)
+
+
+def _allow_result() -> dict[str, Any]:
+	return {"decision": "allow", "matched_rules": [], "actions": []}
+
+
+def _reasons(result: dict[str, Any]) -> list[str]:
+	return list(dict.fromkeys(
+		str(action["reason"])
+		for action in result.get("actions", [])
+		if action.get("reason")
+	))
+
+
+def _review_evidence(result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+	return {
+		"required_actions": list(dict.fromkeys(
+			str(action.get("required_action"))
+			for action in result.get("actions", [])
+			if action.get("required_action")
+		)),
+		"reasons": _reasons(result),
+		"review_recorded": bool(review_recorded),
+	}
+
+
+def _policy_kwargs(result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+	return {
+		"decision": result["decision"],
+		"matched_rules": list(result["matched_rules"]),
+		"policy_decision": result["decision"],
+		"review_reasons": _reasons(result),
+		"review_evidence": _review_evidence(result, review_recorded),
+	}
 
 
 def _raise_if_blocked(result: dict[str, Any]) -> None:

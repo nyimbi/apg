@@ -33,7 +33,9 @@ def test_contract_shape_is_valid():
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["agents"]["first_class"] is True
 	assert contract["streaming"]["required_processor"] == "bytewax"
-	assert contract["provides"] == ["import_export", "bulk_transfer", "transfer_agent_composition"]
+	assert contract["provides"] == ["import_export", "bulk_transfer", "transfer_agent_composition", "review_evidence"]
+	assert "transfer_agents" in contract["review_evidence"]["pending_queues"]
+	assert "policy_decision" in contract["review_evidence"]["policy_fields"]
 	assert contract["requires"] == ["etlp", "conn", "auth", "audl"]
 
 
@@ -53,3 +55,5 @@ def test_app_entrypoint_is_publishable():
 	assert model["capabilities"]["imex"]["streaming"]["required_processor"] == "bytewax"
 	assert model["capabilities"]["imex"]["agents"]["first_class"] is True
 	assert model["capabilities"]["imex"]["transfer_lifecycle"]["transfer_agent"] == "TransferAgentRecord"
+	assert model["capabilities"]["imex"]["review_evidence"]["deny_behavior"]
+	assert model["contracts"]["imex"]["review_evidence"]["pending_queues"]

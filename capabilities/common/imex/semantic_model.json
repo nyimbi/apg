@@ -262,7 +262,8 @@
       "provides": [
         "import_export",
         "bulk_transfer",
-        "transfer_agent_composition"
+        "transfer_agent_composition",
+        "review_evidence"
       ],
       "requires": [
         "etlp",
@@ -270,6 +271,40 @@
         "auth",
         "audl"
       ],
+      "review_evidence": {
+        "deny_behavior": "Denied IMEX lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "pending",
+          "pending_review",
+          "review_required",
+          "review_denied",
+          "denied",
+          "accepted",
+          "draft",
+          "validated",
+          "running",
+          "queued",
+          "completed",
+          "published",
+          "purged"
+        ],
+        "pending_queues": [
+          "endpoints",
+          "mappings",
+          "jobs",
+          "runs",
+          "artifacts",
+          "reviews",
+          "transfer_agents",
+          "lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "review_evidence"
+        ]
+      },
       "rule_engine": {
         "rules": [
           {
@@ -1793,7 +1828,8 @@
       "provides": [
         "import_export",
         "bulk_transfer",
-        "transfer_agent_composition"
+        "transfer_agent_composition",
+        "review_evidence"
       ],
       "requires": [
         "etlp",
@@ -1801,6 +1837,40 @@
         "auth",
         "audl"
       ],
+      "review_evidence": {
+        "deny_behavior": "Denied IMEX lifecycle batches persist evidence before PermissionError",
+        "durable_statuses": [
+          "pending",
+          "pending_review",
+          "review_required",
+          "review_denied",
+          "denied",
+          "accepted",
+          "draft",
+          "validated",
+          "running",
+          "queued",
+          "completed",
+          "published",
+          "purged"
+        ],
+        "pending_queues": [
+          "endpoints",
+          "mappings",
+          "jobs",
+          "runs",
+          "artifacts",
+          "reviews",
+          "transfer_agents",
+          "lifecycle_batches"
+        ],
+        "policy_fields": [
+          "policy_decision",
+          "matched_rules",
+          "review_reasons",
+          "review_evidence"
+        ]
+      },
       "streaming": {
         "engine": "bytewax",
         "lifecycle_stream": "imex.lifecycle",

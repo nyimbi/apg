@@ -25244,6 +25244,86 @@ Known gaps:
 - Existing SQLAlchemy and Pydantic deprecation warnings surfaced by focused
   tests remain outside this slice.
 
+### 2026-06-01 10:39 EAT
+
+IMEX review-evidence lifecycle slice:
+
+- Added durable review evidence for endpoints, mapping profiles, transfer jobs,
+  transfer runs, transfer artifacts, review records, transfer agents, lifecycle
+  batches, and audit events.
+- Surfaced contract-level `review_evidence` through registration metadata, API
+  helpers, generated view models, semantic model evidence, release evidence,
+  package tests, and the app self-test.
+- Added a composed pending-review queue across endpoints, mappings, jobs, runs,
+  artifacts, reviews, transfer agents, and lifecycle batches so generated apps
+  can build transfer governance consoles without re-evaluating history.
+- Preserved evidence-bearing review records for destination approvals, quality
+  and capacity checks, artifact purge reviews, privileged transfer-agent
+  approvals, and non-Bytewax lifecycle-batch denials.
+- Kept transfer agents provider-neutral across Codex, Claude Code, OpenCode,
+  and Pi runtime adapters while keeping lifecycle batch governance Bytewax
+  first.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/imex/__init__.py capabilities/common/imex/capability_contract.py capabilities/common/imex/models.py capabilities/common/imex/imex_runtime.py capabilities/common/imex/api.py capabilities/common/imex/view_models.py capabilities/common/imex/app.py capabilities/common/imex/test_capability_contract.py capabilities/common/imex/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/imex/test_capability_contract.py capabilities/common/imex/tests/test_package_contract.py`
+  passed with 10 tests and 10 pre-existing SQLAlchemy/Pydantic deprecation
+  warnings from imported shared modules.
+- `./.venv/bin/python -c "import importlib; app=importlib.import_module('capabilities.common.imex.app'); r=app.self_test(); print(r); assert r['passed']"`
+  passed.
+- `./.venv/bin/python -m json.tool capabilities/common/imex/semantic_model.json`
+  passed.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/imex --json`
+  passed with one domain-specific IMEX implementation, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/imex --strict --json`
+  passed with one domain-specific IMEX implementation, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/imex --json`
+  passed and showed Bytewax event-stream configuration, first-class
+  transfer-agent composition, review evidence, side-effect-free publish
+  evidence, and no warnings.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/common/imex --json`
+  passed with one complete lifecycle record, 38 rules, 14 routes, and 0
+  warnings/errors.
+- Direct IMEX service smoke passed for destination review, quality review,
+  privileged transfer-agent review, accepted Bytewax lifecycle batch, and
+  denied legacy lifecycle batch evidence.
+- Focused stale-marker scan over touched IMEX source, docs, tests, and package
+  evidence returned no primary-slice stale markers.
+- `git diff --check -- capabilities/common/imex docs/progress_log.md` passed.
+
+Code review:
+
+- Reviewed blocking guardrails: tenant, owner, connector binding, endpoint,
+  direction, format, mapping, checksum, PII policy, production approval,
+  sensitive-export encryption, monitoring, checkpointing, preview, retention,
+  idempotency, purge approval, unsupported transfer-agent runtime/role, and
+  non-Bytewax lifecycle-stream failures still block where required.
+- Reviewed review-required behavior: destination approvals, quality/capacity
+  reviews, privileged transfer-agent approvals, purge approvals, and lifecycle
+  routing denials now retain policy decisions, matched rules, review reasons,
+  and required actions.
+- Reviewed generated-app composition: dashboard, settings, transfer-agent
+  roster, API helpers, registration metadata, and semantic model evidence expose
+  pending review queues and review manifests directly.
+- Kept live ETLP, CONN, AUTH, AUDL, MONI, KEYM, ENCR, registry, encryption,
+  monitoring, and AI runtime integrations behind adapters.
+
+Known gaps:
+
+- Did not run the full repository test suite, rendered IMEX UI checks, physical
+  file transfer execution, live ETLP/CONN/AUTH/AUDL/MONI/KEYM/ENCR adapters,
+  durable Bytewax workers or dataflows, external vault/encryption/audit/
+  monitoring/registry adapters, performance/load/SLO checks, or live AI runtime
+  adapters during this battery-conscious capability slice.
+- Existing SQLAlchemy and Pydantic deprecation warnings surfaced by focused
+  tests remain outside this slice.
+- Next ordered capability work should continue from the repository development
+  order after IMEX, verifying the current order before editing the next package.
+
 ### 2026-06-01 02:53 EAT
 
 AGNT governed execution run lifecycle slice:

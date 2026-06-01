@@ -10,7 +10,7 @@ from .imex_runtime import ImexService
 
 def dashboard_model(service: ImexService, tenant_id: str = "default") -> dict[str, Any]:
 	contract = get_capability_contract(tenant_id)
-	return {"title": "Import/Export", "tenant_id": tenant_id, "summary": service.dashboard_summary(tenant_id), "transfer_agents": service.list_transfer_agents(tenant_id), "lifecycle_batches": service.list_lifecycle_batches(tenant_id), "routes": contract["ui"]["routes"], "theme": contract["theme"]}
+	return {"title": "Import/Export", "tenant_id": tenant_id, "summary": service.dashboard_summary(tenant_id), "transfer_agents": service.list_transfer_agents(tenant_id), "lifecycle_batches": service.list_lifecycle_batches(tenant_id), "pending_reviews": service.list_pending_reviews(tenant_id), "review_evidence": contract["review_evidence"], "routes": contract["ui"]["routes"], "theme": contract["theme"]}
 
 
 def job_designer_model(service: ImexService, tenant_id: str = "default") -> dict[str, Any]:
@@ -52,7 +52,7 @@ def audit_timeline_model(service: ImexService, tenant_id: str = "default") -> di
 
 def transfer_agent_roster_model(service: ImexService, tenant_id: str = "default") -> dict[str, Any]:
 	contract = get_capability_contract(tenant_id)
-	return {"tenant_id": tenant_id, "agents": service.list_transfer_agents(tenant_id), "agent_contract": contract["agents"], "supported_runtimes": contract["agents"]["supported_runtimes"], "supported_roles": contract["agents"]["supported_roles"], "privileged_roles": contract["agents"]["privileged_roles"], "required_fields": ["name", "runtime", "role", "scope", "owner", "purpose", "contribution_disclosed"]}
+	return {"tenant_id": tenant_id, "agents": service.list_transfer_agents(tenant_id), "pending_reviews": [record for record in service.list_pending_reviews(tenant_id) if record.get("role") in contract["agents"]["supported_roles"]], "agent_contract": contract["agents"], "supported_runtimes": contract["agents"]["supported_runtimes"], "supported_roles": contract["agents"]["supported_roles"], "privileged_roles": contract["agents"]["privileged_roles"], "required_fields": ["name", "runtime", "role", "scope", "owner", "purpose", "contribution_disclosed"]}
 
 
 def lifecycle_batch_model(service: ImexService, tenant_id: str = "default") -> dict[str, Any]:
@@ -62,4 +62,4 @@ def lifecycle_batch_model(service: ImexService, tenant_id: str = "default") -> d
 
 def settings_model(service: ImexService, tenant_id: str = "default") -> dict[str, Any]:
 	contract = get_capability_contract(tenant_id)
-	return {"tenant_id": tenant_id, "configuration": contract["configuration"], "schema": contract["configuration_schema"], "adapters": contract["configuration"]["adapters"], "agents": contract["agents"], "streaming": contract["streaming"], "theme": contract["theme"]}
+	return {"tenant_id": tenant_id, "configuration": contract["configuration"], "schema": contract["configuration_schema"], "adapters": contract["configuration"]["adapters"], "agents": contract["agents"], "streaming": contract["streaming"], "review_evidence": contract["review_evidence"], "theme": contract["theme"]}

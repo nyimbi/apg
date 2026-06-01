@@ -58,6 +58,7 @@ def semantic_model() -> dict[str, Any]:
 				"ui": contract["ui"],
 				"screens": routes,
 				"theme": contract["theme"],
+				"review_evidence": contract["review_evidence"],
 				"runtime": {
 					"api": "api.py",
 					"entrypoint": "app.py",
@@ -99,6 +100,7 @@ def semantic_model() -> dict[str, Any]:
 				"requires": requires,
 				"agents": contract["agents"],
 				"streaming": contract["streaming"],
+				"review_evidence": contract["review_evidence"],
 			}
 		},
 		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
@@ -157,6 +159,7 @@ def self_test() -> dict[str, Any]:
 	routes = capability.get("ui", {}).get("routes", [])
 	rules = capability.get("rule_engine", {}).get("rules", [])
 	adapters = capability.get("adapters", {})
+	review_evidence = capability.get("review_evidence", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "imex" not in model.get("capabilities", {}):
@@ -175,6 +178,8 @@ def self_test() -> dict[str, Any]:
 		errors.append("IMEX semantic model must expose first-class transfer agents")
 	if capability.get("streaming", {}).get("required_processor") != "bytewax":
 		errors.append("IMEX lifecycle batches must require Bytewax")
+	if "transfer_agents" not in review_evidence.get("pending_queues", []):
+		errors.append("IMEX semantic model must expose transfer-agent pending review evidence")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

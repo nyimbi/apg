@@ -21,7 +21,7 @@ capability_metadata = {
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": ["etlp", "conn", "auth", "audl"],
 	"optional_dependencies": ["moni", "keym", "encr"],
-	"provides": ["import_export", "bulk_transfer", "transfer_agent_composition"],
+	"provides": ["import_export", "bulk_transfer", "transfer_agent_composition", "review_evidence"],
 	"permissions": ["imex:view", "imex:create", "imex:execute", "imex:manage", "imex:approve", "imex:admin"],
 }
 
@@ -68,6 +68,7 @@ def register_capability() -> dict:
 		"rule_engine": contract["rule_engine"],
 		"agents": contract["agents"],
 		"streaming": contract["streaming"],
+		"review_evidence": contract["review_evidence"],
 		"capabilities": {
 			"jobs": "Create and execute governed import, export, and migration jobs",
 			"endpoints": "Bind transfer endpoints to CONN-managed connections",
@@ -77,6 +78,7 @@ def register_capability() -> dict:
 			"capability_rules": "Evaluate deterministic import/export governance rules",
 			"transfer_agent_composition": "Govern AI and automation agents that review or mutate transfer state",
 			"bytewax_lifecycle_batches": "Validate import/export lifecycle mutation batches through Bytewax",
+			"review_evidence": "Preserve policy decisions, matched rules, review reasons, and review evidence for generated transfer governance queues",
 			"visual_theming": "Apply transfer-console theme tokens and components",
 		},
 		"endpoints": {

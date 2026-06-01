@@ -22,6 +22,9 @@ existing heavier IMEX modules instead of replacing them wholesale.
    - Add endpoint, mapping, job, run, artifact, review, and audit records.
    - Add transfer-agent records, lifecycle-batch records, guardrail-backed
      registration, Bytewax validation, summaries, and audit events.
+   - Preserve policy decisions, matched rules, review reasons, and required
+     actions across endpoint, mapping, job, run, artifact, review,
+     transfer-agent, lifecycle-batch, and audit records.
    - Implement lifecycle operations and rule enforcement.
    - Keep the runtime dependency-light for compiler-generated apps.
 
@@ -31,6 +34,8 @@ existing heavier IMEX modules instead of replacing them wholesale.
      including transfer-agent and lifecycle-batch helpers.
    - Add `view_models.py` for composable UI screens, including agent roster and
      lifecycle-batch monitor views.
+   - Add generated-app pending-review helpers and review-evidence metadata for
+     dashboards, rosters, and settings surfaces.
 
 4. Package Evidence
    - Replace static app semantics with contract-derived semantic output.
@@ -47,6 +52,8 @@ existing heavier IMEX modules instead of replacing them wholesale.
 ## Review Checklist
 
 - Runtime enforces every declared critical guardrail.
+- Runtime preserves durable review evidence for review-required and denied
+  lifecycle paths.
 - Contract rule count and route count match package evidence.
 - UI models use runtime list methods and contract configuration.
 - API helpers do not bypass the generated-app runtime.

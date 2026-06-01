@@ -8,6 +8,7 @@ from capabilities.common.imex.view_models import (
 	dashboard_model,
 	job_designer_model,
 	lifecycle_batch_model,
+	settings_model,
 	transfer_agent_roster_model,
 	transfer_monitor_model,
 )
@@ -34,12 +35,14 @@ def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
 		"theme",
 	]
 	assert len(contract["rule_engine"]["rules"]) >= 38
-	assert contract["provides"] == ["import_export", "bulk_transfer", "transfer_agent_composition"]
+	assert contract["provides"] == ["import_export", "bulk_transfer", "transfer_agent_composition", "review_evidence"]
 	assert contract["requires"] == ["etlp", "conn", "auth", "audl"]
 	assert contract["agents"]["first_class"] is True
 	assert "codex" in contract["agents"]["supported_runtimes"]
 	assert "migration_reviewer" in contract["agents"]["supported_roles"]
 	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert "transfer_agents" in contract["review_evidence"]["pending_queues"]
+	assert "policy_decision" in contract["review_evidence"]["policy_fields"]
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "imex_runtime.ImexService"
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
@@ -187,6 +190,8 @@ def test_imex_runtime_review_and_artifact_guardrails():
 	service.create_mapping_profile("map", "tenant-a", "Map", "profiles/file.json", "maps/file.json", "quality/file")
 	job = service.create_job("export", "tenant-a", "Export", "export", "source", "external", "json", "data", "production", "map", "sha256:abc", data_classification="sensitive", destination_approved=False)
 	assert job["status"] == "pending_review"
+	assert job["policy_decision"] == "require_review"
+	assert job["review_reasons"] == ["destination_approval_required"]
 	assert any(review["review_type"] == "destination" for review in service.list_reviews("tenant-a"))
 
 	service.validate_preview("tenant-a", "export", quality_score=0.99)
@@ -250,14 +255,27 @@ def test_imex_runtime_governs_agents_and_lifecycle_batches():
 		service.validate_imex_lifecycle_batch("tenant-a", "legacy_queue", 2)
 	batch = service.validate_imex_lifecycle_batch("tenant-a", "bytewax", 4)
 	summary = service.dashboard_summary("tenant-a")
+	denied_batch = [
+		record
+		for record in service.list_lifecycle_batches("tenant-a")
+		if record["status"] == "denied"
+	][0]
 
 	assert pending["status"] == "pending_review"
 	assert pending["runtime"] == "claude_code"
+	assert pending["policy_decision"] == "require_review"
+	assert pending["review_reasons"] == ["transfer_agent_human_approval_required"]
 	assert active["status"] == "active"
 	assert batch["status"] == "accepted"
+	assert denied_batch["policy_decision"] == "deny"
+	assert denied_batch["required_processor"] == "bytewax"
+	assert denied_batch["review_reasons"] == ["bytewax_lifecycle_stream_required"]
 	assert summary["transfer_agent_count"] == 2
+	assert summary["pending_transfer_agent_review_count"] == 1
+	assert summary["review_count"] >= 1
 	assert summary["lifecycle_batch_count"] == 2
 	assert summary["denied_lifecycle_batch_count"] == 1
+	assert service.list_pending_reviews("tenant-a")
 
 
 def test_registration_and_ui_models_are_composable():
@@ -280,6 +298,7 @@ def test_registration_and_ui_models_are_composable():
 	service.validate_imex_lifecycle_batch("tenant-a", "bytewax", 1)
 	agents = transfer_agent_roster_model(service, "tenant-a")
 	batches = lifecycle_batch_model(service, "tenant-a")
+	settings = settings_model(service, "tenant-a")
 
 	assert registration["configuration"]["tenant_id"] == "default"
 	assert registration["rule_engine"]["type"] == "deterministic"
@@ -290,9 +309,16 @@ def test_registration_and_ui_models_are_composable():
 	assert "moni" in registration["optional_dependencies"]
 	assert registration["agents"]["first_class"] is True
 	assert registration["streaming"]["required_processor"] == "bytewax"
+	assert "review_evidence" in registration["provides"]
+	assert "transfer_agents" in registration["review_evidence"]["pending_queues"]
+	assert "review_evidence" in registration["capabilities"]
 	assert dashboard["summary"]["endpoint_count"] == 1
+	assert "pending_reviews" in dashboard
+	assert "review_evidence" in dashboard
 	assert "create_job" in designer["actions"]
 	assert monitor["runs"] == []
 	assert agents["agents"][0]["runtime"] == "codex"
+	assert "pending_reviews" in agents
 	assert batches["required_processor"] == "bytewax"
+	assert "review_evidence" in settings
 	assert callable(imex_capability.health_check)
