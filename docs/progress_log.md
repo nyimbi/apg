@@ -30041,3 +30041,117 @@ Known gaps:
   execution engines, graph writes, RAG indexing, dashboard rendering,
   notification delivery, durable Bytewax topology, or performance/load checks
   during this battery-conscious slice.
+
+## 2026-06-01 - Intel Threats executable package
+
+Implemented and reviewed `capabilities/intel/threats` as a complete executable
+APG package for governed, evidence-backed threat intelligence.
+
+What changed:
+
+- Replaced the placeholder marker with an executable package exporting
+  `ThreatIntelligenceService`, `IntelThreatsService`, and
+  `get_capability_contract`.
+- Added a detailed `SPECIFICATION.md`, `PLAN.md`, `README.md`, and
+  `cap_spec.md` defining the authority, workspace, source, indicator, actor,
+  campaign, assessment, report, mitigation, review, Bytewax lifecycle,
+  AI-agent, UI, theme, and adapter-boundary model.
+- Added `capability_contract.py` with 65 deterministic rules, 13 UI routes,
+  compact `intel_threats_control` theme tokens, APG dependencies, Bytewax
+  lifecycle metadata, and provider-neutral AI-agent runtimes for `codex`,
+  `claude_code`, `opencode`, and `pi`.
+- Added in-memory domain models and a tenant-scoped service for lawful
+  authority records, threat workspaces, source lineage, indicators, actors,
+  campaigns, assessments, approved reports, approved mitigations, reviews,
+  Bytewax batch validation, and AI-agent guardrails.
+- Added API helpers, dashboard/console/agent view models, and a publishable
+  `app.py` entrypoint with self-test, component manifest, and semantic-model
+  generation.
+- Added package manifest, release evidence, generated semantic model, and
+  focused tests for contract shape, rule-engine denial paths, full threat
+  lifecycle execution, tenant isolation, guardrail rejection, API helpers, view
+  models, and app entrypoint.
+- Updated `capabilities/intel/__init__.py` so `threats` is listed as an
+  implemented sub-capability.
+- Updated `capabilities/README.md` so the catalog snapshot reports 151 valid
+  contracts, 151 domain-specific packages, 151 strict complete package artifact
+  sets, and 17 Intel packages.
+
+Focused verification:
+
+- Generated `capabilities/intel/threats/semantic_model.json` from
+  `app.semantic_model()`.
+- `./.venv/bin/python -m py_compile
+  capabilities/intel/threats/__init__.py
+  capabilities/intel/threats/capability_contract.py
+  capabilities/intel/threats/models.py
+  capabilities/intel/threats/threat_runtime.py
+  capabilities/intel/threats/service.py
+  capabilities/intel/threats/api.py
+  capabilities/intel/threats/views.py
+  capabilities/intel/threats/app.py
+  capabilities/intel/threats/tests/test_package_contract.py` passed.
+- `./.venv/bin/python capabilities/intel/threats/app.py` passed self-test with
+  `passed: true` and `status: ok`.
+- `./.venv/bin/python -m json.tool
+  capabilities/intel/threats/package_manifest.json` passed.
+- `./.venv/bin/python -m json.tool
+  capabilities/intel/threats/release_report.json` passed.
+- `./.venv/bin/python -m json.tool
+  capabilities/intel/threats/semantic_model.json` passed.
+- `./.venv/bin/pytest -q
+  capabilities/intel/threats/tests/test_package_contract.py` passed with 7
+  tests.
+- `./.venv/bin/apg capabilities inspect intel_threats --json` passed with 65
+  rules, 13 UI routes, theme `intel_threats_control`, shell `apg_python`, and
+  Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/intel/threats --json` passed with `side_effect_free: true` and
+  0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/intel/threats --json` passed with 1 domain-specific capability,
+  0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/intel/threats --json` passed with 1 complete lifecycle, 0
+  warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 151 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 151 operable contracts, 151 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/intel/threats`, `capabilities/intel/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed authority, workspace, source, indicator, actor, campaign,
+  assessment, report, mitigation, review, Bytewax batch, and AI-agent lifecycle
+  paths so rule evaluation happens before state mutation.
+- Confirmed service state is keyed by tenant plus record ID and covered by a
+  regression test with shared authority/workspace IDs across tenants.
+- Confirmed sources require existing tenant workspaces, supported source type,
+  custodian, lineage, and evidence before indicators can be recorded.
+- Confirmed actor confidence, campaign risk, assessment confidence, analyst
+  attribution, report approval, mitigation approval, and review evidence are
+  enforced before mutation.
+- Confirmed AI-agent registration requires supported runtime, supported role,
+  name, and bounded operational scope.
+- Confirmed AI-agent actions deny unsupported attribution, fabricated
+  indicators, source tampering, privacy bypass, autonomous mitigation,
+  unapproved publication, and privileged scopes without human approval.
+- Kept live enrichment, graph writes, persistent case updates, RAG indexing,
+  notification delivery, report rendering, threat-feed pulls, sandbox
+  detonation, automated takedown, and durable Bytewax workers behind adapter
+  boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live enrichment,
+  feed ingestion, graph writes, persistent case updates, RAG indexing,
+  notification delivery, report rendering, sandbox detonation, automated
+  takedown, durable Bytewax topology, or performance/load checks during this
+  battery-conscious slice.
