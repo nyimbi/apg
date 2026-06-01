@@ -1,0 +1,1467 @@
+{
+  "app": {
+    "description": "Cross-Border Remittance package-backed APG capability",
+    "entity_count": 4,
+    "name": "fintech_remittance",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "fintech_remittance": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "remittance_ops_reviewer",
+            "compliance_reviewer",
+            "payout_reviewer",
+            "treasury_reviewer",
+            "customer_support_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "compliance": {
+          "aml_review_requires_human_approval": true,
+          "aml_screen_required": true,
+          "fraud_review_requires_human_approval": true,
+          "sanctions_hit_blocks": true
+        },
+        "corridors": {
+          "corridor_policy_required": true,
+          "same_country_blocked": true,
+          "supported_countries": [
+            "KE",
+            "UG",
+            "TZ",
+            "RW",
+            "GH",
+            "NG",
+            "ZA",
+            "GB",
+            "US",
+            "AE",
+            "IN"
+          ]
+        },
+        "governance": {
+          "audit_remittance_events": true,
+          "customer_consent_required": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_payout_events": true,
+          "emit_quote_events": true,
+          "emit_refund_events": true,
+          "emit_transfer_events": true,
+          "event_stream": "apg.fintech.remittance.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "payouts": {
+          "provider_receipt_required": true,
+          "settlement_reference_required": true,
+          "supported_methods": [
+            "bank_account",
+            "mobile_money",
+            "wallet",
+            "cash_pickup",
+            "card_push"
+          ]
+        },
+        "quotes": {
+          "expiry_required": true,
+          "fee_non_negative_required": true,
+          "positive_amount_required": true,
+          "positive_fx_rate_required": true,
+          "supported_currencies": [
+            "KES",
+            "UGX",
+            "TZS",
+            "RWF",
+            "GHS",
+            "NGN",
+            "ZAR",
+            "GBP",
+            "USD",
+            "AED",
+            "INR",
+            "EUR"
+          ]
+        },
+        "refunds": {
+          "reason_required": true,
+          "reviewer_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_remittance_control"
+        },
+        "transfers": {
+          "beneficiary_required": true,
+          "funding_required": true,
+          "high_value_threshold": 100000,
+          "kyc_required": true,
+          "quote_lock_required": true,
+          "sender_required": true,
+          "source_of_funds_required": true
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_corridors": true,
+          "enable_dashboard": true,
+          "enable_payouts": true,
+          "enable_quotes": true,
+          "enable_refunds": true,
+          "enable_transfers": true
+        }
+      },
+      "name": "Cross-Border Remittance",
+      "provides": [
+        "remittance_corridor_governance",
+        "remittance_quote_lifecycle",
+        "cross_border_transfer_workflow",
+        "remittance_payout_workflow",
+        "remittance_refund_workflow",
+        "remittance_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "Remittance operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "description": "Remittance writes require policy evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "remittance_policy_required",
+              "required_action": "attach_remittance_policy"
+            },
+            "name": "remittance_write_requires_policy"
+          },
+          {
+            "condition": {
+              "corridor_supported": false,
+              "operation": "quote_transfer"
+            },
+            "description": "Remittance corridor must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "corridor_not_supported",
+              "required_action": "select_supported_corridor"
+            },
+            "name": "corridor_supported"
+          },
+          {
+            "condition": {
+              "operation": "quote_transfer",
+              "same_country": true
+            },
+            "description": "Cross-border remittance cannot use the same source and destination country.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_border_corridor_required",
+              "required_action": "select_cross_border_corridor"
+            },
+            "name": "same_country_blocked"
+          },
+          {
+            "condition": {
+              "operation": "quote_transfer",
+              "source_currency_supported": false
+            },
+            "description": "Source currency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_currency_not_supported",
+              "required_action": "select_supported_source_currency"
+            },
+            "name": "source_currency_supported"
+          },
+          {
+            "condition": {
+              "destination_currency_supported": false,
+              "operation": "quote_transfer"
+            },
+            "description": "Destination currency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "destination_currency_not_supported",
+              "required_action": "select_supported_destination_currency"
+            },
+            "name": "destination_currency_supported"
+          },
+          {
+            "condition": {
+              "operation": "quote_transfer",
+              "positive_amount": false
+            },
+            "description": "Quote send amount must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_amount_required",
+              "required_action": "set_positive_send_amount"
+            },
+            "name": "send_amount_positive"
+          },
+          {
+            "condition": {
+              "operation": "quote_transfer",
+              "positive_fx_rate": false
+            },
+            "description": "Quote FX rate must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_fx_rate_required",
+              "required_action": "set_positive_fx_rate"
+            },
+            "name": "fx_rate_positive"
+          },
+          {
+            "condition": {
+              "fee_non_negative": false,
+              "operation": "quote_transfer"
+            },
+            "description": "Quote fee cannot be negative.",
+            "effect": {
+              "decision": "deny",
+              "reason": "non_negative_fee_required",
+              "required_action": "set_non_negative_fee"
+            },
+            "name": "fee_non_negative"
+          },
+          {
+            "condition": {
+              "expiry_present": false,
+              "operation": "quote_transfer"
+            },
+            "description": "Quote expiry is required.",
+            "effect": {
+              "decision": "deny",
+              "reason": "quote_expiry_required",
+              "required_action": "set_quote_expiry"
+            },
+            "name": "quote_expiry_required"
+          },
+          {
+            "condition": {
+              "operation": "create_transfer",
+              "quote_present": false
+            },
+            "description": "Transfer creation requires a quote lock.",
+            "effect": {
+              "decision": "deny",
+              "reason": "quote_lock_required",
+              "required_action": "attach_quote_lock"
+            },
+            "name": "quote_lock_required"
+          },
+          {
+            "condition": {
+              "operation": "create_transfer",
+              "sender_present": false
+            },
+            "description": "Transfer requires sender reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "sender_required",
+              "required_action": "attach_sender"
+            },
+            "name": "sender_required"
+          },
+          {
+            "condition": {
+              "beneficiary_present": false,
+              "operation": "create_transfer"
+            },
+            "description": "Transfer requires beneficiary reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "beneficiary_required",
+              "required_action": "attach_beneficiary"
+            },
+            "name": "beneficiary_required"
+          },
+          {
+            "condition": {
+              "operation": "create_transfer",
+              "sender_kyc_present": false
+            },
+            "description": "Transfer requires sender KYC.",
+            "effect": {
+              "decision": "deny",
+              "reason": "sender_kyc_required",
+              "required_action": "attach_sender_kyc"
+            },
+            "name": "sender_kyc_required"
+          },
+          {
+            "condition": {
+              "beneficiary_kyc_present": false,
+              "operation": "create_transfer"
+            },
+            "description": "Transfer requires beneficiary KYC.",
+            "effect": {
+              "decision": "deny",
+              "reason": "beneficiary_kyc_required",
+              "required_action": "attach_beneficiary_kyc"
+            },
+            "name": "beneficiary_kyc_required"
+          },
+          {
+            "condition": {
+              "funding_present": false,
+              "operation": "create_transfer"
+            },
+            "description": "Transfer requires funding reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "funding_reference_required",
+              "required_action": "attach_funding_reference"
+            },
+            "name": "funding_reference_required"
+          },
+          {
+            "condition": {
+              "operation": "create_transfer",
+              "payout_method_supported": false
+            },
+            "description": "Transfer payout method must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payout_method_not_supported",
+              "required_action": "select_supported_payout_method"
+            },
+            "name": "payout_method_supported"
+          },
+          {
+            "condition": {
+              "operation": "create_transfer",
+              "purpose_code_supported": false
+            },
+            "description": "Transfer purpose code must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "purpose_code_not_supported",
+              "required_action": "select_supported_purpose"
+            },
+            "name": "purpose_code_supported"
+          },
+          {
+            "condition": {
+              "operation": "create_transfer",
+              "source_of_funds_present": false
+            },
+            "description": "Transfer requires source-of-funds evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_of_funds_required",
+              "required_action": "attach_source_of_funds"
+            },
+            "name": "source_of_funds_required"
+          },
+          {
+            "condition": {
+              "aml_screen_present": false,
+              "operation": "create_transfer"
+            },
+            "description": "Transfer requires AML screen evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "aml_screen_required",
+              "required_action": "attach_aml_screen"
+            },
+            "name": "aml_screen_required"
+          },
+          {
+            "condition": {
+              "operation": "create_transfer",
+              "sanctions_hit": true
+            },
+            "description": "Sanctions hits block transfer creation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "sanctions_hit_blocked",
+              "required_action": "resolve_sanctions_hit"
+            },
+            "name": "sanctions_hit_blocks_transfer"
+          },
+          {
+            "condition": {
+              "fraud_decision_supported": false,
+              "operation": "create_transfer"
+            },
+            "description": "Fraud decision must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "fraud_decision_not_supported",
+              "required_action": "attach_supported_fraud_decision"
+            },
+            "name": "fraud_decision_supported"
+          },
+          {
+            "condition": {
+              "fraud_blocked": true,
+              "operation": "create_transfer"
+            },
+            "description": "Blocked fraud decisions deny transfer creation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "fraud_blocked_transfer",
+              "required_action": "resolve_fraud_block"
+            },
+            "name": "fraud_block_denies_transfer"
+          },
+          {
+            "condition": {
+              "aml_review": true,
+              "human_approval_recorded": false,
+              "operation": "create_transfer"
+            },
+            "description": "AML review outcomes require human approval.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "aml_review_approval_required",
+              "required_action": "record_aml_approval"
+            },
+            "name": "aml_review_requires_approval"
+          },
+          {
+            "condition": {
+              "fraud_review": true,
+              "human_approval_recorded": false,
+              "operation": "create_transfer"
+            },
+            "description": "Fraud review or hold outcomes require human approval.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "fraud_review_approval_required",
+              "required_action": "record_fraud_approval"
+            },
+            "name": "fraud_review_requires_approval"
+          },
+          {
+            "condition": {
+              "high_value": true,
+              "human_approval_recorded": false,
+              "operation": "create_transfer"
+            },
+            "description": "High-value transfers require approval.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "high_value_approval_required",
+              "required_action": "record_high_value_approval"
+            },
+            "name": "high_value_requires_approval"
+          },
+          {
+            "condition": {
+              "operation": "release_payout",
+              "transfer_present": false
+            },
+            "description": "Payout release requires transfer reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "transfer_required",
+              "required_action": "select_transfer"
+            },
+            "name": "payout_transfer_required"
+          },
+          {
+            "condition": {
+              "operation": "release_payout",
+              "provider_receipt_present": false
+            },
+            "description": "Payout release requires provider receipt.",
+            "effect": {
+              "decision": "deny",
+              "reason": "provider_receipt_required",
+              "required_action": "attach_provider_receipt"
+            },
+            "name": "provider_receipt_required"
+          },
+          {
+            "condition": {
+              "operation": "release_payout",
+              "settlement_reference_present": false
+            },
+            "description": "Payout release requires settlement reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "settlement_reference_required",
+              "required_action": "attach_settlement_reference"
+            },
+            "name": "settlement_reference_required"
+          },
+          {
+            "condition": {
+              "operation": "file_refund",
+              "reason_present": false
+            },
+            "description": "Refund filing requires reason.",
+            "effect": {
+              "decision": "deny",
+              "reason": "refund_reason_required",
+              "required_action": "record_refund_reason"
+            },
+            "name": "refund_reason_required"
+          },
+          {
+            "condition": {
+              "operation": "file_refund",
+              "reviewer_present": false
+            },
+            "description": "Refund filing requires reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "refund_reviewer_required",
+              "required_action": "assign_refund_reviewer"
+            },
+            "name": "refund_reviewer_required"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "remittance_batch"
+            },
+            "description": "Remittance batches require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_remittance_batch_to_bytewax"
+            },
+            "name": "remittance_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_remittance_agent"
+            },
+            "description": "Remittance agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "remittance_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "remittance_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_remittance_agent"
+            },
+            "description": "Remittance agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "remittance_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "remittance_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "remittance_agent_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged remittance-agent actions require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_remittance_agent_action_requires_human_approval"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "Remittance operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "description": "Remittance writes require policy evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "remittance_policy_required",
+            "required_action": "attach_remittance_policy"
+          },
+          "name": "remittance_write_requires_policy"
+        },
+        {
+          "condition": {
+            "corridor_supported": false,
+            "operation": "quote_transfer"
+          },
+          "description": "Remittance corridor must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "corridor_not_supported",
+            "required_action": "select_supported_corridor"
+          },
+          "name": "corridor_supported"
+        },
+        {
+          "condition": {
+            "operation": "quote_transfer",
+            "same_country": true
+          },
+          "description": "Cross-border remittance cannot use the same source and destination country.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_border_corridor_required",
+            "required_action": "select_cross_border_corridor"
+          },
+          "name": "same_country_blocked"
+        },
+        {
+          "condition": {
+            "operation": "quote_transfer",
+            "source_currency_supported": false
+          },
+          "description": "Source currency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_currency_not_supported",
+            "required_action": "select_supported_source_currency"
+          },
+          "name": "source_currency_supported"
+        },
+        {
+          "condition": {
+            "destination_currency_supported": false,
+            "operation": "quote_transfer"
+          },
+          "description": "Destination currency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "destination_currency_not_supported",
+            "required_action": "select_supported_destination_currency"
+          },
+          "name": "destination_currency_supported"
+        },
+        {
+          "condition": {
+            "operation": "quote_transfer",
+            "positive_amount": false
+          },
+          "description": "Quote send amount must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_amount_required",
+            "required_action": "set_positive_send_amount"
+          },
+          "name": "send_amount_positive"
+        },
+        {
+          "condition": {
+            "operation": "quote_transfer",
+            "positive_fx_rate": false
+          },
+          "description": "Quote FX rate must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_fx_rate_required",
+            "required_action": "set_positive_fx_rate"
+          },
+          "name": "fx_rate_positive"
+        },
+        {
+          "condition": {
+            "fee_non_negative": false,
+            "operation": "quote_transfer"
+          },
+          "description": "Quote fee cannot be negative.",
+          "effect": {
+            "decision": "deny",
+            "reason": "non_negative_fee_required",
+            "required_action": "set_non_negative_fee"
+          },
+          "name": "fee_non_negative"
+        },
+        {
+          "condition": {
+            "expiry_present": false,
+            "operation": "quote_transfer"
+          },
+          "description": "Quote expiry is required.",
+          "effect": {
+            "decision": "deny",
+            "reason": "quote_expiry_required",
+            "required_action": "set_quote_expiry"
+          },
+          "name": "quote_expiry_required"
+        },
+        {
+          "condition": {
+            "operation": "create_transfer",
+            "quote_present": false
+          },
+          "description": "Transfer creation requires a quote lock.",
+          "effect": {
+            "decision": "deny",
+            "reason": "quote_lock_required",
+            "required_action": "attach_quote_lock"
+          },
+          "name": "quote_lock_required"
+        },
+        {
+          "condition": {
+            "operation": "create_transfer",
+            "sender_present": false
+          },
+          "description": "Transfer requires sender reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "sender_required",
+            "required_action": "attach_sender"
+          },
+          "name": "sender_required"
+        },
+        {
+          "condition": {
+            "beneficiary_present": false,
+            "operation": "create_transfer"
+          },
+          "description": "Transfer requires beneficiary reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "beneficiary_required",
+            "required_action": "attach_beneficiary"
+          },
+          "name": "beneficiary_required"
+        },
+        {
+          "condition": {
+            "operation": "create_transfer",
+            "sender_kyc_present": false
+          },
+          "description": "Transfer requires sender KYC.",
+          "effect": {
+            "decision": "deny",
+            "reason": "sender_kyc_required",
+            "required_action": "attach_sender_kyc"
+          },
+          "name": "sender_kyc_required"
+        },
+        {
+          "condition": {
+            "beneficiary_kyc_present": false,
+            "operation": "create_transfer"
+          },
+          "description": "Transfer requires beneficiary KYC.",
+          "effect": {
+            "decision": "deny",
+            "reason": "beneficiary_kyc_required",
+            "required_action": "attach_beneficiary_kyc"
+          },
+          "name": "beneficiary_kyc_required"
+        },
+        {
+          "condition": {
+            "funding_present": false,
+            "operation": "create_transfer"
+          },
+          "description": "Transfer requires funding reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "funding_reference_required",
+            "required_action": "attach_funding_reference"
+          },
+          "name": "funding_reference_required"
+        },
+        {
+          "condition": {
+            "operation": "create_transfer",
+            "payout_method_supported": false
+          },
+          "description": "Transfer payout method must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payout_method_not_supported",
+            "required_action": "select_supported_payout_method"
+          },
+          "name": "payout_method_supported"
+        },
+        {
+          "condition": {
+            "operation": "create_transfer",
+            "purpose_code_supported": false
+          },
+          "description": "Transfer purpose code must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "purpose_code_not_supported",
+            "required_action": "select_supported_purpose"
+          },
+          "name": "purpose_code_supported"
+        },
+        {
+          "condition": {
+            "operation": "create_transfer",
+            "source_of_funds_present": false
+          },
+          "description": "Transfer requires source-of-funds evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_of_funds_required",
+            "required_action": "attach_source_of_funds"
+          },
+          "name": "source_of_funds_required"
+        },
+        {
+          "condition": {
+            "aml_screen_present": false,
+            "operation": "create_transfer"
+          },
+          "description": "Transfer requires AML screen evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "aml_screen_required",
+            "required_action": "attach_aml_screen"
+          },
+          "name": "aml_screen_required"
+        },
+        {
+          "condition": {
+            "operation": "create_transfer",
+            "sanctions_hit": true
+          },
+          "description": "Sanctions hits block transfer creation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "sanctions_hit_blocked",
+            "required_action": "resolve_sanctions_hit"
+          },
+          "name": "sanctions_hit_blocks_transfer"
+        },
+        {
+          "condition": {
+            "fraud_decision_supported": false,
+            "operation": "create_transfer"
+          },
+          "description": "Fraud decision must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "fraud_decision_not_supported",
+            "required_action": "attach_supported_fraud_decision"
+          },
+          "name": "fraud_decision_supported"
+        },
+        {
+          "condition": {
+            "fraud_blocked": true,
+            "operation": "create_transfer"
+          },
+          "description": "Blocked fraud decisions deny transfer creation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "fraud_blocked_transfer",
+            "required_action": "resolve_fraud_block"
+          },
+          "name": "fraud_block_denies_transfer"
+        },
+        {
+          "condition": {
+            "aml_review": true,
+            "human_approval_recorded": false,
+            "operation": "create_transfer"
+          },
+          "description": "AML review outcomes require human approval.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "aml_review_approval_required",
+            "required_action": "record_aml_approval"
+          },
+          "name": "aml_review_requires_approval"
+        },
+        {
+          "condition": {
+            "fraud_review": true,
+            "human_approval_recorded": false,
+            "operation": "create_transfer"
+          },
+          "description": "Fraud review or hold outcomes require human approval.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "fraud_review_approval_required",
+            "required_action": "record_fraud_approval"
+          },
+          "name": "fraud_review_requires_approval"
+        },
+        {
+          "condition": {
+            "high_value": true,
+            "human_approval_recorded": false,
+            "operation": "create_transfer"
+          },
+          "description": "High-value transfers require approval.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "high_value_approval_required",
+            "required_action": "record_high_value_approval"
+          },
+          "name": "high_value_requires_approval"
+        },
+        {
+          "condition": {
+            "operation": "release_payout",
+            "transfer_present": false
+          },
+          "description": "Payout release requires transfer reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "transfer_required",
+            "required_action": "select_transfer"
+          },
+          "name": "payout_transfer_required"
+        },
+        {
+          "condition": {
+            "operation": "release_payout",
+            "provider_receipt_present": false
+          },
+          "description": "Payout release requires provider receipt.",
+          "effect": {
+            "decision": "deny",
+            "reason": "provider_receipt_required",
+            "required_action": "attach_provider_receipt"
+          },
+          "name": "provider_receipt_required"
+        },
+        {
+          "condition": {
+            "operation": "release_payout",
+            "settlement_reference_present": false
+          },
+          "description": "Payout release requires settlement reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "settlement_reference_required",
+            "required_action": "attach_settlement_reference"
+          },
+          "name": "settlement_reference_required"
+        },
+        {
+          "condition": {
+            "operation": "file_refund",
+            "reason_present": false
+          },
+          "description": "Refund filing requires reason.",
+          "effect": {
+            "decision": "deny",
+            "reason": "refund_reason_required",
+            "required_action": "record_refund_reason"
+          },
+          "name": "refund_reason_required"
+        },
+        {
+          "condition": {
+            "operation": "file_refund",
+            "reviewer_present": false
+          },
+          "description": "Refund filing requires reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "refund_reviewer_required",
+            "required_action": "assign_refund_reviewer"
+          },
+          "name": "refund_reviewer_required"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "remittance_batch"
+          },
+          "description": "Remittance batches require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_remittance_batch_to_bytewax"
+          },
+          "name": "remittance_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_remittance_agent"
+          },
+          "description": "Remittance agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "remittance_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "remittance_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_remittance_agent"
+          },
+          "description": "Remittance agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "remittance_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "remittance_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "remittance_agent_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged remittance-agent actions require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_remittance_agent_action_requires_human_approval"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "agents": {
+          "component": "RemittanceAgentWorkbench",
+          "permission": "fintech_remittance:admin",
+          "route": "/fintech-remittance/agents"
+        },
+        "corridors": {
+          "component": "CorridorConsole",
+          "permission": "fintech_remittance:govern_corridors",
+          "route": "/fintech-remittance/corridors"
+        },
+        "dashboard": {
+          "component": "RemittanceDashboard",
+          "permission": "fintech_remittance:view",
+          "route": "/fintech-remittance/dashboard"
+        },
+        "payouts": {
+          "component": "PayoutConsole",
+          "permission": "fintech_remittance:payout",
+          "route": "/fintech-remittance/payouts"
+        },
+        "quotes": {
+          "component": "QuoteWorkbench",
+          "permission": "fintech_remittance:quote",
+          "route": "/fintech-remittance/quotes"
+        },
+        "refunds": {
+          "component": "RefundConsole",
+          "permission": "fintech_remittance:refund",
+          "route": "/fintech-remittance/refunds"
+        },
+        "settings": {
+          "component": "RemittanceSettings",
+          "permission": "fintech_remittance:admin",
+          "route": "/fintech-remittance/settings"
+        },
+        "transfers": {
+          "component": "TransferWorkbench",
+          "permission": "fintech_remittance:transfer",
+          "route": "/fintech-remittance/transfers"
+        }
+      },
+      "streaming": {
+        "events": [
+          "remittance_quote_created",
+          "remittance_transfer_created",
+          "remittance_payout_released",
+          "remittance_refund_filed",
+          "remittance_agent_registered"
+        ],
+        "guardrails": [
+          "remittance_batch_requires_bytewax",
+          "remittance_event_requires_bytewax",
+          "privileged_remittance_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.fintech.remittance.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "corridors": {
+            "icon": "route",
+            "status_indicator": "corridor-chip"
+          },
+          "payouts": {
+            "icon": "landmark",
+            "status_indicator": "payout-chip"
+          },
+          "quotes": {
+            "icon": "badge-dollar-sign",
+            "status_indicator": "quote-chip"
+          },
+          "refunds": {
+            "icon": "undo-2",
+            "status_indicator": "refund-chip"
+          },
+          "transfers": {
+            "icon": "send",
+            "status_indicator": "transfer-status-chip"
+          }
+        },
+        "name": "fintech_remittance_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#2563EB",
+          "color.danger": "#B91C1C",
+          "color.primary": "#0F766E",
+          "color.success": "#15803D",
+          "color.warning": "#B45309",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/fintech-remittance/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "RemittanceDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/fintech-remittance/dashboard",
+            "permission": "fintech_remittance:view"
+          },
+          {
+            "component": "CorridorConsole",
+            "name": "corridors",
+            "nav_group": "Corridors",
+            "path": "/fintech-remittance/corridors",
+            "permission": "fintech_remittance:govern_corridors"
+          },
+          {
+            "component": "QuoteWorkbench",
+            "name": "quotes",
+            "nav_group": "Quotes",
+            "path": "/fintech-remittance/quotes",
+            "permission": "fintech_remittance:quote"
+          },
+          {
+            "component": "TransferWorkbench",
+            "name": "transfers",
+            "nav_group": "Transfers",
+            "path": "/fintech-remittance/transfers",
+            "permission": "fintech_remittance:transfer"
+          },
+          {
+            "component": "PayoutConsole",
+            "name": "payouts",
+            "nav_group": "Payouts",
+            "path": "/fintech-remittance/payouts",
+            "permission": "fintech_remittance:payout"
+          },
+          {
+            "component": "RefundConsole",
+            "name": "refunds",
+            "nav_group": "Exceptions",
+            "path": "/fintech-remittance/refunds",
+            "permission": "fintech_remittance:refund"
+          },
+          {
+            "component": "RemittanceAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/fintech-remittance/agents",
+            "permission": "fintech_remittance:admin"
+          },
+          {
+            "component": "RemittanceSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/fintech-remittance/settings",
+            "permission": "fintech_remittance:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "remittance_review": {
+        "roles": [
+          "remittance_ops_reviewer",
+          "compliance_reviewer",
+          "payout_reviewer",
+          "treasury_reviewer",
+          "customer_support_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "fintech_remittance": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud"
+      ]
+    }
+  },
+  "contracts": {
+    "fintech_remittance": {
+      "configuration": {
+        "adapters": {
+          "aml": "fintech_aml",
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "fraud": "fintech_fraud",
+          "keys": "keym",
+          "kyc": "fintech_kyc",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments",
+          "wallets": "fintech_wallets"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "supported_roles": [
+            "remittance_ops_reviewer",
+            "compliance_reviewer",
+            "payout_reviewer",
+            "treasury_reviewer",
+            "customer_support_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "compliance": {
+          "aml_review_requires_human_approval": true,
+          "aml_screen_required": true,
+          "fraud_review_requires_human_approval": true,
+          "sanctions_hit_blocks": true
+        },
+        "corridors": {
+          "corridor_policy_required": true,
+          "same_country_blocked": true,
+          "supported_countries": [
+            "KE",
+            "UG",
+            "TZ",
+            "RW",
+            "GH",
+            "NG",
+            "ZA",
+            "GB",
+            "US",
+            "AE",
+            "IN"
+          ]
+        },
+        "governance": {
+          "audit_remittance_events": true,
+          "customer_consent_required": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_payout_events": true,
+          "emit_quote_events": true,
+          "emit_refund_events": true,
+          "emit_transfer_events": true,
+          "event_stream": "apg.fintech.remittance.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "payouts": {
+          "provider_receipt_required": true,
+          "settlement_reference_required": true,
+          "supported_methods": [
+            "bank_account",
+            "mobile_money",
+            "wallet",
+            "cash_pickup",
+            "card_push"
+          ]
+        },
+        "quotes": {
+          "expiry_required": true,
+          "fee_non_negative_required": true,
+          "positive_amount_required": true,
+          "positive_fx_rate_required": true,
+          "supported_currencies": [
+            "KES",
+            "UGX",
+            "TZS",
+            "RWF",
+            "GHS",
+            "NGN",
+            "ZAR",
+            "GBP",
+            "USD",
+            "AED",
+            "INR",
+            "EUR"
+          ]
+        },
+        "refunds": {
+          "reason_required": true,
+          "reviewer_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "fintech_remittance_control"
+        },
+        "transfers": {
+          "beneficiary_required": true,
+          "funding_required": true,
+          "high_value_threshold": 100000,
+          "kyc_required": true,
+          "quote_lock_required": true,
+          "sender_required": true,
+          "source_of_funds_required": true
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_corridors": true,
+          "enable_dashboard": true,
+          "enable_payouts": true,
+          "enable_quotes": true,
+          "enable_refunds": true,
+          "enable_transfers": true
+        }
+      },
+      "id": "fintech_remittance",
+      "provides": [
+        "remittance_corridor_governance",
+        "remittance_quote_lifecycle",
+        "cross_border_transfer_workflow",
+        "remittance_payout_workflow",
+        "remittance_refund_workflow",
+        "remittance_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "keym",
+        "fintech_payments",
+        "fintech_wallets",
+        "fintech_kyc",
+        "fintech_aml",
+        "fintech_fraud"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 10,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "fintech_remittance": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}

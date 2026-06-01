@@ -72,6 +72,7 @@ CAPABILITY_META = {
 	'implemented_subcapabilities': [
 		'payments',      # Digital Payments
 		'wallets',       # Digital Wallets
+		'remittance',    # Cross-Border Remittance
 		'kyc',           # Know Your Customer
 		'aml',           # Anti Money Laundering
 		'fraud',         # Fraud Detection

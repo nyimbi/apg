@@ -1,11 +1,6 @@
-"""
-remittance FinTech Capability
+"""APG Cross-Border Remittance executable capability."""
 
-Placeholder for remittance financial technology capability.
-To be implemented as part of the comprehensive APG FinTech platform.
-"""
+from .capability_contract import CAPABILITY_ID, CAPABILITY_NAME, CAPABILITY_VERSION, get_capability_contract
+from .service import RemittanceService
 
-# Placeholder implementation
-__version__ = "1.0.0"
-__status__ = "Development"
-
+__all__ = ["CAPABILITY_ID", "CAPABILITY_NAME", "CAPABILITY_VERSION", "RemittanceService", "get_capability_contract"]

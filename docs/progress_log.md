@@ -26666,3 +26666,81 @@ Known gaps:
   card-network chargeback submission, durable Bytewax topology,
   cross-institution graph analytics, or performance/load checks during this
   battery-conscious slice.
+
+### 2026-06-01 14:04 EAT
+
+Fintech Cross-Border Remittance executable capability slice:
+
+- Promoted `capabilities/fintech/remittance` from a placeholder package into a
+  first-class APG capability with `README.md`, `SPECIFICATION.md`, `PLAN.md`,
+  `cap_spec.md`, contract, models, service, API helpers, view models, app
+  entrypoint, semantic/package/release evidence, and focused tests.
+- Added tenant-scoped corridor and currency eligibility, FX quote lifecycle,
+  cross-border transfer creation, AML/Fraud controlled payout readiness,
+  payout release, refund filing, dashboard summaries, Bytewax batch validation,
+  and provider-neutral remittance-agent registration.
+- Added deterministic remittance guardrails for tenant context, write policy,
+  supported corridors/currencies, quote amount/rate/fee/expiry, transfer quote
+  lock, sender and beneficiary references, sender and beneficiary KYC, funding
+  reference, payout method, purpose code, source-of-funds evidence, AML screen,
+  sanctions blocking, fraud decisions, AML/fraud/high-value approvals, payout
+  provider receipt and settlement evidence, refund reason/reviewer, Bytewax
+  lifecycle events, supported AI-agent runtimes/roles, and privileged-agent
+  approval.
+- Added `remittance_runtime.py` domain helpers for normalized countries,
+  currencies, amounts, rates, corridor keys, transfer bands, and payout states.
+- Updated fintech capability metadata so `remittance` is listed as an
+  implemented sub-capability.
+- Removed the empty `_Cross_Border_Remittance` marker file and refreshed
+  `semantic_model.json`, `package_manifest.json`, and `release_report.json`.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/fintech/remittance/__init__.py capabilities/fintech/remittance/capability_contract.py capabilities/fintech/remittance/models.py capabilities/fintech/remittance/remittance_runtime.py capabilities/fintech/remittance/service.py capabilities/fintech/remittance/api.py capabilities/fintech/remittance/views.py capabilities/fintech/remittance/app.py capabilities/fintech/remittance/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/fintech/remittance/tests/test_package_contract.py`
+  passed with 6 tests.
+- `./.venv/bin/python capabilities/fintech/remittance/app.py` passed with
+  `self_test()` status `ok`.
+- `./.venv/bin/apg capabilities inspect fintech_remittance --json` passed with
+  35 rules, 8 routes, Bytewax streaming, and provider-neutral remittance-agent
+  runtimes.
+- `./.venv/bin/apg capabilities publish-plan capabilities/fintech/remittance --json`
+  passed with side-effect-free publish evidence and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/fintech/remittance --json`
+  passed with one domain-specific fintech remittance implementation, 0 baseline
+  markers, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/fintech/remittance --json`
+  passed with one complete lifecycle record, 35 rules, 8 routes, 11 theme
+  tokens, and 0 warnings/errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 115 operable contracts, 115 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+
+Code review:
+
+- Reviewed quote guardrails so corridors, currencies, positive amount, positive
+  FX rate, non-negative fees, expiry, tenant, and policy evidence are enforced
+  before local state changes.
+- Reviewed transfer guardrails so sender, beneficiary, KYC, funding,
+  payout-method, purpose, source-of-funds, AML, fraud, sanctions, high-value,
+  and approval evidence are enforced before transfer creation.
+- Reviewed payout/refund guardrails so provider receipts, settlement
+  references, refund reasons, and reviewer assignments are enforced before
+  state transitions.
+- Reviewed first-class remittance-agent behavior so Codex, Claude Code,
+  OpenCode, and Pi runtimes are provider-neutral and privileged actions require
+  human approval.
+- Kept live FX providers, payment rails, wallet rails, bank/mobile-money/card
+  payout providers, sanctions/PEP/adverse-media providers, travel-rule
+  adapters, regulator filing, treasury reconciliation, audit sinks,
+  notifications, key management, and durable Bytewax workers behind adapter
+  boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live FX providers,
+  live bank/mobile-money/card payouts, live payment or wallet rails, live
+  sanctions/PEP/adverse-media feeds, regulator filing, durable Bytewax
+  topology, treasury reconciliation, travel-rule adapters, or performance/load
+  checks during this battery-conscious slice.
