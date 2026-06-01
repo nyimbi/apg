@@ -29706,3 +29706,113 @@ Known gaps:
   cross-domain data movement, entity-resolution engines, graph writes, RAG
   indexing, storage backends, dissemination delivery, durable Bytewax topology,
   or performance/load checks during this battery-conscious slice.
+
+## 2026-06-01 - Intel Analytics executable package
+
+Implemented and reviewed `capabilities/intel/analytics` as a complete
+executable APG package for governed, evidence-backed intelligence analytics.
+
+What changed:
+
+- Replaced the placeholder marker with an executable package exporting
+  `IntelligenceAnalyticsService`, `IntelAnalyticsService`, and
+  `get_capability_contract`.
+- Added a detailed `SPECIFICATION.md`, `PLAN.md`, `README.md`, and
+  `cap_spec.md` defining the authority, workspace, dataset, feature-set, model,
+  run, insight, dashboard, narrative, recommendation, review, Bytewax
+  lifecycle, AI-agent, UI, theme, and adapter-boundary model.
+- Added `capability_contract.py` with 73 deterministic rules, 14 UI routes,
+  compact `intel_analytics_control` theme tokens, APG dependencies, Bytewax
+  lifecycle metadata, and provider-neutral AI-agent runtimes for `codex`,
+  `claude_code`, `opencode`, and `pi`.
+- Added in-memory domain models and a tenant-scoped service for lawful
+  authority records, analytic workspaces, datasets, feature sets, analytic
+  models, runs, insights, dashboards, narratives, recommendations, reviews,
+  Bytewax batch validation, and AI-agent guardrails.
+- Added API helpers, dashboard/console/agent view models, and a publishable
+  `app.py` entrypoint with self-test, component manifest, and semantic-model
+  generation.
+- Added package manifest, release evidence, generated semantic model, and
+  focused tests for contract shape, rule-engine denial paths, full analytics
+  lifecycle execution, tenant isolation, guardrail rejection, API helpers, view
+  models, and app entrypoint.
+- Updated `capabilities/intel/__init__.py` so `analytics` is listed as an
+  implemented sub-capability.
+- Updated `capabilities/README.md` so the catalog snapshot reports 148 valid
+  contracts, 148 domain-specific packages, 148 strict complete package artifact
+  sets, and 14 Intel packages.
+
+Focused verification:
+
+- Generated `capabilities/intel/analytics/semantic_model.json` from
+  `app.semantic_model()`.
+- `./.venv/bin/python -m py_compile
+  capabilities/intel/analytics/__init__.py
+  capabilities/intel/analytics/capability_contract.py
+  capabilities/intel/analytics/models.py
+  capabilities/intel/analytics/analytics_runtime.py
+  capabilities/intel/analytics/service.py
+  capabilities/intel/analytics/api.py
+  capabilities/intel/analytics/views.py
+  capabilities/intel/analytics/app.py
+  capabilities/intel/analytics/tests/test_package_contract.py` passed.
+- `./.venv/bin/python capabilities/intel/analytics/app.py` passed self-test
+  with `passed: true` and `status: ok`.
+- `./.venv/bin/python -m json.tool
+  capabilities/intel/analytics/package_manifest.json` passed.
+- `./.venv/bin/python -m json.tool
+  capabilities/intel/analytics/release_report.json` passed.
+- `./.venv/bin/pytest -q
+  capabilities/intel/analytics/tests/test_package_contract.py` passed with 7
+  tests.
+- `./.venv/bin/apg capabilities inspect intel_analytics --json` passed with 73
+  rules, 14 UI routes, theme `intel_analytics_control`, shell `apg_python`,
+  and Bytewax streaming.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/intel/analytics --json` passed with `side_effect_free: true`
+  and 0 warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/intel/analytics --json` passed with 1 domain-specific
+  capability, 0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root
+  capabilities/intel/analytics --json` passed with 1 complete lifecycle, 0
+  warnings, and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed globally
+  with 148 domain-specific capability packages, 0 materialized-baseline
+  packages, 0 mixed packages, 0 contract-only packages, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 148 operable contracts, 148 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- Stale-marker and disallowed messaging scans passed for
+  `capabilities/intel/analytics`, `capabilities/intel/__init__.py`, and
+  `capabilities/README.md`.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed authority, workspace, dataset, feature-set, model, run, insight,
+  dashboard, narrative, recommendation, review, Bytewax batch, and AI-agent
+  lifecycle paths so rule evaluation happens before state mutation.
+- Confirmed service state is keyed by tenant plus record ID and covered by a
+  regression test with shared authority/workspace IDs across tenants.
+- Confirmed datasets require an existing workspace, owner, lineage, supported
+  retention class, and evidence before feature sets or analytic models can be
+  recorded.
+- Confirmed model records require validation evidence and risk classification
+  before runs, insights, dashboards, narratives, or recommendations can be
+  composed.
+- Confirmed AI-agent actions deny hallucinated insight, training-data leakage,
+  privacy bypass, unsupported automated decision, unapproved model deployment,
+  and autonomous dissemination scopes.
+- Kept live warehouses, ML engines, feature stores, model registries, notebook
+  runtimes, visualization renderers, graph writes, RAG indexing, notification
+  delivery, and durable Bytewax workers behind adapter boundaries.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live warehouse
+  connectors, feature stores, model registries, notebook runtimes, model
+  execution engines, graph writes, RAG indexing, dashboard rendering,
+  notification delivery, durable Bytewax topology, or performance/load checks
+  during this battery-conscious slice.

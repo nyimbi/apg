@@ -70,6 +70,7 @@ CAPABILITY_META = {
 		'surveillance', # Digital Surveillance
 		'monitoring',  # Real-Time Monitoring
 		'fusion',      # Intelligence Fusion
+		'analytics',   # Intelligence Analytics
 	],
 	'security_requirements': {
 		'classification_handling': True,
