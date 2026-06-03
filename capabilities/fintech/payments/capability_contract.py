@@ -124,8 +124,8 @@ REQUIRES = [
 	"keym",
 	"encr",
 	"fintech_gateway",
-	"cash_management",
-	"accounts_receivable",
+	"cbm_cash_management",
+	"arc_accounts_receivable",
 ]
 
 UI_ROUTES = [
@@ -218,6 +218,23 @@ RULES: list[dict[str, Any]] = [
 	{"name": "payment_agent_runtime_supported", "description": "Payment agents must use a supported runtime.", "condition": {"operation": "register_payment_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "payment_agent_runtime_not_supported", "required_action": "select_supported_agent_runtime"}},
 	{"name": "payment_agent_role_supported", "description": "Payment agents must use a supported role.", "condition": {"operation": "register_payment_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "payment_agent_role_not_supported", "required_action": "select_supported_agent_role"}},
 	{"name": "privileged_payment_agent_action_requires_human_approval", "description": "Privileged payment-agent actions require human approval.", "condition": {"operation": "payment_agent_action", "privileged_scope": True, "human_approval_recorded": False}, "effect": {"decision": "deny", "reason": "human_approval_required", "required_action": "record_human_approval"}},
+
+	# Cross-tenant and privilege escalation guards
+	{"name": "cross_tenant_payment_access_denied", "description": "Payment resources cannot be accessed across tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_access_denied", "required_action": "use_tenant_scoped_credentials"}},
+	{"name": "privilege_escalation_denied", "description": "Payment privilege escalation without approval is denied.", "condition": {"privilege_escalation_attempt": True, "approval_recorded": False}, "effect": {"decision": "deny", "reason": "privilege_escalation_denied", "required_action": "obtain_escalation_approval"}},
+
+	# Africa-specific mobile money rules
+	{"name": "mpesa_stk_push_shortcode_required", "description": "M-Pesa STK push requires a registered Safaricom shortcode.", "condition": {"operation": "mpesa_stk_push", "mpesa_shortcode_present": False}, "effect": {"decision": "deny", "reason": "mpesa_shortcode_required", "required_action": "register_mpesa_shortcode"}},
+	{"name": "mpesa_b2c_approval_required", "description": "M-Pesa B2C disbursements above threshold require human approval.", "condition": {"operation": "mpesa_b2c", "high_value": True, "approval_recorded": False}, "effect": {"decision": "require_review", "reason": "mpesa_b2c_approval_required", "required_action": "record_mpesa_b2c_approval"}},
+	{"name": "mpesa_b2b_paybill_required", "description": "M-Pesa B2B transactions require a registered paybill number.", "condition": {"operation": "mpesa_b2b", "mpesa_paybill_present": False}, "effect": {"decision": "deny", "reason": "mpesa_paybill_required", "required_action": "register_mpesa_paybill"}},
+	{"name": "mobile_money_kyc_required", "description": "Mobile money payment instruments require linked KYC evidence.", "condition": {"operation": "register_instrument", "instrument_type": "mobile_money", "kyc_present": False}, "effect": {"decision": "deny", "reason": "mobile_money_kyc_required", "required_action": "attach_kyc_profile"}},
+	{"name": "mobile_money_phone_number_required", "description": "Mobile money instruments require a verified phone number.", "condition": {"operation": "register_instrument", "instrument_type": "mobile_money", "phone_number_verified": False}, "effect": {"decision": "deny", "reason": "verified_phone_required", "required_action": "verify_phone_number"}},
+	{"name": "airtel_money_msisdn_required", "description": "Airtel Money payments require a registered MSISDN.", "condition": {"operation": "airtel_money_payment", "msisdn_registered": False}, "effect": {"decision": "deny", "reason": "airtel_money_msisdn_required", "required_action": "register_airtel_money_msisdn"}},
+	{"name": "pesalink_account_required", "description": "PesaLink transfers require a registered bank account.", "condition": {"operation": "pesalink_transfer", "bank_account_registered": False}, "effect": {"decision": "deny", "reason": "pesalink_account_required", "required_action": "register_pesalink_account"}},
+	{"name": "pesalink_daily_limit_enforced", "description": "PesaLink single transfer limit is enforced (KES 999,999).", "condition": {"operation": "pesalink_transfer", "exceeds_pesalink_limit": True}, "effect": {"decision": "deny", "reason": "pesalink_limit_exceeded", "required_action": "reduce_transfer_amount"}},
+	{"name": "ussd_payment_session_required", "description": "USSD-initiated payments require an active session token.", "condition": {"operation": "ussd_payment", "ussd_session_present": False}, "effect": {"decision": "deny", "reason": "ussd_session_required", "required_action": "initiate_ussd_session"}},
+	{"name": "cbk_large_cash_reporting_required", "description": "Cash payments above CBK reporting threshold require declaration.", "condition": {"operation": "create_payment_order", "instrument_type": "cash", "exceeds_cbk_reporting_threshold": True, "declaration_present": False}, "effect": {"decision": "require_review", "reason": "cbk_large_cash_reporting_required", "required_action": "file_cbk_cash_declaration"}},
+	{"name": "ke_kes_payment_requires_cbk_compliance", "description": "KES-denominated payments require CBK compliance evidence.", "condition": {"operation": "create_payment_order", "currency": "KES", "cbk_compliant": False}, "effect": {"decision": "deny", "reason": "cbk_compliance_required", "required_action": "attach_cbk_compliance_evidence"}},
 ]
 
 

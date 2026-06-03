@@ -1,11 +1,31 @@
-"""APG Digital Payments capability package."""
+"""APG Digital Payments capability.
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
-from .service import DigitalPaymentsService, FintechPaymentsService
+Standalone package: ``pip install apg-fintech-payments``
+
+Quick start::
+
+    from apg_fintech_payments import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : fintech_payments
+Provides      : payment_account_lifecycle, payment_instrument_vault, payment_order_lifecycle, risk_screening_workflow, authorization_capture_refund_workflow, payout_workflow
+"""
+from __future__ import annotations
+
+__version__  = "1.1.0"
+__package_name__ = "apg-fintech-payments"
+__capability_id__ = "fintech_payments"
+
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
+)
 
 __all__ = [
-	"DigitalPaymentsService",
-	"FintechPaymentsService",
-	"evaluate_capability_rules",
-	"get_capability_contract",
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
 ]

@@ -10,7 +10,7 @@ except ImportError:  # pragma: no cover - supports direct file loading in tests
 	from service import DigitalPaymentsService  # type: ignore
 
 
-SERVICE = DigitalPaymentsService()
+SERVICE = DigitalPaymentsService(tenant_id="default")
 
 
 def service() -> DigitalPaymentsService:
