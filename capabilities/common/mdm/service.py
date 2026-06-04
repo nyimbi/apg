@@ -2115,6 +2115,284 @@ class MdmService:
 			raise PermissionError(self._first_reason(rule_decision))
 		return record
 
+	def golden_record_create(
+		self,
+		*,
+		tenant_id: str,
+		entity_type: str,
+		source_entity_ids: list[str],
+		survivorship_policy: str,
+		attributes: dict[str, Any] | None = None,
+	) -> MdmGoldenRecord:
+		"""Create a golden record from governed source entities (alias for create_golden_record)."""
+		return self.create_golden_record(
+			tenant_id=tenant_id,
+			entity_type=entity_type,
+			source_entity_ids=source_entity_ids,
+			survivorship_policy=survivorship_policy,
+			attributes=attributes,
+		)
+
+	def match_score(
+		self,
+		*,
+		tenant_id: str,
+		entity_id_a: str,
+		entity_id_b: str,
+	) -> dict[str, Any]:
+		"""Compute a lightweight match score between two entities based on shared attributes."""
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		a = self._require_entity(tenant_id, entity_id_a)
+		b = self._require_entity(tenant_id, entity_id_b)
+		common_keys = set(a.attributes) & set(b.attributes)
+		matching = sum(1 for k in common_keys if str(a.attributes[k]).lower() == str(b.attributes[k]).lower())
+		score = round(matching / max(len(common_keys), 1) * 100, 2)
+		return {
+			"entity_id_a": entity_id_a,
+			"entity_id_b": entity_id_b,
+			"tenant_id": tenant_id,
+			"common_attribute_count": len(common_keys),
+			"matching_attribute_count": matching,
+			"match_score": score,
+			"confidence": "high" if score >= 80 else ("medium" if score >= 50 else "low"),
+		}
+
+	def merge_records(
+		self,
+		*,
+		tenant_id: str,
+		golden_record_id: str,
+		source_entity_ids: list[str],
+		survivorship_policy: str | None = None,
+		conflict_present: bool = False,
+		independent_steward: str | None = None,
+		review_notes: str | None = None,
+	) -> MdmMergeRequestRecord:
+		"""Merge source entities into an existing golden record (alias for merge_golden_record)."""
+		return self.merge_golden_record(
+			tenant_id=tenant_id,
+			golden_record_id=golden_record_id,
+			source_entity_ids=source_entity_ids,
+			survivorship_policy=survivorship_policy,
+			conflict_present=conflict_present,
+			independent_steward=independent_steward,
+			review_notes=review_notes,
+		)
+
+	def split_record(
+		self,
+		*,
+		tenant_id: str,
+		golden_record_id: str,
+		split_entity_ids: list[str],
+		reason: str,
+		actor: str,
+	) -> dict[str, Any]:
+		"""Split a golden record by removing specified source entities from its composition."""
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		if golden_record_id not in self.golden_records:
+			raise KeyError(f"Golden record {golden_record_id} not found")
+		gr = self.golden_records[golden_record_id]
+		removed = [e for e in split_entity_ids if e in gr.source_entity_ids]
+		gr.source_entity_ids = [e for e in gr.source_entity_ids if e not in split_entity_ids]
+		gr.updated_at = datetime.utcnow()
+		self._audit(tenant_id, "golden_record.split", golden_record_id, actor, _allow_result(), {"removed": removed, "reason": reason})
+		return {"golden_record_id": golden_record_id, "removed_entity_ids": removed, "remaining_count": len(gr.source_entity_ids), "reason": reason}
+
+	def survivorship_rule(
+		self,
+		*,
+		tenant_id: str,
+		rule_id: str,
+		entity_type: str,
+		field: str,
+		strategy: str,
+		priority: int = 1,
+		owner: str = "system",
+	) -> dict[str, Any]:
+		"""Define a survivorship rule for a field determining which source value wins in merges."""
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		supported = set(self.describe(tenant_id)["configuration"]["survivorship"]["supported_policies"])
+		strategy = self._require_choice(strategy, "strategy", supported)
+		record = {
+			"rule_id": rule_id,
+			"tenant_id": tenant_id,
+			"entity_type": entity_type,
+			"field": field,
+			"strategy": strategy,
+			"priority": priority,
+			"owner": owner,
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self._audit(tenant_id, "survivorship_rule.defined", rule_id, owner, _allow_result(), record)
+		return record
+
+	def workflow_approve(
+		self,
+		*,
+		tenant_id: str,
+		candidate_id: str,
+		steward: str,
+		review_decision: str,
+		review_notes: str,
+	) -> MdmDuplicateCandidateRecord:
+		"""Approve or reject a duplicate candidate via stewardship workflow (alias for review_duplicate_candidate)."""
+		return self.review_duplicate_candidate(
+			candidate_id=candidate_id,
+			steward=steward,
+			review_decision=review_decision,
+			review_notes=review_notes,
+		)
+
+	def steward_assign(
+		self,
+		*,
+		tenant_id: str,
+		entity_id: str,
+		steward_id: str,
+		role: str = "data_steward",
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Assign a data steward to an entity."""
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		entity = self._require_entity(tenant_id, entity_id)
+		entity.attributes["assigned_steward"] = steward_id
+		entity.attributes["steward_role"] = role
+		entity.updated_at = datetime.utcnow()
+		record = {"entity_id": entity_id, "tenant_id": tenant_id, "steward_id": steward_id, "role": role, "assigned_by": actor, "assigned_at": datetime.utcnow().isoformat()}
+		self._audit(tenant_id, "steward.assigned", entity_id, actor, _allow_result(), record)
+		return record
+
+	def domain_publish(
+		self,
+		*,
+		tenant_id: str,
+		entity_id: str,
+		channel: str,
+	) -> MdmPublishRecord:
+		"""Publish a mastered entity to a domain channel (alias for publish_entity)."""
+		return self.publish_entity(tenant_id=tenant_id, entity_id=entity_id, channel=channel)
+
+	def subscription_notify(
+		self,
+		*,
+		tenant_id: str,
+		entity_id: str,
+		event_type: str,
+		subscriber_ids: list[str],
+		payload: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Notify downstream subscribers of an MDM entity change event."""
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		entity = self._require_entity(tenant_id, entity_id)
+		record = {
+			"entity_id": entity_id,
+			"tenant_id": tenant_id,
+			"event_type": event_type,
+			"subscriber_ids": list(subscriber_ids),
+			"subscriber_count": len(subscriber_ids),
+			"payload": dict(payload or {}),
+			"notified_at": datetime.utcnow().isoformat(),
+		}
+		self._audit(tenant_id, "subscription.notified", entity_id, "system", _allow_result(), record)
+		return record
+
+	def data_quality_score(
+		self,
+		*,
+		tenant_id: str,
+		entity_id: str,
+		overall_score: float,
+		dimensions: dict[str, float],
+		assessor: str,
+	) -> MdmQualityRecord:
+		"""Record a quality score for an entity (alias for assess_quality)."""
+		return self.assess_quality(
+			tenant_id=tenant_id,
+			entity_id=entity_id,
+			overall_score=overall_score,
+			dimensions=dimensions,
+			assessor=assessor,
+		)
+
+	def entity_search(
+		self,
+		*,
+		tenant_id: str,
+		entity_type: str | None = None,
+		status: str | None = None,
+		min_quality_score: float | None = None,
+		limit: int = 50,
+	) -> list[dict[str, Any]]:
+		"""Search entities by type, status, or minimum quality score."""
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		results = []
+		for entity in self.entities.values():
+			if entity.tenant_id != tenant_id:
+				continue
+			if entity_type and entity.entity_type != entity_type:
+				continue
+			if status and entity.status != status:
+				continue
+			if min_quality_score is not None and (entity.quality_score is None or entity.quality_score < min_quality_score):
+				continue
+			results.append(asdict(entity))
+			if len(results) >= limit:
+				break
+		return results
+
+	def entity_bulk_register(
+		self,
+		*,
+		tenant_id: str,
+		entities: list[dict[str, Any]],
+		data_owner: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""Register multiple entities in a single call, returning per-entity outcomes."""
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		outcomes: list[dict[str, Any]] = []
+		for e in entities:
+			try:
+				rec = self.register_entity(
+					tenant_id=tenant_id,
+					entity_id=e["entity_id"],
+					entity_type=e["entity_type"],
+					name=e["name"],
+					business_key=e.get("business_key", e["entity_id"]),
+					source_system=e.get("source_system", "bulk"),
+					data_owner=e.get("data_owner", data_owner),
+					classification=e.get("classification", "internal"),
+					attributes=e.get("attributes"),
+				)
+				outcomes.append({"status": "registered", "entity_id": e["entity_id"], "record_id": rec.record_id})
+			except Exception as exc:
+				outcomes.append({"status": "error", "entity_id": e.get("entity_id", "unknown"), "error": str(exc)})
+		return outcomes
+
+	def data_lineage(
+		self,
+		*,
+		tenant_id: str,
+		entity_id: str,
+		lineage_direction: str = "upstream",
+	) -> dict[str, Any]:
+		"""Return data lineage graph for an entity (upstream sources or downstream consumers)."""
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		entity = self._require_entity(tenant_id, entity_id)
+		assert lineage_direction in {"upstream", "downstream", "both"}, f"invalid direction: {lineage_direction}"
+		xrefs = [asdict(xr) for xr in self.cross_references.values() if xr.tenant_id == tenant_id and xr.entity_id == entity_id]
+		golden = self.golden_records.get(entity.golden_record_id) if entity.golden_record_id else None
+		return {
+			"entity_id": entity_id,
+			"tenant_id": tenant_id,
+			"lineage_direction": lineage_direction,
+			"source_system": entity.source_system,
+			"cross_references": xrefs,
+			"golden_record_id": entity.golden_record_id,
+			"golden_record_sources": golden.source_entity_ids if golden else [],
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+
 	def list_records(self, tenant_id: str | None = None, record_type: str | None = None) -> list[dict[str, Any]]:
 		"""List generated-app records for a tenant."""
 		tenant_id = tenant_id or self.tenant_id

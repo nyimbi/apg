@@ -1,0 +1,679 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1780338561328,
+  "projectRoot": "/Users/nyimbiodero/src/pjs/apg",
+  "techStack": {
+    "languages": [],
+    "frameworks": [],
+    "packageManager": null,
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": "/Users/nyimbiodero/src/pjs/apg/.venv/bin/python -m pytest \\\n  tests/test_bia_tsa_context_resolution.py \\\n  tests/test_common_auth_abac_policy_applicability.py \\\n  tests/test_common_mdm_pose_blueprint_context.py \\\n  tests/test_common_mfau_context_resolution.py \\\n  tests/test_common_nlpc_gateway_handlers.py \\\n  tests/test_composition_api_auth_context.py \\\n  tests/test_composition_gateway_api_runtime_state.py \\\n  tests/test_composition_gateway_tenant_resolution.py \\\n  tests/test_composition_orchestration_context.py \\\n  tests/test_composition_registry_import_contract.py \\\n  tests/test_conf_isolated.py \\\n  tests/test_eam_ast_context_resolution.py \\\n  tests/test_ecd_esg_context_resolution.py \\\n  tests/test_fin_apy_context_resolution.py \\\n  tests/test_fin_arc_views_context_resolution.py \\\n  tests/test_fin_bfc_context_resolution.py \\\n  tests/test_fin_cbm_cash_api_context.py \\\n  tests/test_fin_cbm_cash_views_context.py \\\n  tests/test_fin_glr_context_resolution.py \\\n  tests/test_fin_rpt_context_resolution.py \\\n  tests/test_hcm_employee_context_resolution.py \\\n  tests/test_hcm_tat_context_resolution.py \\\n  tests/test_mten_crm_auth_context.py \\\n  tests/test_placeholder_identity_hygiene.py \\\n  tests/test_repository_hygiene.py \\\n  tests/test_top_level_blueprint_tenant_context.py \\\n  -q --tb=no 2>&1 | tail -3",
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "docs",
+      "examples",
+      "scripts",
+      "spec",
+      "tests"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "__pycache__": {
+      "path": "__pycache__",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1780338561313,
+      "keyFiles": [
+        "cli.cpython-311.pyc",
+        "complete_demo.cpython-311.pyc",
+        "setup.cpython-311.pyc",
+        "uuid_extensions.cpython-311.pyc"
+      ]
+    },
+    "agents": {
+      "path": "agents",
+      "purpose": null,
+      "fileCount": 10,
+      "lastAccessed": 1780338561314,
+      "keyFiles": [
+        "__init__.py",
+        "architect_agent.py",
+        "base_agent.py",
+        "deployment_manager.py",
+        "developer_agent.py"
+      ]
+    },
+    "apg": {
+      "path": "apg",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1780338561314,
+      "keyFiles": [
+        "__init__.py"
+      ]
+    },
+    "apg_demo_output": {
+      "path": "apg_demo_output",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1780338561315,
+      "keyFiles": []
+    },
+    "apg_language.egg-info": {
+      "path": "apg_language.egg-info",
+      "purpose": null,
+      "fileCount": 7,
+      "lastAccessed": 1780338561316,
+      "keyFiles": [
+        "PKG-INFO",
+        "SOURCES.txt",
+        "dependency_links.txt",
+        "entry_points.txt",
+        "not-zip-safe"
+      ]
+    },
+    "capabilities": {
+      "path": "capabilities",
+      "purpose": null,
+      "fileCount": 11,
+      "lastAccessed": 1780338561316,
+      "keyFiles": [
+        "PLAN.md",
+        "README.md",
+        "SPECIFICATION.md",
+        "__init__.py",
+        "__init___NEW.py"
+      ]
+    },
+    "cli": {
+      "path": "cli",
+      "purpose": null,
+      "fileCount": 30,
+      "lastAccessed": 1780338561317,
+      "keyFiles": [
+        "__init__.py",
+        "agent_adapter.py",
+        "baseline_command.py",
+        "capabilities_command.py",
+        "compile_command.py"
+      ]
+    },
+    "common": {
+      "path": "common",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1780338561317,
+      "keyFiles": [
+        "__init__.py",
+        "base.py"
+      ]
+    },
+    "compiler": {
+      "path": "compiler",
+      "purpose": null,
+      "fileCount": 34,
+      "lastAccessed": 1780338561318,
+      "keyFiles": [
+        "__init__.py",
+        "ai_agent_composition.py",
+        "ast_builder.py",
+        "baseline.py",
+        "capability_implementation.py"
+      ]
+    },
+    "database": {
+      "path": "database",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1780338561318,
+      "keyFiles": [
+        "init_postgresql.py"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 26,
+      "lastAccessed": 1780338561318,
+      "keyFiles": [
+        "README.md",
+        "ai_agent_composition.md",
+        "apg_cheat_sheet.md",
+        "apg_grammar_guide.md",
+        "apg_language.md"
+      ]
+    },
+    "examples": {
+      "path": "examples",
+      "purpose": "Example code",
+      "fileCount": 20,
+      "lastAccessed": 1780338561318,
+      "keyFiles": [
+        "FEEL_1_1.g4",
+        "README.md",
+        "RuleSet.g4",
+        "ai_agent_systems.apg",
+        "basic_applications.apg"
+      ]
+    },
+    "gen": {
+      "path": "gen",
+      "purpose": null,
+      "fileCount": 34,
+      "lastAccessed": 1780338561319,
+      "keyFiles": [
+        "D2DiagramVisitor.py",
+        "FABModelGenerator.py",
+        "FABViewGenerator.py",
+        "FMG.py",
+        "SQLGenerator.py"
+      ]
+    },
+    "installed_capabilities": {
+      "path": "installed_capabilities",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1780338561320,
+      "keyFiles": []
+    },
+    "language_server": {
+      "path": "language_server",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1780338561321,
+      "keyFiles": [
+        "__init__.py",
+        "client.py",
+        "semantic_service.py",
+        "server.py"
+      ]
+    },
+    "marketplace": {
+      "path": "marketplace",
+      "purpose": null,
+      "fileCount": 5,
+      "lastAccessed": 1780338561321,
+      "keyFiles": [
+        "README.md",
+        "capability_marketplace.py",
+        "capability_template.json",
+        "cli.py",
+        "web_api.py"
+      ]
+    },
+    "mobile_apps": {
+      "path": "mobile_apps",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1780338561322,
+      "keyFiles": []
+    },
+    "ref": {
+      "path": "ref",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1780338561322,
+      "keyFiles": [
+        "types.txt"
+      ]
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 1,
+      "lastAccessed": 1780338561322,
+      "keyFiles": [
+        "README.md"
+      ]
+    },
+    "singer_logs": {
+      "path": "singer_logs",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1780338561322,
+      "keyFiles": []
+    },
+    "singer_runtime": {
+      "path": "singer_runtime",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1780338561322,
+      "keyFiles": []
+    },
+    "singer_state": {
+      "path": "singer_state",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1780338561323,
+      "keyFiles": []
+    },
+    "spec": {
+      "path": "spec",
+      "purpose": "Test specifications",
+      "fileCount": 15,
+      "lastAccessed": 1780338561323,
+      "keyFiles": [
+        "apg.g4",
+        "apg.interp",
+        "apg.tokens",
+        "apgLexer.interp",
+        "apgLexer.py"
+      ]
+    },
+    "storage": {
+      "path": "storage",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1780338561323,
+      "keyFiles": []
+    },
+    "templates": {
+      "path": "templates",
+      "purpose": null,
+      "fileCount": 5,
+      "lastAccessed": 1780338561323,
+      "keyFiles": [
+        "__init__.py",
+        "application_template_manager.py",
+        "project_scaffolder.py",
+        "template_manager.py",
+        "template_types.py"
+      ]
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 203,
+      "lastAccessed": 1780338561324,
+      "keyFiles": [
+        "__init__.py",
+        "conftest.py",
+        "test_agent_adapter_shims.py",
+        "test_agent_basic.py",
+        "test_agent_integrations.py"
+      ]
+    },
+    "tmp": {
+      "path": "tmp",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1780338561324,
+      "keyFiles": []
+    },
+    "uploads": {
+      "path": "uploads",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1780338561325,
+      "keyFiles": []
+    },
+    "vscode-extension": {
+      "path": "vscode-extension",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1780338561325,
+      "keyFiles": [
+        "README.md",
+        "language-configuration.json",
+        "package.json"
+      ]
+    },
+    "docs/api": {
+      "path": "docs/api",
+      "purpose": "API routes",
+      "fileCount": 1,
+      "lastAccessed": 1780338561326,
+      "keyFiles": [
+        "README.md"
+      ]
+    },
+    "scripts/migrations": {
+      "path": "scripts/migrations",
+      "purpose": "Database migrations",
+      "fileCount": 1,
+      "lastAccessed": 1780338561327,
+      "keyFiles": [
+        "migration_to_v2.py"
+      ]
+    },
+    "tests/fixtures": {
+      "path": "tests/fixtures",
+      "purpose": "Test fixtures",
+      "fileCount": 0,
+      "lastAccessed": 1780338561328,
+      "keyFiles": []
+    },
+    "vscode-extension/src": {
+      "path": "vscode-extension/src",
+      "purpose": "Source code",
+      "fileCount": 1,
+      "lastAccessed": 1780338561328,
+      "keyFiles": [
+        "extension.ts"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "spec/apg.g4",
+      "accessCount": 31,
+      "lastAccessed": 1780349028581,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/intel/alerts/models.py",
+      "accessCount": 19,
+      "lastAccessed": 1780475795394,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/intel/alerts/service.py",
+      "accessCount": 18,
+      "lastAccessed": 1780567158860,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/intel/alerts/api.py",
+      "accessCount": 14,
+      "lastAccessed": 1780452523952,
+      "type": "file"
+    },
+    {
+      "path": "compiler/compiler.py",
+      "accessCount": 8,
+      "lastAccessed": 1780520626968,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/capability_contract_registry.py",
+      "accessCount": 7,
+      "lastAccessed": 1780385257548,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/intel/alerts/views.py",
+      "accessCount": 6,
+      "lastAccessed": 1780451211435,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/intel/alerts/capability_contract.py",
+      "accessCount": 5,
+      "lastAccessed": 1780452047945,
+      "type": "file"
+    },
+    {
+      "path": "compiler/semantic_model.py",
+      "accessCount": 4,
+      "lastAccessed": 1780349070454,
+      "type": "file"
+    },
+    {
+      "path": "docs/apg_language.md",
+      "accessCount": 4,
+      "lastAccessed": 1780349106916,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/government/__init__.py",
+      "accessCount": 3,
+      "lastAccessed": 1780386309153,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/pharma/ctr/__init__.py",
+      "accessCount": 3,
+      "lastAccessed": 1780449508658,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/intel/alerts/tests/test_package_contract.py",
+      "accessCount": 2,
+      "lastAccessed": 1780384406289,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/loc/__init__.py",
+      "accessCount": 2,
+      "lastAccessed": 1780385530748,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/ppm/__init__.py",
+      "accessCount": 2,
+      "lastAccessed": 1780385695752,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/pharma/__init__.py",
+      "accessCount": 2,
+      "lastAccessed": 1780386648887,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/__init__.py",
+      "accessCount": 2,
+      "lastAccessed": 1780571204918,
+      "type": "file"
+    },
+    {
+      "path": "README.md",
+      "accessCount": 1,
+      "lastAccessed": 1780338593018,
+      "type": "file"
+    },
+    {
+      "path": "compiler/parser.py",
+      "accessCount": 1,
+      "lastAccessed": 1780338599011,
+      "type": "file"
+    },
+    {
+      "path": "cli.py",
+      "accessCount": 1,
+      "lastAccessed": 1780338618419,
+      "type": "file"
+    },
+    {
+      "path": "compiler/semantic_analyzer.py",
+      "accessCount": 1,
+      "lastAccessed": 1780338796490,
+      "type": "file"
+    },
+    {
+      "path": "docs/language_reference.md",
+      "accessCount": 1,
+      "lastAccessed": 1780338797444,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/mining/exp/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384392504,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/mining/exp/tests/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384392932,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/mining/pro/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384393462,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/mining/pro/tests/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384394416,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/energy/gen/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384394688,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/mining/saf/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384394993,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/energy/gen/tests/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384395060,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/education/lms/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384395571,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/mining/saf/tests/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384395649,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/energy/dis/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384395666,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/education/lms/tests/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384396053,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/mining/eqp/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384396130,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/energy/dis/tests/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384396166,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/education/sch_mgmt/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384396423,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/mining/eqp/tests/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384396913,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/energy/met/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384397015,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/education/sch_mgmt/tests/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384397609,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/mining/ore/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384397660,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/energy/met/tests/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384397728,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/pharma/com/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384397894,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/mining/ore/tests/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384398128,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/education/ttbl/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384398227,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/energy/bil/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384398398,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/pharma/com/tests/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384398820,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/education/ttbl/tests/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384398943,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/mining/env/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384399005,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/energy/bil/tests/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384399042,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/mining/env/tests/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1780384399542,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

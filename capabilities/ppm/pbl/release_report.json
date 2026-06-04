@@ -1,0 +1,21 @@
+{
+  "evidence": {
+    "contracts": {
+      "capability_contract": {
+        "display_name": "Project Baseline Management",
+        "errors": []
+      }
+    },
+    "self_test": {
+      "capability": "ppm_pbl",
+      "passed": true,
+      "status": "ok"
+    },
+    "semantic_model": {
+      "capability": "ppm_pbl",
+      "format": "apg.semantic-model.v1"
+    }
+  },
+  "format": "apg.release-report.v1",
+  "ok": true
+}

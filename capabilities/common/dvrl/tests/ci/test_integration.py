@@ -12,10 +12,10 @@ from datetime import datetime, timezone
 from typing import Dict, Any
 
 # Import all DVRL components
-from ..service import DVRLService
-from ..api import DVRLAPIController, APGRequest
+from ...service import DVRLService
+from ...api import DVRLAPIController, APGRequest
 from ..views import DVRLDashboardView
-from ..models import DataSource, DataSourceType
+from ...models import DataSource, DataSourceType
 
 
 async def test_complete_dvrl_integration():

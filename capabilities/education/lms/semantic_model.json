@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "education_lms",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "education_lms": {
+      "capability": "education_lms"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

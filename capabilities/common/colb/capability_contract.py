@@ -333,6 +333,32 @@ THEME: dict[str, Any] = {
 }
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.colb.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"workspace_created",
+		"workspace_updated",
+		"workspace_archived",
+		"session_started",
+		"session_ended",
+		"artifact_created",
+		"artifact_updated",
+		"artifact_shared",
+		"annotation_added",
+		"decision_recorded",
+		"participant_added",
+		"participant_removed",
+		"agent_registered",
+	],
+	"guardrails": [
+		"colb_batch_requires_bytewax",
+		"colb_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable COLB capability contract."""
 	config = deepcopy(DEFAULT_CONFIGURATION)
@@ -355,7 +381,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		},
 		"theme": deepcopy(THEME),
 		"agents": agent_manifest(config),
-		"streaming": streaming_manifest(config),
+		"streaming": deepcopy(STREAMING),
 	}
 
 

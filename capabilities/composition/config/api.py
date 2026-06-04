@@ -2,9 +2,69 @@
 
 from __future__ import annotations
 
-from typing import Any
+import logging
+import os
+from typing import Any, Dict, Optional
+
+from fastapi import Depends, HTTPException, Security
+from fastapi.security import APIKeyHeader
+from starlette.requests import Request
 
 from .service import CompositionConfigService
+
+logger = logging.getLogger(__name__)
+
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+
+def _clean_text(value: Any) -> Optional[str]:
+	"""Return a non-empty stripped string or None."""
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+
+async def verify_api_key(
+	request: Request,
+	api_key: Optional[str] = Security(api_key_header),
+) -> Dict[str, Any]:
+	"""Verify API key and resolve user/tenant context from headers, query, or environment."""
+	if not api_key:
+		raise HTTPException(status_code=401, detail="API key required")
+
+	headers = getattr(request, "headers", {})
+	query_params = getattr(request, "query_params", {})
+
+	def _hget(*keys: str) -> Optional[str]:
+		for k in keys:
+			v = _clean_text(headers.get(k))
+			if v:
+				return v
+		return None
+
+	def _qget(*keys: str) -> Optional[str]:
+		for k in keys:
+			v = _clean_text(query_params.get(k))
+			if v:
+				return v
+		return None
+
+	user_id = (
+		_hget("X-APG-User-ID", "X-User-ID")
+		or _qget("user_id", "user")
+		or os.getenv("APG_API_KEY_USER_ID", os.getenv("APG_DEFAULT_USER_ID", "system"))
+	)
+	tenant_id = (
+		_hget("X-APG-Tenant-ID", "X-Tenant-ID")
+		or _qget("tenant_id", "tenant")
+		or os.getenv("APG_API_KEY_TENANT_ID", os.getenv("APG_DEFAULT_TENANT_ID", "default"))
+	)
+
+	return {"user_id": user_id, "tenant_id": tenant_id, "api_key": api_key}
+
+
+# ==================== Dependency Injection
 
 
 SERVICE = CompositionConfigService()

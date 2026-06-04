@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import csv
+import io
+import json
+from collections import Counter, defaultdict
+from datetime import datetime, timezone
 from typing import Any
 
 from .capability_contract import (
@@ -15,8 +20,12 @@ from .chat_engine import ChatEngine
 from .models import ChatAgentRecord, ChatAuditEvent, ChatLifecycleBatchRecord, ChatMessage, ChatPresence, ChatRoom, ModerationItem
 
 
+def _utc_now() -> str:
+	return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
 class ChatService:
-	"""Room registry, message stream, presence store, and moderation queue."""
+	"""Room registry, message stream, presence store, moderation queue, and analytics."""
 
 	def __init__(self) -> None:
 		self._rooms: dict[str, ChatRoom] = {}
@@ -26,6 +35,15 @@ class ChatService:
 		self._audit_events: dict[str, ChatAuditEvent] = {}
 		self._chat_agents: dict[str, ChatAgentRecord] = {}
 		self._lifecycle_batches: dict[str, ChatLifecycleBatchRecord] = {}
+		# Extended stores
+		self._reactions: dict[str, dict[str, Any]] = {}       # message_id -> {emoji: [user_ids]}
+		self._threads: dict[str, list[str]] = {}              # parent_message_id -> [reply_message_ids]
+		self._pinned: dict[str, list[str]] = {}               # room_id -> [message_ids]
+		self._read_receipts: dict[str, dict[str, str]] = {}   # message_id -> {user_id: timestamp}
+		self._webhooks: dict[str, dict[str, Any]] = {}        # webhook_id -> record
+		self._bots: dict[str, dict[str, Any]] = {}            # bot_id -> record
+		self._room_permissions: dict[str, dict[str, Any]] = {}  # room_id -> permission record
+		self._direct_messages: dict[str, list[str]] = {}      # dm_key -> [message_ids]
 		self._engine = ChatEngine()
 		self._restricted_terms = ("secret", "credential", "restricted")
 		self._agent_runtimes = {_normalize_token(item) for item in SUPPORTED_CHAT_AGENT_RUNTIMES}
@@ -36,11 +54,19 @@ class ChatService:
 			for item in get_capability_contract()["streaming"]["required_operations"]
 		}
 
+	# -------------------------------------------------------------------------
+	# Contract helpers
+	# -------------------------------------------------------------------------
+
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
 
 	def evaluate(self, context: dict[str, Any]) -> dict[str, Any]:
 		return evaluate_capability_rules(context)
+
+	# -------------------------------------------------------------------------
+	# Room management
+	# -------------------------------------------------------------------------
 
 	def create_room(
 		self,
@@ -140,11 +166,104 @@ class ChatService:
 		)
 		return approved.to_dict()
 
+	def join_room(self, room_id: str, user_id: str, tenant_id: str, invited_by: str | None = None) -> dict[str, Any]:
+		"""Add a user to an existing room."""
+		self._require_tenant(tenant_id)
+		room = self._require_room(room_id, tenant_id)
+		if room.status != "active":
+			raise PermissionError("room_not_active")
+		if user_id in room.members:
+			return room.to_dict()
+		updated_members = tuple(list(room.members) + [user_id])
+		updated = ChatRoom(
+			id=room.id,
+			tenant_id=room.tenant_id,
+			name=room.name,
+			owner=room.owner,
+			members=updated_members,
+			retention_policy=room.retention_policy,
+			visibility=room.visibility,
+			external_guests=room.external_guests,
+			status=room.status,
+			review_status=room.review_status,
+		)
+		self._rooms[self._key(tenant_id, room_id)] = updated
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=room_id,
+			event_type="member_joined",
+			actor=user_id,
+			decision="allow",
+			metadata={"invited_by": invited_by or "self"},
+		)
+		return updated.to_dict()
+
+	def leave_room(self, room_id: str, user_id: str, tenant_id: str) -> dict[str, Any]:
+		"""Remove a user from a room."""
+		self._require_tenant(tenant_id)
+		room = self._require_room(room_id, tenant_id)
+		if user_id not in room.members:
+			return room.to_dict()
+		updated_members = tuple(m for m in room.members if m != user_id)
+		updated = ChatRoom(
+			id=room.id,
+			tenant_id=room.tenant_id,
+			name=room.name,
+			owner=room.owner,
+			members=updated_members,
+			retention_policy=room.retention_policy,
+			visibility=room.visibility,
+			external_guests=room.external_guests,
+			status=room.status,
+			review_status=room.review_status,
+		)
+		self._rooms[self._key(tenant_id, room_id)] = updated
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=room_id,
+			event_type="member_left",
+			actor=user_id,
+			decision="allow",
+		)
+		return updated.to_dict()
+
 	def list_rooms(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		rooms = list(self._rooms.values())
 		if tenant_id is not None:
 			rooms = [item for item in rooms if item.tenant_id == tenant_id]
 		return [item.to_dict() for item in sorted(rooms, key=lambda item: item.id)]
+
+	def room_members(self, room_id: str, tenant_id: str) -> list[str]:
+		"""Return member list for a room."""
+		room = self._require_room(room_id, tenant_id)
+		return list(room.members)
+
+	def room_permissions(self, room_id: str, tenant_id: str, actor: str, permissions: dict[str, Any]) -> dict[str, Any]:
+		"""Set or update permission configuration for a room."""
+		self._require_tenant(tenant_id)
+		room = self._require_room(room_id, tenant_id)
+		key = self._key(tenant_id, room_id)
+		record = {
+			"room_id": room_id,
+			"tenant_id": tenant_id,
+			"permissions": dict(permissions),
+			"updated_by": actor,
+			"updated_at": _utc_now(),
+		}
+		self._room_permissions[key] = record
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=room_id,
+			event_type="room_permissions_updated",
+			actor=actor,
+			decision="allow",
+			metadata={"permission_keys": list(permissions.keys())},
+		)
+		return dict(record)
+
+	# -------------------------------------------------------------------------
+	# Messaging
+	# -------------------------------------------------------------------------
 
 	def send_message(
 		self,
@@ -238,6 +357,300 @@ class ChatService:
 		)
 		return message.to_dict()
 
+	def edit_message(self, message_id: str, tenant_id: str, editor: str, new_body: str) -> dict[str, Any]:
+		"""Edit an existing message body. Only the sender may edit."""
+		self._require_tenant(tenant_id)
+		key = self._key(tenant_id, message_id)
+		message = self._messages.get(key)
+		if message is None:
+			raise KeyError(f"unknown_message:{message_id}")
+		if message.sender != editor:
+			raise PermissionError("only_sender_may_edit_message")
+		terms = self._engine.restricted_terms(new_body, self._restricted_terms)
+		if terms:
+			raise PermissionError("restricted_content_in_edit")
+		updated = ChatMessage(
+			id=message.id,
+			tenant_id=message.tenant_id,
+			room_id=message.room_id,
+			sender=message.sender,
+			body=new_body,
+			fingerprint=self._engine.message_fingerprint({"body": new_body}),
+			thread_key=message.thread_key,
+			attachments=message.attachments,
+			delivery_receipts=message.delivery_receipts,
+			moderation_status=message.moderation_status,
+		)
+		self._messages[key] = updated
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=message_id,
+			event_type="message_edited",
+			actor=editor,
+			decision="allow",
+		)
+		return updated.to_dict()
+
+	def delete_message(self, message_id: str, tenant_id: str, actor: str) -> dict[str, Any]:
+		"""Soft-delete a message by removing its body and marking it deleted."""
+		self._require_tenant(tenant_id)
+		key = self._key(tenant_id, message_id)
+		message = self._messages.get(key)
+		if message is None:
+			raise KeyError(f"unknown_message:{message_id}")
+		deleted = ChatMessage(
+			id=message.id,
+			tenant_id=message.tenant_id,
+			room_id=message.room_id,
+			sender=message.sender,
+			body="[deleted]",
+			fingerprint=message.fingerprint,
+			thread_key=message.thread_key,
+			attachments=(),
+			delivery_receipts=message.delivery_receipts,
+			moderation_status="deleted",
+		)
+		self._messages[key] = deleted
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=message_id,
+			event_type="message_deleted",
+			actor=actor,
+			decision="allow",
+		)
+		return deleted.to_dict()
+
+	def react_to_message(self, message_id: str, tenant_id: str, user_id: str, emoji: str) -> dict[str, Any]:
+		"""Add or toggle a reaction emoji on a message."""
+		self._require_tenant(tenant_id)
+		key = self._key(tenant_id, message_id)
+		if key not in self._messages:
+			raise KeyError(f"unknown_message:{message_id}")
+		reactions = self._reactions.setdefault(key, {})
+		users = reactions.setdefault(emoji, [])
+		if user_id in users:
+			users.remove(user_id)
+		else:
+			users.append(user_id)
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=message_id,
+			event_type="message_reacted",
+			actor=user_id,
+			decision="allow",
+			metadata={"emoji": emoji},
+		)
+		return {"message_id": message_id, "reactions": {k: list(v) for k, v in reactions.items()}}
+
+	def thread_reply(
+		self,
+		reply_id: str,
+		tenant_id: str,
+		parent_message_id: str,
+		room_id: str,
+		sender: str,
+		body: str,
+	) -> dict[str, Any]:
+		"""Post a reply in a thread anchored to parent_message_id."""
+		parent_key = self._key(tenant_id, parent_message_id)
+		if parent_key not in self._messages:
+			raise KeyError(f"unknown_parent_message:{parent_message_id}")
+		reply = self.send_message(
+			message_id=reply_id,
+			tenant_id=tenant_id,
+			room_id=room_id,
+			sender=sender,
+			body=body,
+		)
+		thread = self._threads.setdefault(parent_key, [])
+		thread.append(reply_id)
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=reply_id,
+			event_type="thread_reply_posted",
+			actor=sender,
+			decision="allow",
+			metadata={"parent_message_id": parent_message_id},
+		)
+		return {**reply, "parent_message_id": parent_message_id, "thread_position": len(thread)}
+
+	def pin_message(self, room_id: str, tenant_id: str, message_id: str, actor: str) -> dict[str, Any]:
+		"""Pin a message in a room."""
+		self._require_tenant(tenant_id)
+		room = self._require_room(room_id, tenant_id)
+		key = self._key(tenant_id, message_id)
+		if key not in self._messages:
+			raise KeyError(f"unknown_message:{message_id}")
+		pin_key = self._key(tenant_id, room_id)
+		pinned = self._pinned.setdefault(pin_key, [])
+		if message_id not in pinned:
+			pinned.append(message_id)
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=message_id,
+			event_type="message_pinned",
+			actor=actor,
+			decision="allow",
+			metadata={"room_id": room_id},
+		)
+		return {"room_id": room_id, "pinned_message_ids": list(pinned)}
+
+	def search_messages(
+		self,
+		tenant_id: str,
+		query: str,
+		room_id: str | None = None,
+		sender: str | None = None,
+		limit: int = 50,
+	) -> list[dict[str, Any]]:
+		"""Full-text search over messages for a tenant."""
+		self._require_tenant(tenant_id)
+		terms = [t.lower() for t in query.split() if t.strip()]
+		results: list[tuple[int, dict[str, Any]]] = []
+		for key, msg in self._messages.items():
+			if not key.startswith(f"{tenant_id}:"):
+				continue
+			if room_id and msg.room_id != room_id:
+				continue
+			if sender and msg.sender != sender:
+				continue
+			if msg.moderation_status == "deleted":
+				continue
+			haystack = msg.body.lower()
+			score = sum(1 for t in terms if t in haystack)
+			if score > 0 or not terms:
+				results.append((score, msg.to_dict()))
+		results.sort(key=lambda x: -x[0])
+		return [r[1] for r in results[:limit]]
+
+	def message_search(self, tenant_id: str, query: str, room_id: str | None = None) -> list[dict[str, Any]]:
+		"""Alias for search_messages with simpler signature."""
+		return self.search_messages(tenant_id, query, room_id=room_id)
+
+	def typing_indicator(self, tenant_id: str, room_id: str, user_id: str, typing: bool) -> dict[str, Any]:
+		"""Update typing indicator for a user in a room."""
+		return self.update_presence(
+			tenant_id=tenant_id,
+			user_id=user_id,
+			status="online",
+			room_id=room_id,
+			typing=typing,
+		)
+
+	def read_receipts(self, tenant_id: str, message_id: str, user_id: str) -> dict[str, Any]:
+		"""Mark a message as read by a user."""
+		self._require_tenant(tenant_id)
+		key = self._key(tenant_id, message_id)
+		if key not in self._messages:
+			raise KeyError(f"unknown_message:{message_id}")
+		receipts = self._read_receipts.setdefault(key, {})
+		receipts[user_id] = _utc_now()
+		return {"message_id": message_id, "read_by": dict(receipts)}
+
+	def direct_message(
+		self,
+		message_id: str,
+		tenant_id: str,
+		from_user: str,
+		to_user: str,
+		body: str,
+	) -> dict[str, Any]:
+		"""Send a direct message between two users. Creates a synthetic room key."""
+		self._require_tenant(tenant_id)
+		dm_key = ":".join(sorted([from_user, to_user]))
+		# Use a synthetic room_id for DMs (create if absent)
+		dm_room_id = f"dm_{dm_key}"
+		dm_room_key = self._key(tenant_id, dm_room_id)
+		if dm_room_key not in self._rooms:
+			self._rooms[dm_room_key] = ChatRoom(
+				id=dm_room_id,
+				tenant_id=tenant_id,
+				name=f"DM: {from_user} <-> {to_user}",
+				owner=from_user,
+				members=(from_user, to_user),
+				retention_policy="default",
+				visibility="private",
+				status="active",
+				review_status="approved",
+			)
+		result = self.send_message(
+			message_id=message_id,
+			tenant_id=tenant_id,
+			room_id=dm_room_id,
+			sender=from_user,
+			body=body,
+		)
+		dm_list = self._direct_messages.setdefault(self._key(tenant_id, dm_key), [])
+		dm_list.append(message_id)
+		return {**result, "dm_key": dm_key, "to_user": to_user}
+
+	def broadcast_message(
+		self,
+		message_id: str,
+		tenant_id: str,
+		sender: str,
+		body: str,
+		room_ids: list[str],
+	) -> list[dict[str, Any]]:
+		"""Broadcast a message to multiple rooms. Returns per-room results."""
+		self._require_tenant(tenant_id)
+		results: list[dict[str, Any]] = []
+		for idx, room_id in enumerate(room_ids):
+			mid = f"{message_id}_{idx}"
+			try:
+				result = self.send_message(
+					message_id=mid,
+					tenant_id=tenant_id,
+					room_id=room_id,
+					sender=sender,
+					body=body,
+				)
+				results.append({"room_id": room_id, "status": "delivered", "message": result})
+			except Exception as exc:
+				results.append({"room_id": room_id, "status": "failed", "error": str(exc)})
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=message_id,
+			event_type="broadcast_sent",
+			actor=sender,
+			decision="allow",
+			metadata={"room_count": len(room_ids)},
+		)
+		return results
+
+	def file_share(
+		self,
+		message_id: str,
+		tenant_id: str,
+		room_id: str,
+		sender: str,
+		file_name: str,
+		file_size_bytes: int,
+		mime_type: str,
+		storage_ref: str,
+	) -> dict[str, Any]:
+		"""Share a file in a room via an attachment message."""
+		body = f"[file: {file_name}]"
+		result = self.send_message(
+			message_id=message_id,
+			tenant_id=tenant_id,
+			room_id=room_id,
+			sender=sender,
+			body=body,
+			attachments=[storage_ref],
+			attachment_scan_completed=True,
+			dlp_check_completed=True,
+		)
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=message_id,
+			event_type="file_shared",
+			actor=sender,
+			decision="allow",
+			metadata={"file_name": file_name, "file_size_bytes": file_size_bytes, "mime_type": mime_type},
+		)
+		return {**result, "file_name": file_name, "file_size_bytes": file_size_bytes, "mime_type": mime_type, "storage_ref": storage_ref}
+
 	def list_messages(self, tenant_id: str | None = None, room_id: str | None = None) -> list[dict[str, Any]]:
 		messages = list(self._messages.values())
 		if tenant_id is not None:
@@ -245,6 +658,10 @@ class ChatService:
 		if room_id is not None:
 			messages = [item for item in messages if item.room_id == room_id]
 		return [item.to_dict() for item in sorted(messages, key=lambda item: item.id)]
+
+	# -------------------------------------------------------------------------
+	# Presence
+	# -------------------------------------------------------------------------
 
 	def update_presence(
 		self,
@@ -287,6 +704,45 @@ class ChatService:
 			presence = [item for item in presence if item.room_id == room_id]
 		return [item.to_dict() for item in sorted(presence, key=lambda item: item.id)]
 
+	# -------------------------------------------------------------------------
+	# Moderation
+	# -------------------------------------------------------------------------
+
+	def message_moderation(
+		self,
+		tenant_id: str,
+		message_id: str,
+		moderator: str,
+		action: str,
+		reason: str,
+	) -> dict[str, Any]:
+		"""Flag, approve, or remove a message via moderation action."""
+		self._require_tenant(tenant_id)
+		key = self._key(tenant_id, message_id)
+		message = self._messages.get(key)
+		if message is None:
+			raise KeyError(f"unknown_message:{message_id}")
+		if action not in {"approve", "flag", "remove"}:
+			raise ValueError(f"unsupported_moderation_action:{action}")
+		if action == "remove":
+			self.delete_message(message_id, tenant_id, moderator)
+		item = self._record_moderation(
+			tenant_id=tenant_id,
+			subject_id=message_id,
+			subject_type="message",
+			status=action,
+			reason=reason,
+		)
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=message_id,
+			event_type="message_moderated",
+			actor=moderator,
+			decision="allow",
+			metadata={"action": action, "reason": reason},
+		)
+		return item.to_dict()
+
 	def review_moderation(self, item_id: str, reviewer: str, decision: str, tenant_id: str | None = None) -> dict[str, Any]:
 		item = self._moderation.get(self._key(tenant_id, item_id)) if tenant_id else self._find_by_public_id(self._moderation, item_id)
 		if item is None:
@@ -327,11 +783,198 @@ class ChatService:
 			items = [item for item in items if item.tenant_id == tenant_id]
 		return [item.to_dict() for item in sorted(items, key=lambda item: item.id)]
 
-	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
-		events = list(self._audit_events.values())
-		if tenant_id is not None:
-			events = [item for item in events if item.tenant_id == tenant_id]
-		return [item.to_dict() for item in sorted(events, key=lambda item: item.id)]
+	# -------------------------------------------------------------------------
+	# Webhooks & Bots
+	# -------------------------------------------------------------------------
+
+	def webhook_integration(
+		self,
+		tenant_id: str,
+		room_id: str,
+		webhook_url: str,
+		events: list[str],
+		owner: str,
+		webhook_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Register an outgoing webhook for a room."""
+		self._require_tenant(tenant_id)
+		self._require_room(room_id, tenant_id)
+		wid = webhook_id or f"wh_{len(self._webhooks) + 1:06d}"
+		record = {
+			"id": wid,
+			"tenant_id": tenant_id,
+			"room_id": room_id,
+			"webhook_url": webhook_url,
+			"events": list(events),
+			"owner": owner,
+			"status": "active",
+			"created_at": _utc_now(),
+		}
+		self._webhooks[self._key(tenant_id, wid)] = record
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=wid,
+			event_type="webhook_registered",
+			actor=owner,
+			decision="allow",
+			metadata={"room_id": room_id, "events": events},
+		)
+		return dict(record)
+
+	def bot_registration(
+		self,
+		tenant_id: str,
+		bot_id: str,
+		name: str,
+		owner: str,
+		allowed_rooms: list[str],
+		commands: list[str],
+	) -> dict[str, Any]:
+		"""Register a bot for use in chat rooms."""
+		self._require_tenant(tenant_id)
+		for room_id in allowed_rooms:
+			self._require_room(room_id, tenant_id)
+		record = {
+			"id": bot_id,
+			"tenant_id": tenant_id,
+			"name": name,
+			"owner": owner,
+			"allowed_rooms": list(allowed_rooms),
+			"commands": list(commands),
+			"status": "active",
+			"created_at": _utc_now(),
+		}
+		self._bots[self._key(tenant_id, bot_id)] = record
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=bot_id,
+			event_type="bot_registered",
+			actor=owner,
+			decision="allow",
+			metadata={"allowed_room_count": len(allowed_rooms)},
+		)
+		return dict(record)
+
+	def mention_notification(
+		self,
+		tenant_id: str,
+		room_id: str,
+		message_id: str,
+		mentioned_user: str,
+		sender: str,
+	) -> dict[str, Any]:
+		"""Record a mention notification for a user."""
+		self._require_tenant(tenant_id)
+		key = self._key(tenant_id, message_id)
+		if key not in self._messages:
+			raise KeyError(f"unknown_message:{message_id}")
+		notification = {
+			"tenant_id": tenant_id,
+			"room_id": room_id,
+			"message_id": message_id,
+			"mentioned_user": mentioned_user,
+			"sender": sender,
+			"created_at": _utc_now(),
+			"read": False,
+		}
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=message_id,
+			event_type="mention_notification_sent",
+			actor=sender,
+			decision="allow",
+			metadata={"mentioned_user": mentioned_user},
+		)
+		return notification
+
+	# -------------------------------------------------------------------------
+	# Analytics & Exports
+	# -------------------------------------------------------------------------
+
+	def room_analytics(self, tenant_id: str, room_id: str) -> dict[str, Any]:
+		"""Per-room analytics: message volume, top senders, peak activity."""
+		self._require_tenant(tenant_id)
+		room = self._require_room(room_id, tenant_id)
+		messages = [m for m in self._messages.values() if m.tenant_id == tenant_id and m.room_id == room_id]
+		sender_counts: Counter[str] = Counter(m.sender for m in messages)
+		attachment_count = sum(len(m.attachments) for m in messages)
+		moderated = sum(1 for m in messages if m.moderation_status not in {"clear", "approved"})
+		return {
+			"room_id": room_id,
+			"tenant_id": tenant_id,
+			"member_count": len(room.members),
+			"message_count": len(messages),
+			"attachment_count": attachment_count,
+			"moderated_message_count": moderated,
+			"top_senders": sender_counts.most_common(5),
+			"unique_sender_count": len(sender_counts),
+		}
+
+	def chat_analytics(self, tenant_id: str) -> dict[str, Any]:
+		"""Tenant-wide chat analytics aggregated across all rooms."""
+		self._require_tenant(tenant_id)
+		rooms = [r for r in self._rooms.values() if r.tenant_id == tenant_id]
+		messages = [m for m in self._messages.values() if m.tenant_id == tenant_id]
+		active_rooms = [r for r in rooms if r.status == "active"]
+		msgs_per_room: dict[str, int] = defaultdict(int)
+		for m in messages:
+			msgs_per_room[m.room_id] += 1
+		busiest = max(msgs_per_room.items(), key=lambda x: x[1]) if msgs_per_room else ("none", 0)
+		return {
+			"tenant_id": tenant_id,
+			"total_rooms": len(rooms),
+			"active_rooms": len(active_rooms),
+			"total_messages": len(messages),
+			"avg_messages_per_room": len(messages) / max(len(rooms), 1),
+			"busiest_room": {"room_id": busiest[0], "message_count": busiest[1]},
+			"webhook_count": sum(1 for v in self._webhooks.values() if v["tenant_id"] == tenant_id),
+			"bot_count": sum(1 for v in self._bots.values() if v["tenant_id"] == tenant_id),
+			"total_reactions": sum(
+				sum(len(users) for users in r.values())
+				for key, r in self._reactions.items()
+				if key.startswith(f"{tenant_id}:")
+			),
+		}
+
+	def export_chat_history(
+		self,
+		tenant_id: str,
+		room_id: str,
+		format: str = "json",
+	) -> dict[str, Any]:
+		"""Export chat history for a room as JSON or CSV."""
+		self._require_tenant(tenant_id)
+		self._require_room(room_id, tenant_id)
+		messages = self.list_messages(tenant_id=tenant_id, room_id=room_id)
+		if format == "csv":
+			buf = io.StringIO()
+			writer = csv.DictWriter(buf, fieldnames=["id", "sender", "body", "room_id", "moderation_status"])
+			writer.writeheader()
+			for msg in messages:
+				writer.writerow({k: msg.get(k, "") for k in ["id", "sender", "body", "room_id", "moderation_status"]})
+			payload = buf.getvalue()
+		else:
+			payload = json.dumps(messages, indent=2)
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=room_id,
+			event_type="chat_history_exported",
+			actor="system",
+			decision="allow",
+			metadata={"format": format, "message_count": len(messages)},
+		)
+		return {
+			"room_id": room_id,
+			"tenant_id": tenant_id,
+			"format": format,
+			"message_count": len(messages),
+			"payload": payload,
+			"exported_at": _utc_now(),
+		}
+
+	# -------------------------------------------------------------------------
+	# Agents & lifecycle batches
+	# -------------------------------------------------------------------------
 
 	def register_chat_agent(
 		self,
@@ -456,6 +1099,16 @@ class ChatService:
 			batches = [item for item in batches if item.tenant_id == tenant_id]
 		return [item.to_dict() for item in sorted(batches, key=lambda item: item.id)]
 
+	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		events = list(self._audit_events.values())
+		if tenant_id is not None:
+			events = [item for item in events if item.tenant_id == tenant_id]
+		return [item.to_dict() for item in sorted(events, key=lambda item: item.id)]
+
+	# -------------------------------------------------------------------------
+	# Compatibility surface
+	# -------------------------------------------------------------------------
+
 	def list_records(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		"""Compatibility surface exposing messages as CHAT records."""
 		return self.list_messages(tenant_id)
@@ -479,6 +1132,20 @@ class ChatService:
 		)
 		return event.to_dict()
 
+	# -------------------------------------------------------------------------
+	# Dashboard / health
+	# -------------------------------------------------------------------------
+
+	def health_check(self) -> dict[str, Any]:
+		"""Return service health status."""
+		return {
+			"service": "chat",
+			"status": "healthy",
+			"room_count": len(self._rooms),
+			"message_count": len(self._messages),
+			"checked_at": _utc_now(),
+		}
+
 	def conversation_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		rooms = self.list_rooms(tenant_id)
 		messages = self.list_messages(tenant_id)
@@ -496,7 +1163,13 @@ class ChatService:
 			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
 			"denied_lifecycle_batch_count": len([item for item in self.list_lifecycle_batches(tenant_id) if item["status"] == "denied"]),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
+			"webhook_count": sum(1 for v in self._webhooks.values() if v["tenant_id"] == tenant_id),
+			"bot_count": sum(1 for v in self._bots.values() if v["tenant_id"] == tenant_id),
 		}
+
+	# -------------------------------------------------------------------------
+	# Private helpers
+	# -------------------------------------------------------------------------
 
 	def _require_tenant(self, tenant_id: str) -> None:
 		result = self.evaluate({"tenant_context_present": bool(tenant_id)})

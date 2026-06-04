@@ -797,3 +797,14 @@ __all__ = [
 	# Helper Functions
 	'validate_tenant_access'
 ]
+
+from dataclasses import dataclass as _dc
+
+@_dc
+class CMResource:
+    id: str
+    name: str
+    resource_type: str = "api"
+    metadata: dict = None
+    def __post_init__(self):
+        if self.metadata is None: self.metadata = {}

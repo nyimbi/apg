@@ -92,6 +92,13 @@ class EntityType(Enum):
 	AGENT_RUNTIME = "agent_runtime"
 	NOTIFICATION = "notification"
 	ANALYTICS = "analytics"
+	# New types added for enum, statemachine, migration, deployment, marketplace, event sourcing
+	ENUM = "enum"
+	STATEMACHINE = "statemachine"
+	MIGRATION = "migration"
+	DEPLOYMENT = "deployment"
+	MARKETPLACE = "marketplace"
+	EVENT_STORE = "event_store"
 
 
 @dataclass
@@ -658,6 +665,34 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 			"report": EntityType.ANALYTICS,
 			"dashboard": EntityType.ANALYTICS,
 			"notify": EntityType.NOTIFICATION,
+			# Enum and type system
+			"enum": EntityType.ENUM,
+			"interface": EntityType.ENTITY,
+			"type_alias": EntityType.ENTITY,
+			"struct": EntityType.ENTITY,
+			# State machines
+			"statemachine": EntityType.STATEMACHINE,
+			"state_machine": EntityType.STATEMACHINE,
+			"fsm": EntityType.STATEMACHINE,
+			# Event sourcing
+			"event_schema": EntityType.EVENT_STORE,
+			"event_store": EntityType.EVENT_STORE,
+			"projection": EntityType.EVENT_STORE,
+			"aggregate": EntityType.EVENT_STORE,
+			# Database lifecycle
+			"migration": EntityType.MIGRATION,
+			"seed": EntityType.MIGRATION,
+			"fixture_data": EntityType.MIGRATION,
+			# Deployment and platform
+			"deployment_strategy": EntityType.DEPLOYMENT,
+			"deployment_pattern": EntityType.DEPLOYMENT,
+			"marketplace": EntityType.MARKETPLACE,
+			"ecommerce": EntityType.MARKETPLACE,
+			"platform": EntityType.ENTITY,
+			# Reporting and analytics
+			"pipeline": EntityType.ENTITY,
+			"etl": EntityType.ENTITY,
+			"dbt_model": EntityType.ENTITY,
 		}.get(kind, EntityType.ENTITY)
 
 	def _parse_source_capability(self, name: str, body: str, source_file: Optional[str]) -> CapabilityDeclaration:

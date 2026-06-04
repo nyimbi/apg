@@ -181,6 +181,18 @@ entity_type
     | 'layout' | 'ui' | 'component' | 'widget' | 'screen' | 'view'
     | 'middleware' | 'interceptor' | 'filter' | 'transformer' | 'mapper'
     | 'cache' | 'session' | 'store' | 'repository' | 'gateway' | 'proxy'
+    // Type system and data modeling
+    | 'enum' | 'interface' | 'type_alias' | 'struct'
+    // State machines and event sourcing
+    | 'statemachine' | 'state_machine' | 'fsm'
+    | 'event_schema' | 'event_store' | 'projection' | 'aggregate'
+    // Database lifecycle
+    | 'migration' | 'seed' | 'fixture_data'
+    // Deployment and platform
+    | 'deployment_strategy' | 'deployment_pattern'
+    | 'marketplace' | 'ecommerce' | 'platform'
+    // Reporting and analytics
+    | 'pipeline' | 'etl' | 'dbt_model'
     ;
 
 inheritance
@@ -214,6 +226,9 @@ entity_member
     | exception_def
     | variable_declaration
     | database_schema  // DBML integration for db and table entities
+    | form_layout           // Form layout sublanguage for form entities
+    | state_transition      // State machine transition for statemachine entities
+    | enum_variant_decl     // Enum variant for enum entities
     ;
 
 // CONFIGURATION with type annotations
@@ -916,6 +931,8 @@ value_expr
     | list_value
     | dict_value
     | cascade_value
+    | fallback_chain           // ?? based fallback: gpt4 ?? claude3 ?? llama
+    | physical_literal         // measurement literals: 80°C, 150psi
     | agent_memory_value
     | reference_value
     | lambda_expr
@@ -956,6 +973,14 @@ key_value_pair
 
 cascade_value
     : simple_value ('->' simple_value)+          // Fallback chain: gpt4->claude3->llama
+    ;
+
+fallback_chain
+    : simple_value ('??' simple_value)+          // Preferred cascade: gpt4 ?? claude3 ?? llama
+    ;
+
+physical_literal
+    : NUMBER PHYS_UNIT
     ;
 
 agent_memory_value
@@ -1008,6 +1033,7 @@ annotation_body
     : simple_value
     | method_call
     | combination_expr
+    | IDENTIFIER '{' annotation_member* '}'     // named block: @physics: finite_element { ... }
     | '{' annotation_member* '}'
     ;
 
@@ -1271,7 +1297,12 @@ lambda_expr
     ;
 
 conditional_expr
-    : or_test ('if' or_test 'else' expression)?
+    : null_coalesce_expr ('if' null_coalesce_expr 'else' expression)?
+    | null_coalesce_expr '?' null_coalesce_expr ':' expression    // C-style ternary
+    ;
+
+null_coalesce_expr
+    : or_test ('??' or_test)*
     ;
 
 or_test
@@ -1290,7 +1321,11 @@ not_test
     ;
 
 comparison
-    : bitwise_or (comp_op bitwise_or)*
+    : pipeline_expr (comp_op pipeline_expr)*
+    ;
+
+pipeline_expr
+    : bitwise_or ('|>' bitwise_or)*
     ;
 
 comp_op
@@ -1806,7 +1841,7 @@ CRON_EXPR: '"' [0-9*,-/]+ (' ' [0-9*,-/]+){4,5} '"';
 SEMVER: [0-9]+ '.' [0-9]+ '.' [0-9]+ ('-' [a-zA-Z0-9-]+)? ('+' [a-zA-Z0-9-]+)?;
 
 // Booleans and NULL
-BOOLEAN: 'True' | 'False' | 'true' | 'false' | 'yes' | 'no' | 'on' | 'off';
+BOOLEAN: 'True' | 'False' | 'true' | 'false';
 NULL: 'null' | 'NULL' | 'nil';
 
 // Comments
@@ -1816,6 +1851,30 @@ PYTHON_COMMENT: '#' ~[\r\n]* -> skip;
 
 // Whitespace
 WS: [ \t\r\n]+ -> skip;
+
+// Null coalescing and fallback operator (must precede QUESTION token)
+NULL_COALESCE: '??';
+
+// Pipeline operator (must precede PIPE token)
+PIPELINE_OP: '|>';
+
+// Physical/measurement unit suffix (must precede other tokens that could overlap)
+// Supports common SI and imperial units including degree symbol (U+00B0)
+PHYS_UNIT
+    : '°' [CFKRc]          // temperature: °C °F °K °R
+    | 'μm' | 'nm'               // micro/nano length
+    | 'kPa' | 'MPa' | 'GPa'    // pressure
+    | 'kHz' | 'MHz' | 'GHz'    // frequency (must precede shorter forms)
+    | 'mV' | 'kV' | 'MV'       // voltage
+    | 'mA' | 'kA'              // current
+    | 'kW' | 'MW' | 'GW'      // power
+    | 'rpm' | 'rps'            // rotational
+    | 'ms' | 'us' | 'ns' | 'ps' // time (sub-second)
+    | 'psi' | 'bar' | 'atm'    // pressure (word forms)
+    | 'Hz' | 'Pa'              // base SI units
+    | 'km' | 'cm' | 'mm'       // length (must precede 'm')
+    | 'kg' | 'mg'              // mass (must precede 'g')
+    ;
 
 // Special operators and symbols
 ARROW: '->';
@@ -2561,7 +2620,7 @@ font_weight
 
 font_weight_keyword
     : 'normal' | 'bold' | 'bolder' | 'lighter'
-    | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900'
+    | 'thin' | 'light' | 'medium' | 'semibold' | 'extrabold' | 'black'
     ;
 
 font_style
@@ -3185,6 +3244,35 @@ database_property
 // Main database schema construct
 database_schema
     : 'schema' IDENTIFIER '{' schema_element* '}'
+    ;
+
+// ENUM VARIANT DECLARATIONS
+// Used inside enum entity bodies.
+enum_variant_decl
+    : IDENTIFIER ('=' (NUMBER | STRING))? enum_variant_doc? contract_separator?
+    ;
+
+enum_variant_doc
+    : '[' 'label' ':' STRING (',' 'description' ':' STRING)? ']'
+    ;
+
+// STATE MACHINE TRANSITIONS
+// Used inside statemachine/fsm entity bodies.
+state_transition
+    : IDENTIFIER '->' IDENTIFIER ('[' state_transition_props ']')? contract_separator?
+    ;
+
+state_transition_props
+    : state_transition_prop (',' state_transition_prop)*
+    ;
+
+state_transition_prop
+    : 'on' ':' contract_scalar
+    | 'guard' ':' contract_value
+    | 'action' ':' contract_value
+    | 'priority' ':' NUMBER
+    | 'timeout' ':' time_expr
+    | IDENTIFIER ':' contract_value
     ;
 
 schema_element
@@ -4001,285 +4089,22 @@ unit_specification
 // DIGITAL TWIN AND INDUSTRIAL MONITORING EXTENSIONS
 // ========================================
 
-// Digital Twin Architecture
-TWIN_COMPONENTS
-    : 'physical_asset' | 'virtual_model' | 'data_connection'  // 'analytics' removed - conflicts with ANALYTICS_KEYWORDS
-    | 'simulation_engine' | 'state_sync' | 'behavior_model' | 'physics_engine'
-    | 'geometry_model' | 'material_properties' | 'environmental_conditions'
-    | 'operational_parameters' | 'performance_metrics' | 'lifecycle_data'
-    ;
-
-// Simulation and Modeling
-SIMULATION_TYPES
-    : 'finite_element' | 'computational_fluid' | 'discrete_event' | 'agent_based'
-    | 'monte_carlo' | 'molecular_dynamics' | 'multibody_dynamics' | 'thermal'
-    | 'electromagnetic' | 'structural' | 'kinematic' | 'dynamic' | 'stochastic'
-    | 'continuous' | 'hybrid' | 'real_time' | 'predictive' | 'what_if'
-    ;
-
-// Physical-Digital Synchronization
-SYNC_MECHANISMS
-    : 'real_time_sync' | 'batch_sync' | 'periodic_update'
-    | 'differential_sync' | 'state_reconciliation' | 'conflict_resolution'
-    | 'versioning' | 'rollback' | 'checkpoint' | 'snapshot' | 'incremental'
-    | 'bidirectional' | 'unidirectional' | 'master_slave' | 'peer_to_peer'
-    ;
-
-// Computer Vision and Image Processing
-VISION_ALGORITHMS
-    : 'object_detection' | 'image_classification' | 'semantic_segmentation'
-    | 'instance_segmentation' | 'edge_detection' | 'feature_extraction'
-    | 'template_matching' | 'optical_flow' | 'stereo_vision' | 'depth_estimation'
-    | 'pose_estimation' | 'motion_tracking' | 'background_subtraction'
-    | 'noise_reduction' | 'histogram_equalization' | 'morphological_ops'
-    | 'fourier_transform' | 'wavelet_transform' | 'gabor_filters'
-    ;
-
-// Anomaly Detection Methods
-ANOMALY_METHODS
-    : 'statistical_outlier' | 'isolation_forest' | 'one_class_svm' | 'local_outlier'
-    | 'variational_autoencoder' | 'generative_adversarial'
-    | 'lstm_autoencoder' | 'transformer_based' | 'spectral_analysis'
-    | 'change_point_detection' | 'control_charts' | 'hotelling_t2'
-    | 'principal_component' | 'independent_component' | 'mahalanobis_distance'
-    | 'density_based' | 'clustering_based' | 'ensemble_methods'
-    ;
-
-// Quality Control and Inspection
-QC_METRICS
-    : 'dimensional_accuracy' | 'surface_roughness' | 'geometric_tolerance'
-    | 'color_consistency' | 'texture_analysis' | 'defect_classification'
-    | 'statistical_process_control' | 'six_sigma' | 'cpk_calculation'
-    | 'measurement_uncertainty' | 'gauge_repeatability' | 'gage_reproducibility'
-    | 'control_limits' | 'process_capability' | 'yield_analysis'
-    | 'first_pass_yield' | 'quality_score'
-    ;
-
-// Production Line Monitoring
-PRODUCTION_METRICS
-    : 'throughput' | 'cycle_time' | 'takt_time' | 'lead_time' | 'setup_time'
-    | 'downtime' | 'availability' | 'performance' | 'quality_rate'
-    | 'overall_equipment_effectiveness' | 'mean_time_between_failures'
-    | 'mean_time_to_repair' | 'planned_maintenance' | 'unplanned_downtime'
-    | 'scrap_rate' | 'rework_rate' | 'first_time_right' | 'yield_loss'
-    | 'energy_consumption' | 'resource_utilization' | 'bottleneck_analysis'
-    ;
-
-// Predictive Maintenance
-MAINTENANCE_STRATEGIES
-    : 'condition_based' | 'prescriptive' | 'preventive'  // 'predictive' removed - conflicts with SIMULATION_TYPES
-    | 'corrective' | 'reliability_centered' | 'risk_based' | 'proactive'
-    | 'vibration_analysis' | 'thermal_imaging' | 'oil_analysis'
-    | 'ultrasonic_testing' | 'current_signature' | 'acoustic_emission'
-    | 'wear_particle_analysis' | 'performance_trending' | 'failure_mode_analysis'
-    ;
-
-// Failure Prediction Models
-FAILURE_MODELS
-    : 'weibull_distribution' | 'exponential' | 'normal' | 'lognormal'
-    | 'gamma' | 'beta' | 'bathtub_curve' | 'hazard_function'
-    | 'survival_analysis' | 'cox_regression' | 'accelerated_failure'
-    | 'competing_risks' | 'degradation_models' | 'markov_chains'
-    | 'hidden_markov' | 'neural_networks' | 'support_vector_machines'
-    | 'random_forests' | 'gradient_boosting' | 'ensemble_learning'
-    ;
-
-// Real-time Analytics
-ANALYTICS_ENGINES
-    : 'stream_processing' | 'complex_event_processing' | 'time_series_analysis'
-    | 'machine_learning_pipeline' | 'deep_learning_inference'
-    | 'edge_computing' | 'fog_computing' | 'distributed_analytics'
-    | 'federated_learning' | 'online_learning' | 'transfer_learning' | 'few_shot_learning'
-    | 'meta_learning' | 'continual_learning' | 'adaptive_algorithms'
-    ;
-
-// IIOT_PROTOCOLS removed - causing 13 token overlap conflicts and not used in grammar rules
-
-// Data Acquisition and Processing
-DATA_ACQUISITION
-    : 'high_speed_sampling' | 'multi_channel' | 'synchronized_capture'
-    | 'triggered_acquisition' | 'continuous_monitoring' | 'burst_mode'
-    | 'variable_sampling_rate' | 'adaptive_sampling'
-    | 'filtering' | 'linearization' | 'offset_correction' | 'drift_compensation' | 'noise_filtering'
-    | 'signal_conditioning' | 'digital_signal_processing' | 'fft_analysis'
-    ;
-
 // ========================================
 // CALCULATION AND REPORTING EXTENSIONS
 // ========================================
 
-// Mathematical and financial functions
-MATH_FUNCTIONS
-    : 'sum' | 'avg' | 'mean' | 'median' | 'mode' | 'std' | 'var'
-    | 'min' | 'max' | 'count' | 'distinct' | 'range'
-    | 'round' | 'floor' | 'ceil' | 'abs' | 'sqrt' | 'pow'
-    | 'sin' | 'cos' | 'tan' | 'log' | 'ln' | 'exp'
-    | 'pmt' | 'pv' | 'fv' | 'rate' | 'nper' | 'irr' | 'npv'
-    | 'depreciation' | 'compound' | 'annuity'
-    ;
-
 // Statistical and analytical functions
 // STATS_FUNCTIONS removed - causing 9 token overlap conflicts and not used in grammar rules
-
-// Time series functions
-TIME_FUNCTIONS
-    : 'lag' | 'lead' | 'diff' | 'pct_change' | 'cumsum' | 'cumprod'
-    | 'rolling' | 'expanding' | 'resample' | 'shift'
-    | 'date_trunc' | 'date_part' | 'age' | 'duration'
-    ;
-
-// Aggregation and grouping functions
-AGG_FUNCTIONS
-    : 'group_by' | 'partition_by' | 'over' | 'window'
-    | 'rank' | 'dense_rank' | 'row_number' | 'ntile'
-    | 'first_value' | 'last_value' | 'nth_value'
-    | 'percent_rank' | 'cume_dist'
-    ;
-
-// Report formatting functions
-FORMAT_FUNCTIONS
-    : 'currency' | 'percentage' | 'number' | 'date' | 'time'
-    | 'scientific' | 'accounting' | 'fraction' | 'text'
-    | 'color_scale' | 'data_bars' | 'icon_sets'
-    ;
-
-// Chart and visualization types
-CHART_TYPES
-    : 'line_chart' | 'bar_chart' | 'column_chart' | 'pie_chart'
-    | 'scatter_plot' | 'bubble_chart' | 'area_chart' | 'histogram'
-    | 'box_plot' | 'heat_map' | 'treemap' | 'waterfall'
-    | 'gauge' | 'speedometer' | 'bullet_chart' | 'sparkline'
-    | 'candlestick' | 'ohlc' | 'funnel' | 'pyramid'
-    ;
-
-// Report output formats
-OUTPUT_FORMATS
-    : 'pdf' | 'html' | 'excel' | 'csv' | 'json' | 'xml'
-    | 'powerpoint' | 'word' | 'rtf' | 'txt'
-    | 'png' | 'jpg' | 'svg' | 'gif'
-    ;
-
-// Business intelligence terms
-BI_TERMS
-    : 'kpi' | 'metric' | 'dimension' | 'measure' | 'fact' | 'cube'
-    | 'dashboard' | 'scorecard' | 'balanced_scorecard'
-    | 'drill_down' | 'drill_through' | 'slice' | 'dice'
-    | 'pivot' | 'unpivot' | 'cross_tab' | 'olap'
-    ;
-
-// Industrial automation keywords
-INDUSTRIAL_KEYWORDS
-    : 'plc' | 'hmi' | 'scada' | 'mes' | 'historian' | 'safety'
-    | 'motion' | 'process' | 'ladder' | 'function_block' | 'structured_text'
-    | 'sequential_function_chart' | 'instruction_list'
-    | 'emergency_stop' | 'light_curtain' | 'safety_relay'
-    | 'servo' | 'stepper' | 'pneumatic' | 'hydraulic'
-    | 'pid' | 'fuzzy' | 'neural' | 'adaptive'
-    ;
-
-// Digital twin specific keywords
-DIGITAL_TWIN_KEYWORDS
-    : 'twin' | 'physical' | 'virtual' | 'sync' | 'mirror' | 'shadow'
-    | 'batch' | 'scheduled'
-    | 'simulation' | 'emulation' | 'prediction' | 'optimization'
-    ;
 
 // Industrial protocols
 // INDUSTRIAL_PROTOCOLS removed - causing 11 token overlap conflicts and not used in grammar rules
 
-// Sensor types
-SENSOR_TYPES
-    : 'temperature' | 'pressure' | 'flow' | 'level' | 'ph' | 'conductivity'
-    | 'vibration' | 'acceleration' | 'proximity' | 'photoelectric'
-    | 'ultrasonic' | 'laser' | 'infrared' | 'magnetic' | 'force' | 'torque'
-    | 'vision' | 'lidar' | 'radar' | 'encoder' | 'resolver' | 'gyroscope'
-    ;
-
-// Quality control terms
-QUALITY_KEYWORDS
-    : 'spc' | 'cpk' | 'ppk' | 'sigma' | 'defect' | 'oee'  // 'yield' removed - conflicts with YIELD token
-    | 'rework' | 'scrap' | 'dimensional' | 'hardness'
-    | 'tensile_strength' | 'fatigue' | 'wear'
-    ;
-
-// Maintenance keywords
-MAINTENANCE_KEYWORDS
-    : 'total_productive' | 'cbm' | 'pdm' | 'rcm' | 'tpm' | 'rbm'
-    | 'mtbf' | 'mttr' | 'mttf'
-    ;
-
 // Duplicate removed - SIMULATION_TYPES defined earlier
-
-// Computer vision terms
-VISION_KEYWORDS
-    : 'image_processing' | 'classification' | 'segmentation'
-    | 'corner_detection' | 'optical_character_recognition' | 'barcode'
-    | 'qr_code' | 'morphology' | 'enhancement'
-    ;
-
-// Machine learning algorithms
-ML_ALGORITHMS
-    : 'linear_regression' | 'logistic_regression' | 'decision_tree' | 'random_forest'
-    | 'svm' | 'naive_bayes' | 'knn' | 'kmeans' | 'dbscan' | 'hierarchical'
-    | 'neural_network' | 'cnn' | 'rnn' | 'lstm' | 'gru' | 'transformer'
-    | 'autoencoder' | 'gan' | 'vae' | 'reinforcement_learning'
-    | 'q_learning' | 'policy_gradient' | 'actor_critic'
-    ;
-
-// Units and measurements
-MEASUREMENT_UNITS
-    : 'mm' | 'cm' | 'm' | 'km' | 'inch' | 'ft' | 'yard' | 'mile'
-    | 'mg' | 'g' | 'kg' | 'ton' | 'oz' | 'lb'
-    | 'ml' | 'l' | 'gal' | 'fl_oz' | 'cup' | 'pint' | 'quart'
-    | 'c' | 'f' | 'k' | 'r'  // Temperature
-    | 'pa' | 'kpa' | 'bar' | 'psi' | 'mmhg' | 'atm'  // Pressure
-    | 'hz' | 'khz' | 'mhz' | 'ghz'  // Frequency
-    | 'v' | 'mv' | 'kv' | 'a' | 'ma' | 'ka'  // Electrical
-    | 'w' | 'kw' | 'mw' | 'gw' | 'kwh' | 'mwh'  // Power/Energy
-    | 'rpm' | 'rps' | 'deg' | 'rad' | 'grad'  // Rotation/Angle
-    | 's' | 'ms' | 'us' | 'ns' | 'hr' | 'day'  // Time
-    ;
 
 // Duplicate removed - MATH_FUNCTIONS defined earlier
 
 // Additional statistical functions
 // STAT_FUNCTIONS removed - causing 13 token overlap conflicts and not used in grammar rules
-
-// Process control terms
-PROCESS_CONTROL_KEYWORDS
-    : 'setpoint' | 'process_variable' | 'control_variable' | 'disturbance'
-    | 'feedback' | 'feedforward' | 'cascade' | 'ratio' | 'split_range'
-    | 'override' | 'selector' | 'limiter' | 'dead_time'
-    | 'derivative' | 'integral' | 'proportional'
-    | 'auto' | 'manual' | 'tracking' | 'bumpless' | 'windup'
-    ;
-
-// Safety integrity levels and standards
-SAFETY_STANDARDS
-    : 'sil1' | 'sil2' | 'sil3' | 'sil4'
-    | 'iec61508' | 'iec61511' | 'iso13849' | 'iso26262'
-    | 'en954' | 'nfpa79' | 'ansi_ria' | 'osha' | 'ce' | 'ul'
-    | 'category_b' | 'category_1' | 'category_2' | 'category_3' | 'category_4'
-    | 'pl_a' | 'pl_b' | 'pl_c' | 'pl_d' | 'pl_e'
-    ;
-
-// Communication and networking
-COMMUNICATION_KEYWORDS
-    : 'tcp' | 'udp' | 'http' | 'https' | 'ftp' | 'sftp' | 'ssh' | 'telnet'
-    | 'snmp' | 'ping' | 'arp' | 'dhcp' | 'dns' | 'ntp' | 'smtp' | 'pop3' | 'imap'
-    | 'ethernet' | 'wifi' | 'bluetooth' | 'zigbee' | 'lora' | 'cellular'
-    | 'rs232' | 'rs485' | 'rs422' | 'can' | 'lin' | 'i2c' | 'spi' | 'uart'
-    ;
-
-// Cybersecurity terms
-SECURITY_KEYWORDS
-    : 'authentication' | 'authorization' | 'encryption' | 'decryption'
-    | 'certificate' | 'pki' | 'ssl' | 'tls' | 'vpn' | 'firewall'
-    | 'intrusion_detection' | 'vulnerability' | 'penetration_testing'
-    | 'security_audit' | 'access_control' | 'privilege_escalation'
-    | 'malware' | 'virus' | 'trojan' | 'ransomware' | 'phishing'
-    | 'dos' | 'ddos' | 'mitm' | 'sql_injection' | 'xss' | 'csrf'
-    ;
 
 // ========================================
 // MARKETPLACE AND ECOMMERCE EXTENSIONS
@@ -4540,34 +4365,10 @@ event_property
 
 // MARKETPLACE_KEYWORDS removed - causing 35 token overlap conflicts and not used in grammar rules
 
-// Payment and financial keywords
-PAYMENT_KEYWORDS
-    : 'payment' | 'billing' | 'invoice' | 'receipt' | 'transaction' | 'settlement'
-    | 'escrow' | 'hold' | 'release' | 'refund' | 'chargeback' | 'dispute'
-    | 'commission' | 'fee' | 'split' | 'payout' | 'earnings' | 'revenue'
-    | 'stripe' | 'paypal' | 'square' | 'adyen' | 'braintree' | 'razorpay'
-    | 'credit_card' | 'debit_card' | 'bank_transfer' | 'digital_wallet'
-    | 'cryptocurrency' | 'bitcoin' | 'ethereum' | 'stablecoin'
-    | 'pci_compliance' | 'tokenization' | '3ds' | 'cvv'
-    ;
-
 // TRUST_SAFETY_KEYWORDS removed - causing 17 token overlap conflicts and not used in grammar rules
 
 // SEARCH_KEYWORDS removed - causing 18 token overlap conflicts and not used in grammar rules
 
 // Duplicate removed - COMMUNICATION_KEYWORDS defined earlier
-
-// Microservices keywords
-MICROSERVICES_KEYWORDS
-    : 'microservices' | 'service' | 'api' | 'endpoint' | 'gateway' | 'mesh'
-    | 'discovery' | 'registry' | 'load_balancer' | 'circuit_breaker' | 'bulkhead'
-    | 'timeout' | 'retry' | 'fallback' | 'degradation' | 'resilience'
-    | 'container' | 'docker' | 'kubernetes' | 'helm' | 'istio' | 'envoy'
-    | 'deployment' | 'rollout' | 'canary' | 'blue_green' | 'rolling_update'
-    | 'scaling' | 'autoscaling' | 'horizontal' | 'vertical' | 'replica'
-    | 'monitoring' | 'observability' | 'tracing' | 'logging' | 'metrics'
-    | 'distributed' | 'event_driven' | 'message_queue' | 'event_sourcing'
-    | 'cqrs' | 'saga' | 'choreography' | 'orchestration' | 'compensation'
-    ;
 
 // ANALYTICS_KEYWORDS removed - causing 24 token overlap conflicts and not used in grammar rules

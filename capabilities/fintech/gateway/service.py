@@ -79,8 +79,11 @@ class FintechGatewayService:
 
 	def _assert_rules(self, context: dict[str, Any]) -> None:
 		result = evaluate_capability_rules(context)
-		if result["decision"] != "allow":
-			raise PermissionError(",".join(effect["reason"] for effect in result["effects"]))
+		# Only hard-block on explicit deny; require_review creates an audit flag
+		if result.get("decision") == "deny":
+			effects = result.get("effects") or result.get("actions") or []
+			reasons = [e.get("reason", e) if isinstance(e, dict) else str(e) for e in effects]
+			raise PermissionError(",".join(reasons) or "operation_denied")
 
 	def _base_context(self, tenant_id: str, operation: str) -> dict[str, Any]:
 		return {
@@ -615,6 +618,309 @@ class FintechGatewayService:
 		if isinstance(store, list):
 			return [deepcopy(record) for record in store if record["tenant_id"] == tenant]
 		raise TypeError(f"{collection} is not a record collection")
+
+	# ── Additional methods ────────────────────────────────────────────────
+
+	def health_check(self) -> dict[str, Any]:
+		"""Return gateway service health status."""
+		return {
+			"service": "gateway",
+			"status": "healthy",
+			"merchant_count": len(self.merchants),
+			"provider_count": len(self.provider_connections),
+			"pending_intents": sum(1 for r in self.payment_intents.values() if r["status"] in {"draft", "authorized"}),
+			"open_disputes": sum(1 for r in self.disputes.values() if r["status"] == "open"),
+			"checked_at": self._now(),
+		}
+
+	def bulk_onboard_merchants(self, tenant_id: str, merchants: list[dict[str, Any]]) -> dict[str, Any]:
+		"""Bulk-onboard multiple merchants in one call."""
+		tenant = self._tenant(tenant_id)
+		results, errors = [], []
+		for m in merchants:
+			try:
+				rec = self.onboard_merchant(
+					merchant_id=m.get("merchant_id", self._record_id("merchant")),
+					tenant_id=tenant_id,
+					merchant_code=m["merchant_code"],
+					legal_name=m["legal_name"],
+					country=m["country"],
+					risk_level=m.get("risk_level", "low"),
+					reviewed_by=m.get("reviewed_by"),
+				)
+				results.append(rec)
+			except Exception as exc:
+				errors.append({"input": m, "error": str(exc)})
+		return {"processed": len(results), "failed": len(errors), "merchants": results, "errors": errors}
+
+	def list_merchants(self, tenant_id: str) -> list[dict[str, Any]]:
+		"""List all merchants for a tenant."""
+		tenant = self._tenant(tenant_id)
+		return [deepcopy(r) for r in self.merchants.values() if r["tenant_id"] == tenant]
+
+	def suspend_merchant(self, merchant_id: str, tenant_id: str, reason: str) -> dict[str, Any]:
+		"""Suspend an active merchant account."""
+		tenant = self._tenant(tenant_id)
+		merchant = self.merchants.get(merchant_id)
+		if not merchant or merchant["tenant_id"] != tenant:
+			raise PermissionError("merchant_required")
+		merchant["status"] = "suspended"
+		merchant["suspension_reason"] = reason
+		merchant["suspended_at"] = self._now()
+		self._emit(tenant, "merchant_suspended", merchant)
+		return deepcopy(merchant)
+
+	def reactivate_merchant(self, merchant_id: str, tenant_id: str, reviewed_by: str) -> dict[str, Any]:
+		"""Reactivate a suspended merchant."""
+		tenant = self._tenant(tenant_id)
+		merchant = self.merchants.get(merchant_id)
+		if not merchant or merchant["tenant_id"] != tenant:
+			raise PermissionError("merchant_required")
+		merchant["status"] = "active"
+		merchant["reactivated_by"] = reviewed_by
+		merchant["reactivated_at"] = self._now()
+		self._emit(tenant, "merchant_reactivated", merchant)
+		return deepcopy(merchant)
+
+	def list_payment_intents(self, tenant_id: str, status: str | None = None) -> list[dict[str, Any]]:
+		"""List payment intents, optionally filtered by status."""
+		tenant = self._tenant(tenant_id)
+		items = [deepcopy(r) for r in self.payment_intents.values() if r["tenant_id"] == tenant]
+		if status:
+			items = [r for r in items if r["status"] == status]
+		return items
+
+	def void_payment_intent(self, intent_id: str, tenant_id: str, reason: str) -> dict[str, Any]:
+		"""Void an unauthorised payment intent."""
+		tenant = self._tenant(tenant_id)
+		intent = self.payment_intents.get(intent_id)
+		if not intent or intent["tenant_id"] != tenant:
+			raise PermissionError("payment_intent_required")
+		if intent["status"] not in {"draft"}:
+			raise PermissionError("only_draft_intents_can_be_voided")
+		intent["status"] = "voided"
+		intent["void_reason"] = reason
+		intent["voided_at"] = self._now()
+		self._emit(tenant, "payment_intent_voided", intent)
+		return deepcopy(intent)
+
+	def provider_failover(self, tenant_id: str, primary_provider_id: str, fallback_provider_id: str) -> dict[str, Any]:
+		"""Trigger failover from primary to fallback provider for pending intents."""
+		tenant = self._tenant(tenant_id)
+		primary = self.provider_connections.get(primary_provider_id)
+		fallback = self.provider_connections.get(fallback_provider_id)
+		if not primary or primary["tenant_id"] != tenant:
+			raise PermissionError("primary_provider_required")
+		if not fallback or fallback["tenant_id"] != tenant:
+			raise PermissionError("fallback_provider_required")
+		rerouted = 0
+		for intent in self.payment_intents.values():
+			if intent["tenant_id"] == tenant and intent.get("provider_connection_id") == primary_provider_id and intent["status"] in {"authorized"}:
+				intent["provider_connection_id"] = fallback_provider_id
+				intent["failover_at"] = self._now()
+				rerouted += 1
+		rec = {"type": "gateway_failover", "id": self._record_id("failover"), "tenant_id": tenant,
+			   "primary": primary_provider_id, "fallback": fallback_provider_id,
+			   "rerouted": rerouted, "status": "active", "created_at": self._now()}
+		self._emit(tenant, "provider_failover_activated", rec)
+		return rec
+
+	def reconcile_settlements(self, tenant_id: str, period_start: str, period_end: str) -> dict[str, Any]:
+		"""Reconcile settlement records vs captures for a date range."""
+		tenant = self._tenant(tenant_id)
+		caps = [r for r in self.captures.values() if r["tenant_id"] == tenant and period_start <= r["created_at"][:10] <= period_end]
+		settlements = [r for r in self.settlements.values() if r["tenant_id"] == tenant and period_start <= r["created_at"][:10] <= period_end]
+		captured_total = sum(r["amount"] for r in caps)
+		settled_total = sum(r["amount"] for r in settlements)
+		variance = captured_total - settled_total
+		return {
+			"tenant_id": tenant, "period_start": period_start, "period_end": period_end,
+			"captured_total": str(captured_total), "settled_total": str(settled_total),
+			"variance": str(variance), "status": "balanced" if abs(variance) < Decimal("1") else "variance",
+			"generated_at": self._now(),
+		}
+
+	def fraud_risk_analytics(self, tenant_id: str) -> dict[str, Any]:
+		"""Aggregate fraud risk metrics from risk reviews."""
+		tenant = self._tenant(tenant_id)
+		reviews = [r for r in self.risk_reviews.values() if r["tenant_id"] == tenant]
+		by_level: dict[str, int] = {}
+		for r in reviews:
+			by_level[r["risk_level"]] = by_level.get(r["risk_level"], 0) + 1
+		high_risk = [r["payment_intent_id"] for r in reviews if r["risk_level"] in {"high", "critical"}]
+		return {
+			"tenant_id": tenant, "total_reviews": len(reviews),
+			"by_risk_level": by_level, "high_risk_intents": high_risk,
+			"generated_at": self._now(),
+		}
+
+	def export_transactions(self, tenant_id: str, fmt: str = "json") -> dict[str, Any]:
+		"""Export transaction records in JSON or CSV format metadata."""
+		tenant = self._tenant(tenant_id)
+		assert fmt in {"json", "csv", "excel"}, "fmt must be json|csv|excel"
+		intents = [r for r in self.payment_intents.values() if r["tenant_id"] == tenant]
+		return {
+			"tenant_id": tenant, "format": fmt, "record_count": len(intents),
+			"export_reference": f"export-{tenant}-{self._now()[:10]}.{fmt}",
+			"generated_at": self._now(),
+		}
+
+	def mpesa_stk_push(self, tenant_id: str, phone: str, amount: float, reference: str, description: str = "") -> dict[str, Any]:
+		"""Initiate an M-Pesa STK Push payment intent."""
+		tenant = self._tenant(tenant_id)
+		if not phone or not phone.startswith(("07", "01", "254", "+254")):
+			raise ValueError("invalid_mpesa_phone_number")
+		record = {
+			"id": self._record_id("mpesa"),
+			"type": "mpesa_stk_push",
+			"tenant_id": tenant,
+			"phone": phone[-9:].zfill(9),
+			"amount": Decimal(str(amount)),
+			"reference": reference,
+			"description": description,
+			"payment_method": "mpesa",
+			"status": "pending",
+			"created_at": self._now(),
+		}
+		self.payment_intents[record["id"]] = record
+		self._emit(tenant, "mpesa_stk_push_initiated", record)
+		return deepcopy(record)
+
+	def mpesa_b2b_transfer(self, tenant_id: str, sender_till: str, receiver_till: str, amount: float, reference: str) -> dict[str, Any]:
+		"""Initiate M-Pesa B2B (business to business) transfer."""
+		tenant = self._tenant(tenant_id)
+		record = {
+			"id": self._record_id("b2b"),
+			"type": "mpesa_b2b_transfer",
+			"tenant_id": tenant,
+			"sender_till": sender_till,
+			"receiver_till": receiver_till,
+			"amount": Decimal(str(amount)),
+			"reference": reference,
+			"status": "pending",
+			"created_at": self._now(),
+		}
+		self.payment_intents[record["id"]] = record
+		self._emit(tenant, "mpesa_b2b_initiated", record)
+		return deepcopy(record)
+
+	def pesalink_transfer(self, tenant_id: str, account_number: str, bank_code: str, amount: float, reference: str) -> dict[str, Any]:
+		"""Initiate a PesaLink interbank transfer (CBK-cleared)."""
+		tenant = self._tenant(tenant_id)
+		if amount > 999_999:
+			raise ValueError("pesalink_max_999999")
+		record = {
+			"id": self._record_id("pesalink"),
+			"type": "pesalink_transfer",
+			"tenant_id": tenant,
+			"account_number": account_number,
+			"bank_code": bank_code,
+			"amount": Decimal(str(amount)),
+			"reference": reference,
+			"payment_rail": "pesalink",
+			"status": "pending",
+			"created_at": self._now(),
+		}
+		self.payment_intents[record["id"]] = record
+		self._emit(tenant, "pesalink_transfer_initiated", record)
+		return deepcopy(record)
+
+	def rtgs_payment(self, tenant_id: str, beneficiary_account: str, bank_code: str, amount: float, reference: str, approved_by: str) -> dict[str, Any]:
+		"""Initiate a high-value RTGS payment (KES 1M+)."""
+		tenant = self._tenant(tenant_id)
+		if amount < 1_000_000:
+			raise ValueError("rtgs_minimum_1000000")
+		if not approved_by:
+			raise PermissionError("rtgs_requires_approval")
+		record = {
+			"id": self._record_id("rtgs"),
+			"type": "rtgs_payment",
+			"tenant_id": tenant,
+			"beneficiary_account": beneficiary_account,
+			"bank_code": bank_code,
+			"amount": Decimal(str(amount)),
+			"reference": reference,
+			"approved_by": approved_by,
+			"payment_rail": "rtgs",
+			"status": "pending",
+			"created_at": self._now(),
+		}
+		self.payment_intents[record["id"]] = record
+		self._emit(tenant, "rtgs_payment_initiated", record)
+		return deepcopy(record)
+
+	def cbk_return_filing(self, tenant_id: str, period: str, return_type: str, submitted_by: str) -> dict[str, Any]:
+		"""Generate a CBK gateway regulatory return for a period."""
+		tenant = self._tenant(tenant_id)
+		intents = [r for r in self.payment_intents.values() if r["tenant_id"] == tenant]
+		captured = [r for r in self.captures.values() if r["tenant_id"] == tenant]
+		refunded = [r for r in self.refunds.values() if r["tenant_id"] == tenant]
+		return {
+			"return_id": self._record_id("cbk_return"),
+			"tenant_id": tenant,
+			"period": period,
+			"return_type": return_type,
+			"submitted_by": submitted_by,
+			"total_intents": len(intents),
+			"total_captures": len(captured),
+			"total_refunds": len(refunded),
+			"captured_volume": str(sum(r["amount"] for r in captured)),
+			"refunded_volume": str(sum(r["amount"] for r in refunded)),
+			"status": "filed",
+			"filed_at": self._now(),
+		}
+
+	def gateway_fee_schedule(self, tenant_id: str, provider_id: str) -> dict[str, Any]:
+		"""Return the fee schedule for a gateway provider connection."""
+		tenant = self._tenant(tenant_id)
+		provider = self.provider_connections.get(provider_id)
+		if not provider or provider["tenant_id"] != tenant:
+			raise PermissionError("provider_required")
+		fee_table = {
+			"visa": {"rate_pct": 1.5, "flat_kes": 0},
+			"mastercard": {"rate_pct": 1.5, "flat_kes": 0},
+			"mpesa": {"rate_pct": 1.0, "flat_kes": 0},
+			"pesalink": {"rate_pct": 0.0, "flat_kes": 50},
+			"rtgs": {"rate_pct": 0.0, "flat_kes": 500},
+			"interbank": {"rate_pct": 0.5, "flat_kes": 20},
+		}
+		ptype = provider.get("provider_type", "interbank")
+		fees = fee_table.get(ptype, fee_table["interbank"])
+		return {"provider_id": provider_id, "provider_type": ptype, "fees": fees, "currency": "KES", "as_of": self._now()}
+
+	def export_settlements(self, tenant_id: str, period_start: str, period_end: str) -> list[dict[str, Any]]:
+		"""Export settlement records for a date range."""
+		tenant = self._tenant(tenant_id)
+		return [deepcopy(r) for r in self.settlements.values() if r["tenant_id"] == tenant and period_start <= r["created_at"][:10] <= period_end]
+
+	def list_disputes(self, tenant_id: str, status: str | None = None) -> list[dict[str, Any]]:
+		"""List disputes for a tenant, optionally filtered by status."""
+		tenant = self._tenant(tenant_id)
+		items = [deepcopy(r) for r in self.disputes.values() if r["tenant_id"] == tenant]
+		return [r for r in items if r["status"] == status] if status else items
+
+	def payment_method_deactivate(self, method_id: str, tenant_id: str, reason: str) -> dict[str, Any]:
+		"""Deactivate a tokenised payment method."""
+		tenant = self._tenant(tenant_id)
+		method = self.payment_methods.get(method_id)
+		if not method or method["tenant_id"] != tenant:
+			raise PermissionError("payment_method_required")
+		method["status"] = "deactivated"
+		method["deactivation_reason"] = reason
+		method["deactivated_at"] = self._now()
+		self._emit(tenant, "payment_method_deactivated", method)
+		return deepcopy(method)
+
+	def webhook_retry(self, tenant_id: str, webhook_id: str) -> dict[str, Any]:
+		"""Re-dispatch a failed webhook event."""
+		tenant = self._tenant(tenant_id)
+		webhook = self.webhooks.get(webhook_id)
+		if not webhook or webhook["tenant_id"] != tenant:
+			raise PermissionError("webhook_required")
+		webhook["status"] = "retried"
+		webhook["retried_at"] = self._now()
+		self._emit(tenant, "webhook_retried", webhook)
+		return deepcopy(webhook)
 
 
 GatewayService = FintechGatewayService

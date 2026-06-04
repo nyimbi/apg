@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "energy_met",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "energy_met": {
+      "capability": "energy_met"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

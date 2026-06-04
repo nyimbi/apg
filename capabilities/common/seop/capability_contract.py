@@ -204,6 +204,36 @@ RULES: list[dict[str, Any]] = [
 		"condition": {"operation": "agent_response_action", "incident_severity": "critical", "human_approval_recorded": False},
 		"effect": {"decision": "deny", "reason": "human_approval_required", "required_action": "record_human_approval"},
 	},
+	{
+		"name": "tenant_context_required",
+		"description": "All security operations require tenant context.",
+		"condition": {"tenant_context_present": False},
+		"effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"},
+	},
+	{
+		"name": "write_requires_policy",
+		"description": "Security operations write actions require an explicit authorization policy.",
+		"condition": {"operation_type": "write", "write_policy_present": False},
+		"effect": {"decision": "deny", "reason": "seop_write_policy_required", "required_action": "attach_write_policy"},
+	},
+	{
+		"name": "privilege_escalation_denied",
+		"description": "Security operations personnel cannot self-grant elevated permissions.",
+		"condition": {"operation": "assign_seop_permission", "target_tier_exceeds_actor_tier": True},
+		"effect": {"decision": "deny", "reason": "privilege_escalation_prevented", "required_action": "route_to_higher_authority_approver"},
+	},
+	{
+		"name": "cross_tenant_seop_access_denied",
+		"description": "Security operations data may not cross tenant boundaries.",
+		"condition": {"cross_tenant_access": True, "cross_tenant_membership_confirmed": False},
+		"effect": {"decision": "deny", "reason": "cross_tenant_seop_access_denied", "required_action": "use_tenant_scoped_seop_resource"},
+	},
+	{
+		"name": "incident_delete_requires_approval",
+		"description": "Security incident deletion requires explicit approval.",
+		"condition": {"operation": "delete_incident", "delete_approved": False},
+		"effect": {"decision": "deny", "reason": "incident_delete_approval_required", "required_action": "record_incident_delete_approval"},
+	},
 ]
 
 

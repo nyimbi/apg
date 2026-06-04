@@ -79,7 +79,7 @@ def _run(coro: Any) -> Any:
 			import concurrent.futures
 			with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
 				return pool.submit(asyncio.run, coro).result()
-		return loop.run_until_complete(coro)
+		return asyncio.run(coro)
 	except RuntimeError:
 		return asyncio.run(coro)
 

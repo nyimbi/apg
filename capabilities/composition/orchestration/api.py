@@ -2,7 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any
+import base64
+import json
+import logging
+import os
+from typing import Any, Dict, List, Optional
+
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from starlette.requests import Request
 
 try:
 	from .capability_contract import get_capability_contract
@@ -10,6 +18,99 @@ try:
 except ImportError:
 	from capability_contract import get_capability_contract
 	from service import WorkflowOrchestrationService
+
+logger = logging.getLogger(__name__)
+security = HTTPBearer(auto_error=False)
+
+
+def _clean_text(value: Any) -> Optional[str]:
+	"""Return a non-empty stripped string or None."""
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+
+def _decode_jwt_claims(token: str) -> Optional[Dict[str, Any]]:
+	"""Decode JWT payload without signature verification."""
+	import base64 as _base64
+	try:
+		parts = token.split(".")
+		if len(parts) < 2:
+			return None
+		payload = parts[1]
+		padding = "=" * (-len(payload) % 4)
+		data = _base64.urlsafe_b64decode(f"{payload}{padding}".encode("ascii"))
+		return json.loads(data.decode("utf-8"))
+	except Exception:
+		return None
+
+
+async def get_current_user(
+	request: Request,
+	credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> Dict[str, Any]:
+	"""Resolve current user from JWT claims, headers, query params, or environment."""
+	# 1. Try JWT bearer claims
+	if credentials and credentials.credentials:
+		claims = _decode_jwt_claims(credentials.credentials)
+		if claims:
+			user_id = _clean_text(claims.get("sub") or claims.get("user_id"))
+			tenant_id = _clean_text(claims.get("tenant_id") or claims.get("org_id"))
+			roles = claims.get("roles") or []
+			permissions = claims.get("permissions") or []
+			if user_id:
+				return {
+					"user_id": user_id,
+					"tenant_id": tenant_id or os.getenv("APG_DEFAULT_TENANT_ID", "default"),
+					"roles": roles,
+					"permissions": permissions,
+				}
+
+	# 2. Fallback: headers, query params, environment
+	headers = getattr(request, "headers", {})
+	query_params = getattr(request, "query_params", {})
+
+	def _hget(*keys: str) -> Optional[str]:
+		for k in keys:
+			v = _clean_text(headers.get(k))
+			if v:
+				return v
+		return None
+
+	def _qget(*keys: str) -> Optional[str]:
+		for k in keys:
+			v = _clean_text(query_params.get(k))
+			if v:
+				return v
+		return None
+
+	raw_permissions = _hget("X-APG-Permissions", "X-Permissions")
+	permissions_list: List[str] = raw_permissions.split() if raw_permissions else []
+
+	return {
+		"user_id": (
+			_hget("X-APG-User-ID", "X-User-ID")
+			or _qget("user_id", "user")
+			or os.getenv("APG_DEFAULT_USER_ID", os.getenv("APG_USER_ID", "system"))
+		),
+		"tenant_id": (
+			_hget("X-APG-Tenant-ID", "X-Tenant-ID")
+			or _qget("tenant_id", "tenant")
+			or os.getenv("APG_DEFAULT_TENANT_ID", os.getenv("APG_TENANT_ID", "default"))
+		),
+		"roles": [],
+		"permissions": permissions_list,
+	}
+
+
+async def get_tenant_id(
+	request: Request,
+	current_user: Dict[str, Any] = Depends(get_current_user),
+) -> str:
+	"""FastAPI dependency: resolve tenant ID from the current request context."""
+	_ = request
+	return str(current_user.get("tenant_id") or "default")
 
 
 _SERVICE = WorkflowOrchestrationService()

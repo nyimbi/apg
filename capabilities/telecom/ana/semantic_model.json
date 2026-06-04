@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "telecom_ana",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "telecom_ana": {
+      "capability": "telecom_ana"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

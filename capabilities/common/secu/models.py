@@ -23,7 +23,7 @@ try:
 		SecurityAction, DeviceTrustLevel
 	)
 except ImportError:
-	from __init__ import (
+	from capabilities.common.secu import (
 		SecurityLevel, RiskLevel, ThreatType, ComplianceFramework,
 		SecurityAction, DeviceTrustLevel
 	)

@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "education_sch_mgmt",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "education_sch_mgmt": {
+      "capability": "education_sch_mgmt"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

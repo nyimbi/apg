@@ -60,7 +60,23 @@ PROVIDES = [
 	"trading_review_workflow",
 	"trading_agent_workflow",
 ]
-REQUIRES = ["auth", "audl", "ntfy", "nlpc", "keym", "fintech_portfolio", "fintech_wealth", "fintech_robo", "fintech_payments", "fintech_wallets", "fintech_kyc", "fintech_aml", "fintech_fraud", "bia", "fin_rpt"]
+REQUIRES = [
+	"auth",
+	"audl",
+	"ntfy",
+	"nlpc",
+	"keym",
+	"fintech_portfolio",
+	"fintech_wealth",
+	"fintech_robo",
+	"fintech_payments",
+	"fintech_wallets",
+	"fintech_kyc",
+	"fintech_aml",
+	"fintech_fraud",
+	"bia_anl",
+	"fin_rpt",
+]
 
 UI_ROUTES = [
 	{"name": "dashboard", "path": "/fintech-trading/dashboard", "component": "TradingDashboard", "permission": "fintech_trading:view", "nav_group": "Overview"},
@@ -130,7 +146,20 @@ RULES: list[dict[str, Any]] = [
 	{"name": "trading_agent_runtime_supported", "condition": {"operation": "register_trading_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "trading_agent_runtime_not_supported", "required_action": "select_supported_runtime"}},
 	{"name": "trading_agent_role_supported", "condition": {"operation": "register_trading_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "trading_agent_role_not_supported", "required_action": "select_supported_role"}},
 	{"name": "privileged_trading_agent_action_requires_human_approval", "condition": {"operation": "trading_agent_action", "privileged_scope": True, "human_approval_recorded": False}, "effect": {"decision": "deny", "reason": "human_approval_required", "required_action": "record_human_approval"}},
+
+	# Cross-tenant and privilege escalation guards
+	{"name": "cross_tenant_trading_access_denied", "description": "Trading resources cannot be accessed across tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_access_denied", "required_action": "use_tenant_scoped_credentials"}},
+	{"name": "privilege_escalation_denied", "description": "Trading privilege escalation without approval is denied.", "condition": {"privilege_escalation_attempt": True, "approval_recorded": False}, "effect": {"decision": "deny", "reason": "privilege_escalation_denied", "required_action": "obtain_escalation_approval"}},
+
+	# Africa-specific trading rules
+	{"name": "ke_nse_member_broker_required", "description": "NSE trading requires routing through a licensed NSE member broker.", "condition": {"operation": "place_order", "exchange": "NSE", "nse_member_broker_present": False}, "effect": {"decision": "deny", "reason": "ke_nse_member_broker_required", "required_action": "route_through_nse_member_broker"}},
+	{"name": "ke_cma_trading_licence_required", "description": "Kenya CMA stockbroker or dealer licence required for trading operations.", "condition": {"operation": "execute_trade", "country": "KE", "cma_trading_licence_present": False}, "effect": {"decision": "deny", "reason": "ke_cma_trading_licence_required", "required_action": "obtain_cma_trading_licence"}},
+	{"name": "mobile_money_trade_funding_kyc", "description": "Mobile money trade account funding requires investor KYC.", "condition": {"operation": "fund_trading_account", "method": "mobile_money", "investor_kyc_present": False}, "effect": {"decision": "deny", "reason": "mobile_money_trade_funding_kyc_required", "required_action": "complete_investor_kyc"}},
+	{"name": "ng_sec_dealing_licence_required", "description": "Nigeria SEC dealing licence required for securities trading.", "condition": {"operation": "execute_trade", "country": "NG", "ng_sec_dealing_licence_present": False}, "effect": {"decision": "deny", "reason": "ng_sec_dealing_licence_required", "required_action": "obtain_ng_sec_dealing_licence"}},
+	{"name": "ke_nse_settlement_t2_required", "description": "NSE trades must settle on T+2 schedule.", "condition": {"operation": "settle_trade", "exchange": "NSE", "t2_settlement_observed": False}, "effect": {"decision": "deny", "reason": "ke_nse_t2_settlement_required", "required_action": "settle_on_t2_schedule"}},
+	{"name": "trading_aml_screening_required", "description": "Trading clients require AML screening.", "condition": {"operation": "onboard_trading_client", "aml_screened": False}, "effect": {"decision": "deny", "reason": "trading_client_aml_screening_required", "required_action": "screen_trading_client"}},
 ]
+
 
 
 def get_capability_contract(tenant_id: str = "default") -> dict[str, Any]:

@@ -1,11 +1,31 @@
+"""APG Alert Management capability.
+
+Standalone package: ``pip install apg-intel-alerts``
+
+Quick start::
+
+    from apg_intel_alerts import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : intel_alerts
+Provides      : alert_authority_workflow, alert_workspace_workflow, alert_rule_workflow, alert_signal_workflow, alert_record_workflow, alert_escalation_workflow
 """
-alerts Intelligence Capability
+from __future__ import annotations
 
-Placeholder for alerts intelligence gathering, analysis and management capability.
-To be implemented as part of the comprehensive APG Intelligence platform.
-"""
+__version__  = "1.1.0"
+__package_name__ = "apg-intel-alerts"
+__capability_id__ = "intel_alerts"
 
-# Placeholder implementation
-__version__ = "1.0.0"
-__status__ = "Development"
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
+)
 
+__all__ = [
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
+]

@@ -119,7 +119,20 @@ RULES: list[dict[str, Any]] = [
 	{"name": "blockchain_agent_runtime_supported", "condition": {"operation": "register_blockchain_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "blockchain_agent_runtime_not_supported", "required_action": "select_supported_runtime"}},
 	{"name": "blockchain_agent_role_supported", "condition": {"operation": "register_blockchain_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "blockchain_agent_role_not_supported", "required_action": "select_supported_role"}},
 	{"name": "privileged_blockchain_agent_action_requires_human_approval", "condition": {"operation": "blockchain_agent_action", "privileged_scope": True, "human_approval_recorded": False}, "effect": {"decision": "deny", "reason": "human_approval_required", "required_action": "record_human_approval"}},
+
+	# Cross-tenant and privilege escalation guards
+	{"name": "cross_tenant_blockchain_access_denied", "description": "Blockchain resources cannot be accessed across tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_access_denied", "required_action": "use_tenant_scoped_credentials"}},
+	{"name": "privilege_escalation_denied", "description": "Blockchain privilege escalation without approval is denied.", "condition": {"privilege_escalation_attempt": True, "approval_recorded": False}, "effect": {"decision": "deny", "reason": "privilege_escalation_denied", "required_action": "obtain_escalation_approval"}},
+
+	# Africa-specific blockchain rules
+	{"name": "ke_cma_virtual_asset_licence", "description": "Kenya CMA requires virtual asset service provider licence for blockchain token issuance.", "condition": {"operation": "issue_token", "country": "KE", "cma_vasp_licence_present": False}, "effect": {"decision": "deny", "reason": "ke_cma_vasp_licence_required", "required_action": "obtain_cma_vasp_licence"}},
+	{"name": "ke_cbk_digital_currency_approval", "description": "Kenya CBK approval required for digital currency issuance.", "condition": {"operation": "issue_digital_currency", "country": "KE", "cbk_approval_present": False}, "effect": {"decision": "deny", "reason": "ke_cbk_digital_currency_approval_required", "required_action": "obtain_cbk_approval"}},
+	{"name": "ng_sec_blockchain_compliance", "description": "Nigeria SEC digital assets framework compliance required for token offerings.", "condition": {"operation": "issue_token", "country": "NG", "ng_sec_compliant": False}, "effect": {"decision": "deny", "reason": "ng_sec_compliance_required", "required_action": "comply_with_ng_sec_framework"}},
+	{"name": "mobile_money_blockchain_bridge_kyc", "description": "Mobile money to blockchain bridge transactions require KYC verification.", "condition": {"operation": "mobile_money_to_blockchain", "kyc_verified": False}, "effect": {"decision": "deny", "reason": "mobile_money_blockchain_bridge_kyc_required", "required_action": "verify_kyc_before_bridge"}},
+	{"name": "blockchain_aml_screening_required", "description": "Blockchain wallet addresses must be screened against AML watchlists.", "condition": {"operation": "blockchain_transfer", "aml_screened": False}, "effect": {"decision": "deny", "reason": "blockchain_aml_screening_required", "required_action": "screen_blockchain_address"}},
+	{"name": "cbdc_cbk_approval_required", "description": "CBDC (e-Shilling) integrations require CBK pilot programme approval.", "condition": {"operation": "integrate_cbdc", "cbk_cbdc_approval_present": False}, "effect": {"decision": "deny", "reason": "cbk_cbdc_approval_required", "required_action": "obtain_cbk_cbdc_approval"}},
 ]
+
 
 
 def get_capability_contract(tenant_id: str = "default") -> dict[str, Any]:

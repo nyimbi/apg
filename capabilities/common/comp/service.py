@@ -536,6 +536,296 @@ class CompService:
 			events = [event for event in events if event.tenant_id == tenant_id]
 		return [event.to_dict() for event in sorted(events, key=lambda item: item.id)]
 
+	# ── New methods ────────────────────────────────────────────────────────────
+
+	def obligation_register(
+		self,
+		obligation_id: str,
+		tenant_id: str,
+		framework_id: str,
+		title: str,
+		owner: str,
+		regulation: str,
+		due_date: datetime | None = None,
+	) -> dict[str, Any]:
+		"""Register a regulatory obligation against a framework."""
+		self._require_tenant(tenant_id)
+		self._require_framework(framework_id, tenant_id)
+		record: dict[str, Any] = {
+			"id": obligation_id,
+			"tenant_id": tenant_id,
+			"framework_id": framework_id,
+			"title": title,
+			"owner": owner,
+			"regulation": regulation,
+			"due_date": due_date.isoformat() if due_date else None,
+			"status": "open",
+			"created_at": utc_now().isoformat(),
+		}
+		self._frameworks[self._key(tenant_id, framework_id)].obligations.append(obligation_id)
+		self._record_audit(tenant_id, "obligation_registered", obligation_id, owner, record)
+		return record
+
+	def gap_assess(
+		self,
+		tenant_id: str,
+		framework_id: str,
+	) -> dict[str, Any]:
+		"""Return a gap assessment: controls without recent effective assessments."""
+		self._require_tenant(tenant_id)
+		self._require_framework(framework_id, tenant_id)
+		controls = [c for c in self._controls.values() if c.tenant_id == tenant_id and c.framework_id == framework_id]
+		assessed_ids = {a.control_id for a in self._assessments.values() if a.tenant_id == tenant_id and a.result == "effective"}
+		gaps = [c.to_dict() for c in controls if c.id not in assessed_ids]
+		return {
+			"framework_id": framework_id,
+			"tenant_id": tenant_id,
+			"total_controls": len(controls),
+			"assessed_controls": len(controls) - len(gaps),
+			"gap_count": len(gaps),
+			"gaps": gaps,
+		}
+
+	def evidence_upload(
+		self,
+		evidence_id: str,
+		tenant_id: str,
+		control_id: str,
+		source: str,
+		collected_by: str,
+		file_ref: str,
+		encrypted: bool = True,
+	) -> dict[str, Any]:
+		"""Upload evidence file reference for a control."""
+		return self.record_evidence(
+			evidence_id=evidence_id,
+			tenant_id=tenant_id,
+			control_id=control_id,
+			source=source,
+			collected_by=collected_by,
+			encrypted=encrypted,
+			immutable_reference=file_ref,
+		)
+
+	def control_map(self, tenant_id: str, framework_id: str) -> list[dict[str, Any]]:
+		"""Return control-to-assessment mapping for a framework."""
+		self._require_tenant(tenant_id)
+		self._require_framework(framework_id, tenant_id)
+		controls = [c for c in self._controls.values() if c.tenant_id == tenant_id and c.framework_id == framework_id]
+		result: list[dict[str, Any]] = []
+		for ctrl in controls:
+			assessments = [a.to_dict() for a in self._assessments.values() if a.tenant_id == tenant_id and a.control_id == ctrl.id]
+			result.append({"control": ctrl.to_dict(), "assessments": assessments})
+		return result
+
+	def policy_enforce(
+		self,
+		tenant_id: str,
+		policy_id: str,
+		policy_name: str,
+		rules: list[str],
+		enforced_by: str,
+	) -> dict[str, Any]:
+		"""Record a policy enforcement action."""
+		self._require_tenant(tenant_id)
+		record: dict[str, Any] = {
+			"id": policy_id,
+			"tenant_id": tenant_id,
+			"policy_name": policy_name,
+			"rules": rules,
+			"enforced_by": enforced_by,
+			"enforced_at": utc_now().isoformat(),
+			"status": "enforced",
+		}
+		self._record_audit(tenant_id, "policy_enforced", policy_id, enforced_by, record)
+		return record
+
+	def training_assign(
+		self,
+		assignment_id: str,
+		tenant_id: str,
+		control_id: str,
+		assignee: str,
+		training_ref: str,
+		due_days: int = 30,
+	) -> dict[str, Any]:
+		"""Assign compliance training to a user for a control."""
+		self._require_tenant(tenant_id)
+		self._require_control(control_id, tenant_id)
+		due_at = utc_now() + timedelta(days=due_days)
+		record: dict[str, Any] = {
+			"id": assignment_id,
+			"tenant_id": tenant_id,
+			"control_id": control_id,
+			"assignee": assignee,
+			"training_ref": training_ref,
+			"due_at": due_at.isoformat(),
+			"status": "assigned",
+			"assigned_at": utc_now().isoformat(),
+		}
+		self._record_audit(tenant_id, "training_assigned", assignment_id, assignee, record)
+		return record
+
+	def audit_schedule(
+		self,
+		schedule_id: str,
+		tenant_id: str,
+		framework_id: str,
+		audit_date: datetime,
+		auditor: str,
+		scope: str,
+	) -> dict[str, Any]:
+		"""Schedule an internal or external audit for a framework."""
+		self._require_tenant(tenant_id)
+		self._require_framework(framework_id, tenant_id)
+		record: dict[str, Any] = {
+			"id": schedule_id,
+			"tenant_id": tenant_id,
+			"framework_id": framework_id,
+			"audit_date": audit_date.isoformat(),
+			"auditor": auditor,
+			"scope": scope,
+			"status": "scheduled",
+			"created_at": utc_now().isoformat(),
+		}
+		self._record_audit(tenant_id, "audit_scheduled", schedule_id, auditor, record)
+		return record
+
+	def finding_create(
+		self,
+		finding_id: str,
+		tenant_id: str,
+		control_id: str,
+		severity: str,
+		description: str,
+		owner: str,
+		remediation_plan: str = "",
+	) -> dict[str, Any]:
+		"""Alias for open_finding with explicit naming."""
+		return self.open_finding(
+			finding_id=finding_id,
+			tenant_id=tenant_id,
+			control_id=control_id,
+			severity=severity,
+			description=description,
+			owner=owner,
+			remediation_plan=remediation_plan,
+		)
+
+	def remediation_track(self, tenant_id: str, finding_id: str, progress_note: str, updated_by: str) -> dict[str, Any]:
+		"""Add a progress note to an open finding's remediation."""
+		self._require_tenant(tenant_id)
+		finding = self._require_finding(finding_id, tenant_id)
+		finding.remediation_plan = f"{finding.remediation_plan}\n[{utc_now().isoformat()}] {progress_note}".strip()
+		self._record_audit(tenant_id, "remediation_tracked", finding_id, updated_by, {"note": progress_note})
+		return finding.to_dict()
+
+	def regulatory_alert(
+		self,
+		alert_id: str,
+		tenant_id: str,
+		regulation: str,
+		summary: str,
+		severity: str,
+		effective_date: datetime | None = None,
+	) -> dict[str, Any]:
+		"""Record an incoming regulatory change alert."""
+		self._require_tenant(tenant_id)
+		record: dict[str, Any] = {
+			"id": alert_id,
+			"tenant_id": tenant_id,
+			"regulation": regulation,
+			"summary": summary,
+			"severity": severity,
+			"effective_date": effective_date.isoformat() if effective_date else None,
+			"status": "new",
+			"created_at": utc_now().isoformat(),
+		}
+		self._record_audit(tenant_id, "regulatory_alert_created", alert_id, "system", record)
+		return record
+
+	def iso27001_checklist(self, tenant_id: str) -> dict[str, Any]:
+		"""Return ISO 27001 control coverage status for the tenant."""
+		self._require_tenant(tenant_id)
+		iso_frameworks = [f for f in self._frameworks.values() if f.tenant_id == tenant_id and "27001" in f.name]
+		controls = [c for c in self._controls.values() if c.tenant_id == tenant_id]
+		assessed = [a for a in self._assessments.values() if a.tenant_id == tenant_id and a.result == "effective"]
+		return {
+			"tenant_id": tenant_id,
+			"iso27001_frameworks": [f.to_dict() for f in iso_frameworks],
+			"total_controls": len(controls),
+			"effective_controls": len(assessed),
+			"coverage_pct": round(len(assessed) / max(len(controls), 1) * 100, 1),
+		}
+
+	def gdpr_dpia(
+		self,
+		dpia_id: str,
+		tenant_id: str,
+		processing_activity: str,
+		data_types: list[str],
+		risk_level: str,
+		owner: str,
+	) -> dict[str, Any]:
+		"""Record a GDPR Data Protection Impact Assessment."""
+		self._require_tenant(tenant_id)
+		record: dict[str, Any] = {
+			"id": dpia_id,
+			"tenant_id": tenant_id,
+			"processing_activity": processing_activity,
+			"data_types": data_types,
+			"risk_level": risk_level,
+			"owner": owner,
+			"status": "draft",
+			"created_at": utc_now().isoformat(),
+		}
+		self._record_audit(tenant_id, "gdpr_dpia_created", dpia_id, owner, record)
+		return record
+
+	def soc2_evidence(self, tenant_id: str) -> dict[str, Any]:
+		"""Aggregate SOC 2 evidence items for the tenant."""
+		self._require_tenant(tenant_id)
+		evidence_items = [e.to_dict() for e in self._evidence.values() if e.tenant_id == tenant_id and e.encrypted]
+		attestations = [a.to_dict() for a in self._attestations.values() if a.tenant_id == tenant_id]
+		return {
+			"tenant_id": tenant_id,
+			"encrypted_evidence_count": len(evidence_items),
+			"attestation_count": len(attestations),
+			"evidence": evidence_items,
+			"attestations": attestations,
+		}
+
+	def compliance_dashboard(self, tenant_id: str) -> dict[str, Any]:
+		"""Alias for dashboard_summary with extended breakdown."""
+		summary = self.dashboard_summary(tenant_id)
+		summary["gap_assessment"] = self.gap_assess(tenant_id, next(
+			(f.id for f in self._frameworks.values() if f.tenant_id == tenant_id),
+			"__none__",
+		)) if any(f.tenant_id == tenant_id for f in self._frameworks.values()) else {}
+		return summary
+
+	def risk_integrate(
+		self,
+		tenant_id: str,
+		risk_id: str,
+		control_id: str,
+		risk_score: float,
+		risk_owner: str,
+	) -> dict[str, Any]:
+		"""Link an external risk item to a compliance control."""
+		self._require_tenant(tenant_id)
+		self._require_control(control_id, tenant_id)
+		record: dict[str, Any] = {
+			"id": risk_id,
+			"tenant_id": tenant_id,
+			"control_id": control_id,
+			"risk_score": max(0.0, min(1.0, risk_score)),
+			"risk_owner": risk_owner,
+			"integrated_at": utc_now().isoformat(),
+		}
+		self._record_audit(tenant_id, "risk_integrated", risk_id, risk_owner, record)
+		return record
+
 	def _record_audit(self, tenant_id: str, event_type: str, subject_id: str, actor: str, payload: dict[str, Any]) -> None:
 		event = ComplianceAuditEvent(
 			id=f"audit-{len(self._audit_events) + 1:06d}",

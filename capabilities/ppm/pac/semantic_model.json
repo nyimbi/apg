@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "ppm_pac",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "ppm_pac": {
+      "capability": "ppm_pac"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

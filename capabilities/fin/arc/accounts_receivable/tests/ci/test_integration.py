@@ -16,11 +16,11 @@ import json
 
 from uuid_extensions import uuid7str
 
-from ..models import (
+from ...models import (
 	ARCustomer, ARInvoice, ARPayment, ARCollectionActivity, ARCreditAssessment,
 	ARCustomerType, ARCustomerStatus, ARInvoiceStatus, ARPaymentStatus, ARCollectionPriority
 )
-from ..service import (
+from ...service import (
 	ARCustomerService, ARInvoiceService, ARCollectionsService,
 	ARCashApplicationService, ARAnalyticsService
 )

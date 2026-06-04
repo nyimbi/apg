@@ -373,6 +373,32 @@ def streaming_manifest() -> dict[str, Any]:
 	}
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.apig.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"upstream_registered",
+		"upstream_updated",
+		"upstream_retired",
+		"consumer_registered",
+		"consumer_updated",
+		"route_created",
+		"route_updated",
+		"route_retired",
+		"traffic_shifted",
+		"policy_changed",
+		"canary_released",
+		"gateway_deployed",
+		"agent_registered",
+	],
+	"guardrails": [
+		"apig_batch_requires_bytewax",
+		"apig_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	config = CapabilityConfiguration()
 	theme = CapabilityTheme()
@@ -387,7 +413,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		"ui": ui_manifest(),
 		"theme": {"name": theme.name, "tokens": theme.tokens, "components": theme.components},
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": STREAMING,
 		"review_evidence": {
 			"durable_statuses": [
 				"pending",

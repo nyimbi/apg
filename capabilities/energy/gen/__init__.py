@@ -1,0 +1,31 @@
+"""APG Generation Management capability.
+
+Standalone package: ``pip install apg-energy-gen``
+
+Quick start::
+
+    from apg_energy_gen import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : energy_gen
+Provides      : plant_registry, dispatch_scheduling, outage_management, capacity_planning, generation_kpis, fuel_management
+"""
+from __future__ import annotations
+
+__version__  = "1.0.0"
+__package_name__ = "apg-energy-gen"
+__capability_id__ = "energy_gen"
+
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
+)
+
+__all__ = [
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
+]

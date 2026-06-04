@@ -1,143 +1,134 @@
-# APG Fintech Gateway Capability
+# Fintech Gateway
 
-`fintech_gateway` is the APG payment orchestration capability for merchant onboarding, provider connections, payment method tokenization, payment intents, routing, fraud-risk review, authorization, capture, refunds, webhooks, settlements, disputes, and gateway-focused AI agent review.
+## Overview
+Fintech Gateway is the payment orchestration capability responsible for merchant onboarding, payment provider connections, payment method tokenization, payment intent lifecycle, routing decisions, fraud risk review, authorization and capture, refunds, webhook ingestion, settlement reconciliation, and dispute management. It is the operational hub that connects the APG payment layer to external payment processors (Stripe, Adyen, MPESA, Flutterwave, Pesapal, DPO, PayPal, and others) while enforcing routing, risk, and governance rules on every payment.
 
-The package keeps live provider integrations behind adapter boundaries. Importing `capabilities.fintech.gateway` does not require Flask, databases, payment SDKs, provider credentials, or external services.
+Blocked risk levels produce hard denies on authorization. Overcapture and overrefund are blocked by the rule engine. Settlement variance requires review. Webhook ingestion requires idempotency keys and signature verification. All gateway events stream to `apg.fintech.gateway.lifecycle` via Bytewax.
 
 ## Capability ID
+`fintech_gateway`  Version: 2.1.0
 
-- ID: `fintech_gateway`
-- Display name: `Fintech Gateway`
-- Version: `2.1.0`
-- Event stream: `apg.fintech.gateway.lifecycle`
-- Stream processor: `bytewax`
-- Primary package files: `capability_contract.py`, `service.py`, `api.py`, `views.py`, `app.py`
+## Provides
+| Service | Description |
+|---------|-------------|
+| merchant_onboarding_lifecycle | Onboard merchants with code, legal name, country, KYC, and high-risk review gates |
+| provider_connection_lifecycle | Connect payment providers with type, credential reference, and supported methods |
+| payment_method_tokenization_workflow | Tokenize payment methods for card, bank, mobile money, wallet, and cash voucher |
+| payment_intent_lifecycle | Create and track payment intents with merchant, amount, currency, and method |
+| payment_routing_workflow | Route payment intents to providers based on risk and routing decisions |
+| fraud_risk_review_workflow | Score and review payment risk; blocked risk denies authorization |
+| authorization_capture_workflow | Authorize and capture payments with overcapture protection |
+| refund_lifecycle | Process refunds with overrefund protection and large-refund review |
+| webhook_ingestion_workflow | Ingest signed provider webhooks with idempotency key enforcement |
+| settlement_reconciliation_workflow | Record settlements with variance review |
+| payment_dispute_workflow | Open and resolve payment disputes with owner assignment and resolution review |
+| gateway_agents | Register AI agents for merchant underwriting, routing, fraud, and settlement review |
 
-## What It Provides
+## Requires
+| Capability | Purpose |
+|------------|---------|
+| auth | Authentication |
+| audl | Audit trail |
+| ntfy | Merchant and operations notifications |
+| composition_events | Composition event bus |
+| composition_config | Configuration management |
+| keym | Key management |
+| encr | Encryption for payment credentials |
+| cash_management | Cash management integration |
+| accounts_receivable | Accounts receivable integration |
+| customer_relationship_management | CRM integration |
+| business_intelligence | Analytics |
 
-- Merchant onboarding lifecycle.
-- Provider connection lifecycle for card, bank, mobile money, wallet, settlement, and fraud providers.
-- Payment method tokenization workflow.
-- Payment intent lifecycle.
-- Payment routing workflow.
-- Fraud-risk review workflow.
-- Authorization and capture workflow.
-- Refund lifecycle.
-- Webhook ingestion workflow with idempotency.
-- Settlement reconciliation workflow.
-- Payment dispute workflow.
-- Gateway agent registration and privileged-action approval rules.
-- UI routes, theme metadata, semantic app metadata, and APG publish evidence.
+## Configuration Reference
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| merchants.supported_providers | list | stripe, adyen, mpesa, dpo, flutterwave, pesapal, paypal, manual | Supported payment providers |
+| merchants.supported_provider_types | list | card, bank, mobile_money, wallet, settlement, fraud | Provider categories |
+| payment_intents.supported_currencies | list | USD, EUR, GBP, KES, ZAR, NGN, GHS, UGX, TZS | Supported currencies |
+| disputes.supported_reasons | list | fraud, duplicate, product_not_received, service_not_provided, authorization, processing_error, other | Dispute reason codes |
 
-## Required Capabilities
+## API Routes
+| Name | Path | Method | Permission | Group |
+|------|------|--------|------------|-------|
+| dashboard | /fintech-gateway/dashboard | GET | fintech_gateway:view | Overview |
+| merchants | /fintech-gateway/merchants | GET/POST | fintech_gateway:manage_merchants | Merchants |
+| providers | /fintech-gateway/providers | GET/POST | fintech_gateway:manage_providers | Providers |
+| payment_methods | /fintech-gateway/payment-methods | GET/POST | fintech_gateway:manage_payment_methods | Payments |
+| payments | /fintech-gateway/payments | GET/POST | fintech_gateway:process | Payments |
+| routing | /fintech-gateway/routing | GET/POST | fintech_gateway:route | Operations |
+| risk | /fintech-gateway/risk | GET/POST | fintech_gateway:risk | Risk |
+| webhooks | /fintech-gateway/webhooks | GET/POST | fintech_gateway:webhooks | Operations |
+| settlements | /fintech-gateway/settlements | GET/POST | fintech_gateway:settle | Finance |
+| disputes | /fintech-gateway/disputes | GET/POST | fintech_gateway:disputes | Risk |
+| agents | /fintech-gateway/agents | GET/POST | fintech_gateway:admin | Automation |
+| settings | /fintech-gateway/settings | GET/POST | fintech_gateway:admin | Administration |
 
-The contract declares composition dependencies on:
+## Business Rules
+| Rule | Condition | Effect |
+|------|-----------|--------|
+| high_risk_merchant_requires_review | Merchant with `risk_level: high` without review | require_review |
+| provider_requires_credentials | Provider connection without credential reference | deny |
+| payment_intent_amount_positive | Payment intent amount <= 0 | deny |
+| high_risk_payment_requires_review | Payment risk `high` without review | require_review |
+| blocked_risk_denies_authorization | Payment risk `blocked` | deny |
+| high_value_authorization_requires_approval | High-value authorization without approval | require_review |
+| capture_blocks_overcapture | Capture amount exceeds authorized amount | deny |
+| refund_blocks_overrefund | Refund amount exceeds captured balance | deny |
+| large_refund_requires_review | Large refund without review | require_review |
+| webhook_requires_signature | Webhook without signature | deny |
+| webhook_requires_idempotency | Webhook without idempotency key | deny |
+| settlement_variance_requires_review | Settlement variance without review | require_review |
+| dispute_resolution_requires_review | Dispute resolution without review | deny |
+| gateway_batch_requires_bytewax | Batch without Bytewax | deny |
+| gateway_event_requires_bytewax | Event without Bytewax | deny |
 
-- `auth`
-- `audl`
-- `ntfy`
-- `composition_events`
-- `composition_config`
-- `keym`
-- `encr`
-- `cash_management`
-- `accounts_receivable`
-- `customer_relationship_management`
-- `business_intelligence`
+## Data Models
+| Model | Key Fields |
+|-------|-----------|
+| Merchant | id, merchant_code, legal_name, country, kyc_reference, risk_level, status |
+| ProviderConnection | id, provider, provider_type, credential_reference, status |
+| PaymentMethod | id, merchant_id, customer_reference, method_type, token_reference, status |
+| PaymentIntent | id, merchant_id, payment_method_id, amount, currency, risk_level, status |
+| Authorization | id, payment_intent_id, provider_id, authorized_amount, status |
+| Capture | id, authorization_id, capture_amount, status |
+| Refund | id, capture_id, refund_amount, status |
+| WebhookEvent | id, provider_id, event_id, signature, idempotency_key, payload |
+| Settlement | id, provider_id, settlement_reference, amount, variance, status |
+| PaymentDispute | id, payment_id, reason, owner_id, resolution_review_reference, status |
 
-The current runtime exposes adapter boundaries for these dependencies and does not require live providers during focused package checks.
+## Streaming Events
+Events emitted to the fintech event stream via Bytewax.
+| Event | Trigger |
+|-------|---------|
+| merchant_onboarded | Merchant passes onboarding |
+| provider_connected | Provider connection established |
+| payment_method_tokenized | Payment method tokenized |
+| payment_intent_created | Payment intent created |
+| payment_risk_assessed | Risk assessment recorded |
+| payment_authorized | Authorization approved |
+| payment_captured | Payment captured |
+| payment_refunded | Refund processed |
+| webhook_ingested | Provider webhook ingested |
+| settlement_recorded | Settlement reconciled |
+| payment_dispute_opened | Dispute opened |
+| payment_dispute_resolved | Dispute resolved |
+| gateway_agent_registered | AI agent registered |
 
-## Quick Use
+## Edge Cases Handled
+- `blocked` risk level produces a hard deny on authorization regardless of all other factors — no override path exists for blocked risk
+- Capture amount is validated against the authorized amount; partial captures are allowed but over-captures are blocked; the `overcapture: True` flag in context triggers the deny
+- Refund amount is validated against the remaining captured balance; partial refunds are allowed; over-refunds are blocked at the rule engine level
+- Webhook idempotency keys prevent duplicate event processing; a webhook without an idempotency key is rejected even if the signature is valid
+- Dispute resolution requires a recorded review — disputes cannot be auto-resolved; every resolution must have a review reference
+- Settlement amounts use the `_lt` condition suffix (amount < 0) rather than `_lte`; zero-amount settlements are valid reconciliation entries
 
-```python
-from capabilities.fintech.gateway import FintechGatewayService
+## Composability
+- **Upstream**: `fintech_payments` routes payment orders to the gateway; `fintech_wallets` provides wallet-based payment methods; `fintech_kyc` provides merchant KYC evidence
+- **Downstream**: `cash_management` and `accounts_receivable` receive settlement and reconciliation data; `business_intelligence` consumes gateway event data
+- **Peer**: Deployed alongside `fintech_payments` (application-facing payment layer) and `fintech_fraud` (risk scoring before authorization)
 
-svc = FintechGatewayService()
-merchant = svc.onboard_merchant("merchant-1", "tenant-1", "MERCH-001", "Merchant One", "KE")
-provider = svc.connect_provider("provider-1", "tenant-1", "mpesa", "mobile_money", "vault://mpesa")
-method = svc.tokenize_payment_method("method-1", "tenant-1", merchant["id"], "customer-1", "mobile_money", "tok-1")
-intent = svc.create_payment_intent("intent-1", "tenant-1", merchant["id"], method["id"], 1000, "KES")
-svc.assess_payment_risk("risk-1", "tenant-1", intent["id"], "medium", 0.35)
-authorization = svc.authorize_payment("auth-1", "tenant-1", intent["id"], provider["id"])
-svc.capture_payment("capture-1", "tenant-1", authorization["id"], 1000)
-print(svc.dashboard_summary("tenant-1"))
-```
-
-## Rule And Guardrail Coverage
-
-The deterministic rule engine enforces:
-
-- tenant context for operations;
-- policy attachment for writes;
-- required merchant code, legal name, country, and review for high-risk merchants;
-- supported provider names, provider types, and credential references;
-- merchant, customer reference, supported method type, and token reference for payment methods;
-- merchant, positive amount, supported currency, and payment method for payment intents;
-- payment risk parent intent, high-risk payment review, and blocked-risk denial;
-- payment intent, provider, and approval gates for authorization;
-- authorized payment, positive amount, and overcapture blocking for capture;
-- captured payment, positive amount, overrefund blocking, and large-refund review;
-- provider, event ID, signature, and idempotency key for webhooks;
-- provider, settlement reference, nonnegative amount, and variance review for settlements;
-- payment, supported reason, owner, and reviewed resolution for disputes;
-- Bytewax routing for gateway batches and events;
-- gateway agent runtime, role, and privileged-action approval controls.
-
-## UI Surface
-
-The contract and `views.py` expose these screens:
-
-- Dashboard
-- Merchants
-- Providers
-- Payment Methods
-- Payments
-- Routing
-- Risk
-- Webhooks
-- Settlements
-- Disputes
-- Agents
-- Settings
-
-The theme is `fintech_gateway_control` and uses compact operational layouts for provider status, routing decisions, risk queues, event inboxes, settlement variance, dispute cases, and agent review lanes.
-
-## AI Agent Composition
-
-Gateway agents are first-class records. Supported runtimes are:
-
-- `codex`
-- `claude_code`
-- `opencode`
-- `pi`
-
-Supported roles are:
-
-- `merchant_underwriter`
-- `routing_reviewer`
-- `fraud_reviewer`
-- `settlement_reviewer`
-- `dispute_reviewer`
-- `provider_operations_reviewer`
-
-Agents may prepare and review gateway operations. Privileged actions require recorded human approval.
-
-## Focused Proof Commands
-
-```bash
-./.venv/bin/python -m py_compile capabilities/fintech/gateway/__init__.py capabilities/fintech/gateway/capability_contract.py capabilities/fintech/gateway/service.py capabilities/fintech/gateway/api.py capabilities/fintech/gateway/views.py capabilities/fintech/gateway/app.py capabilities/fintech/gateway/tests/test_package_contract.py
-./.venv/bin/pytest -q capabilities/fintech/gateway/tests/test_package_contract.py
-./.venv/bin/python capabilities/fintech/gateway/app.py
-./.venv/bin/apg capabilities inspect fintech_gateway --json
-./.venv/bin/apg capabilities publish-plan capabilities/fintech/gateway --json
-./.venv/bin/apg capabilities implementation-audit --root capabilities/fintech/gateway --json
-git diff --check -- capabilities/fintech/gateway
-```
-
-## Next Extensions
-
-- Wire durable payment, provider, webhook, settlement, and dispute stores.
-- Connect live provider adapters for Stripe, Adyen, MPESA, DPO, Flutterwave, Pesapal, PayPal, and regional networks.
-- Add durable Bytewax topology deployment and replay checks.
-- Add rendered UI validation for the APG shell.
-- Add provider failover and settlement reconciliation tests against provider sandboxes.
+## Development Notes
+- Version is 2.1.0 (higher than other capabilities at 1.1.0) — this reflects the gateway being a more mature capability with additional provider types and routing features
+- `composition_events` and `composition_config` are declared as required dependencies (unlike the pattern in other capabilities which use `auth`, `audl`, etc.); these are platform-level event bus and config dependencies
+- The `_lte` and `_lt` condition key suffixes enable numeric comparisons: `amount_lte: 0` fires when amount <= 0, `settlement_amount_lt: 0` fires when amount < 0
+- `max_autonomous_scope` for gateway agents is set to `recommend_validate_and_prepare` — agents cannot execute payments autonomously; they can only prepare and validate

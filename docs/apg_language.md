@@ -87,7 +87,7 @@ APG accepts these comment forms:
 
 Identifiers start with a letter or underscore and then use letters, digits, or
 underscores. Strings may be single quoted, double quoted, or triple quoted.
-Booleans accept `true`, `false`, `yes`, `no`, `on`, and `off`.
+Booleans accept `true`, `false`, `True`, and `False`. (`yes`, `no`, `on`, `off` were removed as reserved boolean keywords — see Language Design Notes.)
 
 Semicolons are required for field declarations and most configuration items.
 Inside contract objects, APG accepts either semicolons or commas as separators:
@@ -472,3 +472,128 @@ The compiler target is `python`. Avoid older framework target names such as
 - Put external systems behind capabilities and adapters, not inline prose.
 - Run `apg compile --verify` and the generated `smoke_test.py` before claiming a
   source file is executable.
+
+## Language Design Notes
+
+### `??` Null-Coalescing / Fallback Operator
+
+`??` is the preferred fallback cascade operator for model and service chains:
+
+```apg
+settings: {
+    model: gpt4 ?? claude3 ?? llama,
+    endpoint: env("API_URL") ?? "https://api.example.com"
+};
+```
+
+`??` evaluates left to right and returns the first non-null value. Use `->` only
+for directed flow (handoffs, state transitions, model chains where ordering
+matters beyond fallback semantics).
+
+### `|>` Pipeline Operator
+
+`|>` threads a value through a chain of transformations in expression contexts:
+
+```apg
+result: raw_data |> normalize |> validate |> enrich;
+```
+
+This maps to `enrich(validate(normalize(raw_data)))` in generated Python.
+
+### Physical Unit Literals
+
+Physical measurement literals combine a number with a SI or imperial unit suffix:
+
+```apg
+sensor ThermalProbe {
+    max_temp: 80°C;
+    operating_pressure: 150psi;
+    sample_rate: 500Hz;
+    tolerance: 0.5mm;
+}
+```
+
+Supported unit suffixes: `°C`, `°F`, `°K`, `°R`, `μm`, `nm`, `kPa`, `MPa`,
+`GPa`, `kHz`, `MHz`, `GHz`, `mV`, `kV`, `MV`, `mA`, `kA`, `kW`, `MW`, `GW`,
+`rpm`, `rps`, `ms`, `us`, `ns`, `ps`, `psi`, `bar`, `atm`, `Hz`, `Pa`,
+`km`, `cm`, `mm`, `kg`, `mg`.
+
+### `enum` Entity Type
+
+Use `enum` to declare named value sets:
+
+```apg
+enum InvoiceStatus {
+    draft;
+    pending [label: "Awaiting Approval"];
+    approved = 2 [label: "Approved", description: "Ready to dispatch"];
+    rejected;
+    paid;
+}
+```
+
+Variant syntax: `NAME ('=' (NUMBER | STRING))? ('[' 'label' ':' STRING ... ']')?`
+
+### `statemachine` Entity Type
+
+Use `statemachine`, `state_machine`, or `fsm` to declare state machines. Transitions
+use `->` with optional property brackets:
+
+```apg
+statemachine OrderLifecycle {
+    initial: draft;
+    states: [draft, pending, approved, dispatched, delivered, cancelled];
+
+    draft -> pending [on: submit, guard: "amount > 0"];
+    pending -> approved [on: approve, action: notify_customer];
+    pending -> rejected [on: reject];
+    approved -> dispatched [on: dispatch, timeout: 48h];
+    dispatched -> delivered [on: delivery_confirmed];
+    pending -> cancelled [on: cancel, priority: 10];
+}
+```
+
+Transition props: `on`, `guard`, `action`, `priority`, `timeout`, plus any
+`IDENTIFIER: value` extension.
+
+`initial:` and `states:` are `config_item` key-value pairs — no special
+grammar needed.
+
+### Removed Boolean Keywords: `yes`, `no`, `on`, `off`
+
+`yes`, `no`, `on`, and `off` are no longer reserved as BOOLEAN tokens. They
+were extremely common as config values, field names, and enum variants, and
+their reservation as booleans caused persistent identifier conflicts. Use
+`true`/`false` (or `True`/`False`) for all boolean values.
+
+Before:
+```apg
+notifications: on;
+two_factor: yes;
+```
+
+After:
+```apg
+notifications: true;
+two_factor: true;
+```
+
+### `@annotation: name { ... }` Named-Block Form
+
+Annotation bodies now accept a named-block form for domain annotations that
+carry a named configuration sub-object:
+
+```apg
+@physics: finite_element {
+    mesh: 0.1mm;
+    solver: iterative;
+}
+
+@compliance: gdpr {
+    retention: 90d;
+    lawful_basis: legitimate_interest;
+}
+```
+
+This is equivalent to `@annotation: { ... }` but makes the annotation subtype
+explicit in the source, which is useful for tooling and documentation generators.

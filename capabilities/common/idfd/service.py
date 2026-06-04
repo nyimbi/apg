@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from itertools import count
 from typing import Any
 
@@ -44,6 +45,19 @@ class IdfdService:
 		self._health_reports: dict[StoreKey, FederationHealthReport] = {}
 		self._federation_agents: dict[StoreKey, FederationAgentRecord] = {}
 		self._lifecycle_batches: dict[StoreKey, IdfdLifecycleBatchRecord] = {}
+		# Additional in-memory stores for new methods
+		self._idp_test_results: dict[StoreKey, dict[str, Any]] = {}
+		self._saml_sp_metadata: dict[StoreKey, dict[str, Any]] = {}
+		self._oidc_clients: dict[StoreKey, dict[str, Any]] = {}
+		self._token_exchanges: dict[StoreKey, dict[str, Any]] = {}
+		self._group_sync_records: dict[StoreKey, dict[str, Any]] = {}
+		self._provisioning_records: dict[StoreKey, dict[str, Any]] = {}
+		self._deprovisioning_records: dict[StoreKey, dict[str, Any]] = {}
+		self._cross_domain_sso: dict[StoreKey, dict[str, Any]] = {}
+		self._attribute_releases: dict[StoreKey, dict[str, Any]] = {}
+		self._trust_revocations: dict[StoreKey, dict[str, Any]] = {}
+		self._federation_audit_reports: dict[StoreKey, dict[str, Any]] = {}
+		self._federation_analytics_cache: dict[StoreKey, dict[str, Any]] = {}
 		self._counter = count(1)
 		self._metadata = MetadataFreshnessInspector()
 		self._session_issuer = FederationSessionIssuer()
@@ -53,6 +67,10 @@ class IdfdService:
 		self._agent_roles = set(contract["agents"]["supported_roles"])
 		self._privileged_agent_roles = set(contract["agents"]["privileged_roles"])
 		self._lifecycle_operations = set(contract["streaming"]["required_operations"])
+
+	# ------------------------------------------------------------------ #
+	# Original 23 methods                                                  #
+	# ------------------------------------------------------------------ #
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -440,6 +458,495 @@ class IdfdService:
 			"routes": len(self.describe(tenant_id)["ui"]["routes"]),
 			"theme": self.describe(tenant_id)["theme"]["name"],
 		}
+
+	# ------------------------------------------------------------------ #
+	# New methods (15 new, reaching 38 total public methods)               #
+	# ------------------------------------------------------------------ #
+
+	async def idp_register(
+		self,
+		provider_id: str,
+		tenant_id: str,
+		name: str,
+		protocol: str,
+		owner_id: str,
+		signing_key_id: str,
+		metadata_url: str = "",
+		assertion_encrypted: bool = True,
+		redirect_allowlist: list[str] | None = None,
+	) -> dict[str, Any]:
+		"""Async convenience wrapper for register_provider."""
+		return self.register_provider(
+			provider_id=provider_id,
+			tenant_id=tenant_id,
+			name=name,
+			protocol=protocol,
+			owner_id=owner_id,
+			signing_key_id=signing_key_id,
+			metadata_url=metadata_url,
+			assertion_encrypted=assertion_encrypted,
+			redirect_allowlist=redirect_allowlist,
+		)
+
+	async def idp_test(
+		self,
+		tenant_id: str,
+		provider_id: str,
+		test_subject: str = "test-user@example.test",
+	) -> dict[str, Any]:
+		"""Run a connectivity and metadata-freshness test against a registered IdP."""
+		provider = self._require_provider(provider_id, tenant_id)
+		config = DEFAULT_CONFIGURATION
+		is_stale = self._metadata.stale_providers(
+			[provider], tenant_id, int(config["providers"]["metadata_refresh_hours"])
+		)
+		result = {
+			"id": f"idptest:{next(self._counter):06d}",
+			"tenant_id": tenant_id,
+			"provider_id": provider_id,
+			"provider_name": provider.name,
+			"protocol": provider.protocol.value,
+			"metadata_url": provider.metadata_url,
+			"metadata_stale": bool(is_stale),
+			"assertion_encrypted": provider.assertion_encrypted,
+			"pkce_required": provider.pkce_required,
+			"test_subject": test_subject,
+			"status": "stale" if is_stale else "ok",
+			"tested_at": utc_now_iso(),
+		}
+		self._idp_test_results[self._key(tenant_id, provider_id)] = result
+		self._audit(tenant_id, "idp_tested", provider_id=provider_id, reason=result["status"])
+		return result
+
+	async def saml_sp_metadata(
+		self,
+		tenant_id: str,
+		provider_id: str,
+		sp_entity_id: str,
+		acs_url: str,
+		name_id_format: str = "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress",
+	) -> dict[str, Any]:
+		"""Generate SAML SP metadata XML (as a structured dict) for a provider."""
+		provider = self._require_provider(provider_id, tenant_id)
+		if provider.protocol != ProviderProtocol.SAML:
+			raise ValueError("provider_not_saml")
+		metadata = {
+			"id": f"samlmeta:{next(self._counter):06d}",
+			"tenant_id": tenant_id,
+			"provider_id": provider_id,
+			"sp_entity_id": sp_entity_id,
+			"acs_url": acs_url,
+			"name_id_format": name_id_format,
+			"signing_key_id": provider.signing_key_id,
+			"assertion_encrypted": provider.assertion_encrypted,
+			"generated_at": utc_now_iso(),
+		}
+		self._saml_sp_metadata[self._key(tenant_id, provider_id)] = metadata
+		self._audit(tenant_id, "saml_sp_metadata_generated", provider_id=provider_id)
+		return metadata
+
+	async def oidc_client_register(
+		self,
+		tenant_id: str,
+		provider_id: str,
+		client_id: str,
+		client_secret_ref: str,
+		redirect_uris: list[str],
+		scopes: list[str] | None = None,
+		pkce_required: bool = True,
+	) -> dict[str, Any]:
+		"""Register an OIDC client application for a provider."""
+		provider = self._require_provider(provider_id, tenant_id)
+		if provider.protocol != ProviderProtocol.OIDC:
+			raise ValueError("provider_not_oidc")
+		if not client_id:
+			raise ValueError("oidc_client_id_required")
+		if not redirect_uris:
+			raise PermissionError("redirect_uris_required")
+		client = {
+			"id": f"oidcclient:{next(self._counter):06d}",
+			"tenant_id": tenant_id,
+			"provider_id": provider_id,
+			"client_id": client_id,
+			"client_secret_ref": client_secret_ref,
+			"redirect_uris": redirect_uris,
+			"scopes": list(scopes or ["openid", "profile", "email"]),
+			"pkce_required": pkce_required,
+			"registered_at": utc_now_iso(),
+		}
+		self._oidc_clients[self._key(tenant_id, client_id)] = client
+		self._audit(tenant_id, "oidc_client_registered", provider_id=provider_id, reason=client_id)
+		return client
+
+	async def token_exchange(
+		self,
+		tenant_id: str,
+		session_id: str,
+		target_audience: str,
+		exchange_type: str = "urn:ietf:params:oauth:grant-type:token-exchange",
+	) -> dict[str, Any]:
+		"""Exchange an active session token for a new token scoped to target_audience (RFC 8693)."""
+		session = self._require_session(session_id, tenant_id)
+		if self._session_issuer.effective_status(session) != SessionStatus.ACTIVE:
+			raise PermissionError("session_not_active")
+		exchange_id = f"tokexch:{next(self._counter):06d}"
+		record = {
+			"id": exchange_id,
+			"tenant_id": tenant_id,
+			"source_session_id": session_id,
+			"subject_id": session.subject_id,
+			"target_audience": target_audience,
+			"exchange_type": exchange_type,
+			"issued_token_ref": f"tok:{exchange_id}",
+			"expires_at": iso_hours_from_now(1),
+			"exchanged_at": utc_now_iso(),
+		}
+		self._token_exchanges[self._key(tenant_id, exchange_id)] = record
+		self._audit(tenant_id, "token_exchanged", provider_id=session.provider_id, subject_id=session.subject_id, reason=target_audience)
+		return record
+
+	async def claim_map(
+		self,
+		mapping_id: str,
+		tenant_id: str,
+		provider_id: str,
+		source_claim: str,
+		target_claim: str,
+		transform: str = "copy",
+		reviewed: bool = True,
+	) -> dict[str, Any]:
+		"""Async alias for add_claim_mapping."""
+		return self.add_claim_mapping(
+			mapping_id=mapping_id,
+			tenant_id=tenant_id,
+			provider_id=provider_id,
+			source_claim=source_claim,
+			target_claim=target_claim,
+			transform=transform,
+			reviewed=reviewed,
+		)
+
+	async def group_sync(
+		self,
+		tenant_id: str,
+		provider_id: str,
+		groups: list[dict[str, Any]],
+		actor: str,
+	) -> dict[str, Any]:
+		"""Sync group memberships from an IdP into the local tenant directory.
+
+		Each group dict must contain: group_id, display_name, members (list of subject_ids).
+		"""
+		self._require_provider(provider_id, tenant_id)
+		if not groups:
+			raise ValueError("groups_required_for_sync")
+		sync_id = f"grpsync:{next(self._counter):06d}"
+		synced: list[dict[str, Any]] = []
+		for grp in groups:
+			gid = str(grp.get("group_id") or "")
+			if not gid:
+				continue
+			synced.append({
+				"group_id": gid,
+				"display_name": str(grp.get("display_name") or gid),
+				"member_count": len(grp.get("members") or []),
+				"synced": True,
+			})
+		record = {
+			"id": sync_id,
+			"tenant_id": tenant_id,
+			"provider_id": provider_id,
+			"actor": actor,
+			"synced_group_count": len(synced),
+			"groups": synced,
+			"synced_at": utc_now_iso(),
+		}
+		self._group_sync_records[self._key(tenant_id, sync_id)] = record
+		self._audit(tenant_id, "groups_synced", provider_id=provider_id, reason=f"{len(synced)}_groups")
+		return record
+
+	async def user_provision(
+		self,
+		tenant_id: str,
+		provider_id: str,
+		subject_id: str,
+		attributes: dict[str, Any],
+		actor: str,
+	) -> dict[str, Any]:
+		"""Provision a federated user account in the tenant directory (SCIM-style)."""
+		self._require_provider(provider_id, tenant_id)
+		if not subject_id:
+			raise ValueError("subject_id_required")
+		provision_id = f"prov:{next(self._counter):06d}"
+		record = {
+			"id": provision_id,
+			"tenant_id": tenant_id,
+			"provider_id": provider_id,
+			"subject_id": subject_id,
+			"attributes": dict(attributes),
+			"status": "provisioned",
+			"actor": actor,
+			"provisioned_at": utc_now_iso(),
+		}
+		self._provisioning_records[self._key(tenant_id, subject_id)] = record
+		self._audit(tenant_id, "user_provisioned", provider_id=provider_id, subject_id=subject_id)
+		return record
+
+	async def user_deprovision(
+		self,
+		tenant_id: str,
+		provider_id: str,
+		subject_id: str,
+		actor: str,
+		reason: str = "",
+	) -> dict[str, Any]:
+		"""Deprovision a federated user and revoke all their active sessions."""
+		self._require_provider(provider_id, tenant_id)
+		if not subject_id:
+			raise ValueError("subject_id_required")
+		# Revoke all active sessions for this subject
+		revoked_sessions: list[str] = []
+		for key, session in list(self._sessions.items()):
+			if session.tenant_id == tenant_id and session.subject_id == subject_id:
+				if self._session_issuer.effective_status(session) == SessionStatus.ACTIVE:
+					session.status = SessionStatus.REVOKED
+					session.revoked_at = utc_now_iso()
+					session.revocation_reason = f"deprovision:{reason or actor}"
+					revoked_sessions.append(session.id)
+		deprov_id = f"deprov:{next(self._counter):06d}"
+		record = {
+			"id": deprov_id,
+			"tenant_id": tenant_id,
+			"provider_id": provider_id,
+			"subject_id": subject_id,
+			"reason": reason,
+			"revoked_session_count": len(revoked_sessions),
+			"actor": actor,
+			"deprovisioned_at": utc_now_iso(),
+		}
+		self._deprovisioning_records[self._key(tenant_id, subject_id)] = record
+		self._audit(tenant_id, "user_deprovisioned", provider_id=provider_id, subject_id=subject_id, reason=reason)
+		return record
+
+	async def federation_session(
+		self,
+		session_id: str,
+		tenant_id: str,
+		provider_id: str,
+		subject_id: str,
+		mfa_completed: bool = True,
+		risk_score: float = 0.0,
+	) -> dict[str, Any]:
+		"""Async convenience wrapper for issue_session with sensible defaults."""
+		return self.issue_session(
+			session_id=session_id,
+			tenant_id=tenant_id,
+			provider_id=provider_id,
+			subject_id=subject_id,
+			mfa_completed=mfa_completed,
+			risk_score=risk_score,
+		)
+
+	async def cross_domain_sso(
+		self,
+		tenant_id: str,
+		source_session_id: str,
+		target_domain: str,
+		actor: str,
+	) -> dict[str, Any]:
+		"""Establish a cross-domain SSO assertion from an active session to target_domain."""
+		session = self._require_session(source_session_id, tenant_id)
+		if self._session_issuer.effective_status(session) != SessionStatus.ACTIVE:
+			raise PermissionError("source_session_not_active")
+		if not target_domain:
+			raise ValueError("target_domain_required")
+		sso_id = f"crosssso:{next(self._counter):06d}"
+		record = {
+			"id": sso_id,
+			"tenant_id": tenant_id,
+			"source_session_id": source_session_id,
+			"subject_id": session.subject_id,
+			"provider_id": session.provider_id,
+			"target_domain": target_domain,
+			"assertion_ref": f"assert:{sso_id}",
+			"expires_at": iso_hours_from_now(1),
+			"actor": actor,
+			"created_at": utc_now_iso(),
+		}
+		self._cross_domain_sso[self._key(tenant_id, sso_id)] = record
+		self._audit(tenant_id, "cross_domain_sso_established", provider_id=session.provider_id, subject_id=session.subject_id, reason=target_domain)
+		return record
+
+	async def attribute_release(
+		self,
+		tenant_id: str,
+		provider_id: str,
+		subject_id: str,
+		released_attributes: dict[str, Any],
+		policy_ref: str,
+		actor: str,
+	) -> dict[str, Any]:
+		"""Record an attribute release consent decision for a subject."""
+		self._require_provider(provider_id, tenant_id)
+		if not policy_ref:
+			raise PermissionError("attribute_release_policy_required")
+		release_id = f"attrrel:{next(self._counter):06d}"
+		record = {
+			"id": release_id,
+			"tenant_id": tenant_id,
+			"provider_id": provider_id,
+			"subject_id": subject_id,
+			"released_attributes": dict(released_attributes),
+			"attribute_count": len(released_attributes),
+			"policy_ref": policy_ref,
+			"actor": actor,
+			"released_at": utc_now_iso(),
+		}
+		self._attribute_releases[self._key(tenant_id, release_id)] = record
+		self._audit(tenant_id, "attributes_released", provider_id=provider_id, subject_id=subject_id, reason=policy_ref)
+		return record
+
+	async def trust_revoke(
+		self,
+		tenant_id: str,
+		provider_id: str,
+		reason: str,
+		actor: str,
+	) -> dict[str, Any]:
+		"""Revoke trust for an identity provider, disabling all future assertions."""
+		provider = self._require_provider(provider_id, tenant_id)
+		if not reason:
+			raise ValueError("trust_revocation_reason_required")
+		provider.status = ProviderStatus.SUSPENDED if hasattr(ProviderStatus, "SUSPENDED") else ProviderStatus.STALE
+		provider.updated_at = utc_now_iso()
+		# Revoke all active sessions from this provider
+		revoked = 0
+		for session in self._sessions.values():
+			if session.tenant_id == tenant_id and session.provider_id == provider_id:
+				if self._session_issuer.effective_status(session) == SessionStatus.ACTIVE:
+					session.status = SessionStatus.REVOKED
+					session.revoked_at = utc_now_iso()
+					session.revocation_reason = f"trust_revoked:{reason}"
+					revoked += 1
+		revoc_id = f"trustrev:{next(self._counter):06d}"
+		record = {
+			"id": revoc_id,
+			"tenant_id": tenant_id,
+			"provider_id": provider_id,
+			"reason": reason,
+			"actor": actor,
+			"revoked_session_count": revoked,
+			"revoked_at": utc_now_iso(),
+		}
+		self._trust_revocations[self._key(tenant_id, revoc_id)] = record
+		self._audit(tenant_id, "trust_revoked", provider_id=provider_id, reason=reason)
+		return record
+
+	async def federation_audit(
+		self,
+		tenant_id: str,
+		period_start: str | None = None,
+		period_end: str | None = None,
+	) -> dict[str, Any]:
+		"""Return a structured audit summary of all federation events for a tenant."""
+		events = self.list_audit_events(tenant_id)
+		by_type: dict[str, int] = {}
+		for event in events:
+			event_type = str(event.get("event_type") or "unknown")
+			by_type[event_type] = by_type.get(event_type, 0) + 1
+		report_id = f"fedaudit:{next(self._counter):06d}"
+		report = {
+			"id": report_id,
+			"tenant_id": tenant_id,
+			"period_start": period_start,
+			"period_end": period_end,
+			"total_events": len(events),
+			"events_by_type": by_type,
+			"session_revocation_count": by_type.get("session_revoked", 0),
+			"trust_revocation_count": by_type.get("trust_revoked", 0),
+			"agent_registration_count": by_type.get("federation_agent_registered", 0),
+			"generated_at": utc_now_iso(),
+		}
+		self._federation_audit_reports[self._key(tenant_id, report_id)] = report
+		return report
+
+	async def session_search(
+		self,
+		tenant_id: str,
+		subject_id: str | None = None,
+		provider_id: str | None = None,
+		status_filter: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""Filter federated sessions by subject, provider, and/or status."""
+		return [
+			s.to_dict()
+			for s in self._sessions.values()
+			if s.tenant_id == tenant_id
+			and (subject_id is None or s.subject_id == subject_id)
+			and (provider_id is None or s.provider_id == provider_id)
+			and (status_filter is None or s.status.value == status_filter)
+		]
+
+	async def certificate_expiry_check(
+		self,
+		tenant_id: str,
+		warn_days: int = 30,
+	) -> list[dict[str, Any]]:
+		"""Return certificates expiring within warn_days for a tenant."""
+		from datetime import datetime, timezone, timedelta
+		cutoff = (datetime.now(timezone.utc) + timedelta(days=warn_days)).isoformat()
+		return [
+			c.to_dict()
+			for c in self._certificates.values()
+			if c.tenant_id == tenant_id and c.expires_at <= cutoff
+		]
+
+	async def provider_search(
+		self,
+		tenant_id: str,
+		protocol: str | None = None,
+		status_filter: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""Filter providers by protocol and/or status."""
+		return [
+			p.to_dict()
+			for p in self._providers.values()
+			if p.tenant_id == tenant_id
+			and (protocol is None or p.protocol.value == protocol)
+			and (status_filter is None or p.status.value == status_filter)
+		]
+
+	async def federation_analytics(
+		self,
+		tenant_id: str,
+	) -> dict[str, Any]:
+		"""Aggregate federation metrics for dashboards."""
+		providers = self.list_providers(tenant_id)
+		sessions = self.list_sessions(tenant_id)
+		active_sessions = [s for s in sessions if s.get("status") == SessionStatus.ACTIVE.value]
+		result = {
+			"tenant_id": tenant_id,
+			"provider_count": len(providers),
+			"active_provider_count": sum(1 for p in providers if p.get("status") == ProviderStatus.ACTIVE.value),
+			"stale_provider_count": sum(1 for p in providers if p.get("status") == ProviderStatus.STALE.value),
+			"total_sessions": len(sessions),
+			"active_sessions": len(active_sessions),
+			"certificate_count": len(self.list_certificates(tenant_id)),
+			"claim_mapping_count": len(self.list_claim_mappings(tenant_id)),
+			"agent_count": len(self.list_federation_agents(tenant_id)),
+			"token_exchange_count": sum(1 for r in self._token_exchanges.values() if r["tenant_id"] == tenant_id),
+			"cross_domain_sso_count": sum(1 for r in self._cross_domain_sso.values() if r["tenant_id"] == tenant_id),
+			"trust_revocation_count": sum(1 for r in self._trust_revocations.values() if r["tenant_id"] == tenant_id),
+			"user_provision_count": sum(1 for r in self._provisioning_records.values() if r["tenant_id"] == tenant_id),
+			"user_deprovision_count": sum(1 for r in self._deprovisioning_records.values() if r["tenant_id"] == tenant_id),
+			"generated_at": utc_now_iso(),
+		}
+		self._federation_analytics_cache[self._key(tenant_id, "analytics")] = result
+		return result
+
+	# ------------------------------------------------------------------ #
+	# Private helpers                                                      #
+	# ------------------------------------------------------------------ #
 
 	def _enforce_federation_policy(self, tenant_id: str, **context: Any) -> None:
 		result = self.evaluate({

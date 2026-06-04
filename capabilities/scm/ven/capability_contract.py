@@ -157,13 +157,11 @@ REQUIRES = [
 	"ntfy",
 	"composition_events",
 	"composition_config",
-	"workflow",
-	"procurement_requisition_lifecycle",
-	"sourcing_event_lifecycle",
-	"contract_lifecycle",
-	"document_management",
-	"risk_policy",
-	"supplier_master_data",
+	"wflo",
+	"grc_doc",
+	"grc_doc",
+	"grc_rsa",
+	"mdm",
 ]
 
 

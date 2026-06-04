@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "telecom_cus",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "telecom_cus": {
+      "capability": "telecom_cus"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

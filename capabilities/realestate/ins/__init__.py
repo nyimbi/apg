@@ -1,10 +1,31 @@
+"""APG Property Insurance capability.
+
+Standalone package: ``pip install apg-realestate-ins``
+
+Quick start::
+
+    from apg_realestate_ins import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : realestate_ins
+Provides      : policy_lifecycle_management, asset_schedule_management, claims_processing_workflow, premium_allocation_engine, coverage_gap_analysis, endorsement_management
 """
-Insurance Management (INS) - Real Estate Sub-Module
+from __future__ import annotations
 
-Property insurance management including policy tracking, claims processing,
-risk assessment, and coverage optimization.
-"""
+__version__  = "1.0.0"
+__package_name__ = "apg-realestate-ins"
+__capability_id__ = "realestate_ins"
 
-__version__ = "1.0.0"
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
+)
 
-__all__ = []
+__all__ = [
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
+]

@@ -26,10 +26,16 @@ try:
     )
     from ..secu.models import SecurityContext
 except ImportError:
-    from models import (
-        CMResource, ConfigurationDSL, ValidationResult,
-        ResourceType, CloudProvider, ResourceState
-    )
+    try:
+        from .models import (
+            CMResource, ConfigurationDSL, ValidationResult,
+            ResourceType, CloudProvider, ResourceState
+        )
+    except ImportError:
+        from capabilities.common.conf.models import (
+            CMResource, ConfigurationDSL, ValidationResult,
+            ResourceType, CloudProvider, ResourceState
+        )
     # Mock SecurityContext for testing
     class SecurityContext:
         def __init__(self, **kwargs):

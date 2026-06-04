@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "government_lic",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "government_lic": {
+      "capability": "government_lic"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

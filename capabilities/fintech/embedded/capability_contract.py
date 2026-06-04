@@ -114,7 +114,20 @@ RULES: list[dict[str, Any]] = [
 	{"name": "embedded_agent_runtime_supported", "condition": {"operation": "register_embedded_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "embedded_agent_runtime_not_supported", "required_action": "select_supported_runtime"}},
 	{"name": "embedded_agent_role_supported", "condition": {"operation": "register_embedded_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "embedded_agent_role_not_supported", "required_action": "select_supported_role"}},
 	{"name": "privileged_embedded_agent_action_requires_human_approval", "condition": {"operation": "embedded_agent_action", "privileged_scope": True, "human_approval_recorded": False}, "effect": {"decision": "deny", "reason": "human_approval_required", "required_action": "record_human_approval"}},
+
+	# Cross-tenant and privilege escalation guards
+	{"name": "cross_tenant_embedded_access_denied", "description": "Embedded finance resources cannot be accessed across tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_access_denied", "required_action": "use_tenant_scoped_credentials"}},
+	{"name": "privilege_escalation_denied", "description": "Embedded finance privilege escalation without approval is denied.", "condition": {"privilege_escalation_attempt": True, "approval_recorded": False}, "effect": {"decision": "deny", "reason": "privilege_escalation_denied", "required_action": "obtain_escalation_approval"}},
+
+	# Africa-specific embedded finance rules
+	{"name": "ke_cbk_fintech_partnership_required", "description": "Embedded finance in Kenya requires a CBK-licensed fintech partner.", "condition": {"operation": "embed_financial_service", "country": "KE", "cbk_licensed_partner_present": False}, "effect": {"decision": "deny", "reason": "ke_cbk_licensed_partner_required", "required_action": "partner_with_cbk_licensed_entity"}},
+	{"name": "mpesa_embedded_shortcode_required", "description": "M-Pesa embedded payment products require registered shortcode.", "condition": {"operation": "embed_mpesa_payment", "mpesa_shortcode_present": False}, "effect": {"decision": "deny", "reason": "mpesa_shortcode_required", "required_action": "register_mpesa_shortcode"}},
+	{"name": "mobile_money_embedded_kyc_required", "description": "Embedded mobile money products require customer KYC.", "condition": {"operation": "embed_mobile_money", "customer_kyc_present": False}, "effect": {"decision": "deny", "reason": "mobile_money_embedded_kyc_required", "required_action": "complete_customer_kyc"}},
+	{"name": "embedded_aml_passthrough_required", "description": "Embedded finance transactions must pass through AML screening.", "condition": {"operation": "embedded_transaction", "aml_screened": False}, "effect": {"decision": "deny", "reason": "embedded_aml_screening_required", "required_action": "route_through_aml_screening"}},
+	{"name": "ke_data_protection_embedded", "description": "Embedded finance data sharing requires Kenya Data Protection Act consent.", "condition": {"operation": "share_customer_data", "country": "KE", "dpa_consent_recorded": False}, "effect": {"decision": "deny", "reason": "ke_data_protection_consent_required", "required_action": "record_dpa_consent"}},
+	{"name": "ng_cbn_embedded_finance_framework", "description": "Nigeria CBN embedded finance framework compliance required.", "condition": {"operation": "embed_financial_service", "country": "NG", "cbn_framework_compliant": False}, "effect": {"decision": "deny", "reason": "ng_cbn_embedded_finance_compliance_required", "required_action": "comply_with_cbn_embedded_finance_framework"}},
 ]
+
 
 
 def get_capability_contract(tenant_id: str = "default") -> dict[str, Any]:

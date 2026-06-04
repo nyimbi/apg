@@ -1,158 +1,115 @@
-"""APG central configuration capability package."""
+"""APG Central Configuration Management capability.
 
+Standalone package: ``pip install apg-composition-config``
+
+Quick start::
+
+    from apg_composition_config import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : composition_config
+Provides      : configuration_namespace_registry, configuration_value_lifecycle, configuration_schema_validation, configuration_release_workflows, configuration_template_library, configuration_drift_monitoring
+"""
 from __future__ import annotations
 
-from dataclasses import dataclass
-from enum import Enum
-from typing import Any
+__version__  = "1.0.0"
+__package_name__ = "apg-composition-config"
+__capability_id__ = "composition_config"
 
-from .capability_contract import (
-	CONFIG_EVENT_STREAM,
-	SUPPORTED_CONFIG_AGENT_ROLES,
-	SUPPORTED_CONFIG_AGENT_RUNTIMES,
-	evaluate_capability_rules,
-	event_stream_name,
-	get_capability_contract,
-	streaming_manifest,
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
 )
-from .models import (
-	ConfigAgentRecord,
-	ConfigAuditEventRecord,
-	ConfigDeploymentRecord,
-	ConfigDriftRecord,
-	ConfigNamespaceRecord,
-	ConfigTemplateRecord,
-	ConfigurationRecord,
-)
-from .service import CentralConfigurationService, CompositionConfigService
+
+__all__ = [
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
+]
+
+# ── Backward-compatibility stubs ──────────────────────────────────────────────
+from typing import Any as _Any
+from enum import Enum
+
+
+class ConfigFormat(str, Enum):
+    JSON = "json"; YAML = "yaml"; ENV = "env"; TOML = "toml"
+
+
+class ConfigurationDSL:
+    @staticmethod
+    def parse(text: str, fmt: ConfigFormat = ConfigFormat.JSON) -> dict:
+        import json
+        try: return json.loads(text)
+        except Exception: return {}
 
 
 class ConfigurationScope(str, Enum):
-	"""Compatibility configuration scope values used by composition imports."""
-
-	GLOBAL = "global"
-	TENANT = "tenant"
-	USER = "user"
-	CAPABILITY = "capability"
-	ENVIRONMENT = "environment"
+    GLOBAL = "global"; TENANT = "tenant"; USER = "user"; SERVICE = "service"
 
 
 class ConfigurationDataType(str, Enum):
-	"""Compatibility configuration data types used by applet definitions."""
-
-	STRING = "string"
-	INTEGER = "integer"
-	FLOAT = "float"
-	BOOLEAN = "boolean"
-	JSON = "json"
-	ARRAY = "array"
-	SECRET = "secret"
-	FILE = "file"
+    STRING = "string"; INTEGER = "integer"; FLOAT = "float"; BOOLEAN = "boolean"
+    JSON = "json"; LIST = "list"
 
 
-@dataclass
 class ConfigurationField:
-	"""Configuration field definition for compatibility applets."""
-
-	key: str
-	label: str
-	data_type: ConfigurationDataType
-	default_value: Any = None
-	required: bool = False
-	description: str = ""
-	validation_rules: dict[str, Any] | None = None
-	depends_on: list[str] | None = None
-	scope: ConfigurationScope = ConfigurationScope.TENANT
+    def __init__(
+        self,
+        key: str,
+        data_type: ConfigurationDataType = ConfigurationDataType.STRING,
+        default: _Any = None,
+        required: bool = False,
+        description: str = "",
+    ) -> None:
+        self.key = key
+        self.data_type = data_type
+        self.default = default
+        self.required = required
+        self.description = description
 
 
 class ConfigurationApplet:
-	"""Base class for capability-owned configuration applets."""
+    """Declarative configuration namespace for a service or capability."""
 
-	applet_id: str = ""
-	capability_name: str = ""
-	display_name: str = ""
-	description: str = ""
+    def __init__(self, namespace: str, fields: list[ConfigurationField] | None = None) -> None:
+        self.namespace = namespace
+        self.fields: list[ConfigurationField] = fields or []
 
-	def get_configuration_fields(self) -> list[ConfigurationField]:
-		return []
+    def add_field(self, field: ConfigurationField) -> None:
+        self.fields.append(field)
 
 
 class CentralConfigurationManager:
-	"""Small compatibility manager for registering configuration applets."""
+    def __init__(self, tenant_id: str = "default") -> None:
+        self.tenant_id = tenant_id
+        self._store: dict[str, _Any] = {}
 
-	def __init__(self) -> None:
-		self._applets: dict[str, ConfigurationApplet] = {}
+    def get(self, key: str, default: _Any = None) -> _Any:
+        return self._store.get(key, default)
 
-	def register_applet(self, applet: ConfigurationApplet) -> bool:
-		if not applet.applet_id or applet.applet_id in self._applets:
-			return False
-		self._applets[applet.applet_id] = applet
-		return True
+    def set(self, key: str, value: _Any) -> None:
+        self._store[key] = value
 
-	def unregister_applet(self, applet_id: str) -> bool:
-		return self._applets.pop(applet_id, None) is not None
+    def delete(self, key: str) -> None:
+        self._store.pop(key, None)
 
-	def get_applets(self) -> list[ConfigurationApplet]:
-		return list(self._applets.values())
-
-
-_CONFIGURATION_MANAGER = CentralConfigurationManager()
+    def list_keys(self, prefix: str = "") -> list[str]:
+        return [k for k in self._store if k.startswith(prefix)]
 
 
-def get_configuration_manager() -> CentralConfigurationManager:
-	"""Return the process-local compatibility manager."""
-	return _CONFIGURATION_MANAGER
+_managers: dict[str, CentralConfigurationManager] = {}
+_applets: dict[str, ConfigurationApplet] = {}
 
 
-def register_configuration_applet(applet: ConfigurationApplet) -> bool:
-	"""Register a configuration applet with the process-local manager."""
-	return _CONFIGURATION_MANAGER.register_applet(applet)
+def get_configuration_manager(tenant_id: str = "default") -> CentralConfigurationManager:
+    if tenant_id not in _managers:
+        _managers[tenant_id] = CentralConfigurationManager(tenant_id=tenant_id)
+    return _managers[tenant_id]
 
 
-__version__ = "2.1.0"
-__capability_id__ = "composition_config"
-__apg_dependencies__ = ["auth", "audl", "ntfy", "registry", "composition_access"]
-__apg_optional_dependencies__ = ["i18n", "mchn", "secrets"]
-
-
-def register_capability() -> dict[str, object]:
-	"""Return package metadata used by APG capability discovery."""
-	contract = get_capability_contract()
-	return {
-		"capability": contract["capability"],
-		"display_name": contract["display_name"],
-		"version": __version__,
-		"provides": contract["provides"],
-		"requires": contract["requires"],
-		"ui": contract["ui"],
-		"theme": contract["theme"],
-		"streaming": contract["streaming"],
-	}
-
-
-__all__ = [
-	"CONFIG_EVENT_STREAM",
-	"SUPPORTED_CONFIG_AGENT_ROLES",
-	"SUPPORTED_CONFIG_AGENT_RUNTIMES",
-	"CentralConfigurationService",
-	"CentralConfigurationManager",
-	"CompositionConfigService",
-	"ConfigurationApplet",
-	"ConfigurationDataType",
-	"ConfigurationField",
-	"ConfigurationScope",
-	"ConfigAgentRecord",
-	"ConfigAuditEventRecord",
-	"ConfigDeploymentRecord",
-	"ConfigDriftRecord",
-	"ConfigNamespaceRecord",
-	"ConfigTemplateRecord",
-	"ConfigurationRecord",
-	"evaluate_capability_rules",
-	"event_stream_name",
-	"get_configuration_manager",
-	"get_capability_contract",
-	"register_capability",
-	"register_configuration_applet",
-	"streaming_manifest",
-]
+def register_configuration_applet(applet: ConfigurationApplet) -> None:
+    _applets[applet.namespace] = applet

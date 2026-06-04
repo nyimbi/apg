@@ -631,3 +631,217 @@ class WsblService:
 	@staticmethod
 	def _normalize_token(value: str) -> str:
 		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+	# ── Extended methods ───────────────────────────────────────────────────────
+
+	def page_create(
+		self,
+		site_id: str,
+		slug: str,
+		title: str,
+		tenant_id: str | None = None,
+		metadata: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Spec alias for create_page."""
+		return self.create_page(site_id, slug, title, tenant_id, metadata)
+
+	def page_publish(self, page_id: str, actor_id: str) -> dict[str, Any]:
+		"""Mark a single page as published."""
+		page = self._get_page(page_id)
+		page.status = "published"
+		page.updated_at = utc_now()
+		self._audit(page.tenant_id, "page_published", page_id, actor_id, {"slug": page.slug})
+		return page.to_dict()
+
+	def page_unpublish(self, page_id: str, actor_id: str) -> dict[str, Any]:
+		"""Revert a page to draft status."""
+		page = self._get_page(page_id)
+		page.status = "draft"
+		page.updated_at = utc_now()
+		self._audit(page.tenant_id, "page_unpublished", page_id, actor_id, {"slug": page.slug})
+		return page.to_dict()
+
+	def component_add(
+		self,
+		component_key: str,
+		tenant_id: str,
+		name: str,
+		component_type: str = "section",
+		custom: bool = False,
+	) -> dict[str, Any]:
+		"""Spec alias for create_component."""
+		return self.create_component(component_key, tenant_id, name, component_type, custom)
+
+	def template_apply(
+		self,
+		site_id: str,
+		template_id: str,
+		actor_id: str,
+	) -> dict[str, Any]:
+		"""Apply a named template to a site (recorded as metadata)."""
+		site = self._get_site(site_id)
+		site.metadata["applied_template"] = template_id
+		site.updated_at = utc_now()
+		self._audit(site.tenant_id, "template_applied", site_id, actor_id, {"template_id": template_id})
+		return site.to_dict()
+
+	def domain_bind(
+		self,
+		site_id: str,
+		domain: str,
+		actor_id: str,
+		validated: bool = False,
+	) -> dict[str, Any]:
+		"""Bind a domain to a site (alias for register_domain)."""
+		site = self._get_site(site_id)
+		return self.register_domain(site_id, site.tenant_id, domain, validated, actor_id)
+
+	def seo_optimise(
+		self,
+		page_id: str,
+		meta_title: str,
+		meta_description: str,
+		keywords: list[str],
+		actor_id: str,
+	) -> dict[str, Any]:
+		"""Attach SEO metadata to a page."""
+		page = self._get_page(page_id)
+		page.metadata.update({
+			"seo_meta_title": meta_title,
+			"seo_meta_description": meta_description,
+			"seo_keywords": keywords,
+		})
+		page.updated_at = utc_now()
+		self._audit(page.tenant_id, "seo_optimised", page_id, actor_id, {"meta_title": meta_title})
+		return page.to_dict()
+
+	def form_embed(
+		self,
+		page_id: str,
+		form_id: str,
+		form_type: str,
+		actor_id: str,
+	) -> dict[str, Any]:
+		"""Embed a form reference into a page's metadata."""
+		page = self._get_page(page_id)
+		page.metadata.setdefault("embedded_forms", []).append({"form_id": form_id, "form_type": form_type})
+		page.updated_at = utc_now()
+		self._audit(page.tenant_id, "form_embedded", page_id, actor_id, {"form_id": form_id})
+		return page.to_dict()
+
+	def analytics_embed(
+		self,
+		site_id: str,
+		provider: str,
+		tracking_id: str,
+		actor_id: str,
+	) -> dict[str, Any]:
+		"""Attach an analytics provider tracking ID to a site."""
+		site = self._get_site(site_id)
+		site.metadata.update({"analytics_provider": provider, "analytics_tracking_id": tracking_id})
+		site.updated_at = utc_now()
+		self._audit(site.tenant_id, "analytics_embedded", site_id, actor_id, {"provider": provider})
+		return site.to_dict()
+
+	def media_upload(
+		self,
+		site_id: str,
+		media_id: str,
+		file_ref: str,
+		media_type: str,
+		actor_id: str,
+	) -> dict[str, Any]:
+		"""Register a media asset reference against a site."""
+		site = self._get_site(site_id)
+		media: dict[str, Any] = {
+			"id": media_id,
+			"site_id": site_id,
+			"tenant_id": site.tenant_id,
+			"file_ref": file_ref,
+			"media_type": media_type,
+			"uploaded_at": utc_now(),
+		}
+		site.metadata.setdefault("media", []).append({"id": media_id, "file_ref": file_ref, "media_type": media_type})
+		site.updated_at = utc_now()
+		self._audit(site.tenant_id, "media_uploaded", site_id, actor_id, {"media_id": media_id, "media_type": media_type})
+		return media
+
+	def css_customise(
+		self,
+		site_id: str,
+		css_snippet: str,
+		actor_id: str,
+	) -> dict[str, Any]:
+		"""Attach or replace custom CSS for a site."""
+		site = self._get_site(site_id)
+		site.metadata["custom_css"] = css_snippet
+		site.updated_at = utc_now()
+		self._audit(site.tenant_id, "css_customised", site_id, actor_id, {"css_length": len(css_snippet)})
+		return site.to_dict()
+
+	def mobile_preview(self, site_id: str, actor_id: str) -> dict[str, Any]:
+		"""Generate a mobile-preview record for a site."""
+		site = self._get_site(site_id)
+		preview: dict[str, Any] = {
+			"site_id": site_id,
+			"tenant_id": site.tenant_id,
+			"viewport": "375x812",
+			"generated_at": utc_now(),
+			"status": "ready",
+		}
+		self._audit(site.tenant_id, "mobile_preview_generated", site_id, actor_id, {})
+		return preview
+
+	def ab_test_page(
+		self,
+		site_id: str,
+		page_a_id: str,
+		page_b_id: str,
+		test_id: str,
+		split_pct: int,
+		actor_id: str,
+	) -> dict[str, Any]:
+		"""Register an A/B test between two pages."""
+		site = self._get_site(site_id)
+		self._get_page(page_a_id)
+		self._get_page(page_b_id)
+		ab_record: dict[str, Any] = {
+			"id": test_id,
+			"site_id": site_id,
+			"tenant_id": site.tenant_id,
+			"page_a_id": page_a_id,
+			"page_b_id": page_b_id,
+			"split_pct": max(0, min(100, split_pct)),
+			"status": "running",
+			"created_at": utc_now(),
+		}
+		site.metadata.setdefault("ab_tests", []).append(ab_record)
+		site.updated_at = utc_now()
+		self._audit(site.tenant_id, "ab_test_created", site_id, actor_id, {"test_id": test_id})
+		return ab_record
+
+	def sitemap_generate(self, site_id: str, actor_id: str) -> dict[str, Any]:
+		"""Generate an XML sitemap record for a site."""
+		site = self._get_site(site_id)
+		pages = [p for p in self._pages.values() if p.site_id == site_id and p.tenant_id == site.tenant_id]
+		urls = [{"loc": f"/{p.slug}", "lastmod": p.updated_at} for p in pages]
+		sitemap: dict[str, Any] = {
+			"site_id": site_id,
+			"tenant_id": site.tenant_id,
+			"url_count": len(urls),
+			"urls": urls,
+			"generated_at": utc_now(),
+		}
+		self._audit(site.tenant_id, "sitemap_generated", site_id, actor_id, {"url_count": len(urls)})
+		return sitemap
+
+	def site_export(self, site_id: str, actor_id: str, format: str = "json") -> dict[str, Any]:
+		"""Export a full site bundle (pages + components + metadata)."""
+		site = self._get_site(site_id)
+		pages = self.list_pages(site.tenant_id, site_id)
+		return {
+			"site": site.to_dict(),
+			"pages": pages,
+			"format": format,
+			"exported_at": utc_now(),
+		}

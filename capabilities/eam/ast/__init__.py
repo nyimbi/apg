@@ -1,50 +1,31 @@
-"""APG enterprise asset management capability package."""
+"""APG Enterprise Asset Management capability.
 
+Standalone package: ``pip install apg-eam-ast``
+
+Quick start::
+
+    from apg_eam_ast import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : eam_ast
+Provides      : asset_registry_lifecycle, asset_location_hierarchy, criticality_and_condition_management, maintenance_plan_lifecycle, work_order_lifecycle, inspection_and_condition_readings
+"""
 from __future__ import annotations
 
-from .capability_contract import (
-	EAM_EVENT_STREAM,
-	SUPPORTED_EAM_AGENT_ROLES,
-	SUPPORTED_EAM_AGENT_RUNTIMES,
-	evaluate_capability_rules,
-	event_stream_name,
-	get_capability_contract,
-	streaming_manifest,
+__version__  = "1.0.0"
+__package_name__ = "apg-eam-ast"
+__capability_id__ = "eam_ast"
+
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
 )
-from .service import EAMAssetService, EnterpriseAssetManagementService
-
-
-CAPABILITY_ID = "eam_ast"
-CAPABILITY_NAME = "Enterprise Asset Management"
-CAPABILITY_VERSION = "2.1.0"
-
-
-def register_capability() -> dict[str, object]:
-	contract = get_capability_contract()
-	return {
-		"capability": CAPABILITY_ID,
-		"display_name": CAPABILITY_NAME,
-		"version": CAPABILITY_VERSION,
-		"provides": contract["provides"],
-		"requires": contract["requires"],
-		"ui": contract["ui"],
-		"theme": contract["theme"],
-		"streaming": contract["streaming"],
-	}
-
 
 __all__ = [
-	"CAPABILITY_ID",
-	"CAPABILITY_NAME",
-	"CAPABILITY_VERSION",
-	"EAMAssetService",
-	"EAM_EVENT_STREAM",
-	"EnterpriseAssetManagementService",
-	"SUPPORTED_EAM_AGENT_ROLES",
-	"SUPPORTED_EAM_AGENT_RUNTIMES",
-	"evaluate_capability_rules",
-	"event_stream_name",
-	"get_capability_contract",
-	"register_capability",
-	"streaming_manifest",
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
 ]

@@ -1,41 +1,31 @@
+"""APG Resource Management capability.
+
+Standalone package: ``pip install apg-ppm-res``
+
+Quick start::
+
+    from apg_ppm_res import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : ppm_res
+Provides      : resource_pool_management, skill_matching_engine, capacity_planning, utilisation_tracking, demand_forecasting, resource_allocation_workflow
 """
-Resource Scheduling Sub-Capability
+from __future__ import annotations
 
-Optimizes the allocation and scheduling of human and equipment resources
-for projects and tasks across the organization.
-"""
+__version__  = "1.0.0"
+__package_name__ = "apg-ppm-res"
+__capability_id__ = "ppm_res"
 
-from typing import Dict, List, Any
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
+)
 
-# Sub-capability metadata
-SUBCAPABILITY_META = {
-	'name': 'Resource Scheduling',
-	'code': 'RS',
-	'version': '1.0.0',
-	'capability': 'service_specific',
-	'description': 'Optimizes the allocation and scheduling of human and equipment resources for projects and tasks',
-	'industry_focus': 'Professional Services, Field Services, Consulting',
-	'dependencies': [],
-	'optional_dependencies': ['project_management', 'time_expense_tracking'],
-	'database_tables': [
-		'ss_rs_resource',
-		'ss_rs_resource_skill',
-		'ss_rs_schedule',
-		'ss_rs_availability',
-		'ss_rs_booking',
-		'ss_rs_capacity_plan',
-		'ss_rs_utilization_report'
-	],
-	'configuration': {
-		'enable_skill_matching': True,
-		'enable_automatic_scheduling': True,
-		'default_booking_duration_hours': 8,
-		'utilization_target_percentage': 85,
-		'schedule_optimization_algorithm': 'genetic',
-		'enable_overbooking_warnings': True
-	}
-}
-
-def get_subcapability_info() -> Dict[str, Any]:
-	"""Get sub-capability information"""
-	return SUBCAPABILITY_META
+__all__ = [
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
+]

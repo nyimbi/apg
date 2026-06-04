@@ -374,6 +374,30 @@ def streaming_manifest() -> dict[str, Any]:
 	}
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.biop.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"consent_recorded",
+		"consent_revoked",
+		"template_enrolled",
+		"template_retired",
+		"verification_completed",
+		"liveness_checked",
+		"match_reviewed",
+		"privacy_reviewed",
+		"presentation_attack_detected",
+		"retention_policy_applied",
+		"agent_registered",
+	],
+	"guardrails": [
+		"biop_batch_requires_bytewax",
+		"biop_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable BIOP capability contract."""
 	config = deepcopy(DEFAULT_CONFIGURATION)
@@ -397,7 +421,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"requires_theme": True
 		},
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": deepcopy(STREAMING),
 		"theme": deepcopy(THEME)
 	}
 

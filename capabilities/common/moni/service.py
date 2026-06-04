@@ -2476,8 +2476,12 @@ def _allow_result() -> dict[str, Any]:
 
 
 def uuid_like() -> str:
-	"""Return a sortable enough local identifier without adding dependencies."""
-	return f"moni-{time.time_ns()}"
+	"""Return a UUID7 string for use as a record identifier."""
+	try:
+		from uuid6 import uuid7
+		return str(uuid7())
+	except ImportError:
+		return f"moni-{time.time_ns()}"
 
 
 # Export main components

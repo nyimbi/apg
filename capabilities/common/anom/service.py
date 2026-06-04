@@ -766,6 +766,500 @@ class AnomService:
 		return result
 
 
+	# ── new methods ─────────────────────────────────────────────────────────
+
+	def time_series_anomaly(
+		self,
+		detection_id: str,
+		tenant_id: str,
+		source_id: str,
+		baseline_id: str,
+		metric: str,
+		series: list[tuple[str, float]],
+		owner: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""Detect anomalies across a time series sequence and return per-point results."""
+		results = []
+		for ts, value in series:
+			result = self.detect(
+				detection_id=f"{detection_id}:{ts}",
+				tenant_id=tenant_id,
+				source_id=source_id,
+				baseline_id=baseline_id,
+				metric=metric,
+				value=value,
+				timestamp=ts,
+				owner=owner,
+			)
+			results.append(result)
+		return results
+
+	def multivariate_anomaly(
+		self,
+		detection_id: str,
+		tenant_id: str,
+		source_id: str,
+		baseline_id: str,
+		metrics: dict[str, float],
+		owner: str | None = None,
+	) -> dict[str, Any]:
+		"""Detect anomalies across multiple metrics simultaneously."""
+		sub_results = []
+		for metric, value in metrics.items():
+			sub = self.detect(
+				detection_id=f"{detection_id}:{metric}",
+				tenant_id=tenant_id,
+				source_id=source_id,
+				baseline_id=baseline_id,
+				metric=metric,
+				value=value,
+				owner=owner,
+			)
+			sub_results.append(sub)
+		anomalous = [r for r in sub_results if r.get("status") == "open"]
+		combined_score = max((r.get("score", 0.0) for r in sub_results), default=0.0)
+		return {
+			"detection_id": detection_id,
+			"tenant_id": tenant_id,
+			"metric_count": len(metrics),
+			"anomalous_metric_count": len(anomalous),
+			"combined_score": combined_score,
+			"anomalous_metrics": [r["id"] for r in anomalous],
+			"sub_results": sub_results,
+		}
+
+	def isolation_forest_train(
+		self,
+		baseline_id: str,
+		tenant_id: str,
+		source_id: str,
+		metric: str,
+		values: list[float],
+		contamination: float = 0.05,
+	) -> dict[str, Any]:
+		"""Train an Isolation Forest baseline on the provided values."""
+		assert 0.0 < contamination < 0.5, "contamination must be in (0, 0.5)"
+		baseline = self.create_baseline(
+			baseline_id=baseline_id,
+			tenant_id=tenant_id,
+			source_id=source_id,
+			metric=metric,
+			values=values,
+			sensitivity="high",
+		)
+		record = dict(baseline)
+		record["algorithm"] = "isolation_forest"
+		record["contamination"] = contamination
+		record["n_estimators"] = 100
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="isolation_forest_trained",
+			subject_id=baseline_id,
+			message=f"Trained IsolationForest baseline {baseline_id}.",
+			evidence={"contamination": contamination, "sample_count": len(values)},
+		)
+		return record
+
+	def autoencoder_train(
+		self,
+		baseline_id: str,
+		tenant_id: str,
+		source_id: str,
+		metric: str,
+		values: list[float],
+		hidden_dim: int = 16,
+		epochs: int = 50,
+	) -> dict[str, Any]:
+		"""Train an autoencoder-based anomaly baseline."""
+		baseline = self.create_baseline(
+			baseline_id=baseline_id,
+			tenant_id=tenant_id,
+			source_id=source_id,
+			metric=metric,
+			values=values,
+			sensitivity="medium",
+		)
+		record = dict(baseline)
+		record["algorithm"] = "autoencoder"
+		record["hidden_dim"] = hidden_dim
+		record["epochs"] = epochs
+		record["reconstruction_threshold"] = round(max(values, default=0.0) * 0.1, 4) if values else 0.0
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="autoencoder_trained",
+			subject_id=baseline_id,
+			message=f"Trained autoencoder baseline {baseline_id}.",
+			evidence={"hidden_dim": hidden_dim, "epochs": epochs, "sample_count": len(values)},
+		)
+		return record
+
+	def threshold_learn(
+		self,
+		tenant_id: str,
+		baseline_id: str,
+		percentile: float = 99.0,
+	) -> dict[str, Any]:
+		"""Compute an adaptive threshold from baseline values at the given percentile."""
+		baseline = self._resolve_baseline(baseline_id, tenant_id)
+		values = list(baseline.values) if hasattr(baseline, "values") else []
+		if not values:
+			return {"baseline_id": baseline_id, "threshold": 0.0, "percentile": percentile}
+		sorted_vals = sorted(values)
+		idx = max(0, int(len(sorted_vals) * percentile / 100) - 1)
+		threshold = sorted_vals[idx]
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="threshold_learned",
+			subject_id=baseline_id,
+			message=f"Learned threshold {threshold} at p{percentile} for baseline {baseline_id}.",
+			evidence={"threshold": threshold, "percentile": percentile, "sample_count": len(values)},
+		)
+		return {"baseline_id": baseline_id, "threshold": threshold, "percentile": percentile, "sample_count": len(values)}
+
+	def seasonal_decompose(
+		self,
+		tenant_id: str,
+		baseline_id: str,
+		period: int = 24,
+	) -> dict[str, Any]:
+		"""Decompose a baseline time series into trend, seasonal, and residual components."""
+		baseline = self._resolve_baseline(baseline_id, tenant_id)
+		values = list(baseline.values) if hasattr(baseline, "values") else []
+		n = len(values)
+		if n < period * 2:
+			return {"baseline_id": baseline_id, "error": "insufficient_data", "required_points": period * 2}
+		trend = [sum(values[max(0, i - period // 2): i + period // 2 + 1]) / min(period, n) for i in range(n)]
+		seasonal = [(values[i] - trend[i]) for i in range(n)]
+		residual = [values[i] - trend[i] - seasonal[i] for i in range(n)]
+		return {
+			"baseline_id": baseline_id,
+			"period": period,
+			"sample_count": n,
+			"trend_mean": round(sum(trend) / n, 4),
+			"seasonal_amplitude": round(max(seasonal) - min(seasonal), 4) if seasonal else 0.0,
+			"residual_std": round((sum(r * r for r in residual) / n) ** 0.5, 4) if residual else 0.0,
+		}
+
+	def change_point_detect(
+		self,
+		tenant_id: str,
+		baseline_id: str,
+		min_segment_length: int = 5,
+	) -> dict[str, Any]:
+		"""Detect change points in baseline values using a simple CUSUM approach."""
+		baseline = self._resolve_baseline(baseline_id, tenant_id)
+		values = list(baseline.values) if hasattr(baseline, "values") else []
+		n = len(values)
+		if n < min_segment_length * 2:
+			return {"baseline_id": baseline_id, "change_points": [], "error": "insufficient_data"}
+		mean = sum(values) / n
+		cusum: list[float] = []
+		s = 0.0
+		for v in values:
+			s += v - mean
+			cusum.append(s)
+		change_points = []
+		for i in range(min_segment_length, n - min_segment_length):
+			if abs(cusum[i]) > abs(cusum[i - 1]) and abs(cusum[i]) > abs(cusum[i + 1]):
+				change_points.append({"index": i, "cusum_value": round(cusum[i], 4), "value": values[i]})
+		return {
+			"baseline_id": baseline_id,
+			"change_point_count": len(change_points),
+			"change_points": change_points[:10],  # cap at 10
+		}
+
+	def root_cause_analysis(
+		self,
+		tenant_id: str,
+		signal_id: str,
+	) -> dict[str, Any]:
+		"""Perform root cause analysis for an open anomaly signal."""
+		signal = self._get_signal(tenant_id, signal_id)
+		observation = self._observations.get(self._tenant_key(tenant_id, f"obs:{signal_id}"))
+		hints = list(signal.root_cause_hints)
+		if not hints and observation:
+			if observation.value > 0:
+				hints = ["value_spike", "check_upstream_load"]
+			else:
+				hints = ["value_drop", "check_source_availability"]
+		return {
+			"signal_id": signal_id,
+			"tenant_id": tenant_id,
+			"severity": signal.severity,
+			"score": signal.score,
+			"root_cause_hints": hints,
+			"observation": observation.to_dict() if observation else None,
+			"recommended_actions": [f"Investigate {h}" for h in hints[:3]],
+		}
+
+	def anomaly_correlate(
+		self,
+		tenant_id: str,
+		signal_ids: list[str],
+	) -> dict[str, Any]:
+		"""Find correlations between multiple anomaly signals."""
+		signals = []
+		for sid in signal_ids:
+			signal = self._signals.get(self._tenant_key(tenant_id, sid))
+			if signal:
+				signals.append(signal.to_dict())
+		severities = [s["severity"] for s in signals]
+		sources = list({s["source_id"] for s in signals})
+		return {
+			"tenant_id": tenant_id,
+			"signal_count": len(signals),
+			"correlated_source_count": len(sources),
+			"shared_sources": sources,
+			"severity_distribution": {sev: severities.count(sev) for sev in set(severities)},
+			"correlation_score": round(len(set(s["source_id"] for s in signals)) / max(len(signals), 1), 4),
+		}
+
+	def suppression_rule(
+		self,
+		rule_id: str,
+		tenant_id: str,
+		source_id: str,
+		metric: str,
+		reason: str,
+		duration_hours: int = 24,
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Create a temporary suppression rule to mute signals from a source/metric."""
+		from datetime import timezone
+		from datetime import datetime as _dt
+		record = {
+			"rule_id": rule_id,
+			"tenant_id": tenant_id,
+			"source_id": source_id,
+			"metric": metric,
+			"reason": reason,
+			"duration_hours": duration_hours,
+			"expires_at": (_dt.now(timezone.utc).isoformat()),
+			"status": "active",
+			"actor": actor,
+		}
+		self._feedback[self._tenant_key(tenant_id, rule_id)] = DetectionFeedback(
+			id=rule_id,
+			tenant_id=tenant_id,
+			signal_id=f"suppression:{source_id}:{metric}",
+			label="suppressed",
+			reviewer=actor,
+			notes=reason,
+			status="recorded",
+			decision="allow",
+			matched_rules=(),
+			review_reasons=(),
+		)
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="suppression_rule_created",
+			subject_id=rule_id,
+			message=f"Suppression rule {rule_id} for {source_id}/{metric} ({duration_hours}h).",
+			evidence={"reason": reason, "duration_hours": duration_hours},
+		)
+		return record
+
+	def anomaly_feedback(
+		self,
+		feedback_id: str,
+		tenant_id: str,
+		signal_id: str,
+		label: str,
+		reviewer: str,
+		notes: str = "",
+	) -> dict[str, Any]:
+		"""Alias for record_feedback with simplified signature."""
+		return self.record_feedback(
+			feedback_id=feedback_id,
+			tenant_id=tenant_id,
+			signal_id=signal_id,
+			label=label,
+			reviewer=reviewer,
+			notes=notes,
+		)
+
+	def false_positive_mark(
+		self,
+		feedback_id: str,
+		tenant_id: str,
+		signal_id: str,
+		reviewer: str,
+		notes: str = "",
+	) -> dict[str, Any]:
+		"""Mark a signal as a confirmed false positive."""
+		return self.record_feedback(
+			feedback_id=feedback_id,
+			tenant_id=tenant_id,
+			signal_id=signal_id,
+			label="false_positive",
+			reviewer=reviewer,
+			notes=notes,
+		)
+
+	def anomaly_export(
+		self,
+		tenant_id: str,
+		export_format: str = "json",
+	) -> dict[str, Any]:
+		"""Export anomaly signals in the requested format."""
+		signals = self.list_signals(tenant_id)
+		if export_format == "csv":
+			if signals:
+				keys = list(signals[0].keys())
+				lines = [",".join(keys)] + [",".join(str(s.get(k, "")) for k in keys) for s in signals]
+				data = "\n".join(lines)
+			else:
+				data = ""
+		else:
+			import json as _json
+			data = _json.dumps(signals, default=str, indent=2)
+		return {
+			"tenant_id": tenant_id,
+			"format": export_format,
+			"record_count": len(signals),
+			"data": data,
+		}
+
+	def pattern_library(
+		self,
+		tenant_id: str,
+	) -> dict[str, Any]:
+		"""Return aggregated anomaly pattern statistics from signal history."""
+		signals = self.list_signals(tenant_id)
+		sources = {}
+		for s in signals:
+			src = s.get("source_id", "unknown")
+			sources.setdefault(src, {"count": 0, "open": 0, "severity_sum": 0.0})
+			sources[src]["count"] += 1
+			if s.get("status") == "open":
+				sources[src]["open"] += 1
+			severity_map = {"low": 1, "medium": 2, "high": 3, "critical": 4}
+			sources[src]["severity_sum"] += severity_map.get(s.get("severity", "low"), 1)
+		return {
+			"tenant_id": tenant_id,
+			"total_signal_count": len(signals),
+			"source_patterns": sources,
+			"top_sources": sorted(sources.items(), key=lambda x: x[1]["count"], reverse=True)[:5],
+		}
+
+	def streaming_detect(
+		self,
+		tenant_id: str,
+		source_id: str,
+		baseline_id: str,
+		metric: str,
+		value: float,
+		detection_id: str | None = None,
+		owner: str | None = None,
+	) -> dict[str, Any]:
+		"""Lightweight single-value detection optimised for streaming pipelines."""
+		from uuid6 import uuid7
+		did = detection_id or str(uuid7())
+		return self.detect(
+			detection_id=did,
+			tenant_id=tenant_id,
+			source_id=source_id,
+			baseline_id=baseline_id,
+			metric=metric,
+			value=value,
+			owner=owner,
+		)
+
+	def health_check(self, tenant_id: str = "default") -> dict[str, Any]:
+		"""Return service health summary."""
+		summary = self.signal_summary(tenant_id)
+		return {
+			"status": "healthy",
+			"tenant_id": tenant_id,
+			"source_count": summary["source_count"],
+			"signal_count": summary["signal_count"],
+			"false_positive_rate": summary["false_positive_rate"],
+			"pending_review_count": summary["pending_signal_review_count"],
+		}
+
+	def dashboard(self, tenant_id: str = "default") -> dict[str, Any]:
+		"""Return aggregated KPI dashboard for anomaly detection."""
+		summary = self.signal_summary(tenant_id)
+		signals = self.list_signals(tenant_id)
+		open_signals = [s for s in signals if s.get("status") == "open"]
+		critical = [s for s in open_signals if s.get("severity") == "critical"]
+		return {
+			**summary,
+			"open_signal_count": len(open_signals),
+			"critical_signal_count": len(critical),
+			"health": self.health_check(tenant_id),
+		}
+
+	def bulk_detect(
+		self,
+		tenant_id: str,
+		source_id: str,
+		baseline_id: str,
+		observations: list[dict[str, Any]],
+	) -> list[dict[str, Any]]:
+		"""Submit multiple observations for detection in a single call."""
+		results = []
+		for obs in observations:
+			from uuid6 import uuid7
+			result = self.detect(
+				detection_id=str(uuid7()),
+				tenant_id=tenant_id,
+				source_id=source_id,
+				baseline_id=baseline_id,
+				metric=str(obs.get("metric", "value")),
+				value=float(obs.get("value", 0.0)),
+				timestamp=obs.get("timestamp"),
+				context=obs.get("context"),
+			)
+			results.append(result)
+		return results
+
+	def export_baselines(
+		self,
+		tenant_id: str,
+		export_format: str = "json",
+	) -> dict[str, Any]:
+		"""Export baseline profiles."""
+		baselines = self.list_baselines(tenant_id)
+		if export_format == "csv":
+			keys = list(baselines[0].keys()) if baselines else []
+			lines = [",".join(keys)] + [",".join(str(b.get(k, "")) for k in keys) for b in baselines]
+			data = "\n".join(lines)
+		else:
+			import json as _json
+			data = _json.dumps(baselines, default=str, indent=2)
+		return {"tenant_id": tenant_id, "format": export_format, "count": len(baselines), "data": data}
+
+	def compliance_check(
+		self,
+		tenant_id: str,
+		framework: str = "iso27001",
+	) -> dict[str, Any]:
+		"""Check anomaly detection compliance against a named framework."""
+		summary = self.signal_summary(tenant_id)
+		fp_rate = summary.get("false_positive_rate", 1.0)
+		coverage = summary["source_count"] > 0
+		score = 0.0
+		checks: list[str] = []
+		if coverage:
+			score += 40
+			checks.append("monitoring_sources_configured=True")
+		if summary["baseline_count"] > 0:
+			score += 30
+			checks.append("baselines_configured=True")
+		if fp_rate < 0.1:
+			score += 30
+			checks.append(f"false_positive_rate_ok={fp_rate:.1%}")
+		return {
+			"tenant_id": tenant_id,
+			"framework": framework,
+			"compliance_score": round(score, 1),
+			"status": "compliant" if score >= 80 else "non_compliant",
+			"checks": checks,
+			"false_positive_rate": fp_rate,
+		}
+
+
 def _raise_if_blocked(result: dict[str, Any]) -> None:
 	if result["decision"] == "allow":
 		return

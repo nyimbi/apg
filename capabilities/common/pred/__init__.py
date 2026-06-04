@@ -1,127 +1,31 @@
-"""APG Predictive Analytics (PRED) capability registration."""
+"""APG Predictive Analytics capability.
 
+Standalone package: ``pip install apg-common-pred``
+
+Quick start::
+
+    from apg_common_pred import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : pred
+Provides      : predictive_analytics, forecasting, prediction_agent_composition
+"""
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any
+__version__  = "1.0.0"
+__package_name__ = "apg-common-pred"
+__capability_id__ = "pred"
 
-from .capability_contract import (
-	evaluate_capability_rules,
-	get_capability_contract
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
 )
 
-__version__ = "1.0.0"
-__capability_id__ = "pred"
-__capability_name__ = "Predictive Analytics"
-__apg_dependencies__ = ["aicr", "mlcm", "etlp", "conf", "auth", "audl", "moni"]
-
-capability_metadata: dict[str, Any] = {
-	"name": "pred",
-	"version": __version__,
-	"display_name": __capability_name__,
-	"description": "Tenant-aware forecasting, scoring, simulation, and predictive model operations",
-	"category": "ai_intelligence",
-	"subcategory": "predictive_analytics",
-	"vendor": "Datacraft",
-	"author": "APG Platform Team",
-	"license": "Commercial",
-	"created_at": datetime.now(timezone.utc),
-	"dependencies": __apg_dependencies__,
-	"provides": [
-		"forecasting",
-		"predictive_scoring",
-		"scenario_simulation",
-		"feature_lineage",
-		"prediction_monitoring",
-		"model_explainability",
-		"prediction_agent_composition",
-	],
-	"composition_patterns": [
-		"forecast_pipeline",
-		"batch_scoring",
-		"real_time_prediction",
-		"what_if_simulation"
-	],
-	"permissions": [
-		"pred:view",
-		"pred:score",
-		"pred:forecast",
-		"pred:simulate",
-		"pred:manage_models",
-		"pred:govern",
-		"pred:audit",
-		"pred:admin"
-	]
-}
-
-
-def register_capability() -> dict[str, Any]:
-	"""Register PRED with the APG composition engine."""
-	contract = get_capability_contract()
-	return {
-		"name": "pred",
-		"aliases": ["predictive_analytics", "forecasting", "predictive_scoring"],
-		"display_name": capability_metadata["display_name"],
-		"description": capability_metadata["description"],
-		"version": capability_metadata["version"],
-		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["cach", "nlpc"],
-		"configuration": contract["configuration"],
-		"configuration_schema": contract["configuration_schema"],
-		"rule_engine": contract["rule_engine"],
-		"adapters": contract["configuration"]["adapters"],
-		"agents": contract["agents"],
-		"streaming": contract["streaming"],
-		"capabilities": {
-			"forecasting": "Run governed time-series and demand forecasts",
-			"predictive_scoring": "Score tenant-scoped entities through approved models",
-			"feature_registry": "Register feature sets with ETLP lineage evidence",
-			"scenario_simulation": "Compare what-if scenarios with audit evidence",
-			"feature_lineage": "Track prediction features back to ETLP and metadata sources",
-			"drift_monitoring": "Record drift reports and review above-threshold drift",
-			"batch_scoring": "Expose Bytewax-backed batch scoring composition metadata",
-			"prediction_agent_composition": "Register provider-neutral AI prediction agents with runtime, role, scope, owner, purpose, disclosure, and human-review guardrails",
-			"lifecycle_batch_governance": "Validate predictive lifecycle mutations through Bytewax-only batch contracts",
-			"capability_rules": "Evaluate deterministic predictive-analytics governance rules",
-			"visual_theming": "Apply forecast-console theme tokens and components"
-		},
-		"endpoints": {
-			"forecasts": "/pred/api/v1/forecasts",
-			"scores": "/pred/api/v1/scores",
-			"features": "/pred/api/v1/features",
-			"models": "/pred/api/v1/models",
-			"scenarios": "/pred/api/v1/scenarios",
-			"drift": "/pred/api/v1/drift",
-			"batch": "/pred/api/v1/batch",
-			"agents": "/pred/api/v1/agents",
-			"lifecycle": "/pred/api/v1/lifecycle",
-			"audit": "/pred/api/v1/audit"
-		},
-		"ui_components": {
-			route["name"]: route["path"]
-			for route in contract["ui"]["routes"]
-		},
-		"ui_manifest": contract["ui"],
-		"theme": contract["theme"],
-		"permissions": capability_metadata["permissions"]
-	}
-
-
-def get_capability_info() -> dict[str, Any]:
-	"""Get PRED capability information for composition and marketplace discovery."""
-	info = capability_metadata.copy()
-	info["contract"] = get_capability_contract()
-	return info
-
-
 __all__ = [
-	"capability_metadata",
-	"register_capability",
-	"get_capability_info",
-	"get_capability_contract",
-	"evaluate_capability_rules",
-	"__version__",
-	"__capability_id__",
-	"__capability_name__",
-	"__apg_dependencies__"
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
 ]

@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "telecom_ord",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "telecom_ord": {
+      "capability": "telecom_ord"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

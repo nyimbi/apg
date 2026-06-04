@@ -1,75 +1,31 @@
-"""APG Backup and Restore (BKUP) capability registration."""
+"""APG Backup and Restore capability.
 
+Standalone package: ``pip install apg-common-bkup``
+
+Quick start::
+
+    from apg_common_bkup import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : bkup
+Provides      : backup_plan_governance, snapshot_vault, restore_governance, retention_governance, continuity_reporting, backup_agents
+"""
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any
-
-from .capability_contract import evaluate_capability_rules, get_capability_contract
-from .service import BkupService
-
-__version__ = "1.0.0"
+__version__  = "1.0.0"
+__package_name__ = "apg-common-bkup"
 __capability_id__ = "bkup"
-__capability_name__ = "Backup and Restore"
-__apg_dependencies__ = ["encr", "conf", "audl"]
 
-capability_metadata: dict[str, Any] = {
-	"name": "bkup",
-	"version": __version__,
-	"display_name": __capability_name__,
-	"description": "Tenant-aware backup plans, snapshots, restore testing, retention, encryption, and continuity governance",
-	"category": "infrastructure_operations",
-	"subcategory": "backup_restore",
-	"vendor": "Datacraft",
-	"author": "APG Platform Team",
-	"license": "Commercial",
-	"created_at": datetime.now(timezone.utc),
-	"dependencies": __apg_dependencies__,
-	"provides": ["backup_plans", "snapshots", "restore_testing", "retention_policy", "continuity_reporting", "backup_agents"],
-	"permissions": ["bkup:view", "bkup:manage_plans", "bkup:run_backup", "bkup:restore", "bkup:approve_restore", "bkup:approve_retention", "bkup:admin"]
-}
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
+)
 
-
-def register_capability() -> dict[str, Any]:
-	"""Register BKUP with the APG composition engine."""
-	contract = get_capability_contract()
-	return {
-		"name": "bkup",
-		"aliases": ["backup", "restore", "business_continuity"],
-		"display_name": capability_metadata["display_name"],
-		"description": capability_metadata["description"],
-		"version": capability_metadata["version"],
-		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["schd", "moni", "comp", "depl"],
-		"configuration": contract["configuration"],
-		"configuration_schema": contract["configuration_schema"],
-		"rule_engine": contract["rule_engine"],
-		"capabilities": {
-			"backup_plans": "Define tenant-scoped backup plans, sources, schedules, retention, and ownership",
-			"snapshots": "Create encrypted snapshots with integrity and lineage metadata",
-			"restore_testing": "Run restore drills, point-in-time validation, and recovery reports",
-			"restore_approvals": "Route production and high-risk restores through independent approval",
-			"retention_policy": "Enforce retention, legal hold, deletion, and compliance policies",
-			"retention_dispositions": "Approve legal-hold-aware snapshot deletion and archival disposition",
-			"backup_agents": "Register governed AI backup agents for continuity and restore review support",
-			"bytewax_streaming": "Expose Bytewax lifecycle-stream metadata for batch backup mutation",
-			"capability_rules": "Evaluate deterministic backup and restore rules",
-			"visual_theming": "Apply continuity-operations theme tokens and components"
-		},
-		"endpoints": {"plans": "/bkup/api/v1/plans", "snapshots": "/bkup/api/v1/snapshots", "restores": "/bkup/api/v1/restores", "restore_approvals": "/bkup/api/v1/restore-approvals", "retention": "/bkup/api/v1/retention", "retention_dispositions": "/bkup/api/v1/retention-dispositions", "reports": "/bkup/api/v1/reports", "backup_agents": "/bkup/api/v1/agents"},
-		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
-		"ui_manifest": contract["ui"],
-		"theme": contract["theme"],
-		"streaming": contract["streaming"],
-		"permissions": capability_metadata["permissions"]
-	}
-
-
-def get_capability_info() -> dict[str, Any]:
-	"""Get BKUP capability information for composition and marketplace discovery."""
-	info = capability_metadata.copy()
-	info["contract"] = get_capability_contract()
-	return info
-
-
-__all__ = ["BkupService", "capability_metadata", "register_capability", "get_capability_info", "get_capability_contract", "evaluate_capability_rules", "__version__", "__capability_id__", "__capability_name__", "__apg_dependencies__"]
+__all__ = [
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
+]

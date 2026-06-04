@@ -116,7 +116,20 @@ RULES: list[dict[str, Any]] = [
 	{"name": "compliance_agent_runtime_supported", "condition": {"operation": "register_compliance_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "compliance_agent_runtime_not_supported", "required_action": "select_supported_runtime"}},
 	{"name": "compliance_agent_role_supported", "condition": {"operation": "register_compliance_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "compliance_agent_role_not_supported", "required_action": "select_supported_role"}},
 	{"name": "privileged_compliance_agent_action_requires_human_approval", "condition": {"operation": "compliance_agent_action", "privileged_scope": True, "human_approval_recorded": False}, "effect": {"decision": "deny", "reason": "human_approval_required", "required_action": "record_human_approval"}},
+
+	# Cross-tenant and privilege escalation guards
+	{"name": "cross_tenant_compliance_access_denied", "description": "Compliance resources cannot be accessed across tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_access_denied", "required_action": "use_tenant_scoped_credentials"}},
+	{"name": "privilege_escalation_denied", "description": "Compliance privilege escalation without approval is denied.", "condition": {"privilege_escalation_attempt": True, "approval_recorded": False}, "effect": {"decision": "deny", "reason": "privilege_escalation_denied", "required_action": "obtain_escalation_approval"}},
+
+	# Africa-specific compliance rules
+	{"name": "ke_cbk_prudential_returns_required", "description": "Kenya CBK prudential returns must be filed on schedule.", "condition": {"operation": "file_regulatory_return", "jurisdiction": "KE", "cbk_return_overdue": True}, "effect": {"decision": "deny", "reason": "ke_cbk_return_overdue", "required_action": "file_cbk_prudential_return_immediately"}},
+	{"name": "ke_frc_aml_return_required", "description": "Kenya FRC AML/CFT compliance returns are mandatory.", "condition": {"operation": "file_regulatory_return", "jurisdiction": "KE", "frc_aml_return_filed": False}, "effect": {"decision": "deny", "reason": "ke_frc_aml_return_required", "required_action": "file_frc_aml_return"}},
+	{"name": "ng_cbn_compliance_return_required", "description": "Nigeria CBN compliance returns must be filed on schedule.", "condition": {"operation": "file_regulatory_return", "jurisdiction": "NG", "cbn_return_overdue": True}, "effect": {"decision": "deny", "reason": "ng_cbn_return_overdue", "required_action": "file_cbn_compliance_return"}},
+	{"name": "mobile_money_regulatory_cap_enforced", "description": "Mobile money regulatory transaction caps must be enforced.", "condition": {"operation": "process_mobile_money", "regulatory_cap_exceeded": True}, "effect": {"decision": "deny", "reason": "mobile_money_regulatory_cap_exceeded", "required_action": "enforce_regulatory_transaction_cap"}},
+	{"name": "ke_data_protection_act_compliance", "description": "Kenya Data Protection Act compliance is required for personal data processing.", "condition": {"operation": "process_personal_data", "country": "KE", "dpa_compliant": False}, "effect": {"decision": "deny", "reason": "ke_data_protection_act_compliance_required", "required_action": "comply_with_ke_data_protection_act"}},
+	{"name": "cbk_cbdc_pilot_compliance", "description": "CBK e-Shilling CBDC pilot compliance is required for digital currency operations in Kenya.", "condition": {"operation": "digital_currency_operation", "jurisdiction": "KE", "cbdc_pilot_compliant": False}, "effect": {"decision": "deny", "reason": "cbk_cbdc_pilot_compliance_required", "required_action": "comply_with_cbk_cbdc_pilot_guidelines"}},
 ]
+
 
 
 def get_capability_contract(tenant_id: str = "default") -> dict[str, Any]:

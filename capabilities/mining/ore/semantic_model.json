@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "mining_ore",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "mining_ore": {
+      "capability": "mining_ore"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

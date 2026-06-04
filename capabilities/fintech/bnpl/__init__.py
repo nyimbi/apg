@@ -1,8 +1,31 @@
-"""APG Buy Now Pay Later capability package."""
+"""APG Buy Now Pay Later capability.
 
+Standalone package: ``pip install apg-fintech-bnpl``
+
+Quick start::
+
+    from apg_fintech_bnpl import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : fintech_bnpl
+Provides      : bnpl_merchant_program_governance, consumer_bnpl_lifecycle, merchant_checkout_workflow, affordability_decisioning, bnpl_plan_workflow, installment_schedule_workflow
+"""
 from __future__ import annotations
 
-from .capability_contract import CAPABILITY_ID, CAPABILITY_NAME, CAPABILITY_VERSION, get_capability_contract
-from .service import BNPLService
+__version__  = "1.1.0"
+__package_name__ = "apg-fintech-bnpl"
+__capability_id__ = "fintech_bnpl"
 
-__all__ = ["BNPLService", "CAPABILITY_ID", "CAPABILITY_NAME", "CAPABILITY_VERSION", "get_capability_contract"]
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
+)
+
+__all__ = [
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
+]

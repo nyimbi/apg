@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "mining_exp",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "mining_exp": {
+      "capability": "mining_exp"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

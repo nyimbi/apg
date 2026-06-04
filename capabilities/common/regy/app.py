@@ -217,3 +217,70 @@ def self_test() -> dict[str, Any]:
 
 if __name__ == "__main__":
 	print(json.dumps(self_test(), indent=2, sort_keys=True))
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Standalone HTTP server — added by APG packaging pipeline
+# Run: python -m <module_name>  OR  <package-name> --port 8080
+# ──────────────────────────────────────────────────────────────────────────────
+import argparse as _argparse
+
+try:
+	from flask import Flask as _Flask, jsonify as _jsonify, request as _request
+
+	def create_app(config: dict | None = None):
+		"""Create the standalone Flask application for this capability."""
+		app = _Flask(__name__)
+		if config:
+			app.config.update(config)
+
+		try:
+			from .api import blueprint as _api_bp
+			app.register_blueprint(_api_bp, url_prefix="/api/v1")
+		except (ImportError, AttributeError):
+			pass
+
+		try:
+			from .views import blueprint as _views_bp
+			app.register_blueprint(_views_bp)
+		except (ImportError, AttributeError):
+			pass
+
+		@app.get("/health")
+		def _health():
+			return _jsonify({"status": "ok", "capability": get_capability_contract().get("capability"), "version": get_capability_contract().get("version")})
+
+		@app.get("/contract")
+		def _contract():
+			return _jsonify(get_capability_contract())
+
+		@app.post("/evaluate")
+		def _evaluate():
+			from .capability_contract import evaluate_capability_rules
+			ctx = _request.get_json(force=True, silent=True) or {}
+			return _jsonify(evaluate_capability_rules(ctx))
+
+		@app.get("/semantic-model.json")
+		def _semantic_model():
+			return _jsonify(semantic_model())
+
+		return app
+
+except ImportError:
+	# Flask not installed — create_app is unavailable in this environment
+	def create_app(config=None):
+		raise ImportError("flask is required for standalone HTTP mode: pip install flask")
+
+
+def main(argv=None):
+	parser = _argparse.ArgumentParser(description=f"APG capability server")
+	parser.add_argument("--host", default="127.0.0.1")
+	parser.add_argument("--port", type=int, default=8080)
+	parser.add_argument("--debug", action="store_true")
+	args = parser.parse_args(argv)
+	app = create_app()
+	app.run(host=args.host, port=args.port, debug=args.debug)
+
+
+if __name__ == "__main__":
+	main()

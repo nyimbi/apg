@@ -386,7 +386,77 @@ def default_rules() -> list[CapabilityRule]:
 				"reason": "bytewax_security_stream_required",
 				"required_action": "route_security_lifecycle_batch_through_bytewax"
 			}
-		)
+		),
+		CapabilityRule(
+			name="tenant_context_required",
+			description="All security operations require tenant context.",
+			condition={"tenant_context_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "tenant_context_required",
+				"required_action": "attach_tenant_context"
+			}
+		),
+		CapabilityRule(
+			name="cross_tenant_security_access_denied",
+			description="Security policies and incidents are scoped to the requesting tenant.",
+			condition={"cross_tenant_security_access": True, "cross_tenant_membership_confirmed": False},
+			effect={
+				"decision": "deny",
+				"reason": "cross_tenant_security_access_denied",
+				"required_action": "use_tenant_scoped_security_resource"
+			}
+		),
+		CapabilityRule(
+			name="write_requires_policy",
+			description="Security write operations require an explicit authorization policy.",
+			condition={"operation_type": "write", "write_policy_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "secu_write_policy_required",
+				"required_action": "attach_write_policy"
+			}
+		),
+		CapabilityRule(
+			name="privilege_escalation_denied",
+			description="Security operators cannot self-grant elevated security permissions.",
+			condition={"operation": "assign_secu_permission", "target_tier_exceeds_actor_tier": True},
+			effect={
+				"decision": "deny",
+				"reason": "privilege_escalation_prevented",
+				"required_action": "route_to_higher_authority_approver"
+			}
+		),
+		CapabilityRule(
+			name="unknown_device_denied",
+			description="Devices not registered in the device registry are denied access.",
+			condition={"device_registered": False, "zero_trust_enabled": True},
+			effect={
+				"decision": "deny",
+				"reason": "unknown_device_denied",
+				"required_action": "register_device_before_access"
+			}
+		),
+		CapabilityRule(
+			name="threat_indicator_triggers_review",
+			description="Active threat indicators against a resource require mandatory review before access.",
+			condition={"active_threat_indicator": True, "threat_review_completed": False},
+			effect={
+				"decision": "require_review",
+				"reason": "threat_indicator_review_required",
+				"required_action": "complete_threat_indicator_review"
+			}
+		),
+		CapabilityRule(
+			name="security_audit_event_required",
+			description="All security state changes must produce an immutable audit event.",
+			condition={"security_state_change_requested": True, "audit_event_recorded": False},
+			effect={
+				"decision": "deny",
+				"reason": "security_audit_event_required",
+				"required_action": "record_security_audit_event"
+			}
+		),
 	]
 
 

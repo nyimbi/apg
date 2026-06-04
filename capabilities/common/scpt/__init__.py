@@ -1,83 +1,31 @@
-"""APG Custom Scripting Engine (SCPT) capability registration."""
+"""APG Custom Scripting Engine capability.
 
+Standalone package: ``pip install apg-common-scpt``
+
+Quick start::
+
+    from apg_common_scpt import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : scpt
+Provides      : script_registry, secure_sandbox, workflow_extensions, package_policy, script_execution, scripting_agent_composition
+"""
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any
-
-from .capability_contract import evaluate_capability_rules, get_capability_contract
-
-__version__ = "1.0.0"
+__version__  = "1.0.0"
+__package_name__ = "apg-common-scpt"
 __capability_id__ = "scpt"
-__capability_name__ = "Custom Scripting Engine"
-__apg_dependencies__ = ["wflo", "secu", "auth", "audl", "aicr"]
 
-capability_metadata: dict[str, Any] = {
-	"name": "scpt",
-	"version": __version__,
-	"display_name": __capability_name__,
-	"description": "Tenant-aware custom scripts, secure sandboxes, workflow extensions, package policies, first-class provider-neutral scripting agents, Bytewax lifecycle governance, and execution governance",
-	"category": "workflow_automation",
-	"subcategory": "custom_scripting",
-	"vendor": "Datacraft",
-	"author": "APG Platform Team",
-	"license": "Commercial",
-	"created_at": datetime.now(timezone.utc),
-	"dependencies": __apg_dependencies__,
-	"provides": ["script_registry", "secure_sandbox", "workflow_extensions", "package_policy", "script_execution", "scripting_agent_composition", "script_governance", "bytewax_script_lifecycle"],
-	"permissions": ["scpt:view", "scpt:write", "scpt:execute", "scpt:approve", "scpt:audit", "scpt:admin"]
-}
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
+)
 
-
-def register_capability() -> dict[str, Any]:
-	"""Register SCPT with the APG composition engine."""
-	contract = get_capability_contract()
-	return {
-		"name": "scpt",
-		"aliases": ["scripting", "custom_scripting", "script_engine"],
-		"display_name": capability_metadata["display_name"],
-		"description": capability_metadata["description"],
-		"version": capability_metadata["version"],
-		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["ncod", "schd", "moni", "them"],
-		"configuration": contract["configuration"],
-		"configuration_schema": contract["configuration_schema"],
-		"rule_engine": contract["rule_engine"],
-		"capabilities": {
-			"script_registry": "Version, review, publish, and retire tenant-scoped scripts",
-			"secure_sandbox": "Run scripts inside constrained sandboxes with resource and network policy",
-			"workflow_extensions": "Attach scripts to workflow steps, triggers, and scheduled jobs",
-			"package_policy": "Control allowed packages, secrets, imports, and runtime permissions",
-			"scripting_agent_composition": "Register first-class provider-neutral scripting agents for authoring, review, policy advice, tests, runtime triage, lifecycle, and stewardship",
-			"script_governance": "Govern review, publication, retirement, execution evidence, and Bytewax event policy",
-			"bytewax_script_lifecycle": "Validate scripting lifecycle batches through Bytewax-only processor metadata",
-			"capability_rules": "Evaluate deterministic scripting-governance rules",
-			"visual_theming": "Apply script-workbench theme tokens and components"
-		},
-		"endpoints": {
-			"scripts": "/scpt/api/v1/scripts",
-			"executions": "/scpt/api/v1/executions",
-			"sandboxes": "/scpt/api/v1/sandboxes",
-			"packages": "/scpt/api/v1/packages",
-			"approvals": "/scpt/api/v1/approvals",
-			"agents": "/scpt/api/v1/agents",
-			"lifecycle": "/scpt/api/v1/lifecycle",
-			"audit": "/scpt/api/v1/audit"
-		},
-		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
-		"ui_manifest": contract["ui"],
-		"theme": contract["theme"],
-		"agents": contract["agents"],
-		"streaming": contract["streaming"],
-		"permissions": capability_metadata["permissions"]
-	}
-
-
-def get_capability_info() -> dict[str, Any]:
-	"""Get SCPT capability information for composition and marketplace discovery."""
-	info = capability_metadata.copy()
-	info["contract"] = get_capability_contract()
-	return info
-
-
-__all__ = ["capability_metadata", "register_capability", "get_capability_info", "get_capability_contract", "evaluate_capability_rules", "__version__", "__capability_id__", "__capability_name__", "__apg_dependencies__"]
+__all__ = [
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
+]

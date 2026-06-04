@@ -244,7 +244,7 @@ class HealthMetricsResource(Resource):
 			loop = asyncio.new_event_loop()
 			asyncio.set_event_loop(loop)
 			
-			metrics_result = loop.run_until_complete(
+			metrics_result = asyncio.run(
 				self.health_service.get_health_metrics(
 					tenant_id=args['tenant_id'],
 					component_id=args.get('component_id'),
@@ -286,7 +286,7 @@ class HealthMetricsResource(Resource):
 			loop = asyncio.new_event_loop()
 			asyncio.set_event_loop(loop)
 			
-			processing_result = loop.run_until_complete(
+			processing_result = asyncio.run(
 				self.health_service.process_health_metric(health_metric)
 			)
 			
@@ -335,7 +335,7 @@ class ComponentHealthResource(Resource):
 			
 			if component_id:
 				# Get specific component health
-				health_assessment = loop.run_until_complete(
+				health_assessment = asyncio.run(
 					self.health_service.assess_component_health(
 						component_id=component_id,
 						tenant_id=args['tenant_id'],
@@ -349,7 +349,7 @@ class ComponentHealthResource(Resource):
 				}
 				
 				if args['include_predictions']:
-					prediction = loop.run_until_complete(
+					prediction = asyncio.run(
 						self.health_service.predict_component_health(
 							component_id=component_id,
 							tenant_id=args['tenant_id']
@@ -359,7 +359,7 @@ class ComponentHealthResource(Resource):
 			
 			else:
 				# Get all components health summary
-				health_summary = loop.run_until_complete(
+				health_summary = asyncio.run(
 					self.health_service.get_tenant_health_summary(args['tenant_id'])
 				)
 				
@@ -387,7 +387,7 @@ class ComponentHealthResource(Resource):
 			loop = asyncio.new_event_loop()
 			asyncio.set_event_loop(loop)
 			
-			assessment_result = loop.run_until_complete(
+			assessment_result = asyncio.run(
 				self.health_service.assess_component_health(
 					component_id=assessment_data['component_id'],
 					tenant_id=assessment_data['tenant_id'],
@@ -439,7 +439,7 @@ class HealthAlertsResource(Resource):
 			loop = asyncio.new_event_loop()
 			asyncio.set_event_loop(loop)
 			
-			alerts_result = loop.run_until_complete(
+			alerts_result = asyncio.run(
 				self.health_service.get_health_alerts(
 					tenant_id=args['tenant_id'],
 					component_id=args.get('component_id'),
@@ -477,7 +477,7 @@ class HealthAlertsResource(Resource):
 			loop = asyncio.new_event_loop()
 			asyncio.set_event_loop(loop)
 			
-			update_result = loop.run_until_complete(
+			update_result = asyncio.run(
 				self.health_service.update_alert_status(
 					alert_id=alert_id,
 					action=args['action'],
@@ -527,7 +527,7 @@ class HealthReportsResource(Resource):
 			loop = asyncio.new_event_loop()
 			asyncio.set_event_loop(loop)
 			
-			reports_result = loop.run_until_complete(
+			reports_result = asyncio.run(
 				self.health_service.get_health_reports(
 					tenant_id=args['tenant_id'],
 					report_type=args.get('report_type'),
@@ -557,7 +557,7 @@ class HealthReportsResource(Resource):
 			loop = asyncio.new_event_loop()
 			asyncio.set_event_loop(loop)
 			
-			health_report = loop.run_until_complete(
+			health_report = asyncio.run(
 				self.health_service.generate_health_report(
 					tenant_id=report_data['tenant_id'],
 					report_type=report_data['report_type'],
@@ -607,7 +607,7 @@ class MultiDimensionalAnalysisResource(Resource):
 			loop = asyncio.new_event_loop()
 			asyncio.set_event_loop(loop)
 			
-			analysis_result = loop.run_until_complete(
+			analysis_result = asyncio.run(
 				self.health_service.analyze_multi_dimensional_health(
 					tenant_id=args['tenant_id'],
 					component_id=args.get('component_id'),
@@ -652,7 +652,7 @@ class HealthPredictionsResource(Resource):
 			
 			if args.get('component_id'):
 				# Single component prediction
-				prediction_result = loop.run_until_complete(
+				prediction_result = asyncio.run(
 					self.health_service.predict_component_health(
 						component_id=args['component_id'],
 						tenant_id=args['tenant_id'],
@@ -666,7 +666,7 @@ class HealthPredictionsResource(Resource):
 				}
 			else:
 				# Tenant-wide predictions
-				predictions_result = loop.run_until_complete(
+				predictions_result = asyncio.run(
 					self.health_service.get_tenant_health_predictions(
 						tenant_id=args['tenant_id'],
 						prediction_window_hours=args['prediction_window_hours']
@@ -712,7 +712,7 @@ class RemediationResource(Resource):
 			loop = asyncio.new_event_loop()
 			asyncio.set_event_loop(loop)
 			
-			remediation_result = loop.run_until_complete(
+			remediation_result = asyncio.run(
 				self.health_service.trigger_manual_remediation(
 					alert_id=args['alert_id'],
 					tenant_id=args['tenant_id'],
@@ -745,7 +745,7 @@ class RemediationResource(Resource):
 			loop = asyncio.new_event_loop()
 			asyncio.set_event_loop(loop)
 			
-			remediation_history = loop.run_until_complete(
+			remediation_history = asyncio.run(
 				self.health_service.get_remediation_history(
 					tenant_id=args['tenant_id'],
 					component_id=args.get('component_id'),
@@ -797,7 +797,7 @@ def health_status():
 		loop = asyncio.new_event_loop()
 		asyncio.set_event_loop(loop)
 		
-		health_status_result = loop.run_until_complete(health_check())
+		health_status_result = asyncio.run(health_check())
 		
 		loop.close()
 		

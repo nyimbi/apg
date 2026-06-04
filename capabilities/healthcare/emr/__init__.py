@@ -1,10 +1,31 @@
+"""APG Electronic Medical Records capability.
+
+Standalone package: ``pip install apg-healthcare-emr``
+
+Quick start::
+
+    from apg_healthcare_emr import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : healthcare_emr
+Provides      : patient_chart_management, clinical_note_authoring, problem_list_management, medication_reconciliation, allergy_tracking, vital_signs_recording
 """
-Electronic Medical Records (EMR) - Healthcare Sub-Module
+from __future__ import annotations
 
-Complete electronic medical records system with clinical documentation,
-medical history, prescriptions, and care plans.
-"""
+__version__  = "1.0.0"
+__package_name__ = "apg-healthcare-emr"
+__capability_id__ = "healthcare_emr"
 
-__version__ = "1.0.0"
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
+)
 
-__all__ = []
+__all__ = [
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
+]

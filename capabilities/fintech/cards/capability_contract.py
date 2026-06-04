@@ -109,7 +109,20 @@ RULES: list[dict[str, Any]] = [
 	{"name": "card_agent_runtime_supported", "description": "Card agents must use a supported runtime.", "condition": {"operation": "register_card_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "card_agent_runtime_not_supported", "required_action": "select_supported_agent_runtime"}},
 	{"name": "card_agent_role_supported", "description": "Card agents must use a supported role.", "condition": {"operation": "register_card_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "card_agent_role_not_supported", "required_action": "select_supported_agent_role"}},
 	{"name": "privileged_card_agent_action_requires_human_approval", "description": "Privileged card-agent actions require human approval.", "condition": {"operation": "card_agent_action", "privileged_scope": True, "human_approval_recorded": False}, "effect": {"decision": "deny", "reason": "human_approval_required", "required_action": "record_human_approval"}},
+
+	# Cross-tenant and privilege escalation guards
+	{"name": "cross_tenant_card_access_denied", "description": "Card resources cannot be accessed across tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_access_denied", "required_action": "use_tenant_scoped_credentials"}},
+	{"name": "privilege_escalation_denied", "description": "Card privilege escalation without approval is denied.", "condition": {"privilege_escalation_attempt": True, "approval_recorded": False}, "effect": {"decision": "deny", "reason": "privilege_escalation_denied", "required_action": "obtain_escalation_approval"}},
+
+	# Africa-specific card rules
+	{"name": "ke_cbk_payment_card_guidelines", "description": "Kenya CBK payment card guidelines require issuer registration.", "condition": {"operation": "issue_card", "country": "KE", "cbk_issuer_registered": False}, "effect": {"decision": "deny", "reason": "ke_cbk_issuer_registration_required", "required_action": "register_with_cbk_as_issuer"}},
+	{"name": "pesalink_card_account_required", "description": "PesaLink-enabled cards require a registered bank account.", "condition": {"operation": "issue_card", "card_type": "pesalink", "bank_account_registered": False}, "effect": {"decision": "deny", "reason": "pesalink_account_required", "required_action": "register_pesalink_account"}},
+	{"name": "mpesa_card_linkage_msisdn_required", "description": "M-Pesa-linked cards require verified Safaricom MSISDN.", "condition": {"operation": "link_mobile_money", "provider": "mpesa", "msisdn_verified": False}, "effect": {"decision": "deny", "reason": "mpesa_msisdn_verification_required", "required_action": "verify_safaricom_msisdn"}},
+	{"name": "mobile_money_card_kyc_required", "description": "Mobile money card products require KYC per CBK tier guidelines.", "condition": {"operation": "issue_card", "card_type": "mobile_money_linked", "kyc_tier_compliant": False}, "effect": {"decision": "deny", "reason": "mobile_money_card_kyc_required", "required_action": "complete_kyc_for_card_issuance"}},
+	{"name": "ke_card_daily_limit_enforced", "description": "Kenya CBK card daily transaction limits are enforced.", "condition": {"operation": "authorize_card_transaction", "country": "KE", "daily_limit_exceeded": True}, "effect": {"decision": "deny", "reason": "ke_card_daily_limit_exceeded", "required_action": "decline_or_request_limit_increase"}},
+	{"name": "card_3ds_required_for_ecommerce", "description": "E-commerce card transactions require 3D Secure authentication.", "condition": {"operation": "authorize_card_transaction", "channel": "ecommerce", "threeds_authenticated": False}, "effect": {"decision": "deny", "reason": "3ds_authentication_required", "required_action": "complete_3ds_authentication"}},
 ]
+
 
 
 def _configuration_schema() -> dict[str, Any]:

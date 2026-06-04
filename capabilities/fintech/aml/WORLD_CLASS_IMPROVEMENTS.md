@@ -77,12 +77,12 @@ import bytewax.operators as op
 from bytewax.dataflow import Dataflow
 
 flow = Dataflow("aml_monitoring")
-inp = op.input("txns", flow, KafkaSource(["apg.fintech.payments.transactions"]))
+inp = op.input("txns", flow, BytewaxSource(["apg.fintech.payments.transactions"]))
 scored = op.map("score", inp, lambda txn: asyncio.run(svc.monitor_transaction(txn)))
 alerts = op.filter("alerts", scored, lambda r: r["alerts_generated"])
-op.output("emit", alerts, KafkaSink("apg.fintech.aml.alerts"))
+op.output("emit", alerts, BytewaxSink("apg.fintech.aml.alerts"))
 ```
-**Complexity**: Medium — Kafka/Bytewax infra required; already in APG streaming stack.
+**Complexity**: Medium — Bytewax/Bytewax infra required; already in APG streaming stack.
 
 ---
 
@@ -215,7 +215,7 @@ Integrates with APG `keym` (key management) for signing and `audl` (audit) for t
 | 1 | Behavioural Biometrics | -35% FP rate | Medium | ai_orchestration |
 | 2 | GNN Network Analysis | +60% layering recall | High | federated_learning |
 | 3 | LLM SAR Narratives | -40% investigator time | Low | ai_orchestration/Ollama |
-| 4 | Real-Time Streaming | Sub-100ms alerts | Medium | Bytewax/Kafka |
+| 4 | Real-Time Streaming | Sub-100ms alerts | Medium | Bytewax/Bytewax |
 | 5 | SHAP Explainability | Regulatory compliance | Medium | ai_orchestration |
 | 6 | Correspondent Nesting | Novel typology coverage | Low | SWIFT integration |
 | 7 | Predictive Prioritisation | -25% time-to-SAR | High | ai_orchestration |

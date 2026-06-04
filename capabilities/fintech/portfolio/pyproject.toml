@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "apg-fintech-portfolio"
+version = "1.1.0"
+description = "APG Portfolio Management — fintech domain capability"
+readme = "README.md"
+license = {text = "Proprietary"}
+requires-python = ">=3.11"
+keywords = ["apg", "datacraft", "capability", "fintech", "portfolio"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+        "pydantic>=2.0",
+    "uuid6>=0.4",
+    "sqlalchemy>=2.0",
+    "flask>=3.0",
+]
+
+[project.optional-dependencies]
+streaming = ["bytewax>=0.18"]
+nlp       = ["transformers>=4.30", "sentence-transformers>=2.2"]
+vision    = ["opencv-python>=4.0", "Pillow>=10.0"]
+geo       = ["shapely>=2.0", "geopy>=2.4"]
+crypto    = ["cryptography>=41.0"]
+full      = [
+    "apg-fintech-portfolio[streaming]",
+    "apg-fintech-portfolio[nlp]",
+    "apg-fintech-portfolio[vision]",
+    "apg-fintech-portfolio[geo]",
+    "apg-fintech-portfolio[crypto]",
+]
+
+[project.urls]
+Homepage   = "https://www.datacraft.co.ke"
+Repository = "https://github.com/datacraft/apg"
+Changelog  = "https://github.com/datacraft/apg/blob/main/capabilities/fintech/portfolio/CHANGELOG.md"
+
+
+[project.scripts]
+apg-fintech-portfolio = "apg_fintech_portfolio.app:main"
+[project.entry-points."apg.capabilities"]
+fintech_portfolio = "apg_fintech_portfolio:get_capability_contract"
+
+[tool.setuptools]
+package-dir = {"apg_fintech_portfolio" = "."}
+packages    = ["apg_fintech_portfolio"]
+
+[tool.setuptools.package-data]
+"apg_fintech_portfolio" = ["py.typed", "README.md", "*.pyi"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

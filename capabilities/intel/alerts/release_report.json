@@ -1,0 +1,25 @@
+{
+  "evidence": {
+    "contracts": {
+      "capability_contract": {
+        "display_name": "Alert Management",
+        "errors": []
+      }
+    },
+    "self_test": {
+      "capability": "intel_alerts",
+      "passed": true,
+      "status": "ok"
+    },
+    "semantic_model": {
+      "capability": "intel_alerts",
+      "format": "apg.semantic-model.v1"
+    }
+  },
+  "format": "apg.release-report.v1",
+  "ok": true,
+  "package": "intel_alerts",
+  "source": "capability_contract.py",
+  "target": "python"
+}
+

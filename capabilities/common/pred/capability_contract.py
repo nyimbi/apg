@@ -334,6 +334,30 @@ def streaming_manifest() -> dict[str, Any]:
 	}
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.pred.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"model_registered",
+		"model_trained",
+		"model_evaluated",
+		"model_deployed",
+		"prediction_completed",
+		"forecast_generated",
+		"feature_computed",
+		"drift_detected",
+		"retraining_scheduled",
+		"batch_prediction_processed",
+		"agent_registered",
+	],
+	"guardrails": [
+		"pred_batch_requires_bytewax",
+		"pred_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable PRED capability contract."""
 	config = deepcopy(DEFAULT_CONFIGURATION)
@@ -357,7 +381,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"requires_theme": True,
 		},
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": deepcopy(STREAMING),
 		"theme": deepcopy(THEME),
 	}
 

@@ -7,7 +7,7 @@ import json
 
 import click
 
-from compiler.tooling_audit import build_tooling_fixture_audit
+from compiler.tooling_audit import audit_tooling_fixture_contracts
 
 
 @click.group(name="tooling")
@@ -19,7 +19,7 @@ def tooling() -> None:
 @click.option("--json", "as_json", is_flag=True, help="Emit apg.tooling-fixture-audit.v1 JSON")
 def audit(as_json: bool) -> None:
 	"""Run every checked-in tooling fixture audit."""
-	report = build_tooling_fixture_audit()
+	report = audit_tooling_fixture_contracts()
 	if as_json:
 		click.echo(json.dumps(report, indent=2, sort_keys=True))
 	else:

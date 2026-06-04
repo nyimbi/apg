@@ -123,7 +123,20 @@ RULES: list[dict[str, Any]] = [
 	{"name": "api_agent_runtime_supported", "description": "Banking API agents must use a supported runtime.", "condition": {"operation": "register_api_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "api_agent_runtime_not_supported", "required_action": "select_supported_runtime"}},
 	{"name": "api_agent_role_supported", "description": "Banking API agents must use a supported role.", "condition": {"operation": "register_api_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "api_agent_role_not_supported", "required_action": "select_supported_role"}},
 	{"name": "privileged_api_agent_action_requires_human_approval", "description": "Privileged API-agent actions require human approval.", "condition": {"operation": "api_agent_action", "privileged_scope": True, "human_approval_recorded": False}, "effect": {"decision": "deny", "reason": "human_approval_required", "required_action": "record_human_approval"}},
+
+	# Cross-tenant and privilege escalation guards
+	{"name": "cross_tenant_api_access_denied", "description": "API resources cannot be accessed across tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_access_denied", "required_action": "use_tenant_scoped_credentials"}},
+	{"name": "privilege_escalation_denied", "description": "API privilege escalation without approval is denied.", "condition": {"privilege_escalation_attempt": True, "approval_recorded": False}, "effect": {"decision": "deny", "reason": "privilege_escalation_denied", "required_action": "obtain_escalation_approval"}},
+
+	# Africa-specific API governance rules
+	{"name": "mpesa_daraja_api_key_required", "description": "M-Pesa Daraja API integrations require a registered consumer key.", "condition": {"operation": "register_api_integration", "provider": "mpesa_daraja", "consumer_key_present": False}, "effect": {"decision": "deny", "reason": "mpesa_daraja_consumer_key_required", "required_action": "register_mpesa_daraja_app"}},
+	{"name": "ke_cbk_open_banking_compliance", "description": "Kenya open banking API integrations require CBK compliance attestation.", "condition": {"operation": "register_api_integration", "country": "KE", "cbk_open_banking_compliant": False}, "effect": {"decision": "deny", "reason": "cbk_open_banking_compliance_required", "required_action": "attach_cbk_open_banking_attestation"}},
+	{"name": "mobile_money_api_rate_limit_enforced", "description": "Mobile money API calls are rate-limited per provider SLA.", "condition": {"operation": "api_call", "provider_type": "mobile_money", "rate_limit_exceeded": True}, "effect": {"decision": "deny", "reason": "mobile_money_api_rate_limit_exceeded", "required_action": "backoff_and_retry"}},
+	{"name": "ng_cbn_open_banking_framework", "description": "Nigeria CBN open banking API integrations require CBN framework compliance.", "condition": {"operation": "register_api_integration", "country": "NG", "cbn_open_banking_compliant": False}, "effect": {"decision": "deny", "reason": "cbn_open_banking_compliance_required", "required_action": "comply_with_cbn_open_banking_framework"}},
+	{"name": "api_data_residency_enforced", "description": "Financial API data must reside within approved jurisdictions per CBK data localisation rules.", "condition": {"operation": "register_api_integration", "data_residency_compliant": False}, "effect": {"decision": "deny", "reason": "data_residency_non_compliant", "required_action": "enforce_data_residency"}},
+	{"name": "api_pci_dss_webhook_required", "description": "Payment API webhooks must use PCI DSS-compliant endpoints.", "condition": {"operation": "register_webhook", "pci_dss_compliant": False}, "effect": {"decision": "deny", "reason": "pci_dss_webhook_required", "required_action": "use_pci_dss_compliant_endpoint"}},
 ]
+
 
 
 def _configuration_schema() -> dict[str, Any]:

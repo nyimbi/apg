@@ -9,6 +9,8 @@ try:
 except ImportError:  # pragma: no cover - supports direct file loading in tests
 	from service import AccountsReceivableService  # type: ignore
 
+from .context import get_current_user_id, get_tenant_id_from_request
+
 
 NAVIGATION = [
 	{"name": "Dashboard", "route": "/arc-accounts-receivable/dashboard", "icon": "layout-dashboard"},
@@ -99,4 +101,99 @@ def agent_workbench_model(service: AccountsReceivableService, tenant_id: str) ->
 	model = _base("agents", tenant_id)
 	model["records"] = service.list_records("agents", tenant_id)
 	model["actions"] = ["review_credit", "review_invoice", "prepare_cash_application", "prepare_collection_activity", "review_dispute"]
+	return model
+
+
+# ---------------------------------------------------------------------------
+# Context-aware constructors — resolve tenant and user from request context
+# ---------------------------------------------------------------------------
+
+
+def dashboard_ctx(service: AccountsReceivableService) -> dict[str, Any]:
+	"""Build dashboard model resolving tenant from request context."""
+	tenant_id = get_tenant_id_from_request()
+	user_id = get_current_user_id()
+	model = dashboard_model(service, tenant_id)
+	model["current_user_id"] = user_id
+	return model
+
+
+def customer_ctx(service: AccountsReceivableService) -> dict[str, Any]:
+	"""Build customer model resolving tenant from request context."""
+	tenant_id = get_tenant_id_from_request()
+	user_id = get_current_user_id()
+	model = customer_model(service, tenant_id)
+	model["current_user_id"] = user_id
+	return model
+
+
+def credit_ctx(service: AccountsReceivableService) -> dict[str, Any]:
+	"""Build credit model resolving tenant from request context."""
+	tenant_id = get_tenant_id_from_request()
+	user_id = get_current_user_id()
+	model = credit_model(service, tenant_id)
+	model["current_user_id"] = user_id
+	return model
+
+
+def invoice_ctx(service: AccountsReceivableService) -> dict[str, Any]:
+	"""Build invoice model resolving tenant from request context."""
+	tenant_id = get_tenant_id_from_request()
+	user_id = get_current_user_id()
+	model = invoice_model(service, tenant_id)
+	model["current_user_id"] = user_id
+	return model
+
+
+def payment_ctx(service: AccountsReceivableService) -> dict[str, Any]:
+	"""Build payment model resolving tenant from request context."""
+	tenant_id = get_tenant_id_from_request()
+	user_id = get_current_user_id()
+	model = payment_model(service, tenant_id)
+	model["current_user_id"] = user_id
+	return model
+
+
+def cash_application_ctx(service: AccountsReceivableService) -> dict[str, Any]:
+	"""Build cash application model resolving tenant from request context."""
+	tenant_id = get_tenant_id_from_request()
+	user_id = get_current_user_id()
+	model = cash_application_model(service, tenant_id)
+	model["current_user_id"] = user_id
+	return model
+
+
+def collection_ctx(service: AccountsReceivableService) -> dict[str, Any]:
+	"""Build collection model resolving tenant from request context."""
+	tenant_id = get_tenant_id_from_request()
+	user_id = get_current_user_id()
+	model = collection_model(service, tenant_id)
+	model["current_user_id"] = user_id
+	return model
+
+
+def dispute_ctx(service: AccountsReceivableService) -> dict[str, Any]:
+	"""Build dispute model resolving tenant from request context."""
+	tenant_id = get_tenant_id_from_request()
+	user_id = get_current_user_id()
+	model = dispute_model(service, tenant_id)
+	model["current_user_id"] = user_id
+	return model
+
+
+def aging_ctx(service: AccountsReceivableService) -> dict[str, Any]:
+	"""Build aging model resolving tenant from request context."""
+	tenant_id = get_tenant_id_from_request()
+	user_id = get_current_user_id()
+	model = aging_model(service, tenant_id)
+	model["current_user_id"] = user_id
+	return model
+
+
+def agent_workbench_ctx(service: AccountsReceivableService) -> dict[str, Any]:
+	"""Build agent workbench model resolving tenant from request context."""
+	tenant_id = get_tenant_id_from_request()
+	user_id = get_current_user_id()
+	model = agent_workbench_model(service, tenant_id)
+	model["current_user_id"] = user_id
 	return model

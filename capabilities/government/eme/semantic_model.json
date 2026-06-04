@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "government_eme",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "government_eme": {
+      "capability": "government_eme"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

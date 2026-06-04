@@ -19,7 +19,7 @@ from ..ai_credit_scoring import (
 	APGCreditScoringService, CreditScoringModelTrainer,
 	create_credit_scoring_service
 )
-from ..models import (
+from ...models import (
 	ARCustomer, ARCreditAssessment, ARInvoice, ARPayment,
 	ARCreditRating, ARCustomerStatus, ARCustomerType, ARInvoiceStatus, ARPaymentStatus
 )

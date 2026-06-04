@@ -172,22 +172,40 @@ class PythonCodeGenerator:
 			return self._generate_python_application(ast)
 
 	def _generate_python_application(self, ast: ModuleDeclaration) -> Dict[str, str]:
-		"""Generate a dependency-free Python application manifest."""
+		"""Generate core dependency-free Python application artifacts.
+
+		Produces only the portable, target-agnostic files.  Deployment-bundle
+		artefacts (Dockerfile, README, smoke_test.py, etc.) are added by
+		:meth:`generate_deployment_bundle` and are intentionally kept separate
+		so that callers such as the test suite can control which set they need.
+		"""
 		files = {
 			"app.py": self._generate_python_app(ast),
 			"__init__.py": self._generate_package_init(ast),
-			"semantic_model.json": self._generate_semantic_model_json(ast),
-			".dockerignore": self._generate_python_dockerignore(),
-			".env.example": self._generate_python_env_example(ast),
-			"Dockerfile": self._generate_python_dockerfile(ast),
-			"README.md": self._generate_python_readme(ast),
 			"requirements.txt": self._generate_python_requirements(),
-			"smoke_test.py": self._generate_python_smoke_test(),
 		}
 		files.update(self._generate_ai_agent_files(ast))
 		files.update(self._generate_application_files(ast))
 		files.update(self._generate_capability_files(ast))
 		return files
+
+	def generate_deployment_bundle(self, ast: ModuleDeclaration) -> Dict[str, str]:
+		"""Return deployment-bundle artefacts that supplement the core application.
+
+		These files are shipping/ops concerns (Dockerfile, README, smoke tests,
+		environment example, semantic model snapshot) that are added on top of
+		the core files produced by :meth:`_generate_python_application`.
+		``APGCompiler`` calls this after generation so that unit tests that use
+		``PythonCodeGenerator`` directly receive only the predictable core set.
+		"""
+		return {
+			"semantic_model.json": self._generate_semantic_model_json(ast),
+			".dockerignore": self._generate_python_dockerignore(),
+			".env.example": self._generate_python_env_example(ast),
+			"Dockerfile": self._generate_python_dockerfile(ast),
+			"README.md": self._generate_python_readme(ast),
+			"smoke_test.py": self._generate_python_smoke_test(),
+		}
 
 	def _generate_semantic_model_files(self, ast: ModuleDeclaration) -> Dict[str, str]:
 		"""Generate the compiler semantic model artifact shipped with apps."""
@@ -2814,11 +2832,15 @@ def validate_route_dispatch_contract() -> Dict[str, Any]:
 
 
 def describe_application() -> Dict[str, Any]:
+    _entity_summary_keys = {{"name", "type", "properties", "methods"}}
     description: Dict[str, Any] = {{
         "name": MODULE_NAME,
         "version": MODULE_VERSION,
         "description": MODULE_DESCRIPTION,
-        "entities": list_entities(),
+        "entities": [
+            {{k: v for k, v in entity.items() if k in _entity_summary_keys}}
+            for entity in list_entities()
+        ],
         "databases": list_databases(),
     }}
     if AI_AGENTS is not None and hasattr(AI_AGENTS, "list_agents"):

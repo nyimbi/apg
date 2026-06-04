@@ -11,10 +11,23 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 from typing import List, Dict, Any
 from enum import Enum
 
-# Healthcare Medical Metadata  
+# Healthcare Medical Metadata
 __version__ = "1.0.0"
 __capability_id__ = "healthcare"
 __description__ = "Healthcare and medical industry management platform"
+
+# Canonical capability IDs — one per sub-capability module
+CAPABILITY_IDS: list[str] = [
+	"healthcare_ana",  # Clinical Analytics
+	"healthcare_cli",  # Clinical Management
+	"healthcare_dev",  # Medical Device Management
+	"healthcare_emr",  # Electronic Medical Records
+	"healthcare_lab",  # Laboratory Information System
+	"healthcare_pha",  # Pharmacy Management
+	"healthcare_pmt",  # Patient Management
+	"healthcare_reg",  # Healthcare Regulatory
+	"healthcare_tel",  # Telemedicine
+]
 
 class HCComplianceFramework(str, Enum):
 	"""Healthcare compliance frameworks."""
@@ -104,6 +117,7 @@ def get_facility_types() -> List[HCFacilityType]:
 	return list(HCFacilityType)
 
 __all__ = [
+	"CAPABILITY_IDS",
 	"HCComplianceFramework",
 	"HCFacilityType",
 	"SUBCAPABILITIES",
@@ -111,5 +125,5 @@ __all__ = [
 	"get_capability_info",
 	"list_subcapabilities",
 	"get_compliance_frameworks",
-	"get_facility_types"
+	"get_facility_types",
 ]

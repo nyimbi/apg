@@ -356,6 +356,30 @@ def streaming_manifest() -> dict[str, Any]:
 	}
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.nlpc.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"document_processed",
+		"entity_extracted",
+		"sentiment_analyzed",
+		"classification_completed",
+		"translation_completed",
+		"summarization_completed",
+		"embedding_generated",
+		"pipeline_executed",
+		"language_detected",
+		"pii_detected",
+		"agent_registered",
+	],
+	"guardrails": [
+		"nlpc_batch_requires_bytewax",
+		"nlpc_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable NLPC capability contract."""
 	config = deepcopy(DEFAULT_CONFIGURATION)
@@ -379,7 +403,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"requires_theme": True,
 		},
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": deepcopy(STREAMING),
 		"theme": deepcopy(THEME),
 	}
 

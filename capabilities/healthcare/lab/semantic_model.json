@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "healthcare_lab",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "healthcare_lab": {
+      "capability": "healthcare_lab"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

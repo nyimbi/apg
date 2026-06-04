@@ -11,7 +11,7 @@ import asyncio
 import pytest
 from typing import Dict, Any
 
-from ..models import DataSource, DataSourceType, DataSourceStatus
+from ...models import DataSource, DataSourceType, DataSourceStatus
 from ..adapters import (
 	FileSystemConnector, CloudStorageConnector, 
 	DistributedFileSystemConnector, DataWarehouseConnector

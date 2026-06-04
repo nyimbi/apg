@@ -1,1283 +1,1227 @@
 """
-APG Employee Data Management - Governed AI-Powered Models
+Employee Data Management — Pydantic v2 domain models.
 
-Enhanced database models with AI intelligence, predictive analytics, and immersive
-features for measurable improvement over market leaders like Workday and BambooHR.
+Covers the full HCM employee lifecycle: hire → onboard → transfer/promote
+→ performance → discipline/grievance → termination, plus supporting
+entities (JobGrade, Qualification, Training, Contract, Benefit, Dependant,
+EmergencyContact, WorkPermit, BackgroundCheck).
 
 © 2025 Datacraft. All rights reserved.
-Author: Nyimbi Odero | APG Platform Architect
+Author: Nyimbi Odero
 """
 
-import asyncio
-import json
-from datetime import datetime, date, timedelta
-from typing import Dict, List, Any, Optional, Union, Tuple
+from __future__ import annotations
+
+from datetime import date, datetime
 from decimal import Decimal
-from dataclasses import dataclass, field
 from enum import Enum
-from sqlalchemy import Column, String, Text, Integer, Float, Boolean, DateTime, Date, DECIMAL, ForeignKey, UniqueConstraint, JSON, LargeBinary
-from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB, VECTOR
-from uuid_extensions import uuid7str
-from pydantic import BaseModel, Field, ConfigDict, AfterValidator
-from annotated_types import Annotated
+from typing import Annotated, Any
 
-from ...auth_rbac.models import BaseMixin, AuditMixin, Model
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic.functional_validators import AfterValidator
+from uuid6 import uuid7
 
 
-class HRDepartment(Model, AuditMixin, BaseMixin):
-	"""
-	Department structure for organizational hierarchy.
-	
-	Supports hierarchical department structure with parent-child relationships.
-	"""
-	__tablename__ = 'hr_edm_department'
-	
-	# Identity
-	department_id = Column(String(36), unique=True, nullable=False, default=uuid7str, index=True)
-	tenant_id = Column(String(36), nullable=False, index=True)
-	
-	# Department Information
-	department_code = Column(String(20), nullable=False, index=True)
-	department_name = Column(String(200), nullable=False, index=True)
-	description = Column(Text, nullable=True)
-	
-	# Hierarchy
-	parent_department_id = Column(String(36), ForeignKey('hr_edm_department.department_id'), nullable=True, index=True)
-	level = Column(Integer, default=0)
-	path = Column(String(500), nullable=True)
-	
-	# Configuration
-	is_active = Column(Boolean, default=True)
-	cost_center = Column(String(20), nullable=True)
-	budget_allocation = Column(DECIMAL(15, 2), nullable=True)
-	
-	# Manager
-	manager_id = Column(String(36), ForeignKey('hr_edm_employee.employee_id'), nullable=True, index=True)
-	
-	# Location
-	location = Column(String(200), nullable=True)
-	address = Column(Text, nullable=True)
-	
-	# Constraints
-	__table_args__ = (
-		UniqueConstraint('tenant_id', 'department_code', name='uq_department_code_tenant'),
+# ---------------------------------------------------------------------------
+# UUID helper
+# ---------------------------------------------------------------------------
+
+def uuid7str() -> str:
+	return str(uuid7())
+
+
+# ---------------------------------------------------------------------------
+# Shared validators
+# ---------------------------------------------------------------------------
+
+def _positive(v: Decimal) -> Decimal:
+	assert v >= 0, "must be non-negative"
+	return v
+
+
+def _probability(v: float) -> float:
+	assert 0.0 <= v <= 1.0, "must be in [0, 1]"
+	return v
+
+
+PositiveDecimal = Annotated[Decimal, AfterValidator(_positive)]
+Probability = Annotated[float, AfterValidator(_probability)]
+
+
+# ---------------------------------------------------------------------------
+# Status / Type enumerations
+# ---------------------------------------------------------------------------
+
+class EmploymentStatus(str, Enum):
+	ACTIVE = "active"
+	PROBATION = "probation"
+	NOTICE = "notice"
+	SUSPENDED = "suspended"
+	ON_LEAVE = "on_leave"
+	TERMINATED = "terminated"
+	RETIRED = "retired"
+	DECEASED = "deceased"
+
+
+class EmploymentType(str, Enum):
+	FULL_TIME = "full_time"
+	PART_TIME = "part_time"
+	CONTRACT = "contract"
+	INTERN = "intern"
+	CASUAL = "casual"
+	CONSULTANT = "consultant"
+
+
+class WorkMode(str, Enum):
+	OFFICE = "office"
+	REMOTE = "remote"
+	HYBRID = "hybrid"
+	FIELD = "field"
+
+
+class Gender(str, Enum):
+	MALE = "male"
+	FEMALE = "female"
+	NON_BINARY = "non_binary"
+	UNDISCLOSED = "undisclosed"
+
+
+class MaritalStatus(str, Enum):
+	SINGLE = "single"
+	MARRIED = "married"
+	DIVORCED = "divorced"
+	WIDOWED = "widowed"
+	SEPARATED = "separated"
+	OTHER = "other"
+
+
+class JobGradeLevel(str, Enum):
+	"""Broad-banding grade levels."""
+	GRADE_1 = "G1"
+	GRADE_2 = "G2"
+	GRADE_3 = "G3"
+	GRADE_4 = "G4"
+	GRADE_5 = "G5"
+	GRADE_6 = "G6"
+	GRADE_7 = "G7"
+	GRADE_8 = "G8"
+	GRADE_9 = "G9"
+	GRADE_10 = "G10"
+
+
+class QualificationLevel(str, Enum):
+	CERTIFICATE = "certificate"
+	DIPLOMA = "diploma"
+	BACHELORS = "bachelors"
+	HONOURS = "honours"
+	MASTERS = "masters"
+	DOCTORATE = "doctorate"
+	PROFESSIONAL = "professional"
+	VOCATIONAL = "vocational"
+
+
+class TrainingStatus(str, Enum):
+	PLANNED = "planned"
+	ENROLLED = "enrolled"
+	IN_PROGRESS = "in_progress"
+	COMPLETED = "completed"
+	CANCELLED = "cancelled"
+	FAILED = "failed"
+
+
+class PerformanceRating(str, Enum):
+	EXCEPTIONAL = "exceptional"        # 5 — top ~5 %
+	EXCEEDS = "exceeds"                # 4
+	MEETS = "meets"                    # 3
+	NEEDS_IMPROVEMENT = "needs_improvement"  # 2
+	UNSATISFACTORY = "unsatisfactory"  # 1
+
+
+PERFORMANCE_RATING_SCORE: dict[PerformanceRating, int] = {
+	PerformanceRating.EXCEPTIONAL: 5,
+	PerformanceRating.EXCEEDS: 4,
+	PerformanceRating.MEETS: 3,
+	PerformanceRating.NEEDS_IMPROVEMENT: 2,
+	PerformanceRating.UNSATISFACTORY: 1,
+}
+
+
+class ReviewStatus(str, Enum):
+	DRAFT = "draft"
+	SELF_ASSESSMENT = "self_assessment"
+	MANAGER_REVIEW = "manager_review"
+	CALIBRATION = "calibration"
+	APPROVED = "approved"
+	ACKNOWLEDGED = "acknowledged"
+
+
+class DisciplinaryType(str, Enum):
+	VERBAL_WARNING = "verbal_warning"
+	WRITTEN_WARNING = "written_warning"
+	FINAL_WARNING = "final_warning"
+	SUSPENSION = "suspension"
+	DEMOTION = "demotion"
+	DISMISSAL = "dismissal"
+
+
+class DisciplinaryStatus(str, Enum):
+	INITIATED = "initiated"
+	INVESTIGATION = "investigation"
+	HEARING_SCHEDULED = "hearing_scheduled"
+	OUTCOME_ISSUED = "outcome_issued"
+	APPEALED = "appealed"
+	CLOSED = "closed"
+	OVERTURNED = "overturned"
+
+
+class GrievanceStatus(str, Enum):
+	SUBMITTED = "submitted"
+	ACKNOWLEDGED = "acknowledged"
+	INVESTIGATION = "investigation"
+	MEDIATION = "mediation"
+	RESOLVED = "resolved"
+	ESCALATED = "escalated"
+	CLOSED = "closed"
+	WITHDRAWN = "withdrawn"
+
+
+class ContractType(str, Enum):
+	PERMANENT = "permanent"
+	FIXED_TERM = "fixed_term"
+	PROBATIONARY = "probationary"
+	INTERNSHIP = "internship"
+	PART_TIME = "part_time"
+	CASUAL = "casual"
+	ZERO_HOURS = "zero_hours"
+
+
+class ContractStatus(str, Enum):
+	DRAFT = "draft"
+	PENDING_SIGNATURE = "pending_signature"
+	ACTIVE = "active"
+	EXPIRED = "expired"
+	TERMINATED = "terminated"
+	RENEWED = "renewed"
+
+
+class BenefitType(str, Enum):
+	HEALTH_INSURANCE = "health_insurance"
+	LIFE_INSURANCE = "life_insurance"
+	PENSION = "pension"
+	PROVIDENT_FUND = "provident_fund"
+	HOUSING_ALLOWANCE = "housing_allowance"
+	TRANSPORT_ALLOWANCE = "transport_allowance"
+	MEAL_ALLOWANCE = "meal_allowance"
+	EDUCATION = "education"
+	WELLNESS = "wellness"
+	OTHER = "other"
+
+
+class BenefitStatus(str, Enum):
+	ELIGIBLE = "eligible"
+	ENROLLED = "enrolled"
+	ACTIVE = "active"
+	SUSPENDED = "suspended"
+	TERMINATED = "terminated"
+	WAIVED = "waived"
+
+
+class WorkPermitStatus(str, Enum):
+	APPLIED = "applied"
+	PENDING = "pending"
+	APPROVED = "approved"
+	ACTIVE = "active"
+	RENEWAL_DUE = "renewal_due"
+	EXPIRED = "expired"
+	REJECTED = "rejected"
+	CANCELLED = "cancelled"
+
+
+class BackgroundCheckStatus(str, Enum):
+	INITIATED = "initiated"
+	IN_PROGRESS = "in_progress"
+	CLEAR = "clear"
+	FLAG = "flag"
+	ADVERSE = "adverse"
+	CANCELLED = "cancelled"
+	EXPIRED = "expired"
+
+
+class TerminationType(str, Enum):
+	RESIGNATION = "resignation"
+	REDUNDANCY = "redundancy"
+	DISMISSAL = "dismissal"
+	RETIREMENT = "retirement"
+	CONTRACT_END = "contract_end"
+	MUTUAL_AGREEMENT = "mutual_agreement"
+	DECEASED = "deceased"
+	ABANDONMENT = "abandonment"
+
+
+class HistoryEventType(str, Enum):
+	HIRE = "hire"
+	ONBOARD = "onboard"
+	TRANSFER = "transfer"
+	PROMOTION = "promotion"
+	DEMOTION = "demotion"
+	COMPENSATION_CHANGE = "compensation_change"
+	STATUS_CHANGE = "status_change"
+	TERMINATION = "termination"
+	REHIRE = "rehire"
+	LEAVE_START = "leave_start"
+	LEAVE_END = "leave_end"
+	PROBATION_PASS = "probation_pass"
+	PROBATION_FAIL = "probation_fail"
+	CONTRACT_RENEWAL = "contract_renewal"
+
+
+class OnboardingItemStatus(str, Enum):
+	PENDING = "pending"
+	IN_PROGRESS = "in_progress"
+	COMPLETED = "completed"
+	SKIPPED = "skipped"
+	BLOCKED = "blocked"
+
+
+class SuccessionReadiness(str, Enum):
+	READY_NOW = "ready_now"
+	ONE_YEAR = "1_year"
+	TWO_YEARS = "2_years"
+	DEVELOPMENT = "development"
+
+
+# ---------------------------------------------------------------------------
+# Base model
+# ---------------------------------------------------------------------------
+
+class EDMBase(BaseModel):
+	"""Base for all Employee Data Management Pydantic models."""
+	model_config = ConfigDict(
+		extra="forbid",
+		validate_by_name=True,
+		validate_by_alias=True,
 	)
-	
-	# Relationships
-	parent_department = relationship("HRDepartment", remote_side=[department_id])
-	child_departments = relationship("HRDepartment")
-	employees = relationship("HREmployee", back_populates="department")
-	positions = relationship("HRPosition", back_populates="department")
-	manager = relationship("HREmployee", foreign_keys=[manager_id])
-	
-	def __repr__(self):
-		return f"<HRDepartment {self.department_name}>"
 
-
-class HRPosition(Model, AuditMixin, BaseMixin):
-	"""
-	Position/job definitions within the organization.
-	
-	Defines roles, responsibilities, and requirements for positions.
-	"""
-	__tablename__ = 'hr_edm_position'
-	
-	# Identity
-	position_id = Column(String(36), unique=True, nullable=False, default=uuid7str, index=True)
-	tenant_id = Column(String(36), nullable=False, index=True)
-	
-	# Position Information
-	position_code = Column(String(20), nullable=False, index=True)
-	position_title = Column(String(200), nullable=False, index=True)
-	description = Column(Text, nullable=True)
-	responsibilities = Column(Text, nullable=True)
-	requirements = Column(Text, nullable=True)
-	
-	# Classification
-	department_id = Column(String(36), ForeignKey('hr_edm_department.department_id'), nullable=False, index=True)
-	job_level = Column(String(50), nullable=True)  # Executive, Manager, Individual Contributor
-	job_family = Column(String(100), nullable=True)  # Engineering, Sales, Marketing, etc.
-	
-	# Compensation
-	min_salary = Column(DECIMAL(12, 2), nullable=True)
-	max_salary = Column(DECIMAL(12, 2), nullable=True)
-	currency_code = Column(String(3), default='USD')
-	
-	# Configuration
-	is_active = Column(Boolean, default=True)
-	is_exempt = Column(Boolean, default=True)  # Exempt from overtime
-	reports_to_position_id = Column(String(36), ForeignKey('hr_edm_position.position_id'), nullable=True, index=True)
-	
-	# Headcount
-	authorized_headcount = Column(Integer, default=1)
-	current_headcount = Column(Integer, default=0)
-	
-	# Constraints
-	__table_args__ = (
-		UniqueConstraint('tenant_id', 'position_code', name='uq_position_code_tenant'),
-	)
-	
-	# Relationships
-	department = relationship("HRDepartment", back_populates="positions")
-	employees = relationship("HREmployee", back_populates="position")
-	reports_to_position = relationship("HRPosition", remote_side=[position_id])
-	direct_reports = relationship("HRPosition")
-	required_skills = relationship("HRPositionSkill", back_populates="position")
-	
-	def __repr__(self):
-		return f"<HRPosition {self.position_title}>"
-
-
-class HREmployee(Model, AuditMixin, BaseMixin):
-	"""
-	Core employee record with personal and employment information.
-	
-	Central employee entity linking to all other HR modules.
-	"""
-	__tablename__ = 'hr_edm_employee'
-	
-	# Identity
-	employee_id = Column(String(36), unique=True, nullable=False, default=uuid7str, index=True)
-	tenant_id = Column(String(36), nullable=False, index=True)
-	
-	# Employee Number
-	employee_number = Column(String(20), nullable=False, index=True)  # EMP000001
-	badge_id = Column(String(20), nullable=True, index=True)
-	
-	# Personal Information
-	first_name = Column(String(100), nullable=False, index=True)
-	middle_name = Column(String(100), nullable=True)
-	last_name = Column(String(100), nullable=False, index=True) 
-	preferred_name = Column(String(100), nullable=True)
-	full_name = Column(String(300), nullable=False, index=True)  # Computed field
-	
-	# Contact Information
-	personal_email = Column(String(200), nullable=True, index=True)
-	work_email = Column(String(200), nullable=True, index=True)
-	phone_mobile = Column(String(20), nullable=True)
-	phone_home = Column(String(20), nullable=True)
-	phone_work = Column(String(20), nullable=True)
-	
-	# Demographics
-	date_of_birth = Column(Date, nullable=True)
-	gender = Column(String(20), nullable=True)
-	marital_status = Column(String(20), nullable=True)
-	nationality = Column(String(100), nullable=True)
-	
-	# Address
-	address_line1 = Column(String(200), nullable=True)
-	address_line2 = Column(String(200), nullable=True)
-	city = Column(String(100), nullable=True)
-	state_province = Column(String(100), nullable=True)
-	postal_code = Column(String(20), nullable=True)
-	country = Column(String(100), nullable=True)
-	
-	# Employment Information
-	department_id = Column(String(36), ForeignKey('hr_edm_department.department_id'), nullable=False, index=True)
-	position_id = Column(String(36), ForeignKey('hr_edm_position.position_id'), nullable=False, index=True)
-	manager_id = Column(String(36), ForeignKey('hr_edm_employee.employee_id'), nullable=True, index=True)
-	
-	# Employment Dates
-	hire_date = Column(Date, nullable=False, index=True)
-	start_date = Column(Date, nullable=True)  # May differ from hire_date
-	termination_date = Column(Date, nullable=True, index=True)
-	rehire_date = Column(Date, nullable=True)
-	
-	# Employment Status
-	employment_status = Column(String(20), default='Active', index=True)  # Active, Inactive, Terminated, Leave
-	employment_type = Column(String(20), default='Full-Time', index=True)  # Full-Time, Part-Time, Contract, Intern
-	work_location = Column(String(20), default='Office', index=True)  # Office, Remote, Hybrid
-	
-	# Compensation
-	base_salary = Column(DECIMAL(12, 2), nullable=True)
-	hourly_rate = Column(DECIMAL(8, 2), nullable=True)
-	currency_code = Column(String(3), default='USD')
-	pay_frequency = Column(String(20), default='Monthly')  # Weekly, Bi-Weekly, Monthly, Annual
-	
-	# Benefits Eligibility
-	benefits_eligible = Column(Boolean, default=True)
-	benefits_start_date = Column(Date, nullable=True)
-	
-	# Tax Information
-	tax_id = Column(String(50), nullable=True)  # SSN, TIN, etc.
-	tax_country = Column(String(3), default='USA')
-	tax_state = Column(String(50), nullable=True)
-	
-	# Performance & Review
-	probation_end_date = Column(Date, nullable=True)
-	next_review_date = Column(Date, nullable=True)
-	performance_rating = Column(String(20), nullable=True)
-	
-	# System Fields
-	is_active = Column(Boolean, default=True, index=True)
-	is_system_user = Column(Boolean, default=False)
-	system_user_id = Column(String(36), nullable=True)  # Link to auth system
-	
-	# Photo and Documents
-	photo_url = Column(String(500), nullable=True)
-	documents_folder = Column(String(500), nullable=True)
-	
-	# Constraints
-	__table_args__ = (
-		UniqueConstraint('tenant_id', 'employee_number', name='uq_employee_number_tenant'),
-		UniqueConstraint('tenant_id', 'work_email', name='uq_work_email_tenant'),
-	)
-	
-	# Relationships
-	department = relationship("HRDepartment", back_populates="employees")
-	position = relationship("HRPosition", back_populates="employees")
-	manager = relationship("HREmployee", remote_side=[employee_id])
-	direct_reports = relationship("HREmployee")
-	
-	personal_info = relationship("HRPersonalInfo", back_populates="employee", uselist=False)
-	emergency_contacts = relationship("HREmergencyContact", back_populates="employee")
-	employment_history = relationship("HREmploymentHistory", back_populates="employee")
-	employee_skills = relationship("HREmployeeSkill", back_populates="employee")
-	employee_certifications = relationship("HREmployeeCertification", back_populates="employee")
-	
-	def __repr__(self):
-		return f"<HREmployee {self.full_name} ({self.employee_number})>"
-
-
-class HRPersonalInfo(Model, AuditMixin, BaseMixin):
-	"""
-	Extended personal information for employees.
-	
-	Sensitive personal data stored separately for access control.
-	"""
-	__tablename__ = 'hr_edm_personal_info'
-	
-	# Identity
-	personal_info_id = Column(String(36), unique=True, nullable=False, default=uuid7str, index=True)
-	tenant_id = Column(String(36), nullable=False, index=True)
-	employee_id = Column(String(36), ForeignKey('hr_edm_employee.employee_id'), nullable=False, unique=True, index=True)
-	
-	# Identification
-	passport_number = Column(String(50), nullable=True)
-	passport_country = Column(String(3), nullable=True)
-	passport_expiry = Column(Date, nullable=True)
-	drivers_license = Column(String(50), nullable=True)
-	drivers_license_state = Column(String(50), nullable=True)
-	drivers_license_expiry = Column(Date, nullable=True)
-	
-	# Banking (for payroll)
-	bank_name = Column(String(200), nullable=True)
-	bank_account_number = Column(String(50), nullable=True)
-	bank_routing_number = Column(String(20), nullable=True)
-	bank_account_type = Column(String(20), nullable=True)  # Checking, Savings
-	
-	# Insurance
-	health_insurance_id = Column(String(50), nullable=True)
-	life_insurance_beneficiary = Column(String(200), nullable=True)
-	
-	# Veteran Status
-	veteran_status = Column(String(50), nullable=True)
-	disability_status = Column(String(50), nullable=True)
-	
-	# Visa/Work Authorization
-	work_authorization = Column(String(50), nullable=True)
-	visa_type = Column(String(50), nullable=True)
-	visa_expiry = Column(Date, nullable=True)
-	i9_verified = Column(Boolean, default=False)
-	i9_verification_date = Column(Date, nullable=True)
-	
-	# Relationships
-	employee = relationship("HREmployee", back_populates="personal_info")
-	
-	def __repr__(self):
-		return f"<HRPersonalInfo for {self.employee_id}>"
-
-
-class HREmergencyContact(Model, AuditMixin, BaseMixin):
-	"""
-	Emergency contact information for employees.
-	"""
-	__tablename__ = 'hr_edm_emergency_contact'
-	
-	# Identity
-	contact_id = Column(String(36), unique=True, nullable=False, default=uuid7str, index=True)
-	tenant_id = Column(String(36), nullable=False, index=True)
-	employee_id = Column(String(36), ForeignKey('hr_edm_employee.employee_id'), nullable=False, index=True)
-	
-	# Contact Information
-	contact_name = Column(String(200), nullable=False)
-	relationship = Column(String(50), nullable=False)  # Spouse, Parent, Sibling, Friend, etc.
-	phone_primary = Column(String(20), nullable=False)
-	phone_secondary = Column(String(20), nullable=True)
-	email = Column(String(200), nullable=True)
-	
-	# Address
-	address_line1 = Column(String(200), nullable=True)
-	address_line2 = Column(String(200), nullable=True)
-	city = Column(String(100), nullable=True)
-	state_province = Column(String(100), nullable=True)
-	postal_code = Column(String(20), nullable=True)
-	country = Column(String(100), nullable=True)
-	
-	# Priority
-	is_primary = Column(Boolean, default=False)
-	priority_order = Column(Integer, default=1)
-	
-	# Configuration
-	is_active = Column(Boolean, default=True)
-	
-	# Relationships
-	employee = relationship("HREmployee", back_populates="emergency_contacts")
-	
-	def __repr__(self):
-		return f"<HREmergencyContact {self.contact_name} for {self.employee_id}>"
-
-
-class HREmploymentHistory(Model, AuditMixin, BaseMixin):
-	"""
-	Track employment history and position changes.
-	
-	Maintains audit trail of all position, department, and compensation changes.
-	"""
-	__tablename__ = 'hr_edm_employment_history'
-	
-	# Identity
-	history_id = Column(String(36), unique=True, nullable=False, default=uuid7str, index=True)
-	tenant_id = Column(String(36), nullable=False, index=True)
-	employee_id = Column(String(36), ForeignKey('hr_edm_employee.employee_id'), nullable=False, index=True)
-	
-	# Change Information
-	change_type = Column(String(50), nullable=False, index=True)  # Hire, Promotion, Transfer, Termination, etc.
-	effective_date = Column(Date, nullable=False, index=True)
-	reason = Column(String(200), nullable=True)
-	notes = Column(Text, nullable=True)
-	
-	# Previous Values
-	previous_department_id = Column(String(36), nullable=True)
-	previous_position_id = Column(String(36), nullable=True)
-	previous_manager_id = Column(String(36), nullable=True)
-	previous_salary = Column(DECIMAL(12, 2), nullable=True)
-	previous_status = Column(String(50), nullable=True)
-	
-	# New Values
-	new_department_id = Column(String(36), nullable=True)
-	new_position_id = Column(String(36), nullable=True)
-	new_manager_id = Column(String(36), nullable=True)
-	new_salary = Column(DECIMAL(12, 2), nullable=True)
-	new_status = Column(String(50), nullable=True)
-	
-	# Approval
-	approved_by = Column(String(36), nullable=True)  # Employee ID of approver
-	approval_date = Column(Date, nullable=True)
-	
-	# Relationships
-	employee = relationship("HREmployee", back_populates="employment_history")
-	
-	def __repr__(self):
-		return f"<HREmploymentHistory {self.change_type} for {self.employee_id}>"
-
-
-class HRSkill(Model, AuditMixin, BaseMixin):
-	"""
-	Skills catalog for competency management.
-	
-	Defines available skills that can be assigned to employees and positions.
-	"""
-	__tablename__ = 'hr_edm_skill'
-	
-	# Identity
-	skill_id = Column(String(36), unique=True, nullable=False, default=uuid7str, index=True)
-	tenant_id = Column(String(36), nullable=False, index=True)
-	
-	# Skill Information
-	skill_code = Column(String(20), nullable=False, index=True)
-	skill_name = Column(String(200), nullable=False, index=True)
-	description = Column(Text, nullable=True)
-	
-	# Classification
-	skill_category = Column(String(100), nullable=True, index=True)  # Technical, Leadership, Communication, etc.
-	skill_type = Column(String(50), nullable=True)  # Hard, Soft
-	
-	# Configuration
-	is_active = Column(Boolean, default=True)
-	is_core_competency = Column(Boolean, default=False)
-	
-	# Constraints
-	__table_args__ = (
-		UniqueConstraint('tenant_id', 'skill_code', name='uq_skill_code_tenant'),
-	)
-	
-	# Relationships
-	employee_skills = relationship("HREmployeeSkill", back_populates="skill")
-	position_skills = relationship("HRPositionSkill", back_populates="skill")
-	
-	def __repr__(self):
-		return f"<HRSkill {self.skill_name}>"
-
-
-class HREmployeeSkill(Model, AuditMixin, BaseMixin):
-	"""
-	Employee skill assignments with proficiency levels.
-	
-	Links employees to skills with proficiency ratings and validation.
-	"""
-	__tablename__ = 'hr_edm_employee_skill'
-	
-	# Identity
-	employee_skill_id = Column(String(36), unique=True, nullable=False, default=uuid7str, index=True)
-	tenant_id = Column(String(36), nullable=False, index=True)
-	employee_id = Column(String(36), ForeignKey('hr_edm_employee.employee_id'), nullable=False, index=True)
-	skill_id = Column(String(36), ForeignKey('hr_edm_skill.skill_id'), nullable=False, index=True)
-	
-	# Proficiency
-	proficiency_level = Column(String(20), nullable=False)  # Beginner, Intermediate, Advanced, Expert
-	proficiency_score = Column(Integer, nullable=True)  # 1-10 scale
-	
-	# Validation
-	self_assessed = Column(Boolean, default=True)
-	manager_validated = Column(Boolean, default=False)
-	validated_by = Column(String(36), nullable=True)  # Employee ID of validator
-	validation_date = Column(Date, nullable=True)
-	
-	# Experience
-	years_experience = Column(DECIMAL(4, 2), nullable=True)
-	last_used_date = Column(Date, nullable=True)
-	
-	# Evidence
-	evidence_notes = Column(Text, nullable=True)
-	certification_reference = Column(String(36), nullable=True)  # Link to certification
-	
-	# Configuration
-	is_active = Column(Boolean, default=True)
-	is_primary = Column(Boolean, default=False)  # Primary skill for role
-	
-	# Constraints
-	__table_args__ = (
-		UniqueConstraint('tenant_id', 'employee_id', 'skill_id', name='uq_employee_skill'),
-	)
-	
-	# Relationships
-	employee = relationship("HREmployee", back_populates="employee_skills")
-	skill = relationship("HRSkill", back_populates="employee_skills")
-	
-	def __repr__(self):
-		return f"<HREmployeeSkill {self.employee_id} - {self.skill_id}>"
-
-
-class HRPositionSkill(Model, AuditMixin, BaseMixin):
-	"""
-	Position skill requirements.
-	
-	Defines required and preferred skills for positions.
-	"""
-	__tablename__ = 'hr_edm_position_skill'
-	
-	# Identity
-	position_skill_id = Column(String(36), unique=True, nullable=False, default=uuid7str, index=True)
-	tenant_id = Column(String(36), nullable=False, index=True)
-	position_id = Column(String(36), ForeignKey('hr_edm_position.position_id'), nullable=False, index=True)
-	skill_id = Column(String(36), ForeignKey('hr_edm_skill.skill_id'), nullable=False, index=True)
-	
-	# Requirements
-	requirement_level = Column(String(20), nullable=False)  # Required, Preferred, Nice-to-Have
-	minimum_proficiency = Column(String(20), nullable=False)  # Beginner, Intermediate, Advanced, Expert
-	minimum_years_experience = Column(DECIMAL(4, 2), nullable=True)
-	
-	# Priority
-	priority = Column(Integer, default=1)  # 1 = highest priority
-	
-	# Configuration
-	is_active = Column(Boolean, default=True)
-	
-	# Constraints
-	__table_args__ = (
-		UniqueConstraint('tenant_id', 'position_id', 'skill_id', name='uq_position_skill'),
-	)
-	
-	# Relationships
-	position = relationship("HRPosition", back_populates="required_skills")
-	skill = relationship("HRSkill", back_populates="position_skills")
-	
-	def __repr__(self):
-		return f"<HRPositionSkill {self.position_id} - {self.skill_id}>"
-
-
-class HRCertification(Model, AuditMixin, BaseMixin):
-	"""
-	Certification catalog for professional certifications.
-	
-	Defines available certifications that employees can obtain.
-	"""
-	__tablename__ = 'hr_edm_certification'
-	
-	# Identity
-	certification_id = Column(String(36), unique=True, nullable=False, default=uuid7str, index=True)
-	tenant_id = Column(String(36), nullable=False, index=True)
-	
-	# Certification Information
-	certification_code = Column(String(20), nullable=False, index=True)
-	certification_name = Column(String(200), nullable=False, index=True)
-	description = Column(Text, nullable=True)
-	
-	# Provider
-	issuing_organization = Column(String(200), nullable=False)
-	organization_website = Column(String(500), nullable=True)
-	
-	# Classification
-	certification_category = Column(String(100), nullable=True, index=True)  # Technical, Professional, Safety, etc.
-	industry = Column(String(100), nullable=True)
-	
-	# Validity
-	validity_period_months = Column(Integer, nullable=True)  # Months before renewal required
-	is_renewable = Column(Boolean, default=True)
-	
-	# Configuration
-	is_active = Column(Boolean, default=True)
-	is_continuing_education = Column(Boolean, default=False)
-	
-	# Constraints
-	__table_args__ = (
-		UniqueConstraint('tenant_id', 'certification_code', name='uq_certification_code_tenant'),
-	)
-	
-	# Relationships
-	employee_certifications = relationship("HREmployeeCertification", back_populates="certification")
-	
-	def __repr__(self):
-		return f"<HRCertification {self.certification_name}>"
-
-
-class HREmployeeCertification(Model, AuditMixin, BaseMixin):
-	"""
-	Employee certification records.
-	
-	Tracks certifications obtained by employees with validity and renewal tracking.
-	"""
-	__tablename__ = 'hr_edm_employee_certification'
-	
-	# Identity
-	employee_certification_id = Column(String(36), unique=True, nullable=False, default=uuid7str, index=True)
-	tenant_id = Column(String(36), nullable=False, index=True)
-	employee_id = Column(String(36), ForeignKey('hr_edm_employee.employee_id'), nullable=False, index=True)
-	certification_id = Column(String(36), ForeignKey('hr_edm_certification.certification_id'), nullable=False, index=True)
-	
-	# Certificate Details
-	certificate_number = Column(String(100), nullable=True)
-	issued_date = Column(Date, nullable=False, index=True)
-	expiry_date = Column(Date, nullable=True, index=True)
-	renewal_date = Column(Date, nullable=True)
-	
-	# Status
-	status = Column(String(20), default='Active', index=True)  # Active, Expired, Suspended, Revoked
-	
-	# Verification
-	verified = Column(Boolean, default=False)
-	verified_by = Column(String(36), nullable=True)  # Employee ID of verifier
-	verification_date = Column(Date, nullable=True)
-	verification_notes = Column(Text, nullable=True)
-	
-	# Scoring
-	score = Column(String(20), nullable=True)  # Pass/Fail, Percentage, Grade
-	score_details = Column(Text, nullable=True)
-	
-	# Documentation
-	certificate_file_path = Column(String(500), nullable=True)
-	documentation_notes = Column(Text, nullable=True)
-	
-	# Cost Tracking
-	cost = Column(DECIMAL(10, 2), nullable=True)
-	reimbursed = Column(Boolean, default=False)
-	reimbursement_amount = Column(DECIMAL(10, 2), nullable=True)
-	
-	# Configuration
-	is_active = Column(Boolean, default=True)
-	
-	# Constraints
-	__table_args__ = (
-		UniqueConstraint('tenant_id', 'employee_id', 'certification_id', 'issued_date', name='uq_employee_certification'),
-	)
-	
-	# Relationships
-	employee = relationship("HREmployee", back_populates="employee_certifications")
-	certification = relationship("HRCertification", back_populates="employee_certifications")
-	
-	def __repr__(self):
-		return f"<HREmployeeCertification {self.employee_id} - {self.certification_id}>"
-
-
-# ============================================================================
-# REVOLUTIONARY AI-POWERED MODELS FOR 10X IMPROVEMENT
-# ============================================================================
-
-class EmployeeEngagementLevel(str, Enum):
-	"""Employee engagement levels for predictive analytics."""
-	DISENGAGED = "disengaged"
-	SOMEWHAT_ENGAGED = "somewhat_engaged"
-	ENGAGED = "engaged"
-	HIGHLY_ENGAGED = "highly_engaged"
-	CHAMPION = "champion"
-
-
-class RiskLevel(str, Enum):
-	"""Risk assessment levels."""
-	LOW = "low"
-	MEDIUM = "medium"
-	HIGH = "high"
-	CRITICAL = "critical"
-
-
-class AIInsightType(str, Enum):
-	"""Types of AI-generated insights."""
-	CAREER_RECOMMENDATION = "career_recommendation"
-	SKILL_DEVELOPMENT = "skill_development"
-	PERFORMANCE_PREDICTION = "performance_prediction"
-	RETENTION_RISK = "retention_risk"
-	PROMOTION_READINESS = "promotion_readiness"
-	LEARNING_SUGGESTION = "learning_suggestion"
-	COMPENSATION_ANALYSIS = "compensation_analysis"
-	TEAM_DYNAMICS = "team_dynamics"
-
-
-class HREmployeeAIProfile(Model, AuditMixin, BaseMixin):
-	"""
-	AI-powered employee profile with predictive insights and recommendations.
-	
-	Governed feature #1: AI-Powered Employee Intelligence Engine
-	"""
-	__tablename__ = 'hr_edm_ai_profile'
-	
-	# Identity
-	ai_profile_id = Column(String(36), unique=True, nullable=False, default=uuid7str, index=True)
-	tenant_id = Column(String(36), nullable=False, index=True)
-	employee_id = Column(String(36), ForeignKey('hr_edm_employee.employee_id'), nullable=False, unique=True, index=True)
-	
-	# AI Embeddings for Semantic Search
-	profile_embedding = Column(VECTOR(1536), nullable=True)  # OpenAI embeddings
-	skills_embedding = Column(VECTOR(1536), nullable=True)
-	career_embedding = Column(VECTOR(1536), nullable=True)
-	
-	# Predictive Analytics
-	retention_risk_score = Column(DECIMAL(5, 4), nullable=True, index=True)  # 0.0000 to 1.0000
-	performance_prediction = Column(DECIMAL(5, 4), nullable=True)
-	promotion_readiness_score = Column(DECIMAL(5, 4), nullable=True)
-	engagement_score = Column(DECIMAL(5, 4), nullable=True)
-	engagement_level = Column(String(20), nullable=True, index=True)
-	
-	# Career Path Intelligence
-	suggested_career_paths = Column(JSONB, nullable=True)
-	skill_gap_analysis = Column(JSONB, nullable=True)
-	learning_recommendations = Column(JSONB, nullable=True)
-	
-	# Behavioral Analytics
-	communication_style = Column(String(50), nullable=True)
-	work_preferences = Column(JSONB, nullable=True)
-	collaboration_patterns = Column(JSONB, nullable=True)
-	productivity_metrics = Column(JSONB, nullable=True)
-	
-	# AI Model Metadata
-	last_ai_analysis = Column(DateTime, nullable=True, index=True)
-	ai_model_version = Column(String(20), nullable=True)
-	confidence_score = Column(DECIMAL(5, 4), nullable=True)
-	
-	# Relationships
-	employee = relationship("HREmployee", foreign_keys=[employee_id])
-	ai_insights = relationship("HREmployeeAIInsight", back_populates="ai_profile")
-	
-	def __repr__(self):
-		return f"<HREmployeeAIProfile {self.employee_id}>"
-
-
-class HREmployeeAIInsight(Model, AuditMixin, BaseMixin):
-	"""
-	AI-generated insights and recommendations for employees.
-	
-	Governed feature #1: AI-Powered Employee Intelligence Engine
-	"""
-	__tablename__ = 'hr_edm_ai_insight'
-	
-	# Identity
-	insight_id = Column(String(36), unique=True, nullable=False, default=uuid7str, index=True)
-	tenant_id = Column(String(36), nullable=False, index=True)
-	ai_profile_id = Column(String(36), ForeignKey('hr_edm_ai_profile.ai_profile_id'), nullable=False, index=True)
-	
-	# Insight Details
-	insight_type = Column(String(50), nullable=False, index=True)
-	title = Column(String(200), nullable=False)
-	description = Column(Text, nullable=False)
-	recommendation = Column(Text, nullable=True)
-	
-	# Scoring and Priority
-	confidence_score = Column(DECIMAL(5, 4), nullable=False)
-	priority_score = Column(Integer, nullable=False, default=1)  # 1-10
-	impact_assessment = Column(String(20), nullable=True)  # Low, Medium, High, Critical
-	
-	# Timeline and Actions
-	suggested_action_date = Column(Date, nullable=True)
-	expiry_date = Column(Date, nullable=True)
-	action_taken = Column(Boolean, default=False)
-	action_notes = Column(Text, nullable=True)
-	
-	# Supporting Data
-	supporting_data = Column(JSONB, nullable=True)
-	related_metrics = Column(JSONB, nullable=True)
-	
-	# Status
-	is_active = Column(Boolean, default=True, index=True)
-	is_dismissed = Column(Boolean, default=False)
-	dismissed_by = Column(String(36), nullable=True)
-	dismissed_date = Column(DateTime, nullable=True)
-	
-	# Relationships
-	ai_profile = relationship("HREmployeeAIProfile", back_populates="ai_insights")
-	
-	def __repr__(self):
-		return f"<HREmployeeAIInsight {self.insight_type} - {self.title[:30]}>"
-
-
-class HROrganizationalVisualization(Model, AuditMixin, BaseMixin):
-	"""
-	3D/AR organizational visualization data and configurations.
-	
-	Governed feature #2: Immersive Employee Experience Platform
-	"""
-	__tablename__ = 'hr_edm_org_visualization'
-	
-	# Identity
-	visualization_id = Column(String(36), unique=True, nullable=False, default=uuid7str, index=True)
-	tenant_id = Column(String(36), nullable=False, index=True)
-	
-	# Visualization Configuration
-	visualization_name = Column(String(200), nullable=False)
-	visualization_type = Column(String(50), nullable=False)  # 3d_org_chart, ar_directory, vr_workspace
-	description = Column(Text, nullable=True)
-	
-	# 3D Layout Data
-	layout_data = Column(JSONB, nullable=False)  # Node positions, connections, animations
-	visual_theme = Column(String(50), default='modern')
-	color_scheme = Column(JSONB, nullable=True)
-	
-	# AR/VR Settings
-	ar_markers = Column(JSONB, nullable=True)
-	vr_environment = Column(String(50), nullable=True)
-	interaction_config = Column(JSONB, nullable=True)
-	
-	# Permissions and Sharing
-	is_public = Column(Boolean, default=False)
-	shared_with_departments = Column(ARRAY(String), nullable=True)
-	created_by = Column(String(36), ForeignKey('hr_edm_employee.employee_id'), nullable=False)
-	
-	# Usage Analytics
-	view_count = Column(Integer, default=0)
-	last_accessed = Column(DateTime, nullable=True)
-	average_interaction_time = Column(Integer, nullable=True)  # seconds
-	
-	# Configuration
-	is_active = Column(Boolean, default=True, index=True)
-	
-	# Relationships
-	creator = relationship("HREmployee", foreign_keys=[created_by])
-	
-	def __repr__(self):
-		return f"<HROrganizationalVisualization {self.visualization_name}>"
-
-
-class HRConversationalSession(Model, AuditMixin, BaseMixin):
-	"""
-	Conversational AI session tracking for natural language HR interactions.
-	
-	Governed feature #3: Conversational HR Assistant
-	"""
-	__tablename__ = 'hr_edm_conversation_session'
-	
-	# Identity
-	session_id = Column(String(36), unique=True, nullable=False, default=uuid7str, index=True)
-	tenant_id = Column(String(36), nullable=False, index=True)
-	employee_id = Column(String(36), ForeignKey('hr_edm_employee.employee_id'), nullable=False, index=True)
-	
-	# Session Details
-	session_start = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
-	session_end = Column(DateTime, nullable=True)
-	session_duration_seconds = Column(Integer, nullable=True)
-	
-	# Interaction Mode
-	interaction_mode = Column(String(20), nullable=False)  # text, voice, hybrid
-	language_code = Column(String(10), default='en-US')
-	device_type = Column(String(50), nullable=True)  # mobile, desktop, tablet
-	
-	# Conversation Analytics
-	total_messages = Column(Integer, default=0)
-	user_satisfaction_score = Column(Integer, nullable=True)  # 1-5
-	resolution_achieved = Column(Boolean, nullable=True)
-	escalated_to_human = Column(Boolean, default=False)
-	
-	# AI Performance Metrics
-	average_response_time_ms = Column(Integer, nullable=True)
-	ai_confidence_average = Column(DECIMAL(5, 4), nullable=True)
-	successful_task_completion = Column(Boolean, nullable=True)
-	
-	# Context and State
-	conversation_context = Column(JSONB, nullable=True)
-	session_metadata = Column(JSONB, nullable=True)
-	
-	# Status
-	is_active = Column(Boolean, default=True, index=True)
-	
-	# Relationships
-	employee = relationship("HREmployee", foreign_keys=[employee_id])
-	messages = relationship("HRConversationalMessage", back_populates="session")
-	
-	def __repr__(self):
-		return f"<HRConversationalSession {self.session_id}>"
-
-
-class HRConversationalMessage(Model, AuditMixin, BaseMixin):
-	"""
-	Individual messages within conversational AI sessions.
-	
-	Governed feature #3: Conversational HR Assistant
-	"""
-	__tablename__ = 'hr_edm_conversation_message'
-	
-	# Identity
-	message_id = Column(String(36), unique=True, nullable=False, default=uuid7str, index=True)
-	tenant_id = Column(String(36), nullable=False, index=True)
-	session_id = Column(String(36), ForeignKey('hr_edm_conversation_session.session_id'), nullable=False, index=True)
-	
-	# Message Details
-	message_timestamp = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
-	message_type = Column(String(20), nullable=False)  # user_text, user_voice, ai_response, system
-	message_content = Column(Text, nullable=False)
-	
-	# Voice Message Data
-	audio_file_path = Column(String(500), nullable=True)
-	transcription_confidence = Column(DECIMAL(5, 4), nullable=True)
-	audio_duration_seconds = Column(Integer, nullable=True)
-	
-	# AI Processing
-	intent_detected = Column(String(100), nullable=True)
-	entities_extracted = Column(JSONB, nullable=True)
-	ai_confidence_score = Column(DECIMAL(5, 4), nullable=True)
-	processing_time_ms = Column(Integer, nullable=True)
-	
-	# Response Generation
-	response_generated = Column(Boolean, default=False)
-	response_type = Column(String(50), nullable=True)  # text, voice, action, data
-	actions_triggered = Column(JSONB, nullable=True)
-	
-	# Quality and Feedback
-	user_feedback = Column(Integer, nullable=True)  # 1-5 rating
-	feedback_notes = Column(Text, nullable=True)
-	flagged_for_review = Column(Boolean, default=False)
-	
-	# Relationships
-	session = relationship("HRConversationalSession", back_populates="messages")
-	
-	def __repr__(self):
-		return f"<HRConversationalMessage {self.message_type} - {self.message_content[:30]}>"
-
-
-class HRPredictiveAnalyticsModel(Model, AuditMixin, BaseMixin):
-	"""
-	ML model definitions and performance tracking for predictive analytics.
-	
-	Governed feature #5: Predictive People Analytics
-	"""
-	__tablename__ = 'hr_edm_predictive_model'
-	
-	# Identity
-	model_id = Column(String(36), unique=True, nullable=False, default=uuid7str, index=True)
-	tenant_id = Column(String(36), nullable=False, index=True)
-	
-	# Model Definition
-	model_name = Column(String(200), nullable=False, index=True)
-	model_type = Column(String(50), nullable=False)  # retention_prediction, performance_forecast, skill_recommendation
-	model_version = Column(String(20), nullable=False)
-	description = Column(Text, nullable=True)
-	
-	# Model Configuration
-	algorithm = Column(String(100), nullable=False)  # random_forest, neural_network, xgboost
-	hyperparameters = Column(JSONB, nullable=True)
-	feature_columns = Column(JSONB, nullable=False)
-	target_column = Column(String(100), nullable=False)
-	
-	# Training Data
-	training_data_source = Column(String(200), nullable=True)
-	training_date = Column(DateTime, nullable=True)
-	training_records_count = Column(Integer, nullable=True)
-	validation_split = Column(DECIMAL(3, 2), default=0.2)
-	
-	# Performance Metrics
-	accuracy_score = Column(DECIMAL(5, 4), nullable=True)
-	precision_score = Column(DECIMAL(5, 4), nullable=True)
-	recall_score = Column(DECIMAL(5, 4), nullable=True)
-	f1_score = Column(DECIMAL(5, 4), nullable=True)
-	auc_score = Column(DECIMAL(5, 4), nullable=True)
-	
-	# Model Artifacts
-	model_file_path = Column(String(500), nullable=True)
-	feature_importance = Column(JSONB, nullable=True)
-	model_metrics = Column(JSONB, nullable=True)
-	
-	# Deployment Status
-	is_active = Column(Boolean, default=False, index=True)
-	is_production = Column(Boolean, default=False)
-	deployment_date = Column(DateTime, nullable=True)
-	last_prediction_date = Column(DateTime, nullable=True)
-	
-	# Usage Statistics
-	total_predictions = Column(Integer, default=0)
-	average_prediction_time_ms = Column(Integer, nullable=True)
-	
-	def __repr__(self):
-		return f"<HRPredictiveAnalyticsModel {self.model_name} v{self.model_version}>"
-
-
-class HRGlobalComplianceRule(Model, AuditMixin, BaseMixin):
-	"""
-	Global workforce compliance rules and automated monitoring.
-	
-	Governed feature #10: Global Workforce Management
-	"""
-	__tablename__ = 'hr_edm_global_compliance'
-	
-	# Identity
-	rule_id = Column(String(36), unique=True, nullable=False, default=uuid7str, index=True)
-	tenant_id = Column(String(36), nullable=False, index=True)
-	
-	# Rule Definition
-	rule_name = Column(String(200), nullable=False, index=True)
-	rule_category = Column(String(100), nullable=False)  # labor_law, tax_compliance, data_privacy, safety
-	jurisdiction = Column(String(10), nullable=False, index=True)  # Country code (US, UK, DE, etc.)
-	region = Column(String(100), nullable=True)  # State, Province, Region
-	
-	# Rule Logic
-	rule_description = Column(Text, nullable=False)
-	validation_logic = Column(JSONB, nullable=False)  # JSON-based rule engine
-	severity_level = Column(String(20), default='medium')  # low, medium, high, critical
-	
-	# Automation Settings
-	auto_check_enabled = Column(Boolean, default=True)
-	auto_fix_enabled = Column(Boolean, default=False)
-	notification_required = Column(Boolean, default=True)
-	escalation_required = Column(Boolean, default=False)
-	
-	# Effective Dates
-	effective_from = Column(Date, nullable=False, index=True)
-	effective_to = Column(Date, nullable=True, index=True)
-	
-	# Compliance Tracking
-	last_check_date = Column(DateTime, nullable=True)
-	violations_count = Column(Integer, default=0)
-	last_violation_date = Column(DateTime, nullable=True)
-	
-	# Documentation
-	regulation_reference = Column(String(500), nullable=True)
-	documentation_url = Column(String(500), nullable=True)
-	
-	# Status
-	is_active = Column(Boolean, default=True, index=True)
-	
-	# Relationships
-	compliance_violations = relationship("HRComplianceViolation", back_populates="compliance_rule")
-	
-	def __repr__(self):
-		return f"<HRGlobalComplianceRule {self.rule_name} - {self.jurisdiction}>"
-
-
-class HRComplianceViolation(Model, AuditMixin, BaseMixin):
-	"""
-	Compliance violation tracking and resolution management.
-	
-	Governed feature #10: Global Workforce Management
-	"""
-	__tablename__ = 'hr_edm_compliance_violation'
-	
-	# Identity
-	violation_id = Column(String(36), unique=True, nullable=False, default=uuid7str, index=True)
-	tenant_id = Column(String(36), nullable=False, index=True)
-	rule_id = Column(String(36), ForeignKey('hr_edm_global_compliance.rule_id'), nullable=False, index=True)
-	
-	# Violation Details
-	violation_date = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
-	severity_level = Column(String(20), nullable=False, index=True)
-	violation_description = Column(Text, nullable=False)
-	
-	# Affected Entity
-	entity_type = Column(String(50), nullable=False)  # employee, department, policy
-	entity_id = Column(String(36), nullable=False, index=True)
-	entity_name = Column(String(200), nullable=True)
-	
-	# Detection Details
-	detection_method = Column(String(50), nullable=False)  # automated, manual, audit
-	detected_by_system = Column(Boolean, default=True)
-	detected_by_user = Column(String(36), nullable=True)
-	
-	# Resolution Tracking
-	status = Column(String(20), default='open', index=True)  # open, investigating, resolved, dismissed
-	assigned_to = Column(String(36), ForeignKey('hr_edm_employee.employee_id'), nullable=True)
-	resolution_notes = Column(Text, nullable=True)
-	resolution_date = Column(DateTime, nullable=True)
-	
-	# Impact Assessment
-	risk_level = Column(String(20), nullable=False)
-	potential_penalties = Column(Text, nullable=True)
-	business_impact = Column(Text, nullable=True)
-	
-	# Remediation
-	remediation_plan = Column(Text, nullable=True)
-	remediation_deadline = Column(Date, nullable=True)
-	remediation_cost = Column(DECIMAL(12, 2), nullable=True)
-	
-	# Follow-up
-	requires_reporting = Column(Boolean, default=False)
-	reported_to_authority = Column(Boolean, default=False)
-	report_date = Column(DateTime, nullable=True)
-	
-	# Relationships
-	compliance_rule = relationship("HRGlobalComplianceRule", back_populates="compliance_violations")
-	assigned_employee = relationship("HREmployee", foreign_keys=[assigned_to])
-	
-	def __repr__(self):
-		return f"<HRComplianceViolation {self.violation_id} - {self.severity_level}>"
-
-
-class HRWorkflowAutomation(Model, AuditMixin, BaseMixin):
-	"""
-	Intelligent workflow automation configurations and execution tracking.
-	
-	Governed feature #8: Privacy-First Data Architecture
-	"""
-	__tablename__ = 'hr_edm_workflow_automation'
-	
-	# Identity
-	workflow_id = Column(String(36), unique=True, nullable=False, default=uuid7str, index=True)
-	tenant_id = Column(String(36), nullable=False, index=True)
-	
-	# Workflow Definition
-	workflow_name = Column(String(200), nullable=False, index=True)
-	workflow_type = Column(String(50), nullable=False)  # onboarding, offboarding, promotion, training
-	description = Column(Text, nullable=True)
-	
-	# Workflow Configuration
-	trigger_conditions = Column(JSONB, nullable=False)
-	workflow_steps = Column(JSONB, nullable=False)
-	approval_chain = Column(JSONB, nullable=True)
-	notification_settings = Column(JSONB, nullable=True)
-	
-	# Automation Settings
-	is_automated = Column(Boolean, default=True)
-	auto_approve_conditions = Column(JSONB, nullable=True)
-	escalation_rules = Column(JSONB, nullable=True)
-	timeout_settings = Column(JSONB, nullable=True)
-	
-	# AI Enhancement
-	ai_optimization_enabled = Column(Boolean, default=False)
-	ai_recommendation_engine = Column(String(100), nullable=True)
-	learning_mode = Column(Boolean, default=False)
-	
-	# Performance Metrics
-	total_executions = Column(Integer, default=0)
-	successful_executions = Column(Integer, default=0)
-	average_completion_time_hours = Column(DECIMAL(8, 2), nullable=True)
-	user_satisfaction_score = Column(DECIMAL(3, 2), nullable=True)
-	
-	# Version Control
-	version = Column(String(20), default='1.0.0')
-	is_active = Column(Boolean, default=True, index=True)
-	created_by = Column(String(36), ForeignKey('hr_edm_employee.employee_id'), nullable=False)
-	
-	# Relationships
-	creator = relationship("HREmployee", foreign_keys=[created_by])
-	executions = relationship("HRWorkflowExecution", back_populates="workflow")
-	
-	def __repr__(self):
-		return f"<HRWorkflowAutomation {self.workflow_name}>"
-
-
-class HRWorkflowExecution(Model, AuditMixin, BaseMixin):
-	"""
-	Individual workflow execution instances and tracking.
-	
-	Governed feature #8: Privacy-First Data Architecture
-	"""
-	__tablename__ = 'hr_edm_workflow_execution'
-	
-	# Identity
-	execution_id = Column(String(36), unique=True, nullable=False, default=uuid7str, index=True)
-	tenant_id = Column(String(36), nullable=False, index=True)
-	workflow_id = Column(String(36), ForeignKey('hr_edm_workflow_automation.workflow_id'), nullable=False, index=True)
-	
-	# Execution Details
-	execution_start = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
-	execution_end = Column(DateTime, nullable=True)
-	execution_duration_hours = Column(DECIMAL(8, 2), nullable=True)
-	
-	# Trigger Information
-	triggered_by = Column(String(36), ForeignKey('hr_edm_employee.employee_id'), nullable=True)
-	trigger_event = Column(String(100), nullable=False)
-	trigger_data = Column(JSONB, nullable=True)
-	
-	# Subject Information
-	subject_type = Column(String(50), nullable=False)  # employee, department, position
-	subject_id = Column(String(36), nullable=False, index=True)
-	subject_name = Column(String(200), nullable=True)
-	
-	# Execution Status
-	status = Column(String(20), default='running', index=True)  # running, completed, failed, cancelled
-	current_step = Column(String(100), nullable=True)
-	steps_completed = Column(Integer, default=0)
-	total_steps = Column(Integer, nullable=True)
-	
-	# Progress Tracking
-	step_history = Column(JSONB, nullable=True)
-	approval_history = Column(JSONB, nullable=True)
-	notification_history = Column(JSONB, nullable=True)
-	
-	# Results and Metrics
-	completion_percentage = Column(Integer, default=0)
-	user_satisfaction_rating = Column(Integer, nullable=True)  # 1-5
-	outcome_summary = Column(Text, nullable=True)
-	
-	# Error Handling
-	error_count = Column(Integer, default=0)
-	last_error = Column(Text, nullable=True)
-	retry_count = Column(Integer, default=0)
-	
-	# Relationships
-	workflow = relationship("HRWorkflowAutomation", back_populates="executions")
-	triggered_by_employee = relationship("HREmployee", foreign_keys=[triggered_by])
-	
-	def __repr__(self):
-		return f"<HRWorkflowExecution {self.execution_id} - {self.status}>"
-
-
-class HRAnalyticsDashboard(Model, AuditMixin, BaseMixin):
-	"""
-	Dynamic analytics dashboard configurations with AI-powered insights.
-	
-	Governed feature #4: Real-Time Collaborative Workspaces
-	"""
-	__tablename__ = 'hr_edm_analytics_dashboard'
-	
-	# Identity
-	dashboard_id = Column(String(36), unique=True, nullable=False, default=uuid7str, index=True)
-	tenant_id = Column(String(36), nullable=False, index=True)
-	
-	# Dashboard Configuration
-	dashboard_name = Column(String(200), nullable=False, index=True)
-	dashboard_type = Column(String(50), nullable=False)  # executive, hr_manager, employee_self_service
-	description = Column(Text, nullable=True)
-	
-	# Layout and Widgets
-	layout_config = Column(JSONB, nullable=False)
-	widget_config = Column(JSONB, nullable=False)
-	filter_config = Column(JSONB, nullable=True)
-	
-	# AI Enhancement
-	ai_insights_enabled = Column(Boolean, default=True)
-	auto_refresh_enabled = Column(Boolean, default=True)
-	refresh_interval_minutes = Column(Integer, default=15)
-	predictive_alerts_enabled = Column(Boolean, default=False)
-	
-	# Sharing and Permissions
-	is_public = Column(Boolean, default=False)
-	shared_with_roles = Column(ARRAY(String), nullable=True)
-	shared_with_users = Column(ARRAY(String), nullable=True)
-	owner_id = Column(String(36), ForeignKey('hr_edm_employee.employee_id'), nullable=False)
-	
-	# Usage Analytics
-	view_count = Column(Integer, default=0)
-	last_viewed = Column(DateTime, nullable=True)
-	average_session_duration_minutes = Column(Integer, nullable=True)
-	
-	# Personalization
-	user_customizations = Column(JSONB, nullable=True)
-	auto_personalization_enabled = Column(Boolean, default=True)
-	
-	# Status
-	is_active = Column(Boolean, default=True, index=True)
-	
-	# Relationships
-	owner = relationship("HREmployee", foreign_keys=[owner_id])
-	
-	def __repr__(self):
-		return f"<HRAnalyticsDashboard {self.dashboard_name}>"
-
-
-# ============================================================================
-# PYDANTIC V2 MODELS FOR API VALIDATION
-# ============================================================================
-
-class EmployeeProfilePydantic(BaseModel):
-	"""Pydantic model for employee profile validation."""
-	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
-	
-	employee_id: str = Field(default_factory=uuid7str)
+	id: str = Field(default_factory=uuid7str)
 	tenant_id: str
-	employee_number: str
-	first_name: str
-	last_name: str
-	work_email: str | None = None
+	created_at: datetime = Field(default_factory=datetime.utcnow)
+	updated_at: datetime = Field(default_factory=datetime.utcnow)
+	created_by: str = "system"
+	is_deleted: bool = False
+
+
+# ---------------------------------------------------------------------------
+# Department
+# ---------------------------------------------------------------------------
+
+class DepartmentCreate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	tenant_id: str
+	code: str = Field(min_length=2, max_length=20)
+	name: str = Field(min_length=2, max_length=200)
+	description: str | None = None
+	parent_id: str | None = None
+	manager_id: str | None = None
+	cost_center: str | None = None
+	location: str | None = None
+	created_by: str = "system"
+
+
+class DepartmentUpdate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	name: str | None = None
+	description: str | None = None
+	parent_id: str | None = None
+	manager_id: str | None = None
+	cost_center: str | None = None
+	location: str | None = None
+	is_active: bool | None = None
+
+
+class Department(EDMBase):
+	code: str
+	name: str
+	description: str | None = None
+	parent_id: str | None = None
+	manager_id: str | None = None
+	cost_center: str | None = None
+	location: str | None = None
+	is_active: bool = True
+	headcount: int = 0
+
+
+# ---------------------------------------------------------------------------
+# Job Grade
+# ---------------------------------------------------------------------------
+
+class JobGradeCreate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	tenant_id: str
+	code: str = Field(min_length=2, max_length=20)
+	name: str = Field(min_length=2, max_length=100)
+	level: JobGradeLevel
+	min_salary: PositiveDecimal
+	max_salary: PositiveDecimal
+	currency: str = Field(default="KES", max_length=3)
+	description: str | None = None
+	created_by: str = "system"
+
+	@field_validator("max_salary")
+	@classmethod
+	def max_exceeds_min(cls, v: Decimal, info: Any) -> Decimal:
+		if "min_salary" in (info.data or {}) and v < info.data["min_salary"]:
+			raise ValueError("max_salary must be >= min_salary")
+		return v
+
+
+class JobGradeUpdate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	name: str | None = None
+	min_salary: PositiveDecimal | None = None
+	max_salary: PositiveDecimal | None = None
+	description: str | None = None
+	is_active: bool | None = None
+
+
+class JobGrade(EDMBase):
+	code: str
+	name: str
+	level: JobGradeLevel
+	min_salary: PositiveDecimal
+	max_salary: PositiveDecimal
+	currency: str = "KES"
+	description: str | None = None
+	is_active: bool = True
+
+	@property
+	def midpoint(self) -> Decimal:
+		return (self.min_salary + self.max_salary) / 2
+
+
+# ---------------------------------------------------------------------------
+# Position
+# ---------------------------------------------------------------------------
+
+class PositionCreate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	tenant_id: str
+	code: str = Field(min_length=2, max_length=20)
+	title: str = Field(min_length=2, max_length=200)
+	department_id: str
+	job_grade_id: str
+	employment_type: EmploymentType = EmploymentType.FULL_TIME
+	authorized_headcount: int = Field(default=1, ge=1)
+	reports_to_position_id: str | None = None
+	description: str | None = None
+	responsibilities: str | None = None
+	requirements: str | None = None
+	is_exempt: bool = True
+	created_by: str = "system"
+
+
+class PositionUpdate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	title: str | None = None
+	department_id: str | None = None
+	job_grade_id: str | None = None
+	authorized_headcount: int | None = None
+	reports_to_position_id: str | None = None
+	description: str | None = None
+	is_active: bool | None = None
+
+
+class Position(EDMBase):
+	code: str
+	title: str
+	department_id: str
+	job_grade_id: str
+	employment_type: EmploymentType = EmploymentType.FULL_TIME
+	authorized_headcount: int = 1
+	current_headcount: int = 0
+	reports_to_position_id: str | None = None
+	description: str | None = None
+	responsibilities: str | None = None
+	requirements: str | None = None
+	is_exempt: bool = True
+	is_active: bool = True
+
+
+# ---------------------------------------------------------------------------
+# Employee (core record)
+# ---------------------------------------------------------------------------
+
+class EmployeeCreate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	tenant_id: str
+	employee_number: str = Field(min_length=3, max_length=20)
+	first_name: str = Field(min_length=1, max_length=100)
+	middle_name: str | None = None
+	last_name: str = Field(min_length=1, max_length=100)
+	preferred_name: str | None = None
+	work_email: EmailStr
+	personal_email: EmailStr | None = None
+	phone_mobile: str | None = None
 	department_id: str
 	position_id: str
+	job_grade_id: str
+	manager_id: str | None = None
 	hire_date: date
-	employment_status: str = "Active"
+	start_date: date | None = None
+	employment_type: EmploymentType = EmploymentType.FULL_TIME
+	employment_status: EmploymentStatus = EmploymentStatus.PROBATION
+	work_mode: WorkMode = WorkMode.HYBRID
+	nationality: str | None = None
+	country_of_work: str = "KE"
+	base_salary: PositiveDecimal | None = None
+	currency: str = "KES"
+	created_by: str = "system"
+
+
+class EmployeeUpdate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	first_name: str | None = None
+	middle_name: str | None = None
+	last_name: str | None = None
+	preferred_name: str | None = None
+	personal_email: EmailStr | None = None
+	phone_mobile: str | None = None
+	phone_home: str | None = None
+	work_mode: WorkMode | None = None
+	photo_url: str | None = None
+	gender: Gender | None = None
+	date_of_birth: date | None = None
+	marital_status: MaritalStatus | None = None
+	address_line1: str | None = None
+	address_line2: str | None = None
+	city: str | None = None
+	country: str | None = None
+	national_id: str | None = None
+
+
+class Employee(EDMBase):
+	employee_number: str
+	first_name: str
+	middle_name: str | None = None
+	last_name: str
+	preferred_name: str | None = None
+	full_name: str = ""
+	work_email: str
+	personal_email: str | None = None
+	phone_mobile: str | None = None
+	phone_home: str | None = None
+	phone_work: str | None = None
+	gender: Gender | None = None
+	date_of_birth: date | None = None
+	marital_status: MaritalStatus | None = None
+	nationality: str | None = None
+	country_of_work: str = "KE"
+	national_id: str | None = None
+	address_line1: str | None = None
+	address_line2: str | None = None
+	city: str | None = None
+	country: str | None = None
+	department_id: str
+	position_id: str
+	job_grade_id: str
+	manager_id: str | None = None
+	hire_date: date
+	start_date: date | None = None
+	probation_end_date: date | None = None
+	termination_date: date | None = None
+	employment_type: EmploymentType = EmploymentType.FULL_TIME
+	employment_status: EmploymentStatus = EmploymentStatus.PROBATION
+	work_mode: WorkMode = WorkMode.HYBRID
+	base_salary: PositiveDecimal | None = None
+	currency: str = "KES"
+	pay_frequency: str = "monthly"
+	photo_url: str | None = None
+	badge_id: str | None = None
 	is_active: bool = True
 
-
-class AIInsightPydantic(BaseModel):
-	"""Pydantic model for AI insight validation."""
-	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
-	
-	insight_id: str = Field(default_factory=uuid7str)
-	tenant_id: str
-	insight_type: AIInsightType
-	title: str
-	description: str
-	confidence_score: Annotated[float, AfterValidator(lambda v: 0.0 <= v <= 1.0)]
-	priority_score: Annotated[int, AfterValidator(lambda v: 1 <= v <= 10)]
-	is_active: bool = True
+	def model_post_init(self, __context: Any) -> None:
+		if not self.full_name:
+			parts = [self.first_name, self.middle_name, self.last_name]
+			self.full_name = " ".join(p for p in parts if p)
 
 
-class ConversationSessionPydantic(BaseModel):
-	"""Pydantic model for conversational session validation."""
-	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
-	
-	session_id: str = Field(default_factory=uuid7str)
+# ---------------------------------------------------------------------------
+# Qualification
+# ---------------------------------------------------------------------------
+
+class QualificationCreate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
 	tenant_id: str
 	employee_id: str
-	interaction_mode: str
-	language_code: str = "en-US"
-	device_type: str | None = None
-	is_active: bool = True
+	institution: str = Field(min_length=2, max_length=300)
+	qualification_name: str = Field(min_length=2, max_length=300)
+	field_of_study: str | None = None
+	level: QualificationLevel
+	start_year: int = Field(ge=1950, le=2100)
+	end_year: int | None = Field(default=None, ge=1950, le=2100)
+	is_completed: bool = True
+	grade: str | None = None
+	country: str = "KE"
+	document_ref: str | None = None
+	created_by: str = "system"
 
 
-class WorkflowAutomationPydantic(BaseModel):
-	"""Pydantic model for workflow automation validation."""
-	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
-	
-	workflow_id: str = Field(default_factory=uuid7str)
+class QualificationUpdate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	end_year: int | None = None
+	is_completed: bool | None = None
+	grade: str | None = None
+	document_ref: str | None = None
+	verified: bool | None = None
+	verified_by: str | None = None
+
+
+class Qualification(EDMBase):
+	employee_id: str
+	institution: str
+	qualification_name: str
+	field_of_study: str | None = None
+	level: QualificationLevel
+	start_year: int
+	end_year: int | None = None
+	is_completed: bool = True
+	grade: str | None = None
+	country: str = "KE"
+	document_ref: str | None = None
+	verified: bool = False
+	verified_by: str | None = None
+	verified_at: datetime | None = None
+
+
+# ---------------------------------------------------------------------------
+# Training
+# ---------------------------------------------------------------------------
+
+class TrainingCreate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
 	tenant_id: str
-	workflow_name: str
-	workflow_type: str
-	trigger_conditions: dict[str, Any]
-	workflow_steps: list[dict[str, Any]]
-	is_automated: bool = True
+	employee_id: str
+	title: str = Field(min_length=2, max_length=300)
+	provider: str | None = None
+	training_type: str = "internal"  # internal / external / e-learning
+	start_date: date
+	end_date: date | None = None
+	duration_hours: float | None = None
+	cost: PositiveDecimal | None = None
+	currency: str = "KES"
+	location: str | None = None
+	objectives: str | None = None
+	created_by: str = "system"
+
+
+class TrainingUpdate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	status: TrainingStatus | None = None
+	end_date: date | None = None
+	score: float | None = None
+	certificate_ref: str | None = None
+	facilitator_notes: str | None = None
+	passed: bool | None = None
+
+
+class Training(EDMBase):
+	employee_id: str
+	title: str
+	provider: str | None = None
+	training_type: str = "internal"
+	status: TrainingStatus = TrainingStatus.PLANNED
+	start_date: date
+	end_date: date | None = None
+	duration_hours: float | None = None
+	cost: PositiveDecimal | None = None
+	currency: str = "KES"
+	location: str | None = None
+	objectives: str | None = None
+	score: float | None = None
+	passed: bool | None = None
+	certificate_ref: str | None = None
+	facilitator_notes: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Performance Review
+# ---------------------------------------------------------------------------
+
+class PerformanceReviewCreate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	tenant_id: str
+	employee_id: str
+	reviewer_id: str
+	review_period_start: date
+	review_period_end: date
+	review_type: str = "annual"  # annual / mid_year / probation / pip
+	goals: list[dict[str, Any]] = Field(default_factory=list)
+	created_by: str = "system"
+
+
+class PerformanceReviewUpdate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	status: ReviewStatus | None = None
+	self_rating: PerformanceRating | None = None
+	manager_rating: PerformanceRating | None = None
+	overall_rating: PerformanceRating | None = None
+	strengths: str | None = None
+	development_areas: str | None = None
+	goals_next_period: list[dict[str, Any]] | None = None
+	calibrated_rating: PerformanceRating | None = None
+	approved_by: str | None = None
+	acknowledged_at: datetime | None = None
+
+
+class PerformanceReview(EDMBase):
+	employee_id: str
+	reviewer_id: str
+	review_period_start: date
+	review_period_end: date
+	review_type: str = "annual"
+	status: ReviewStatus = ReviewStatus.DRAFT
+	goals: list[dict[str, Any]] = Field(default_factory=list)
+	self_rating: PerformanceRating | None = None
+	manager_rating: PerformanceRating | None = None
+	calibrated_rating: PerformanceRating | None = None
+	overall_rating: PerformanceRating | None = None
+	strengths: str | None = None
+	development_areas: str | None = None
+	goals_next_period: list[dict[str, Any]] = Field(default_factory=list)
+	approved_by: str | None = None
+	acknowledged_at: datetime | None = None
+
+
+# ---------------------------------------------------------------------------
+# Disciplinary
+# ---------------------------------------------------------------------------
+
+class DisciplinaryCreate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	tenant_id: str
+	employee_id: str
+	initiated_by: str
+	disciplinary_type: DisciplinaryType
+	incident_date: date
+	incident_description: str = Field(min_length=10)
+	created_by: str = "system"
+
+
+class DisciplinaryUpdate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	status: DisciplinaryStatus | None = None
+	hearing_date: date | None = None
+	outcome: str | None = None
+	outcome_date: date | None = None
+	appeal_date: date | None = None
+	appeal_outcome: str | None = None
+	closed_by: str | None = None
+	closed_at: datetime | None = None
+
+
+class Disciplinary(EDMBase):
+	employee_id: str
+	initiated_by: str
+	disciplinary_type: DisciplinaryType
+	status: DisciplinaryStatus = DisciplinaryStatus.INITIATED
+	incident_date: date
+	incident_description: str
+	hearing_date: date | None = None
+	outcome: str | None = None
+	outcome_date: date | None = None
+	appeal_date: date | None = None
+	appeal_outcome: str | None = None
+	closed_by: str | None = None
+	closed_at: datetime | None = None
+
+
+# ---------------------------------------------------------------------------
+# Grievance
+# ---------------------------------------------------------------------------
+
+class GrievanceCreate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	tenant_id: str
+	employee_id: str
+	category: str  # harassment / discrimination / pay / working_conditions / other
+	description: str = Field(min_length=10)
+	is_anonymous: bool = False
+	against_employee_id: str | None = None
+	created_by: str = "system"
+
+
+class GrievanceUpdate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	status: GrievanceStatus | None = None
+	assigned_to: str | None = None
+	investigation_notes: str | None = None
+	resolution: str | None = None
+	resolved_at: datetime | None = None
+	withdrawn_reason: str | None = None
+
+
+class Grievance(EDMBase):
+	employee_id: str
+	category: str
+	description: str
+	status: GrievanceStatus = GrievanceStatus.SUBMITTED
+	is_anonymous: bool = False
+	against_employee_id: str | None = None
+	assigned_to: str | None = None
+	investigation_notes: str | None = None
+	resolution: str | None = None
+	resolved_at: datetime | None = None
+	withdrawn_reason: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Contract
+# ---------------------------------------------------------------------------
+
+class ContractCreate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	tenant_id: str
+	employee_id: str
+	contract_type: ContractType
+	start_date: date
+	end_date: date | None = None
+	probation_end_date: date | None = None
+	notice_period_days: int = 30
+	base_salary: PositiveDecimal
+	currency: str = "KES"
+	pay_frequency: str = "monthly"
+	position_id: str
+	job_grade_id: str
+	document_ref: str | None = None
+	created_by: str = "system"
+
+
+class ContractUpdate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	status: ContractStatus | None = None
+	end_date: date | None = None
+	signed_by_employee_at: datetime | None = None
+	signed_by_employer_at: datetime | None = None
+	terminated_at: datetime | None = None
+	termination_reason: str | None = None
+
+
+class Contract(EDMBase):
+	employee_id: str
+	contract_type: ContractType
+	status: ContractStatus = ContractStatus.DRAFT
+	start_date: date
+	end_date: date | None = None
+	probation_end_date: date | None = None
+	notice_period_days: int = 30
+	base_salary: PositiveDecimal
+	currency: str = "KES"
+	pay_frequency: str = "monthly"
+	position_id: str
+	job_grade_id: str
+	document_ref: str | None = None
+	signed_by_employee_at: datetime | None = None
+	signed_by_employer_at: datetime | None = None
+	terminated_at: datetime | None = None
+	termination_reason: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Benefit Enrollment
+# ---------------------------------------------------------------------------
+
+class BenefitEnrollmentCreate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	tenant_id: str
+	employee_id: str
+	benefit_type: BenefitType
+	plan_name: str
+	provider: str | None = None
+	coverage_start: date
+	coverage_end: date | None = None
+	employee_contribution: PositiveDecimal = Decimal("0")
+	employer_contribution: PositiveDecimal = Decimal("0")
+	currency: str = "KES"
+	created_by: str = "system"
+
+
+class BenefitEnrollmentUpdate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	status: BenefitStatus | None = None
+	coverage_end: date | None = None
+	employee_contribution: PositiveDecimal | None = None
+	employer_contribution: PositiveDecimal | None = None
+	policy_number: str | None = None
+
+
+class BenefitEnrollment(EDMBase):
+	employee_id: str
+	benefit_type: BenefitType
+	plan_name: str
+	provider: str | None = None
+	status: BenefitStatus = BenefitStatus.ELIGIBLE
+	coverage_start: date
+	coverage_end: date | None = None
+	employee_contribution: PositiveDecimal = Decimal("0")
+	employer_contribution: PositiveDecimal = Decimal("0")
+	currency: str = "KES"
+	policy_number: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Dependant
+# ---------------------------------------------------------------------------
+
+class DependantCreate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	tenant_id: str
+	employee_id: str
+	first_name: str
+	last_name: str
+	relationship: str  # spouse / child / parent / sibling / other
+	date_of_birth: date | None = None
+	gender: Gender | None = None
+	national_id: str | None = None
+	is_beneficiary: bool = False
+	created_by: str = "system"
+
+
+class DependantUpdate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	first_name: str | None = None
+	last_name: str | None = None
+	date_of_birth: date | None = None
+	gender: Gender | None = None
+	national_id: str | None = None
+	is_beneficiary: bool | None = None
+	is_active: bool | None = None
+
+
+class Dependant(EDMBase):
+	employee_id: str
+	first_name: str
+	last_name: str
+	relationship: str
+	date_of_birth: date | None = None
+	gender: Gender | None = None
+	national_id: str | None = None
+	is_beneficiary: bool = False
 	is_active: bool = True
 
 
-# ============================================================================
-# ASYNC HELPER FUNCTIONS
-# ============================================================================
+# ---------------------------------------------------------------------------
+# Emergency Contact
+# ---------------------------------------------------------------------------
 
-async def _log_model_operation(operation: str, model_name: str, record_id: str) -> None:
-	"""Log model operations for audit trails."""
-	print(f"[MODEL_LOG] {operation}: {model_name} - {record_id} at {datetime.utcnow()}")
+class EmergencyContactCreate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	tenant_id: str
+	employee_id: str
+	name: str = Field(min_length=2, max_length=200)
+	relationship: str
+	phone_primary: str = Field(min_length=7, max_length=25)
+	phone_secondary: str | None = None
+	email: str | None = None
+	address: str | None = None
+	is_primary: bool = False
+	created_by: str = "system"
 
 
-async def _validate_tenant_access(tenant_id: str, user_id: str) -> bool:
-	"""Validate tenant access for multi-tenant security."""
-	# Implementation would check user's tenant permissions
-	return True
+class EmergencyContactUpdate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	name: str | None = None
+	phone_primary: str | None = None
+	phone_secondary: str | None = None
+	email: str | None = None
+	address: str | None = None
+	is_primary: bool | None = None
+	is_active: bool | None = None
 
 
-async def _generate_ai_embeddings(text_content: str) -> list[float] | None:
-	"""Generate AI embeddings for semantic search."""
-	# Implementation would call APG AI orchestration service
-	return None
+class EmergencyContact(EDMBase):
+	employee_id: str
+	name: str
+	relationship: str
+	phone_primary: str
+	phone_secondary: str | None = None
+	email: str | None = None
+	address: str | None = None
+	is_primary: bool = False
+	is_active: bool = True
+
+
+# ---------------------------------------------------------------------------
+# Work Permit
+# ---------------------------------------------------------------------------
+
+class WorkPermitCreate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	tenant_id: str
+	employee_id: str
+	nationality: str
+	permit_type: str  # work_permit / residence / critical_skills / exemption
+	permit_number: str | None = None
+	country_of_work: str = "KE"
+	issue_date: date | None = None
+	expiry_date: date | None = None
+	issuing_authority: str | None = None
+	document_ref: str | None = None
+	created_by: str = "system"
+
+
+class WorkPermitUpdate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	status: WorkPermitStatus | None = None
+	permit_number: str | None = None
+	issue_date: date | None = None
+	expiry_date: date | None = None
+	renewal_submitted_at: date | None = None
+	rejection_reason: str | None = None
+
+
+class WorkPermit(EDMBase):
+	employee_id: str
+	nationality: str
+	permit_type: str
+	status: WorkPermitStatus = WorkPermitStatus.APPLIED
+	permit_number: str | None = None
+	country_of_work: str = "KE"
+	issue_date: date | None = None
+	expiry_date: date | None = None
+	renewal_submitted_at: date | None = None
+	issuing_authority: str | None = None
+	document_ref: str | None = None
+	rejection_reason: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Background Check
+# ---------------------------------------------------------------------------
+
+class BackgroundCheckCreate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	tenant_id: str
+	employee_id: str
+	check_type: str  # criminal / credit / identity / education / employment
+	provider: str | None = None
+	initiated_by: str
+	consent_given: bool
+	consent_date: date
+	created_by: str = "system"
+
+
+class BackgroundCheckUpdate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	status: BackgroundCheckStatus | None = None
+	result_summary: str | None = None
+	flags: list[str] | None = None
+	completed_at: datetime | None = None
+	expires_at: date | None = None
+	report_ref: str | None = None
+
+
+class BackgroundCheck(EDMBase):
+	employee_id: str
+	check_type: str
+	provider: str | None = None
+	initiated_by: str
+	status: BackgroundCheckStatus = BackgroundCheckStatus.INITIATED
+	consent_given: bool = False
+	consent_date: date
+	result_summary: str | None = None
+	flags: list[str] = Field(default_factory=list)
+	completed_at: datetime | None = None
+	expires_at: date | None = None
+	report_ref: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Employment History (audit trail entry)
+# ---------------------------------------------------------------------------
+
+class EmploymentHistoryEntry(EDMBase):
+	employee_id: str
+	event_type: HistoryEventType
+	effective_date: date
+	reason: str | None = None
+	prev_department_id: str | None = None
+	new_department_id: str | None = None
+	prev_position_id: str | None = None
+	new_position_id: str | None = None
+	prev_job_grade_id: str | None = None
+	new_job_grade_id: str | None = None
+	prev_manager_id: str | None = None
+	new_manager_id: str | None = None
+	prev_salary: PositiveDecimal | None = None
+	new_salary: PositiveDecimal | None = None
+	prev_status: EmploymentStatus | None = None
+	new_status: EmploymentStatus | None = None
+	approved_by: str | None = None
+	approved_at: datetime | None = None
+	notes: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Onboarding
+# ---------------------------------------------------------------------------
+
+class OnboardingItem(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	task: str
+	owner: str
+	due_date: date | None = None
+	status: OnboardingItemStatus = OnboardingItemStatus.PENDING
+	completed_at: datetime | None = None
+	notes: str | None = None
+
+
+class OnboardingChecklist(EDMBase):
+	employee_id: str
+	items: list[OnboardingItem] = Field(default_factory=list)
+	completed_at: datetime | None = None
+	completion_pct: float = 0.0
+
+	def model_post_init(self, __context: Any) -> None:
+		if self.items:
+			done = sum(1 for i in self.items if i.status == OnboardingItemStatus.COMPLETED)
+			self.completion_pct = round(done / len(self.items) * 100, 1)
+
+
+class OnboardingChecklistCreate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	tenant_id: str
+	employee_id: str
+	items: list[OnboardingItem]
+	created_by: str = "system"
+
+
+# ---------------------------------------------------------------------------
+# Action request models (service input)
+# ---------------------------------------------------------------------------
+
+class TerminationRequest(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	tenant_id: str
+	employee_id: str
+	termination_type: TerminationType
+	effective_date: date
+	reason: str = Field(min_length=5)
+	last_working_day: date | None = None
+	notice_date: date | None = None
+	exit_interview_done: bool = False
+	final_settlement_amount: PositiveDecimal | None = None
+	initiated_by: str
+	approved_by: str | None = None
+
+
+class TransferRequest(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	tenant_id: str
+	employee_id: str
+	new_department_id: str
+	new_position_id: str
+	new_manager_id: str | None = None
+	effective_date: date
+	reason: str
+	approved_by: str | None = None
+
+
+class PromotionRequest(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	tenant_id: str
+	employee_id: str
+	new_position_id: str
+	new_job_grade_id: str
+	new_salary: PositiveDecimal
+	effective_date: date
+	reason: str
+	approved_by: str | None = None
+
+
+class CompensationChangeRequest(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	tenant_id: str
+	employee_id: str
+	new_salary: PositiveDecimal
+	new_job_grade_id: str | None = None
+	effective_date: date
+	reason: str
+	approved_by: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Aggregate / report models
+# ---------------------------------------------------------------------------
+
+class HeadcountSummary(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	tenant_id: str
+	as_at: date
+	total_headcount: int
+	active: int
+	on_probation: int
+	on_leave: int
+	on_notice: int
+	by_department: dict[str, int] = Field(default_factory=dict)
+	by_employment_type: dict[str, int] = Field(default_factory=dict)
+	by_gender: dict[str, int] = Field(default_factory=dict)
+	by_nationality: dict[str, int] = Field(default_factory=dict)
+	by_work_mode: dict[str, int] = Field(default_factory=dict)
+
+
+class AttritionReport(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	tenant_id: str
+	period_start: date
+	period_end: date
+	opening_headcount: int
+	closing_headcount: int
+	new_hires: int
+	terminations: int
+	attrition_rate: float
+	voluntary_turnover: int
+	involuntary_turnover: int
+	top_termination_reasons: list[dict[str, Any]] = Field(default_factory=list)
+	attrition_by_department: dict[str, float] = Field(default_factory=dict)
+
+
+class SuccessionCandidate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	employee_id: str
+	full_name: str
+	current_position_id: str
+	target_position_id: str
+	readiness: SuccessionReadiness
+	performance_rating: PerformanceRating | None = None
+	readiness_score: float = 0.0
+	retention_risk: Probability = 0.0
+	gap_areas: list[str] = Field(default_factory=list)
+
+
+class ProbationReviewResult(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	employee_id: str
+	outcome: str  # pass / fail / extend
+	effective_date: date
+	new_probation_end: date | None = None
+	notes: str | None = None
+	decided_by: str
+
+
+class ListParams(BaseModel):
+	"""Common pagination / filter parameters for list endpoints."""
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	page: int = Field(default=1, ge=1)
+	page_size: int = Field(default=50, ge=1, le=500)
+	search: str | None = None
+	sort_by: str = "created_at"
+	sort_dir: str = "desc"
+
+
+class PagedResponse(BaseModel):
+	"""Generic paged response wrapper."""
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+	items: list[Any]
+	total: int
+	page: int
+	page_size: int
+	pages: int

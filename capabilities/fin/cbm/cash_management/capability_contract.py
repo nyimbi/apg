@@ -162,14 +162,12 @@ PROVIDES = [
 REQUIRES = [
 	"auth",
 	"audl",
+	"mten",
+	"conf",
 	"ntfy",
-	"composition_events",
-	"composition_config",
-	"general_ledger",
-	"accounts_payable",
-	"accounts_receivable",
-	"document_management",
-	"business_intelligence",
+	"mqeb",
+	"wflo",
+	"glr_general_ledger",
 ]
 
 
@@ -336,13 +334,13 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 
 	return {
 		"capability": CAPABILITY_ID,
-		"name": CAPABILITY_NAME,
+		"display_name": CAPABILITY_NAME,
 		"version": CAPABILITY_VERSION,
 		"configuration": configuration,
 		"configuration_schema": _configuration_schema(),
 		"provides": PROVIDES,
 		"requires": REQUIRES,
-		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},
+		"rule_engine": {"type": "deterministic", "default_decision": "allow", "rules": deepcopy(RULES)},
 		"ui": {
 			"shell": "apg_python",
 			"api_prefix": "/cbm-cash-management/api/v1",

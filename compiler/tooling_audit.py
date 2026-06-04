@@ -78,9 +78,17 @@ FixtureAudit = tuple[str, str, Callable[[], dict[str, Any]]]
 
 
 def audit_tooling_fixtures() -> dict[str, Any]:
-	"""Run every checked-in APG tooling fixture audit."""
+	"""Run every checked-in APG tooling fixture audit (all 21 surfaces)."""
+	return _build_audit_report(_fixture_audits())
+
+
+build_tooling_fixture_audit = audit_tooling_fixtures
+
+
+def _build_audit_report(fixture_list: list[FixtureAudit]) -> dict[str, Any]:
+	"""Shared helper: run a list of fixture audits and assemble the report."""
 	surfaces: list[dict[str, Any]] = []
-	for name, expected_format, audit in _fixture_audits():
+	for name, expected_format, audit in fixture_list:
 		surfaces.append(_run_surface(name, expected_format, audit))
 
 	blocking_gaps = [
@@ -112,7 +120,36 @@ def audit_tooling_fixtures() -> dict[str, Any]:
 	}
 
 
-build_tooling_fixture_audit = audit_tooling_fixtures
+def audit_tooling_fixture_contracts() -> dict[str, Any]:
+	"""Run the 14 lightweight CLI/IDE/studio fixture-contract audits.
+
+	This is the surface exposed by ``apg tooling audit``.  It deliberately
+	excludes the heavy capability-wide and compiler-baseline suites
+	(capability_operability, capability_implementation, capability_lifecycle,
+	compiler_baseline, repository_hygiene, doctor, docs) which are covered
+	by the comprehensive :func:`audit_tooling_fixtures` suite.
+	"""
+	return _build_audit_report(_fixture_contract_audits())
+
+
+def _fixture_contract_audits() -> list[FixtureAudit]:
+	"""Return the 14 lightweight fixture-contract surfaces used by the CLI."""
+	return [
+		("parser_golden", "apg.parser-golden-audit.v1", audit_parser_golden),
+		("diagnostics", "apg.diagnostic-audit.v1", audit_diagnostic_fixtures),
+		("lint", "apg.lint-fixture-audit.v1", audit_lint_fixtures),
+		("formatter", "apg.formatter-audit.v1", audit_formatter_fixtures),
+		("drift", "apg.drift-audit.v1", audit_drift_fixtures),
+		("semantic_model", "apg.semantic-model-fixture-audit.v1", audit_semantic_model_fixtures),
+		("graph", "apg.graph-fixture-audit.v1", audit_graph_fixtures),
+		("language_server", "apg.language-server-fixture-audit.v1", audit_language_server_fixtures),
+		("nl_plan", "apg.nl-plan-fixture-audit.v1", audit_nl_plan_fixtures),
+		("migration", "apg.migration-fixture-audit.v1", audit_migration_fixtures),
+		("release_evidence", "apg.release-evidence-fixture-audit.v1", audit_release_evidence_fixtures),
+		("cli_surface", CLI_SURFACE_AUDIT_FORMAT, audit_cli_surface_contracts),
+		("ide_integration", "apg.ide-audit.v1", audit_vscode_extension),
+		("studio_designer", STUDIO_SURFACE_AUDIT_FORMAT, audit_studio_designer_surface),
+	]
 
 
 def _fixture_audits() -> list[FixtureAudit]:

@@ -20,11 +20,11 @@ from uuid_extensions import uuid7str
 
 # Import the FastAPI app and dependencies
 from ..api_endpoints import app
-from ..models import (
+from ...models import (
 	ARCustomer, ARInvoice, ARPayment, ARCollectionActivity,
 	ARCustomerType, ARCustomerStatus, ARInvoiceStatus, ARPaymentStatus
 )
-from ..service import (
+from ...service import (
 	ARCustomerService, ARInvoiceService, ARCollectionsService,
 	ARCashApplicationService, ARAnalyticsService
 )

@@ -1,0 +1,21 @@
+{
+  "evidence": {
+    "contracts": {
+      "capability_contract": {
+        "display_name": "Government Contracts and Procurement",
+        "errors": []
+      }
+    },
+    "self_test": {
+      "capability": "government_con",
+      "passed": true,
+      "status": "ok"
+    },
+    "semantic_model": {
+      "capability": "government_con",
+      "format": "apg.semantic-model.v1"
+    }
+  },
+  "format": "apg.release-report.v1",
+  "ok": true
+}

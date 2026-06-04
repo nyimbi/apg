@@ -380,6 +380,31 @@ def streaming_manifest() -> dict[str, Any]:
 	}
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.etlp.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"pipeline_created",
+		"pipeline_updated",
+		"pipeline_activated",
+		"pipeline_deactivated",
+		"pipeline_run_started",
+		"pipeline_run_completed",
+		"pipeline_run_failed",
+		"transformation_applied",
+		"data_quality_checked",
+		"lineage_captured",
+		"schedule_triggered",
+		"agent_registered",
+	],
+	"guardrails": [
+		"etlp_batch_requires_bytewax",
+		"etlp_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	config = CapabilityConfiguration()
 	theme = CapabilityTheme()
@@ -393,7 +418,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		"rule_engine": {"type": "deterministic", "rules": [rule.__dict__ for rule in default_rules()]},
 		"ui": ui_manifest(),
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": STREAMING,
 		"review_evidence": {
 			"durable_statuses": [
 				"pending",

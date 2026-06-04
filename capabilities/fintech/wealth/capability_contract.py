@@ -40,7 +40,20 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 }
 
 PROVIDES = ["wealth_client_profile_workflow", "suitability_profile_workflow", "portfolio_management_workflow", "advisory_mandate_workflow", "portfolio_rebalance_workflow", "wealth_order_workflow", "performance_reporting_workflow", "wealth_fee_workflow", "wealth_agent_workflow"]
-REQUIRES = ["auth", "audl", "ntfy", "nlpc", "keym", "fintech_kyc", "fintech_aml", "fintech_fraud", "fintech_payments", "fintech_wallets", "bia", "fin_rpt"]
+REQUIRES = [
+	"auth",
+	"audl",
+	"ntfy",
+	"nlpc",
+	"keym",
+	"fintech_kyc",
+	"fintech_aml",
+	"fintech_fraud",
+	"fintech_payments",
+	"fintech_wallets",
+	"bia_anl",
+	"fin_rpt",
+]
 
 UI_ROUTES = [
 	{"name": "dashboard", "path": "/fintech-wealth/dashboard", "component": "WealthDashboard", "permission": "fintech_wealth:view", "nav_group": "Overview"},
@@ -109,7 +122,20 @@ RULES: list[dict[str, Any]] = [
 	{"name": "wealth_agent_runtime_supported", "condition": {"operation": "register_wealth_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "wealth_agent_runtime_not_supported", "required_action": "select_supported_runtime"}},
 	{"name": "wealth_agent_role_supported", "condition": {"operation": "register_wealth_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "wealth_agent_role_not_supported", "required_action": "select_supported_role"}},
 	{"name": "privileged_wealth_agent_action_requires_human_approval", "condition": {"operation": "wealth_agent_action", "privileged_scope": True, "human_approval_recorded": False}, "effect": {"decision": "deny", "reason": "human_approval_required", "required_action": "record_human_approval"}},
+
+	# Cross-tenant and privilege escalation guards
+	{"name": "cross_tenant_wealth_access_denied", "description": "Wealth management resources cannot be accessed across tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_access_denied", "required_action": "use_tenant_scoped_credentials"}},
+	{"name": "privilege_escalation_denied", "description": "Wealth management privilege escalation without approval is denied.", "condition": {"privilege_escalation_attempt": True, "approval_recorded": False}, "effect": {"decision": "deny", "reason": "privilege_escalation_denied", "required_action": "obtain_escalation_approval"}},
+
+	# Africa-specific wealth management rules
+	{"name": "ke_cma_wealth_management_licence", "description": "Kenya CMA fund manager or investment adviser licence required for wealth management.", "condition": {"operation": "manage_wealth", "country": "KE", "cma_licence_present": False}, "effect": {"decision": "deny", "reason": "ke_cma_wealth_licence_required", "required_action": "obtain_cma_wealth_management_licence"}},
+	{"name": "mobile_money_wealth_onboarding_kyc", "description": "Mobile money wealth management clients require enhanced KYC.", "condition": {"operation": "onboard_wealth_client", "funding_method": "mobile_money", "enhanced_kyc_present": False}, "effect": {"decision": "deny", "reason": "mobile_money_wealth_enhanced_kyc_required", "required_action": "complete_enhanced_kyc"}},
+	{"name": "ke_nse_equity_custody_required", "description": "Kenya NSE equity wealth products require licensed CDS custodian.", "condition": {"operation": "hold_ke_equity", "cds_custodian_present": False}, "effect": {"decision": "deny", "reason": "ke_cds_custodian_required", "required_action": "assign_cds_custodian"}},
+	{"name": "wealth_suitability_assessment_required", "description": "Wealth management products require completed suitability assessment.", "condition": {"operation": "offer_wealth_product", "suitability_assessed": False}, "effect": {"decision": "deny", "reason": "wealth_suitability_assessment_required", "required_action": "complete_suitability_assessment"}},
+	{"name": "ng_sec_wealth_management_compliance", "description": "Nigeria SEC portfolio management rules compliance required.", "condition": {"operation": "manage_wealth", "country": "NG", "ng_sec_compliant": False}, "effect": {"decision": "deny", "reason": "ng_sec_wealth_compliance_required", "required_action": "comply_with_ng_sec_portfolio_rules"}},
+	{"name": "wealth_aml_enhanced_due_diligence", "description": "High-net-worth wealth clients require AML enhanced due diligence.", "condition": {"operation": "onboard_wealth_client", "high_net_worth": True, "edd_completed": False}, "effect": {"decision": "deny", "reason": "wealth_edd_required", "required_action": "complete_enhanced_due_diligence"}},
 ]
+
 
 
 def get_capability_contract(tenant_id: str = "default") -> dict[str, Any]:

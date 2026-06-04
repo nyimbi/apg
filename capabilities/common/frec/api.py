@@ -86,7 +86,7 @@ def async_route(f):
         try:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            result = loop.run_until_complete(f(*args, **kwargs))
+            result = asyncio.run(f(*args, **kwargs))
             loop.close()
             return result
         except Exception as e:

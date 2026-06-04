@@ -1,66 +1,31 @@
-"""APG composition access-control capability package."""
+"""APG Access Control Integration Hub capability.
 
+Standalone package: ``pip install apg-composition-access``
+
+Quick start::
+
+    from apg_composition_access import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : composition_access
+Provides      : identity_provider_composition, resource_access_registry, policy_orchestration, grant_lifecycle, session_risk_control, access_decision_audit
+"""
 from __future__ import annotations
 
-from .capability_contract import (
-	ACCESS_EVENT_STREAM,
-	SUPPORTED_ACCESS_AGENT_ROLES,
-	SUPPORTED_ACCESS_AGENT_RUNTIMES,
-	evaluate_capability_rules,
-	event_stream_name,
-	get_capability_contract,
-	streaming_manifest,
-)
-from .models import (
-	AccessAgentRecord,
-	AccessAuditEventRecord,
-	AccessDecisionRecord,
-	AccessGrantRecord,
-	AccessPolicyRecord,
-	AccessProviderRecord,
-	AccessResourceRecord,
-	AccessSessionRecord,
-)
-from .service import CompositionAccessService
-
-
-__version__ = "2.1.0"
+__version__  = "1.0.0"
+__package_name__ = "apg-composition-access"
 __capability_id__ = "composition_access"
-__apg_dependencies__ = ["auth", "audl", "ntfy", "conf", "registry"]
-__apg_optional_dependencies__ = ["i18n", "mchn", "biom"]
 
-
-def register_capability() -> dict[str, object]:
-	"""Return package metadata used by APG capability discovery."""
-	contract = get_capability_contract()
-	return {
-		"capability": contract["capability"],
-		"display_name": contract["display_name"],
-		"version": __version__,
-		"provides": contract["provides"],
-		"requires": contract["requires"],
-		"ui": contract["ui"],
-		"theme": contract["theme"],
-		"streaming": contract["streaming"],
-	}
-
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
+)
 
 __all__ = [
-	"ACCESS_EVENT_STREAM",
-	"SUPPORTED_ACCESS_AGENT_ROLES",
-	"SUPPORTED_ACCESS_AGENT_RUNTIMES",
-	"AccessAgentRecord",
-	"AccessAuditEventRecord",
-	"AccessDecisionRecord",
-	"AccessGrantRecord",
-	"AccessPolicyRecord",
-	"AccessProviderRecord",
-	"AccessResourceRecord",
-	"AccessSessionRecord",
-	"CompositionAccessService",
-	"evaluate_capability_rules",
-	"event_stream_name",
-	"get_capability_contract",
-	"register_capability",
-	"streaming_manifest",
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
 ]

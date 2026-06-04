@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "mining_eqp",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "mining_eqp": {
+      "capability": "mining_eqp"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

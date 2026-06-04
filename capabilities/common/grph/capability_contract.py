@@ -352,6 +352,31 @@ def streaming_manifest() -> dict[str, Any]:
 	}
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.grph.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"graph_created",
+		"graph_updated",
+		"graph_archived",
+		"node_created",
+		"node_updated",
+		"node_deleted",
+		"edge_created",
+		"edge_updated",
+		"edge_deleted",
+		"traversal_executed",
+		"schema_evolved",
+		"agent_registered",
+	],
+	"guardrails": [
+		"grph_batch_requires_bytewax",
+		"grph_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable GRPH capability contract."""
 	config = deepcopy(DEFAULT_CONFIGURATION)
@@ -375,7 +400,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"requires_theme": True,
 		},
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": deepcopy(STREAMING),
 		"theme": deepcopy(THEME),
 	}
 

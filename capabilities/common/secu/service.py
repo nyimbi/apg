@@ -30,11 +30,11 @@ try:
 		ComplianceStatus, SecurityPolicy, SecurityIncident, SecurityMetric
 	)
 except ImportError:
-	from __init__ import (
+	from capabilities.common.secu import (
 		SecurityLevel, RiskLevel, ThreatType, ComplianceFramework,
 		SecurityAction, DeviceTrustLevel, get_apg_dependencies
 	)
-	from models import (
+	from capabilities.common.secu.models import (
 		DeviceContext, NetworkContext, BehavioralPattern, RiskScore,
 		ThreatIndicator, SecurityContext, ComplianceRequirement,
 		ComplianceStatus, SecurityPolicy, SecurityIncident, SecurityMetric

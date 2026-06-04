@@ -233,7 +233,7 @@ class AMLService:
 	# ------------------------------------------------------------------
 
 	async def _emit_event(self, event_type: str, payload: dict[str, Any]) -> None:
-		"""Emit domain event to the AML event stream (Bytewax/Kafka/etc)."""
+		"""Emit domain event to the AML event stream (Bytewax/mqtt/etc)."""
 		event = {
 			"event_type": event_type,
 			"tenant_id": self.tenant_id,

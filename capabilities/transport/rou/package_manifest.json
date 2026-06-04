@@ -1,0 +1,20 @@
+{
+  "base_target": "python",
+  "display_name": "Route Optimisation",
+  "format": "apg.package-manifest.v1",
+  "generated_artifacts": [
+    "__init__.py",
+    "cap_spec.md",
+    "capability_contract.py",
+    "models.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py",
+    "semantic_model.json",
+    "release_report.json"
+  ],
+  "name": "transport_rou",
+  "profile": "capability",
+  "profile_artifacts": []
+}

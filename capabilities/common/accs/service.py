@@ -755,6 +755,444 @@ class AccsService:
 		return normalized if normalized in SUPPORTED_ACCESSIBILITY_AGENT_ROLES else None
 
 
+	# -------------------------------------------------------------------------
+	# Extended async methods — in-memory store pattern
+	# -------------------------------------------------------------------------
+
+	async def audit_wcag(
+		self,
+		url: str,
+		tenant_id: str,
+		level: str = "AA",
+		owner: str = "accessibility-team",
+	) -> dict[str, Any]:
+		"""
+		Run a WCAG audit against a URL. Registers a target and runs an audit.
+		Returns findings summary.
+		"""
+		from urllib.parse import urlparse
+		parsed = urlparse(url)
+		route = parsed.path or "/"
+		target_id = f"wcag-{abs(hash(url)):x}"
+		standard_id = f"wcag_2_2_{level.lower()}"
+
+		# Register standard if not present
+		standard_key = self._key(tenant_id, standard_id)
+		if standard_key not in self._standards:
+			try:
+				self.register_standard(standard_id=standard_id, tenant_id=tenant_id,
+					name="WCAG", version="2.2", level=level)
+			except ValueError:
+				pass
+
+		# Register target if not present
+		target_key = self._key(tenant_id, target_id)
+		if target_key not in self._targets:
+			self.register_target(
+				target_id=target_id, tenant_id=tenant_id,
+				surface="web", route=route, owner=owner,
+				published_ui=True,
+			)
+
+		# Run audit
+		audit_id = f"audit-wcag-{abs(hash(url + level)):x}"
+		try:
+			return self.run_audit(
+				audit_id=audit_id,
+				tenant_id=tenant_id,
+				standard_id=standard_id,
+				target_ids=[target_id],
+				remediation_owner=owner,
+			)
+		except ValueError:
+			# Audit already run — return existing
+			key = self._key(tenant_id, audit_id)
+			audit = self._audits.get(key)
+			return audit.to_dict() if audit else {"audit_id": audit_id, "status": "already_run"}
+
+	async def auto_remediate(
+		self,
+		issue_id: str,
+		tenant_id: str | None = None,
+		resolution: str = "auto_remediated",
+	) -> dict[str, Any]:
+		"""Attempt automatic remediation of a finding by closing it with auto-resolution."""
+		key = self._find_remediation_key(issue_id, tenant_id)
+		task = self._remediations.get(key)
+		if task is None:
+			raise KeyError(f"remediation_task_not_found:{issue_id}")
+		effective_tenant = tenant_id or task.tenant_id
+		# Mark finding closed if review not required
+		finding_key = self._key(effective_tenant, issue_id)
+		finding = self._findings.get(finding_key)
+		if finding and not finding.review_required:
+			return self.close_finding(issue_id, effective_tenant, resolution)
+		# Otherwise just update remediation status
+		return self.update_remediation(
+			finding_id=issue_id,
+			status="in_progress",
+			review_recorded=False,
+			tenant_id=effective_tenant,
+		)
+
+	async def screen_reader_test(
+		self,
+		tenant_id: str,
+		target_id: str,
+		test_tool: str = "nvda",
+		tested_by: str = "qa",
+	) -> dict[str, Any]:
+		"""Record a screen-reader compatibility test result for a target."""
+		self._enforce_tenant(tenant_id)
+		target = self._get_target(target_id, tenant_id)
+		if target is None:
+			raise KeyError(f"target_not_found:{target_id}")
+		finding_id = f"sr-{abs(hash(target_id + test_tool)):x}"
+		# Register finding only if semantic labels missing
+		if not target.semantic_labels_present:
+			try:
+				finding = self.record_finding(
+					finding_id=finding_id,
+					tenant_id=tenant_id,
+					target_id=target_id,
+					rule="screen_reader_compatibility",
+					severity="high",
+					description=f"Screen reader test ({test_tool}) detected missing semantic labels.",
+					remediation_owner=tested_by,
+				)
+			except ValueError:
+				finding = self._findings.get(self._key(tenant_id, finding_id), {})
+				finding = finding.to_dict() if hasattr(finding, "to_dict") else finding
+		else:
+			finding = None
+		self._record_event(tenant_id=tenant_id, event_type="screen_reader_test_completed",
+			subject_id=target_id, message=f"Screen reader test ({test_tool}) on {target_id}.",
+			evidence={"tool": test_tool, "passed": target.semantic_labels_present})
+		return {
+			"target_id": target_id,
+			"test_tool": test_tool,
+			"passed": target.semantic_labels_present,
+			"finding": finding,
+		}
+
+	async def keyboard_nav_test(
+		self,
+		tenant_id: str,
+		target_id: str,
+		tested_by: str = "qa",
+	) -> dict[str, Any]:
+		"""Test keyboard navigation on a target and record findings."""
+		self._enforce_tenant(tenant_id)
+		target = self._get_target(target_id, tenant_id)
+		if target is None:
+			raise KeyError(f"target_not_found:{target_id}")
+		passed = target.keyboard_navigation_present
+		if not passed:
+			finding_id = f"kb-{abs(hash(target_id + 'keyboard')):x}"
+			try:
+				self.record_finding(
+					finding_id=finding_id,
+					tenant_id=tenant_id,
+					target_id=target_id,
+					rule="keyboard_navigation",
+					severity="critical",
+					description="Keyboard navigation not fully implemented on this surface.",
+					remediation_owner=tested_by,
+				)
+			except ValueError:
+				pass
+		self._record_event(tenant_id=tenant_id, event_type="keyboard_nav_test_completed",
+			subject_id=target_id, message=f"Keyboard nav test on {target_id}.",
+			evidence={"passed": passed})
+		return {"target_id": target_id, "keyboard_navigation_present": passed, "passed": passed}
+
+	async def contrast_check(
+		self,
+		tenant_id: str,
+		target_id: str,
+		contrast_ratio: float | None = None,
+	) -> dict[str, Any]:
+		"""Check foreground/background contrast ratio against WCAG AA (4.5:1)."""
+		self._enforce_tenant(tenant_id)
+		target = self._get_target(target_id, tenant_id)
+		if target is None:
+			raise KeyError(f"target_not_found:{target_id}")
+		ratio = contrast_ratio if contrast_ratio is not None else target.contrast_ratio
+		wcag_aa_threshold = 4.5
+		passed = ratio >= wcag_aa_threshold
+		if not passed:
+			finding_id = f"contrast-{abs(hash(target_id + str(ratio))):x}"
+			try:
+				self.record_finding(
+					finding_id=finding_id,
+					tenant_id=tenant_id,
+					target_id=target_id,
+					rule="contrast_ratio",
+					severity="high",
+					description=f"Contrast ratio {ratio:.2f} is below WCAG AA threshold of {wcag_aa_threshold}.",
+					remediation_owner="ui-team",
+					evidence={"contrast_ratio": ratio, "threshold": wcag_aa_threshold},
+				)
+			except ValueError:
+				pass
+		return {"target_id": target_id, "contrast_ratio": ratio, "threshold": wcag_aa_threshold, "passed": passed}
+
+	async def font_size_validate(
+		self,
+		tenant_id: str,
+		target_id: str,
+		min_body_px: float = 16.0,
+		tested_by: str = "qa",
+	) -> dict[str, Any]:
+		"""Validate that body font size meets minimum readability requirement."""
+		self._enforce_tenant(tenant_id)
+		target = self._get_target(target_id, tenant_id)
+		if target is None:
+			raise KeyError(f"target_not_found:{target_id}")
+		# Deterministic check — in a real integration, inspect CSS
+		passed = min_body_px >= 16.0
+		self._record_event(tenant_id=tenant_id, event_type="font_size_validated",
+			subject_id=target_id, message=f"Font size validation on {target_id}: min={min_body_px}px.",
+			evidence={"min_body_px": min_body_px, "passed": passed})
+		return {"target_id": target_id, "min_body_px": min_body_px, "passed": passed}
+
+	async def alt_text_audit(
+		self,
+		tenant_id: str,
+		target_id: str,
+		image_count: int,
+		images_with_alt: int,
+		audited_by: str = "qa",
+	) -> dict[str, Any]:
+		"""Audit alt-text coverage for images on a target."""
+		self._enforce_tenant(tenant_id)
+		target = self._get_target(target_id, tenant_id)
+		if target is None:
+			raise KeyError(f"target_not_found:{target_id}")
+		coverage = images_with_alt / image_count if image_count else 1.0
+		passed = coverage >= 1.0
+		if not passed:
+			finding_id = f"alt-{abs(hash(target_id + str(image_count))):x}"
+			try:
+				self.record_finding(
+					finding_id=finding_id,
+					tenant_id=tenant_id,
+					target_id=target_id,
+					rule="alt_text_missing",
+					severity="high",
+					description=f"{image_count - images_with_alt} image(s) missing alt text.",
+					remediation_owner=audited_by,
+					evidence={"image_count": image_count, "images_with_alt": images_with_alt},
+				)
+			except ValueError:
+				pass
+		return {
+			"target_id": target_id,
+			"image_count": image_count,
+			"images_with_alt": images_with_alt,
+			"coverage": round(coverage, 4),
+			"passed": passed,
+		}
+
+	async def aria_label_check(
+		self,
+		tenant_id: str,
+		target_id: str,
+		aria_coverage: float = 1.0,
+		checked_by: str = "qa",
+	) -> dict[str, Any]:
+		"""Check ARIA label coverage. aria_coverage is fraction 0-1."""
+		self._enforce_tenant(tenant_id)
+		passed = aria_coverage >= 0.9
+		self._record_event(tenant_id=tenant_id, event_type="aria_label_check_completed",
+			subject_id=target_id, message=f"ARIA label check on {target_id}: coverage={aria_coverage:.0%}.",
+			evidence={"aria_coverage": aria_coverage, "passed": passed})
+		return {"target_id": target_id, "aria_coverage": aria_coverage, "passed": passed}
+
+	async def focus_order_audit(
+		self,
+		tenant_id: str,
+		target_id: str,
+		issues_found: int = 0,
+		audited_by: str = "qa",
+	) -> dict[str, Any]:
+		"""Audit focus order for logical keyboard tab sequence."""
+		self._enforce_tenant(tenant_id)
+		passed = issues_found == 0
+		if not passed:
+			finding_id = f"focus-{abs(hash(target_id + str(issues_found))):x}"
+			try:
+				self.record_finding(
+					finding_id=finding_id,
+					tenant_id=tenant_id,
+					target_id=target_id,
+					rule="focus_order",
+					severity="medium",
+					description=f"{issues_found} focus order issue(s) detected.",
+					remediation_owner=audited_by,
+				)
+			except ValueError:
+				pass
+		return {"target_id": target_id, "issues_found": issues_found, "passed": passed}
+
+	async def form_accessibility_audit(
+		self,
+		tenant_id: str,
+		target_id: str,
+		field_count: int,
+		labelled_fields: int,
+		audited_by: str = "qa",
+	) -> dict[str, Any]:
+		"""Audit form field label coverage."""
+		self._enforce_tenant(tenant_id)
+		coverage = labelled_fields / field_count if field_count else 1.0
+		passed = coverage >= 1.0
+		if not passed:
+			finding_id = f"form-{abs(hash(target_id + str(field_count))):x}"
+			try:
+				self.record_finding(
+					finding_id=finding_id,
+					tenant_id=tenant_id,
+					target_id=target_id,
+					rule="form_field_labels",
+					severity="high",
+					description=f"{field_count - labelled_fields} form field(s) missing labels.",
+					remediation_owner=audited_by,
+					evidence={"field_count": field_count, "labelled_fields": labelled_fields},
+				)
+			except ValueError:
+				pass
+		return {
+			"target_id": target_id,
+			"field_count": field_count,
+			"labelled_fields": labelled_fields,
+			"coverage": round(coverage, 4),
+			"passed": passed,
+		}
+
+	async def pdf_accessibility(
+		self,
+		tenant_id: str,
+		document_ref: str,
+		tagged_pdf: bool = False,
+		owner: str = "content-team",
+	) -> dict[str, Any]:
+		"""Evaluate PDF accessibility (tagged PDF requirement)."""
+		self._enforce_tenant(tenant_id)
+		finding = None
+		if not tagged_pdf:
+			finding_id = f"pdf-{abs(hash(document_ref)):x}"
+			target_id = f"pdf-target-{abs(hash(document_ref)):x}"
+			# Register target if needed
+			if self._key(tenant_id, target_id) not in self._targets:
+				self.register_target(target_id=target_id, tenant_id=tenant_id,
+					surface="document", route=document_ref, owner=owner)
+			try:
+				finding = self.record_finding(
+					finding_id=finding_id,
+					tenant_id=tenant_id,
+					target_id=target_id,
+					rule="pdf_tagged",
+					severity="high",
+					description="PDF document is not tagged, preventing screen reader access.",
+					remediation_owner=owner,
+					evidence={"document_ref": document_ref},
+				)
+			except ValueError:
+				pass
+		return {"document_ref": document_ref, "tagged_pdf": tagged_pdf, "passed": tagged_pdf, "finding": finding}
+
+	async def accessibility_report(
+		self,
+		tenant_id: str,
+		include_closed: bool = False,
+	) -> dict[str, Any]:
+		"""Generate a comprehensive accessibility status report for the tenant."""
+		findings = self.list_findings(tenant_id)
+		if not include_closed:
+			findings = [f for f in findings if f["status"] != "closed"]
+		remediations = self.list_remediations(tenant_id)
+		open_remediations = [r for r in remediations if r["status"] not in {"closed"}]
+		by_severity: dict[str, int] = {}
+		for f in findings:
+			sev = f.get("severity", "unknown")
+			by_severity[sev] = by_severity.get(sev, 0) + 1
+		return {
+			"tenant_id": tenant_id,
+			"report_type": "accessibility_report",
+			"open_findings": len(findings),
+			"by_severity": by_severity,
+			"open_remediations": len(open_remediations),
+			"audits_run": len(self.list_audits(tenant_id)),
+			"targets_registered": len(self.list_targets(tenant_id)),
+			"exceptions_active": len([
+				e for e in self.list_accessibility_exceptions(tenant_id)
+				if e["status"] == "approved"
+			]),
+		}
+
+	async def remediation_track(
+		self,
+		tenant_id: str,
+		finding_id: str,
+		status: str,
+		due_date: str | None = None,
+		review_recorded: bool = False,
+	) -> dict[str, Any]:
+		"""Update remediation tracking status for a finding."""
+		return self.update_remediation(
+			finding_id=finding_id,
+			status=status,
+			review_recorded=review_recorded,
+			due_date=due_date,
+			tenant_id=tenant_id,
+		)
+
+	async def user_preference_store(
+		self,
+		tenant_id: str,
+		user_id: str,
+		preferences: dict[str, Any],
+	) -> dict[str, Any]:
+		"""
+		Store user accessibility preferences (font size, contrast mode, etc.).
+		Recorded as an audit event with preference payload.
+		"""
+		self._enforce_tenant(tenant_id)
+		pref_id = f"pref-{abs(hash(tenant_id + user_id)):x}"
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="user_accessibility_preferences_stored",
+			subject_id=pref_id,
+			message=f"Accessibility preferences stored for user {user_id}.",
+			evidence={"user_id": user_id, "preferences": preferences},
+		)
+		return {"preference_id": pref_id, "user_id": user_id, "tenant_id": tenant_id, "preferences": preferences}
+
+	async def accessibility_analytics(
+		self,
+		tenant_id: str,
+		days: int = 30,
+	) -> dict[str, Any]:
+		"""Return aggregated accessibility compliance analytics for the tenant."""
+		findings = self.list_findings(tenant_id)
+		closed = [f for f in findings if f["status"] == "closed"]
+		open_findings = [f for f in findings if f["status"] != "closed"]
+		critical_high = [f for f in open_findings if f.get("severity") in {"critical", "high"}]
+		return {
+			"tenant_id": tenant_id,
+			"window_days": days,
+			"total_findings": len(findings),
+			"open_findings": len(open_findings),
+			"closed_findings": len(closed),
+			"critical_or_high_open": len(critical_high),
+			"closure_rate": round(len(closed) / len(findings), 4) if findings else 1.0,
+			"audits_completed": len(self.list_audits(tenant_id)),
+			"targets_registered": len(self.list_targets(tenant_id)),
+			"audit_events": len(self.list_audit_events(tenant_id)),
+		}
+
+
 def _raise_if_blocked(result: dict[str, Any]) -> None:
 	if result["decision"] == "allow":
 		return

@@ -43,7 +43,20 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 }
 
 PROVIDES = ["risk_appetite_workflow", "risk_profile_workflow", "risk_exposure_workflow", "risk_control_workflow", "risk_stress_testing_workflow", "risk_limit_breach_workflow", "risk_event_workflow", "risk_review_workflow", "risk_agent_workflow"]
-REQUIRES = ["auth", "audl", "ntfy", "nlpc", "keym", "fintech_payments", "fintech_wallets", "fintech_kyc", "fintech_aml", "fintech_fraud", "bia", "fin_rpt"]
+REQUIRES = [
+	"auth",
+	"audl",
+	"ntfy",
+	"nlpc",
+	"keym",
+	"fintech_payments",
+	"fintech_wallets",
+	"fintech_kyc",
+	"fintech_aml",
+	"fintech_fraud",
+	"bia_anl",
+	"fin_rpt",
+]
 
 UI_ROUTES = [
 	{"name": "dashboard", "path": "/fintech-risk/dashboard", "component": "RiskDashboard", "permission": "fintech_risk:view", "nav_group": "Overview"},
@@ -112,7 +125,20 @@ RULES: list[dict[str, Any]] = [
 	{"name": "risk_agent_runtime_supported", "condition": {"operation": "register_risk_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "risk_agent_runtime_not_supported", "required_action": "select_supported_runtime"}},
 	{"name": "risk_agent_role_supported", "condition": {"operation": "register_risk_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "risk_agent_role_not_supported", "required_action": "select_supported_role"}},
 	{"name": "privileged_risk_agent_action_requires_human_approval", "condition": {"operation": "risk_agent_action", "privileged_scope": True, "human_approval_recorded": False}, "effect": {"decision": "deny", "reason": "human_approval_required", "required_action": "record_human_approval"}},
+
+	# Cross-tenant and privilege escalation guards
+	{"name": "cross_tenant_risk_access_denied", "description": "Risk resources cannot be accessed across tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_access_denied", "required_action": "use_tenant_scoped_credentials"}},
+	{"name": "privilege_escalation_denied", "description": "Risk privilege escalation without approval is denied.", "condition": {"privilege_escalation_attempt": True, "approval_recorded": False}, "effect": {"decision": "deny", "reason": "privilege_escalation_denied", "required_action": "obtain_escalation_approval"}},
+
+	# Africa-specific risk rules
+	{"name": "ke_cbk_risk_framework_required", "description": "Kenya CBK Enterprise Risk Management Framework compliance required.", "condition": {"operation": "assess_risk", "country": "KE", "cbk_erm_framework_compliant": False}, "effect": {"decision": "deny", "reason": "ke_cbk_erm_framework_required", "required_action": "comply_with_cbk_erm_framework"}},
+	{"name": "mobile_money_operational_risk_assessment", "description": "Mobile money services require operational risk assessment.", "condition": {"operation": "launch_mobile_money_service", "operational_risk_assessed": False}, "effect": {"decision": "deny", "reason": "mobile_money_operational_risk_assessment_required", "required_action": "complete_operational_risk_assessment"}},
+	{"name": "mpesa_api_downtime_risk_mitigation", "description": "M-Pesa API integrations require downtime risk mitigation plan.", "condition": {"operation": "register_mpesa_integration", "downtime_mitigation_plan_present": False}, "effect": {"decision": "deny", "reason": "mpesa_downtime_risk_mitigation_required", "required_action": "document_mpesa_downtime_mitigation"}},
+	{"name": "ke_cbk_capital_adequacy_check", "description": "Kenya CBK capital adequacy ratio must be maintained.", "condition": {"operation": "approve_large_exposure", "country": "KE", "capital_adequacy_breached": True}, "effect": {"decision": "deny", "reason": "ke_cbk_capital_adequacy_breached", "required_action": "restore_capital_adequacy"}},
+	{"name": "ng_cbn_risk_management_framework", "description": "Nigeria CBN risk management framework compliance required.", "condition": {"operation": "assess_risk", "country": "NG", "cbn_risk_framework_compliant": False}, "effect": {"decision": "deny", "reason": "ng_cbn_risk_framework_required", "required_action": "comply_with_cbn_risk_framework"}},
+	{"name": "forex_risk_ke_cbk_guidelines", "description": "Kenya CBK foreign exchange risk guidelines must be followed.", "condition": {"operation": "assess_fx_risk", "country": "KE", "cbk_fx_guidelines_compliant": False}, "effect": {"decision": "deny", "reason": "ke_cbk_fx_risk_guidelines_required", "required_action": "comply_with_cbk_fx_guidelines"}},
 ]
+
 
 
 def get_capability_contract(tenant_id: str = "default") -> dict[str, Any]:

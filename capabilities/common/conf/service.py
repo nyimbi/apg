@@ -1312,6 +1312,10 @@ class ProductionConfigurationManager:
 			logger.error(f"Failed to get AI configuration summary: {e}")
 			raise
 
+	# Alias used by tests and external integrations
+	async def get_revolutionary_metrics(self) -> Dict[str, Any]:
+		return await self.get_governed_metrics()
+
 	async def shutdown(self) -> None:
 		"""Graceful shutdown of configuration manager"""
 		try:
@@ -1958,10 +1962,14 @@ async def get_config_manager(tenant_id: Optional[str] = None) -> ProductionConfi
 	return _service_instances[key]
 
 
+# Alias used by tests and external integrations
+RevolutionaryConfigurationManager = ProductionConfigurationManager
+
 # Export main service class
 __all__ = [
 	"ProductionConfigurationManager",
+	"RevolutionaryConfigurationManager",
 	"ConfService",
-	"create_configuration_manager", 
+	"create_configuration_manager",
 	"get_config_manager"
 ]

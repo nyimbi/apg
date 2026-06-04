@@ -1,0 +1,21 @@
+{
+  "evidence": {
+    "contracts": {
+      "capability_contract": {
+        "display_name": "Payment Switch",
+        "errors": []
+      }
+    },
+    "self_test": {
+      "capability": "fintech_switch",
+      "passed": true,
+      "status": "ok"
+    },
+    "semantic_model": {
+      "capability": "fintech_switch",
+      "format": "apg.semantic-model.v1"
+    }
+  },
+  "format": "apg.release-report.v1",
+  "ok": true
+}

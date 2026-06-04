@@ -368,7 +368,97 @@ def default_rules() -> list[CapabilityRule]:
 				"reason": "audit_purge_review_required",
 				"required_action": "review_audit_purge"
 			}
-		)
+		),
+		CapabilityRule(
+			name="tenant_context_required",
+			description="All audit operations require tenant context.",
+			condition={"tenant_context_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "tenant_context_required",
+				"required_action": "attach_tenant_context"
+			}
+		),
+		CapabilityRule(
+			name="cross_tenant_audit_access_denied",
+			description="Cross-tenant audit access is denied unless explicit membership is confirmed.",
+			condition={"cross_tenant_access": True, "cross_tenant_membership_confirmed": False},
+			effect={
+				"decision": "deny",
+				"reason": "cross_tenant_audit_access_denied",
+				"required_action": "confirm_cross_tenant_membership"
+			}
+		),
+		CapabilityRule(
+			name="write_requires_policy",
+			description="Audit write operations require an explicit write policy.",
+			condition={"operation_type": "write", "write_policy_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "audit_write_policy_required",
+				"required_action": "attach_write_policy"
+			}
+		),
+		CapabilityRule(
+			name="audit_event_requires_actor",
+			description="Every audit event must identify an accountable actor.",
+			condition={"operation": "create_audit_event", "actor_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "audit_actor_required",
+				"required_action": "attach_event_actor"
+			}
+		),
+		CapabilityRule(
+			name="audit_event_requires_resource",
+			description="Every audit event must reference the target resource.",
+			condition={"operation": "create_audit_event", "resource_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "audit_resource_required",
+				"required_action": "attach_event_resource"
+			}
+		),
+		CapabilityRule(
+			name="audit_event_requires_timestamp",
+			description="Audit events must carry a valid ISO-8601 timestamp.",
+			condition={"operation": "create_audit_event", "timestamp_valid": False},
+			effect={
+				"decision": "deny",
+				"reason": "audit_timestamp_required",
+				"required_action": "attach_valid_timestamp"
+			}
+		),
+		CapabilityRule(
+			name="compliance_evidence_retention_enforced",
+			description="Compliance evidence must be retained for the configured minimum period.",
+			condition={"operation": "delete_audit_event", "retention_period_expired": False},
+			effect={
+				"decision": "deny",
+				"reason": "compliance_retention_period_not_expired",
+				"required_action": "wait_for_retention_expiry_or_legal_hold_release"
+			}
+		),
+		CapabilityRule(
+			name="investigation_create_requires_owner",
+			description="Investigation cases require an assigned owner at creation.",
+			condition={"operation": "create_investigation", "owner_assigned": False},
+			effect={
+				"decision": "deny",
+				"reason": "investigation_owner_required",
+				"required_action": "assign_investigation_owner"
+			}
+		),
+		CapabilityRule(
+			name="privilege_escalation_denied",
+			description="Audit operators cannot self-grant elevated access beyond their current role.",
+			condition={"operation": "assign_audit_permission", "target_tier_exceeds_actor_tier": True},
+			effect={
+				"decision": "deny",
+				"reason": "privilege_escalation_prevented",
+				"required_action": "route_to_higher_authority_approver"
+			}
+		),
 	]
 
 
@@ -437,6 +527,31 @@ def streaming_manifest() -> dict[str, Any]:
 	}
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.audl.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"audit_event_recorded",
+		"audit_batch_ingested",
+		"investigation_created",
+		"investigation_closed",
+		"legal_hold_placed",
+		"legal_hold_released",
+		"export_requested",
+		"export_approved",
+		"purge_requested",
+		"purge_approved",
+		"compliance_assessed",
+		"agent_registered",
+	],
+	"guardrails": [
+		"audl_batch_requires_bytewax",
+		"audl_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable AUDL capability contract."""
 	config = CapabilityConfiguration()
@@ -458,7 +573,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"components": theme.components
 		},
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": STREAMING,
 		"review_evidence": {
 			"durable_statuses": ["review_required", "pending_review", "denied", "accepted"],
 			"policy_fields": ["policy_decision", "matched_rules", "review_reasons", "audit_evidence"],

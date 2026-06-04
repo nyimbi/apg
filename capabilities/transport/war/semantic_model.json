@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "transport_war",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "transport_war": {
+      "capability": "transport_war"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

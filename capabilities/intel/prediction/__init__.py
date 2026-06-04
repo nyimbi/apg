@@ -1,16 +1,31 @@
-"""APG Predictive Intelligence executable capability package."""
+"""APG Predictive Intelligence capability.
 
-from .capability_contract import CAPABILITY_ID, CAPABILITY_NAME, CAPABILITY_VERSION, get_capability_contract
-from .service import IntelPredictionService, PredictiveIntelligenceService
+Standalone package: ``pip install apg-intel-prediction``
+
+Quick start::
+
+    from apg_intel_prediction import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : intel_prediction
+Provides      : prediction_authority_workflow, prediction_workspace_workflow, prediction_scenario_workflow, prediction_indicator_workflow, prediction_model_workflow, prediction_forecast_workflow
+"""
+from __future__ import annotations
+
+__version__  = "1.1.0"
+__package_name__ = "apg-intel-prediction"
+__capability_id__ = "intel_prediction"
+
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
+)
 
 __all__ = [
-	"CAPABILITY_ID",
-	"CAPABILITY_NAME",
-	"CAPABILITY_VERSION",
-	"PredictiveIntelligenceService",
-	"IntelPredictionService",
-	"get_capability_contract",
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
 ]
-
-__version__ = CAPABILITY_VERSION
-__status__ = "Executable"

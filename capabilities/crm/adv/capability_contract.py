@@ -185,7 +185,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"forecast_analytics",
 			"crm_agents",
 		],
-		"requires": ["auth", "audl", "ntfy", "composition_events", "composition_config", "common_mdm"],
+		"requires": ["auth", "audl", "ntfy", "composition_events", "composition_config", "mdm"],
 		"configuration": config,
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},

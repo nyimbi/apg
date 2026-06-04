@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "telecom_pro",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "telecom_pro": {
+      "capability": "telecom_pro"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

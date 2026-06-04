@@ -76,6 +76,7 @@ CAPABILITY_META = {
 		'threats',     # Threat Intelligence
 		'reporting',   # Intelligence Reporting
 		'dashboard',   # Intelligence Dashboard
+		'alerts',      # Alert Management
 	],
 	'security_requirements': {
 		'classification_handling': True,

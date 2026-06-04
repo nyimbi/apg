@@ -681,6 +681,31 @@ def streaming_manifest() -> dict[str, Any]:
 	}
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.meta.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"asset_created",
+		"asset_updated",
+		"asset_deprecated",
+		"asset_deleted",
+		"tag_applied",
+		"tag_removed",
+		"lineage_captured",
+		"schema_registered",
+		"schema_updated",
+		"classification_applied",
+		"catalog_indexed",
+		"agent_registered",
+	],
+	"guardrails": [
+		"meta_batch_requires_bytewax",
+		"meta_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable META capability contract."""
 	config = CapabilityConfiguration()
@@ -698,7 +723,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		},
 		"ui": ui_manifest(),
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": STREAMING,
 		"review_evidence": {
 			"durable_statuses": [
 				"pending",

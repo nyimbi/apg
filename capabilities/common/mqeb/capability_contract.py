@@ -592,6 +592,31 @@ def streaming_manifest() -> dict[str, Any]:
 	}
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.mqeb.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"topic_created",
+		"topic_updated",
+		"topic_retired",
+		"subscription_created",
+		"subscription_deleted",
+		"message_published",
+		"message_consumed",
+		"message_dead_lettered",
+		"queue_created",
+		"queue_purged",
+		"routing_policy_changed",
+		"agent_registered",
+	],
+	"guardrails": [
+		"mqeb_batch_requires_bytewax",
+		"mqeb_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable MQEB capability contract."""
 	config = CapabilityConfiguration()
@@ -609,7 +634,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		},
 		"ui": ui_manifest(),
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": STREAMING,
 		"theme": {
 			"name": theme.name,
 			"tokens": theme.tokens,

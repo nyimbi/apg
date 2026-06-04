@@ -350,6 +350,34 @@ def streaming_manifest() -> dict[str, Any]:
 	}
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.aicr.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"service_registered",
+		"service_updated",
+		"service_retired",
+		"provider_registered",
+		"provider_updated",
+		"model_registered",
+		"model_promoted",
+		"model_retired",
+		"inference_completed",
+		"workflow_created",
+		"workflow_executed",
+		"agent_registered",
+		"agent_deactivated",
+		"model_metric_recorded",
+		"drift_review_required",
+	],
+	"guardrails": [
+		"aicr_batch_requires_bytewax",
+		"aicr_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable AICR capability contract."""
 	config = deepcopy(DEFAULT_CONFIGURATION)
@@ -373,7 +401,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"requires_theme": True,
 		},
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": deepcopy(STREAMING),
 		"theme": deepcopy(THEME),
 	}
 

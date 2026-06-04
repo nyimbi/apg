@@ -327,6 +327,29 @@ def streaming_manifest() -> dict[str, Any]:
 	}
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.dvrl.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"virtual_source_registered",
+		"virtual_source_updated",
+		"virtual_source_retired",
+		"federated_query_executed",
+		"query_plan_generated",
+		"cache_invalidated",
+		"schema_synchronized",
+		"lineage_recorded",
+		"access_policy_changed",
+		"agent_registered",
+	],
+	"guardrails": [
+		"dvrl_batch_requires_bytewax",
+		"dvrl_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	config = CapabilityConfiguration()
 	theme = CapabilityTheme()
@@ -341,7 +364,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		"ui": ui_manifest(),
 		"theme": {"name": theme.name, "tokens": theme.tokens, "components": theme.components},
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": STREAMING,
 		"review_evidence": {
 			"durable_statuses": [
 				"pending",

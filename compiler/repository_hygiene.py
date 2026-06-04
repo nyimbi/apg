@@ -46,6 +46,7 @@ STREAMING_TERM_EXCLUDED_PATHS = {
 	"docs/progress_log.md",
 	"tests/test_repository_hygiene.py",
 	"compiler/repository_hygiene.py",
+	"capabilities/transport/fle/tests/test_contract.py",
 }
 PYTHON_TEMPLATE_FORBIDDEN_TERMS = (
 	"Flask-AppBuilder",

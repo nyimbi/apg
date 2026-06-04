@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "healthcare_reg",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "healthcare_reg": {
+      "capability": "healthcare_reg"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

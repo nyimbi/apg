@@ -1,12 +1,31 @@
-"""APG Digital Neobanking executable capability package."""
+"""APG Digital Neobanking capability.
 
-from .capability_contract import CAPABILITY_ID, CAPABILITY_NAME, get_capability_contract
-from .service import DigitalNeobankingService, NeobankingService
+Standalone package: ``pip install apg-fintech-neobanking``
+
+Quick start::
+
+    from apg_fintech_neobanking import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : fintech_neobanking
+Provides      : neobank_program_governance, digital_customer_onboarding, deposit_account_lifecycle, payment_rail_linking, account_transaction_posting, savings_pot_workflow
+"""
+from __future__ import annotations
+
+__version__  = "1.1.0"
+__package_name__ = "apg-fintech-neobanking"
+__capability_id__ = "fintech_neobanking"
+
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
+)
 
 __all__ = [
-	"CAPABILITY_ID",
-	"CAPABILITY_NAME",
-	"DigitalNeobankingService",
-	"NeobankingService",
-	"get_capability_contract",
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
 ]

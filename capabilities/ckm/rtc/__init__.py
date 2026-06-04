@@ -1,56 +1,31 @@
-"""APG CKM Real-Time Collaboration capability package."""
+"""APG Real-Time Collaboration capability.
 
+Standalone package: ``pip install apg-ckm-rtc``
+
+Quick start::
+
+    from apg_ckm_rtc import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : ckm_rtc
+Provides      : collaboration_sessions, presence_awareness, real_time_messaging, media_collaboration, decision_capture, page_collaboration
+"""
 from __future__ import annotations
 
-from .capability_contract import (
-	SUPPORTED_RTC_AGENT_ROLES,
-	SUPPORTED_RTC_AGENT_RUNTIMES,
-	SUPPORTED_RTC_MODES,
-	SUPPORTED_RTC_PROTOCOLS,
-	evaluate_capability_rules,
-	get_capability_contract,
-	streaming_manifest,
+__version__  = "1.0.0"
+__package_name__ = "apg-ckm-rtc"
+__capability_id__ = "ckm_rtc"
+
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
 )
-from .lifecycle import (
-	RtcAgent,
-	RtcDecision,
-	RtcLifecycleService,
-	RtcMessage,
-	RtcParticipant,
-	RtcSession,
-)
-
-
-__version__ = "1.0.0"
-__author__ = "Datacraft"
-
-APG_CAPABILITY_INFO = {
-	"id": "ckm_rtc",
-	"name": "Real-Time Collaboration",
-	"version": __version__,
-	"description": "Tenant-scoped collaboration sessions, presence, messaging, media guardrails, decisions, and AI-agent review for generated APG applications.",
-	"category": "ckm",
-	"provides": get_capability_contract()["provides"],
-	"requires": get_capability_contract()["requires"],
-	"supported_modes": SUPPORTED_RTC_MODES,
-	"supported_protocols": SUPPORTED_RTC_PROTOCOLS,
-	"supported_agent_runtimes": SUPPORTED_RTC_AGENT_RUNTIMES,
-	"streaming": streaming_manifest(),
-}
 
 __all__ = [
-	"APG_CAPABILITY_INFO",
-	"RtcAgent",
-	"RtcDecision",
-	"RtcLifecycleService",
-	"RtcMessage",
-	"RtcParticipant",
-	"RtcSession",
-	"SUPPORTED_RTC_AGENT_ROLES",
-	"SUPPORTED_RTC_AGENT_RUNTIMES",
-	"SUPPORTED_RTC_MODES",
-	"SUPPORTED_RTC_PROTOCOLS",
-	"evaluate_capability_rules",
-	"get_capability_contract",
-	"streaming_manifest",
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
 ]

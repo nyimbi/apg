@@ -138,7 +138,20 @@ RULES: list[dict[str, Any]] = [
 	{"name": "mobile_agent_runtime_supported", "description": "Mobile agents must use a supported runtime.", "condition": {"operation": "register_mobile_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "mobile_agent_runtime_not_supported", "required_action": "select_supported_runtime"}},
 	{"name": "mobile_agent_role_supported", "description": "Mobile agents must use a supported role.", "condition": {"operation": "register_mobile_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "mobile_agent_role_not_supported", "required_action": "select_supported_role"}},
 	{"name": "privileged_mobile_agent_action_requires_human_approval", "description": "Privileged mobile-agent actions require human approval.", "condition": {"operation": "mobile_agent_action", "privileged_scope": True, "human_approval_recorded": False}, "effect": {"decision": "deny", "reason": "human_approval_required", "required_action": "record_human_approval"}},
+
+	# Cross-tenant and privilege escalation guards
+	{"name": "cross_tenant_mobile_access_denied", "description": "Mobile banking resources cannot be accessed across tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_access_denied", "required_action": "use_tenant_scoped_credentials"}},
+	{"name": "privilege_escalation_denied", "description": "Mobile banking privilege escalation without approval is denied.", "condition": {"privilege_escalation_attempt": True, "approval_recorded": False}, "effect": {"decision": "deny", "reason": "privilege_escalation_denied", "required_action": "obtain_escalation_approval"}},
+
+	# Africa-specific mobile banking rules
+	{"name": "ke_cbk_mobile_banking_approval_required", "description": "Kenya CBK approval required for mobile banking services.", "condition": {"operation": "launch_mobile_banking", "country": "KE", "cbk_mobile_banking_approved": False}, "effect": {"decision": "deny", "reason": "ke_cbk_mobile_banking_approval_required", "required_action": "obtain_cbk_mobile_banking_approval"}},
+	{"name": "mpesa_api_integration_required_for_ke", "description": "Kenya mobile banking apps must integrate M-Pesa for payments.", "condition": {"operation": "process_payment", "country": "KE", "mpesa_integrated": False, "payment_method": "mobile_money"}, "effect": {"decision": "deny", "reason": "mpesa_integration_required", "required_action": "integrate_mpesa_daraja_api"}},
+	{"name": "mobile_banking_ussd_fallback_required", "description": "Mobile banking must provide USSD fallback for feature phone users.", "condition": {"operation": "launch_mobile_banking", "country": "KE", "ussd_fallback_available": False}, "effect": {"decision": "deny", "reason": "ussd_fallback_required", "required_action": "implement_ussd_fallback"}},
+	{"name": "ke_cbk_mobile_kyc_tier_required", "description": "Kenya CBK tiered KYC required for mobile banking customers.", "condition": {"operation": "onboard_customer", "country": "KE", "kyc_tier_assigned": False}, "effect": {"decision": "deny", "reason": "ke_cbk_mobile_kyc_tier_required", "required_action": "assign_cbk_kyc_tier"}},
+	{"name": "mobile_money_interoperability_required", "description": "Kenya mobile banking must support inter-mobile-money transfers per CBK interoperability guidelines.", "condition": {"operation": "process_transfer", "country": "KE", "interoperability_supported": False}, "effect": {"decision": "deny", "reason": "mobile_money_interoperability_required", "required_action": "enable_mobile_money_interoperability"}},
+	{"name": "ng_cbn_mobile_banking_licence", "description": "Nigeria CBN mobile banking licence required.", "condition": {"operation": "launch_mobile_banking", "country": "NG", "cbn_mobile_licence_present": False}, "effect": {"decision": "deny", "reason": "ng_cbn_mobile_banking_licence_required", "required_action": "obtain_cbn_mobile_banking_licence"}},
 ]
+
 
 
 def _configuration_schema() -> dict[str, Any]:

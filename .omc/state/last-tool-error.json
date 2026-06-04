@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"python3 -c \\\"\\nimport ast, sys\\nfiles = [\\n    '/Users/nyimbiodero/src/pjs/apg/capabilities/common/apig/service.py',\\n    '/Users/nyimbiodero/src/pjs/apg/capabilities/ckm/rtc/service.py',\\...",
+  "error": "Exit code 1\nFAIL: common/apig : inconsistent use of tabs and spaces in indentation (<unknown>, line 815)",
+  "timestamp": "2026-06-04T14:04:50.441Z",
+  "retry_count": 1
+}

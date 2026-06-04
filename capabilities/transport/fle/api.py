@@ -59,7 +59,7 @@ def _run(coro: Any) -> Any:
 	"""Run an async coroutine from a sync Flask route."""
 	loop = asyncio.new_event_loop()
 	try:
-		return loop.run_until_complete(coro)
+		return asyncio.run(coro)
 	finally:
 		loop.close()
 

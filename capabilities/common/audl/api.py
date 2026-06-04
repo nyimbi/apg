@@ -1,749 +1,524 @@
 """
-APG Audit Logging REST API
+APG Audit Logging — REST API (Flask Blueprint).
 
-Production-grade audit logging API with natural language querying, real-time streaming,
-and comprehensive APG integration. Provides enterprise-grade audit management
-exceeding industry leader capabilities.
+URL prefix: /api/audl/v1
 
-© 2025 Datacraft - www.datacraft.co.ke
+All endpoints are synchronous wrappers around async service methods,
+using asyncio.run() per request.  In production, mount this blueprint
+inside a Quart or ASGI-wrapped Flask app for native async support.
+
+© 2025 Datacraft  www.datacraft.co.ke
 Author: Nyimbi Odero <nyimbi@gmail.com>
 """
+from __future__ import annotations
 
 import asyncio
-import json
-import time
-from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List, Union
-from functools import wraps
 import logging
-from uuid_extensions import uuid7str
+from datetime import datetime, timezone
+from typing import Any
 
-from fastapi import FastAPI, HTTPException, Depends, Query, Body, BackgroundTasks
-from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel, Field, ValidationError
+from flask import Blueprint, current_app, g, jsonify, request
+from pydantic import ValidationError
 
 from .models import (
-	AuditEvent, AuditEventBatch, ComplianceRule, AuditLevel, 
-	AuditEventType, EventSource, ComplianceFramework,
-	validate_tenant_id
+	AuditEventCreate,
+	AuditQueryCreate,
+	AuditTrailCreate,
+	AuditTrailUpdate,
+	ComplianceFramework,
+	ComplianceReportCreate,
+	DataSubjectRequestCreate,
+	DataSubjectRequestUpdate,
+	EvidencePackageCreate,
+	RetentionPolicyCreate,
+	RetentionPolicyUpdate,
+	TamperDetectionCreate,
+	uuid7str,
 )
-from .service import AuditService
+from .service import AuditLoggingService
 
-# APG Integration
-try:
-	from ..auth.service import AuthService
-	from ..mten.service import MultiTenantService
-	from ..nlpc.service import NLPService
-	from ..ntfy.service import NotificationService
-except ImportError:
-	# Mock services for development
-	class MockAuthService:
-		async def verify_token(self, token: str) -> Dict[str, Any]:
-			return {"user_id": "test_user", "tenant_id": "test_tenant"}
-		async def check_permission(self, user_id: str, resource: str, action: str) -> bool:
-			return True
-	
-	AuthService = MockAuthService
-	MultiTenantService = None
-	NLPService = None
-	NotificationService = None
+log = logging.getLogger(__name__)
 
-# Logging setup following APG patterns
-logger = logging.getLogger(__name__)
+# ---------------------------------------------------------------------------
+# Blueprint
+# ---------------------------------------------------------------------------
 
-# FastAPI app for high-performance async API
-app = FastAPI(
-	title="APG Audit Logging API",
-	description="Production-grade audit trail management with ML-powered analytics",
-	version="1.0.0",
-	openapi_tags=[
-		{"name": "events", "description": "Audit event operations"},
-		{"name": "search", "description": "Audit log search and analytics"},
-		{"name": "compliance", "description": "Compliance monitoring and reporting"},
-		{"name": "investigations", "description": "Collaborative audit investigations"},
-		{"name": "admin", "description": "Administrative operations"}
-	]
-)
+audl_bp = Blueprint("audl", __name__, url_prefix="/api/audl/v1")
 
-# Global service registry
-_audit_services: Dict[str, AuditService] = {}
-_auth_service = AuthService()
 
-# === REQUEST/RESPONSE MODELS ===
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
-class HealthResponse(BaseModel):
-	"""Health check response"""
-	status: str = Field(..., description="Service health status")
-	service: str = Field(..., description="Service name")
-	version: str = Field(..., description="Service version")
-	timestamp: datetime = Field(default_factory=datetime.utcnow, description="Response timestamp")
-	capabilities: List[str] = Field(default_factory=list, description="Available capabilities")
-
-class EventIngestionRequest(BaseModel):
-	"""Single event ingestion request"""
-	tenant_id: str = Field(..., description="APG tenant identifier")
-	event: AuditEvent = Field(..., description="Audit event to ingest")
-
-class EventIngestionResponse(BaseModel):
-	"""Event ingestion response"""
-	event_id: str = Field(..., description="Ingested event identifier")
-	status: str = Field(..., description="Ingestion status")
-	processing_time_ms: float = Field(..., description="Processing time in milliseconds")
-	risk_score: float = Field(..., description="ML-generated risk score")
-	anomaly_score: float = Field(..., description="Anomaly detection score")
-	compliance_violations: int = Field(..., description="Number of compliance violations detected")
-
-class BatchIngestionRequest(BaseModel):
-	"""Batch event ingestion request"""
-	tenant_id: str = Field(..., description="APG tenant identifier")
-	batch: AuditEventBatch = Field(..., description="Batch of audit events to ingest")
-
-class BatchIngestionResponse(BaseModel):
-	"""Batch ingestion response"""
-	batch_id: str = Field(..., description="Batch identifier")
-	status: str = Field(..., description="Ingestion status")
-	events_processed: int = Field(..., description="Number of events processed")
-	processing_time_ms: float = Field(..., description="Processing time in milliseconds")
-	events_per_second: float = Field(..., description="Processing rate")
-	batch_checksum: str = Field(..., description="Batch integrity checksum")
-
-class NaturalLanguageQueryRequest(BaseModel):
-	"""Natural language query request"""
-	tenant_id: str = Field(..., description="APG tenant identifier")
-	query: str = Field(..., description="Natural language query", min_length=3, max_length=1000)
-	limit: int = Field(default=100, description="Maximum results", ge=1, le=10000)
-	include_context: bool = Field(default=True, description="Include query context and explanation")
-
-class SearchRequest(BaseModel):
-	"""Advanced audit log search request"""
-	tenant_id: str = Field(..., description="APG tenant identifier")
-	event_types: Optional[List[AuditEventType]] = Field(None, description="Event type filters")
-	date_range_start: Optional[datetime] = Field(None, description="Start date filter")
-	date_range_end: Optional[datetime] = Field(None, description="End date filter")
-	user_filters: Optional[List[str]] = Field(None, description="User ID filters")
-	risk_score_min: Optional[float] = Field(None, description="Minimum risk score", ge=0.0, le=1.0)
-	risk_score_max: Optional[float] = Field(None, description="Maximum risk score", ge=0.0, le=1.0)
-	full_text_search: Optional[str] = Field(None, description="Full text search terms")
-	limit: int = Field(default=100, description="Result limit", ge=1, le=10000)
-	offset: int = Field(default=0, description="Result offset", ge=0)
-
-class SearchResponse(BaseModel):
-	"""Search results response"""
-	total_count: int = Field(..., description="Total matching events")
-	events: List[AuditEvent] = Field(..., description="Matching audit events")
-	query_time_ms: float = Field(..., description="Query execution time")
-	has_more: bool = Field(..., description="Whether more results exist")
-
-class ComplianceReportRequest(BaseModel):
-	"""Compliance report generation request"""
-	tenant_id: str = Field(..., description="APG tenant identifier")
-	framework: ComplianceFramework = Field(..., description="Compliance framework")
-	date_range_start: datetime = Field(..., description="Report start date")
-	date_range_end: datetime = Field(..., description="Report end date")
-	format: str = Field(default="json", description="Report format (json, pdf, excel)")
-	include_violations: bool = Field(default=True, description="Include compliance violations")
-	include_recommendations: bool = Field(default=True, description="Include recommendations")
-
-class MetricsResponse(BaseModel):
-	"""Performance metrics response"""
-	tenant_id: str = Field(..., description="APG tenant identifier")
-	status: str = Field(..., description="Service operational status")
-	events_per_second: float = Field(..., description="Current ingestion rate")
-	total_events: int = Field(..., description="Total events processed")
-	anomalies_detected: int = Field(..., description="Anomalies detected")
-	compliance_violations: int = Field(..., description="Compliance violations")
-	buffer_size: int = Field(..., description="Event buffer size")
-	timestamp: datetime = Field(default_factory=datetime.utcnow, description="Metrics timestamp")
-
-# === AUTHENTICATION AND AUTHORIZATION ===
-
-async def get_current_user(authorization: str = Depends(lambda: None)) -> Dict[str, Any]:
-	"""Extract current user from APG authentication token"""
-	# In production, this would validate APG JWT tokens
-	return {
-		"user_id": "test_user",
-		"tenant_id": "test_tenant",
-		"roles": ["audit_user"]
-	}
-
-async def verify_tenant_access(tenant_id: str, current_user: Dict[str, Any] = Depends(get_current_user)) -> str:
-	"""Verify user has access to tenant"""
-	# In production, this would validate tenant access through APG auth
-	if current_user["tenant_id"] != tenant_id:
-		raise HTTPException(status_code=403, detail="Access denied to tenant")
-	return tenant_id
-
-async def get_audit_service_for_tenant(tenant_id: str = Depends(verify_tenant_access)) -> AuditService:
-	"""Get or create audit service for tenant"""
-	if tenant_id not in _audit_services:
-		service = AuditService(tenant_id=tenant_id)
-		await service.initialize()
-		_audit_services[tenant_id] = service
-	return _audit_services[tenant_id]
-
-def _log_api_request(endpoint: str, method: str, user_id: str, tenant_id: str) -> None:
-	"""Log API request for APG audit trail"""
-	logger.info(f"API {method} {endpoint} - User: {user_id}, Tenant: {tenant_id}")
-
-def _log_api_response(endpoint: str, method: str, status_code: int, duration_ms: float) -> None:
-	"""Log API response for APG audit trail"""
-	logger.info(f"API {method} {endpoint} - Status: {status_code}, Duration: {duration_ms:.2f}ms")
-
-def _log_api_error(endpoint: str, method: str, error: str) -> None:
-	"""Log API error for APG audit trail"""
-	logger.error(f"API {method} {endpoint} - Error: {error}")
-
-# === CORE API ENDPOINTS ===
-
-@app.get("/health", response_model=HealthResponse, tags=["admin"])
-async def health_check() -> HealthResponse:
+def _svc() -> AuditLoggingService:
 	"""
-	Get service health status
-	
-	Returns comprehensive health information including:
-	- Service status and version
-	- Available capabilities
-	- Performance metrics
-	- APG integration status
+	Resolve the AuditLoggingService for the current request.
+
+	Reads ``tenant_id`` and ``actor_id`` from Flask ``g`` (set by your auth
+	middleware).  Falls back to header values for development convenience.
+	"""
+	tenant_id = getattr(g, "tenant_id", None) or request.headers.get("X-Tenant-Id", "default")
+	actor_id  = getattr(g, "actor_id",  None) or request.headers.get("X-Actor-Id",  "anonymous")
+	db        = getattr(g, "db_session", None)   # None → service uses in-memory store
+	return AuditLoggingService(db_session=db, tenant_id=tenant_id, actor_id=actor_id)
+
+
+def _run(coro):
+	"""Execute an async coroutine from a sync Flask view."""
+	try:
+		loop = asyncio.get_event_loop()
+		if loop.is_running():
+			# Inside an async server (Quart / ASGI) — schedule and wait
+			import concurrent.futures
+			with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+				fut = pool.submit(asyncio.run, coro)
+				return fut.result()
+		return asyncio.run(coro)
+	except RuntimeError:
+		return asyncio.run(coro)
+
+
+def _ok(data: Any, status: int = 200):
+	if hasattr(data, "model_dump"):
+		return jsonify(data.model_dump(mode="json")), status
+	if isinstance(data, list) and data and hasattr(data[0], "model_dump"):
+		return jsonify([d.model_dump(mode="json") for d in data]), status
+	return jsonify(data), status
+
+
+def _err(msg: str, status: int = 400):
+	return jsonify({"error": msg}), status
+
+
+def _parse(model_cls):
+	"""Parse JSON body into a Pydantic model; abort 400 on failure."""
+	body = request.get_json(silent=True) or {}
+	# Inject tenant / actor from context if not in body
+	tenant_id = getattr(g, "tenant_id", None) or request.headers.get("X-Tenant-Id", "default")
+	body.setdefault("tenant_id", tenant_id)
+	try:
+		return model_cls(**body)
+	except ValidationError as exc:
+		raise _ValidationError(exc) from exc
+
+
+class _ValidationError(Exception):
+	def __init__(self, exc: ValidationError):
+		self.exc = exc
+
+
+@audl_bp.errorhandler(_ValidationError)
+def _handle_validation(exc):
+	return _err(str(exc.exc), 422)
+
+
+# ---------------------------------------------------------------------------
+# Health
+# ---------------------------------------------------------------------------
+
+@audl_bp.get("/health")
+def health():
+	"""Service liveness check."""
+	return _ok({"status": "ok", "capability": "audl", "ts": datetime.now(timezone.utc).isoformat()})
+
+
+# ---------------------------------------------------------------------------
+# AuditEvent  — POST /events, GET /events, GET /events/<id>
+# ---------------------------------------------------------------------------
+
+@audl_bp.post("/events")
+def log_event():
+	"""
+	Log a single audit event.
+
+	Body: AuditEventCreate JSON.
+	Returns the created AuditEventResponse.
 	"""
 	try:
-		return HealthResponse(
-			status="healthy",
-			service="audit_logging",
-			version="1.0.0",
-			capabilities=[
-				"event_ingestion",
-				"ml_powered_analytics", 
-				"natural_language_queries",
-				"compliance_monitoring",
-				"real_time_alerting",
-				"blockchain_verification"
-			]
-		)
-	except Exception as e:
-		_log_api_error("/health", "GET", str(e))
-		raise HTTPException(status_code=500, detail="Health check failed")
+		payload = _parse(AuditEventCreate)
+	except _ValidationError as exc:
+		return _err(str(exc.exc), 422)
 
-@app.post("/v1/events", response_model=EventIngestionResponse, tags=["events"])
-async def ingest_single_event(
-	request: EventIngestionRequest,
-	current_user: Dict[str, Any] = Depends(get_current_user),
-	audit_service: AuditService = Depends(get_audit_service_for_tenant)
-) -> EventIngestionResponse:
+	svc = _svc()
+	result = _run(svc.log_event(
+		who     = payload.actor_id or svc.actor_id,
+		what    = payload.action,
+		on_what = payload.resource_id or "",
+		how     = payload.event_type,
+		where   = payload.ip_address,
+		when    = None,
+		result  = payload.success,
+		payload = payload,
+	))
+	return _ok(result, 201)
+
+
+@audl_bp.post("/events/batch")
+def log_event_batch():
 	"""
-	Ingest single audit event with ML enrichment
-	
-	Features:
-	- Sub-100ms response time with ML-powered risk scoring
-	- Automatic anomaly detection and threat intelligence
-	- Real-time compliance checking
-	- Blockchain integrity verification
-	- Immediate alerting for high-risk events
+	Write a batch of audit events atomically (max 10 000 per call).
+
+	Body: { "events": [ AuditEventCreate, ... ] }
 	"""
-	start_time = time.time()
-	_log_api_request("/v1/events", "POST", current_user["user_id"], request.tenant_id)
-	
+	body = request.get_json(silent=True) or {}
+	raw_events = body.get("events", [])
+	if not raw_events:
+		return _err("events array must be non-empty", 400)
+	tenant_id = getattr(g, "tenant_id", None) or request.headers.get("X-Tenant-Id", "default")
 	try:
-		# Validate and enrich event
-		event = request.event
-		event.tenant_id = request.tenant_id
-		
-		# Ingest event through service
-		result = await audit_service.ingest_event(event)
-		
-		processing_time = (time.time() - start_time) * 1000
-		_log_api_response("/v1/events", "POST", 200, processing_time)
-		
-		return EventIngestionResponse(
-			event_id=result["event_id"],
-			status=result["status"],
-			processing_time_ms=result["processing_time_ms"],
-			risk_score=result["risk_score"],
-			anomaly_score=result["anomaly_score"],
-			compliance_violations=result["compliance_violations"]
-		)
-		
-	except ValidationError as e:
-		_log_api_error("/v1/events", "POST", f"Validation error: {str(e)}")
-		raise HTTPException(status_code=400, detail=f"Invalid event data: {str(e)}")
-	except Exception as e:
-		_log_api_error("/v1/events", "POST", str(e))
-		raise HTTPException(status_code=500, detail="Event ingestion failed")
+		events = [AuditEventCreate(**{**e, "tenant_id": tenant_id}) for e in raw_events]
+	except ValidationError as exc:
+		return _err(str(exc), 422)
 
-@app.post("/v1/events/batch", response_model=BatchIngestionResponse, tags=["events"])
-async def ingest_event_batch(
-	request: BatchIngestionRequest,
-	background_tasks: BackgroundTasks,
-	current_user: Dict[str, Any] = Depends(get_current_user),
-	audit_service: AuditService = Depends(get_audit_service_for_tenant)
-) -> BatchIngestionResponse:
+	svc = _svc()
+	results = _run(svc.immutable_log_write(events))
+	return _ok([r.model_dump(mode="json") for r in results], 201)
+
+
+@audl_bp.get("/events/<event_id>")
+def get_event(event_id: str):
+	"""Retrieve a single audit event by ID."""
+	svc = _svc()
+	ev  = svc._events.get(event_id)
+	if ev is None or ev.tenant_id != svc.tenant_id:
+		return _err("event not found", 404)
+	return _ok(ev)
+
+
+# ---------------------------------------------------------------------------
+# AuditQuery / search  — POST /search
+# ---------------------------------------------------------------------------
+
+@audl_bp.post("/search")
+def search_events():
 	"""
-	Ingest batch of audit events for maximum throughput
-	
-	Optimized for 10M+ events/second ingestion with:
-	- Parallel processing and automatic load balancing
-	- Batch integrity verification with checksums
-	- Real-time metrics and performance monitoring
-	- Background processing for persistent storage
+	Structured / NLP audit log search.
+
+	Body: AuditQueryCreate JSON.
+	Returns AuditSearchResult.
 	"""
-	start_time = time.time()
-	_log_api_request("/v1/events/batch", "POST", current_user["user_id"], request.tenant_id)
-	
 	try:
-		# Validate batch
-		batch = request.batch
-		batch.tenant_id = request.tenant_id
-		
-		if len(batch.events) == 0:
-			raise HTTPException(status_code=400, detail="Batch cannot be empty")
-		if len(batch.events) > 10000:
-			raise HTTPException(status_code=400, detail="Batch size exceeds maximum limit (10,000)")
-		
-		# Ingest batch through service
-		result = await audit_service.ingest_batch(batch)
-		
-		# Schedule background processing
-		background_tasks.add_task(_process_batch_background, batch, audit_service)
-		
-		processing_time = (time.time() - start_time) * 1000
-		_log_api_response("/v1/events/batch", "POST", 200, processing_time)
-		
-		return BatchIngestionResponse(
-			batch_id=result["batch_id"],
-			status=result["status"],
-			events_processed=result["events_processed"],
-			processing_time_ms=result["processing_time_ms"],
-			events_per_second=result["events_per_second"],
-			batch_checksum=result["batch_checksum"]
-		)
-		
-	except ValidationError as e:
-		_log_api_error("/v1/events/batch", "POST", f"Validation error: {str(e)}")
-		raise HTTPException(status_code=400, detail=f"Invalid batch data: {str(e)}")
-	except Exception as e:
-		_log_api_error("/v1/events/batch", "POST", str(e))
-		raise HTTPException(status_code=500, detail="Batch ingestion failed")
+		q = _parse(AuditQueryCreate)
+	except _ValidationError as exc:
+		return _err(str(exc.exc), 422)
 
-async def _process_batch_background(batch: AuditEventBatch, audit_service: AuditService) -> None:
-	"""Background task for batch processing"""
+	svc    = _svc()
+	result = _run(svc.audit_trail_search(q))
+	return _ok(result)
+
+
+@audl_bp.get("/queries")
+def list_queries():
+	"""List saved audit queries for this tenant."""
+	svc = _svc()
+	return _ok(_run(svc.list_queries()))
+
+
+@audl_bp.get("/queries/<query_id>")
+def get_query(query_id: str):
+	"""Retrieve a saved query by ID."""
+	svc = _svc()
 	try:
-		# Additional background processing like database persistence,
-		# advanced analytics, compliance checking, etc.
-		logger.info(f"Background processing started for batch: {batch.batch_id}")
-		
-		# Placeholder for additional processing
-		await asyncio.sleep(0.1)  # Simulate processing
-		
-		logger.info(f"Background processing completed for batch: {batch.batch_id}")
-		
-	except Exception as e:
-		logger.error(f"Background processing failed for batch {batch.batch_id}: {str(e)}")
+		return _ok(_run(svc.get_query(query_id)))
+	except KeyError:
+		return _err("query not found", 404)
 
-@app.post("/v1/search", response_model=SearchResponse, tags=["search"])
-async def search_audit_events(
-	request: SearchRequest,
-	current_user: Dict[str, Any] = Depends(get_current_user),
-	audit_service: AuditService = Depends(get_audit_service_for_tenant)
-) -> SearchResponse:
-	"""
-	Advanced audit log search with filtering and analytics
-	
-	Features:
-	- Sub-second query response for millions of events
-	- Advanced filtering by event types, risk scores, dates
-	- Full-text search with relevance scoring
-	- Real-time result streaming for large datasets
-	"""
-	start_time = time.time()
-	_log_api_request("/v1/search", "POST", current_user["user_id"], request.tenant_id)
-	
+
+# ---------------------------------------------------------------------------
+# AuditTrail  — CRUD
+# ---------------------------------------------------------------------------
+
+@audl_bp.post("/trails")
+def create_trail():
 	try:
-		# For now, return mock results - in production would use Elasticsearch
-		mock_events = []
-		for i in range(min(request.limit, 10)):
-			event = AuditEvent(
-				tenant_id=request.tenant_id,
-				level=AuditLevel.INFO,
-				event_type=AuditEventType.DATA_READ,
-				source=EventSource.APG_CORE,
-				category="data_access",
-				user_id=f"user_{i}",
-				action=f"read_document_{i}",
-				resource_type="document",
-				resource_id=f"doc_{i}"
-			)
-			mock_events.append(event)
-		
-		query_time = (time.time() - start_time) * 1000
-		_log_api_response("/v1/search", "POST", 200, query_time)
-		
-		return SearchResponse(
-			total_count=len(mock_events),
-			events=mock_events,
-			query_time_ms=query_time,
-			has_more=False
-		)
-		
-	except ValidationError as e:
-		_log_api_error("/v1/search", "POST", f"Validation error: {str(e)}")
-		raise HTTPException(status_code=400, detail=f"Invalid search request: {str(e)}")
-	except Exception as e:
-		_log_api_error("/v1/search", "POST", str(e))
-		raise HTTPException(status_code=500, detail="Search operation failed")
+		req = _parse(AuditTrailCreate)
+	except _ValidationError as exc:
+		return _err(str(exc.exc), 422)
+	svc = _svc()
+	return _ok(_run(svc.create_trail(req)), 201)
 
-@app.post("/v1/search/natural", response_model=SearchResponse, tags=["search"])
-async def natural_language_search(
-	request: NaturalLanguageQueryRequest,
-	current_user: Dict[str, Any] = Depends(get_current_user),
-	audit_service: AuditService = Depends(get_audit_service_for_tenant)
-) -> SearchResponse:
-	"""
-	Natural language audit log queries using APG NLP
-	
-	Production-grade features:
-	- Conversational audit analysis with 95%+ query accuracy
-	- Intelligent query translation to complex search operations
-	- Context-aware query expansion and refinement
-	- Multi-turn dialogue support with query history
-	"""
-	start_time = time.time()
-	_log_api_request("/v1/search/natural", "POST", current_user["user_id"], request.tenant_id)
-	
+
+@audl_bp.get("/trails")
+def list_trails():
+	svc = _svc()
+	active_only = request.args.get("active_only", "true").lower() != "false"
+	return _ok(_run(svc.list_trails(active_only=active_only)))
+
+
+@audl_bp.get("/trails/<trail_id>")
+def get_trail(trail_id: str):
+	svc = _svc()
 	try:
-		# In production, this would integrate with APG NLP service
-		# For now, return mock results based on query analysis
-		query_lower = request.query.lower()
-		
-		# Simple query interpretation
-		if "failed login" in query_lower or "failed auth" in query_lower:
-			event_type = AuditEventType.USER_FAILED_LOGIN
-		elif "admin" in query_lower:
-			event_type = AuditEventType.PERMISSION_GRANTED
-		else:
-			event_type = AuditEventType.DATA_READ
-		
-		# Generate mock results
-		mock_events = []
-		for i in range(min(request.limit, 5)):
-			event = AuditEvent(
-				tenant_id=request.tenant_id,
-				level=AuditLevel.WARNING if "failed" in query_lower else AuditLevel.INFO,
-				event_type=event_type,
-				source=EventSource.AUTH,
-				category="authentication" if "login" in query_lower else "data_access",
-				user_id=f"user_{i}",
-				action="login_attempt" if "login" in query_lower else f"data_access_{i}",
-				success=False if "failed" in query_lower else True
-			)
-			mock_events.append(event)
-		
-		query_time = (time.time() - start_time) * 1000
-		_log_api_response("/v1/search/natural", "POST", 200, query_time)
-		
-		return SearchResponse(
-			total_count=len(mock_events),
-			events=mock_events,
-			query_time_ms=query_time,
-			has_more=False
-		)
-		
-	except ValidationError as e:
-		_log_api_error("/v1/search/natural", "POST", f"Validation error: {str(e)}")
-		raise HTTPException(status_code=400, detail=f"Invalid query request: {str(e)}")
-	except Exception as e:
-		_log_api_error("/v1/search/natural", "POST", str(e))
-		raise HTTPException(status_code=500, detail="Natural language query failed")
+		return _ok(_run(svc.get_trail(trail_id)))
+	except KeyError:
+		return _err("trail not found", 404)
 
-@app.get("/v1/events/stream", tags=["events"])
-async def stream_audit_events(
-	tenant_id: str = Query(..., description="APG tenant identifier"),
-	event_types: Optional[str] = Query(None, description="Comma-separated event types"),
-	risk_threshold: float = Query(0.0, description="Minimum risk score threshold"),
-	current_user: Dict[str, Any] = Depends(get_current_user),
-	audit_service: AuditService = Depends(get_audit_service_for_tenant)
-):
-	"""
-	Real-time audit event streaming with Server-Sent Events
-	
-	Features:
-	- Sub-second latency for real-time monitoring
-	- Event filtering by type, risk score, user, etc.
-	- Automatic connection management and reconnection
-	- WebSocket alternative with HTTP/2 compatibility
-	"""
-	_log_api_request("/v1/events/stream", "GET", current_user["user_id"], tenant_id)
-	
-	async def event_stream():
-		"""Generate real-time event stream"""
-		try:
-			while True:
-				# In production, this would stream from event buffer
-				# For now, generate mock events
-				mock_event = {
-					"id": uuid7str(),
-					"timestamp": datetime.utcnow().isoformat(),
-					"event_type": "data_read",
-					"user_id": "streaming_user",
-					"action": "view_document",
-					"risk_score": 0.1
-				}
-				
-				# Format as Server-Sent Event
-				data = f"data: {json.dumps(mock_event)}\n\n"
-				yield data
-				
-				await asyncio.sleep(2)  # Stream every 2 seconds
-				
-		except Exception as e:
-			logger.error(f"Event streaming error: {str(e)}")
-			yield f"data: {json.dumps({'error': str(e)})}\n\n"
-	
-	return StreamingResponse(
-		event_stream(),
-		media_type="text/event-stream",
-		headers={
-			"Cache-Control": "no-cache",
-			"Connection": "keep-alive",
-			"Access-Control-Allow-Origin": "*"
-		}
-	)
 
-@app.post("/v1/compliance/report", tags=["compliance"])
-async def generate_compliance_report(
-	request: ComplianceReportRequest,
-	background_tasks: BackgroundTasks,
-	current_user: Dict[str, Any] = Depends(get_current_user),
-	audit_service: AuditService = Depends(get_audit_service_for_tenant)
-) -> Dict[str, Any]:
-	"""
-	Generate automated compliance reports
-	
-	Features:
-	- Pre-configured templates for SOX, GDPR, HIPAA, PCI-DSS
-	- Automated evidence collection with chain of custody
-	- Executive summaries with risk assessments
-	- Multiple export formats (JSON, PDF, Excel)
-	"""
-	start_time = time.time()
-	_log_api_request("/v1/compliance/report", "POST", current_user["user_id"], request.tenant_id)
-	
+@audl_bp.put("/trails/<trail_id>")
+def update_trail(trail_id: str):
+	body = request.get_json(silent=True) or {}
 	try:
-		report_id = uuid7str()
-		
-		# Schedule background report generation
-		background_tasks.add_task(
-			_generate_compliance_report_background,
-			report_id, request, audit_service
-		)
-		
-		processing_time = (time.time() - start_time) * 1000
-		_log_api_response("/v1/compliance/report", "POST", 202, processing_time)
-		
-		return {
-			"report_id": report_id,
-			"status": "generating",
-			"framework": request.framework,
-			"estimated_completion": (datetime.utcnow() + timedelta(minutes=5)).isoformat(),
-			"processing_time_ms": processing_time
-		}
-		
-	except ValidationError as e:
-		_log_api_error("/v1/compliance/report", "POST", f"Validation error: {str(e)}")
-		raise HTTPException(status_code=400, detail=f"Invalid report request: {str(e)}")
-	except Exception as e:
-		_log_api_error("/v1/compliance/report", "POST", str(e))
-		raise HTTPException(status_code=500, detail="Report generation failed")
-
-async def _generate_compliance_report_background(
-	report_id: str, 
-	request: ComplianceReportRequest, 
-	audit_service: AuditService
-) -> None:
-	"""Background task for compliance report generation"""
+		upd = AuditTrailUpdate(**body)
+	except ValidationError as exc:
+		return _err(str(exc), 422)
+	svc = _svc()
 	try:
-		logger.info(f"Starting compliance report generation: {report_id}")
-		
-		# Simulate report generation
-		await asyncio.sleep(10)  # Simulate processing time
-		
-		logger.info(f"Compliance report generated: {report_id}")
-		
-	except Exception as e:
-		logger.error(f"Compliance report generation failed {report_id}: {str(e)}")
+		return _ok(_run(svc.update_trail(trail_id, upd)))
+	except KeyError:
+		return _err("trail not found", 404)
 
-@app.get("/v1/metrics", response_model=MetricsResponse, tags=["admin"])
-async def get_performance_metrics(
-	tenant_id: str = Query(..., description="APG tenant identifier"),
-	current_user: Dict[str, Any] = Depends(get_current_user),
-	audit_service: AuditService = Depends(get_audit_service_for_tenant)
-) -> MetricsResponse:
-	"""
-	Get real-time performance metrics
-	
-	Provides comprehensive metrics including:
-	- Event ingestion rates and throughput
-	- ML model performance and accuracy
-	- Compliance monitoring statistics  
-	- System health and resource utilization
-	"""
-	start_time = time.time()
-	_log_api_request("/v1/metrics", "GET", current_user["user_id"], tenant_id)
-	
+
+@audl_bp.delete("/trails/<trail_id>")
+def delete_trail(trail_id: str):
+	svc = _svc()
 	try:
-		# Get metrics from service
-		metrics = await audit_service.get_metrics()
-		
-		processing_time = (time.time() - start_time) * 1000
-		_log_api_response("/v1/metrics", "GET", 200, processing_time)
-		
-		return MetricsResponse(
-			tenant_id=tenant_id,
-			status=metrics["status"],
-			events_per_second=metrics["metrics"]["events_per_second"],
-			total_events=metrics["metrics"]["events_ingested"],
-			anomalies_detected=metrics["metrics"]["anomalies_detected"],
-			compliance_violations=metrics["metrics"]["compliance_violations"],
-			buffer_size=metrics["buffer_size"]
-		)
-		
-	except Exception as e:
-		_log_api_error("/v1/metrics", "GET", str(e))
-		raise HTTPException(status_code=500, detail="Metrics retrieval failed")
+		_run(svc.delete_trail(trail_id))
+		return _ok({"deleted": True})
+	except KeyError:
+		return _err("trail not found", 404)
 
-@app.get("/v1/health/{tenant_id}", tags=["admin"])
-async def get_tenant_health(
-	tenant_id: str,
-	current_user: Dict[str, Any] = Depends(get_current_user),
-	audit_service: AuditService = Depends(get_audit_service_for_tenant)
-) -> Dict[str, Any]:
+
+# ---------------------------------------------------------------------------
+# ComplianceReport
+# ---------------------------------------------------------------------------
+
+@audl_bp.post("/compliance/reports")
+def create_compliance_report():
 	"""
-	Get comprehensive tenant-specific health status
-	
-	Returns detailed health information including:
-	- Service component status and availability
-	- APG capability integration health
-	- Performance metrics and benchmarks
-	- Error rates and system reliability
+	Generate a compliance report for a framework and time window.
+
+	Body: ComplianceReportCreate JSON.
 	"""
-	start_time = time.time()
-	_log_api_request(f"/v1/health/{tenant_id}", "GET", current_user["user_id"], tenant_id)
-	
 	try:
-		# Get health status from service
-		health_status = await audit_service.get_health_status()
-		
-		processing_time = (time.time() - start_time) * 1000
-		_log_api_response(f"/v1/health/{tenant_id}", "GET", 200, processing_time)
-		
-		return health_status
-		
-	except Exception as e:
-		_log_api_error(f"/v1/health/{tenant_id}", "GET", str(e))
-		raise HTTPException(status_code=500, detail="Health status retrieval failed")
+		req = _parse(ComplianceReportCreate)
+	except _ValidationError as exc:
+		return _err(str(exc.exc), 422)
+	svc = _svc()
+	return _ok(_run(svc.compliance_report(req)), 202)
 
-# === WEBHOOK ENDPOINTS ===
 
-@app.post("/v1/webhooks/compliance-violation", tags=["webhooks"])
-async def handle_compliance_violation_webhook(
-	payload: Dict[str, Any] = Body(...),
-	current_user: Dict[str, Any] = Depends(get_current_user)
-) -> Dict[str, Any]:
-	"""
-	Handle compliance violation webhooks from external systems
-	
-	Enables integration with external compliance monitoring tools
-	and automated incident response workflows.
-	"""
-	start_time = time.time()
-	_log_api_request("/v1/webhooks/compliance-violation", "POST", current_user["user_id"], "webhook")
-	
+@audl_bp.get("/compliance/reports")
+def list_compliance_reports():
+	svc = _svc()
+	reports = [r for r in svc._reports.values() if r.tenant_id == svc.tenant_id]
+	return _ok([r.model_dump(mode="json") for r in reports])
+
+
+@audl_bp.get("/compliance/reports/<report_id>")
+def get_compliance_report(report_id: str):
+	svc = _svc()
+	rec = svc._reports.get(report_id)
+	if rec is None or rec.tenant_id != svc.tenant_id:
+		return _err("report not found", 404)
+	return _ok(rec)
+
+
+# ---------------------------------------------------------------------------
+# RetentionPolicy
+# ---------------------------------------------------------------------------
+
+@audl_bp.post("/retention-policies")
+def create_retention_policy():
 	try:
-		# Process webhook payload
-		webhook_id = uuid7str()
-		
-		# In production, would process compliance violation
-		# and integrate with APG notification service
-		
-		processing_time = (time.time() - start_time) * 1000
-		_log_api_response("/v1/webhooks/compliance-violation", "POST", 200, processing_time)
-		
-		return {
-			"webhook_id": webhook_id,
-			"status": "processed",
-			"processing_time_ms": processing_time
-		}
-		
-	except Exception as e:
-		_log_api_error("/v1/webhooks/compliance-violation", "POST", str(e))
-		raise HTTPException(status_code=500, detail="Webhook processing failed")
+		req = _parse(RetentionPolicyCreate)
+	except _ValidationError as exc:
+		return _err(str(exc.exc), 422)
+	svc = _svc()
+	return _ok(_run(svc.create_retention_policy(req)), 201)
 
-# === ERROR HANDLERS ===
 
-@app.exception_handler(ValidationError)
-async def validation_exception_handler(request, exc: ValidationError):
-	"""Handle Pydantic validation errors"""
-	_log_api_error(str(request.url.path), request.method, f"Validation error: {str(exc)}")
-	return JSONResponse(
-		status_code=400,
-		content={
-			"error": "Validation failed",
-			"details": exc.errors(),
-			"timestamp": datetime.utcnow().isoformat()
-		}
-	)
+@audl_bp.get("/retention-policies")
+def list_retention_policies():
+	svc = _svc()
+	return _ok(_run(svc.list_retention_policies()))
 
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request, exc: HTTPException):
-	"""Handle HTTP exceptions"""
-	_log_api_error(str(request.url.path), request.method, f"HTTP error: {exc.detail}")
-	return JSONResponse(
-		status_code=exc.status_code,
-		content={
-			"error": exc.detail,
-			"status_code": exc.status_code,
-			"timestamp": datetime.utcnow().isoformat()
-		}
-	)
 
-@app.exception_handler(Exception)
-async def general_exception_handler(request, exc: Exception):
-	"""Handle general exceptions"""
-	_log_api_error(str(request.url.path), request.method, f"Unhandled error: {str(exc)}")
-	return JSONResponse(
-		status_code=500,
-		content={
-			"error": "Internal server error",
-			"timestamp": datetime.utcnow().isoformat()
-		}
-	)
+@audl_bp.put("/retention-policies/<policy_id>")
+def update_retention_policy(policy_id: str):
+	body = request.get_json(silent=True) or {}
+	try:
+		upd = RetentionPolicyUpdate(**body)
+	except ValidationError as exc:
+		return _err(str(exc), 422)
+	svc = _svc()
+	try:
+		return _ok(_run(svc.update_retention_policy(policy_id, upd)))
+	except KeyError:
+		return _err("policy not found", 404)
 
-# === STARTUP AND SHUTDOWN ===
 
-@app.on_event("startup")
-async def startup_event():
-	"""Application startup event"""
-	logger.info("APG Audit Logging API starting up...")
-	
-	# Initialize global services
-	global _auth_service
-	_auth_service = AuthService()
-	
-	logger.info("APG Audit Logging API ready")
+@audl_bp.delete("/retention-policies/<policy_id>")
+def delete_retention_policy(policy_id: str):
+	svc = _svc()
+	try:
+		_run(svc.delete_retention_policy(policy_id))
+		return _ok({"deleted": True})
+	except KeyError:
+		return _err("policy not found", 404)
 
-@app.on_event("shutdown")
-async def shutdown_event():
-	"""Application shutdown event"""
-	logger.info("APG Audit Logging API shutting down...")
-	
-	# Gracefully shutdown all audit services
-	for tenant_id, service in _audit_services.items():
-		try:
-			await service.shutdown()
-			logger.info(f"Audit service shutdown complete for tenant: {tenant_id}")
-		except Exception as e:
-			logger.error(f"Error shutting down audit service for tenant {tenant_id}: {str(e)}")
-	
-	logger.info("APG Audit Logging API shutdown complete")
 
-# Export FastAPI app
-__all__ = ["app"]
+@audl_bp.post("/retention-policies/enforce")
+def enforce_retention():
+	"""Run retention enforcement for the current tenant."""
+	svc = _svc()
+	return _ok(_run(svc.retention_enforcement()))
+
+
+# ---------------------------------------------------------------------------
+# DataSubjectRequest (GDPR)
+# ---------------------------------------------------------------------------
+
+@audl_bp.post("/dsr")
+def create_dsr():
+	"""
+	Submit a data subject request (access, erasure, portability, etc.).
+
+	Body: DataSubjectRequestCreate JSON.
+	"""
+	try:
+		req = _parse(DataSubjectRequestCreate)
+	except _ValidationError as exc:
+		return _err(str(exc.exc), 422)
+	is_admin = request.headers.get("X-Admin", "false").lower() == "true"
+	svc      = _svc()
+	return _ok(_run(svc.create_dsr(req, is_admin=is_admin)), 201)
+
+
+@audl_bp.get("/dsr")
+def list_dsrs():
+	svc = _svc()
+	return _ok(_run(svc.list_dsrs()))
+
+
+@audl_bp.get("/dsr/<dsr_id>")
+def get_dsr(dsr_id: str):
+	svc = _svc()
+	rec = svc._dsrs.get(dsr_id)
+	if rec is None or rec.tenant_id != svc.tenant_id:
+		return _err("DSR not found", 404)
+	return _ok(rec)
+
+
+@audl_bp.put("/dsr/<dsr_id>")
+def update_dsr(dsr_id: str):
+	body = request.get_json(silent=True) or {}
+	try:
+		upd = DataSubjectRequestUpdate(**body)
+	except ValidationError as exc:
+		return _err(str(exc), 422)
+	svc = _svc()
+	try:
+		return _ok(_run(svc.update_dsr(dsr_id, upd)))
+	except KeyError:
+		return _err("DSR not found", 404)
+
+
+@audl_bp.get("/dsr/erasure-impact/<subject_id>")
+def erasure_impact(subject_id: str):
+	"""Assess audit-log impact of a GDPR Art. 17 erasure request without modifying data."""
+	svc = _svc()
+	return _ok(_run(svc.right_to_erasure_audit_impact(subject_id)))
+
+
+# ---------------------------------------------------------------------------
+# EvidencePackage
+# ---------------------------------------------------------------------------
+
+@audl_bp.post("/evidence-packages")
+def create_evidence_package():
+	"""
+	Assemble and seal a tamper-evident evidence package.
+
+	Body: EvidencePackageCreate JSON.
+	"""
+	try:
+		req = _parse(EvidencePackageCreate)
+	except _ValidationError as exc:
+		return _err(str(exc.exc), 422)
+	svc = _svc()
+	return _ok(_run(svc.evidence_package_export(req)), 201)
+
+
+@audl_bp.get("/evidence-packages")
+def list_evidence_packages():
+	svc = _svc()
+	return _ok(_run(svc.list_evidence_packages()))
+
+
+@audl_bp.get("/evidence-packages/<pkg_id>")
+def get_evidence_package(pkg_id: str):
+	svc = _svc()
+	try:
+		return _ok(_run(svc.get_evidence_package(pkg_id)))
+	except KeyError:
+		return _err("evidence package not found", 404)
+
+
+# ---------------------------------------------------------------------------
+# TamperDetection
+# ---------------------------------------------------------------------------
+
+@audl_bp.post("/tamper-detection")
+def run_tamper_detection():
+	"""
+	Run a tamper-detection scan over all stored events.
+
+	Body: TamperDetectionCreate JSON.
+	"""
+	try:
+		req = _parse(TamperDetectionCreate)
+	except _ValidationError as exc:
+		return _err(str(exc.exc), 422)
+	svc = _svc()
+	return _ok(_run(svc.tamper_detection(req)))
+
+
+@audl_bp.get("/tamper-detection")
+def list_tamper_scans():
+	svc = _svc()
+	scans = [s for s in svc._tampers.values() if s.tenant_id == svc.tenant_id]
+	return _ok([s.model_dump(mode="json") for s in scans])
+
+
+# ---------------------------------------------------------------------------
+# Risk summary
+# ---------------------------------------------------------------------------
+
+@audl_bp.get("/reports/risk-summary")
+def risk_summary():
+	"""
+	Return risk and compliance aggregates for a time window.
+
+	Query params: period_start (ISO), period_end (ISO)
+	"""
+	svc   = _svc()
+	start = request.args.get("period_start")
+	end   = request.args.get("period_end")
+	now   = datetime.now(timezone.utc)
+	from datetime import timedelta
+	ps = datetime.fromisoformat(start) if start else (now - timedelta(days=30))
+	pe = datetime.fromisoformat(end)   if end   else now
+	return _ok(_run(svc.risk_summary(ps, pe)))
+
+
+# ---------------------------------------------------------------------------
+# Error handlers
+# ---------------------------------------------------------------------------
+
+@audl_bp.errorhandler(404)
+def not_found(e):
+	return _err("not found", 404)
+
+
+@audl_bp.errorhandler(405)
+def method_not_allowed(e):
+	return _err("method not allowed", 405)
+
+
+@audl_bp.errorhandler(500)
+def server_error(e):
+	log.exception("audl unhandled error")
+	return _err("internal server error", 500)
+
+
+__all__ = ["audl_bp"]

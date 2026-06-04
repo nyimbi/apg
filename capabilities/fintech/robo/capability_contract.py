@@ -39,7 +39,19 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 }
 
 PROVIDES = ["robo_investor_profile_workflow", "robo_goal_plan_workflow", "robo_model_portfolio_workflow", "robo_recommendation_workflow", "robo_automation_workflow", "robo_drift_workflow", "robo_tax_loss_workflow", "robo_review_workflow", "robo_agent_workflow"]
-REQUIRES = ["auth", "audl", "ntfy", "nlpc", "keym", "fintech_wealth", "fintech_kyc", "fintech_aml", "fintech_fraud", "bia", "fin_rpt"]
+REQUIRES = [
+	"auth",
+	"audl",
+	"ntfy",
+	"nlpc",
+	"keym",
+	"fintech_wealth",
+	"fintech_kyc",
+	"fintech_aml",
+	"fintech_fraud",
+	"bia_anl",
+	"fin_rpt",
+]
 
 UI_ROUTES = [
 	{"name": "dashboard", "path": "/fintech-robo/dashboard", "component": "RoboAdvisoryDashboard", "permission": "fintech_robo:view", "nav_group": "Overview"},
@@ -104,7 +116,20 @@ RULES: list[dict[str, Any]] = [
 	{"name": "robo_agent_runtime_supported", "condition": {"operation": "register_robo_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "robo_agent_runtime_not_supported", "required_action": "select_supported_runtime"}},
 	{"name": "robo_agent_role_supported", "condition": {"operation": "register_robo_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "robo_agent_role_not_supported", "required_action": "select_supported_role"}},
 	{"name": "privileged_robo_agent_action_requires_human_approval", "condition": {"operation": "robo_agent_action", "privileged_scope": True, "human_approval_recorded": False}, "effect": {"decision": "deny", "reason": "human_approval_required", "required_action": "record_human_approval"}},
+
+	# Cross-tenant and privilege escalation guards
+	{"name": "cross_tenant_robo_access_denied", "description": "Robo-adviser resources cannot be accessed across tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_access_denied", "required_action": "use_tenant_scoped_credentials"}},
+	{"name": "privilege_escalation_denied", "description": "Robo-adviser privilege escalation without approval is denied.", "condition": {"privilege_escalation_attempt": True, "approval_recorded": False}, "effect": {"decision": "deny", "reason": "privilege_escalation_denied", "required_action": "obtain_escalation_approval"}},
+
+	# Africa-specific robo-adviser rules
+	{"name": "ke_cma_robo_adviser_licence_required", "description": "Kenya CMA investment adviser licence required for robo-advisory services.", "condition": {"operation": "provide_investment_advice", "country": "KE", "cma_licence_present": False}, "effect": {"decision": "deny", "reason": "ke_cma_robo_adviser_licence_required", "required_action": "obtain_cma_investment_adviser_licence"}},
+	{"name": "ke_cma_algorithm_disclosure_required", "description": "Kenya CMA requires disclosure of robo-adviser algorithm methodology.", "condition": {"operation": "launch_robo_adviser", "country": "KE", "algorithm_disclosed": False}, "effect": {"decision": "deny", "reason": "ke_cma_algorithm_disclosure_required", "required_action": "disclose_algorithm_methodology"}},
+	{"name": "mobile_money_robo_funding_kyc", "description": "Mobile money robo-adviser funding requires investor KYC.", "condition": {"operation": "fund_robo_account", "method": "mobile_money", "investor_kyc_present": False}, "effect": {"decision": "deny", "reason": "mobile_money_robo_funding_kyc_required", "required_action": "complete_investor_kyc"}},
+	{"name": "ke_nse_equity_robo_compliance", "description": "NSE equity robo-advisory requires NSE member broker routing.", "condition": {"operation": "trade_ke_equity", "nse_member_broker_present": False}, "effect": {"decision": "deny", "reason": "ke_nse_member_broker_required", "required_action": "route_through_nse_member_broker"}},
+	{"name": "robo_suitability_assessment_required", "description": "Robo-adviser must complete client suitability assessment.", "condition": {"operation": "provide_investment_advice", "suitability_assessed": False}, "effect": {"decision": "deny", "reason": "suitability_assessment_required", "required_action": "complete_client_suitability_assessment"}},
+	{"name": "robo_aml_client_screening_required", "description": "Robo-adviser clients require AML screening.", "condition": {"operation": "onboard_client", "aml_screened": False}, "effect": {"decision": "deny", "reason": "robo_client_aml_screening_required", "required_action": "screen_robo_client"}},
 ]
+
 
 
 def get_capability_contract(tenant_id: str = "default") -> dict[str, Any]:

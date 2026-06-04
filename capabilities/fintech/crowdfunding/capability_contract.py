@@ -61,7 +61,22 @@ PROVIDES = [
 	"crowdfunding_review_workflow",
 	"crowdfunding_agent_workflow",
 ]
-REQUIRES = ["auth", "audl", "ntfy", "nlpc", "keym", "fintech_payments", "fintech_wallets", "fintech_kyc", "fintech_aml", "fintech_fraud", "fintech_portfolio", "fintech_wealth", "bia", "fin_rpt"]
+REQUIRES = [
+	"auth",
+	"audl",
+	"ntfy",
+	"nlpc",
+	"keym",
+	"fintech_payments",
+	"fintech_wallets",
+	"fintech_kyc",
+	"fintech_aml",
+	"fintech_fraud",
+	"fintech_portfolio",
+	"fintech_wealth",
+	"bia_anl",
+	"fin_rpt",
+]
 
 UI_ROUTES = [
 	{"name": "dashboard", "path": "/fintech-crowdfunding/dashboard", "component": "CrowdfundingDashboard", "permission": "fintech_crowdfunding:view", "nav_group": "Overview"},
@@ -130,7 +145,20 @@ RULES: list[dict[str, Any]] = [
 	{"name": "crowdfunding_agent_runtime_supported", "condition": {"operation": "register_crowdfunding_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "crowdfunding_agent_runtime_not_supported", "required_action": "select_supported_runtime"}},
 	{"name": "crowdfunding_agent_role_supported", "condition": {"operation": "register_crowdfunding_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "crowdfunding_agent_role_not_supported", "required_action": "select_supported_role"}},
 	{"name": "privileged_crowdfunding_agent_action_requires_human_approval", "condition": {"operation": "crowdfunding_agent_action", "privileged_scope": True, "human_approval_recorded": False}, "effect": {"decision": "deny", "reason": "human_approval_required", "required_action": "record_human_approval"}},
+
+	# Cross-tenant and privilege escalation guards
+	{"name": "cross_tenant_crowdfunding_access_denied", "description": "Crowdfunding resources cannot be accessed across tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_access_denied", "required_action": "use_tenant_scoped_credentials"}},
+	{"name": "privilege_escalation_denied", "description": "Crowdfunding privilege escalation without approval is denied.", "condition": {"privilege_escalation_attempt": True, "approval_recorded": False}, "effect": {"decision": "deny", "reason": "privilege_escalation_denied", "required_action": "obtain_escalation_approval"}},
+
+	# Africa-specific crowdfunding rules
+	{"name": "ke_cma_crowdfunding_licence_required", "description": "Kenya CMA investment-based crowdfunding requires CMA licence.", "condition": {"operation": "launch_campaign", "country": "KE", "campaign_type": "investment", "cma_licence_present": False}, "effect": {"decision": "deny", "reason": "ke_cma_crowdfunding_licence_required", "required_action": "obtain_cma_crowdfunding_licence"}},
+	{"name": "mpesa_campaign_collection_shortcode_required", "description": "M-Pesa campaign fund collection requires a registered paybill/shortcode.", "condition": {"operation": "launch_campaign", "collection_method": "mpesa", "mpesa_shortcode_present": False}, "effect": {"decision": "deny", "reason": "mpesa_collection_shortcode_required", "required_action": "register_mpesa_collection_shortcode"}},
+	{"name": "mobile_money_backer_kyc_required", "description": "Mobile money campaign contributions require backer KYC verification.", "condition": {"operation": "pledge_contribution", "payment_method": "mobile_money", "backer_kyc_present": False}, "effect": {"decision": "deny", "reason": "mobile_money_backer_kyc_required", "required_action": "verify_backer_kyc"}},
+	{"name": "ke_campaign_disclosure_required", "description": "Kenya CMA requires full campaign disclosure for investment crowdfunding.", "condition": {"operation": "launch_campaign", "country": "KE", "campaign_type": "investment", "disclosure_present": False}, "effect": {"decision": "deny", "reason": "ke_campaign_disclosure_required", "required_action": "file_campaign_disclosure"}},
+	{"name": "campaign_aml_screening_required", "description": "Campaign organiser and large contributors require AML screening.", "condition": {"operation": "launch_campaign", "aml_screened": False}, "effect": {"decision": "deny", "reason": "campaign_aml_screening_required", "required_action": "screen_campaign_organiser"}},
+	{"name": "mobile_money_disbursement_limit_enforced", "description": "Mobile money campaign disbursements are subject to CBK daily limits.", "condition": {"operation": "disburse_funds", "method": "mobile_money", "daily_limit_exceeded": True}, "effect": {"decision": "deny", "reason": "mobile_money_disbursement_limit_exceeded", "required_action": "schedule_batch_disbursement"}},
 ]
+
 
 
 def get_capability_contract(tenant_id: str = "default") -> dict[str, Any]:

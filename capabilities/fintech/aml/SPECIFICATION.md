@@ -65,7 +65,7 @@ Required APG capabilities:
 - `fintech_wallets` for wallet activity and balances.
 - `fintech_kyc` for customer profiles, screening, and risk scores.
 
-The event processor is Bytewax. Kafka is intentionally not part of this
+The event processor is Bytewax. Bytewax is intentionally not part of this
 capability contract.
 
 ## Configuration

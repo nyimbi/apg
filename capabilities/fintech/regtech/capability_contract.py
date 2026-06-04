@@ -118,7 +118,20 @@ RULES: list[dict[str, Any]] = [
 	{"name": "regtech_agent_runtime_supported", "condition": {"operation": "register_regtech_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "regtech_agent_runtime_not_supported", "required_action": "select_supported_runtime"}},
 	{"name": "regtech_agent_role_supported", "condition": {"operation": "register_regtech_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "regtech_agent_role_not_supported", "required_action": "select_supported_role"}},
 	{"name": "privileged_regtech_agent_action_requires_human_approval", "condition": {"operation": "regtech_agent_action", "privileged_scope": True, "human_approval_recorded": False}, "effect": {"decision": "deny", "reason": "human_approval_required", "required_action": "record_human_approval"}},
+
+	# Cross-tenant and privilege escalation guards
+	{"name": "cross_tenant_regtech_access_denied", "description": "RegTech resources cannot be accessed across tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_access_denied", "required_action": "use_tenant_scoped_credentials"}},
+	{"name": "privilege_escalation_denied", "description": "RegTech privilege escalation without approval is denied.", "condition": {"privilege_escalation_attempt": True, "approval_recorded": False}, "effect": {"decision": "deny", "reason": "privilege_escalation_denied", "required_action": "obtain_escalation_approval"}},
+
+	# Africa-specific RegTech rules
+	{"name": "ke_cbk_regtech_return_filing", "description": "Kenya CBK RegTech returns must be filed on schedule.", "condition": {"operation": "file_return", "jurisdiction": "KE", "cbk_return_overdue": True}, "effect": {"decision": "deny", "reason": "ke_cbk_return_overdue", "required_action": "file_cbk_return_immediately"}},
+	{"name": "ke_frc_aml_cft_reporting", "description": "Kenya FRC AML/CFT reporting requirements must be met.", "condition": {"operation": "file_aml_report", "jurisdiction": "KE", "frc_report_filed": False}, "effect": {"decision": "deny", "reason": "ke_frc_aml_report_required", "required_action": "file_frc_aml_report"}},
+	{"name": "mobile_money_transaction_reporting", "description": "Mobile money transaction regulatory reports must be filed per CBK requirements.", "condition": {"operation": "file_return", "report_type": "mobile_money_transactions", "cbk_compliant": False}, "effect": {"decision": "deny", "reason": "mobile_money_transaction_reporting_required", "required_action": "file_mobile_money_transaction_report"}},
+	{"name": "ke_data_protection_regtech_compliance", "description": "RegTech data processing requires Kenya Data Protection Act compliance.", "condition": {"operation": "process_regulatory_data", "country": "KE", "dpa_compliant": False}, "effect": {"decision": "deny", "reason": "ke_dpa_compliance_required", "required_action": "comply_with_ke_data_protection_act"}},
+	{"name": "ng_cbn_regulatory_returns_required", "description": "Nigeria CBN regulatory returns must be filed on time.", "condition": {"operation": "file_return", "jurisdiction": "NG", "cbn_return_overdue": True}, "effect": {"decision": "deny", "reason": "ng_cbn_return_overdue", "required_action": "file_cbn_return_immediately"}},
+	{"name": "regtech_audit_trail_immutability", "description": "RegTech audit trails must be immutable for regulatory purposes.", "condition": {"operation": "modify_audit_record", "audit_trail_immutable": False}, "effect": {"decision": "deny", "reason": "audit_trail_modification_denied", "required_action": "use_append_only_audit_log"}},
 ]
+
 
 
 def get_capability_contract(tenant_id: str = "default") -> dict[str, Any]:

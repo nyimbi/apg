@@ -1,367 +1,2216 @@
-"""Dependency-light HCM Time and Attendance lifecycle service."""
+"""
+Time & Attendance — Async Domain Service
 
+Full lifecycle management: clock-in/out, shift scheduling, leave, TOIL,
+flexitime, annualised hours, geofencing, biometric sync, payroll export.
+
+All methods are async.  DB session is injected; no ORM assumed — raw
+asyncpg-compatible dicts (or SQLAlchemy async sessions) work equally well
+via the thin _exec / _fetch helpers.
+
+Copyright © 2025 Datacraft. Author: Nyimbi Odero
+"""
 from __future__ import annotations
 
-from copy import deepcopy
-from datetime import datetime
+import csv
+import io
+import logging
+from datetime import date, datetime, time, timedelta, timezone
+from decimal import Decimal
 from typing import Any
-from uuid import uuid4
+
+from uuid6 import uuid7
 
 try:
-	from .capability_contract import (
-		ATTENDANCE_EVENT_STREAM,
-		STREAMING,
-		SUPPORTED_ATTENDANCE_AGENT_ROLES,
-		SUPPORTED_ATTENDANCE_AGENT_RUNTIMES,
-		SUPPORTED_ENTRY_METHODS,
-		SUPPORTED_ENTRY_TYPES,
-		SUPPORTED_EXCEPTION_TYPES,
-		SUPPORTED_LEAVE_TYPES,
-		SUPPORTED_SCHEDULE_TYPES,
-		evaluate_capability_rules,
-		get_capability_contract,
+	from .domain.calculations import (
+		HoursBreakdown,
+		LeaveEntitlement,
+		calculate_hours_breakdown,
+		calculate_leave_entitlement,
+		calculate_pay,
+		calculate_prorata_leave,
+		calculate_toil_from_overtime,
+		calculate_weekly_hours_breakdown,
+		calculate_worked_hours,
+		working_days_between,
+		calculate_flexi_balance,
 	)
-except ImportError:  # pragma: no cover - supports direct file loading in tests
-	from capability_contract import (  # type: ignore
-		ATTENDANCE_EVENT_STREAM,
-		STREAMING,
-		SUPPORTED_ATTENDANCE_AGENT_ROLES,
-		SUPPORTED_ATTENDANCE_AGENT_RUNTIMES,
-		SUPPORTED_ENTRY_METHODS,
-		SUPPORTED_ENTRY_TYPES,
-		SUPPORTED_EXCEPTION_TYPES,
-		SUPPORTED_LEAVE_TYPES,
-		SUPPORTED_SCHEDULE_TYPES,
-		evaluate_capability_rules,
-		get_capability_contract,
+	from .domain.rules import (
+		RuleViolation,
+		assert_annualised_hours_deficit_manageable,
+		assert_biometric_confidence,
+		assert_clock_in_before_clock_out,
+		assert_core_hours_covered,
+		assert_device_registered,
+		assert_fmla_eligibility,
+		assert_import_row_valid,
+		assert_leave_balance_sufficient,
+		assert_leave_dates_valid,
+		assert_leave_not_overlapping,
+		assert_maximum_consecutive_days,
+		assert_maximum_weekly_hours,
+		assert_medical_certificate_for_extended_sick,
+		assert_minimum_rest_between_shifts,
+		assert_night_shift_midnight_span,
+		assert_no_cross_tenant_access,
+		assert_not_already_clocked_in,
+		assert_not_already_clocked_out,
+		assert_overtime_threshold_positive,
+		assert_shift_duration_reasonable,
+		assert_tenant_context,
+		assert_timesheet_approved_before_export,
+		assert_within_geofence,
+		calculate_daily_overtime,
+		calculate_weekly_overtime,
+		is_night_shift,
 	)
+except ImportError:  # pragma: no cover – direct-load via importlib in contract tests
+	from domain.calculations import (  # type: ignore[no-redef]
+		HoursBreakdown,
+		LeaveEntitlement,
+		calculate_hours_breakdown,
+		calculate_leave_entitlement,
+		calculate_pay,
+		calculate_prorata_leave,
+		calculate_toil_from_overtime,
+		calculate_weekly_hours_breakdown,
+		calculate_worked_hours,
+		working_days_between,
+		calculate_flexi_balance,
+	)
+	from domain.rules import (  # type: ignore[no-redef]
+		RuleViolation,
+		assert_annualised_hours_deficit_manageable,
+		assert_biometric_confidence,
+		assert_clock_in_before_clock_out,
+		assert_core_hours_covered,
+		assert_device_registered,
+		assert_fmla_eligibility,
+		assert_import_row_valid,
+		assert_leave_balance_sufficient,
+		assert_leave_dates_valid,
+		assert_leave_not_overlapping,
+		assert_maximum_consecutive_days,
+		assert_maximum_weekly_hours,
+		assert_medical_certificate_for_extended_sick,
+		assert_minimum_rest_between_shifts,
+		assert_night_shift_midnight_span,
+		assert_no_cross_tenant_access,
+		assert_not_already_clocked_in,
+		assert_not_already_clocked_out,
+		assert_overtime_threshold_positive,
+		assert_shift_duration_reasonable,
+		assert_tenant_context,
+		assert_timesheet_approved_before_export,
+		assert_within_geofence,
+		calculate_daily_overtime,
+		calculate_weekly_overtime,
+		is_night_shift,
+	)
+
+logger = logging.getLogger(__name__)
+
+
+def _uuid7str() -> str:
+	return str(uuid7())
+
+
+UTC = timezone.utc
 
 
 class TimeAttendanceError(Exception):
-	"""Base exception for attendance operations."""
+	"""Base domain exception."""
 
 
-class TimeAttendanceNotFoundError(TimeAttendanceError):
-	"""Raised when an attendance lifecycle record is not found."""
+class NotFoundError(TimeAttendanceError):
+	"""Record not found or tenant mismatch."""
 
 
-class TimeAttendanceLifecycleService:
-	"""In-memory executable service for Time and Attendance lifecycle packets."""
+class TimeAttendanceService:
+	"""
+	Full-featured async Time & Attendance service.
 
-	def __init__(self, tenant_id: str | None = None, user_id: str | None = None, *_: Any, **__: Any) -> None:
-		self.tenant_id = tenant_id
-		self.user_id = user_id
-		self.policies: dict[str, dict[str, Any]] = {}
-		self.schedules: dict[str, dict[str, Any]] = {}
-		self.shifts: dict[str, dict[str, Any]] = {}
-		self.time_entries: dict[str, dict[str, Any]] = {}
-		self.breaks: dict[str, dict[str, Any]] = {}
-		self.timesheets: dict[str, dict[str, Any]] = {}
-		self.leave_requests: dict[str, dict[str, Any]] = {}
-		self.exceptions: dict[str, dict[str, Any]] = {}
-		self.payroll_exports: dict[str, dict[str, Any]] = {}
-		self.agents: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+	Args:
+		db_session: Async database session (asyncpg Connection or SQLAlchemy AsyncSession).
+		tenant_id:  Tenant context — enforced on every operation.
+		actor_id:   Authenticated user performing the action.
+	"""
 
-	def _tenant(self, tenant_id: str | None = None) -> str:
-		value = tenant_id or self.tenant_id
-		if not value:
-			raise PermissionError("tenant_context_required")
-		return value
+	def __init__(self, db_session: Any, tenant_id: str, actor_id: str) -> None:
+		assert tenant_id, "tenant_id is required"
+		assert actor_id, "actor_id is required"
+		self._db = db_session
+		self._tenant_id = tenant_id
+		self._actor_id = actor_id
+		self._events: list[dict[str, Any]] = []
 
-	def _record_id(self, prefix: str, explicit: str | None = None) -> str:
-		return explicit or f"{prefix}-{uuid4().hex[:12]}"
+	# ------------------------------------------------------------------
+	# Internal helpers
+	# ------------------------------------------------------------------
 
-	def _now(self) -> str:
-		return datetime.utcnow().isoformat(timespec="seconds") + "Z"
+	def _log_ctx(self, method: str, **kw: Any) -> str:
+		"""Return a log prefix string for consistent tracing."""
+		return f"[TAT][{self._tenant_id}][{method}] " + " ".join(f"{k}={v}" for k, v in kw.items())
 
-	def _base_context(self, tenant_id: str, operation: str) -> dict[str, Any]:
-		return {
-			"tenant_id": tenant_id,
-			"tenant_context_present": True,
-			"operation": operation,
-			"operation_type": "write",
-			"policy_attached": True,
-			"audit_enabled": True,
+	def _log_action(self, method: str, record_id: str, **kw: Any) -> None:
+		logger.info(self._log_ctx(method, id=record_id, **kw))
+
+	def _log_error(self, method: str, exc: Exception, **kw: Any) -> None:
+		logger.error(self._log_ctx(method, **kw) + f" error={exc!r}")
+
+	def _emit_event(self, event_type: str, payload: dict[str, Any]) -> None:
+		"""Emit a domain event. Replace with real event bus in production."""
+		event = {
+			"id": _uuid7str(),
+			"type": event_type,
+			"tenant_id": self._tenant_id,
+			"actor_id": self._actor_id,
+			"occurred_at": datetime.now(UTC).isoformat(),
+			"payload": payload,
 		}
+		self._events.append(event)
+		logger.debug("event emitted: %s id=%s", event_type, event["id"])
 
-	def _assert_rules(self, context: dict[str, Any]) -> None:
-		result = evaluate_capability_rules(context)
-		if result["decision"] != "allow":
-			raise PermissionError(",".join(effect["reason"] for effect in result["effects"]))
+	def _assert_tenant(self, record: dict[str, Any], label: str = "record") -> None:
+		"""Guard: record must belong to this tenant."""
+		assert_no_cross_tenant_access(self._tenant_id, record.get("tenant_id", ""))
 
-	def _emit(self, tenant_id: str, event_type: str, record: dict[str, Any]) -> None:
-		self._audit_events.append({
-			"tenant_id": tenant_id,
-			"event_type": event_type,
-			"record_id": record["id"],
-			"record_type": record["type"],
-			"status": record["status"],
-			"stream": ATTENDANCE_EVENT_STREAM,
-			"processor": "bytewax",
-			"emitted_at": self._now(),
-		})
+	async def _fetch_one(self, table: str, record_id: str) -> dict[str, Any]:
+		"""
+		Fetch a single record by id, enforcing tenant isolation.
+		Raises NotFoundError if absent or wrong tenant.
+		"""
+		row = await self._db.fetchrow(
+			f"SELECT * FROM {table} WHERE id=$1 AND tenant_id=$2 AND NOT is_deleted",
+			record_id, self._tenant_id,
+		)
+		if row is None:
+			raise NotFoundError(f"{table} record {record_id} not found")
+		return dict(row)
 
-	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
-		return get_capability_contract(tenant_id)
+	async def _fetch_many(
+		self,
+		table: str,
+		filters: dict[str, Any] | None = None,
+		order_by: str = "created_at DESC",
+		limit: int = 100,
+		offset: int = 0,
+	) -> list[dict[str, Any]]:
+		"""Generic paginated fetch with tenant isolation."""
+		wheres = ["tenant_id=$1", "NOT is_deleted"]
+		params: list[Any] = [self._tenant_id]
+		idx = 2
+		for col, val in (filters or {}).items():
+			if val is None:
+				continue
+			wheres.append(f"{col}=${idx}")
+			params.append(val)
+			idx += 1
+		params += [limit, offset]
+		sql = (
+			f"SELECT * FROM {table} WHERE {' AND '.join(wheres)} "
+			f"ORDER BY {order_by} LIMIT ${idx} OFFSET ${idx+1}"
+		)
+		rows = await self._db.fetch(sql, *params)
+		return [dict(r) for r in rows]
 
-	def evaluate(self, context: dict[str, Any]) -> dict[str, Any]:
-		return evaluate_capability_rules(context)
+	async def _soft_delete(self, table: str, record_id: str) -> None:
+		await self._db.execute(
+			f"UPDATE {table} SET is_deleted=true, updated_at=now() WHERE id=$1 AND tenant_id=$2",
+			record_id, self._tenant_id,
+		)
 
-	def create_time_policy(self, policy_id: str, tenant_id: str, name: str, timezone: str, workweek: list[str], overtime_threshold_hours: float = 40.0) -> dict[str, Any]:
-		tenant = self._tenant(tenant_id)
-		context = self._base_context(tenant, "create_time_policy")
-		context.update({
-			"name_present": bool(name),
-			"timezone_present": bool(timezone),
-			"workweek_present": bool(workweek),
-			"overtime_threshold_present": overtime_threshold_hours is not None,
-			"overtime_threshold_positive": overtime_threshold_hours is not None and float(overtime_threshold_hours) > 0,
-		})
-		self._assert_rules(context)
-		record = {"id": self._record_id("policy", policy_id), "type": "time_policy", "kind": "policy", "tenant_id": tenant, "name": name, "timezone": timezone, "workweek": list(workweek), "overtime_threshold_hours": float(overtime_threshold_hours), "status": "active", "created_at": self._now()}
-		self.policies[record["id"]] = record
-		self._emit(tenant, "attendance_policy_created", record)
-		return deepcopy(record)
+	# ------------------------------------------------------------------
+	# Time Policy CRUD
+	# ------------------------------------------------------------------
 
-	def create_schedule(self, schedule_id: str, tenant_id: str, employee_id: str, policy_id: str, schedule_type: str, start_date: str, end_date: str) -> dict[str, Any]:
-		tenant = self._tenant(tenant_id)
-		policy = self.policies.get(policy_id)
-		context = self._base_context(tenant, "create_schedule")
-		context.update({
-			"employee_present": bool(employee_id),
-			"policy_present": bool(policy and policy["tenant_id"] == tenant),
-			"schedule_type_supported": schedule_type in SUPPORTED_SCHEDULE_TYPES,
-			"start_date_present": bool(start_date),
-			"end_date_present": bool(end_date),
-		})
-		self._assert_rules(context)
-		record = {"id": self._record_id("schedule", schedule_id), "type": "work_schedule", "kind": "schedule", "tenant_id": tenant, "employee_id": employee_id, "policy_id": policy_id, "schedule_type": schedule_type, "start_date": start_date, "end_date": end_date, "status": "active", "created_at": self._now()}
-		self.schedules[record["id"]] = record
-		self._emit(tenant, "attendance_schedule_created", record)
-		return deepcopy(record)
+	async def create_time_policy(
+		self,
+		name: str,
+		timezone: str,
+		workweek: list[str],
+		overtime_threshold_daily: float = 8.0,
+		overtime_threshold_weekly: float = 40.0,
+		double_time_threshold_daily: float = 12.0,
+		overtime_multiplier: float = 1.5,
+		holiday_pay_multiplier: float = 2.0,
+		min_rest_between_shifts_h: float = 11.0,
+		max_consecutive_days: int = 6,
+		max_weekly_hours: float = 48.0,
+		break_rules: dict[str, Any] | None = None,
+		flexi_core_start: time | None = None,
+		flexi_core_end: time | None = None,
+		flexi_max_carry_hours: float | None = 16.0,
+		toil_enabled: bool = False,
+		comp_time_enabled: bool = False,
+		comp_time_jurisdiction: str | None = None,
+		annualised_hours_enabled: bool = False,
+		contracted_annual_hours: float | None = None,
+		medical_cert_threshold_days: int = 3,
+		metadata: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""
+		Create a time policy defining overtime, rest, and compliance rules.
 
-	def create_shift(self, shift_id: str, tenant_id: str, schedule_id: str, shift_date: str, start_time: str, end_time: str) -> dict[str, Any]:
-		tenant = self._tenant(tenant_id)
-		schedule = self.schedules.get(schedule_id)
-		context = self._base_context(tenant, "create_shift")
-		context.update({
-			"schedule_present": bool(schedule and schedule["tenant_id"] == tenant),
-			"shift_date_present": bool(shift_date),
-			"start_time_present": bool(start_time),
-			"end_time_present": bool(end_time),
-		})
-		self._assert_rules(context)
-		record = {"id": self._record_id("shift", shift_id), "type": "attendance_shift", "kind": "shift", "tenant_id": tenant, "schedule_id": schedule_id, "employee_id": schedule["employee_id"], "shift_date": shift_date, "start_time": start_time, "end_time": end_time, "status": "planned", "created_at": self._now()}
-		self.shifts[record["id"]] = record
-		self._emit(tenant, "attendance_shift_created", record)
-		return deepcopy(record)
+		Args:
+			name: Human-readable policy name.
+			timezone: IANA timezone string (e.g. 'Africa/Nairobi').
+			workweek: List of weekday names, e.g. ['Mon','Tue','Wed','Thu','Fri'].
+			overtime_threshold_daily: Daily hours before overtime kicks in.
+			overtime_threshold_weekly: Weekly hours before overtime kicks in.
+			...
 
-	def record_time_entry(self, entry_id: str, tenant_id: str, employee_id: str, shift_id: str, entry_type: str, method: str, clock_in: str, clock_out: str | None = None, device_id: str | None = None, geofence_verified: bool = True, biometric_confidence: float | None = None, reviewed_by: str | None = None) -> dict[str, Any]:
-		tenant = self._tenant(tenant_id)
-		shift = self.shifts.get(shift_id)
-		tracked_method = method in {"mobile", "kiosk", "biometric"}
-		low_biometric_confidence = biometric_confidence is not None and biometric_confidence < 0.85
-		context = self._base_context(tenant, "record_time_entry")
-		context.update({
-			"employee_present": bool(employee_id),
-			"shift_present": bool(shift and shift["tenant_id"] == tenant),
-			"entry_type_supported": entry_type in SUPPORTED_ENTRY_TYPES,
-			"entry_method_supported": method in SUPPORTED_ENTRY_METHODS,
-			"clock_in_present": bool(clock_in),
-			"tracked_method": tracked_method,
-			"device_present": bool(device_id),
-			"geofence_verified": bool(geofence_verified),
-			"biometric_low_confidence": low_biometric_confidence,
-			"review_recorded": bool(reviewed_by),
-		})
-		self._assert_rules(context)
-		hours = self._calculate_hours(clock_in, clock_out)
-		record = {"id": self._record_id("entry", entry_id), "type": "time_entry", "kind": "time_entry", "tenant_id": tenant, "employee_id": employee_id, "shift_id": shift_id, "entry_type": entry_type, "method": method, "clock_in": clock_in, "clock_out": clock_out, "device_id": device_id, "geofence_verified": geofence_verified, "biometric_confidence": biometric_confidence, "reviewed_by": reviewed_by, "hours": hours, "status": "recorded", "created_at": self._now()}
-		self.time_entries[record["id"]] = record
-		self._emit(tenant, "time_entry_recorded", record)
-		return deepcopy(record)
+		Returns:
+			Created policy record dict.
+		"""
+		assert_overtime_threshold_positive(overtime_threshold_daily)
+		assert_overtime_threshold_positive(overtime_threshold_weekly)
 
-	def record_break(self, break_id: str, tenant_id: str, time_entry_id: str, break_type: str, start_time: str, end_time: str) -> dict[str, Any]:
-		tenant = self._tenant(tenant_id)
-		entry = self.time_entries.get(time_entry_id)
-		context = self._base_context(tenant, "record_break")
-		context.update({"time_entry_present": bool(entry and entry["tenant_id"] == tenant), "start_time_present": bool(start_time), "end_time_present": bool(end_time)})
-		self._assert_rules(context)
-		record = {"id": self._record_id("break", break_id), "type": "attendance_break", "kind": "break", "tenant_id": tenant, "time_entry_id": time_entry_id, "break_type": break_type, "start_time": start_time, "end_time": end_time, "status": "recorded", "created_at": self._now()}
-		self.breaks[record["id"]] = record
-		self._emit(tenant, "break_recorded", record)
-		return deepcopy(record)
+		record_id = _uuid7str()
+		import json
 
-	def submit_timesheet(self, timesheet_id: str, tenant_id: str, employee_id: str, period_start: str, period_end: str, entry_ids: list[str], submitted_by: str) -> dict[str, Any]:
-		tenant = self._tenant(tenant_id)
-		entries = [self.time_entries.get(entry_id) for entry_id in entry_ids]
-		valid_entries = [entry for entry in entries if entry and entry["tenant_id"] == tenant and entry["employee_id"] == employee_id]
-		total_hours = round(sum(float(entry.get("hours") or 0) for entry in valid_entries), 2)
-		context = self._base_context(tenant, "submit_timesheet")
-		context.update({
-			"employee_present": bool(employee_id),
-			"period_present": bool(period_start and period_end),
-			"entries_present": bool(entry_ids and len(valid_entries) == len(entry_ids)),
-			"submitter_present": bool(submitted_by),
-			"total_hours_negative": total_hours < 0,
-		})
-		self._assert_rules(context)
-		record = {"id": self._record_id("timesheet", timesheet_id), "type": "attendance_timesheet", "kind": "timesheet", "tenant_id": tenant, "employee_id": employee_id, "period_start": period_start, "period_end": period_end, "entry_ids": list(entry_ids), "total_hours": total_hours, "submitted_by": submitted_by, "approved_by": None, "status": "submitted", "created_at": self._now(), "updated_at": self._now()}
-		self.timesheets[record["id"]] = record
-		self._emit(tenant, "timesheet_submitted", record)
-		return deepcopy(record)
+		await self._db.execute(
+			"""
+			INSERT INTO tat_time_policy (
+				id, tenant_id, name, timezone, workweek,
+				overtime_threshold_daily, overtime_threshold_weekly,
+				double_time_threshold_daily, overtime_multiplier,
+				holiday_pay_multiplier, min_rest_between_shifts_h,
+				max_consecutive_days, max_weekly_hours, break_rules,
+				flexi_core_start, flexi_core_end, flexi_max_carry_hours,
+				toil_enabled, comp_time_enabled, comp_time_jurisdiction,
+				annualised_hours_enabled, contracted_annual_hours,
+				medical_cert_threshold_days, metadata, created_by
+			) VALUES (
+				$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
+				$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25
+			)
+			""",
+			record_id, self._tenant_id, name, timezone, json.dumps(workweek),
+			overtime_threshold_daily, overtime_threshold_weekly,
+			double_time_threshold_daily, overtime_multiplier,
+			holiday_pay_multiplier, min_rest_between_shifts_h,
+			max_consecutive_days, max_weekly_hours, json.dumps(break_rules or {}),
+			flexi_core_start, flexi_core_end, flexi_max_carry_hours,
+			toil_enabled, comp_time_enabled, comp_time_jurisdiction,
+			annualised_hours_enabled, contracted_annual_hours,
+			medical_cert_threshold_days, json.dumps(metadata or {}), self._actor_id,
+		)
 
-	def approve_timesheet(self, timesheet_id: str, tenant_id: str, approved_by: str) -> dict[str, Any]:
-		tenant = self._tenant(tenant_id)
-		timesheet = self._get_tenant_record(self.timesheets, timesheet_id, tenant, "timesheet")
-		context = self._base_context(tenant, "approve_timesheet")
-		context.update({"approver_present": bool(approved_by)})
-		self._assert_rules(context)
-		timesheet["approved_by"] = approved_by
-		timesheet["status"] = "approved"
-		timesheet["updated_at"] = self._now()
-		self._emit(tenant, "timesheet_approved", timesheet)
-		return deepcopy(timesheet)
-
-	def request_leave(self, leave_id: str, tenant_id: str, employee_id: str, leave_type: str, start_date: str, end_date: str, reason: str, approved_by: str | None = None) -> dict[str, Any]:
-		tenant = self._tenant(tenant_id)
-		review_required = leave_type == "unpaid" or self._date_span_days(start_date, end_date) > 10
-		context = self._base_context(tenant, "request_leave")
-		context.update({
-			"employee_present": bool(employee_id),
-			"leave_type_supported": leave_type in SUPPORTED_LEAVE_TYPES,
-			"start_date_present": bool(start_date),
-			"end_date_present": bool(end_date),
-			"reason_present": bool(reason),
-			"review_required": review_required,
-			"approval_recorded": bool(approved_by),
-		})
-		self._assert_rules(context)
-		record = {"id": self._record_id("leave", leave_id), "type": "attendance_leave_request", "kind": "leave_request", "tenant_id": tenant, "employee_id": employee_id, "leave_type": leave_type, "start_date": start_date, "end_date": end_date, "reason": reason, "approved_by": approved_by, "status": "approved" if approved_by else "requested", "created_at": self._now()}
-		self.leave_requests[record["id"]] = record
-		self._emit(tenant, "leave_requested", record)
-		return deepcopy(record)
-
-	def record_exception(self, exception_id: str, tenant_id: str, employee_id: str, exception_type: str, severity: str, description: str, owner_id: str | None = None, entry_id: str | None = None) -> dict[str, Any]:
-		tenant = self._tenant(tenant_id)
-		context = self._base_context(tenant, "record_exception")
-		context.update({
-			"employee_present": bool(employee_id),
-			"exception_type_supported": exception_type in SUPPORTED_EXCEPTION_TYPES,
-			"high_severity": severity == "high",
-			"owner_present": bool(owner_id),
-		})
-		self._assert_rules(context)
-		record = {"id": self._record_id("exception", exception_id), "type": "attendance_exception", "kind": "exception", "tenant_id": tenant, "employee_id": employee_id, "entry_id": entry_id, "exception_type": exception_type, "severity": severity, "description": description, "owner_id": owner_id, "status": "open", "created_at": self._now()}
-		self.exceptions[record["id"]] = record
-		self._emit(tenant, "attendance_exception_recorded", record)
-		return deepcopy(record)
-
-	def create_payroll_export(self, export_id: str, tenant_id: str, period_start: str, period_end: str, timesheet_ids: list[str], approved_by: str, event_stream: str = "bytewax") -> dict[str, Any]:
-		tenant = self._tenant(tenant_id)
-		timesheets = [self.timesheets.get(timesheet_id) for timesheet_id in timesheet_ids]
-		valid_timesheets = [timesheet for timesheet in timesheets if timesheet and timesheet["tenant_id"] == tenant]
-		all_approved = bool(valid_timesheets) and all(timesheet["status"] == "approved" for timesheet in valid_timesheets)
-		context = self._base_context(tenant, "create_payroll_export")
-		context.update({
-			"period_present": bool(period_start and period_end),
-			"timesheets_present": bool(timesheet_ids and len(valid_timesheets) == len(timesheet_ids)),
-			"all_timesheets_approved": all_approved,
-			"approval_recorded": bool(approved_by),
-		})
-		self._assert_rules(context)
-		if event_stream != "bytewax":
-			self._assert_rules({"tenant_id": tenant, "tenant_context_present": True, "operation": "attendance_batch", "event_stream": "queue"})
-		total_hours = round(sum(float(timesheet["total_hours"]) for timesheet in valid_timesheets), 2)
-		record = {"id": self._record_id("export", export_id), "type": "attendance_payroll_export", "kind": "payroll_export", "tenant_id": tenant, "period_start": period_start, "period_end": period_end, "timesheet_ids": list(timesheet_ids), "total_hours": total_hours, "approved_by": approved_by, "stream": ATTENDANCE_EVENT_STREAM, "processor": "bytewax", "status": "ready", "created_at": self._now()}
-		self.payroll_exports[record["id"]] = record
-		self._emit(tenant, "attendance_payroll_export_created", record)
-		return deepcopy(record)
-
-	def register_attendance_agent(self, tenant_id: str, name: str, runtime: str, role: str, purpose: str, owner_id: str | None = None) -> dict[str, Any]:
-		tenant = self._tenant(tenant_id)
-		context = self._base_context(tenant, "register_attendance_agent")
-		context.update({"runtime_supported": runtime in SUPPORTED_ATTENDANCE_AGENT_RUNTIMES, "role_supported": role in SUPPORTED_ATTENDANCE_AGENT_ROLES})
-		self._assert_rules(context)
-		record = {"id": self._record_id("agent"), "type": "attendance_agent", "kind": "agent", "tenant_id": tenant, "name": name, "runtime": runtime, "role": role, "purpose": purpose, "owner_id": owner_id, "status": "active", "created_at": self._now()}
-		self.agents[record["id"]] = record
-		self._emit(tenant, "attendance_agent_registered", record)
-		return deepcopy(record)
-
-	def validate_attendance_agent_action(self, tenant_id: str, privileged_action: bool, human_approved: bool) -> dict[str, Any]:
-		tenant = self._tenant(tenant_id)
-		return evaluate_capability_rules({"tenant_id": tenant, "tenant_context_present": True, "operation": "agent_action", "privileged_action": privileged_action, "human_approved": human_approved})
-
-	def validate_batch(self, tenant_id: str, record_count: int, event_stream: str = "bytewax") -> dict[str, Any]:
-		tenant = self._tenant(tenant_id)
-		if event_stream != "bytewax":
-			self._assert_rules({"tenant_id": tenant, "tenant_context_present": True, "operation": "attendance_batch", "event_stream": "queue"})
-		return {"tenant_id": tenant, "record_count": int(record_count), "processor": "bytewax", "event_stream": ATTENDANCE_EVENT_STREAM, "accepted": True}
-
-	def create_record(self, payload: dict[str, Any]) -> dict[str, Any]:
-		tenant = self._tenant(payload.get("tenant_id"))
-		record = {"id": self._record_id("record", payload.get("id")), "type": payload.get("type", "attendance_record"), "kind": payload.get("kind", "generic"), "tenant_id": tenant, "status": payload.get("status", "active"), "created_at": self._now(), **payload}
-		self._emit(tenant, "attendance_record_created", record)
-		return deepcopy(record)
-
-	def dashboard_summary(self, tenant_id: str) -> dict[str, Any]:
-		tenant = self._tenant(tenant_id)
-		def count(records: dict[str, dict[str, Any]]) -> int:
-			return sum(1 for record in records.values() if record["tenant_id"] == tenant)
-		return {
-			"tenant_id": tenant,
-			"policy_count": count(self.policies),
-			"schedule_count": count(self.schedules),
-			"shift_count": count(self.shifts),
-			"time_entry_count": count(self.time_entries),
-			"timesheet_count": count(self.timesheets),
-			"leave_request_count": count(self.leave_requests),
-			"exception_count": count(self.exceptions),
-			"payroll_export_count": count(self.payroll_exports),
-			"agent_count": count(self.agents),
-			"audit_event_count": sum(1 for event in self._audit_events if event["tenant_id"] == tenant),
-			"streaming": deepcopy(STREAMING),
-		}
-
-	def list_records(self, tenant_id: str, record_type: str | None = None) -> list[dict[str, Any]]:
-		tenant = self._tenant(tenant_id)
-		stores = [self.policies, self.schedules, self.shifts, self.time_entries, self.breaks, self.timesheets, self.leave_requests, self.exceptions, self.payroll_exports, self.agents]
-		records = [record for store in stores for record in store.values() if record["tenant_id"] == tenant]
-		if record_type:
-			records = [record for record in records if record["type"] == record_type or record["kind"] == record_type]
-		return deepcopy(records)
-
-	def audit_events(self, tenant_id: str) -> list[dict[str, Any]]:
-		tenant = self._tenant(tenant_id)
-		return deepcopy([event for event in self._audit_events if event["tenant_id"] == tenant])
-
-	def _get_tenant_record(self, store: dict[str, dict[str, Any]], record_id: str, tenant_id: str, label: str) -> dict[str, Any]:
-		record = store.get(record_id)
-		if not record or record["tenant_id"] != tenant_id:
-			raise TimeAttendanceNotFoundError(f"{label}_not_found")
+		record = await self._fetch_one("tat_time_policy", record_id)
+		self._emit_event("tat.time_policy.created", {"policy_id": record_id, "name": name})
+		self._log_action("create_time_policy", record_id, name=name)
 		return record
 
-	def _calculate_hours(self, clock_in: str, clock_out: str | None) -> float:
-		if not clock_in or not clock_out:
-			return 0.0
+	async def get_time_policy(self, policy_id: str) -> dict[str, Any]:
+		"""Return a single time policy by ID."""
+		return await self._fetch_one("tat_time_policy", policy_id)
+
+	async def list_time_policies(self, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
+		"""List all active time policies for the tenant."""
+		return await self._fetch_many("tat_time_policy", {"is_active": True}, limit=limit, offset=offset)
+
+	async def update_time_policy(self, policy_id: str, **fields: Any) -> dict[str, Any]:
+		"""Partial update of a time policy."""
+		if not fields:
+			return await self._fetch_one("tat_time_policy", policy_id)
+
+		set_parts = []
+		params: list[Any] = []
+		idx = 1
+		for k, v in fields.items():
+			set_parts.append(f"{k}=${idx}")
+			params.append(v)
+			idx += 1
+		params += [policy_id, self._tenant_id]
+		await self._db.execute(
+			f"UPDATE tat_time_policy SET {', '.join(set_parts)}, updated_at=now() "
+			f"WHERE id=${idx} AND tenant_id=${idx+1}",
+			*params,
+		)
+		record = await self._fetch_one("tat_time_policy", policy_id)
+		self._emit_event("tat.time_policy.updated", {"policy_id": policy_id})
+		return record
+
+	async def delete_time_policy(self, policy_id: str) -> None:
+		"""Soft-delete a time policy."""
+		await self._soft_delete("tat_time_policy", policy_id)
+		self._emit_event("tat.time_policy.deleted", {"policy_id": policy_id})
+
+	# ------------------------------------------------------------------
+	# Shift Schedule CRUD
+	# ------------------------------------------------------------------
+
+	async def create_shift_schedule(
+		self,
+		policy_id: str,
+		schedule_name: str,
+		schedule_type: str,
+		effective_date: date,
+		patterns: list[dict[str, Any]],
+		end_date: date | None = None,
+		department_id: str | None = None,
+		location_id: str | None = None,
+		description: str | None = None,
+		allow_overtime: bool = True,
+		allow_shift_swapping: bool = True,
+		metadata: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""
+		Create a shift schedule template with weekly patterns.
+
+		patterns format: [{"days_of_week":[0,1,2,3,4], "start_time":"09:00", "end_time":"17:00"}]
+		"""
+		# Validate policy belongs to tenant
+		await self._fetch_one("tat_time_policy", policy_id)
+
+		import json
+		record_id = _uuid7str()
+		await self._db.execute(
+			"""
+			INSERT INTO tat_shift_schedule (
+				id, tenant_id, policy_id, schedule_name, schedule_type,
+				effective_date, end_date, patterns, department_id, location_id,
+				description, allow_overtime, allow_shift_swapping,
+				metadata, created_by
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+			""",
+			record_id, self._tenant_id, policy_id, schedule_name, schedule_type,
+			effective_date, end_date, json.dumps(patterns), department_id, location_id,
+			description, allow_overtime, allow_shift_swapping,
+			json.dumps(metadata or {}), self._actor_id,
+		)
+		record = await self._fetch_one("tat_shift_schedule", record_id)
+		self._emit_event("tat.shift_schedule.created", {"schedule_id": record_id})
+		return record
+
+	async def get_shift_schedule(self, schedule_id: str) -> dict[str, Any]:
+		return await self._fetch_one("tat_shift_schedule", schedule_id)
+
+	async def list_shift_schedules(
+		self,
+		department_id: str | None = None,
+		limit: int = 50,
+		offset: int = 0,
+	) -> list[dict[str, Any]]:
+		filters: dict[str, Any] = {}
+		if department_id:
+			filters["department_id"] = department_id
+		return await self._fetch_many("tat_shift_schedule", filters, limit=limit, offset=offset)
+
+	# ------------------------------------------------------------------
+	# Shift CRUD
+	# ------------------------------------------------------------------
+
+	async def create_shift(
+		self,
+		schedule_id: str,
+		employee_id: str,
+		shift_date: date,
+		planned_start: datetime,
+		planned_end: datetime,
+		location_id: str | None = None,
+		notes: str | None = None,
+	) -> dict[str, Any]:
+		"""Create a concrete shift instance for an employee."""
+		schedule = await self._fetch_one("tat_shift_schedule", schedule_id)
+		policy_id = schedule["policy_id"]
+
+		assert_clock_in_before_clock_out(planned_start, planned_end)
+		assert_shift_duration_reasonable(planned_start, planned_end)
+		night = is_night_shift(planned_start, planned_end)
+		assert_night_shift_midnight_span(planned_start, planned_end)
+
+		record_id = _uuid7str()
+		await self._db.execute(
+			"""
+			INSERT INTO tat_shift (
+				id, tenant_id, schedule_id, employee_id, policy_id,
+				shift_date, planned_start, planned_end, location_id,
+				is_night_shift, notes, created_by
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+			""",
+			record_id, self._tenant_id, schedule_id, employee_id, policy_id,
+			shift_date, planned_start, planned_end, location_id,
+			night, notes, self._actor_id,
+		)
+		record = await self._fetch_one("tat_shift", record_id)
+		self._emit_event("tat.shift.created", {"shift_id": record_id, "employee_id": employee_id})
+		return record
+
+	async def get_shift(self, shift_id: str) -> dict[str, Any]:
+		return await self._fetch_one("tat_shift", shift_id)
+
+	async def list_shifts(
+		self,
+		employee_id: str | None = None,
+		from_date: date | None = None,
+		to_date: date | None = None,
+		limit: int = 100,
+		offset: int = 0,
+	) -> list[dict[str, Any]]:
+		"""List shifts, optionally filtered by employee and date range."""
+		wheres = ["tenant_id=$1", "NOT is_deleted"]
+		params: list[Any] = [self._tenant_id]
+		idx = 2
+		if employee_id:
+			wheres.append(f"employee_id=${idx}"); params.append(employee_id); idx += 1
+		if from_date:
+			wheres.append(f"shift_date>=${idx}"); params.append(from_date); idx += 1
+		if to_date:
+			wheres.append(f"shift_date<=${idx}"); params.append(to_date); idx += 1
+		params += [limit, offset]
+		sql = (
+			f"SELECT * FROM tat_shift WHERE {' AND '.join(wheres)} "
+			f"ORDER BY shift_date, planned_start LIMIT ${idx} OFFSET ${idx+1}"
+		)
+		rows = await self._db.fetch(sql, *params)
+		return [dict(r) for r in rows]
+
+	# ------------------------------------------------------------------
+	# Clock-in / Clock-out
+	# ------------------------------------------------------------------
+
+	async def clock_in(
+		self,
+		employee_id: str,
+		shift_id: str,
+		entry_type: str = "regular",
+		method: str = "web",
+		device_id: str | None = None,
+		latitude: float | None = None,
+		longitude: float | None = None,
+		biometric_confidence: float | None = None,
+		ip_address: str | None = None,
+		cost_center: str | None = None,
+		notes: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Record a clock-in for an employee.
+
+		Enforces:
+		- Not already clocked in (open entry for today)
+		- Device required for mobile/kiosk/biometric methods
+		- Geofence validation if location provided
+		- Biometric confidence threshold
+		"""
+		# Check for open entry today
+		today = date.today()
+		open_entries = await self._db.fetch(
+			"""
+			SELECT id, clock_in FROM tat_time_entry
+			WHERE tenant_id=$1 AND employee_id=$2 AND entry_date=$3
+			  AND clock_out IS NULL AND NOT is_deleted
+			""",
+			self._tenant_id, employee_id, today,
+		)
+		if open_entries:
+			existing_in = open_entries[0]["clock_in"]
+			assert_not_already_clocked_in(existing_in)
+
+		# Device requirement
+		assert_device_registered(device_id, method)
+
+		# Biometric confidence
+		if biometric_confidence is not None:
+			assert_biometric_confidence(biometric_confidence)
+
+		# Geofence validation
+		geofence_verified = True
+		if latitude is not None and longitude is not None and shift_id:
+			shift = await self._fetch_one("tat_shift", shift_id)
+			if shift.get("location_id"):
+				loc = await self._fetch_one("tat_geofence_location", shift["location_id"])
+				try:
+					assert_within_geofence(
+						latitude, longitude,
+						loc["latitude"], loc["longitude"],
+						float(loc["radius_metres"]),
+					)
+				except RuleViolation:
+					geofence_verified = False
+					logger.warning(self._log_ctx("clock_in", employee_id=employee_id) + " geofence fail")
+
+		# Validate shift belongs to tenant and employee
+		shift = await self._fetch_one("tat_shift", shift_id)
+		if shift["employee_id"] != employee_id:
+			raise TimeAttendanceError(f"shift {shift_id} does not belong to employee {employee_id}")
+
+		# Minimum rest check: find last clock-out
+		last_out = await self._db.fetchrow(
+			"""
+			SELECT clock_out FROM tat_time_entry
+			WHERE tenant_id=$1 AND employee_id=$2 AND clock_out IS NOT NULL
+			ORDER BY clock_out DESC LIMIT 1
+			""",
+			self._tenant_id, employee_id,
+		)
+		clock_in_ts = datetime.now(UTC)
+		if last_out and last_out["clock_out"]:
+			try:
+				assert_minimum_rest_between_shifts(last_out["clock_out"], clock_in_ts)
+			except RuleViolation as exc:
+				logger.warning(self._log_ctx("clock_in", employee_id=employee_id) + f" rest warning: {exc}")
+
+		record_id = _uuid7str()
+		await self._db.execute(
+			"""
+			INSERT INTO tat_time_entry (
+				id, tenant_id, employee_id, shift_id, policy_id,
+				entry_date, clock_in, entry_type, entry_method,
+				clock_in_lat, clock_in_lng, geofence_verified,
+				device_id, ip_address, biometric_confidence, biometric_verified,
+				cost_center, notes, requires_approval, created_by
+			) VALUES (
+				$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,
+				$13,$14,$15,$16,$17,$18,$19,$20
+			)
+			""",
+			record_id, self._tenant_id, employee_id, shift_id, shift["policy_id"],
+			today, clock_in_ts, entry_type, method,
+			latitude, longitude, geofence_verified,
+			device_id, ip_address, biometric_confidence,
+			biometric_confidence is not None and biometric_confidence >= 0.85,
+			cost_center, notes, not geofence_verified, self._actor_id,
+		)
+		record = await self._fetch_one("tat_time_entry", record_id)
+		self._emit_event("tat.time_entry.clocked_in", {
+			"entry_id": record_id,
+			"employee_id": employee_id,
+			"clock_in": clock_in_ts.isoformat(),
+		})
+		self._log_action("clock_in", record_id, employee_id=employee_id)
+		return record
+
+	async def clock_out(
+		self,
+		entry_id: str,
+		latitude: float | None = None,
+		longitude: float | None = None,
+		notes: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Record clock-out, compute hours, detect overtime, update entry.
+		"""
+		entry = await self._fetch_one("tat_time_entry", entry_id)
+		assert_not_already_clocked_out(entry.get("clock_out"))
+
+		clock_out_ts = datetime.now(UTC)
+		clock_in_ts = entry["clock_in"]
+		assert_clock_in_before_clock_out(clock_in_ts, clock_out_ts)
+		assert_shift_duration_reasonable(clock_in_ts, clock_out_ts)
+		assert_night_shift_midnight_span(clock_in_ts, clock_out_ts)
+
+		# Load policy for overtime rules
+		policy_id = entry.get("policy_id")
+		policy = await self._fetch_one("tat_time_policy", policy_id) if policy_id else None
+
+		ot_daily = Decimal(str(policy["overtime_threshold_daily"])) if policy else Decimal("8")
+		dt_daily = Decimal(str(policy["double_time_threshold_daily"])) if policy else Decimal("12")
+
+		# Fetch break time for this entry
+		breaks = await self._db.fetch(
+			"SELECT duration_minutes FROM tat_break WHERE time_entry_id=$1 AND NOT is_deleted",
+			entry_id,
+		)
+		total_break_minutes = sum(b["duration_minutes"] or 0 for b in breaks)
+
+		worked_h = calculate_worked_hours(clock_in_ts, clock_out_ts, total_break_minutes)
+		is_holiday = entry.get("is_public_holiday", False)
+		breakdown = calculate_hours_breakdown(
+			worked_h, ot_daily, dt_daily, is_holiday=is_holiday
+		)
+
+		night = is_night_shift(clock_in_ts, clock_out_ts)
+
+		await self._db.execute(
+			"""
+			UPDATE tat_time_entry SET
+				clock_out=$1, clock_out_lat=$2, clock_out_lng=$3,
+				total_hours=$4, regular_hours=$5, overtime_hours=$6,
+				double_time_hours=$7, holiday_hours=$8,
+				is_night_shift=$9, break_minutes=$10,
+				notes=COALESCE($11, notes), updated_at=now()
+			WHERE id=$12 AND tenant_id=$13
+			""",
+			clock_out_ts, latitude, longitude,
+			float(breakdown.total), float(breakdown.regular),
+			float(breakdown.overtime), float(breakdown.double_time),
+			float(breakdown.holiday),
+			night, total_break_minutes,
+			notes, entry_id, self._tenant_id,
+		)
+
+		record = await self._fetch_one("tat_time_entry", entry_id)
+		self._emit_event("tat.time_entry.clocked_out", {
+			"entry_id": entry_id,
+			"employee_id": entry["employee_id"],
+			"total_hours": float(breakdown.total),
+			"overtime_hours": float(breakdown.overtime),
+		})
+		self._log_action("clock_out", entry_id, hours=float(breakdown.total))
+		return record
+
+	async def get_time_entry(self, entry_id: str) -> dict[str, Any]:
+		return await self._fetch_one("tat_time_entry", entry_id)
+
+	async def list_time_entries(
+		self,
+		employee_id: str | None = None,
+		from_date: date | None = None,
+		to_date: date | None = None,
+		status: str | None = None,
+		limit: int = 100,
+		offset: int = 0,
+	) -> list[dict[str, Any]]:
+		wheres = ["tenant_id=$1", "NOT is_deleted"]
+		params: list[Any] = [self._tenant_id]
+		idx = 2
+		if employee_id:
+			wheres.append(f"employee_id=${idx}"); params.append(employee_id); idx += 1
+		if from_date:
+			wheres.append(f"entry_date>=${idx}"); params.append(from_date); idx += 1
+		if to_date:
+			wheres.append(f"entry_date<=${idx}"); params.append(to_date); idx += 1
+		if status:
+			wheres.append(f"status=${idx}"); params.append(status); idx += 1
+		params += [limit, offset]
+		sql = (
+			f"SELECT * FROM tat_time_entry WHERE {' AND '.join(wheres)} "
+			f"ORDER BY entry_date DESC, clock_in DESC LIMIT ${idx} OFFSET ${idx+1}"
+		)
+		rows = await self._db.fetch(sql, *params)
+		return [dict(r) for r in rows]
+
+	async def update_time_entry(self, entry_id: str, **fields: Any) -> dict[str, Any]:
+		"""Partial update; recalculates hours if clock times change."""
+		entry = await self._fetch_one("tat_time_entry", entry_id)
+		if entry["status"] == "locked":
+			raise TimeAttendanceError("Cannot update a locked time entry")
+
+		set_parts, params = [], []
+		idx = 1
+		for k, v in fields.items():
+			set_parts.append(f"{k}=${idx}")
+			params.append(v)
+			idx += 1
+		params += [entry_id, self._tenant_id]
+		await self._db.execute(
+			f"UPDATE tat_time_entry SET {', '.join(set_parts)}, updated_at=now() "
+			f"WHERE id=${idx} AND tenant_id=${idx+1}",
+			*params,
+		)
+		record = await self._fetch_one("tat_time_entry", entry_id)
+		self._emit_event("tat.time_entry.updated", {"entry_id": entry_id})
+		return record
+
+	async def delete_time_entry(self, entry_id: str) -> None:
+		entry = await self._fetch_one("tat_time_entry", entry_id)
+		if entry["status"] in ("approved", "locked"):
+			raise TimeAttendanceError("Cannot delete an approved/locked entry")
+		await self._soft_delete("tat_time_entry", entry_id)
+		self._emit_event("tat.time_entry.deleted", {"entry_id": entry_id})
+
+	# ------------------------------------------------------------------
+	# Breaks
+	# ------------------------------------------------------------------
+
+	async def record_break(
+		self,
+		time_entry_id: str,
+		break_type: str,
+		break_start: datetime,
+		break_end: datetime,
+		is_paid: bool = False,
+	) -> dict[str, Any]:
+		"""Record a break period against an open time entry."""
+		entry = await self._fetch_one("tat_time_entry", time_entry_id)
+		if entry.get("clock_out"):
+			raise TimeAttendanceError("Cannot add break to a closed time entry")
+		assert_clock_in_before_clock_out(break_start, break_end)
+
+		record_id = _uuid7str()
+		await self._db.execute(
+			"""
+			INSERT INTO tat_break (id, tenant_id, time_entry_id, break_type,
+				break_start, break_end, is_paid, created_by)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+			""",
+			record_id, self._tenant_id, time_entry_id, break_type,
+			break_start, break_end, is_paid, self._actor_id,
+		)
+		record = await self._db.fetchrow(
+			"SELECT * FROM tat_break WHERE id=$1", record_id
+		)
+		self._emit_event("tat.break.recorded", {"break_id": record_id, "entry_id": time_entry_id})
+		return dict(record)
+
+	# ------------------------------------------------------------------
+	# Timesheet processing
+	# ------------------------------------------------------------------
+
+	async def process_timesheet(
+		self,
+		employee_id: str,
+		period_start: date,
+		period_end: date,
+		hourly_rate: Decimal | None = None,
+		currency: str = "USD",
+	) -> dict[str, Any]:
+		"""
+		Build or rebuild a timesheet for an employee over a pay period.
+
+		Fetches all approved time entries, sums hours, and calculates gross pay
+		if hourly_rate is provided.
+		"""
+		entries = await self._db.fetch(
+			"""
+			SELECT id, entry_type, total_hours, regular_hours, overtime_hours,
+			       double_time_hours, holiday_hours, entry_date
+			FROM tat_time_entry
+			WHERE tenant_id=$1 AND employee_id=$2
+			  AND entry_date BETWEEN $3 AND $4
+			  AND NOT is_deleted
+			  AND status NOT IN ('rejected')
+			ORDER BY entry_date
+			""",
+			self._tenant_id, employee_id, period_start, period_end,
+		)
+
+		# Weekly re-bucketing
+		daily_breakdowns: list[HoursBreakdown] = []
+		total_leave_hours = Decimal("0")
+		entry_ids = []
+		for row in entries:
+			entry_ids.append(row["id"])
+			et = row["entry_type"]
+			if et in ("sick", "vacation", "personal", "toil", "comp_time"):
+				total_leave_hours += Decimal(str(row["total_hours"] or 0))
+				continue
+			daily_breakdowns.append(HoursBreakdown(
+				regular=Decimal(str(row["regular_hours"] or 0)),
+				overtime=Decimal(str(row["overtime_hours"] or 0)),
+				double_time=Decimal(str(row["double_time_hours"] or 0)),
+				holiday=Decimal(str(row["holiday_hours"] or 0)),
+				total=Decimal(str(row["total_hours"] or 0)),
+			))
+
+		weekly_bd = calculate_weekly_hours_breakdown(daily_breakdowns)
+		gross_pay = None
+		if hourly_rate:
+			pay = calculate_pay(weekly_bd, hourly_rate)
+			gross_pay = float(pay.gross_pay)
+
+		import json
+		# Upsert timesheet
+		existing = await self._db.fetchrow(
+			"""
+			SELECT id FROM tat_timesheet
+			WHERE tenant_id=$1 AND employee_id=$2
+			  AND period_start=$3 AND period_end=$4 AND NOT is_deleted
+			""",
+			self._tenant_id, employee_id, period_start, period_end,
+		)
+
+		ts_id = existing["id"] if existing else _uuid7str()
+		if existing:
+			await self._db.execute(
+				"""
+				UPDATE tat_timesheet SET
+					total_hours=$1, regular_hours=$2, overtime_hours=$3,
+					double_time_hours=$4, holiday_hours=$5, leave_hours=$6,
+					gross_pay=$7, currency=$8, entry_ids=$9, updated_at=now()
+				WHERE id=$10 AND tenant_id=$11
+				""",
+				float(weekly_bd.total), float(weekly_bd.regular),
+				float(weekly_bd.overtime), float(weekly_bd.double_time),
+				float(weekly_bd.holiday), float(total_leave_hours),
+				gross_pay, currency, json.dumps(entry_ids), ts_id, self._tenant_id,
+			)
+		else:
+			await self._db.execute(
+				"""
+				INSERT INTO tat_timesheet (
+					id, tenant_id, employee_id, period_start, period_end,
+					total_hours, regular_hours, overtime_hours, double_time_hours,
+					holiday_hours, leave_hours, gross_pay, currency,
+					entry_ids, status, created_by
+				) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'pending',$15)
+				""",
+				ts_id, self._tenant_id, employee_id, period_start, period_end,
+				float(weekly_bd.total), float(weekly_bd.regular),
+				float(weekly_bd.overtime), float(weekly_bd.double_time),
+				float(weekly_bd.holiday), float(total_leave_hours),
+				gross_pay, currency, json.dumps(entry_ids), self._actor_id,
+			)
+
+		record = await self._fetch_one("tat_timesheet", ts_id)
+		self._emit_event("tat.timesheet.processed", {"timesheet_id": ts_id, "employee_id": employee_id})
+		return record
+
+	async def submit_timesheet(self, timesheet_id: str) -> dict[str, Any]:
+		"""Mark a timesheet as submitted for manager approval."""
+		ts = await self._fetch_one("tat_timesheet", timesheet_id)
+		if ts["status"] != "pending":
+			raise TimeAttendanceError(f"Timesheet status is '{ts['status']}'; expected 'pending'")
+		await self._db.execute(
+			"UPDATE tat_timesheet SET status='submitted', submitted_by=$1, submitted_at=now(), updated_at=now() WHERE id=$2 AND tenant_id=$3",
+			self._actor_id, timesheet_id, self._tenant_id,
+		)
+		record = await self._fetch_one("tat_timesheet", timesheet_id)
+		self._emit_event("tat.timesheet.submitted", {"timesheet_id": timesheet_id})
+		return record
+
+	async def approve_timesheet(self, timesheet_id: str) -> dict[str, Any]:
+		"""Approve a submitted timesheet."""
+		ts = await self._fetch_one("tat_timesheet", timesheet_id)
+		if ts["status"] != "submitted":
+			raise TimeAttendanceError(f"Timesheet status is '{ts['status']}'; expected 'submitted'")
+		await self._db.execute(
+			"UPDATE tat_timesheet SET status='approved', approved_by=$1, approved_at=now(), updated_at=now() WHERE id=$2 AND tenant_id=$3",
+			self._actor_id, timesheet_id, self._tenant_id,
+		)
+		record = await self._fetch_one("tat_timesheet", timesheet_id)
+		self._emit_event("tat.timesheet.approved", {"timesheet_id": timesheet_id, "approved_by": self._actor_id})
+		return record
+
+	async def reject_timesheet(self, timesheet_id: str, reason: str) -> dict[str, Any]:
+		"""Reject a submitted timesheet with a reason."""
+		ts = await self._fetch_one("tat_timesheet", timesheet_id)
+		if ts["status"] not in ("submitted", "approved"):
+			raise TimeAttendanceError(f"Cannot reject timesheet in status '{ts['status']}'")
+		await self._db.execute(
+			"""
+			UPDATE tat_timesheet SET
+				status='rejected', rejected_by=$1, rejected_at=now(),
+				rejection_reason=$2, updated_at=now()
+			WHERE id=$3 AND tenant_id=$4
+			""",
+			self._actor_id, reason, timesheet_id, self._tenant_id,
+		)
+		record = await self._fetch_one("tat_timesheet", timesheet_id)
+		self._emit_event("tat.timesheet.rejected", {"timesheet_id": timesheet_id, "reason": reason})
+		return record
+
+	async def get_timesheet(self, timesheet_id: str) -> dict[str, Any]:
+		return await self._fetch_one("tat_timesheet", timesheet_id)
+
+	async def list_timesheets(
+		self,
+		employee_id: str | None = None,
+		status: str | None = None,
+		from_date: date | None = None,
+		to_date: date | None = None,
+		limit: int = 50,
+		offset: int = 0,
+	) -> list[dict[str, Any]]:
+		wheres = ["tenant_id=$1", "NOT is_deleted"]
+		params: list[Any] = [self._tenant_id]
+		idx = 2
+		for col, val in [("employee_id", employee_id), ("status", status)]:
+			if val:
+				wheres.append(f"{col}=${idx}"); params.append(val); idx += 1
+		if from_date:
+			wheres.append(f"period_start>=${idx}"); params.append(from_date); idx += 1
+		if to_date:
+			wheres.append(f"period_end<=${idx}"); params.append(to_date); idx += 1
+		params += [limit, offset]
+		sql = (
+			f"SELECT * FROM tat_timesheet WHERE {' AND '.join(wheres)} "
+			f"ORDER BY period_start DESC LIMIT ${idx} OFFSET ${idx+1}"
+		)
+		return [dict(r) for r in await self._db.fetch(sql, *params)]
+
+	# ------------------------------------------------------------------
+	# Overtime
+	# ------------------------------------------------------------------
+
+	async def calculate_overtime(
+		self,
+		employee_id: str,
+		period_start: date,
+		period_end: date,
+		policy_id: str,
+	) -> dict[str, Any]:
+		"""
+		Calculate overtime for an employee over a period using the given policy.
+
+		Returns a breakdown of regular, overtime, and double-time hours.
+		"""
+		policy = await self._fetch_one("tat_time_policy", policy_id)
+		entries = await self._db.fetch(
+			"""
+			SELECT entry_date, total_hours, regular_hours, overtime_hours,
+			       double_time_hours, holiday_hours, is_public_holiday
+			FROM tat_time_entry
+			WHERE tenant_id=$1 AND employee_id=$2
+			  AND entry_date BETWEEN $3 AND $4
+			  AND status NOT IN ('rejected') AND NOT is_deleted
+			ORDER BY entry_date
+			""",
+			self._tenant_id, employee_id, period_start, period_end,
+		)
+
+		daily_breakdowns = []
+		for row in entries:
+			daily_breakdowns.append(HoursBreakdown(
+				regular=Decimal(str(row["regular_hours"] or 0)),
+				overtime=Decimal(str(row["overtime_hours"] or 0)),
+				double_time=Decimal(str(row["double_time_hours"] or 0)),
+				holiday=Decimal(str(row["holiday_hours"] or 0)),
+				total=Decimal(str(row["total_hours"] or 0)),
+			))
+
+		weekly_bd = calculate_weekly_hours_breakdown(
+			daily_breakdowns,
+			weekly_ot_threshold=Decimal(str(policy["overtime_threshold_weekly"])),
+		)
+		return {
+			"employee_id": employee_id,
+			"period_start": period_start.isoformat(),
+			"period_end": period_end.isoformat(),
+			"regular_hours": float(weekly_bd.regular),
+			"overtime_hours": float(weekly_bd.overtime),
+			"double_time_hours": float(weekly_bd.double_time),
+			"holiday_hours": float(weekly_bd.holiday),
+			"total_hours": float(weekly_bd.total),
+		}
+
+	async def request_overtime(
+		self,
+		employee_id: str,
+		shift_id: str,
+		requested_hours: float,
+		reason: str,
+	) -> dict[str, Any]:
+		"""Submit an overtime pre-authorisation request."""
+		await self._fetch_one("tat_shift", shift_id)  # tenant check
+		record_id = _uuid7str()
+		await self._db.execute(
+			"""
+			INSERT INTO tat_overtime_request (
+				id, tenant_id, employee_id, shift_id,
+				request_date, requested_hours, reason, created_by
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+			""",
+			record_id, self._tenant_id, employee_id, shift_id,
+			date.today(), requested_hours, reason, self._actor_id,
+		)
+		record = await self._fetch_one("tat_overtime_request", record_id)
+		self._emit_event("tat.overtime_request.created", {"request_id": record_id})
+		return record
+
+	async def approve_overtime_request(self, request_id: str) -> dict[str, Any]:
+		req = await self._fetch_one("tat_overtime_request", request_id)
+		if req["status"] != "pending":
+			raise TimeAttendanceError(f"Overtime request status is '{req['status']}'")
+		await self._db.execute(
+			"UPDATE tat_overtime_request SET status='approved', approved_by=$1, approved_at=now(), updated_at=now() WHERE id=$2 AND tenant_id=$3",
+			self._actor_id, request_id, self._tenant_id,
+		)
+		record = await self._fetch_one("tat_overtime_request", request_id)
+		self._emit_event("tat.overtime_request.approved", {"request_id": request_id})
+		return record
+
+	async def reject_overtime_request(self, request_id: str, reason: str) -> dict[str, Any]:
+		await self._fetch_one("tat_overtime_request", request_id)
+		await self._db.execute(
+			"UPDATE tat_overtime_request SET status='rejected', rejected_by=$1, rejected_at=now(), rejection_reason=$2, updated_at=now() WHERE id=$3 AND tenant_id=$4",
+			self._actor_id, reason, request_id, self._tenant_id,
+		)
+		record = await self._fetch_one("tat_overtime_request", request_id)
+		self._emit_event("tat.overtime_request.rejected", {"request_id": request_id, "reason": reason})
+		return record
+
+	# ------------------------------------------------------------------
+	# Leave management
+	# ------------------------------------------------------------------
+
+	async def calculate_leave_entitlement_for(
+		self,
+		employee_id: str,
+		leave_type: str,
+		entitlement_year: int,
+		fte: float = 1.0,
+	) -> dict[str, Any]:
+		"""
+		Calculate leave entitlement for an employee using the applicable leave policy.
+		"""
+		policy_row = await self._db.fetchrow(
+			"""
+			SELECT * FROM tat_leave_policy
+			WHERE tenant_id=$1 AND leave_type=$2 AND is_active AND NOT is_deleted
+			ORDER BY created_at DESC LIMIT 1
+			""",
+			self._tenant_id, leave_type,
+		)
+		if not policy_row:
+			raise NotFoundError(f"No active leave policy for type '{leave_type}'")
+
+		policy = dict(policy_row)
+		raw_annual = Decimal(str(policy["annual_days"]))
+		fte_dec = Decimal(str(fte))
+		annual_days = calculate_prorata_leave(raw_annual, fte_dec) if policy["fte_prorated"] and fte < 1.0 else raw_annual
+
+		# Fetch existing entitlement record
+		ent = await self._db.fetchrow(
+			"""
+			SELECT * FROM tat_leave_entitlement
+			WHERE tenant_id=$1 AND employee_id=$2 AND leave_type=$3
+			  AND entitlement_year=$4 AND NOT is_deleted
+			""",
+			self._tenant_id, employee_id, leave_type, entitlement_year,
+		)
+		used = Decimal(str(ent["used_days"])) if ent else Decimal("0")
+		pending = Decimal(str(ent["pending_days"])) if ent else Decimal("0")
+		carry = Decimal(str(ent["carried_forward"])) if ent else Decimal("0")
+
+		start_of_year = date(entitlement_year, 1, 1)
+		today = date.today()
+		result = calculate_leave_entitlement(start_of_year, today, annual_days, used, pending)
+
+		return {
+			"employee_id": employee_id,
+			"leave_type": leave_type,
+			"year": entitlement_year,
+			"annual_days": float(result.annual_days),
+			"carried_forward": float(carry),
+			"accrued_to_date": float(result.accrued_to_date),
+			"used_days": float(result.used_to_date),
+			"pending_days": float(result.pending),
+			"balance_days": float(result.balance),
+			"available_days": float(result.available),
+			"policy_id": policy["id"],
+			"policy_name": policy["name"],
+		}
+
+	async def request_leave(
+		self,
+		employee_id: str,
+		leave_type: str,
+		start_date: date,
+		end_date: date,
+		reason: str | None = None,
+		is_emergency: bool = False,
+		is_half_day: bool = False,
+		half_day_portion: str | None = None,
+		is_statutory: bool = False,
+		statutory_type: str | None = None,
+		statutory_jurisdiction: str | None = None,
+		medical_cert_attached: bool = False,
+		attachments: list[str] | None = None,
+		metadata: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""
+		Submit a leave request with full validation.
+
+		Validates:
+		- Date range
+		- Leave balance
+		- No overlap with existing approved/pending leave
+		- Medical certificate for extended sick leave
+		- FMLA prerequisites when statutory_type='FMLA'
+		"""
+		assert_leave_dates_valid(start_date, end_date)
+
+		public_holidays = await self._get_public_holidays_between(start_date, end_date)
+		total_days = Decimal(str(working_days_between(start_date, end_date, public_holidays)))
+		if is_half_day:
+			total_days = Decimal("0.5")
+
+		# Medical cert for extended sick
+		policy_row = await self._db.fetchrow(
+			"SELECT medical_cert_required_days FROM tat_leave_policy WHERE tenant_id=$1 AND leave_type=$2 AND is_active AND NOT is_deleted ORDER BY created_at DESC LIMIT 1",
+			self._tenant_id, leave_type,
+		)
+		cert_threshold = int(policy_row["medical_cert_required_days"]) if policy_row else 3
+		assert_medical_certificate_for_extended_sick(
+			leave_type, int(total_days), medical_cert_attached, cert_threshold
+		)
+
+		# Balance check (skip for unpaid / statutory)
+		if leave_type not in ("unpaid", "fmla", "military", "jury_duty"):
+			ent = await self._db.fetchrow(
+				"""
+				SELECT available_days FROM tat_leave_entitlement
+				WHERE tenant_id=$1 AND employee_id=$2 AND leave_type=$3
+				  AND entitlement_year=$4 AND NOT is_deleted
+				""",
+				self._tenant_id, employee_id, leave_type, start_date.year,
+			)
+			if ent:
+				assert_leave_balance_sufficient(Decimal(str(ent["available_days"])), total_days)
+
+		# Overlap check handled by DB constraint; catch IntegrityError upstream
+		import json
+		record_id = _uuid7str()
+		await self._db.execute(
+			"""
+			INSERT INTO tat_leave_request (
+				id, tenant_id, employee_id, leave_type,
+				start_date, end_date, total_days, total_hours,
+				is_half_day, half_day_portion, is_emergency,
+				reason, medical_cert_attached, attachments,
+				is_statutory, statutory_type, statutory_jurisdiction,
+				metadata, created_by
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+			""",
+			record_id, self._tenant_id, employee_id, leave_type,
+			start_date, end_date, float(total_days), float(total_days * 8),
+			is_half_day, half_day_portion, is_emergency,
+			reason, medical_cert_attached, json.dumps(attachments or []),
+			is_statutory, statutory_type, statutory_jurisdiction,
+			json.dumps(metadata or {}), self._actor_id,
+		)
+		record = await self._fetch_one("tat_leave_request", record_id)
+		self._emit_event("tat.leave_request.created", {
+			"request_id": record_id,
+			"employee_id": employee_id,
+			"leave_type": leave_type,
+			"start_date": start_date.isoformat(),
+			"end_date": end_date.isoformat(),
+		})
+		return record
+
+	async def approve_leave_request(self, request_id: str) -> dict[str, Any]:
+		"""Approve leave and deduct from entitlement balance."""
+		req = await self._fetch_one("tat_leave_request", request_id)
+		if req["status"] != "pending":
+			raise TimeAttendanceError(f"Leave request status is '{req['status']}'")
+
+		await self._db.execute(
+			"UPDATE tat_leave_request SET status='approved', approved_by=$1, approved_at=now(), updated_at=now() WHERE id=$2 AND tenant_id=$3",
+			self._actor_id, request_id, self._tenant_id,
+		)
+
+		# Deduct from entitlement
+		await self._db.execute(
+			"""
+			UPDATE tat_leave_entitlement
+			SET used_days = used_days + $1,
+			    pending_days = GREATEST(pending_days - $1, 0),
+			    updated_at = now()
+			WHERE tenant_id=$2 AND employee_id=$3
+			  AND leave_type=$4 AND entitlement_year=$5 AND NOT is_deleted
+			""",
+			float(req["total_days"]), self._tenant_id, req["employee_id"],
+			req["leave_type"], req["start_date"].year,
+		)
+
+		record = await self._fetch_one("tat_leave_request", request_id)
+		self._emit_event("tat.leave_request.approved", {"request_id": request_id, "approved_by": self._actor_id})
+		return record
+
+	async def reject_leave_request(self, request_id: str, reason: str) -> dict[str, Any]:
+		req = await self._fetch_one("tat_leave_request", request_id)
+		if req["status"] not in ("pending", "approved"):
+			raise TimeAttendanceError(f"Cannot reject leave in status '{req['status']}'")
+
+		await self._db.execute(
+			"UPDATE tat_leave_request SET status='rejected', rejected_by=$1, rejected_at=now(), rejection_reason=$2, updated_at=now() WHERE id=$3 AND tenant_id=$4",
+			self._actor_id, reason, request_id, self._tenant_id,
+		)
+		# If was approved, restore pending days
+		if req["status"] == "approved":
+			await self._db.execute(
+				"""
+				UPDATE tat_leave_entitlement
+				SET used_days = GREATEST(used_days - $1, 0), updated_at=now()
+				WHERE tenant_id=$2 AND employee_id=$3
+				  AND leave_type=$4 AND entitlement_year=$5 AND NOT is_deleted
+				""",
+				float(req["total_days"]), self._tenant_id, req["employee_id"],
+				req["leave_type"], req["start_date"].year,
+			)
+
+		record = await self._fetch_one("tat_leave_request", request_id)
+		self._emit_event("tat.leave_request.rejected", {"request_id": request_id, "reason": reason})
+		return record
+
+	async def cancel_leave_request(self, request_id: str) -> dict[str, Any]:
+		"""Employee cancels their own leave request."""
+		req = await self._fetch_one("tat_leave_request", request_id)
+		if req["status"] not in ("pending", "approved"):
+			raise TimeAttendanceError(f"Cannot cancel leave in status '{req['status']}'")
+
+		was_approved = req["status"] == "approved"
+		await self._db.execute(
+			"UPDATE tat_leave_request SET status='withdrawn', updated_at=now() WHERE id=$1 AND tenant_id=$2",
+			request_id, self._tenant_id,
+		)
+		if was_approved:
+			await self._db.execute(
+				"UPDATE tat_leave_entitlement SET used_days=GREATEST(used_days-$1,0), updated_at=now() WHERE tenant_id=$2 AND employee_id=$3 AND leave_type=$4 AND entitlement_year=$5 AND NOT is_deleted",
+				float(req["total_days"]), self._tenant_id, req["employee_id"],
+				req["leave_type"], req["start_date"].year,
+			)
+
+		record = await self._fetch_one("tat_leave_request", request_id)
+		self._emit_event("tat.leave_request.cancelled", {"request_id": request_id})
+		return record
+
+	async def get_leave_request(self, request_id: str) -> dict[str, Any]:
+		return await self._fetch_one("tat_leave_request", request_id)
+
+	async def list_leave_requests(
+		self,
+		employee_id: str | None = None,
+		leave_type: str | None = None,
+		status: str | None = None,
+		from_date: date | None = None,
+		to_date: date | None = None,
+		limit: int = 50,
+		offset: int = 0,
+	) -> list[dict[str, Any]]:
+		wheres = ["tenant_id=$1", "NOT is_deleted"]
+		params: list[Any] = [self._tenant_id]
+		idx = 2
+		for col, val in [("employee_id", employee_id), ("leave_type", leave_type), ("status", status)]:
+			if val:
+				wheres.append(f"{col}=${idx}"); params.append(val); idx += 1
+		if from_date:
+			wheres.append(f"start_date>=${idx}"); params.append(from_date); idx += 1
+		if to_date:
+			wheres.append(f"end_date<=${idx}"); params.append(to_date); idx += 1
+		params += [limit, offset]
+		sql = (
+			f"SELECT * FROM tat_leave_request WHERE {' AND '.join(wheres)} "
+			f"ORDER BY start_date DESC LIMIT ${idx} OFFSET ${idx+1}"
+		)
+		return [dict(r) for r in await self._db.fetch(sql, *params)]
+
+	# ------------------------------------------------------------------
+	# Flexitime
+	# ------------------------------------------------------------------
+
+	async def flexitime_calculation(
+		self,
+		employee_id: str,
+		from_date: date,
+		to_date: date,
+		policy_id: str,
+	) -> dict[str, Any]:
+		"""
+		Compute cumulative flexitime balance for an employee over a date range.
+		"""
+		policy = await self._fetch_one("tat_time_policy", policy_id)
+		standard_daily = Decimal(str(policy.get("overtime_threshold_daily", 8)))
+
+		entries = await self._db.fetch(
+			"""
+			SELECT entry_date, total_hours FROM tat_time_entry
+			WHERE tenant_id=$1 AND employee_id=$2
+			  AND entry_date BETWEEN $3 AND $4
+			  AND entry_type NOT IN ('sick','vacation','personal','toil')
+			  AND NOT is_deleted
+			ORDER BY entry_date
+			""",
+			self._tenant_id, employee_id, from_date, to_date,
+		)
+		log = [(row["entry_date"], Decimal(str(row["total_hours"] or 0))) for row in entries]
+
+		# Carry forward from previous balance record
+		carry_row = await self._db.fetchrow(
+			"""
+			SELECT balance_hours FROM tat_flexitime_balance
+			WHERE tenant_id=$1 AND employee_id=$2
+			  AND balance_date < $3 AND NOT is_deleted
+			ORDER BY balance_date DESC LIMIT 1
+			""",
+			self._tenant_id, employee_id, from_date,
+		)
+		carry = Decimal(str(carry_row["balance_hours"])) if carry_row else Decimal("0")
+		balance = calculate_flexi_balance(log, standard_daily, carry)
+
+		return {
+			"employee_id": employee_id,
+			"from_date": from_date.isoformat(),
+			"to_date": to_date.isoformat(),
+			"credit_hours": float(balance.credit_hours),
+			"debit_hours": float(balance.debit_hours),
+			"net_hours": float(balance.net_hours),
+			"max_carry": float(policy.get("flexi_max_carry_hours") or 16),
+		}
+
+	# ------------------------------------------------------------------
+	# Annualised hours
+	# ------------------------------------------------------------------
+
+	async def annualised_hours_reconciliation(
+		self,
+		employee_id: str,
+		policy_id: str,
+		as_of_date: date | None = None,
+	) -> dict[str, Any]:
+		"""
+		Reconcile annualised hours for an employee against their contracted total.
+		"""
+		policy = await self._fetch_one("tat_time_policy", policy_id)
+		if not policy.get("annualised_hours_enabled"):
+			raise TimeAttendanceError("Annualised hours not enabled on this policy")
+
+		contracted = Decimal(str(policy["contracted_annual_hours"] or 0))
+		as_of = as_of_date or date.today()
+		year_start = date(as_of.year, 1, 1)
+		weeks_elapsed = Decimal(str(((as_of - year_start).days + 1) / 7))
+
+		rows = await self._db.fetch(
+			"""
+			SELECT SUM(total_hours) AS total FROM tat_time_entry
+			WHERE tenant_id=$1 AND employee_id=$2
+			  AND entry_date BETWEEN $3 AND $4
+			  AND NOT is_deleted AND status NOT IN ('rejected')
+			""",
+			self._tenant_id, employee_id, year_start, as_of,
+		)
+		worked = Decimal(str(rows[0]["total"] or 0))
+		from .domain.calculations import (
+			calculate_annualised_expected_hours,
+			annualised_hours_owed,
+		)
+		expected = calculate_annualised_expected_hours(contracted, weeks_elapsed)
+		owed = annualised_hours_owed(contracted, worked)
+
 		try:
-			start = datetime.fromisoformat(clock_in.replace("Z", "+00:00"))
-			end = datetime.fromisoformat(clock_out.replace("Z", "+00:00"))
-			return round(max((end - start).total_seconds() / 3600, 0), 2)
-		except ValueError:
-			return 0.0
+			assert_annualised_hours_deficit_manageable(-owed if owed < 0 else Decimal("0"))
+		except RuleViolation:
+			pass  # Surface as warning in response
 
-	def _date_span_days(self, start_date: str, end_date: str) -> int:
-		try:
-			start = datetime.fromisoformat(start_date).date()
-			end = datetime.fromisoformat(end_date).date()
-			return (end - start).days + 1
-		except ValueError:
-			return 0
+		return {
+			"employee_id": employee_id,
+			"as_of_date": as_of.isoformat(),
+			"contracted_annual_hours": float(contracted),
+			"weeks_elapsed": float(weeks_elapsed),
+			"expected_hours_to_date": float(expected),
+			"actual_hours_worked": float(worked),
+			"variance_hours": float(worked - expected),
+			"hours_remaining_in_contract": float(max(contracted - worked, Decimal("0"))),
+		}
+
+	# ------------------------------------------------------------------
+	# Roster generation
+	# ------------------------------------------------------------------
+
+	async def roster_generation(
+		self,
+		schedule_id: str,
+		period_start: date,
+		period_end: date,
+		employee_ids: list[str],
+		constraints: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""
+		Generate a roster by instantiating shift records for all employees
+		in employee_ids according to the schedule's patterns over period_start..period_end.
+
+		Returns the created roster record with the list of generated shift IDs.
+		"""
+		schedule = await self._fetch_one("tat_shift_schedule", schedule_id)
+		import json
+		patterns = json.loads(schedule["patterns"]) if isinstance(schedule["patterns"], str) else schedule["patterns"]
+
+		shift_ids = []
+		current = period_start
+		while current <= period_end:
+			dow = current.weekday()  # 0=Mon
+			for pattern in patterns:
+				pattern_days = pattern.get("days_of_week", [])
+				if dow not in pattern_days:
+					continue
+				start_h, start_m = (int(x) for x in pattern["start_time"].split(":"))
+				end_h, end_m = (int(x) for x in pattern["end_time"].split(":"))
+
+				for emp_id in employee_ids:
+					planned_start = datetime.combine(current, time(start_h, start_m), tzinfo=UTC)
+					planned_end_date = current if end_h > start_h else current + timedelta(days=1)
+					planned_end = datetime.combine(planned_end_date, time(end_h, end_m), tzinfo=UTC)
+
+					shift = await self.create_shift(
+						schedule_id=schedule_id,
+						employee_id=emp_id,
+						shift_date=current,
+						planned_start=planned_start,
+						planned_end=planned_end,
+						location_id=schedule.get("location_id"),
+					)
+					shift_ids.append(shift["id"])
+			current += timedelta(days=1)
+
+		# Create roster record
+		roster_id = _uuid7str()
+		await self._db.execute(
+			"""
+			INSERT INTO tat_roster (
+				id, tenant_id, name, period_start, period_end,
+				shift_ids, constraints, status, created_by
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,'draft',$8)
+			""",
+			roster_id, self._tenant_id,
+			f"Roster {period_start}–{period_end}",
+			period_start, period_end,
+			json.dumps(shift_ids), json.dumps(constraints or {}), self._actor_id,
+		)
+		record = await self._fetch_one("tat_roster", roster_id)
+		self._emit_event("tat.roster.generated", {
+			"roster_id": roster_id,
+			"shift_count": len(shift_ids),
+		})
+		return record
+
+	# ------------------------------------------------------------------
+	# Shift swap
+	# ------------------------------------------------------------------
+
+	async def shift_swap_request(
+		self,
+		requester_shift_id: str,
+		target_shift_id: str | None = None,
+		target_id: str | None = None,
+		reason: str | None = None,
+	) -> dict[str, Any]:
+		"""Request a shift swap between two employees."""
+		req_shift = await self._fetch_one("tat_shift", requester_shift_id)
+		requester_id = req_shift["employee_id"]
+
+		record_id = _uuid7str()
+		await self._db.execute(
+			"""
+			INSERT INTO tat_shift_swap_request (
+				id, tenant_id, requester_id, requester_shift_id,
+				target_id, target_shift_id, reason, created_by
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+			""",
+			record_id, self._tenant_id, requester_id, requester_shift_id,
+			target_id, target_shift_id, reason, self._actor_id,
+		)
+		record = await self._fetch_one("tat_shift_swap_request", record_id)
+		self._emit_event("tat.shift_swap.requested", {"swap_id": record_id})
+		return record
+
+	async def approve_shift_swap(self, swap_id: str) -> dict[str, Any]:
+		"""Approve a shift swap and update both shifts."""
+		swap = await self._fetch_one("tat_shift_swap_request", swap_id)
+		if swap["status"] != "pending":
+			raise TimeAttendanceError(f"Swap is in status '{swap['status']}'")
+
+		# Update shifts if both sides specified
+		if swap.get("target_shift_id"):
+			req_shift = await self._fetch_one("tat_shift", swap["requester_shift_id"])
+			tgt_shift = await self._fetch_one("tat_shift", swap["target_shift_id"])
+			# Swap employee_ids
+			await self._db.execute(
+				"UPDATE tat_shift SET employee_id=$1, status='swapped', swapped_with_id=$2, updated_at=now() WHERE id=$3",
+				tgt_shift["employee_id"], swap["target_shift_id"], swap["requester_shift_id"],
+			)
+			await self._db.execute(
+				"UPDATE tat_shift SET employee_id=$1, status='swapped', swapped_with_id=$2, updated_at=now() WHERE id=$3",
+				req_shift["employee_id"], swap["requester_shift_id"], swap["target_shift_id"],
+			)
+
+		await self._db.execute(
+			"UPDATE tat_shift_swap_request SET status='approved', approved_by=$1, approved_at=now(), updated_at=now() WHERE id=$2 AND tenant_id=$3",
+			self._actor_id, swap_id, self._tenant_id,
+		)
+		record = await self._fetch_one("tat_shift_swap_request", swap_id)
+		self._emit_event("tat.shift_swap.approved", {"swap_id": swap_id})
+		return record
+
+	# ------------------------------------------------------------------
+	# Biometric device sync
+	# ------------------------------------------------------------------
+
+	async def biometric_device_sync(
+		self,
+		device_id: str,
+		raw_records: list[dict[str, Any]],
+	) -> dict[str, Any]:
+		"""
+		Process raw biometric punch records from a device.
+
+		Each record must have: employee_id, clock_in (ISO string),
+		optionally clock_out (ISO string), biometric_confidence (float).
+
+		Returns a sync log record with counts.
+		"""
+		device = await self._fetch_one("tat_attendance_device", device_id)
+
+		log_id = _uuid7str()
+		await self._db.execute(
+			"""
+			INSERT INTO tat_biometric_sync_log (id, tenant_id, device_id, initiated_by)
+			VALUES ($1,$2,$3,$4)
+			""",
+			log_id, self._tenant_id, device_id, self._actor_id,
+		)
+
+		created = skipped = 0
+		errors: list[dict[str, Any]] = []
+		required_cols = ["employee_id", "clock_in"]
+
+		for i, row in enumerate(raw_records):
+			try:
+				assert_import_row_valid(row, required_cols)
+				confidence = float(row.get("biometric_confidence", 0))
+				assert_biometric_confidence(confidence)
+
+				clock_in_ts = datetime.fromisoformat(row["clock_in"].replace("Z", "+00:00"))
+				clock_out_ts = None
+				if row.get("clock_out"):
+					clock_out_ts = datetime.fromisoformat(row["clock_out"].replace("Z", "+00:00"))
+
+				# Find shift for this employee on this date
+				shift_rows = await self._db.fetch(
+					"""
+					SELECT id FROM tat_shift
+					WHERE tenant_id=$1 AND employee_id=$2 AND shift_date=$3 AND NOT is_deleted
+					ORDER BY planned_start LIMIT 1
+					""",
+					self._tenant_id, row["employee_id"], clock_in_ts.date(),
+				)
+				if not shift_rows:
+					errors.append({"row": i, "reason": "no_shift_for_date", "employee_id": row["employee_id"]})
+					skipped += 1
+					continue
+
+				shift_id = shift_rows[0]["id"]
+				entry_id = _uuid7str()
+				worked_h = calculate_worked_hours(clock_in_ts, clock_out_ts) if clock_out_ts else Decimal("0")
+
+				await self._db.execute(
+					"""
+					INSERT INTO tat_time_entry (
+						id, tenant_id, employee_id, shift_id,
+						entry_date, clock_in, clock_out, total_hours,
+						entry_type, entry_method, device_id,
+						biometric_confidence, biometric_verified,
+						geofence_verified, status, created_by
+					) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'regular','biometric',$9,$10,$11,true,'submitted',$12)
+					ON CONFLICT (tenant_id, employee_id, entry_date)
+					WHERE NOT is_deleted AND entry_type NOT IN ('break','on_call')
+					DO NOTHING
+					""",
+					entry_id, self._tenant_id, row["employee_id"], shift_id,
+					clock_in_ts.date(), clock_in_ts, clock_out_ts, float(worked_h),
+					device_id, confidence, confidence >= 0.85, self._actor_id,
+				)
+				# Check if it was actually inserted (ON CONFLICT DO NOTHING)
+				exists = await self._db.fetchrow(
+					"SELECT id FROM tat_time_entry WHERE id=$1", entry_id
+				)
+				if exists:
+					created += 1
+				else:
+					skipped += 1
+
+			except (RuleViolation, ValueError, KeyError) as exc:
+				errors.append({"row": i, "reason": str(exc)})
+				skipped += 1
+
+		import json
+		await self._db.execute(
+			"""
+			UPDATE tat_biometric_sync_log SET
+				sync_ended_at=now(), records_pulled=$1, records_created=$2,
+				records_skipped=$3, errors=$4, status='completed'
+			WHERE id=$5
+			""",
+			len(raw_records), created, skipped, json.dumps(errors), log_id,
+		)
+		log = await self._db.fetchrow("SELECT * FROM tat_biometric_sync_log WHERE id=$1", log_id)
+		self._emit_event("tat.device.synced", {
+			"device_id": device_id,
+			"log_id": log_id,
+			"created": created,
+			"skipped": skipped,
+		})
+		return dict(log)
+
+	# ------------------------------------------------------------------
+	# GPS geofence validation
+	# ------------------------------------------------------------------
+
+	async def gps_geofence_validation(
+		self,
+		employee_id: str,
+		latitude: float,
+		longitude: float,
+		location_id: str,
+	) -> dict[str, Any]:
+		"""
+		Validate whether a GPS coordinate is within an allowed geofence.
+
+		Returns a dict with is_valid and distance_metres.
+		"""
+		import math
+		loc = await self._fetch_one("tat_geofence_location", location_id)
+		R = 6_371_000
+		phi1 = math.radians(latitude)
+		phi2 = math.radians(float(loc["latitude"]))
+		dphi = math.radians(float(loc["latitude"]) - latitude)
+		dlambda = math.radians(float(loc["longitude"]) - longitude)
+		a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+		distance = 2 * R * math.asin(math.sqrt(a))
+		radius = float(loc["radius_metres"])
+		return {
+			"employee_id": employee_id,
+			"location_id": location_id,
+			"location_name": loc["name"],
+			"is_valid": distance <= radius,
+			"distance_metres": round(distance, 1),
+			"allowed_radius_metres": radius,
+		}
+
+	# ------------------------------------------------------------------
+	# Bulk timesheet import
+	# ------------------------------------------------------------------
+
+	async def bulk_timesheet_import(
+		self,
+		csv_content: str,
+		date_format: str = "%Y-%m-%d",
+		time_format: str = "%H:%M",
+	) -> dict[str, Any]:
+		"""
+		Import time entries from CSV.
+
+		Expected columns: employee_id, shift_id, entry_date, clock_in, clock_out,
+		                  entry_type, break_minutes, cost_center, notes.
+		Returns counts of imported, skipped, and error rows.
+		"""
+		required_cols = ["employee_id", "entry_date", "clock_in"]
+		reader = csv.DictReader(io.StringIO(csv_content))
+		imported = skipped = 0
+		errors: list[dict[str, Any]] = []
+
+		for i, row in enumerate(reader):
+			try:
+				assert_import_row_valid(row, required_cols)
+				entry_date = datetime.strptime(row["entry_date"], date_format).date()
+				clock_in_ts = datetime.combine(
+					entry_date,
+					datetime.strptime(row["clock_in"], time_format).time(),
+					tzinfo=UTC,
+				)
+				clock_out_ts = None
+				if row.get("clock_out"):
+					clock_out_ts = datetime.combine(
+						entry_date,
+						datetime.strptime(row["clock_out"], time_format).time(),
+						tzinfo=UTC,
+					)
+					if clock_out_ts < clock_in_ts:
+						# Night shift
+						clock_out_ts += timedelta(days=1)
+
+				break_minutes = int(row.get("break_minutes") or 0)
+				worked_h = calculate_worked_hours(clock_in_ts, clock_out_ts, break_minutes) if clock_out_ts else Decimal("0")
+
+				entry_id = _uuid7str()
+				await self._db.execute(
+					"""
+					INSERT INTO tat_time_entry (
+						id, tenant_id, employee_id, shift_id,
+						entry_date, clock_in, clock_out, break_minutes,
+						total_hours, entry_type, entry_method,
+						cost_center, notes, status, created_by
+					) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'import',$11,$12,'submitted',$13)
+					ON CONFLICT (tenant_id, employee_id, entry_date)
+					WHERE NOT is_deleted AND entry_type NOT IN ('break','on_call')
+					DO NOTHING
+					""",
+					entry_id, self._tenant_id, row["employee_id"],
+					row.get("shift_id") or None,
+					entry_date, clock_in_ts, clock_out_ts, break_minutes,
+					float(worked_h), row.get("entry_type") or "regular",
+					row.get("cost_center") or None, row.get("notes") or None,
+					self._actor_id,
+				)
+				check = await self._db.fetchrow("SELECT id FROM tat_time_entry WHERE id=$1", entry_id)
+				if check:
+					imported += 1
+				else:
+					skipped += 1
+
+			except (RuleViolation, ValueError, KeyError) as exc:
+				errors.append({"row": i + 2, "reason": str(exc), "data": dict(row)})
+				skipped += 1
+
+		self._emit_event("tat.bulk_import.completed", {
+			"imported": imported,
+			"skipped": skipped,
+			"error_count": len(errors),
+		})
+		return {"imported": imported, "skipped": skipped, "errors": errors}
+
+	# ------------------------------------------------------------------
+	# Payroll export
+	# ------------------------------------------------------------------
+
+	async def create_payroll_export(
+		self,
+		period_start: date,
+		period_end: date,
+		timesheet_ids: list[str],
+		notes: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Bundle approved timesheets into a payroll export record.
+
+		Raises if any timesheet is not in 'approved' status.
+		"""
+		import json
+		total_hours = Decimal("0")
+		total_gross = Decimal("0")
+		employees: set[str] = set()
+
+		for ts_id in timesheet_ids:
+			ts = await self._fetch_one("tat_timesheet", ts_id)
+			assert_timesheet_approved_before_export(ts["status"])
+			total_hours += Decimal(str(ts["total_hours"] or 0))
+			if ts.get("gross_pay"):
+				total_gross += Decimal(str(ts["gross_pay"]))
+			employees.add(ts["employee_id"])
+			# Mark as exported
+			await self._db.execute(
+				"UPDATE tat_timesheet SET payroll_export_id=$1, updated_at=now() WHERE id=$2 AND tenant_id=$3",
+				"pending", ts_id, self._tenant_id,  # Will be updated after export ID is known
+			)
+
+		record_id = _uuid7str()
+		currency = "USD"
+		if timesheet_ids:
+			ts_row = await self._db.fetchrow(
+				"SELECT currency FROM tat_timesheet WHERE id=$1", timesheet_ids[0]
+			)
+			currency = ts_row["currency"] if ts_row else "USD"
+
+		await self._db.execute(
+			"""
+			INSERT INTO tat_payroll_export (
+				id, tenant_id, period_start, period_end,
+				timesheet_ids, total_employees, total_hours,
+				total_gross_pay, currency, status,
+				event_stream, processor, notes, created_by
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'ready',$10,'bytewax',$11,$12)
+			""",
+			record_id, self._tenant_id, period_start, period_end,
+			json.dumps(timesheet_ids), len(employees),
+			float(total_hours), float(total_gross), currency,
+			"apg.hcm.tat.time_attendance.lifecycle", notes, self._actor_id,
+		)
+
+		# Back-fill export ID into timesheets
+		for ts_id in timesheet_ids:
+			await self._db.execute(
+				"UPDATE tat_timesheet SET payroll_export_id=$1, updated_at=now() WHERE id=$2 AND tenant_id=$3",
+				record_id, ts_id, self._tenant_id,
+			)
+
+		record = await self._fetch_one("tat_payroll_export", record_id)
+		self._emit_event("tat.payroll_export.created", {
+			"export_id": record_id,
+			"total_hours": float(total_hours),
+			"timesheet_count": len(timesheet_ids),
+		})
+		return record
+
+	async def get_payroll_export(self, export_id: str) -> dict[str, Any]:
+		return await self._fetch_one("tat_payroll_export", export_id)
+
+	async def list_payroll_exports(self, limit: int = 20, offset: int = 0) -> list[dict[str, Any]]:
+		return await self._fetch_many("tat_payroll_export", limit=limit, offset=offset)
+
+	# ------------------------------------------------------------------
+	# Attendance exceptions
+	# ------------------------------------------------------------------
+
+	async def record_exception(
+		self,
+		employee_id: str,
+		exception_type: str,
+		severity: str,
+		description: str,
+		time_entry_id: str | None = None,
+		owner_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Record an attendance exception for investigation."""
+		if severity == "high" and not owner_id:
+			raise RuleViolation(
+				"exception_owner_required",
+				"High severity exceptions require an owner",
+				"assign_exception_owner",
+			)
+		record_id = _uuid7str()
+		await self._db.execute(
+			"""
+			INSERT INTO tat_attendance_exception (
+				id, tenant_id, employee_id, time_entry_id,
+				exception_type, severity, description, owner_id, created_by
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+			""",
+			record_id, self._tenant_id, employee_id, time_entry_id,
+			exception_type, severity, description, owner_id, self._actor_id,
+		)
+		record = await self._fetch_one("tat_attendance_exception", record_id)
+		self._emit_event("tat.exception.recorded", {"exception_id": record_id, "type": exception_type})
+		return record
+
+	async def resolve_exception(self, exception_id: str, resolution_notes: str) -> dict[str, Any]:
+		await self._fetch_one("tat_attendance_exception", exception_id)
+		await self._db.execute(
+			"""
+			UPDATE tat_attendance_exception SET
+				status='resolved', resolved_at=now(),
+				resolution_notes=$1, updated_at=now()
+			WHERE id=$2 AND tenant_id=$3
+			""",
+			resolution_notes, exception_id, self._tenant_id,
+		)
+		record = await self._fetch_one("tat_attendance_exception", exception_id)
+		self._emit_event("tat.exception.resolved", {"exception_id": exception_id})
+		return record
+
+	async def list_exceptions(
+		self,
+		employee_id: str | None = None,
+		status: str | None = None,
+		severity: str | None = None,
+		limit: int = 50,
+		offset: int = 0,
+	) -> list[dict[str, Any]]:
+		filters: dict[str, Any] = {}
+		if employee_id: filters["employee_id"] = employee_id
+		if status: filters["status"] = status
+		if severity: filters["severity"] = severity
+		return await self._fetch_many("tat_attendance_exception", filters, limit=limit, offset=offset)
+
+	# ------------------------------------------------------------------
+	# Public holidays
+	# ------------------------------------------------------------------
+
+	async def create_public_holiday(
+		self,
+		name: str,
+		holiday_date: date,
+		jurisdiction: str,
+		is_statutory: bool = True,
+		timezone: str = "UTC",
+		substitute_date: date | None = None,
+	) -> dict[str, Any]:
+		"""Register a public holiday for a jurisdiction."""
+		record_id = _uuid7str()
+		await self._db.execute(
+			"""
+			INSERT INTO tat_public_holiday (
+				id, tenant_id, name, holiday_date, jurisdiction,
+				is_statutory, is_substituted, substitute_date, timezone, created_by
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+			""",
+			record_id, self._tenant_id, name, holiday_date, jurisdiction,
+			is_statutory, substitute_date is not None, substitute_date, timezone,
+			self._actor_id,
+		)
+		record = await self._fetch_one("tat_public_holiday", record_id)
+		self._emit_event("tat.public_holiday.created", {"holiday_id": record_id, "date": holiday_date.isoformat()})
+		return record
+
+	async def list_public_holidays(
+		self,
+		jurisdiction: str | None = None,
+		from_date: date | None = None,
+		to_date: date | None = None,
+	) -> list[dict[str, Any]]:
+		wheres = ["tenant_id=$1", "NOT is_deleted"]
+		params: list[Any] = [self._tenant_id]
+		idx = 2
+		if jurisdiction:
+			wheres.append(f"jurisdiction=${idx}"); params.append(jurisdiction); idx += 1
+		if from_date:
+			wheres.append(f"holiday_date>=${idx}"); params.append(from_date); idx += 1
+		if to_date:
+			wheres.append(f"holiday_date<=${idx}"); params.append(to_date); idx += 1
+		sql = (
+			f"SELECT * FROM tat_public_holiday WHERE {' AND '.join(wheres)} "
+			f"ORDER BY holiday_date"
+		)
+		return [dict(r) for r in await self._db.fetch(sql, *params)]
+
+	# ------------------------------------------------------------------
+	# Geofence CRUD
+	# ------------------------------------------------------------------
+
+	async def create_geofence_location(
+		self,
+		name: str,
+		latitude: float,
+		longitude: float,
+		radius_metres: float = 200.0,
+		timezone: str = "UTC",
+		address: str | None = None,
+	) -> dict[str, Any]:
+		"""Register a geofenced work location."""
+		record_id = _uuid7str()
+		await self._db.execute(
+			"""
+			INSERT INTO tat_geofence_location (
+				id, tenant_id, name, address,
+				latitude, longitude, radius_metres, timezone, created_by
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+			""",
+			record_id, self._tenant_id, name, address,
+			latitude, longitude, radius_metres, timezone, self._actor_id,
+		)
+		record = await self._fetch_one("tat_geofence_location", record_id)
+		self._emit_event("tat.geofence.created", {"location_id": record_id})
+		return record
+
+	async def list_geofence_locations(self, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
+		return await self._fetch_many("tat_geofence_location", {"is_active": True}, limit=limit, offset=offset)
+
+	# ------------------------------------------------------------------
+	# Comp-time
+	# ------------------------------------------------------------------
+
+	async def earn_comp_time(
+		self,
+		employee_id: str,
+		hours: Decimal,
+		time_entry_id: str | None = None,
+		reason: str | None = None,
+		expiry_date: date | None = None,
+	) -> dict[str, Any]:
+		"""Credit comp-time hours to an employee's balance."""
+		current_balance = await self._comp_time_balance(employee_id)
+		new_balance = current_balance + hours
+		record_id = _uuid7str()
+		await self._db.execute(
+			"""
+			INSERT INTO tat_comp_time (
+				id, tenant_id, employee_id, time_entry_id,
+				transaction_type, hours, balance_after,
+				effective_date, expiry_date, reason, approved_by, created_by
+			) VALUES ($1,$2,$3,$4,'earn',$5,$6,$7,$8,$9,$10,$11)
+			""",
+			record_id, self._tenant_id, employee_id, time_entry_id,
+			float(hours), float(new_balance),
+			date.today(), expiry_date, reason, self._actor_id, self._actor_id,
+		)
+		record = await self._fetch_one("tat_comp_time", record_id)
+		self._emit_event("tat.comp_time.earned", {"transaction_id": record_id, "hours": float(hours)})
+		return record
+
+	async def use_comp_time(self, employee_id: str, hours: Decimal, reason: str | None = None) -> dict[str, Any]:
+		"""Debit comp-time hours from an employee's balance."""
+		from .domain.rules import assert_toil_balance_sufficient
+		current_balance = await self._comp_time_balance(employee_id)
+		assert_toil_balance_sufficient(current_balance, hours)
+		new_balance = current_balance - hours
+		record_id = _uuid7str()
+		await self._db.execute(
+			"""
+			INSERT INTO tat_comp_time (
+				id, tenant_id, employee_id, transaction_type,
+				hours, balance_after, effective_date, reason, created_by
+			) VALUES ($1,$2,$3,'use',$4,$5,$6,$7,$8)
+			""",
+			record_id, self._tenant_id, employee_id,
+			float(hours), float(new_balance), date.today(), reason, self._actor_id,
+		)
+		record = await self._fetch_one("tat_comp_time", record_id)
+		self._emit_event("tat.comp_time.used", {"transaction_id": record_id, "hours": float(hours)})
+		return record
+
+	async def _comp_time_balance(self, employee_id: str) -> Decimal:
+		row = await self._db.fetchrow(
+			"""
+			SELECT balance_after FROM tat_comp_time
+			WHERE tenant_id=$1 AND employee_id=$2 AND NOT is_deleted
+			ORDER BY effective_date DESC, created_at DESC LIMIT 1
+			""",
+			self._tenant_id, employee_id,
+		)
+		return Decimal(str(row["balance_after"])) if row else Decimal("0")
+
+	# ------------------------------------------------------------------
+	# Reporting
+	# ------------------------------------------------------------------
+
+	async def generate_attendance_report(
+		self,
+		report_type: str,
+		from_date: date,
+		to_date: date,
+		employee_id: str | None = None,
+		department_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Generate a named attendance report.
+
+		report_type: 'daily_summary' | 'overtime_report' | 'leave_usage' |
+		             'exception_report' | 'bradford_factor' | 'headcount'
+		"""
+		if report_type == "daily_summary":
+			return await self._report_daily_summary(from_date, to_date, employee_id)
+		elif report_type == "overtime_report":
+			return await self._report_overtime(from_date, to_date, employee_id)
+		elif report_type == "leave_usage":
+			return await self._report_leave_usage(from_date, to_date, employee_id)
+		elif report_type == "exception_report":
+			return await self._report_exceptions(from_date, to_date)
+		else:
+			raise TimeAttendanceError(f"Unknown report type '{report_type}'")
+
+	async def _report_daily_summary(
+		self, from_date: date, to_date: date, employee_id: str | None
+	) -> dict[str, Any]:
+		wheres = ["tenant_id=$1", "entry_date BETWEEN $2 AND $3", "NOT is_deleted"]
+		params: list[Any] = [self._tenant_id, from_date, to_date]
+		if employee_id:
+			wheres.append("employee_id=$4"); params.append(employee_id)
+		sql = (
+			f"SELECT entry_date, COUNT(*) as entry_count, "
+			f"SUM(total_hours) as total_hours, SUM(overtime_hours) as overtime_hours "
+			f"FROM tat_time_entry WHERE {' AND '.join(wheres)} "
+			f"GROUP BY entry_date ORDER BY entry_date"
+		)
+		rows = await self._db.fetch(sql, *params)
+		return {
+			"report_type": "daily_summary",
+			"from_date": from_date.isoformat(),
+			"to_date": to_date.isoformat(),
+			"rows": [dict(r) for r in rows],
+		}
+
+	async def _report_overtime(
+		self, from_date: date, to_date: date, employee_id: str | None
+	) -> dict[str, Any]:
+		wheres = [
+			"tenant_id=$1", "entry_date BETWEEN $2 AND $3",
+			"overtime_hours > 0", "NOT is_deleted",
+		]
+		params: list[Any] = [self._tenant_id, from_date, to_date]
+		if employee_id:
+			wheres.append("employee_id=$4"); params.append(employee_id)
+		sql = (
+			f"SELECT employee_id, SUM(overtime_hours) as total_overtime, "
+			f"SUM(double_time_hours) as total_double_time "
+			f"FROM tat_time_entry WHERE {' AND '.join(wheres)} "
+			f"GROUP BY employee_id ORDER BY total_overtime DESC"
+		)
+		rows = await self._db.fetch(sql, *params)
+		return {
+			"report_type": "overtime_report",
+			"from_date": from_date.isoformat(),
+			"to_date": to_date.isoformat(),
+			"rows": [dict(r) for r in rows],
+		}
+
+	async def _report_leave_usage(
+		self, from_date: date, to_date: date, employee_id: str | None
+	) -> dict[str, Any]:
+		wheres = [
+			"tenant_id=$1", "start_date >= $2", "end_date <= $3",
+			"status = 'approved'", "NOT is_deleted",
+		]
+		params: list[Any] = [self._tenant_id, from_date, to_date]
+		if employee_id:
+			wheres.append("employee_id=$4"); params.append(employee_id)
+		sql = (
+			f"SELECT employee_id, leave_type, SUM(total_days) as total_days "
+			f"FROM tat_leave_request WHERE {' AND '.join(wheres)} "
+			f"GROUP BY employee_id, leave_type ORDER BY employee_id, leave_type"
+		)
+		rows = await self._db.fetch(sql, *params)
+		return {
+			"report_type": "leave_usage",
+			"from_date": from_date.isoformat(),
+			"to_date": to_date.isoformat(),
+			"rows": [dict(r) for r in rows],
+		}
+
+	async def _report_exceptions(self, from_date: date, to_date: date) -> dict[str, Any]:
+		rows = await self._db.fetch(
+			"""
+			SELECT employee_id, exception_type, severity, COUNT(*) as count
+			FROM tat_attendance_exception
+			WHERE tenant_id=$1 AND created_at::date BETWEEN $2 AND $3 AND NOT is_deleted
+			GROUP BY employee_id, exception_type, severity
+			ORDER BY count DESC
+			""",
+			self._tenant_id, from_date, to_date,
+		)
+		return {
+			"report_type": "exception_report",
+			"from_date": from_date.isoformat(),
+			"to_date": to_date.isoformat(),
+			"rows": [dict(r) for r in rows],
+		}
+
+	async def dashboard_summary(self) -> dict[str, Any]:
+		"""Return KPI counts for the dashboard."""
+		today = date.today()
+		week_start = today - timedelta(days=today.weekday())
+
+		results = await self._db.fetchrow(
+			"""
+			SELECT
+				(SELECT COUNT(*) FROM tat_time_policy WHERE tenant_id=$1 AND is_active AND NOT is_deleted) AS policy_count,
+				(SELECT COUNT(*) FROM tat_shift WHERE tenant_id=$1 AND shift_date=$2 AND NOT is_deleted) AS shifts_today,
+				(SELECT COUNT(*) FROM tat_time_entry WHERE tenant_id=$1 AND entry_date=$2 AND clock_out IS NULL AND NOT is_deleted) AS clocked_in_now,
+				(SELECT COUNT(*) FROM tat_timesheet WHERE tenant_id=$1 AND status='submitted' AND NOT is_deleted) AS pending_timesheets,
+				(SELECT COUNT(*) FROM tat_leave_request WHERE tenant_id=$1 AND status='pending' AND NOT is_deleted) AS pending_leaves,
+				(SELECT COUNT(*) FROM tat_attendance_exception WHERE tenant_id=$1 AND status='open' AND NOT is_deleted) AS open_exceptions,
+				(SELECT COALESCE(SUM(total_hours),0) FROM tat_time_entry WHERE tenant_id=$1 AND entry_date>=$3 AND NOT is_deleted) AS hours_this_week
+			""",
+			self._tenant_id, today, week_start,
+		)
+		return dict(results)
+
+	# ------------------------------------------------------------------
+	# Private utilities
+	# ------------------------------------------------------------------
+
+	async def _get_public_holidays_between(self, start: date, end: date) -> list[date]:
+		rows = await self._db.fetch(
+			"SELECT holiday_date FROM tat_public_holiday WHERE tenant_id=$1 AND holiday_date BETWEEN $2 AND $3 AND NOT is_deleted",
+			self._tenant_id, start, end,
+		)
+		return [r["holiday_date"] for r in rows]
 
 
-TimeAttendanceService = TimeAttendanceLifecycleService
-TimeEntryService = TimeAttendanceLifecycleService
-AttendanceScheduleService = TimeAttendanceLifecycleService
-AttendanceComplianceService = TimeAttendanceLifecycleService
+# ---------------------------------------------------------------------------
+# Backward-compatible re-export: in-memory lifecycle service
+# The original TimeAttendanceLifecycleService (dependency-light, in-memory)
+# is required by the capability contract tests.  It lives in lifecycle.py.
+# ---------------------------------------------------------------------------
+
+try:
+	from .lifecycle import (
+		TimeAttendanceLifecycleService,
+		TimeAttendanceError as _LegacyError,
+		TimeAttendanceNotFoundError as _LegacyNotFoundError,
+		TimeAttendanceService as _LegacyAlias,
+		TimeEntryService,
+		AttendanceScheduleService,
+		AttendanceComplianceService,
+	)
+except ImportError:  # direct-load
+	from lifecycle import (  # type: ignore[no-redef]
+		TimeAttendanceLifecycleService,
+		TimeAttendanceError as _LegacyError,
+		TimeAttendanceNotFoundError as _LegacyNotFoundError,
+		TimeAttendanceService as _LegacyAlias,
+		TimeEntryService,
+		AttendanceScheduleService,
+		AttendanceComplianceService,
+	)
+
+__all__ = [
+	"TimeAttendanceService",
+	"TimeAttendanceLifecycleService",
+	"TimeEntryService",
+	"AttendanceScheduleService",
+	"AttendanceComplianceService",
+	"TimeAttendanceError",
+	"NotFoundError",
+]

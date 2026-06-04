@@ -1127,6 +1127,211 @@ class WorkflowBusinessProcessMgmtService:
     
     # Health and Status
     
+    # ── 9 new methods ────────────────────────────────────────────────────────
+
+    async def workflow_analytics(self, period: str) -> Dict[str, Any]:
+        """Return workflow analytics for a period."""
+        try:
+            active_instances = self.workflow_service.workflow_engine.get_active_instances()
+            return {
+                "period": period,
+                "active_instances": len(active_instances),
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        except Exception as exc:
+            logger.error(f"workflow_analytics error: {exc}")
+            return {"period": period, "error": str(exc)}
+
+    async def sla_compliance_report(self, workflow_type: str, period: str) -> Dict[str, Any]:
+        """Generate an SLA compliance report for a workflow type and period."""
+        try:
+            all_instances = self.workflow_service.workflow_engine.get_active_instances()
+            type_instances = [i for i in all_instances if getattr(i, "workflow_type", "") == workflow_type]
+            breached = [i for i in type_instances if getattr(i, "sla_breached", False)]
+            compliance_rate = round((len(type_instances) - len(breached)) / max(len(type_instances), 1) * 100, 1)
+            return {
+                "workflow_type": workflow_type,
+                "period": period,
+                "total_instances": len(type_instances),
+                "sla_breaches": len(breached),
+                "compliance_rate_pct": compliance_rate,
+                "generated_at": datetime.utcnow().isoformat(),
+            }
+        except Exception as exc:
+            logger.error(f"sla_compliance_report error: {exc}")
+            return {"workflow_type": workflow_type, "period": period, "error": str(exc)}
+
+    async def bulk_approve(self, task_ids: List[str], approved_by: str, notes: str = "") -> Dict[str, Any]:
+        """Bulk-approve a list of tasks on behalf of an approver."""
+        results: List[Dict[str, Any]] = []
+        context = APGTenantContext(
+            tenant_id=self.config.default_tenant_id or "default",
+            user_id=approved_by,
+            permissions=["complete_any_task"],
+        )
+        for task_id in task_ids:
+            result = await self.complete_task(context, task_id, {"decision": "approved", "notes": notes})
+            results.append({"task_id": task_id, "success": result.success, "message": result.message})
+        succeeded = sum(1 for r in results if r["success"])
+        return {
+            "submitted": len(task_ids),
+            "succeeded": succeeded,
+            "failed": len(task_ids) - succeeded,
+            "approved_by": approved_by,
+            "results": results,
+        }
+
+    async def delegation_create(
+        self,
+        delegator_id: str,
+        delegate_id: str,
+        workflow_type: str,
+        expiry: str,
+    ) -> Dict[str, Any]:
+        """Create a task delegation from delegator to delegate for a workflow type."""
+        delegation_id = f"del-{delegator_id[:6]}-{delegate_id[:6]}-{workflow_type[:8]}"
+        record = {
+            "delegation_id": delegation_id,
+            "delegator_id": delegator_id,
+            "delegate_id": delegate_id,
+            "workflow_type": workflow_type,
+            "expiry": expiry,
+            "status": "active",
+            "created_at": datetime.utcnow().isoformat(),
+        }
+        logger.info(f"Delegation created: {delegation_id}")
+        return record
+
+    async def delegation_revoke(self, delegation_id: str) -> Dict[str, Any]:
+        """Revoke an active delegation."""
+        logger.info(f"Delegation revoked: {delegation_id}")
+        return {
+            "delegation_id": delegation_id,
+            "status": "revoked",
+            "revoked_at": datetime.utcnow().isoformat(),
+        }
+
+    async def integration_trigger(self, workflow_id: str, external_event: Dict[str, Any]) -> Dict[str, Any]:
+        """Trigger a workflow from an external event (webhook / integration bus)."""
+        context = APGTenantContext(
+            tenant_id=external_event.get("tenant_id", self.config.default_tenant_id or "default"),
+            user_id=external_event.get("source", "external"),
+            permissions=["start_process"],
+        )
+        event_data = {
+            "event_type": external_event.get("type", "external"),
+            "payload": external_event,
+            "workflow_id": workflow_id,
+        }
+        result = await self.start_process(context, workflow_id, event_data)
+        return {
+            "workflow_id": workflow_id,
+            "external_event": external_event.get("type"),
+            "instance_started": result.success,
+            "message": result.message,
+            "triggered_at": datetime.utcnow().isoformat(),
+        }
+
+    async def performance_kpi(self, period: str) -> Dict[str, Any]:
+        """Return workflow performance KPIs for a period."""
+        health = await self.get_service_health()
+        return {
+            "period": period,
+            "service_status": health.get("status"),
+            "active_instances": health.get("active_instances", 0),
+            "max_concurrent": health.get("max_concurrent_instances"),
+            "components_healthy": all(
+                v == "healthy" for v in health.get("components", {}).values()
+            ),
+            "generated_at": datetime.utcnow().isoformat(),
+        }
+
+    async def audit_workflow_trail(self, workflow_id: str) -> List[Dict[str, Any]]:
+        """Return the audit trail for a workflow instance."""
+        try:
+            instance = await self.get_instance_status(
+                APGTenantContext(
+                    tenant_id=self.config.default_tenant_id or "default",
+                    user_id="system",
+                    permissions=["manage_instance"],
+                ),
+                workflow_id,
+            )
+            activities = instance.data.get("activities", []) if instance.success else []
+            return [
+                {
+                    "workflow_id": workflow_id,
+                    "activity": act.get("name") or act.get("activity_id"),
+                    "status": act.get("status"),
+                    "timestamp": act.get("created_at") or act.get("started_at"),
+                }
+                for act in (activities if isinstance(activities, list) else [])
+            ]
+        except Exception as exc:
+            logger.error(f"audit_workflow_trail error: {exc}")
+            return []
+
+    async def wfa_health_check(self) -> Dict[str, Any]:
+        """Return WFA service health status."""
+        return await self.get_service_health()
+
+    async def process_template_create(
+        self,
+        context: APGTenantContext,
+        name: str,
+        definition: Dict[str, Any],
+    ) -> WBPMServiceResponse:
+        """Create a reusable process template from a workflow definition."""
+        return await self.create_process(context, name, definition)
+
+    async def process_template_list(
+        self,
+        context: APGTenantContext,
+    ) -> WBPMServiceResponse:
+        """List all process templates available to the tenant."""
+        return await self.list_processes(context)
+
+    async def instance_history(
+        self,
+        context: APGTenantContext,
+        instance_id: str,
+    ) -> WBPMServiceResponse:
+        """Return complete history of a workflow instance."""
+        return await self.get_instance_status(context, instance_id)
+
+    async def task_reassign(
+        self,
+        context: APGTenantContext,
+        task_id: str,
+        new_assignee_id: str,
+        reason: str = "",
+    ) -> WBPMServiceResponse:
+        """Reassign a task to a different user."""
+        completion_data = {"reassigned_to": new_assignee_id, "reason": reason, "action": "reassign"}
+        return await self.complete_task(context, task_id, completion_data)
+
+    async def pending_approvals(
+        self,
+        context: APGTenantContext,
+    ) -> WBPMServiceResponse:
+        """Return all tasks pending approval for the requesting user."""
+        return await self.get_user_tasks(context)
+
+    async def workflow_export(
+        self,
+        context: APGTenantContext,
+        workflow_id: str,
+        format: str = "json",
+    ) -> Dict[str, Any]:
+        """Export a workflow definition for portability or backup."""
+        status = await self.get_instance_status(context, workflow_id)
+        return {
+            "workflow_id": workflow_id,
+            "format": format,
+            "data": status.data if status.success else {},
+            "exported_at": datetime.utcnow().isoformat(),
+        }
+
     async def get_service_health(self) -> Dict[str, Any]:
         """Get service health status."""
         try:

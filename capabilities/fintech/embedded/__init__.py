@@ -1,8 +1,31 @@
-"""APG Embedded Finance capability package."""
+"""APG Embedded Finance capability.
 
+Standalone package: ``pip install apg-fintech-embedded``
+
+Quick start::
+
+    from apg_fintech_embedded import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : fintech_embedded
+Provides      : partner_program_workflow, host_application_workflow, embedded_product_placement_workflow, embedded_customer_consent_workflow, embedded_account_workflow, embedded_payment_workflow
+"""
 from __future__ import annotations
 
-from .capability_contract import CAPABILITY_ID, CAPABILITY_NAME, CAPABILITY_VERSION, get_capability_contract
-from .service import EmbeddedFinanceService
+__version__  = "1.1.0"
+__package_name__ = "apg-fintech-embedded"
+__capability_id__ = "fintech_embedded"
 
-__all__ = ["EmbeddedFinanceService", "CAPABILITY_ID", "CAPABILITY_NAME", "CAPABILITY_VERSION", "get_capability_contract"]
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
+)
+
+__all__ = [
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
+]

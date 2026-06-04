@@ -350,7 +350,7 @@ def agent_manifest() -> dict[str, Any]:
 		"supported_runtimes": list(SUPPORTED_REGY_AGENT_RUNTIMES),
 		"supported_roles": list(SUPPORTED_REGY_AGENT_ROLES),
 		"privileged_roles": list(PRIVILEGED_REGY_AGENT_ROLES),
-		"requires": ["scope", "owner", "purpose", "contribution_disclosure"],
+		
 		"approval": "human approval is required before privileged registry agents mutate registry state",
 		"external_runtimes_are_adapters": True,
 	}
@@ -419,6 +419,30 @@ def review_evidence_manifest() -> dict[str, Any]:
 	}
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.regy.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"service_registered",
+		"service_updated",
+		"service_activated",
+		"service_deactivated",
+		"service_retired",
+		"endpoint_registered",
+		"endpoint_health_changed",
+		"discovery_queried",
+		"policy_attached",
+		"ownership_transferred",
+		"agent_registered",
+	],
+	"guardrails": [
+		"regy_batch_requires_bytewax",
+		"regy_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable REGY capability contract."""
 	config = CapabilityConfiguration()
@@ -432,7 +456,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		"configuration_schema": config.schema,
 		"rule_engine": {"type": "deterministic", "rules": [rule.__dict__ for rule in default_rules()]},
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": STREAMING,
 		"review_evidence": review_evidence_manifest(),
 		"ui": ui_manifest(),
 		"theme": {"name": theme.name, "tokens": theme.tokens, "components": theme.components},

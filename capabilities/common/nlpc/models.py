@@ -1,835 +1,812 @@
 """
-NLPC Data Models - Natural Language Processing Core
+NLPC Data Models — Natural Language Processing Core
 
 Copyright © 2025 Datacraft
 Author: Nyimbi Odero
-Email: nyimbi@gmail.com
 Website: www.datacraft.co.ke
 
-This module defines core data models for the Natural Language Processing Core (NLPC) capability.
-All models follow APG standards with Pydantic v2, async support, and multi-tenancy.
+Pydantic v2 models for all NLPC entities. All models share a common base
+with tenant isolation, soft-delete, and audit columns.
 """
 
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime
 from enum import Enum
-from typing import Any, Annotated, Optional
-from uuid_extensions import uuid7str
+from typing import Annotated, Any
 
-from pydantic import BaseModel, Field, ConfigDict, AfterValidator, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, AfterValidator, field_validator, model_validator
+from uuid6 import uuid7
+
+
+def uuid7str() -> str:
+	return str(uuid7())
+
+
+# ---------------------------------------------------------------------------
+# Validators
+# ---------------------------------------------------------------------------
+
+def _validate_confidence(v: float) -> float:
+	if not 0.0 <= v <= 1.0:
+		raise ValueError("confidence must be in [0, 1]")
+	return v
+
+
+def _validate_non_empty(v: str) -> str:
+	if not v or not v.strip():
+		raise ValueError("value cannot be empty")
+	return v.strip()
+
+
+def _validate_non_negative(v: float) -> float:
+	if v < 0:
+		raise ValueError("value must be non-negative")
+	return v
+
+
+# ---------------------------------------------------------------------------
+# Status / Type enums
+# ---------------------------------------------------------------------------
+
+class ProcessingStatus(str, Enum):
+	PENDING    = "pending"
+	QUEUED     = "queued"
+	PROCESSING = "processing"
+	COMPLETED  = "completed"
+	FAILED     = "failed"
+	CANCELLED  = "cancelled"
+	RETRYING   = "retrying"
 
 
 class NLPTask(str, Enum):
-	"""Enumeration of supported NLP tasks."""
-	TOKENIZATION = "tokenization"
-	SENTENCE_SEGMENTATION = "sentence_segmentation"
-	LANGUAGE_DETECTION = "language_detection"
-	POS_TAGGING = "pos_tagging"
-	PART_OF_SPEECH_TAGGING = "part_of_speech_tagging"
-	NER = "named_entity_recognition"
-	NAMED_ENTITY_RECOGNITION = "named_entity_recognition"
-	DEPENDENCY_PARSING = "dependency_parsing"
-	CONSTITUENCY_PARSING = "constituency_parsing"
-	SENTIMENT_ANALYSIS = "sentiment_analysis"
-	ENTITY_EXTRACTION = "entity_extraction"
-	EMOTION_DETECTION = "emotion_detection"
-	INTENT_CLASSIFICATION = "intent_classification"
-	TOPIC_MODELING = "topic_modeling"
-	SEMANTIC_SIMILARITY = "semantic_similarity"
-	TEXT_SIMILARITY = "text_similarity"
-	TEXT_SUMMARIZATION = "text_summarization"
-	RELATION_EXTRACTION = "relation_extraction"
-	COREFERENCE_RESOLUTION = "coreference_resolution"
-	TEMPORAL_EXTRACTION = "temporal_extraction"
-	EVENT_EXTRACTION = "event_extraction"
-	QUESTION_ANSWERING = "question_answering"
-	TEXT_GENERATION = "text_generation"
-	TEXT_TRANSLATION = "text_translation"
-	PII_DETECTION = "pii_detection"
-	TEXT_CLASSIFICATION = "text_classification"
-	KEYWORD_EXTRACTION = "keyword_extraction"
-	ENTITY_LINKING = "entity_linking"
-	TEXT_NORMALIZATION = "text_normalization"
-	TEXT_CLUSTERING = "text_clustering"
+	LANGUAGE_DETECTION      = "language_detection"
+	ENTITY_EXTRACTION       = "entity_extraction"
+	SENTIMENT_ANALYSIS      = "sentiment_analysis"
+	INTENT_CLASSIFICATION   = "intent_classification"
+	TEXT_SUMMARISATION      = "text_summarisation"
+	TRANSLATION             = "translation"
+	TEXT_EMBEDDING          = "text_embedding"
+	DOCUMENT_CLASSIFICATION = "document_classification"
+	KEYWORD_EXTRACTION      = "keyword_extraction"
+	NAMED_ENTITY_LINKING    = "named_entity_linking"
+	RELATION_EXTRACTION     = "relation_extraction"
+	COREFERENCE_RESOLUTION  = "coreference_resolution"
+	POS_TAGGING             = "pos_tagging"
+	DEPENDENCY_PARSING      = "dependency_parsing"
+	TOPIC_MODELLING         = "topic_modelling"
+	TEXT_SIMILARITY         = "text_similarity"
+	PII_DETECTION           = "pii_detection"
+	QUESTION_ANSWERING      = "question_answering"
+	TEXT_GENERATION         = "text_generation"
 
 
-class NLPTaskType(str, Enum):
-	"""Legacy NLP task names retained for older APG tests and callers."""
-	SENTIMENT_ANALYSIS = "sentiment_analysis"
-	ENTITY_EXTRACTION = "entity_extraction"
-	TEXT_CLASSIFICATION = "text_classification"
-	TEXT_SUMMARIZATION = "text_summarization"
-	LANGUAGE_DETECTION = "language_detection"
-	TEXT_SIMILARITY = "text_similarity"
-	QUESTION_ANSWERING = "question_answering"
-	TEXT_GENERATION = "text_generation"
-	NAMED_ENTITY_RECOGNITION = "named_entity_recognition"
-	PART_OF_SPEECH_TAGGING = "part_of_speech_tagging"
-	DEPENDENCY_PARSING = "dependency_parsing"
-	TOPIC_MODELING = "topic_modeling"
-	KEYWORD_EXTRACTION = "keyword_extraction"
-	TEXT_CLUSTERING = "text_clustering"
+class EntityType(str, Enum):
+	PERSON       = "PERSON"
+	ORGANISATION = "ORG"
+	LOCATION     = "LOC"
+	DATE         = "DATE"
+	TIME         = "TIME"
+	MONEY        = "MONEY"
+	PERCENT      = "PERCENT"
+	PRODUCT      = "PRODUCT"
+	EVENT        = "EVENT"
+	LAW          = "LAW"
+	LANGUAGE     = "LANGUAGE"
+	WORK_OF_ART  = "WORK_OF_ART"
+	FACILITY     = "FAC"
+	GPE          = "GPE"    # geopolitical entity
+	NORP         = "NORP"   # nationalities / religions / political groups
+	QUANTITY     = "QUANTITY"
+	ORDINAL      = "ORDINAL"
+	CARDINAL     = "CARDINAL"
+	MISC         = "MISC"
 
 
-class ModelProvider(str, Enum):
-	"""Legacy on-device model providers."""
-	OLLAMA = "ollama"
-	TRANSFORMERS = "transformers"
-	SPACY = "spacy"
-	NLTK = "nltk"
-	CUSTOM = "custom"
-
-
-class QualityLevel(str, Enum):
-	"""Quality versus latency preference for legacy callers."""
-	FAST = "fast"
-	BALANCED = "balanced"
-	ACCURATE = "accurate"
-	BEST = "best"
-
-
-class DocumentType(str, Enum):
-	"""Legacy document content types."""
-	PLAIN_TEXT = "plain_text"
-	HTML = "html"
-	MARKDOWN = "markdown"
-	JSON = "json"
-	XML = "xml"
-	PDF = "pdf"
-	DOCX = "docx"
-
-
-class ProcessingStatus(str, Enum):
-	"""Enumeration of processing status values."""
-	PENDING = "pending"
-	PROCESSING = "processing"
-	IN_PROGRESS = "in_progress"
-	COMPLETED = "completed"
-	FAILED = "failed"
-	CANCELLED = "cancelled"
-	RETRY = "retry"
-
-
-class ModelType(str, Enum):
-	"""Enumeration of supported model types."""
-	SPACY = "spacy"
-	NLTK = "nltk"
-	TEXTBLOB = "textblob"
-	GENSIM = "gensim"
-	TRANSFORMERS = "transformers"
-	SKLEARN = "sklearn"
-	CUSTOM = "custom"
-	ENSEMBLE = "ensemble"
+class SentimentLabel(str, Enum):
+	POSITIVE = "positive"
+	NEGATIVE = "negative"
+	NEUTRAL  = "neutral"
+	MIXED    = "mixed"
 
 
 class LanguageCode(str, Enum):
-	"""Common language codes (ISO 639-1)."""
-	AUTO = "auto"
-	ENGLISH = "en"
-	EN = "en"
-	SPANISH = "es"
-	ES = "es"
-	FRENCH = "fr"
-	FR = "fr"
-	GERMAN = "de"
-	DE = "de"
-	ITALIAN = "it"
-	IT = "it"
-	PORTUGUESE = "pt"
-	PT = "pt"
-	RUSSIAN = "ru"
-	RU = "ru"
-	CHINESE = "zh"
-	ZH = "zh"
-	JAPANESE = "ja"
-	JA = "ja"
-	KOREAN = "ko"
-	KO = "ko"
-	ARABIC = "ar"
-	AR = "ar"
-	HINDI = "hi"
-	HI = "hi"
-	AUTO_DETECT = "auto"
-	MULTILINGUAL = "multi"
-	AFRIKAANS = "af"
-	AFAR = "aa"
-	AKAN = "ak"
-	AMHARIC = "am"
-	BAMBARA = "bm"
-	EWE = "ee"
-	FULAH = "ff"
-	HAUSA = "ha"
-	IGBO = "ig"
-	KANURI = "kr"
-	KIKUYU = "ki"
-	KINYARWANDA = "rw"
-	KIRUNDI = "rn"
-	KONGO = "kg"
-	LINGALA = "ln"
-	LUGANDA = "lg"
-	MALAGASY = "mg"
-	NYANJA = "ny"
-	OROMO = "om"
-	SANGO = "sg"
-	SHONA = "sn"
-	SOMALI = "so"
-	SOUTHERN_SOTHO = "st"
-	SWAHILI = "sw"
-	SWATI = "ss"
-	TIGRINYA = "ti"
-	TSONGA = "ts"
-	TSWANA = "tn"
-	TWI = "tw"
-	VENDA = "ve"
-	WOLOF = "wo"
-	XHOSA = "xh"
-	YORUBA = "yo"
-	ZULU = "zu"
-	KABYLE = "kab"
-	KAMBA = "kam"
+	AUTO  = "auto"
+	EN    = "en"
+	ES    = "es"
+	FR    = "fr"
+	DE    = "de"
+	IT    = "it"
+	PT    = "pt"
+	RU    = "ru"
+	ZH    = "zh"
+	JA    = "ja"
+	KO    = "ko"
+	AR    = "ar"
+	HI    = "hi"
+	MULTI = "multi"
+	# African languages
+	AF  = "af"
+	AM  = "am"
+	BM  = "bm"
+	EE  = "ee"
+	FF  = "ff"
+	HA  = "ha"
+	IG  = "ig"
+	KI  = "ki"
+	RW  = "rw"
+	RN  = "rn"
+	LN  = "ln"
+	LG  = "lg"
+	MG  = "mg"
+	NY  = "ny"
+	OM  = "om"
+	SN  = "sn"
+	SO  = "so"
+	ST  = "st"
+	SW  = "sw"
+	TI  = "ti"
+	TS  = "ts"
+	TN  = "tn"
+	VE  = "ve"
+	WO  = "wo"
+	XH  = "xh"
+	YO  = "yo"
+	ZU  = "zu"
+	KAB = "kab"
+	KAM = "kam"
 	LUO = "luo"
-	MAASAI = "mas"
-	MERU = "mer"
-	MOORE = "mos"
-	NUER = "nus"
-	SUKUMA = "suk"
-	TAMAZIGHT = "tzm"
-	TIGRE = "tig"
-	UMBUNDU = "umb"
+	MAS = "mas"
+	MER = "mer"
+	MOS = "mos"
+	NUS = "nus"
+	SUK = "suk"
+	TZM = "tzm"
+	TIG = "tig"
+	UMB = "umb"
+
+
+AFRICAN_LANGUAGE_CODES: frozenset[str] = frozenset({
+	"af", "am", "bm", "ee", "ff", "ha", "ig", "ki", "rw", "rn", "ln", "lg",
+	"mg", "ny", "om", "sn", "so", "st", "sw", "ti", "ts", "tn", "ve", "wo",
+	"xh", "yo", "zu", "kab", "kam", "luo", "mas", "mer", "mos", "nus", "suk",
+	"tzm", "tig", "umb",
+})
+
+
+class ModelProvider(str, Enum):
+	OLLAMA       = "ollama"
+	TRANSFORMERS = "transformers"
+	SPACY        = "spacy"
+	LANGDETECT   = "langdetect"
+	CUSTOM       = "custom"
 
 
 class PriorityLevel(str, Enum):
-	"""Processing priority levels."""
-	LOW = "low"
-	NORMAL = "medium"
-	MEDIUM = "medium"
-	HIGH = "high"
-	URGENT = "high"
+	LOW      = "low"
+	NORMAL   = "normal"
+	HIGH     = "high"
 	CRITICAL = "critical"
 
 
-def _validate_confidence_score(value: float) -> float:
-	"""Validate confidence score is between 0 and 1."""
-	if not 0.0 <= value <= 1.0:
-		raise ValueError("Confidence score must be between 0.0 and 1.0")
-	return value
+class DocumentType(str, Enum):
+	PLAIN_TEXT = "text/plain"
+	HTML       = "text/html"
+	MARKDOWN   = "text/markdown"
+	PDF        = "application/pdf"
+	JSON       = "application/json"
+	XML        = "application/xml"
 
 
-def _validate_positive_float(value: float) -> float:
-	"""Validate float is positive."""
-	if value < 0:
-		raise ValueError("Value must be positive")
-	return value
+class ClassificationTaxonomy(str, Enum):
+	TOPICS    = "topics"
+	SENTIMENT = "sentiment"
+	INTENT    = "intent"
+	LANGUAGE  = "language"
+	CUSTOM    = "custom"
 
 
-def _validate_non_empty_string(value: str) -> str:
-	"""Validate string is not empty."""
-	if not value or not value.strip():
-		raise ValueError("String cannot be empty")
-	return value.strip()
+class SummaryMethod(str, Enum):
+	EXTRACTIVE  = "extractive"
+	ABSTRACTIVE = "abstractive"
+	HYBRID      = "hybrid"
 
 
-class BaseNLPCModel(BaseModel):
-	"""Base model for all NLPC entities with common fields."""
+# ---------------------------------------------------------------------------
+# Base model
+# ---------------------------------------------------------------------------
+
+class NLPCBase(BaseModel):
+	"""Shared base for every NLPC entity."""
 	model_config = ConfigDict(
-		extra='forbid',
+		extra="forbid",
 		validate_by_name=True,
 		validate_by_alias=True,
 		str_strip_whitespace=True,
-		use_enum_values=True
+		use_enum_values=True,
 	)
 
-	id: str = Field(default_factory=uuid7str, description="Unique identifier")
-	tenant_id: str = Field(description="Tenant identifier for multi-tenancy")
-	created_at: datetime = Field(default_factory=datetime.utcnow, description="Creation timestamp")
-	updated_at: Optional[datetime] = Field(default_factory=datetime.utcnow, description="Last update timestamp")
-	version: int = Field(default=1, ge=1, description="Version number for optimistic locking")
-
-
-class TextDocument(BaseModel):
-	"""Legacy rich text document with metadata and processing hints."""
-	model_config = ConfigDict(
-		extra='forbid',
-		validate_by_name=True,
-		validate_by_alias=True,
-		str_strip_whitespace=True,
-		use_enum_values=True
-	)
-
-	id: str = Field(default_factory=uuid7str)
-	tenant_id: str
-	content: str
-	title: Optional[str] = Field(default=None, max_length=500)
-	language: Optional[LanguageCode] = None
-	metadata: dict[str, Any] = Field(default_factory=dict)
+	id:         str      = Field(default_factory=uuid7str, description="UUID-7 primary key")
+	tenant_id:  str      = Field(description="Tenant owning this record")
 	created_at: datetime = Field(default_factory=datetime.utcnow)
 	updated_at: datetime = Field(default_factory=datetime.utcnow)
+	created_by: str      = Field(default="system")
+	is_deleted: bool     = Field(default=False)
+	version:    int      = Field(default=1, ge=1)
 
-	@field_validator('content')
+
+# ---------------------------------------------------------------------------
+# NLPDocument
+# ---------------------------------------------------------------------------
+
+class NLPDocument(NLPCBase):
+	"""A text document submitted for NLP processing."""
+
+	content:        Annotated[str, AfterValidator(_validate_non_empty)] = Field(max_length=10_000_000)
+	title:          str | None           = Field(default=None, max_length=500)
+	source:         str | None           = None
+	source_id:      str | None           = None
+	language:       LanguageCode | None  = None
+	content_type:   DocumentType         = DocumentType.PLAIN_TEXT
+	content_hash:   str | None           = None
+	word_count:     int | None           = Field(default=None, ge=0)
+	char_count:     int | None           = Field(default=None, ge=0)
+	is_sensitive:   bool                 = False
+	retention_days: int | None           = Field(default=None, ge=1)
+	metadata:       dict[str, Any]       = Field(default_factory=dict)
+
+
+class NLPDocumentCreate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, str_strip_whitespace=True, use_enum_values=True)
+
+	tenant_id:      str
+	created_by:     str                  = "system"
+	content:        str
+	title:          str | None           = None
+	source:         str | None           = None
+	source_id:      str | None           = None
+	language:       LanguageCode | None  = None
+	content_type:   DocumentType         = DocumentType.PLAIN_TEXT
+	is_sensitive:   bool                 = False
+	retention_days: int | None           = None
+	metadata:       dict[str, Any]       = Field(default_factory=dict)
+
+
+class NLPDocumentUpdate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, str_strip_whitespace=True, use_enum_values=True)
+
+	title:          str | None           = None
+	language:       LanguageCode | None  = None
+	is_sensitive:   bool | None          = None
+	metadata:       dict[str, Any] | None = None
+
+
+class NLPDocumentResponse(NLPDocument):
+	pass
+
+
+# ---------------------------------------------------------------------------
+# NLPEntity
+# ---------------------------------------------------------------------------
+
+class NLPEntity(NLPCBase):
+	"""Named entity extracted from a document."""
+
+	document_id:  str
+	text:         Annotated[str, AfterValidator(_validate_non_empty)]
+	entity_type:  EntityType
+	start_char:   int                = Field(ge=0)
+	end_char:     int                = Field(ge=0)
+	confidence:   Annotated[float, AfterValidator(_validate_confidence)] = 0.0
+	canonical:    str | None         = None
+	kb_id:        str | None         = None
+	kb_url:       str | None         = None
+	sentence_idx: int | None         = None
+	metadata:     dict[str, Any]     = Field(default_factory=dict)
+
+	@model_validator(mode="after")
+	def _end_after_start(self) -> "NLPEntity":
+		if self.end_char < self.start_char:
+			raise ValueError("end_char must be >= start_char")
+		return self
+
+
+class NLPEntityCreate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, str_strip_whitespace=True, use_enum_values=True)
+
+	tenant_id:   str
+	created_by:  str        = "system"
+	document_id: str
+	text:        str
+	entity_type: EntityType
+	start_char:  int
+	end_char:    int
+	confidence:  float      = 0.0
+	canonical:   str | None = None
+	kb_id:       str | None = None
+	kb_url:      str | None = None
+
+
+class NLPEntityResponse(NLPEntity):
+	pass
+
+
+# ---------------------------------------------------------------------------
+# NLPIntent
+# ---------------------------------------------------------------------------
+
+class NLPIntent(NLPCBase):
+	"""Detected user intent for a document or utterance."""
+
+	document_id:  str
+	intent_label: Annotated[str, AfterValidator(_validate_non_empty)]
+	confidence:   Annotated[float, AfterValidator(_validate_confidence)] = 0.0
+	all_scores:   dict[str, float] = Field(default_factory=dict)
+	model_used:   str | None       = None
+	utterance:    str | None       = None
+	metadata:     dict[str, Any]   = Field(default_factory=dict)
+
+
+class NLPIntentCreate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, str_strip_whitespace=True, use_enum_values=True)
+
+	tenant_id:    str
+	created_by:   str             = "system"
+	document_id:  str
+	intent_label: str
+	confidence:   float           = 0.0
+	all_scores:   dict[str, float] = Field(default_factory=dict)
+	model_used:   str | None      = None
+	utterance:    str | None      = None
+
+
+class NLPIntentResponse(NLPIntent):
+	pass
+
+
+# ---------------------------------------------------------------------------
+# NLPSentiment
+# ---------------------------------------------------------------------------
+
+class EmotionScores(BaseModel):
+	"""Fine-grained Ekman-6 + contempt emotion scores."""
+	model_config = ConfigDict(extra="allow", validate_by_name=True)
+
+	joy:      float = Field(default=0.0, ge=0.0, le=1.0)
+	sadness:  float = Field(default=0.0, ge=0.0, le=1.0)
+	anger:    float = Field(default=0.0, ge=0.0, le=1.0)
+	fear:     float = Field(default=0.0, ge=0.0, le=1.0)
+	surprise: float = Field(default=0.0, ge=0.0, le=1.0)
+	disgust:  float = Field(default=0.0, ge=0.0, le=1.0)
+	contempt: float = Field(default=0.0, ge=0.0, le=1.0)
+
+
+class NLPSentiment(NLPCBase):
+	"""Sentiment analysis result for a document."""
+
+	document_id:   str
+	label:         SentimentLabel
+	score:         Annotated[float, AfterValidator(_validate_confidence)]
+	positive:      Annotated[float, AfterValidator(_validate_confidence)] = 0.0
+	negative:      Annotated[float, AfterValidator(_validate_confidence)] = 0.0
+	neutral:       Annotated[float, AfterValidator(_validate_confidence)] = 0.0
+	compound:      float          = Field(default=0.0, ge=-1.0, le=1.0)
+	emotions:      EmotionScores  = Field(default_factory=EmotionScores)
+	model_used:    str | None     = None
+	aspect_scores: list[dict[str, Any]] = Field(default_factory=list)
+	metadata:      dict[str, Any] = Field(default_factory=dict)
+
+
+class NLPSentimentCreate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, str_strip_whitespace=True, use_enum_values=True)
+
+	tenant_id:   str
+	created_by:  str           = "system"
+	document_id: str
+	label:       SentimentLabel
+	score:       float
+	positive:    float         = 0.0
+	negative:    float         = 0.0
+	neutral:     float         = 0.0
+	compound:    float         = 0.0
+	emotions:    EmotionScores = Field(default_factory=EmotionScores)
+	model_used:  str | None    = None
+
+
+class NLPSentimentResponse(NLPSentiment):
+	pass
+
+
+# ---------------------------------------------------------------------------
+# NLPLanguage
+# ---------------------------------------------------------------------------
+
+class LanguageCandidate(BaseModel):
+	"""Single language detection candidate."""
+	model_config = ConfigDict(extra="forbid", validate_by_name=True)
+
+	code:        str
+	name:        str | None = None
+	probability: Annotated[float, AfterValidator(_validate_confidence)] = 0.0
+
+
+class NLPLanguage(NLPCBase):
+	"""Language identification result for a document."""
+
+	document_id: str
+	detected:    LanguageCode
+	confidence:  Annotated[float, AfterValidator(_validate_confidence)] = 0.0
+	candidates:  list[LanguageCandidate] = Field(default_factory=list)
+	script:      str | None  = None
+	is_african:  bool        = False
+	model_used:  str | None  = None
+	metadata:    dict[str, Any] = Field(default_factory=dict)
+
+
+class NLPLanguageCreate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, str_strip_whitespace=True, use_enum_values=True)
+
+	tenant_id:  str
+	created_by: str          = "system"
+	document_id: str
+	detected:   LanguageCode
+	confidence: float        = 0.0
+	candidates: list[LanguageCandidate] = Field(default_factory=list)
+	script:     str | None   = None
+	is_african: bool         = False
+	model_used: str | None   = None
+
+
+class NLPLanguageResponse(NLPLanguage):
+	pass
+
+
+# ---------------------------------------------------------------------------
+# NLPSummary
+# ---------------------------------------------------------------------------
+
+class NLPSummary(NLPCBase):
+	"""Extractive or abstractive summary of a document."""
+
+	document_id:       str
+	summary_text:      Annotated[str, AfterValidator(_validate_non_empty)]
+	method:            SummaryMethod = SummaryMethod.EXTRACTIVE
+	max_words:         int | None    = Field(default=None, ge=1)
+	actual_word_count: int           = Field(default=0, ge=0)
+	compression_ratio: Annotated[float, AfterValidator(_validate_confidence)] = 0.0
+	key_sentences:     list[str]     = Field(default_factory=list)
+	model_used:        str | None    = None
+	metadata:          dict[str, Any] = Field(default_factory=dict)
+
+
+class NLPSummaryCreate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, str_strip_whitespace=True, use_enum_values=True)
+
+	tenant_id:    str
+	created_by:   str          = "system"
+	document_id:  str
+	summary_text: str
+	method:       SummaryMethod = SummaryMethod.EXTRACTIVE
+	max_words:    int | None   = None
+	model_used:   str | None   = None
+
+
+class NLPSummaryResponse(NLPSummary):
+	pass
+
+
+# ---------------------------------------------------------------------------
+# NLPTranslation
+# ---------------------------------------------------------------------------
+
+class NLPTranslation(NLPCBase):
+	"""Translation of document text to a target language."""
+
+	document_id:     str
+	source_language: LanguageCode
+	target_language: LanguageCode
+	translated_text: Annotated[str, AfterValidator(_validate_non_empty)]
+	confidence:      Annotated[float, AfterValidator(_validate_confidence)] = 0.0
+	model_used:      str | None     = None
+	char_count:      int            = Field(default=0, ge=0)
+	metadata:        dict[str, Any] = Field(default_factory=dict)
+
+	@field_validator("target_language")
 	@classmethod
-	def validate_content(cls, value: str) -> str:
-		if not value or not value.strip():
-			raise ValueError("Content cannot be empty")
-		if len(value) > 10_000_000:
-			raise ValueError("Content exceeds maximum length")
-		return value.strip()
-
-	@property
-	def estimated_processing_time(self) -> float:
-		return 0.1 + (len(self.content) / 1_000_000)
+	def _target_not_auto(cls, v: str) -> str:
+		if v == LanguageCode.AUTO.value or v == "auto":
+			raise ValueError("target_language must be a specific language code, not 'auto'")
+		return v
 
 
-class NLPDocument(BaseNLPCModel):
-	"""Model representing a document to be processed."""
-	
-	document_id: str = Field(default_factory=uuid7str, description="Unique document identifier")
-	content: str = Field(
-		description="Text content to be processed",
-		max_length=10_000_000  # 10MB text limit
-	)
-	language: Optional[LanguageCode] = Field(
-		default=None,
-		description="Document language (auto-detected if not specified)"
-	)
-	metadata: dict[str, Any] = Field(
-		default_factory=dict,
-		description="Additional document metadata"
-	)
-	source: Optional[str] = Field(default=None, description="Document source system")
-	source_id: Optional[str] = Field(default=None, description="Original document ID in source system")
-	processing_history: list['ProcessingRecord'] = Field(
-		default_factory=list,
-		description="History of processing operations"
-	)
-	content_hash: Optional[str] = Field(default=None, description="Content hash for deduplication")
-	content_type: str = Field(default="text/plain", description="MIME type of content")
-	word_count: Optional[int] = Field(default=None, ge=0, description="Approximate word count")
-	char_count: Optional[int] = Field(default=None, ge=0, description="Character count")
-	is_sensitive: bool = Field(default=False, description="Contains sensitive/PII data")
-	retention_days: Optional[int] = Field(default=None, ge=1, description="Data retention period in days")
+class NLPTranslationCreate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, str_strip_whitespace=True, use_enum_values=True)
 
-	@field_validator('content')
+	tenant_id:       str
+	created_by:      str         = "system"
+	document_id:     str
+	source_language: LanguageCode
+	target_language: LanguageCode
+	translated_text: str
+	confidence:      float       = 0.0
+	model_used:      str | None  = None
+
+
+class NLPTranslationResponse(NLPTranslation):
+	pass
+
+
+# ---------------------------------------------------------------------------
+# NLPEmbedding
+# ---------------------------------------------------------------------------
+
+class NLPEmbedding(NLPCBase):
+	"""Dense vector embedding of document text."""
+
+	document_id:    str
+	vector:         list[float]   = Field(description="Embedding vector")
+	dimensions:     int           = Field(ge=1)
+	model_used:     str
+	model_provider: ModelProvider = ModelProvider.OLLAMA
+	norm:           float | None  = None
+	chunk_index:    int | None    = Field(default=None, ge=0)
+	chunk_text:     str | None    = None
+	metadata:       dict[str, Any] = Field(default_factory=dict)
+
+	@model_validator(mode="after")
+	def _dimensions_match(self) -> "NLPEmbedding":
+		if len(self.vector) != self.dimensions:
+			raise ValueError(f"vector length {len(self.vector)} != dimensions {self.dimensions}")
+		return self
+
+
+class NLPEmbeddingCreate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, str_strip_whitespace=True, use_enum_values=True)
+
+	tenant_id:      str
+	created_by:     str           = "system"
+	document_id:    str
+	vector:         list[float]
+	dimensions:     int
+	model_used:     str
+	model_provider: ModelProvider = ModelProvider.OLLAMA
+	chunk_index:    int | None    = None
+	chunk_text:     str | None    = None
+
+
+class NLPEmbeddingResponse(NLPEmbedding):
+	"""Bandwidth-friendly response — full vector excluded by default."""
+	vector:         list[float] = Field(default_factory=list, exclude=True)
+	vector_preview: list[float] = Field(default_factory=list, description="First 8 dims")
+
+	@model_validator(mode="after")
+	def _fill_preview(self) -> "NLPEmbeddingResponse":
+		if not self.vector_preview and self.vector:
+			self.vector_preview = self.vector[:8]
+		return self
+
+
+# ---------------------------------------------------------------------------
+# NLPClassification
+# ---------------------------------------------------------------------------
+
+class NLPClassification(NLPCBase):
+	"""Document classification result against a taxonomy."""
+
+	document_id: str
+	taxonomy:    ClassificationTaxonomy
+	label:       Annotated[str, AfterValidator(_validate_non_empty)]
+	confidence:  Annotated[float, AfterValidator(_validate_confidence)] = 0.0
+	all_scores:  dict[str, float] = Field(default_factory=dict)
+	hierarchy:   list[str]        = Field(default_factory=list)
+	model_used:  str | None       = None
+	metadata:    dict[str, Any]   = Field(default_factory=dict)
+
+
+class NLPClassificationCreate(BaseModel):
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, str_strip_whitespace=True, use_enum_values=True)
+
+	tenant_id:   str
+	created_by:  str                  = "system"
+	document_id: str
+	taxonomy:    ClassificationTaxonomy
+	label:       str
+	confidence:  float                = 0.0
+	all_scores:  dict[str, float]     = Field(default_factory=dict)
+	hierarchy:   list[str]            = Field(default_factory=list)
+	model_used:  str | None           = None
+
+
+class NLPClassificationResponse(NLPClassification):
+	pass
+
+
+# ---------------------------------------------------------------------------
+# NLPRelation
+# ---------------------------------------------------------------------------
+
+class NLPRelation(NLPCBase):
+	"""Directed relation between two entities in a document."""
+
+	document_id:  str
+	subject_id:   str
+	object_id:    str
+	relation:     str
+	confidence:   Annotated[float, AfterValidator(_validate_confidence)] = 0.0
+	sentence_idx: int | None     = None
+	model_used:   str | None     = None
+	metadata:     dict[str, Any] = Field(default_factory=dict)
+
+
+# ---------------------------------------------------------------------------
+# NLPCoreferenceChain
+# ---------------------------------------------------------------------------
+
+class NLPCoreferenceChain(NLPCBase):
+	"""Coreference chain — set of mentions referring to the same entity."""
+
+	document_id:    str
+	cluster_id:     int           = Field(ge=0)
+	mentions:       list[dict[str, Any]] = Field(min_length=1)
+	representative: str | None    = None
+	entity_id:      str | None    = None
+	model_used:     str | None    = None
+
+
+# ---------------------------------------------------------------------------
+# NLPKeyPhrase
+# ---------------------------------------------------------------------------
+
+class NLPKeyPhrase(NLPCBase):
+	"""Key phrase extracted from a document."""
+
+	document_id: str
+	phrase:      Annotated[str, AfterValidator(_validate_non_empty)]
+	score:       Annotated[float, AfterValidator(_validate_confidence)] = 0.0
+	frequency:   int          = Field(default=1, ge=1)
+	method:      str          = "tfidf"
+	metadata:    dict[str, Any] = Field(default_factory=dict)
+
+
+# ---------------------------------------------------------------------------
+# NLPModelConfig
+# ---------------------------------------------------------------------------
+
+class NLPModelConfig(NLPCBase):
+	"""Runtime configuration for a loaded NLP model."""
+
+	name:                Annotated[str, AfterValidator(_validate_non_empty)]
+	provider:            ModelProvider
+	model_name:          str
+	supported_tasks:     list[NLPTask]        = Field(min_length=1)
+	supported_languages: list[LanguageCode]   = Field(default_factory=lambda: [LanguageCode.EN])
+	max_input_chars:     int                  = Field(default=100_000, ge=1)
+	gpu_required:        bool                 = False
+	memory_mb:           int | None           = Field(default=None, ge=0)
+	is_active:           bool                 = True
+	load_priority:       int                  = Field(default=50, ge=1, le=100)
+	configuration:       dict[str, Any]       = Field(default_factory=dict)
+	performance_metrics: dict[str, float]     = Field(default_factory=dict)
+
+
+# ---------------------------------------------------------------------------
+# NLPBatchJob
+# ---------------------------------------------------------------------------
+
+class NLPBatchJob(NLPCBase):
+	"""Batch processing job spanning multiple documents."""
+
+	name:                 Annotated[str, AfterValidator(_validate_non_empty)]
+	document_ids:         list[str]        = Field(min_length=1)
+	tasks:                list[NLPTask]    = Field(min_length=1)
+	status:               ProcessingStatus = ProcessingStatus.PENDING
+	priority:             PriorityLevel    = PriorityLevel.NORMAL
+	progress:             float            = Field(default=0.0, ge=0.0, le=100.0)
+	total_documents:      int              = Field(ge=1)
+	processed_documents:  int              = Field(default=0, ge=0)
+	failed_documents:     int              = Field(default=0, ge=0)
+	started_at:           datetime | None  = None
+	completed_at:         datetime | None  = None
+	error_summary:        str | None       = None
+	configuration:        dict[str, Any]   = Field(default_factory=dict)
+
+
+# ---------------------------------------------------------------------------
+# Processing request / result
+# ---------------------------------------------------------------------------
+
+class NLPProcessingRequest(NLPCBase):
+	"""Request to run one or more NLP tasks against a document."""
+
+	document_id:     str
+	tasks:           list[NLPTask]   = Field(min_length=1)
+	priority:        PriorityLevel   = PriorityLevel.NORMAL
+	parameters:      dict[str, Any]  = Field(default_factory=dict)
+	callback_url:    str | None      = None
+	batch_id:        str | None      = None
+	max_seconds:     int | None      = Field(default=None, ge=1)
+	require_explain: bool            = False
+
+	@field_validator("tasks")
 	@classmethod
-	def validate_document_content(cls, value: str) -> str:
-		if not value or not value.strip():
-			raise ValueError("content cannot be empty")
-		return value.strip()
+	def _no_duplicate_tasks(cls, v: list[NLPTask]) -> list[NLPTask]:
+		seen: set[str] = set()
+		out = []
+		for t in v:
+			if t not in seen:
+				seen.add(t)
+				out.append(t)
+		return out
 
 
-class ProcessingRequest(BaseNLPCModel):
-	"""Model for NLP processing requests."""
-	
-	request_id: str = Field(default_factory=uuid7str, description="Unique request identifier")
-	document_id: Optional[str] = Field(default=None, description="Document to process")
-	tasks: list[NLPTask] = Field(default_factory=list, description="List of NLP tasks to perform")
-	priority: PriorityLevel = Field(default=PriorityLevel.NORMAL, description="Processing priority")
-	model_preferences: dict[str, str] = Field(
-		default_factory=dict,
-		description="Preferred models for specific tasks"
-	)
-	parameters: dict[str, Any] = Field(
-		default_factory=dict,
-		description="Task-specific parameters"
-	)
-	callback_url: Optional[str] = Field(default=None, description="Webhook URL for completion notification")
-	max_processing_time: Optional[int] = Field(
-		default=None,
-		ge=1,
-		description="Maximum processing time in seconds"
-	)
-	require_explanation: bool = Field(default=False, description="Include model explanations")
-	batch_id: Optional[str] = Field(default=None, description="Batch identifier for grouped processing")
-	user_id: Optional[str] = Field(default=None, description="User requesting processing")
-	task_type: Optional[Any] = Field(default=None, description="Legacy single-task request type")
-	text_content: Optional[str] = Field(default=None, description="Legacy inline text content")
-	preferred_model: Optional[str] = Field(default=None, description="Legacy preferred model identifier")
-	quality_level: Optional[Any] = Field(default=None, description="Legacy quality preference")
-	options: dict[str, Any] = Field(default_factory=dict, description="Legacy task options")
-	performance_requirements: dict[str, Any] = Field(default_factory=dict, description="Performance requirements")
-	fallback_enabled: bool = Field(default=True, description="Whether fallback processing is allowed")
+class NLPProcessingResult(NLPCBase):
+	"""Result of a single NLP task execution."""
 
-	@model_validator(mode='after')
-	def validate_processing_target(self) -> 'ProcessingRequest':
-		if not self.tasks and self.task_type is None:
-			raise ValueError("at least one task must be specified")
-		if self.task_type is not None and not self.text_content and not self.document_id:
-			raise ValueError("Either text_content or document_id must be provided")
-		if self.text_content is not None and len(self.text_content) > 1_000_000:
-			raise ValueError("Direct text content exceeds 1MB limit")
-		if self.document_id is None and self.text_content is not None:
-			self.document_id = uuid7str()
-		return self
-
-
-class ProcessingResult(BaseNLPCModel):
-	"""Model representing the result of an NLP processing operation."""
-	
-	result_id: str = Field(default_factory=uuid7str, description="Unique result identifier")
-	request_id: str = Field(default_factory=uuid7str, description="Reference to processing request")
-	document_id: str = Field(default="", description="Reference to processed document")
-	task: Optional[Any] = Field(default=None, description="Legacy task field")
-	task_type: Any = Field(default=NLPTask.TEXT_CLASSIFICATION, description="The NLP task that was performed")
-	status: ProcessingStatus = Field(default=ProcessingStatus.COMPLETED, description="Processing status")
-	confidence_score: Optional[float] = Field(
-		default=None,
-		description="Confidence score for the result",
-		ge=0.0,
-		le=1.0
-	)
-	processing_time: Annotated[float, AfterValidator(_validate_positive_float)] = Field(
-		default=0.0,
-		description="Processing time in seconds",
-		ge=0.0
-	)
-	result_data: dict[str, Any] = Field(default_factory=dict, description="Actual processing results")
-	model_version: str = Field(default="1.0", description="Version of the model used")
-	model_type: ModelType = Field(default=ModelType.CUSTOM, description="Type of model used")
-	error_message: Optional[str] = Field(default=None, description="Error message if processing failed")
-	explanation: Optional[dict[str, Any]] = Field(
-		default=None,
-		description="Model explanation if requested"
-	)
-	performance_metrics: dict[str, float] = Field(
-		default_factory=dict,
-		description="Performance metrics for this operation"
-	)
-	cache_key: Optional[str] = Field(default=None, description="Cache key for result reuse")
-	model_used: Optional[str] = Field(default=None, description="Legacy model identifier")
-	provider_used: Optional[Any] = Field(default=None, description="Legacy provider identifier")
-	processing_time_ms: float = Field(default=0.0, ge=0.0, description="Legacy processing time in ms")
-	total_time_ms: float = Field(default=0.0, ge=0.0, description="Legacy total time in ms")
-	results: dict[str, Any] = Field(default_factory=dict, description="Legacy result payload")
-	context_used: bool = Field(default=False, description="Whether context was applied")
-	security_applied: bool = Field(default=False, description="Whether security controls were applied")
-	encryption_applied: bool = Field(default=False, description="Whether encryption controls were applied")
-	cache_used: bool = Field(default=False, description="Whether a cached result was used")
-	optimization_applied: bool = Field(default=False, description="Whether performance optimization was applied")
+	request_id:     str
+	document_id:    str
+	task:           NLPTask
+	status:         ProcessingStatus      = ProcessingStatus.COMPLETED
+	confidence:     float | None          = Field(default=None, ge=0.0, le=1.0)
+	processing_ms:  Annotated[float, AfterValidator(_validate_non_negative)] = 0.0
+	model_used:     str | None            = None
+	model_provider: ModelProvider | None  = None
+	result_data:    dict[str, Any]        = Field(default_factory=dict)
+	error_message:  str | None            = None
+	cache_hit:      bool                  = False
+	explanation:    dict[str, Any] | None = None
 
 	@property
-	def is_successful(self) -> bool:
-		"""Whether the processing request completed successfully."""
-		return self.status == ProcessingStatus.COMPLETED or self.status == ProcessingStatus.COMPLETED.value
-
-	@property
-	def performance_rating(self) -> str:
-		if self.processing_time_ms < 50:
-			return "excellent"
-		if self.processing_time_ms < 150:
-			return "good"
-		if self.processing_time_ms < 500:
-			return "acceptable"
-		return "poor"
-
-	@model_validator(mode='after')
-	def sync_task_fields(self) -> 'ProcessingResult':
-		if self.task is not None:
-			self.task_type = self.task
-		else:
-			self.task = self.task_type
-		if not self.result_data and self.results:
-			self.result_data = self.results
-		if not self.results and self.result_data:
-			self.results = self.result_data
-		return self
+	def succeeded(self) -> bool:
+		return self.status == ProcessingStatus.COMPLETED
 
 
-class ProcessingRecord(BaseModel):
-	"""Record of a processing operation for audit trail."""
-	model_config = ConfigDict(extra='allow', validate_by_name=True, validate_by_alias=True, use_enum_values=True)
-	
-	record_id: str = Field(default_factory=uuid7str, description="Unique record identifier")
-	timestamp: datetime = Field(default_factory=datetime.utcnow, description="Processing timestamp")
-	task: Optional[NLPTask] = Field(default=None, description="Legacy task field")
-	task_type: Optional[NLPTask] = Field(default=None, description="Type of NLP task performed")
-	status: ProcessingStatus = Field(default=ProcessingStatus.COMPLETED, description="Processing status")
-	model_used: str = Field(default="", description="Model identifier used for processing")
-	results: dict[str, Any] = Field(default_factory=dict, description="Legacy processing results")
-	processing_time: float = Field(default=0.0, ge=0.0, description="Processing time in seconds")
-	input_size: int = Field(default=0, ge=0, description="Size of input in characters")
-	result_id: Optional[str] = Field(default=None, description="Reference to processing result")
-	error_code: Optional[str] = Field(default=None, description="Error code if failed")
-	user_id: Optional[str] = Field(default=None, description="User who initiated processing")
+# ---------------------------------------------------------------------------
+# Analytics / report
+# ---------------------------------------------------------------------------
 
-	@model_validator(mode='after')
-	def sync_task_fields(self) -> 'ProcessingRecord':
-		if self.task is not None and self.task_type is None:
-			self.task_type = self.task
-		if self.task is None and self.task_type is not None:
-			self.task = self.task_type
-		return self
+class NLPUsageReport(BaseModel):
+	"""Aggregated usage statistics for a tenant within a time window."""
+	model_config = ConfigDict(extra="forbid", validate_by_name=True)
+
+	tenant_id:              str
+	period_start:           datetime
+	period_end:             datetime
+	total_requests:         int   = 0
+	total_documents:        int   = 0
+	total_tokens_processed: int   = 0
+	task_breakdown:         dict[str, int]   = Field(default_factory=dict)
+	model_breakdown:        dict[str, int]   = Field(default_factory=dict)
+	language_breakdown:     dict[str, int]   = Field(default_factory=dict)
+	avg_processing_ms:      float = 0.0
+	p95_processing_ms:      float = 0.0
+	error_rate:             float = Field(default=0.0, ge=0.0, le=1.0)
+	cache_hit_rate:         float = Field(default=0.0, ge=0.0, le=1.0)
 
 
-class ModelConfiguration(BaseNLPCModel):
-	"""Configuration for NLP models."""
-	
-	config_id: str = Field(default_factory=uuid7str, description="Unique configuration identifier")
-	name: Annotated[str, AfterValidator(_validate_non_empty_string)] = Field(
-		default="default",
-		description="Configuration name",
-		min_length=1,
-		max_length=100
-	)
-	model_type: ModelType = Field(description="Type of model")
-	model_name: str = Field(default="default", description="Specific model name/path")
-	language: Optional[LanguageCode] = Field(default=None, description="Primary model language")
-	supported_tasks: list[NLPTask] = Field(default_factory=lambda: [NLPTask.TEXT_CLASSIFICATION], description="Tasks this model supports", min_items=1)
-	supported_languages: list[LanguageCode] = Field(
-		default_factory=lambda: [LanguageCode.EN],
-		description="Languages this model supports",
-		min_items=1
-	)
-	configuration: dict[str, Any] = Field(
-		default_factory=dict,
-		description="Model-specific configuration parameters"
-	)
-	performance_metrics: dict[str, float] = Field(
-		default_factory=dict,
-		description="Model performance benchmarks"
-	)
-	memory_requirements: Optional[int] = Field(
-		default=None,
-		ge=0,
-		description="Memory requirements in MB"
-	)
-	gpu_required: bool = Field(default=False, description="Whether GPU is required")
-	is_active: bool = Field(default=True, description="Whether this configuration is active")
-	load_priority: int = Field(default=50, ge=1, le=100, description="Model loading priority")
+# ---------------------------------------------------------------------------
+# Forward-ref rebuild
+# ---------------------------------------------------------------------------
 
-
-class ModelConfig(BaseModel):
-	"""Legacy service-level model configuration."""
-	model_config = ConfigDict(extra='allow', validate_by_name=True, validate_by_alias=True)
-
-	enable_ollama: bool = True
-	enable_transformers: bool = True
-	enable_spacy: bool = True
-	default_quality_level: QualityLevel = QualityLevel.BALANCED
-	max_concurrent_requests: int = 10
-	model_cache_size: int = 5
-
-
-class NLPModel(BaseModel):
-	"""Legacy NLP model metadata used by migrated tests and callers."""
-	model_config = ConfigDict(extra='allow', validate_by_name=True, validate_by_alias=True)
-
-	id: str = Field(default_factory=uuid7str)
-	tenant_id: str
-	name: str
-	model_key: str
-	provider: ModelProvider
-	provider_model_name: str
-	version: str = "1.0.0"
-	supported_tasks: list[NLPTaskType] = Field(default_factory=list)
-	supported_languages: list[LanguageCode] = Field(default_factory=list)
-	max_input_length: Optional[int] = None
-	context_window: Optional[int] = None
-	is_active: bool = True
-	is_loaded: bool = True
-	health_status: str = "unknown"
-	successful_requests: int = 0
-	failed_requests: int = 0
-
-	@property
-	def is_available(self) -> bool:
-		return self.is_active and self.is_loaded and self.health_status in {"healthy", "unknown"}
-
-	@property
-	def success_rate(self) -> float:
-		total = self.successful_requests + self.failed_requests
-		return (self.successful_requests / total * 100) if total else 0.0
-
-
-class StreamingSession(BaseModel):
-	"""Legacy streaming session state."""
-	model_config = ConfigDict(extra='allow', validate_by_name=True, validate_by_alias=True)
-
-	id: str = Field(default_factory=uuid7str)
-	tenant_id: str
-	user_id: str
-	task_type: NLPTaskType
-	chunk_size: int = Field(default=1000, ge=100, le=10000)
-	overlap_size: int = 0
-	status: str = "active"
-	chunks_processed: int = 0
-	total_characters: int = 0
-	average_latency_ms: float = 0.0
-	created_at: datetime = Field(default_factory=datetime.utcnow)
-
-	@property
-	def is_connected(self) -> bool:
-		return self.status == "active"
-
-
-class StreamingChunk(BaseModel):
-	"""Legacy streaming text chunk."""
-	model_config = ConfigDict(extra='allow', validate_by_name=True, validate_by_alias=True)
-
-	id: str = Field(default_factory=uuid7str)
-	session_id: str
-	sequence_number: int
-	text_content: Annotated[str, AfterValidator(_validate_non_empty_string)]
-	start_position: int
-	end_position: int
-	status: ProcessingStatus = ProcessingStatus.PENDING
-	results: Optional[dict[str, Any]] = None
-
-
-class SystemHealth(BaseModel):
-	"""Legacy aggregate service health model."""
-	model_config = ConfigDict(extra='allow', validate_by_name=True, validate_by_alias=True)
-
-	tenant_id: str
-	overall_status: str
-	component_status: dict[str, Any] = Field(default_factory=dict)
-	components: dict[str, Any] = Field(default_factory=dict)
-	average_response_time_ms: float = 0.0
-	requests_per_minute: int = 0
-	active_sessions: int = 0
-	queue_depth: int = 0
-	cpu_usage_percent: float = 0.0
-	memory_usage_percent: float = 0.0
-	disk_usage_percent: float = 0.0
-	total_models: int = 0
-	active_models: int = 0
-	loaded_models: int = 0
-	failed_models: int = 0
-	error_messages: list[str] = Field(default_factory=list)
-	last_check: datetime = Field(default_factory=datetime.utcnow)
-	timestamp: datetime = Field(default_factory=datetime.utcnow)
-
-	@property
-	def model_availability_percent(self) -> float:
-		return (self.loaded_models / self.total_models * 100) if self.total_models else 0.0
-
-	@property
-	def performance_rating(self) -> str:
-		if (
-			self.average_response_time_ms < 100
-			and self.cpu_usage_percent < 70
-			and self.memory_usage_percent < 80
-			and self.queue_depth <= 5
-		):
-			return "excellent"
-		if self.average_response_time_ms < 250 and self.cpu_usage_percent < 85 and self.memory_usage_percent < 90:
-			return "good"
-		if self.average_response_time_ms < 500 and self.cpu_usage_percent < 95 and self.memory_usage_percent < 95:
-			return "acceptable"
-		return "poor"
-
-
-class ContextSession(BaseNLPCModel):
-	"""Session for maintaining context across multiple processing requests."""
-	
-	session_id: str = Field(default_factory=uuid7str, description="Unique session identifier")
-	name: Optional[str] = Field(default=None, description="Human-readable session name")
-	context_type: str = Field(default="conversation", description="Type of context being maintained")
-	context_data: list[dict[str, Any]] = Field(
-		default_factory=list,
-		description="Context information"
-	)
-	max_context_length: int = Field(default=10000, gt=0, description="Maximum context length")
-	ttl_seconds: int = Field(default=3600, ge=60, description="Session TTL in seconds")
-	last_accessed: datetime = Field(default_factory=datetime.utcnow, description="Last access time")
-	is_active: bool = Field(default=True, description="Whether session is active")
-	document_ids: list[str] = Field(
-		default_factory=list,
-		description="Documents associated with this session"
-	)
-	user_id: Optional[str] = Field(default=None, description="Legacy user owner")
-	session_name: Optional[str] = Field(default=None, description="Legacy session name")
-	context_window_size: int = Field(default=10, ge=1, description="Legacy context window size")
-	enable_learning: bool = Field(default=True, description="Whether context learning is enabled")
-	learning_rate: float = Field(default=0.1, ge=0.0, description="Context learning rate")
-	context_decay_rate: float = Field(default=0.05, ge=0.0, description="Context decay rate")
-	max_context_age_hours: int = Field(default=24, ge=1, description="Maximum retained context age")
-	memory_retention_hours: int = Field(default=24, gt=0, description="Legacy memory retention")
-	session_metadata: dict[str, Any] = Field(default_factory=dict, description="Legacy session metadata")
-	context_history: list[dict[str, Any]] = Field(default_factory=list, description="Context history")
-	performance_history: list[dict[str, Any]] = Field(default_factory=list, description="Context performance history")
-
-
-class TextAnnotation(BaseModel):
-	"""Annotation attached to a text document."""
-	model_config = ConfigDict(extra='allow', validate_by_name=True, validate_by_alias=True, use_enum_values=True)
-
-	id: str = Field(default_factory=uuid7str)
-	document_id: Optional[str] = None
-	annotator_id: Optional[str] = None
-	annotation_type: Optional[Any] = None
-	label: Optional[str] = None
-	start_position: Optional[int] = None
-	end_position: Optional[int] = None
-	confidence_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
-	metadata: dict[str, Any] = Field(default_factory=dict)
-	created_at: datetime = Field(default_factory=datetime.utcnow)
-
-
-class AnnotationProject(BaseNLPCModel):
-	"""Human annotation project for supervised NLP workflows."""
-
-	name: Annotated[str, AfterValidator(_validate_non_empty_string)]
-	description: Optional[str] = None
-	annotation_type: Any
-	team_members: list[str] = Field(default_factory=list)
-	project_manager: str
-	annotation_schema: dict[str, Any] = Field(default_factory=dict)
-	status: str = "planning"
-	consensus_threshold: float = Field(default=0.8, ge=0.0, le=1.0)
-	document_count: int = Field(default=0, ge=0)
-	completed_annotations: int = Field(default=0, ge=0)
-
-	@property
-	def completion_percentage(self) -> float:
-		return (self.completed_annotations / self.document_count * 100) if self.document_count else 0.0
-
-
-class ModelTrainingConfig(BaseModel):
-	"""Configuration for training or fine-tuning NLP models."""
-	model_config = ConfigDict(extra='allow', validate_by_name=True, validate_by_alias=True, use_enum_values=True)
-
-	id: str = Field(default_factory=uuid7str)
-	tenant_id: str
-	name: str = "training-config"
-	base_model: Optional[str] = None
-	task_type: Optional[Any] = None
-	training_parameters: dict[str, Any] = Field(default_factory=dict)
-	dataset_ids: list[str] = Field(default_factory=list)
-	created_at: datetime = Field(default_factory=datetime.utcnow)
-
-
-class TextAnalytics(BaseModel):
-	"""Aggregated analytics for a text corpus."""
-	model_config = ConfigDict(extra='allow', validate_by_name=True, validate_by_alias=True)
-
-	id: str = Field(default_factory=uuid7str)
-	tenant_id: str
-	document_count: int = Field(default=0, ge=0)
-	token_count: int = Field(default=0, ge=0)
-	language_distribution: dict[str, int] = Field(default_factory=dict)
-	task_metrics: dict[str, Any] = Field(default_factory=dict)
-	created_at: datetime = Field(default_factory=datetime.utcnow)
-
-
-class BatchProcessingJob(BaseNLPCModel):
-	"""Model for batch processing jobs."""
-	
-	job_id: str = Field(default_factory=uuid7str, description="Unique job identifier")
-	name: Annotated[str, AfterValidator(_validate_non_empty_string)] = Field(
-		description="Job name",
-		min_length=1,
-		max_length=200
-	)
-	description: Optional[str] = Field(default=None, description="Job description")
-	status: ProcessingStatus = Field(default=ProcessingStatus.PENDING, description="Job status")
-	document_ids: list[str] = Field(description="Documents to process", min_items=1)
-	tasks: list[NLPTask] = Field(description="NLP tasks to perform", min_items=1)
-	priority: PriorityLevel = Field(default=PriorityLevel.NORMAL, description="Processing priority")
-	progress: float = Field(default=0.0, ge=0.0, le=100.0, description="Progress percentage")
-	total_documents: int = Field(ge=1, description="Total number of documents")
-	processed_documents: int = Field(default=0, ge=0, description="Number of processed documents")
-	failed_documents: int = Field(default=0, ge=0, description="Number of failed documents")
-	started_at: Optional[datetime] = Field(default=None, description="Job start time")
-	completed_at: Optional[datetime] = Field(default=None, description="Job completion time")
-	estimated_completion: Optional[datetime] = Field(default=None, description="Estimated completion time")
-	results_location: Optional[str] = Field(default=None, description="Location of results")
-	error_summary: Optional[str] = Field(default=None, description="Summary of errors")
-	configuration: dict[str, Any] = Field(
-		default_factory=dict,
-		description="Job configuration parameters"
-	)
-
-
-# Model relationships and forward references
 NLPDocument.model_rebuild()
-ProcessingRequest.model_rebuild()
-ProcessingResult.model_rebuild()
-BatchProcessingJob.model_rebuild()
+NLPEntity.model_rebuild()
+NLPSentiment.model_rebuild()
+NLPEmbedding.model_rebuild()
+NLPEmbeddingResponse.model_rebuild()
+NLPProcessingRequest.model_rebuild()
+NLPProcessingResult.model_rebuild()
+NLPBatchJob.model_rebuild()
 
+# Backward-compatibility alias
+ProcessingRequest = NLPProcessingRequest
+ProcessingResult = NLPProcessingResult
+ProcessingRecord = NLPDocument  # backward-compat alias
 
-def _log_model_validation_error(model_name: str, error: Exception) -> str:
-	"""Log model validation errors for debugging."""
-	error_msg = f"Model validation error in {model_name}: {str(error)}"
-	print(f"[NLPC Models] {error_msg}")
-	return error_msg
-
-
-async def validate_models_async() -> dict[str, bool]:
-	"""
-	Async validation of all model classes.
-	
-	Returns:
-		Dictionary mapping model names to validation status
-	"""
-	models_to_test = [
-		('NLPDocument', NLPDocument),
-		('ProcessingRequest', ProcessingRequest),
-		('ProcessingResult', ProcessingResult),
-		('ProcessingRecord', ProcessingRecord),
-		('ModelConfiguration', ModelConfiguration),
-		('ContextSession', ContextSession),
-		('BatchProcessingJob', BatchProcessingJob)
-	]
-	
-	validation_results = {}
-	
-	for model_name, model_class in models_to_test:
-		try:
-			# Test basic instantiation
-			if model_name == 'NLPDocument':
-				test_instance = model_class(
-					tenant_id="test_tenant",
-					content="Test document content"
-				)
-			elif model_name == 'ProcessingRequest':
-				test_instance = model_class(
-					tenant_id="test_tenant",
-					document_id="test_doc_id",
-					tasks=[NLPTask.TOKENIZATION]
-				)
-			elif model_name == 'ProcessingResult':
-				test_instance = model_class(
-					tenant_id="test_tenant",
-					request_id="test_request",
-					document_id="test_doc",
-					task_type=NLPTask.TOKENIZATION,
-					status=ProcessingStatus.COMPLETED,
-					confidence_score=0.95,
-					processing_time=0.1,
-					result_data={"tokens": ["test"]},
-					model_version="1.0",
-					model_type=ModelType.SPACY
-				)
-			elif model_name == 'BatchProcessingJob':
-				test_instance = model_class(
-					tenant_id="test_tenant",
-					name="Test Job",
-					document_ids=["doc1"],
-					tasks=[NLPTask.TOKENIZATION],
-					total_documents=1
-				)
-			else:
-				# For other models, try with minimal required fields
-				test_instance = model_class(tenant_id="test_tenant")
-			
-			# Test serialization/deserialization
-			dict_data = test_instance.model_dump()
-			restored_instance = model_class.model_validate(dict_data)
-			
-			validation_results[model_name] = True
-			
-		except Exception as e:
-			_log_model_validation_error(model_name, e)
-			validation_results[model_name] = False
-	
-	return validation_results
-
-
-def _log_successful_model_load() -> None:
-	"""Log successful model loading."""
-	print("[NLPC Models] All NLP data models loaded successfully")
-
-
-# Initialize models on module load
-_log_successful_model_load()
+from dataclasses import dataclass as _mc_dc, field as _mc_f
+@_mc_dc
+class ModelConfiguration:
+    model_name: str = "default"
+    max_tokens: int = 512
+    temperature: float = 0.7
+    language: str = "en"
+    task_type: str = "general"
+    options: dict = _mc_f(default_factory=dict)

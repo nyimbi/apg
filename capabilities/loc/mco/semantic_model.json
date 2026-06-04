@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "loc_mco",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "loc_mco": {
+      "capability": "loc_mco"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

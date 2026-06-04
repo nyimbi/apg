@@ -723,3 +723,206 @@ class SchdService:
 		if tenant_id is not None:
 			values = [value for value in values if value.tenant_id == tenant_id]
 		return [value.to_dict() for value in values]
+
+	# ── Extended methods ───────────────────────────────────────────────────────
+
+	def job_create(
+		self,
+		tenant_id: str,
+		name: str,
+		command: str,
+		owner: str,
+		criticality: str = "normal",
+		expected_runtime_minutes: int = 30,
+		monitoring_attached: bool = True,
+		tags: list[str] | None = None,
+	) -> dict[str, Any]:
+		"""Spec alias for define_job."""
+		return self.define_job(
+			tenant_id=tenant_id,
+			name=name,
+			command=command,
+			owner=owner,
+			criticality=criticality,
+			expected_runtime_minutes=expected_runtime_minutes,
+			monitoring_attached=monitoring_attached,
+			tags=tags,
+		)
+
+	def job_trigger(
+		self,
+		tenant_id: str,
+		schedule_id: str,
+		requested_by: str,
+		manual_reason: str | None = None,
+	) -> dict[str, Any]:
+		"""Spec alias for trigger_run."""
+		return self.trigger_run(tenant_id, schedule_id, requested_by, manual_reason)
+
+	def job_pause(
+		self,
+		tenant_id: str,
+		schedule_id: str,
+		actor: str,
+		reason: str = "paused_by_operator",
+	) -> dict[str, Any]:
+		"""Spec alias for pause_schedule."""
+		return self.pause_schedule(tenant_id, schedule_id, actor, reason)
+
+	def job_resume(
+		self,
+		tenant_id: str,
+		schedule_id: str,
+		actor: str,
+		reason: str = "resumed_by_operator",
+	) -> dict[str, Any]:
+		"""Spec alias for resume_schedule."""
+		return self.resume_schedule(tenant_id, schedule_id, actor, reason)
+
+	def job_cancel(
+		self,
+		tenant_id: str,
+		run_id: str,
+		actor: str,
+		reason: str = "cancelled_by_operator",
+	) -> dict[str, Any]:
+		"""Spec alias for cancel_run."""
+		return self.cancel_run(tenant_id, run_id, actor, reason)
+
+	def cron_validate(self, cron: str) -> dict[str, Any]:
+		"""Validate a cron expression (5-field standard format)."""
+		import re
+		field_pattern = r"(\*|[0-9,\-\/\*]+)"
+		pattern = r"^" + r"\s+".join([field_pattern] * 5) + r"$"
+		valid = bool(re.match(pattern, cron.strip()))
+		return {"cron": cron, "valid": valid, "fields": cron.strip().split() if valid else []}
+
+	def dependency_chain(
+		self,
+		tenant_id: str,
+		schedule_id: str,
+		downstream_schedule_ids: list[str],
+		owner: str,
+	) -> dict[str, Any]:
+		"""Register a dependency chain between schedules."""
+		self._require_tenant(tenant_id)
+		schedule = self._require_owned(self._schedules, schedule_id, tenant_id, "schedule_not_found")
+		for dep_id in downstream_schedule_ids:
+			self._require_owned(self._schedules, dep_id, tenant_id, "schedule_not_found")
+		chain: dict[str, Any] = {
+			"schedule_id": schedule_id,
+			"schedule_name": schedule.name,
+			"downstream": downstream_schedule_ids,
+			"owner": owner,
+			"registered_at": utc_now(),
+		}
+		self._record_event(tenant_id, "dependency_chain_registered", schedule_id, f"Chain registered for {schedule.name}", owner)
+		return chain
+
+	def retry_policy_set(
+		self,
+		tenant_id: str,
+		job_id: str,
+		retry_strategy: str,
+		max_attempts: int,
+		actor: str,
+	) -> dict[str, Any]:
+		"""Update retry policy on an existing job definition."""
+		self._require_tenant(tenant_id)
+		job = self._require_owned(self._jobs, job_id, tenant_id, "job_not_found")
+		job.retry_strategy = normalize_retry_strategy(retry_strategy)
+		job.max_attempts = max(1, max_attempts)
+		self._record_event(tenant_id, "retry_policy_set", job_id, f"Retry policy updated: {retry_strategy} x{max_attempts}", actor)
+		return job.to_dict()
+
+	def sla_monitor(
+		self,
+		tenant_id: str,
+		schedule_id: str,
+	) -> dict[str, Any]:
+		"""Check SLA compliance: runs that exceeded expected_runtime."""
+		self._require_tenant(tenant_id)
+		schedule = self._require_owned(self._schedules, schedule_id, tenant_id, "schedule_not_found")
+		job = self._require_owned(self._jobs, schedule.job_id, tenant_id, "job_not_found")
+		runs = [r for r in self._runs.values() if r.tenant_id == tenant_id and r.schedule_id == schedule_id]
+		breached: list[dict[str, Any]] = []
+		for run in runs:
+			actual_minutes = (run.completed_at - run.started_at).total_seconds() / 60 if run.completed_at and run.started_at else 0
+			if actual_minutes > job.expected_runtime_minutes:
+				breached.append({**run.to_dict(), "expected_minutes": job.expected_runtime_minutes, "actual_minutes": round(actual_minutes, 2)})
+		return {
+			"schedule_id": schedule_id,
+			"total_runs": len(runs),
+			"sla_breached_count": len(breached),
+			"breached_runs": breached,
+		}
+
+	def job_history(
+		self,
+		tenant_id: str,
+		schedule_id: str,
+		limit: int = 50,
+	) -> list[dict[str, Any]]:
+		"""Return run history for a schedule, most recent first."""
+		self._require_tenant(tenant_id)
+		runs = [r.to_dict() for r in self._runs.values() if r.tenant_id == tenant_id and r.schedule_id == schedule_id]
+		runs.sort(key=lambda r: r.get("started_at", ""), reverse=True)
+		return runs[:limit]
+
+	def dead_letter_handle(
+		self,
+		tenant_id: str,
+		run_id: str,
+		actor: str,
+		reason: str = "dead_letter_requeue",
+	) -> dict[str, Any]:
+		"""Spec alias for dead_letter_run."""
+		return self.dead_letter_run(tenant_id, run_id, actor, reason)
+
+	def job_priority(
+		self,
+		tenant_id: str,
+		job_id: str,
+		priority: int,
+		actor: str,
+	) -> dict[str, Any]:
+		"""Set a numeric priority on a job (stored as a tag)."""
+		self._require_tenant(tenant_id)
+		job = self._require_owned(self._jobs, job_id, tenant_id, "job_not_found")
+		job.tags = [t for t in (job.tags or []) if not t.startswith("priority:")] + [f"priority:{priority}"]
+		self._record_event(tenant_id, "job_priority_set", job_id, f"Priority set to {priority}", actor)
+		return {**job.to_dict(), "priority": priority}
+
+	def queue_depth(self, tenant_id: str, queue: str | None = None) -> dict[str, Any]:
+		"""Return the number of pending/running runs per worker pool queue."""
+		self._require_tenant(tenant_id)
+		depth: dict[str, int] = {}
+		for run in self._runs.values():
+			if run.tenant_id != tenant_id or run.status not in {"running", "pending"}:
+				continue
+			pool = self._workers.get(run.worker_pool_id)
+			q = pool.queue if pool else "unknown"
+			if queue and q != queue:
+				continue
+			depth[q] = depth.get(q, 0) + 1
+		return {"tenant_id": tenant_id, "queue_filter": queue, "queue_depths": depth}
+
+	def worker_scale(
+		self,
+		tenant_id: str,
+		worker_pool_id: str,
+		new_concurrency: int,
+		actor: str,
+	) -> dict[str, Any]:
+		"""Scale a worker pool's max_concurrency."""
+		self._require_tenant(tenant_id)
+		pool = self._require_owned(self._workers, worker_pool_id, tenant_id, "worker_pool_not_found")
+		old = pool.max_concurrency
+		pool.max_concurrency = max(1, new_concurrency)
+		pool.updated_at = utc_now()
+		self._record_event(tenant_id, "worker_scaled", worker_pool_id, f"Concurrency {old} -> {new_concurrency}", actor)
+		return pool.to_dict()
+
+	def scheduler_analytics(self, tenant_id: str | None = None) -> dict[str, Any]:
+		"""Alias for dashboard_summary."""
+		return self.dashboard_summary(tenant_id)

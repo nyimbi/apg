@@ -155,6 +155,7 @@ RULES: list[dict[str, Any]] = [
 	{"name": "envm_agent_requires_disclosure", "description": "AI environment-agent contributions require disclosure.", "condition": {"envm_agent_present": True, "agent_contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "envm_agent_disclosure_required", "required_action": "disclose_envm_agent"}},
 	{"name": "environment_state_change_requires_audit", "description": "Environment lifecycle state changes require audit evidence.", "condition": {"state_change_requested": True, "audit_event_recorded": False}, "effect": {"decision": "deny", "reason": "environment_audit_event_required", "required_action": "record_environment_audit_event"}},
 	{"name": "batch_environment_mutation_requires_bytewax", "description": "Batch environment mutations must use Bytewax event streams.", "condition": {"requested_operation": "batch_environment_mutation", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}},
+	{"name": "write_requires_policy", "description": "Environment write operations require an explicit authorization policy.", "condition": {"operation_type": "write", "write_policy_present": False}, "effect": {"decision": "deny", "reason": "envm_write_policy_required", "required_action": "attach_write_policy"}},
 ]
 
 

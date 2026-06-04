@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "apg-energy-met"
+version = "1.0.0"
+description = "APG Smart Metering & AMI — energy domain capability"
+readme = "README.md"
+license = {text = "Proprietary"}
+requires-python = ">=3.11"
+keywords = ["apg", "datacraft", "capability", "energy", "met"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+        "pydantic>=2.0",
+    "uuid6>=0.4",
+    "sqlalchemy>=2.0",
+    "flask>=3.0",
+]
+
+[project.optional-dependencies]
+streaming = ["bytewax>=0.18"]
+nlp       = ["transformers>=4.30", "sentence-transformers>=2.2"]
+vision    = ["opencv-python>=4.0", "Pillow>=10.0"]
+geo       = ["shapely>=2.0", "geopy>=2.4"]
+crypto    = ["cryptography>=41.0"]
+full      = [
+    "apg-energy-met[streaming]",
+    "apg-energy-met[nlp]",
+    "apg-energy-met[vision]",
+    "apg-energy-met[geo]",
+    "apg-energy-met[crypto]",
+]
+
+[project.urls]
+Homepage   = "https://www.datacraft.co.ke"
+Repository = "https://github.com/datacraft/apg"
+Changelog  = "https://github.com/datacraft/apg/blob/main/capabilities/energy/met/CHANGELOG.md"
+
+
+[project.scripts]
+apg-energy-met = "apg_energy_met.app:main"
+[project.entry-points."apg.capabilities"]
+energy_met = "apg_energy_met:get_capability_contract"
+
+[tool.setuptools]
+package-dir = {"apg_energy_met" = "."}
+packages    = ["apg_energy_met"]
+
+[tool.setuptools.package-data]
+"apg_energy_met" = ["py.typed", "README.md", "*.pyi"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

@@ -1,50 +1,31 @@
-"""APG financial reporting capability package."""
+"""APG Financial Reporting capability.
 
+Standalone package: ``pip install apg-fin-rpt``
+
+Quick start::
+
+    from apg_fin_rpt import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : fin_rpt
+Provides      : financial_report_template_lifecycle, report_line_mapping, reporting_period_lifecycle, financial_statement_generation, statement_publication_workflow, financial_consolidation
+"""
 from __future__ import annotations
 
-from .capability_contract import (
-	RPT_EVENT_STREAM,
-	SUPPORTED_RPT_AGENT_ROLES,
-	SUPPORTED_RPT_AGENT_RUNTIMES,
-	evaluate_capability_rules,
-	event_stream_name,
-	get_capability_contract,
-	streaming_manifest,
+__version__  = "1.0.0"
+__package_name__ = "apg-fin-rpt"
+__capability_id__ = "fin_rpt"
+
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
 )
-from .service import FinancialReportingService, RPTService
-
-
-CAPABILITY_ID = "fin_rpt"
-CAPABILITY_NAME = "Financial Reporting"
-CAPABILITY_VERSION = "2.1.0"
-
-
-def register_capability() -> dict[str, object]:
-	contract = get_capability_contract()
-	return {
-		"capability": CAPABILITY_ID,
-		"display_name": CAPABILITY_NAME,
-		"version": CAPABILITY_VERSION,
-		"provides": contract["provides"],
-		"requires": contract["requires"],
-		"ui": contract["ui"],
-		"theme": contract["theme"],
-		"streaming": contract["streaming"],
-	}
-
 
 __all__ = [
-	"CAPABILITY_ID",
-	"CAPABILITY_NAME",
-	"CAPABILITY_VERSION",
-	"FinancialReportingService",
-	"RPTService",
-	"RPT_EVENT_STREAM",
-	"SUPPORTED_RPT_AGENT_ROLES",
-	"SUPPORTED_RPT_AGENT_RUNTIMES",
-	"evaluate_capability_rules",
-	"event_stream_name",
-	"get_capability_contract",
-	"register_capability",
-	"streaming_manifest",
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
 ]

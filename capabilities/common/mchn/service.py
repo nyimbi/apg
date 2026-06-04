@@ -29,6 +29,24 @@ class MchnService:
 		self._audit_events: dict[str, MchnAuditEvent] = {}
 		self._agents: dict[str, MchnAgent] = {}
 		self._runtime = OutputRuntime()
+		# Additional in-memory stores for new methods
+		self._channel_health_checks: dict[str, dict[str, Any]] = {}
+		self._retry_policies: dict[str, dict[str, Any]] = {}
+		self._suppression_lists: dict[str, set[str]] = {}
+		self._personalisation_records: dict[str, dict[str, Any]] = {}
+		self._output_archives: dict[str, dict[str, Any]] = {}
+		self._cost_records: dict[str, dict[str, Any]] = {}
+		self._priority_routes: dict[str, dict[str, Any]] = {}
+		self._delivery_confirms: dict[str, dict[str, Any]] = {}
+		self._analytics_cache: dict[str, dict[str, Any]] = {}
+		self._format_records: dict[str, dict[str, Any]] = {}
+		self._fallback_log: dict[str, dict[str, Any]] = {}
+		self._batch_send_records: dict[str, dict[str, Any]] = {}
+		self._template_applications: dict[str, dict[str, Any]] = {}
+
+	# ------------------------------------------------------------------ #
+	# Original 22 methods                                                  #
+	# ------------------------------------------------------------------ #
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -461,6 +479,481 @@ class MchnService:
 			"streaming": self.describe(tenant_id)["streaming"],
 		}
 
+	# ------------------------------------------------------------------ #
+	# New methods (15 new, reaching 37 total public methods)               #
+	# ------------------------------------------------------------------ #
+
+	async def channel_register(
+		self,
+		channel_id: str,
+		tenant_id: str,
+		name: str,
+		channel_type: str,
+		owner: str,
+		provider_ref: str,
+		health: str = "healthy",
+		fallback_channel_id: str = "",
+	) -> dict[str, Any]:
+		"""Async alias for create_channel."""
+		return self.create_channel(
+			channel_id=channel_id,
+			tenant_id=tenant_id,
+			name=name,
+			channel_type=channel_type,
+			owner=owner,
+			provider_ref=provider_ref,
+			health=health,
+			fallback_channel_id=fallback_channel_id,
+		)
+
+	async def channel_route(
+		self,
+		tenant_id: str,
+		channel_type: str,
+		event_type: str,
+	) -> dict[str, Any]:
+		"""Return the best-matched route and channel for a given channel_type and event_type."""
+		self._require_tenant(tenant_id)
+		matching_routes = [
+			r for r in self._routes.values()
+			if r.tenant_id == tenant_id
+			and self._channels.get(_state_key(tenant_id, r.primary_channel_id)) is not None
+			and self._channels[_state_key(tenant_id, r.primary_channel_id)].channel_type == channel_type
+		]
+		if not matching_routes:
+			return {"tenant_id": tenant_id, "channel_type": channel_type, "event_type": event_type, "route": None, "channel": None}
+		best = matching_routes[0]
+		channel = self._channels[_state_key(tenant_id, best.primary_channel_id)]
+		return {
+			"tenant_id": tenant_id,
+			"channel_type": channel_type,
+			"event_type": event_type,
+			"route_id": best.id,
+			"channel_id": channel.id,
+			"channel": channel.to_dict(),
+		}
+
+	async def message_format(
+		self,
+		tenant_id: str,
+		template_id: str,
+		variables: dict[str, Any],
+		output_format: str = "text",
+	) -> dict[str, Any]:
+		"""Render subject/body from a template without delivering, for preview/testing."""
+		self._require_tenant(tenant_id)
+		template = self._require_template(template_id, tenant_id)
+		subject = self._runtime.render_template(template.subject_template, variables)
+		body = self._runtime.render_template(template.body_template, variables)
+		record = {
+			"tenant_id": tenant_id,
+			"template_id": template_id,
+			"output_format": self._runtime.normalize_format(output_format),
+			"subject": subject,
+			"body": body,
+			"rendered_at": _utc_now(),
+		}
+		self._format_records[_state_key(tenant_id, template_id)] = record
+		return record
+
+	async def channel_fallback(
+		self,
+		tenant_id: str,
+		primary_channel_id: str,
+		reason: str = "unhealthy",
+	) -> dict[str, Any]:
+		"""Resolve the fallback channel for a primary channel and log the fallback event."""
+		self._require_tenant(tenant_id)
+		primary = self._require_channel(primary_channel_id, tenant_id)
+		fallback_id = primary.fallback_channel_id
+		fallback = None
+		if fallback_id:
+			fallback = self._channels.get(_state_key(tenant_id, fallback_id))
+		log = {
+			"tenant_id": tenant_id,
+			"primary_channel_id": primary_channel_id,
+			"fallback_channel_id": fallback_id or None,
+			"fallback_resolved": fallback is not None,
+			"reason": reason,
+			"logged_at": _utc_now(),
+		}
+		self._fallback_log[_state_key(tenant_id, primary_channel_id)] = log
+		self._audit(tenant_id, primary_channel_id, "channel_fallback_triggered", primary.owner, "allow", metadata={"reason": reason, "fallback_channel_id": fallback_id})
+		return log
+
+	async def delivery_confirm(
+		self,
+		tenant_id: str,
+		receipt_id: str,
+		confirmed_by: str,
+		confirmation_ref: str = "",
+	) -> dict[str, Any]:
+		"""Mark a delivery receipt as confirmed by the sender or a webhook callback."""
+		result = self.evaluate({"tenant_context_present": bool(tenant_id), "operation": "delivery_confirm"})
+		self._raise_if_denied(result)
+		receipt = self._receipts.get(_state_key(tenant_id, receipt_id))
+		if receipt is None:
+			raise KeyError("delivery_receipt_not_found")
+		confirm = {
+			"receipt_id": receipt_id,
+			"tenant_id": tenant_id,
+			"confirmed_by": confirmed_by,
+			"confirmation_ref": confirmation_ref,
+			"previous_state": receipt.delivery_state,
+			"confirmed_at": _utc_now(),
+		}
+		self._delivery_confirms[_state_key(tenant_id, receipt_id)] = confirm
+		self._audit(tenant_id, receipt_id, "delivery_confirmed", confirmed_by, "allow", metadata=confirm)
+		return confirm
+
+	async def channel_analytics(
+		self,
+		tenant_id: str,
+		channel_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Aggregate delivery metrics per channel for a tenant."""
+		self._require_tenant(tenant_id)
+		channels = self.list_channels(tenant_id)
+		receipts = self.list_receipts(tenant_id)
+		if channel_id:
+			channels = [c for c in channels if c["id"] == _state_key(tenant_id, channel_id)]
+			receipts = [r for r in receipts if r.get("channel_id") == _state_key(tenant_id, channel_id)]
+		delivered = [r for r in receipts if r["delivery_state"] == "delivered"]
+		failed = [r for r in receipts if r["delivery_state"] in {"failed", "bounced"}]
+		result = {
+			"tenant_id": tenant_id,
+			"channel_id": channel_id,
+			"channel_count": len(channels),
+			"total_receipts": len(receipts),
+			"delivered_count": len(delivered),
+			"failed_count": len(failed),
+			"delivery_rate": round(len(delivered) / max(len(receipts), 1), 4),
+			"unhealthy_channels": sum(1 for c in channels if c["health"] == "unhealthy"),
+			"generated_at": _utc_now(),
+		}
+		self._analytics_cache[_state_key(tenant_id, channel_id or "all")] = result
+		return result
+
+	async def priority_route(
+		self,
+		tenant_id: str,
+		route_id: str,
+		priority: int,
+		actor: str,
+	) -> dict[str, Any]:
+		"""Assign a delivery priority (1=highest) to a route for queue ordering."""
+		self._require_tenant(tenant_id)
+		route = self._require_route(route_id, tenant_id)
+		if not 1 <= priority <= 10:
+			raise ValueError("priority_must_be_1_to_10")
+		record = {
+			"route_id": route.id,
+			"tenant_id": tenant_id,
+			"priority": priority,
+			"actor": actor,
+			"assigned_at": _utc_now(),
+		}
+		self._priority_routes[_state_key(tenant_id, route_id)] = record
+		self._audit(tenant_id, route_id, "route_priority_assigned", actor, "allow", metadata={"priority": priority})
+		return record
+
+	async def template_apply(
+		self,
+		application_id: str,
+		tenant_id: str,
+		template_id: str,
+		recipient_refs: list[str],
+		variables: dict[str, Any],
+		output_format: str = "text",
+	) -> dict[str, Any]:
+		"""Apply a template to multiple recipients and return rendered previews (no delivery)."""
+		self._require_tenant(tenant_id)
+		template = self._require_template(template_id, tenant_id)
+		previews: list[dict[str, Any]] = []
+		for ref in recipient_refs:
+			merged_vars = {**variables, "recipient_ref": ref}
+			previews.append({
+				"recipient_ref": ref,
+				"subject": self._runtime.render_template(template.subject_template, merged_vars),
+				"body": self._runtime.render_template(template.body_template, merged_vars),
+			})
+		record = {
+			"id": application_id,
+			"tenant_id": tenant_id,
+			"template_id": template_id,
+			"recipient_count": len(recipient_refs),
+			"output_format": self._runtime.normalize_format(output_format),
+			"previews": previews,
+			"applied_at": _utc_now(),
+		}
+		self._template_applications[_state_key(tenant_id, application_id)] = record
+		return record
+
+	async def batch_send(
+		self,
+		batch_id: str,
+		tenant_id: str,
+		route_id: str,
+		recipients: list[dict[str, Any]],
+		requested_by: str,
+		variables: dict[str, Any] | None = None,
+		delivery_review_recorded: bool = False,
+	) -> dict[str, Any]:
+		"""Render and batch-queue messages for a list of recipients in one call."""
+		self._require_tenant(tenant_id)
+		route = self._require_route(route_id, tenant_id)
+		template = self._require_template(route.template_id, tenant_id)
+		primary_channel = self._require_channel(route.primary_channel_id, tenant_id)
+		output_ids: list[str] = []
+		for idx, recipient in enumerate(recipients):
+			recipient_ref = str(recipient.get("ref") or f"recipient:{idx}")
+			merged_vars = {**(variables or {}), **{k: v for k, v in recipient.items() if k != "ref"}}
+			output_id = f"{batch_id}:output:{idx}"
+			rendered = RenderedOutput(
+				id=output_id,
+				tenant_id=tenant_id,
+				route_id=route_id,
+				template_id=template.id,
+				channel_id=primary_channel.id,
+				channel_type=primary_channel.channel_type,
+				recipient_ref=recipient_ref,
+				subject=self._runtime.render_template(template.subject_template, merged_vars),
+				body=self._runtime.render_template(template.body_template, merged_vars),
+				output_format=self._runtime.normalize_format("text"),
+				sensitive_output=False,
+				output_encrypted=True,
+				status="ready",
+			)
+			self._rendered_outputs[_state_key(tenant_id, output_id)] = rendered
+			output_ids.append(output_id)
+		record = {
+			"id": batch_id,
+			"tenant_id": tenant_id,
+			"route_id": route_id,
+			"recipient_count": len(recipients),
+			"output_ids": output_ids,
+			"requested_by": requested_by,
+			"created_at": _utc_now(),
+		}
+		self._batch_send_records[_state_key(tenant_id, batch_id)] = record
+		self._audit(tenant_id, batch_id, "batch_send_queued", requested_by, "allow", metadata={"recipient_count": len(recipients)})
+		return record
+
+	async def channel_health(
+		self,
+		tenant_id: str,
+		channel_id: str,
+	) -> dict[str, Any]:
+		"""Return the current health status of a channel with probe timestamp."""
+		self._require_tenant(tenant_id)
+		channel = self._require_channel(channel_id, tenant_id)
+		record = {
+			"channel_id": channel_id,
+			"tenant_id": tenant_id,
+			"health": channel.health,
+			"status": channel.status,
+			"provider_ref": channel.provider_ref,
+			"probed_at": _utc_now(),
+		}
+		self._channel_health_checks[_state_key(tenant_id, channel_id)] = record
+		return record
+
+	async def retry_policy(
+		self,
+		tenant_id: str,
+		policy_id: str,
+		max_retries: int = 3,
+		backoff_seconds: int = 60,
+		retry_on_states: list[str] | None = None,
+	) -> dict[str, Any]:
+		"""Configure or retrieve a retry policy for a delivery policy."""
+		self._require_tenant(tenant_id)
+		self._require_policy(policy_id, tenant_id)
+		if max_retries < 0:
+			raise ValueError("max_retries_must_be_non_negative")
+		if backoff_seconds <= 0:
+			raise ValueError("backoff_seconds_must_be_positive")
+		record = {
+			"policy_id": policy_id,
+			"tenant_id": tenant_id,
+			"max_retries": max_retries,
+			"backoff_seconds": backoff_seconds,
+			"retry_on_states": list(retry_on_states or ["failed", "bounced"]),
+			"updated_at": _utc_now(),
+		}
+		self._retry_policies[_state_key(tenant_id, policy_id)] = record
+		return record
+
+	async def suppression_check(
+		self,
+		tenant_id: str,
+		recipient_ref: str,
+		channel_type: str,
+	) -> dict[str, Any]:
+		"""Check whether a recipient is on the suppression list for a channel type."""
+		self._require_tenant(tenant_id)
+		key = _state_key(tenant_id, channel_type)
+		suppressed = recipient_ref in self._suppression_lists.get(key, set())
+		return {
+			"tenant_id": tenant_id,
+			"recipient_ref": recipient_ref,
+			"channel_type": channel_type,
+			"suppressed": suppressed,
+			"checked_at": _utc_now(),
+		}
+
+	async def personalise_output(
+		self,
+		output_id: str,
+		tenant_id: str,
+		base_output_id: str,
+		personalisation: dict[str, Any],
+	) -> dict[str, Any]:
+		"""Apply recipient-specific personalisation overrides to a rendered output."""
+		self._require_tenant(tenant_id)
+		base = self._require_rendered_output(base_output_id, tenant_id)
+		personalised_subject = self._runtime.render_template(base.subject, personalisation)
+		personalised_body = self._runtime.render_template(base.body, personalisation)
+		personalised = RenderedOutput(
+			id=output_id,
+			tenant_id=tenant_id,
+			route_id=base.route_id,
+			template_id=base.template_id,
+			channel_id=base.channel_id,
+			channel_type=base.channel_type,
+			recipient_ref=base.recipient_ref,
+			subject=personalised_subject,
+			body=personalised_body,
+			output_format=base.output_format,
+			sensitive_output=base.sensitive_output,
+			output_encrypted=base.output_encrypted,
+			status="ready",
+		)
+		self._rendered_outputs[_state_key(tenant_id, output_id)] = personalised
+		record = {
+			"output_id": output_id,
+			"base_output_id": base_output_id,
+			"personalisation_keys": list(personalisation.keys()),
+			"personalised_at": _utc_now(),
+		}
+		self._personalisation_records[_state_key(tenant_id, output_id)] = record
+		self._audit(tenant_id, output_id, "output_personalised", base.recipient_ref, "allow", metadata=record)
+		return personalised.to_dict()
+
+	async def output_archive(
+		self,
+		tenant_id: str,
+		output_id: str,
+		archive_ref: str,
+		actor: str,
+	) -> dict[str, Any]:
+		"""Archive a delivered rendered output for compliance retention."""
+		self._require_tenant(tenant_id)
+		if not archive_ref:
+			raise ValueError("archive_ref_required")
+		output = self._require_rendered_output(output_id, tenant_id)
+		record = {
+			"output_id": output_id,
+			"tenant_id": tenant_id,
+			"channel_type": output.channel_type,
+			"recipient_ref": output.recipient_ref,
+			"archive_ref": archive_ref,
+			"actor": actor,
+			"archived_at": _utc_now(),
+		}
+		self._output_archives[_state_key(tenant_id, output_id)] = record
+		self._audit(tenant_id, output_id, "output_archived", actor, "allow", metadata={"archive_ref": archive_ref})
+		return record
+
+	async def receipt_search(
+		self,
+		tenant_id: str,
+		channel_id: str | None = None,
+		delivery_state: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""Filter delivery receipts by channel and/or delivery_state."""
+		self._require_tenant(tenant_id)
+		chan_key = _state_key(tenant_id, channel_id) if channel_id else None
+		return sorted(
+			[
+				r.to_dict()
+				for r in self._receipts.values()
+				if r.tenant_id == tenant_id
+				and (chan_key is None or r.channel_id == chan_key)
+				and (delivery_state is None or r.delivery_state == delivery_state)
+			],
+			key=lambda r: r["id"],
+		)
+
+	async def suppression_add(
+		self,
+		tenant_id: str,
+		channel_type: str,
+		recipient_refs: list[str],
+	) -> dict[str, Any]:
+		"""Add recipient refs to the suppression list for a channel type."""
+		self._require_tenant(tenant_id)
+		key = _state_key(tenant_id, channel_type)
+		bucket = self._suppression_lists.setdefault(key, set())
+		bucket.update(recipient_refs)
+		return {
+			"tenant_id": tenant_id,
+			"channel_type": channel_type,
+			"added": len(recipient_refs),
+			"total_suppressed": len(bucket),
+		}
+
+	async def batch_status(
+		self,
+		tenant_id: str,
+		batch_id: str,
+	) -> dict[str, Any]:
+		"""Return the current status and receipt summary for a delivery batch."""
+		self._require_tenant(tenant_id)
+		batch = self._require_batch(batch_id, tenant_id)
+		receipts = [r.to_dict() for r in self._receipts.values() if r.batch_id == batch_id]
+		by_state: dict[str, int] = {}
+		for r in receipts:
+			s = r.get("delivery_state", "unknown")
+			by_state[s] = by_state.get(s, 0) + 1
+		return {
+			"batch_id": batch_id,
+			"tenant_id": tenant_id,
+			"batch_status": batch.status,
+			"recipient_count": batch.recipient_count,
+			"receipt_count": len(receipts),
+			"by_state": by_state,
+		}
+
+	async def channel_cost_report(
+		self,
+		tenant_id: str,
+		channel_id: str | None = None,
+		cost_per_message: float = 0.001,
+	) -> dict[str, Any]:
+		"""Estimate delivery costs for a channel or all channels in a tenant."""
+		self._require_tenant(tenant_id)
+		receipts = self.list_receipts(tenant_id)
+		if channel_id:
+			receipts = [r for r in receipts if r.get("channel_id") == _state_key(tenant_id, channel_id)]
+		delivered = [r for r in receipts if r["delivery_state"] == "delivered"]
+		total_cost = round(len(delivered) * cost_per_message, 4)
+		report = {
+			"tenant_id": tenant_id,
+			"channel_id": channel_id,
+			"delivered_count": len(delivered),
+			"cost_per_message": cost_per_message,
+			"estimated_total_cost": total_cost,
+			"currency": "USD",
+			"generated_at": _utc_now(),
+		}
+		self._cost_records[_state_key(tenant_id, channel_id or "all")] = report
+		return report
+
+	# ------------------------------------------------------------------ #
+	# Private helpers                                                      #
+	# ------------------------------------------------------------------ #
+
 	def _require_tenant(self, tenant_id: str) -> None:
 		result = self.evaluate({"tenant_context_present": bool(tenant_id)})
 		self._raise_if_denied(result)
@@ -554,3 +1047,8 @@ def _normalize_token(value: str) -> str:
 
 def _state_key(tenant_id: str, item_id: str) -> str:
 	return f"{tenant_id}:{item_id}"
+
+
+def _utc_now() -> str:
+	from datetime import datetime, timezone
+	return datetime.now(timezone.utc).isoformat()

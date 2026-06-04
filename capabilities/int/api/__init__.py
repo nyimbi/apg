@@ -1,103 +1,31 @@
-"""Integration API Management APG capability package."""
+"""APG Integration API Management capability.
 
+Standalone package: ``pip install apg-int-api``
+
+Quick start::
+
+    from apg_int_api import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : int_api
+Provides      : api_registry_lifecycle, api_endpoint_lifecycle, api_policy_lifecycle, api_consumer_lifecycle, api_key_lifecycle, api_subscription_lifecycle
+"""
 from __future__ import annotations
 
-from .api import (
-	AnalyticsApi,
-	APIManagementApi,
-	ConsumerManagementApi,
-	GatewayApi,
-	approve_api,
-	attach_policy,
-	capability_status,
-	create_record,
-	create_subscription,
-	dashboard_summary,
-	deploy_api,
-	issue_api_key,
-	list_records,
-	record_usage,
-	register_api,
-	register_api_agent,
-	register_api_endpoints,
-	register_consumer,
-	register_endpoint,
-	service,
+__version__  = "2.1.0"
+__package_name__ = "apg-int-api"
+__capability_id__ = "int_api"
+
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
 )
-from .capability_contract import CAPABILITY_ID, CAPABILITY_NAME, CAPABILITY_VERSION, evaluate_capability_rules, get_capability_contract
-from .service import (
-	APIManagementError,
-	APINotFoundError,
-	APILifecycleService,
-	AnalyticsService,
-	APIService,
-	AuthenticationError,
-	AuthorizationError,
-	ConsumerManagementService,
-	ConsumerNotFoundError,
-	IntApiService,
-	PolicyManagementService,
-	RateLimitExceededError,
-)
-
-
-__capability_info__ = {
-	"capability_id": CAPABILITY_ID,
-	"capability_name": CAPABILITY_NAME,
-	"capability_code": "INT_API",
-	"version": CAPABILITY_VERSION,
-	"category": "integration",
-	"description": "Composable API registry, gateway governance, consumer, policy, deployment, analytics, and API-agent lifecycle capability.",
-	"provides": [
-		"api_registry_lifecycle",
-		"api_endpoint_lifecycle",
-		"api_policy_lifecycle",
-		"api_consumer_lifecycle",
-		"api_deployment_workflow",
-		"api_agents",
-	],
-}
-
-__version__ = CAPABILITY_VERSION
 
 __all__ = [
-	"AnalyticsApi",
-	"AnalyticsService",
-	"APIManagementApi",
-	"APIManagementError",
-	"APINotFoundError",
-	"APILifecycleService",
-	"APIService",
-	"AuthenticationError",
-	"AuthorizationError",
-	"CAPABILITY_ID",
-	"CAPABILITY_NAME",
-	"CAPABILITY_VERSION",
-	"ConsumerManagementApi",
-	"ConsumerManagementService",
-	"ConsumerNotFoundError",
-	"GatewayApi",
-	"IntApiService",
-	"PolicyManagementService",
-	"RateLimitExceededError",
-	"__capability_info__",
-	"__version__",
-	"approve_api",
-	"attach_policy",
-	"capability_status",
-	"create_record",
-	"create_subscription",
-	"dashboard_summary",
-	"deploy_api",
-	"evaluate_capability_rules",
-	"get_capability_contract",
-	"issue_api_key",
-	"list_records",
-	"record_usage",
-	"register_api",
-	"register_api_agent",
-	"register_api_endpoints",
-	"register_consumer",
-	"register_endpoint",
-	"service",
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
 ]

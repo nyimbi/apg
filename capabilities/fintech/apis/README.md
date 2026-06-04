@@ -1,114 +1,130 @@
-# APG Banking APIs
+# Banking APIs
 
-`fintech_apis` is an executable APG capability for open banking and
-embedded-finance API operations: API products, developer onboarding, developer
-applications, consent grants, API clients, endpoint policies, webhooks, API call
-audit, rate limits, SLA incidents, and provider-neutral API governance agents.
+## Overview
+Banking APIs is the Open Banking and API-as-a-product layer for the APG fintech platform. It governs the full lifecycle of API products, developer onboarding, application registration, customer consent grants, API client credential issuance, endpoint policy publishing, webhook subscriptions, call auditing, rate limiting, and SLA incident management. It implements Open Banking-style consent flows where scopes must be explicitly granted before client credentials can be issued.
 
-## What It Provides
+The capability enforces a strict chain of trust: product → developer → application → consent → client. Breaking any link in that chain produces a deterministic deny. All API call records and gateway events stream to `apg.fintech.apis.lifecycle` via Bytewax for real-time monitoring and anomaly detection.
 
-- API product governance for accounts, balances, transactions, payments, cards,
-  wallets, loans, BNPL, agency, identity, statements, and webhooks.
-- Developer organization onboarding with KYB, security, and risk evidence.
-- Developer application registration with environment, redirect URI, and terms
-  evidence.
-- Consent grant lifecycle with scopes, expiry, and customer evidence.
-- Client credential issuance with key references and supported auth flows.
-- Endpoint policy publishing with route, scope, throttle, and risk policies.
-- Webhook subscription management with endpoint and signing-secret evidence.
-- API call audit and rate-limit enforcement.
-- SLA incident tracking.
-- First-class AI-agent composition for Codex, Claude Code, OpenCode, and Pi.
+## Capability ID
+`fintech_apis`  Version: 1.1.0
 
-## How To Use It
+## Provides
+| Service | Description |
+|---------|-------------|
+| banking_api_product_governance | Register and version API products with environment and scope controls |
+| developer_onboarding_workflow | Onboard developer organizations with KYB, security review, and risk clearance |
+| developer_application_workflow | Register applications with redirect URIs and terms acceptance |
+| banking_consent_workflow | Issue and manage scoped customer consent grants with expiry |
+| api_client_credential_workflow | Issue OAuth2/mTLS clients bound to consented scopes |
+| api_endpoint_policy_workflow | Publish endpoint policies with throttle and risk policy attachments |
+| webhook_subscription_workflow | Subscribe applications to platform events with signed-secret verification |
+| api_call_audit_workflow | Record and audit every API call with risk reference |
+| api_rate_limit_workflow | Manage per-client rate limit buckets |
+| api_sla_incident_workflow | Open and track SLA incidents with severity-gated approvals |
+| banking_api_agent_workflow | Register AI agents for API operations review roles |
 
-Inspect the contract:
+## Requires
+| Capability | Purpose |
+|------------|---------|
+| auth | Platform authentication |
+| audl | Audit trail |
+| ntfy | Incident and developer notifications |
+| nlpc | NLP for incident narrative |
+| keym | Key management for client credentials |
+| fintech_payments | Payments API product backing |
+| fintech_wallets | Wallets API product backing |
+| fintech_cards | Cards API product backing |
+| fintech_kyc | Customer identity for consent |
+| fintech_aml | AML checks on high-risk API access |
+| fintech_fraud | Fraud screening for call patterns |
+| fintech_neobanking | Accounts and statements products |
+| fintech_lending | Loans API product backing |
+| fintech_bnpl | BNPL API product backing |
+| fintech_agency | Agency API product backing |
+| fintech_mobile | Mobile channel API access |
 
-```bash
-./.venv/bin/apg capabilities inspect fintech_apis --json
-```
+## Configuration Reference
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| rate_limits.default_limit | number | 1000 | Default calls per window |
+| rate_limits.burst_limit | number | 5000 | Burst capacity |
+| rate_limits.window_seconds | number | 60 | Rate limit rolling window |
+| calls.high_volume_threshold | number | 10000 | Call batch count requiring review |
 
-Run the package self-test:
+## API Routes
+| Name | Path | Method | Permission | Group |
+|------|------|--------|------------|-------|
+| dashboard | /fintech-apis/dashboard | GET | fintech_apis:view | Overview |
+| products | /fintech-apis/products | GET/POST | fintech_apis:products | Products |
+| developers | /fintech-apis/developers | GET/POST | fintech_apis:developers | Developers |
+| applications | /fintech-apis/applications | GET/POST | fintech_apis:applications | Developers |
+| consents | /fintech-apis/consents | GET/POST | fintech_apis:consents | Consent |
+| clients | /fintech-apis/clients | GET/POST | fintech_apis:clients | Security |
+| endpoints | /fintech-apis/endpoints | GET/POST | fintech_apis:endpoints | Gateway |
+| webhooks | /fintech-apis/webhooks | GET/POST | fintech_apis:webhooks | Gateway |
+| calls | /fintech-apis/calls | GET | fintech_apis:calls | Operations |
+| rate_limits | /fintech-apis/rate-limits | GET/POST | fintech_apis:rate_limits | Operations |
+| incidents | /fintech-apis/incidents | GET/POST | fintech_apis:incidents | Operations |
+| agents | /fintech-apis/agents | GET/POST | fintech_apis:admin | Automation |
+| settings | /fintech-apis/settings | GET/POST | fintech_apis:admin | Administration |
 
-```bash
-./.venv/bin/python capabilities/fintech/apis/app.py
-```
+## Business Rules
+| Rule | Condition | Effect |
+|------|-----------|--------|
+| developer_kyb_required | Developer without KYB evidence | deny |
+| developer_security_required | Developer without security review | deny |
+| client_scopes_allowed_by_consent | Client scopes exceed active consent | deny |
+| api_call_rate_limit_allowed | Call exceeds rate limit | deny |
+| high_volume_api_call_requires_review | Batch > 10,000 calls without review | require_review |
+| critical_incident_requires_approval | Critical severity incident without approval | require_review |
+| webhook_signing_secret_required | Webhook without signing secret | deny |
+| endpoint_throttle_required | Endpoint without throttle policy | deny |
+| endpoint_risk_required | Endpoint without risk policy | deny |
 
-Use the service directly:
+## Data Models
+| Model | Key Fields |
+|-------|-----------|
+| APIProduct | id, name, owner_id, product_type, environment, scopes, status |
+| DeveloperOrganization | id, name, kyb_reference, security_review_reference, risk_clearance_reference, status |
+| DeveloperApplication | id, developer_id, name, environment, redirect_uri, terms_reference, status |
+| ConsentGrant | id, application_id, customer_reference, scopes, expiry_date |
+| APIClient | id, application_id, auth_flow, key_reference, scopes |
+| EndpointPolicy | id, product_id, route, scope, throttle_policy, risk_policy |
+| WebhookSubscription | id, application_id, event_type, endpoint, signing_secret |
+| APICallRecord | id, client_id, product_id, endpoint_id, risk_reference, status_code |
+| RateLimitBucket | id, client_id, limit, burst_limit, window_seconds |
+| SLAIncident | id, severity, owner_id, evidence_references, status |
 
-```python
-from capabilities.fintech.apis import BankingAPIService
+## Streaming Events
+Events emitted to the fintech event stream via Bytewax.
+| Event | Trigger |
+|-------|---------|
+| api_product_registered | New API product published |
+| developer_onboarded | Developer passes KYB/security/risk checks |
+| developer_application_registered | Application registered |
+| consent_grant_created | Customer consent recorded |
+| api_client_issued | OAuth/mTLS client credentials issued |
+| endpoint_policy_published | Endpoint throttle/risk policy activated |
+| webhook_subscribed | Webhook subscription confirmed |
+| api_call_recorded | Individual API call audited |
+| rate_limit_updated | Rate limit bucket modified |
+| sla_incident_opened | SLA breach incident created |
+| api_agent_registered | AI agent registered |
 
-service = BankingAPIService()
-product = service.register_api_product(
-	"product-1",
-	"tenant-1",
-	"Accounts API",
-	"api-ops",
-	"accounts",
-	"sandbox",
-	["accounts.read", "balances.read"],
-)
-developer = service.onboard_developer(
-	"developer-1",
-	"tenant-1",
-	"Fintech Builder",
-	"kyb-1",
-	"security-review-1",
-	"risk-clear-1",
-)
-application = service.register_application(
-	"app-1",
-	"tenant-1",
-	developer["id"],
-	"Personal Finance App",
-	"sandbox",
-	"https://example.test/callback",
-	"terms-1",
-)
-consent = service.create_consent_grant(
-	"consent-1",
-	"tenant-1",
-	application["id"],
-	"customer-1",
-	["accounts.read"],
-	"2026-12-31",
-)
-client = service.issue_api_client(
-	"client-1",
-	"tenant-1",
-	application["id"],
-	"oauth2_auth_code",
-	"key-ref-1",
-	["accounts.read"],
-)
-```
+## Edge Cases Handled
+- Client scopes are validated against active consent at issuance time — a client cannot be issued with broader scopes than what the customer explicitly granted, even if the product definition allows them
+- Webhook endpoints require a signing secret; unsigned webhook subscriptions are denied to prevent data exfiltration via misconfigured endpoints
+- Rate limit enforcement fires at the call-record level, not just at the gateway — audit completeness is guaranteed even if a gateway allows a call through
+- API call endpoint must belong to the selected product — cross-product authorization using a mismatched endpoint is denied
+- `device_code` auth flow is supported for IoT/embedded scenarios where a browser redirect is not available
 
-## Composition Surfaces
+## Composability
+- **Upstream**: Developer KYB from `fintech_kyc`; fraud screening for call patterns from `fintech_fraud`; AML for high-risk access from `fintech_aml`
+- **Downstream**: `fintech_embedded` consumes Banking APIs to surface product placements in partner applications; `fintech_mobile` uses the API layer for device-bound client credentials
+- **Peer**: Deployed alongside `fintech_gateway` (provider routing) and `fintech_payments` (the most commonly exposed API product)
 
-- Contract: `capability_contract.py`
-- Service: `service.py`
-- API helpers: `api.py`
-- View models: `views.py`
-- Semantic model: `semantic_model.json`
-- Package manifest: `package_manifest.json`
-
-## Guardrails
-
-The deterministic rule engine checks tenant context, write policy, product
-ownership, product type, environment, scopes, developer KYB/security/risk
-evidence, application redirect URI and terms, consent scope and expiry, client
-auth flow and key evidence, endpoint policy route/scope/throttle/risk evidence,
-webhook endpoint and signing secret, API call client/product/endpoint/rate-limit
-and risk evidence, SLA incident owner/evidence, Bytewax lifecycle processing,
-and privileged AI-agent approvals.
-
-## Streaming
-
-Lifecycle metadata uses Bytewax:
-
-- stream: `apg.fintech.apis.lifecycle`;
-- processor: `bytewax`;
-- key: `tenant_id`.
-
-The package intentionally does not publish alternate broker settings.
+## Development Notes
+- The five-step chain (product → developer → application → consent → client) has separate deny rules at each step; missing a prerequisite at any level blocks the next step
+- `SUPPORTED_ENVIRONMENTS` (sandbox, pilot, production) controls which lifecycle stage a product or application operates in; environment mismatch is denied
+- Webhook signing uses HMAC; the signing secret must be stored in `keym` and referenced by ID, not stored as plaintext
+- Both batch operations and individual high-volume calls require Bytewax routing

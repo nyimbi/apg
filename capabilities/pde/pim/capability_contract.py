@@ -45,7 +45,16 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 
 
 PROVIDES = ["product_catalog_lifecycle", "product_record_lifecycle", "product_attribute_lifecycle", "product_variant_lifecycle", "product_content_lifecycle", "product_asset_lifecycle", "product_compliance_lifecycle", "product_channel_listing_lifecycle", "product_publish_workflow", "product_data_quality_workflow", "product_change_workflow", "pim_dashboard_service", "pim_agents"]
-REQUIRES = ["auth", "audl", "ntfy", "composition_events", "composition_config", "workflow", "media_asset_lifecycle", "commerce_channel_lifecycle", "erp_item_master", "translation_memory", "taxonomy_management"]
+REQUIRES = [
+	"auth",
+	"audl",
+	"ntfy",
+	"composition_events",
+	"composition_config",
+	"wflo",
+	"mdm",
+	"onto",
+]
 
 
 UI_ROUTES = [

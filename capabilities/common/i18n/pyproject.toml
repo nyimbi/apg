@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "apg-common-i18n"
+version = "1.0.0"
+description = "APG Internationalization — common domain capability"
+readme = "README.md"
+license = {text = "Proprietary"}
+requires-python = ">=3.11"
+keywords = ["apg", "datacraft", "capability", "common", "i18n"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+        "pydantic>=2.0",
+    "uuid6>=0.4",
+    "sqlalchemy>=2.0",
+    "flask>=3.0",
+]
+
+[project.optional-dependencies]
+streaming = ["bytewax>=0.18"]
+nlp       = ["transformers>=4.30", "sentence-transformers>=2.2"]
+vision    = ["opencv-python>=4.0", "Pillow>=10.0"]
+geo       = ["shapely>=2.0", "geopy>=2.4"]
+crypto    = ["cryptography>=41.0"]
+full      = [
+    "apg-common-i18n[streaming]",
+    "apg-common-i18n[nlp]",
+    "apg-common-i18n[vision]",
+    "apg-common-i18n[geo]",
+    "apg-common-i18n[crypto]",
+]
+
+[project.urls]
+Homepage   = "https://www.datacraft.co.ke"
+Repository = "https://github.com/datacraft/apg"
+Changelog  = "https://github.com/datacraft/apg/blob/main/capabilities/common/i18n/CHANGELOG.md"
+
+
+[project.scripts]
+apg-common-i18n = "apg_common_i18n.app:main"
+[project.entry-points."apg.capabilities"]
+i18n = "apg_common_i18n:get_capability_contract"
+
+[tool.setuptools]
+package-dir = {"apg_common_i18n" = "."}
+packages    = ["apg_common_i18n"]
+
+[tool.setuptools.package-data]
+"apg_common_i18n" = ["py.typed", "README.md", "*.pyi"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

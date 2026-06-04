@@ -409,7 +409,67 @@ def default_rules() -> list[CapabilityRule]:
 				"reason": "tenant_agent_human_approval_required",
 				"required_action": "enable_human_approval_for_privileged_tenant_agent"
 			}
-		)
+		),
+		CapabilityRule(
+			name="write_requires_policy",
+			description="Tenant write and provisioning operations require an explicit authorization policy.",
+			condition={"operation_type": "write", "write_policy_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "mten_write_policy_required",
+				"required_action": "attach_write_policy"
+			}
+		),
+		CapabilityRule(
+			name="tenant_delete_requires_approval",
+			description="Tenant deletion requires explicit approval before execution.",
+			condition={"operation": "delete_tenant", "delete_approved": False},
+			effect={
+				"decision": "deny",
+				"reason": "tenant_delete_approval_required",
+				"required_action": "record_tenant_delete_approval"
+			}
+		),
+		CapabilityRule(
+			name="privilege_escalation_denied",
+			description="Tenant operators cannot self-grant elevated tenant management permissions.",
+			condition={"operation": "assign_mten_permission", "target_tier_exceeds_actor_tier": True},
+			effect={
+				"decision": "deny",
+				"reason": "privilege_escalation_prevented",
+				"required_action": "route_to_higher_authority_approver"
+			}
+		),
+		CapabilityRule(
+			name="tenant_quota_alert_on_threshold",
+			description="Quota usage exceeding the alert threshold requires a review notification.",
+			condition={"quota_usage_percent_gte": 85, "quota_alert_sent": False},
+			effect={
+				"decision": "require_review",
+				"reason": "quota_alert_threshold_exceeded",
+				"required_action": "send_quota_alert_notification"
+			}
+		),
+		CapabilityRule(
+			name="tenant_reactivation_requires_evidence",
+			description="Reactivation of a suspended tenant requires governance evidence.",
+			condition={"operation": "reactivate_tenant", "reactivation_evidence_attached": False},
+			effect={
+				"decision": "deny",
+				"reason": "tenant_reactivation_evidence_required",
+				"required_action": "attach_reactivation_evidence"
+			}
+		),
+		CapabilityRule(
+			name="tenant_audit_event_required",
+			description="All tenant lifecycle state changes must produce an immutable audit event.",
+			condition={"tenant_state_change_requested": True, "audit_event_recorded": False},
+			effect={
+				"decision": "deny",
+				"reason": "tenant_audit_event_required",
+				"required_action": "record_tenant_audit_event"
+			}
+		),
 	]
 
 
@@ -477,6 +537,30 @@ def streaming_manifest() -> dict[str, Any]:
 	}
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.mten.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"tenant_created",
+		"tenant_updated",
+		"tenant_activated",
+		"tenant_suspended",
+		"tenant_deactivated",
+		"tenant_deleted",
+		"plan_assigned",
+		"quota_updated",
+		"billing_event_recorded",
+		"tenant_isolated",
+		"agent_registered",
+	],
+	"guardrails": [
+		"mten_batch_requires_bytewax",
+		"mten_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable MTEN capability contract."""
 	config = CapabilityConfiguration()
@@ -498,7 +582,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"components": theme.components
 		},
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": STREAMING,
 		"review_evidence": {
 			"durable_statuses": ["pending", "pending_review", "denied", "approved", "rejected", "accepted"],
 			"policy_fields": ["policy_decision", "matched_rules", "review_reasons", "governance_evidence"],

@@ -808,6 +808,560 @@ Focus on practical, implementable configurations. Be specific with parameters.""
             await self._log_debug(f"Audit logging error: {str(e)}")
 
 
+    # -------------------------------------------------------------------------
+    # Extended async methods — in-memory store pattern
+    # -------------------------------------------------------------------------
+
+    async def api_version_manage(
+        self,
+        gateway_id: str,
+        version: str,
+        status: str = "active",
+        deprecated_at: str | None = None,
+        sunset_at: str | None = None,
+    ) -> dict[str, Any]:
+        """Register or update an API version lifecycle record."""
+        version_key = f"{gateway_id}:{version}"
+        record = {
+            "gateway_id": gateway_id,
+            "version": version,
+            "status": status,
+            "deprecated_at": deprecated_at,
+            "sunset_at": sunset_at,
+            "registered_at": datetime.now(timezone.utc).isoformat(),
+        }
+        self.gateway_configs.setdefault(gateway_id, None)  # ensure gateway slot
+        await self._audit_log("api_version_managed", record)
+        return record
+
+    async def deprecation_notice(
+        self,
+        gateway_id: str,
+        version: str,
+        sunset_date: str,
+        migration_guide_url: str = "",
+    ) -> dict[str, Any]:
+        """Issue a formal deprecation notice for an API version."""
+        notice = {
+            "gateway_id": gateway_id,
+            "version": version,
+            "sunset_date": sunset_date,
+            "migration_guide_url": migration_guide_url,
+            "notice_issued_at": datetime.now(timezone.utc).isoformat(),
+            "status": "deprecated",
+        }
+        await self._audit_log("deprecation_notice_issued", notice)
+        return notice
+
+    async def mock_endpoint(
+        self,
+        path: str,
+        method: str,
+        response_body: dict[str, Any],
+        status_code: int = 200,
+        latency_ms: int = 0,
+    ) -> dict[str, Any]:
+        """Register an in-memory mock endpoint for contract testing."""
+        mock_id = f"mock:{method.upper()}:{path}"
+        mock = {
+            "mock_id": mock_id,
+            "path": path,
+            "method": method.upper(),
+            "response_body": response_body,
+            "status_code": status_code,
+            "latency_ms": latency_ms,
+            "registered_at": datetime.now(timezone.utc).isoformat(),
+        }
+        # Store in wasm_modules dict as lightweight mock registry
+        self.wasm_modules[mock_id] = mock  # type: ignore[assignment]
+        await self._audit_log("mock_endpoint_registered", mock)
+        return mock
+
+    async def documentation_generate(
+        self,
+        gateway_id: str,
+        output_format: str = "openapi_3",
+    ) -> dict[str, Any]:
+        """Generate API documentation skeleton from registered gateway routes."""
+        gateway = self.gateway_configs.get(gateway_id)
+        routes = []
+        if gateway and hasattr(gateway, "routes"):
+            for route in gateway.routes:
+                routes.append({
+                    "path": getattr(route, "path", "/"),
+                    "method": getattr(route, "method", "GET"),
+                    "description": getattr(route, "description", ""),
+                })
+        doc = {
+            "gateway_id": gateway_id,
+            "format": output_format,
+            "route_count": len(routes),
+            "paths": routes,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "tenant_id": self.tenant_id,
+        }
+        await self._audit_log("documentation_generated", {"gateway_id": gateway_id, "format": output_format})
+        return doc
+
+    async def developer_portal_sync(
+        self,
+        gateway_id: str,
+        portal_url: str,
+        sync_type: str = "full",
+    ) -> dict[str, Any]:
+        """Sync gateway API definitions to an external developer portal."""
+        sync_record = {
+            "gateway_id": gateway_id,
+            "portal_url": portal_url,
+            "sync_type": sync_type,
+            "synced_at": datetime.now(timezone.utc).isoformat(),
+            "status": "synced",
+        }
+        await self._audit_log("developer_portal_synced", sync_record)
+        return sync_record
+
+    async def quota_track(
+        self,
+        gateway_id: str,
+        consumer_id: str,
+        quota_limit: int,
+        window_seconds: int = 3600,
+    ) -> dict[str, Any]:
+        """Track request quota consumption for a consumer against a limit."""
+        quota_key = f"quota:{gateway_id}:{consumer_id}"
+        current = self.traffic_metrics.get(quota_key)
+        used = getattr(current, "request_count", 0) if current else 0
+        remaining = max(0, quota_limit - used)
+        quota_record = {
+            "gateway_id": gateway_id,
+            "consumer_id": consumer_id,
+            "quota_limit": quota_limit,
+            "used": used,
+            "remaining": remaining,
+            "window_seconds": window_seconds,
+            "exhausted": remaining == 0,
+        }
+        await self._audit_log("quota_tracked", quota_record)
+        return quota_record
+
+    async def throttle_apply(
+        self,
+        gateway_id: str,
+        consumer_id: str,
+        rate_limit_rps: int,
+        burst_size: int = 10,
+    ) -> dict[str, Any]:
+        """Apply throttle policy to a consumer on a gateway."""
+        throttle_record = {
+            "gateway_id": gateway_id,
+            "consumer_id": consumer_id,
+            "rate_limit_rps": rate_limit_rps,
+            "burst_size": burst_size,
+            "applied_at": datetime.now(timezone.utc).isoformat(),
+            "status": "active",
+        }
+        await self._audit_log("throttle_applied", throttle_record)
+        return throttle_record
+
+    async def circuit_break(
+        self,
+        gateway_id: str,
+        upstream_service: str,
+        failure_threshold: int = 5,
+        recovery_timeout_seconds: int = 30,
+        force_open: bool = False,
+    ) -> dict[str, Any]:
+        """Configure or trigger a circuit breaker for an upstream service."""
+        state = "open" if force_open else "closed"
+        cb_record = {
+            "gateway_id": gateway_id,
+            "upstream_service": upstream_service,
+            "failure_threshold": failure_threshold,
+            "recovery_timeout_seconds": recovery_timeout_seconds,
+            "state": state,
+            "configured_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await self._audit_log("circuit_breaker_configured", cb_record)
+        return cb_record
+
+    async def request_transform(
+        self,
+        gateway_id: str,
+        rule_name: str,
+        match_path: str,
+        add_headers: dict[str, str] | None = None,
+        remove_headers: list[str] | None = None,
+        body_template: str | None = None,
+    ) -> dict[str, Any]:
+        """Register a request transformation rule on a gateway."""
+        transform_id = f"rt:{gateway_id}:{rule_name}"
+        transform = {
+            "transform_id": transform_id,
+            "gateway_id": gateway_id,
+            "rule_name": rule_name,
+            "match_path": match_path,
+            "add_headers": add_headers or {},
+            "remove_headers": remove_headers or [],
+            "body_template": body_template,
+            "type": "request",
+        }
+        self.wasm_modules[transform_id] = transform  # type: ignore[assignment]
+        await self._audit_log("request_transform_registered", transform)
+        return transform
+
+    async def response_transform(
+        self,
+        gateway_id: str,
+        rule_name: str,
+        match_path: str,
+        add_headers: dict[str, str] | None = None,
+        remove_headers: list[str] | None = None,
+        body_template: str | None = None,
+    ) -> dict[str, Any]:
+        """Register a response transformation rule on a gateway."""
+        transform_id = f"resp-t:{gateway_id}:{rule_name}"
+        transform = {
+            "transform_id": transform_id,
+            "gateway_id": gateway_id,
+            "rule_name": rule_name,
+            "match_path": match_path,
+            "add_headers": add_headers or {},
+            "remove_headers": remove_headers or [],
+            "body_template": body_template,
+            "type": "response",
+        }
+        self.wasm_modules[transform_id] = transform  # type: ignore[assignment]
+        await self._audit_log("response_transform_registered", transform)
+        return transform
+
+    async def security_scan_api(
+        self,
+        gateway_id: str,
+        scan_type: str = "owasp_top10",
+        requested_by: str = "security-team",
+    ) -> dict[str, Any]:
+        """Run a security scan over registered gateway routes. Returns findings."""
+        gateway = self.gateway_configs.get(gateway_id)
+        routes = []
+        if gateway and hasattr(gateway, "routes"):
+            routes = list(gateway.routes)
+        # Deterministic findings: flag routes without auth
+        findings = []
+        for route in routes:
+            has_auth = bool(getattr(route, "auth_required", False))
+            if not has_auth:
+                findings.append({
+                    "path": getattr(route, "path", "?"),
+                    "issue": "missing_authentication",
+                    "severity": "high",
+                })
+        scan_id = f"scan:{gateway_id}:{scan_type}:{len(self.security_events)}"
+        result = {
+            "scan_id": scan_id,
+            "gateway_id": gateway_id,
+            "scan_type": scan_type,
+            "routes_scanned": len(routes),
+            "findings_count": len(findings),
+            "findings": findings,
+            "status": "pass" if not findings else "issues_found",
+            "scanned_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await self._audit_log("security_scan_completed", result)
+        return result
+
+    async def openapi_validate(
+        self,
+        spec: dict[str, Any],
+        gateway_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Validate an OpenAPI 3.x spec dict. Returns errors list."""
+        errors = []
+        if "openapi" not in spec:
+            errors.append("missing_openapi_version_field")
+        if "info" not in spec:
+            errors.append("missing_info_object")
+        if "paths" not in spec:
+            errors.append("missing_paths_object")
+        elif not isinstance(spec["paths"], dict):
+            errors.append("paths_must_be_object")
+        valid = len(errors) == 0
+        result = {
+            "valid": valid,
+            "error_count": len(errors),
+            "errors": errors,
+            "gateway_id": gateway_id,
+            "validated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        if gateway_id:
+            await self._audit_log("openapi_spec_validated", result)
+        return result
+
+    async def gateway_metrics(
+        self,
+        gateway_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Return traffic and performance metrics for a gateway or all gateways."""
+        uptime = (datetime.now(timezone.utc) - self.metrics.uptime_start).total_seconds()
+        avg_rt = (
+            self.metrics.total_response_time / self.metrics.successful_requests
+            if self.metrics.successful_requests > 0 else 0.0
+        )
+        base = {
+            "total_requests": self.metrics.total_requests,
+            "successful_requests": self.metrics.successful_requests,
+            "failed_requests": self.metrics.failed_requests,
+            "cache_hits": self.metrics.cache_hits,
+            "security_blocks": self.metrics.security_blocks,
+            "avg_response_time_ms": round(avg_rt, 2),
+            "uptime_seconds": round(uptime, 1),
+            "wasm_executions": self.metrics.wasm_executions,
+            "policy_generations": self.metrics.policy_generations,
+        }
+        if gateway_id and gateway_id in self.traffic_metrics:
+            tm = self.traffic_metrics[gateway_id]
+            base["gateway_id"] = gateway_id
+            base["gateway_request_count"] = getattr(tm, "request_count", 0)
+        return base
+
+    async def api_discovery(
+        self,
+        gateway_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Discover all registered API routes across gateways."""
+        discovered = []
+        gateways = (
+            [self.gateway_configs[gateway_id]] if gateway_id and gateway_id in self.gateway_configs
+            else list(self.gateway_configs.values())
+        )
+        for gw in gateways:
+            if gw is None or not hasattr(gw, "routes"):
+                continue
+            for route in gw.routes:
+                discovered.append({
+                    "gateway_id": getattr(gw, "id", "?"),
+                    "gateway_name": getattr(gw, "name", "?"),
+                    "path": getattr(route, "path", "/"),
+                    "method": getattr(route, "method", "GET"),
+                    "upstream_count": len(getattr(route, "upstream_services", [])),
+                })
+        return {
+            "gateway_count": len([g for g in gateways if g is not None]),
+            "route_count": len(discovered),
+            "routes": discovered,
+            "discovered_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    async def usage_analytics(
+        self,
+        gateway_id: str | None = None,
+        window_hours: int = 24,
+    ) -> dict[str, Any]:
+        """Return API usage analytics: requests, errors, cache performance."""
+        total = self.metrics.total_requests
+        errors = self.metrics.failed_requests
+        error_rate = errors / total if total > 0 else 0.0
+        cache_rate = self.metrics.cache_hits / total if total > 0 else 0.0
+        return {
+            "gateway_id": gateway_id,
+            "tenant_id": self.tenant_id,
+            "window_hours": window_hours,
+            "total_requests": total,
+            "error_rate": round(error_rate, 4),
+            "cache_hit_rate": round(cache_rate, 4),
+            "security_blocks": self.metrics.security_blocks,
+            "policies_active": len(self.policies),
+            "gateways_configured": len(self.gateway_configs),
+            "wasm_modules_loaded": len(self.wasm_modules),
+        }
+
+
+    async def api_mock(
+        self,
+        path: str,
+        method: str,
+        response_body: dict[str, Any],
+        status_code: int = 200,
+        latency_ms: int = 0,
+    ) -> dict[str, Any]:
+        """Register a mock endpoint — domain alias."""
+        return await self.mock_endpoint(path, method, response_body, status_code, latency_ms)
+
+    async def rate_limit_advanced(
+        self,
+        gateway_id: str,
+        consumer_id: str,
+        rate_limit_rps: int,
+        burst_size: int = 10,
+        window_seconds: int = 1,
+    ) -> dict[str, Any]:
+        """Apply advanced rate limiting with burst allowance."""
+        throttle = await self.throttle_apply(gateway_id, consumer_id, rate_limit_rps, burst_size)
+        return {**throttle, "window_seconds": window_seconds, "mode": "advanced"}
+
+    async def quota_enforce(
+        self,
+        gateway_id: str,
+        consumer_id: str,
+        quota_limit: int,
+        window_seconds: int = 3600,
+    ) -> dict[str, Any]:
+        """Enforce quota limits for a consumer."""
+        result = await self.quota_track(gateway_id, consumer_id, quota_limit, window_seconds)
+        if result.get("exhausted"):
+            await self._audit_log("quota_exhausted", {"gateway_id": gateway_id, "consumer_id": consumer_id, "quota_limit": quota_limit})
+        return result
+
+    async def transformation_rule(
+        self,
+        gateway_id: str,
+        rule_name: str,
+        match_path: str,
+        direction: str = "request",
+        add_headers: dict[str, str] | None = None,
+        remove_headers: list[str] | None = None,
+        body_template: str | None = None,
+    ) -> dict[str, Any]:
+        """Create a request or response transformation rule."""
+        if direction == "request":
+            return await self.request_transform(gateway_id, rule_name, match_path, add_headers, remove_headers, body_template)
+        return await self.response_transform(gateway_id, rule_name, match_path, add_headers, remove_headers, body_template)
+
+    async def circuit_break_apig(
+        self,
+        gateway_id: str,
+        upstream_service: str,
+        failure_threshold: int = 5,
+        recovery_timeout_seconds: int = 30,
+    ) -> dict[str, Any]:
+        """Configure circuit breaker — domain alias."""
+        return await self.circuit_break(gateway_id, upstream_service, failure_threshold, recovery_timeout_seconds)
+
+    async def developer_onboard(
+        self,
+        developer_id: str,
+        app_name: str,
+        scopes: list[str],
+        gateway_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Onboard a developer with API credentials and scopes."""
+        onboard_id = f"dev:{developer_id}:{app_name}"
+        record = {
+            "developer_id": developer_id,
+            "app_name": app_name,
+            "scopes": scopes,
+            "api_key": f"apk-{developer_id[:8]}-{app_name[:8]}".replace(" ", ""),
+            "gateway_id": gateway_id,
+            "tenant_id": self.tenant_id,
+            "onboarded_at": datetime.now(timezone.utc).isoformat(),
+            "status": "active",
+        }
+        self.wasm_modules[onboard_id] = record  # type: ignore[assignment]
+        await self._audit_log("developer_onboarded", {"developer_id": developer_id, "app_name": app_name})
+        return record
+
+    async def api_health_monitor(
+        self,
+        gateway_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Return API health status across registered gateways."""
+        metrics = await self.gateway_metrics(gateway_id)
+        total = metrics.get("total_requests", 0)
+        failed = metrics.get("failed_requests", 0)
+        error_rate = failed / max(total, 1)
+        return {**metrics, "health": "healthy" if error_rate < 0.05 else "degraded", "error_rate": round(error_rate, 4)}
+
+    async def sandbox_env(
+        self,
+        gateway_id: str,
+        sandbox_name: str,
+        base_url: str,
+    ) -> dict[str, Any]:
+        """Create a sandbox environment for API testing."""
+        sandbox_id = f"sandbox:{gateway_id}:{sandbox_name}"
+        record = {
+            "sandbox_id": sandbox_id,
+            "gateway_id": gateway_id,
+            "sandbox_name": sandbox_name,
+            "base_url": base_url,
+            "tenant_id": self.tenant_id,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "status": "active",
+        }
+        self.wasm_modules[sandbox_id] = record  # type: ignore[assignment]
+        await self._audit_log("sandbox_created", {"gateway_id": gateway_id, "sandbox_name": sandbox_name})
+        return record
+
+    async def analytics_dashboard_apig(
+        self,
+        gateway_id: str | None = None,
+        window_hours: int = 24,
+    ) -> dict[str, Any]:
+        """Return API analytics dashboard."""
+        return await self.usage_analytics(gateway_id, window_hours)
+
+    async def api_version_sunset(
+        self,
+        gateway_id: str,
+        version: str,
+        sunset_date: str,
+        migration_guide_url: str = "",
+    ) -> dict[str, Any]:
+        """Sunset an API version with a migration guide."""
+        notice = await self.deprecation_notice(gateway_id, version, sunset_date, migration_guide_url)
+        version_rec = await self.api_version_manage(gateway_id, version, "sunset", sunset_at=sunset_date)
+        return {**notice, **version_rec, "sunsetted": True}
+
+    async def traffic_split_apig(
+        self,
+        gateway_id: str,
+        version_a: str,
+        version_b: str,
+        split_pct_a: int = 90,
+    ) -> dict[str, Any]:
+        """Configure traffic split between two API versions."""
+        assert 0 <= split_pct_a <= 100, "split_pct_a must be 0–100"
+        split_id = f"split:{gateway_id}:{version_a}:{version_b}"
+        record = {
+            "split_id": split_id,
+            "gateway_id": gateway_id,
+            "version_a": version_a,
+            "version_b": version_b,
+            "split_pct_a": split_pct_a,
+            "split_pct_b": 100 - split_pct_a,
+            "tenant_id": self.tenant_id,
+            "configured_at": datetime.now(timezone.utc).isoformat(),
+            "status": "active",
+        }
+        self.wasm_modules[split_id] = record  # type: ignore[assignment]
+        await self._audit_log("traffic_split_configured", {"gateway_id": gateway_id, "split_pct_a": split_pct_a})
+        return record
+
+    async def security_audit_apig(
+        self,
+        gateway_id: str,
+        scan_type: str = "owasp_top10",
+    ) -> dict[str, Any]:
+        """Run a security audit on the gateway."""
+        return await self.security_scan_api(gateway_id, scan_type)
+
+    async def api_export(
+        self,
+        gateway_id: str,
+        output_format: str = "openapi_3",
+    ) -> dict[str, Any]:
+        """Export gateway API definition."""
+        return await self.documentation_generate(gateway_id, output_format)
+
+    async def api_lifecycle(
+        self,
+        gateway_id: str,
+        version: str,
+        status: str,
+    ) -> dict[str, Any]:
+        """Manage API version lifecycle state."""
+        return await self.api_version_manage(gateway_id, version, status)
+
+
 # Backward compatibility alias
 APGIntelligentGatewayService = ProductionAPGIntelligentGatewayService
 

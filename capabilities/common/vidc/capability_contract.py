@@ -261,6 +261,30 @@ THEME: dict[str, Any] = {
 }
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.vidc.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"meeting_created",
+		"meeting_started",
+		"meeting_ended",
+		"participant_joined",
+		"participant_left",
+		"recording_started",
+		"recording_stopped",
+		"transcript_generated",
+		"screen_share_started",
+		"screen_share_stopped",
+		"agent_registered",
+	],
+	"guardrails": [
+		"vidc_batch_requires_bytewax",
+		"vidc_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable VIDC capability contract."""
 	config = deepcopy(DEFAULT_CONFIGURATION)
@@ -283,7 +307,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		},
 		"theme": deepcopy(THEME),
 		"agents": agent_manifest(config),
-		"streaming": streaming_manifest(config),
+		"streaming": deepcopy(STREAMING),
 	}
 
 

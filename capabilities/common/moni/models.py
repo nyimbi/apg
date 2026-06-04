@@ -1,23 +1,30 @@
-#!/usr/bin/env python3
-"""
-APG Monitoring and Observability (MONI) - Data Models
-Pydantic v2 models following APG coding standards
+"""APG Monitoring and Observability (MONI) — Pydantic v2 data models.
 
 Author: Nyimbi Odero
 Copyright: © 2025 Datacraft
 """
+from __future__ import annotations
 
-from pydantic import BaseModel, Field, ConfigDict, AfterValidator
-from typing import Dict, List, Any, Optional, Union, Annotated
-from datetime import datetime, timedelta
-from enum import Enum
-from uuid_extensions import uuid7str
 import json
+from datetime import datetime, timedelta
 from decimal import Decimal
+from enum import Enum
+from typing import Annotated, Any
 
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field
+
+from uuid6 import uuid7
+
+
+def uuid7str() -> str:
+	"""Return a UUID7 string suitable for use as a default field factory."""
+	return str(uuid7())
+
+
+# ─── Enums ────────────────────────────────────────────────────────────────────
 
 class MetricType(str, Enum):
-	"""Types of monitoring metrics"""
+	"""Types of monitoring metrics."""
 	COUNTER = "counter"
 	GAUGE = "gauge"
 	HISTOGRAM = "histogram"
@@ -26,7 +33,7 @@ class MetricType(str, Enum):
 
 
 class AlertSeverity(str, Enum):
-	"""Alert severity levels"""
+	"""Alert severity levels."""
 	CRITICAL = "critical"
 	HIGH = "high"
 	MEDIUM = "medium"
@@ -35,7 +42,7 @@ class AlertSeverity(str, Enum):
 
 
 class AlertStatus(str, Enum):
-	"""Alert status states"""
+	"""Alert lifecycle states."""
 	ACTIVE = "active"
 	ACKNOWLEDGED = "acknowledged"
 	RESOLVED = "resolved"
@@ -43,7 +50,7 @@ class AlertStatus(str, Enum):
 
 
 class AlertConditionType(str, Enum):
-	"""Alert condition types"""
+	"""Alert condition types."""
 	THRESHOLD = "threshold"
 	ANOMALY = "anomaly"
 	RATE = "rate"
@@ -52,7 +59,7 @@ class AlertConditionType(str, Enum):
 
 
 class DashboardType(str, Enum):
-	"""Dashboard types for different use cases"""
+	"""Dashboard personas."""
 	EXECUTIVE = "executive"
 	OPERATIONAL = "operational"
 	DEVELOPER = "developer"
@@ -61,16 +68,16 @@ class DashboardType(str, Enum):
 
 
 class DataRetentionPolicy(str, Enum):
-	"""Data retention policies"""
-	REAL_TIME = "real_time"		# 1 hour
-	SHORT_TERM = "short_term"	# 24 hours
-	MEDIUM_TERM = "medium_term"	# 7 days
-	LONG_TERM = "long_term"		# 30 days
-	ARCHIVE = "archive"			# 1 year
+	"""Data retention tiers."""
+	REAL_TIME = "real_time"       # 1 hour
+	SHORT_TERM = "short_term"     # 24 hours
+	MEDIUM_TERM = "medium_term"   # 7 days
+	LONG_TERM = "long_term"       # 30 days
+	ARCHIVE = "archive"           # 1 year
 
 
 class MonitoringScope(str, Enum):
-	"""Monitoring scope for rules and dashboards"""
+	"""Monitoring scope for rules and dashboards."""
 	GLOBAL = "global"
 	TENANT = "tenant"
 	APPLICATION = "application"
@@ -78,237 +85,189 @@ class MonitoringScope(str, Enum):
 	INFRASTRUCTURE = "infrastructure"
 
 
-def _validate_positive_number(value: Union[int, float, Decimal]) -> Union[int, float, Decimal]:
-	"""Validate that number is positive"""
-	assert value > 0, "Value must be positive"
-	return value
+# ─── Validators ───────────────────────────────────────────────────────────────
 
-
-def _validate_labels(labels: Dict[str, str]) -> Dict[str, str]:
-	"""Validate metric labels"""
+def _validate_labels(labels: dict[str, str]) -> dict[str, str]:
+	"""Validate metric labels — keys and values must be short strings."""
 	assert isinstance(labels, dict), "Labels must be a dictionary"
 	for key, value in labels.items():
-		assert isinstance(key, str) and isinstance(value, str), "Label keys and values must be strings"
-		assert len(key) <= 255, "Label key too long (max 255 chars)"
-		assert len(value) <= 1024, "Label value too long (max 1024 chars)"
+		assert isinstance(key, str) and isinstance(value, str), \
+			"Label keys and values must be strings"
+		assert len(key) <= 255, f"Label key too long: {key!r}"
+		assert len(value) <= 1024, f"Label value too long for key {key!r}"
 	return labels
 
 
 def _validate_alert_condition(condition: str) -> str:
-	"""Validate alert condition expression"""
+	"""Validate alert condition expression."""
 	assert condition.strip(), "Alert condition cannot be empty"
 	assert len(condition) <= 2048, "Alert condition too long (max 2048 chars)"
 	return condition.strip()
 
 
-class MonitoringMetric(BaseModel):
-	"""
-	Core monitoring metric model for time-series data collection
-	Supports high-cardinality metrics with efficient storage
-	"""
-	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
+# ─── Models ───────────────────────────────────────────────────────────────────
 
-	# Core identification
-	metric_id: str = Field(default_factory=uuid7str, description="Unique metric identifier")
+class MonitoringMetric(BaseModel):
+	"""Core monitoring metric for time-series data collection.
+
+	Supports high-cardinality metrics with efficient label-based routing.
+	"""
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+
+	metric_id: str = Field(default_factory=uuid7str)
 	tenant_id: str = Field(..., description="APG tenant identifier")
-	name: str = Field(..., description="Metric name", max_length=255)
-	
-	# Metric data
-	value: Annotated[float, AfterValidator(_validate_positive_number)] = Field(
-		..., description="Metric value"
+	name: str = Field(..., max_length=255, description="Metric name")
+
+	value: float = Field(..., description="Metric value (any finite float)")
+	metric_type: MetricType = Field(default=MetricType.GAUGE)
+	unit: str | None = Field(None, max_length=50)
+
+	timestamp: datetime = Field(default_factory=datetime.utcnow)
+	interval_seconds: int | None = Field(None, ge=1)
+
+	labels: Annotated[dict[str, str], AfterValidator(_validate_labels)] = Field(
+		default_factory=dict,
 	)
-	metric_type: MetricType = Field(default=MetricType.GAUGE, description="Type of metric")
-	unit: Optional[str] = Field(None, description="Unit of measurement", max_length=50)
-	
-	# Temporal data
-	timestamp: datetime = Field(default_factory=datetime.utcnow, description="Metric timestamp")
-	interval_seconds: Optional[int] = Field(None, description="Collection interval in seconds", ge=1)
-	
-	# Labels and metadata
-	labels: Annotated[Dict[str, str], AfterValidator(_validate_labels)] = Field(
-		default_factory=dict, description="Metric labels for filtering and grouping"
-	)
-	source: str = Field(..., description="Source system or component", max_length=255)
-	source_type: str = Field(default="unknown", description="Type of source", max_length=100)
-	
-	# Data quality and processing
-	quality_score: float = Field(default=1.0, description="Data quality score", ge=0.0, le=1.0)
-	processed: bool = Field(default=False, description="Whether metric has been processed")
-	retention_policy: DataRetentionPolicy = Field(
-		default=DataRetentionPolicy.MEDIUM_TERM, 
-		description="Data retention policy"
-	)
-	
-	# APG integration
-	capability_name: Optional[str] = Field(None, description="Source APG capability", max_length=100)
-	correlation_id: Optional[str] = Field(None, description="Request correlation ID")
-	
-	# Performance tracking
-	ingestion_latency_ms: Optional[float] = Field(None, description="Ingestion latency", ge=0.0)
-	processing_time_ms: Optional[float] = Field(None, description="Processing time", ge=0.0)
+	source: str = Field(..., max_length=255, description="Source system or component")
+	source_type: str = Field(default="unknown", max_length=100)
+
+	quality_score: float = Field(default=1.0, ge=0.0, le=1.0)
+	processed: bool = Field(default=False)
+	retention_policy: DataRetentionPolicy = Field(default=DataRetentionPolicy.MEDIUM_TERM)
+
+	capability_name: str | None = Field(None, max_length=100)
+	correlation_id: str | None = None
+
+	ingestion_latency_ms: float | None = Field(None, ge=0.0)
+	processing_time_ms: float | None = Field(None, ge=0.0)
 
 	def is_stale(self, max_age_seconds: int = 300) -> bool:
-		"""Check if metric is stale based on timestamp"""
-		assert max_age_seconds > 0, "Max age must be positive"
+		"""Return True if metric timestamp exceeds max_age_seconds."""
+		assert max_age_seconds > 0, "max_age_seconds must be positive"
 		age = (datetime.utcnow() - self.timestamp).total_seconds()
 		return age > max_age_seconds
 
 	def get_label_signature(self) -> str:
-		"""Get consistent label signature for grouping"""
+		"""Stable string signature of labels for grouping/keying."""
 		return "|".join(f"{k}={v}" for k, v in sorted(self.labels.items()))
 
 	def to_prometheus_format(self) -> str:
-		"""Convert to Prometheus exposition format"""
+		"""Emit Prometheus exposition format line."""
 		labels_str = ",".join(f'{k}="{v}"' for k, v in self.labels.items())
-		return f'{self.name}{{{labels_str}}} {self.value} {int(self.timestamp.timestamp() * 1000)}'
+		ms = int(self.timestamp.timestamp() * 1000)
+		return f'{self.name}{{{labels_str}}} {self.value} {ms}'
 
 
 class MonitoringAlert(BaseModel):
-	"""
-	Intelligent alert model with correlation and context
-	Supports smart grouping and escalation management
-	"""
-	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
+	"""Alert with correlation context and escalation tracking."""
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
 
-	# Core identification
-	alert_id: str = Field(default_factory=uuid7str, description="Unique alert identifier")
-	tenant_id: str = Field(..., description="APG tenant identifier")
-	rule_id: str = Field(..., description="ID of the rule that triggered this alert")
-	
-	# Alert details
-	name: str = Field(..., description="Alert name", max_length=255)
-	description: str = Field(default="", description="Alert description", max_length=1000)
-	severity: AlertSeverity = Field(default=AlertSeverity.MEDIUM, description="Alert severity")
-	status: AlertStatus = Field(default=AlertStatus.ACTIVE, description="Alert status")
-	
-	# Alert data
-	message: str = Field(..., description="Alert message", max_length=2048)
-	summary: str = Field(default="", description="Brief alert summary", max_length=500)
-	runbook_url: Optional[str] = Field(None, description="Link to runbook or documentation")
-	
-	# Temporal tracking
-	created_at: datetime = Field(default_factory=datetime.utcnow, description="Alert creation time")
-	updated_at: datetime = Field(default_factory=datetime.utcnow, description="Last update time")
-	resolved_at: Optional[datetime] = Field(None, description="Resolution time")
-	acknowledged_at: Optional[datetime] = Field(None, description="Acknowledgment time")
-	
-	# Correlation and grouping
-	correlation_key: Optional[str] = Field(None, description="Key for alert correlation")
-	parent_alert_id: Optional[str] = Field(None, description="Parent alert for grouping")
-	related_alert_ids: List[str] = Field(default_factory=list, description="Related alert IDs")
-	
-	# Context and metadata
-	labels: Dict[str, str] = Field(default_factory=dict, description="Alert labels")
-	annotations: Dict[str, str] = Field(default_factory=dict, description="Additional annotations")
-	source_metric: Optional[str] = Field(None, description="Source metric name")
-	source_value: Optional[float] = Field(None, description="Metric value that triggered alert")
-	threshold_value: Optional[float] = Field(None, description="Threshold that was exceeded")
-	
-	# Escalation and routing
-	assigned_to: Optional[str] = Field(None, description="Assigned user or team")
-	escalation_level: int = Field(default=0, description="Current escalation level", ge=0)
-	max_escalation_level: int = Field(default=3, description="Maximum escalation level", ge=1)
-	escalation_interval_minutes: int = Field(default=30, description="Escalation interval", ge=1)
-	
-	# Business impact
-	impact_score: float = Field(default=0.0, description="Business impact score", ge=0.0, le=1.0)
-	affected_services: List[str] = Field(default_factory=list, description="Affected services")
-	affected_users_count: int = Field(default=0, description="Estimated affected users", ge=0)
-	
-	# APG integration
-	notification_sent: bool = Field(default=False, description="Whether notification was sent")
-	audit_logged: bool = Field(default=False, description="Whether audit was logged")
-	
+	alert_id: str = Field(default_factory=uuid7str)
+	tenant_id: str = Field(...)
+	rule_id: str = Field(...)
+
+	name: str = Field(..., max_length=255)
+	description: str = Field(default="", max_length=1000)
+	severity: AlertSeverity = Field(default=AlertSeverity.MEDIUM)
+	status: AlertStatus = Field(default=AlertStatus.ACTIVE)
+
+	message: str = Field(..., max_length=2048)
+	summary: str = Field(default="", max_length=500)
+	runbook_url: str | None = None
+
+	created_at: datetime = Field(default_factory=datetime.utcnow)
+	updated_at: datetime = Field(default_factory=datetime.utcnow)
+	resolved_at: datetime | None = None
+	acknowledged_at: datetime | None = None
+
+	correlation_key: str | None = None
+	parent_alert_id: str | None = None
+	related_alert_ids: list[str] = Field(default_factory=list)
+
+	labels: dict[str, str] = Field(default_factory=dict)
+	annotations: dict[str, str] = Field(default_factory=dict)
+	source_metric: str | None = None
+	source_value: float | None = None
+	threshold_value: float | None = None
+
+	assigned_to: str | None = None
+	escalation_level: int = Field(default=0, ge=0)
+	max_escalation_level: int = Field(default=3, ge=1)
+	escalation_interval_minutes: int = Field(default=30, ge=1)
+
+	impact_score: float = Field(default=0.0, ge=0.0, le=1.0)
+	affected_services: list[str] = Field(default_factory=list)
+	affected_users_count: int = Field(default=0, ge=0)
+
+	notification_sent: bool = False
+	audit_logged: bool = False
+
 	def is_active(self) -> bool:
-		"""Check if alert is currently active"""
 		return self.status == AlertStatus.ACTIVE
 
-	def is_escalated(self) -> bool:
-		"""Check if alert has been escalated"""
-		return self.escalation_level > 0
-
 	def can_escalate(self) -> bool:
-		"""Check if alert can be escalated further"""
 		return self.escalation_level < self.max_escalation_level
 
 	def get_age_minutes(self) -> float:
-		"""Get alert age in minutes"""
 		return (datetime.utcnow() - self.created_at).total_seconds() / 60
 
 	def should_escalate(self) -> bool:
-		"""Check if alert should be escalated based on age"""
 		if not self.can_escalate() or not self.is_active():
 			return False
-		age_minutes = self.get_age_minutes()
-		return age_minutes >= (self.escalation_level + 1) * self.escalation_interval_minutes
+		return self.get_age_minutes() >= (self.escalation_level + 1) * self.escalation_interval_minutes
 
 
 class MonitoringRule(BaseModel):
-	"""
-	Flexible alert rule configuration with intelligent conditions
-	Supports complex expressions and ML-based anomaly detection
-	"""
-	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
+	"""Alert rule configuration with threshold and anomaly detection support."""
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
 
-	# Core identification
-	rule_id: str = Field(default_factory=uuid7str, description="Unique rule identifier")
-	tenant_id: str = Field(..., description="APG tenant identifier")
-	name: str = Field(..., description="Rule name", max_length=255)
-	description: str = Field(default="", description="Rule description", max_length=1000)
-	
-	# Rule configuration
-	enabled: bool = Field(default=True, description="Whether rule is enabled")
-	condition: Annotated[str, AfterValidator(_validate_alert_condition)] = Field(
-		..., description="Alert condition expression"
-	)
+	rule_id: str = Field(default_factory=uuid7str)
+	tenant_id: str = Field(...)
+	name: str = Field(..., max_length=255)
+	description: str = Field(default="", max_length=1000)
+
+	enabled: bool = True
+	condition: Annotated[str, AfterValidator(_validate_alert_condition)] = Field(...)
 	condition_type: AlertConditionType = Field(default=AlertConditionType.THRESHOLD)
-	
-	# Targeting
-	metric_name: str = Field(..., description="Target metric name", max_length=255)
-	metric_labels: Dict[str, str] = Field(default_factory=dict, description="Metric label filters")
-	scope: MonitoringScope = Field(default=MonitoringScope.TENANT, description="Rule scope")
-	
-	# Thresholds and parameters
-	threshold_value: Optional[float] = Field(None, description="Threshold value for comparison")
-	threshold_operator: str = Field(default="gt", description="Comparison operator (gt, lt, eq, etc.)")
-	evaluation_window_minutes: int = Field(default=5, description="Evaluation window", ge=1, le=1440)
-	evaluation_interval_seconds: int = Field(default=60, description="Evaluation interval", ge=10)
-	
-	# Alert configuration  
-	severity: AlertSeverity = Field(default=AlertSeverity.MEDIUM, description="Alert severity")
-	alert_message: str = Field(..., description="Alert message template", max_length=2048)
-	alert_summary: str = Field(default="", description="Alert summary template", max_length=500)
-	runbook_url: Optional[str] = Field(None, description="Runbook URL")
-	
-	# Escalation settings
-	escalation_enabled: bool = Field(default=True, description="Enable alert escalation")
-	escalation_interval_minutes: int = Field(default=30, description="Escalation interval", ge=1)
-	max_escalation_level: int = Field(default=3, description="Max escalation level", ge=1)
-	
-	# Suppression and correlation
-	suppression_enabled: bool = Field(default=False, description="Enable alert suppression")
-	suppression_window_minutes: int = Field(default=60, description="Suppression window", ge=1)
-	correlation_key: Optional[str] = Field(None, description="Alert correlation key")
-	
-	# ML and anomaly detection
-	anomaly_detection_enabled: bool = Field(default=False, description="Enable anomaly detection")
-	anomaly_sensitivity: float = Field(default=0.8, description="Anomaly sensitivity", ge=0.0, le=1.0)
-	baseline_period_days: int = Field(default=7, description="Baseline period for anomaly detection", ge=1)
-	
-	# Metadata and tracking
-	created_at: datetime = Field(default_factory=datetime.utcnow, description="Rule creation time")
-	updated_at: datetime = Field(default_factory=datetime.utcnow, description="Last update time")
-	created_by: str = Field(..., description="User who created the rule")
-	last_triggered: Optional[datetime] = Field(None, description="Last trigger time")
-	trigger_count: int = Field(default=0, description="Total trigger count", ge=0)
-	
-	# Performance metrics
-	evaluation_time_ms: float = Field(default=0.0, description="Average evaluation time", ge=0.0)
-	false_positive_rate: float = Field(default=0.0, description="False positive rate", ge=0.0, le=1.0)
-	effectiveness_score: float = Field(default=0.0, description="Rule effectiveness", ge=0.0, le=1.0)
+
+	metric_name: str = Field(..., max_length=255)
+	metric_labels: dict[str, str] = Field(default_factory=dict)
+	scope: MonitoringScope = Field(default=MonitoringScope.TENANT)
+
+	threshold_value: float | None = None
+	threshold_operator: str = Field(default="gt")
+	evaluation_window_minutes: int = Field(default=5, ge=1, le=1440)
+	evaluation_interval_seconds: int = Field(default=60, ge=10)
+
+	severity: AlertSeverity = Field(default=AlertSeverity.MEDIUM)
+	alert_message: str = Field(..., max_length=2048)
+	alert_summary: str = Field(default="", max_length=500)
+	runbook_url: str | None = None
+
+	escalation_enabled: bool = True
+	escalation_interval_minutes: int = Field(default=30, ge=1)
+	max_escalation_level: int = Field(default=3, ge=1)
+
+	suppression_enabled: bool = False
+	suppression_window_minutes: int = Field(default=60, ge=1)
+	correlation_key: str | None = None
+
+	anomaly_detection_enabled: bool = False
+	anomaly_sensitivity: float = Field(default=0.8, ge=0.0, le=1.0)
+	baseline_period_days: int = Field(default=7, ge=1)
+
+	created_at: datetime = Field(default_factory=datetime.utcnow)
+	updated_at: datetime = Field(default_factory=datetime.utcnow)
+	created_by: str = Field(...)
+	last_triggered: datetime | None = None
+	trigger_count: int = Field(default=0, ge=0)
+
+	evaluation_time_ms: float = Field(default=0.0, ge=0.0)
+	false_positive_rate: float = Field(default=0.0, ge=0.0, le=1.0)
+	effectiveness_score: float = Field(default=0.0, ge=0.0, le=1.0)
 
 	def is_due_for_evaluation(self) -> bool:
-		"""Check if rule is due for evaluation"""
+		"""True if rule has never been triggered or is past its next eval time."""
 		if not self.enabled:
 			return False
 		if not self.last_triggered:
@@ -317,252 +276,183 @@ class MonitoringRule(BaseModel):
 		return datetime.utcnow() >= next_eval
 
 	def get_evaluation_query(self) -> str:
-		"""Generate query for metric evaluation"""
 		labels_filter = " AND ".join(f'{k}="{v}"' for k, v in self.metric_labels.items())
 		window = f"{self.evaluation_window_minutes}m"
 		return f"SELECT {self.metric_name} WHERE {labels_filter} TIMEFRAME {window}"
 
 	def update_performance_stats(self, evaluation_time_ms: float, is_false_positive: bool = False) -> None:
-		"""Update rule performance statistics"""
-		assert evaluation_time_ms >= 0, "Evaluation time must be non-negative"
-		
-		# Update rolling average of evaluation time
+		"""Rolling EWMA update of rule performance statistics."""
+		assert evaluation_time_ms >= 0, "evaluation_time_ms must be non-negative"
 		self.evaluation_time_ms = (self.evaluation_time_ms * 0.9) + (evaluation_time_ms * 0.1)
-		
-		# Update false positive rate
 		if is_false_positive:
 			self.false_positive_rate = (self.false_positive_rate * 0.95) + 0.05
 		else:
 			self.false_positive_rate = self.false_positive_rate * 0.95
-		
-		# Update effectiveness score (inverse of false positive rate)
 		self.effectiveness_score = 1.0 - self.false_positive_rate
-		
 		self.updated_at = datetime.utcnow()
 
 
 class MonitoringDashboard(BaseModel):
-	"""
-	Intelligent dashboard configuration with adaptive layouts
-	Supports multiple dashboard types and real-time updates
-	"""
-	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
+	"""Dashboard configuration with adaptive layout and engagement tracking."""
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
 
-	# Core identification
-	dashboard_id: str = Field(default_factory=uuid7str, description="Unique dashboard identifier")
-	tenant_id: str = Field(..., description="APG tenant identifier")
-	name: str = Field(..., description="Dashboard name", max_length=255)
-	description: str = Field(default="", description="Dashboard description", max_length=1000)
-	
-	# Dashboard configuration
+	dashboard_id: str = Field(default_factory=uuid7str)
+	tenant_id: str = Field(...)
+	name: str = Field(..., max_length=255)
+	description: str = Field(default="", max_length=1000)
+
 	dashboard_type: DashboardType = Field(default=DashboardType.OPERATIONAL)
 	scope: MonitoringScope = Field(default=MonitoringScope.TENANT)
-	auto_refresh: bool = Field(default=True, description="Enable auto-refresh")
-	refresh_interval_seconds: int = Field(default=30, description="Refresh interval", ge=5, le=3600)
-	
-	# Layout and widgets
-	layout: Dict[str, Any] = Field(default_factory=dict, description="Dashboard layout configuration")
-	widgets: List[Dict[str, Any]] = Field(default_factory=list, description="Dashboard widgets")
-	widget_count: int = Field(default=0, description="Number of widgets", ge=0)
-	
-	# Access control
-	public: bool = Field(default=False, description="Whether dashboard is public")
-	shared_with: List[str] = Field(default_factory=list, description="Users/teams with access")
-	view_permissions: List[str] = Field(default_factory=list, description="View permission roles")
-	edit_permissions: List[str] = Field(default_factory=list, description="Edit permission roles")
-	
-	# Metadata and tracking
-	created_at: datetime = Field(default_factory=datetime.utcnow, description="Dashboard creation time")
-	updated_at: datetime = Field(default_factory=datetime.utcnow, description="Last update time")
-	created_by: str = Field(..., description="User who created the dashboard")
-	last_viewed: Optional[datetime] = Field(None, description="Last view time")
-	view_count: int = Field(default=0, description="Total view count", ge=0)
-	
-	# Performance optimization
-	cached: bool = Field(default=False, description="Whether dashboard data is cached")
-	cache_ttl_seconds: int = Field(default=300, description="Cache TTL", ge=1)
-	preload_data: bool = Field(default=False, description="Preload dashboard data")
-	
-	# Analytics and insights
-	avg_load_time_ms: float = Field(default=0.0, description="Average load time", ge=0.0)
-	user_engagement_score: float = Field(default=0.0, description="User engagement score", ge=0.0, le=1.0)
-	popularity_score: float = Field(default=0.0, description="Dashboard popularity", ge=0.0, le=1.0)
+	auto_refresh: bool = True
+	refresh_interval_seconds: int = Field(default=30, ge=5, le=3600)
 
-	def add_widget(self, widget_config: Dict[str, Any]) -> None:
-		"""Add widget to dashboard"""
-		assert isinstance(widget_config, dict), "Widget config must be a dictionary"
+	layout: dict[str, Any] = Field(default_factory=dict)
+	widgets: list[dict[str, Any]] = Field(default_factory=list)
+	widget_count: int = Field(default=0, ge=0)
+
+	public: bool = False
+	shared_with: list[str] = Field(default_factory=list)
+	view_permissions: list[str] = Field(default_factory=list)
+	edit_permissions: list[str] = Field(default_factory=list)
+
+	created_at: datetime = Field(default_factory=datetime.utcnow)
+	updated_at: datetime = Field(default_factory=datetime.utcnow)
+	created_by: str = Field(...)
+	last_viewed: datetime | None = None
+	view_count: int = Field(default=0, ge=0)
+
+	cached: bool = False
+	cache_ttl_seconds: int = Field(default=300, ge=1)
+	preload_data: bool = False
+
+	avg_load_time_ms: float = Field(default=0.0, ge=0.0)
+	user_engagement_score: float = Field(default=0.0, ge=0.0, le=1.0)
+	popularity_score: float = Field(default=0.0, ge=0.0, le=1.0)
+
+	def add_widget(self, widget_config: dict[str, Any]) -> None:
+		assert isinstance(widget_config, dict), "Widget config must be a dict"
 		assert "type" in widget_config, "Widget must have a type"
-		
 		widget_config["widget_id"] = uuid7str()
 		self.widgets.append(widget_config)
 		self.widget_count = len(self.widgets)
 		self.updated_at = datetime.utcnow()
 
 	def remove_widget(self, widget_id: str) -> bool:
-		"""Remove widget from dashboard"""
-		initial_count = len(self.widgets)
+		initial = len(self.widgets)
 		self.widgets = [w for w in self.widgets if w.get("widget_id") != widget_id]
-		removed = len(self.widgets) < initial_count
-		
+		removed = len(self.widgets) < initial
 		if removed:
 			self.widget_count = len(self.widgets)
 			self.updated_at = datetime.utcnow()
-		
 		return removed
 
 	def update_view_stats(self, load_time_ms: float) -> None:
-		"""Update dashboard view statistics"""
-		assert load_time_ms >= 0, "Load time must be non-negative"
-		
+		assert load_time_ms >= 0, "load_time_ms must be non-negative"
 		self.view_count += 1
 		self.last_viewed = datetime.utcnow()
-		
-		# Update rolling average of load time
 		self.avg_load_time_ms = (self.avg_load_time_ms * 0.9) + (load_time_ms * 0.1)
-		
-		# Update engagement score based on view frequency
-		days_since_created = (datetime.utcnow() - self.created_at).days
-		if days_since_created > 0:
-			views_per_day = self.view_count / max(days_since_created, 1)
-			self.user_engagement_score = min(views_per_day / 10.0, 1.0)
+		days = max((datetime.utcnow() - self.created_at).days, 1)
+		self.user_engagement_score = min(self.view_count / days / 10.0, 1.0)
 
 
 class MonitoringQuery(BaseModel):
-	"""
-	Flexible query model for metrics retrieval and analysis
-	Supports complex filtering, aggregation, and time-based operations
-	"""
-	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
+	"""Metric query with time range, label filters, and aggregation."""
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
 
-	# Query identification
-	query_id: str = Field(default_factory=uuid7str, description="Unique query identifier")
-	tenant_id: str = Field(..., description="APG tenant identifier")
-	
-	# Metric selection
-	metric_names: List[str] = Field(..., description="Target metric names")
-	labels: Dict[str, Union[str, List[str]]] = Field(
-		default_factory=dict, description="Label filters"
-	)
-	
-	# Time range
-	start_time: datetime = Field(..., description="Query start time")
-	end_time: datetime = Field(..., description="Query end time")
-	step_seconds: Optional[int] = Field(None, description="Step size for range queries", ge=1)
-	
-	# Aggregation
-	aggregation: Optional[str] = Field(None, description="Aggregation function (sum, avg, max, min)")
-	group_by: List[str] = Field(default_factory=list, description="Group by labels")
-	
-	# Query options
-	max_results: int = Field(default=1000, description="Maximum results to return", ge=1, le=10000)
-	include_metadata: bool = Field(default=False, description="Include metric metadata")
-	
-	# Performance
-	timeout_seconds: int = Field(default=30, description="Query timeout", ge=1, le=300)
-	cache_enabled: bool = Field(default=True, description="Enable query caching")
+	query_id: str = Field(default_factory=uuid7str)
+	tenant_id: str = Field(...)
+
+	metric_names: list[str] = Field(...)
+	labels: dict[str, str | list[str]] = Field(default_factory=dict)
+
+	start_time: datetime = Field(...)
+	end_time: datetime = Field(...)
+	step_seconds: int | None = Field(None, ge=1)
+
+	aggregation: str | None = None
+	group_by: list[str] = Field(default_factory=list)
+
+	max_results: int = Field(default=1000, ge=1, le=10000)
+	include_metadata: bool = False
+
+	timeout_seconds: int = Field(default=30, ge=1, le=300)
+	cache_enabled: bool = True
 
 	def validate_time_range(self) -> bool:
-		"""Validate that time range is sensible"""
-		assert self.end_time > self.start_time, "End time must be after start time"
-		
+		assert self.end_time > self.start_time, "end_time must be after start_time"
 		duration = (self.end_time - self.start_time).total_seconds()
-		assert duration <= 86400 * 30, "Time range cannot exceed 30 days"  # 30 days max
-		
+		assert duration <= 86400 * 30, "Time range cannot exceed 30 days"
 		return True
 
 	def get_duration_seconds(self) -> int:
-		"""Get query duration in seconds"""
 		return int((self.end_time - self.start_time).total_seconds())
 
 	def generate_query_key(self) -> str:
-		"""Generate cache key for the query"""
-		key_parts = [
+		parts = [
 			"|".join(sorted(self.metric_names)),
 			json.dumps(self.labels, sort_keys=True),
 			self.start_time.isoformat(),
 			self.end_time.isoformat(),
 			str(self.step_seconds or ""),
 			self.aggregation or "",
-			"|".join(sorted(self.group_by))
+			"|".join(sorted(self.group_by)),
 		]
-		return "|".join(key_parts)
+		return "|".join(parts)
 
 
 class MonitoringTarget(BaseModel):
-	"""
-	Monitoring target configuration for services, hosts, and applications
-	Supports auto-discovery and intelligent configuration
-	"""
-	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
+	"""Scrape target configuration with health tracking."""
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
 
-	# Core identification
-	target_id: str = Field(default_factory=uuid7str, description="Unique target identifier")
-	tenant_id: str = Field(..., description="APG tenant identifier")
-	name: str = Field(..., description="Target name", max_length=255)
-	type: str = Field(..., description="Target type (service, host, application)", max_length=100)
-	
-	# Target configuration
-	endpoint: str = Field(..., description="Monitoring endpoint URL")
-	port: Optional[int] = Field(None, description="Target port", ge=1, le=65535)
-	path: str = Field(default="/metrics", description="Metrics path")
-	scheme: str = Field(default="http", description="URL scheme")
-	
-	# Collection settings
-	scrape_interval_seconds: int = Field(default=60, description="Scrape interval", ge=5, le=3600)
-	scrape_timeout_seconds: int = Field(default=10, description="Scrape timeout", ge=1, le=60)
-	enabled: bool = Field(default=True, description="Whether target is enabled")
-	
-	# Authentication
-	auth_type: Optional[str] = Field(None, description="Authentication type")
-	auth_config: Dict[str, str] = Field(default_factory=dict, description="Authentication config")
-	
-	# Labels and metadata
-	static_labels: Dict[str, str] = Field(default_factory=dict, description="Static labels")
-	discovered_labels: Dict[str, str] = Field(default_factory=dict, description="Auto-discovered labels")
-	metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
-	
-	# Health and performance
-	healthy: bool = Field(default=True, description="Target health status")
-	last_scrape: Optional[datetime] = Field(None, description="Last successful scrape")
-	scrape_failures: int = Field(default=0, description="Consecutive scrape failures", ge=0)
-	avg_scrape_duration_ms: float = Field(default=0.0, description="Average scrape duration", ge=0.0)
-	
-	# APG integration
-	capability_name: Optional[str] = Field(None, description="Source APG capability")
-	auto_discovered: bool = Field(default=False, description="Whether target was auto-discovered")
-	
-	# Timestamps
-	created_at: datetime = Field(default_factory=datetime.utcnow, description="Creation timestamp")
-	updated_at: datetime = Field(default_factory=datetime.utcnow, description="Last update timestamp")
+	target_id: str = Field(default_factory=uuid7str)
+	tenant_id: str = Field(...)
+	name: str = Field(..., max_length=255)
+	type: str = Field(..., max_length=100)
+
+	endpoint: str = Field(...)
+	port: int | None = Field(None, ge=1, le=65535)
+	path: str = Field(default="/metrics")
+	scheme: str = Field(default="http")
+
+	scrape_interval_seconds: int = Field(default=60, ge=5, le=3600)
+	scrape_timeout_seconds: int = Field(default=10, ge=1, le=60)
+	enabled: bool = True
+
+	auth_type: str | None = None
+	auth_config: dict[str, str] = Field(default_factory=dict)
+
+	static_labels: dict[str, str] = Field(default_factory=dict)
+	discovered_labels: dict[str, str] = Field(default_factory=dict)
+	metadata: dict[str, Any] = Field(default_factory=dict)
+
+	healthy: bool = True
+	last_scrape: datetime | None = None
+	scrape_failures: int = Field(default=0, ge=0)
+	avg_scrape_duration_ms: float = Field(default=0.0, ge=0.0)
+
+	capability_name: str | None = None
+	auto_discovered: bool = False
+
+	created_at: datetime = Field(default_factory=datetime.utcnow)
+	updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 	def is_healthy(self) -> bool:
-		"""Check if target is healthy"""
 		if not self.healthy or not self.enabled:
 			return False
-		
-		# Consider target unhealthy if too many consecutive failures
 		if self.scrape_failures > 3:
 			return False
-		
-		# Consider target stale if no recent scrapes
 		if self.last_scrape:
-			stale_threshold = datetime.utcnow() - timedelta(
-				seconds=self.scrape_interval_seconds * 3
-			)
-			if self.last_scrape < stale_threshold:
+			stale = datetime.utcnow() - timedelta(seconds=self.scrape_interval_seconds * 3)
+			if self.last_scrape < stale:
 				return False
-		
 		return True
 
 	def get_full_endpoint(self) -> str:
-		"""Get complete endpoint URL"""
 		port_part = f":{self.port}" if self.port else ""
 		return f"{self.scheme}://{self.endpoint}{port_part}{self.path}"
 
 	def update_scrape_stats(self, success: bool, duration_ms: float) -> None:
-		"""Update scrape statistics"""
-		assert duration_ms >= 0, "Duration must be non-negative"
-		
+		assert duration_ms >= 0, "duration_ms must be non-negative"
 		if success:
 			self.scrape_failures = 0
 			self.last_scrape = datetime.utcnow()
@@ -571,16 +461,181 @@ class MonitoringTarget(BaseModel):
 			self.scrape_failures += 1
 			if self.scrape_failures > 3:
 				self.healthy = False
-		
-		# Update rolling average of scrape duration
 		self.avg_scrape_duration_ms = (self.avg_scrape_duration_ms * 0.9) + (duration_ms * 0.1)
 		self.updated_at = datetime.utcnow()
 
 
-# Export all models
+# ─── SLO & Error Budget ────────────────────────────────────────────────────────
+
+class SLOStatus(str, Enum):
+	"""SLO lifecycle states."""
+	ACTIVE = "active"
+	BREACHED = "breached"
+	PAUSED = "paused"
+	RETIRED = "retired"
+
+
+class SLO(BaseModel):
+	"""Service Level Objective definition with error budget tracking."""
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+
+	slo_id: str = Field(default_factory=uuid7str)
+	tenant_id: str = Field(...)
+	service_name: str = Field(..., max_length=255)
+	name: str = Field(..., max_length=255)
+	description: str = Field(default="", max_length=1000)
+
+	objective_percent: float = Field(..., ge=0.0, le=100.0, description="e.g. 99.9")
+	window_days: int = Field(default=30, ge=1, le=365)
+	indicator_metric: str = Field(..., max_length=255)
+
+	status: SLOStatus = Field(default=SLOStatus.ACTIVE)
+	current_compliance: float = Field(default=100.0, ge=0.0, le=100.0)
+	error_budget_remaining_percent: float = Field(default=100.0, ge=0.0, le=100.0)
+	burn_rate: float = Field(default=0.0, ge=0.0)
+
+	owner: str = Field(...)
+	notification_route: str = Field(...)
+
+	created_at: datetime = Field(default_factory=datetime.utcnow)
+	updated_at: datetime = Field(default_factory=datetime.utcnow)
+	created_by: str = Field(...)
+	is_deleted: bool = False
+
+	def is_breached(self) -> bool:
+		return self.current_compliance < self.objective_percent
+
+	def error_budget_minutes(self) -> float:
+		"""Total allowed downtime minutes in the window."""
+		window_minutes = self.window_days * 24 * 60
+		allowed_error_fraction = (100.0 - self.objective_percent) / 100.0
+		return window_minutes * allowed_error_fraction
+
+	def remaining_budget_minutes(self) -> float:
+		return self.error_budget_minutes() * (self.error_budget_remaining_percent / 100.0)
+
+
+class HealthCheck(BaseModel):
+	"""Health check probe configuration and last result."""
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+
+	check_id: str = Field(default_factory=uuid7str)
+	tenant_id: str = Field(...)
+	name: str = Field(..., max_length=255)
+	service_name: str = Field(..., max_length=255)
+	endpoint: str = Field(...)
+	method: str = Field(default="GET", max_length=10)
+	expected_status: int = Field(default=200, ge=100, le=599)
+	timeout_seconds: int = Field(default=5, ge=1, le=60)
+	interval_seconds: int = Field(default=30, ge=5)
+
+	healthy: bool = True
+	last_checked: datetime | None = None
+	last_response_ms: float | None = None
+	consecutive_failures: int = Field(default=0, ge=0)
+
+	labels: dict[str, str] = Field(default_factory=dict)
+	created_at: datetime = Field(default_factory=datetime.utcnow)
+	updated_at: datetime = Field(default_factory=datetime.utcnow)
+	is_deleted: bool = False
+
+
+class TraceSpan(BaseModel):
+	"""Distributed trace span for correlation and latency analysis."""
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+
+	span_id: str = Field(default_factory=uuid7str)
+	tenant_id: str = Field(...)
+	trace_id: str = Field(...)
+	parent_span_id: str | None = None
+
+	service_name: str = Field(..., max_length=255)
+	operation_name: str = Field(..., max_length=255)
+	start_time: datetime = Field(...)
+	end_time: datetime | None = None
+	duration_ms: float | None = Field(None, ge=0.0)
+
+	status: str = Field(default="ok", max_length=50)
+	error: bool = False
+	error_message: str | None = None
+
+	tags: dict[str, str] = Field(default_factory=dict)
+	logs: list[dict[str, Any]] = Field(default_factory=list)
+
+	created_at: datetime = Field(default_factory=datetime.utcnow)
+	is_deleted: bool = False
+
+	def calculate_duration(self) -> float | None:
+		if self.end_time and self.start_time:
+			return (self.end_time - self.start_time).total_seconds() * 1000
+		return None
+
+
+class LogEntry(BaseModel):
+	"""Structured log entry with PII status and ingestion governance."""
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+
+	log_id: str = Field(default_factory=uuid7str)
+	tenant_id: str = Field(...)
+	source_id: str = Field(...)
+	service_name: str = Field(..., max_length=255)
+
+	level: str = Field(default="info", max_length=20)
+	message: str = Field(..., max_length=8192)
+	timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+	trace_id: str | None = None
+	span_id: str | None = None
+	labels: dict[str, str] = Field(default_factory=dict)
+
+	contains_pii: bool = False
+	pii_redacted: bool = True
+	structured_data: dict[str, Any] = Field(default_factory=dict)
+
+	created_at: datetime = Field(default_factory=datetime.utcnow)
+	is_deleted: bool = False
+
+
+class AnomalyDetection(BaseModel):
+	"""Anomaly detection result for a metric series."""
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+
+	anomaly_id: str = Field(default_factory=uuid7str)
+	tenant_id: str = Field(...)
+	metric_name: str = Field(..., max_length=255)
+	source_id: str = Field(...)
+
+	detected_at: datetime = Field(default_factory=datetime.utcnow)
+	anomaly_score: float = Field(..., ge=0.0, le=1.0)
+	sensitivity: float = Field(default=0.8, ge=0.0, le=1.0)
+	algorithm: str = Field(default="z_score", max_length=64)
+
+	observed_value: float = Field(...)
+	expected_value: float = Field(...)
+	baseline_mean: float = Field(...)
+	baseline_std: float = Field(default=0.0, ge=0.0)
+
+	is_true_positive: bool | None = None
+	feedback_note: str | None = None
+	labels: dict[str, str] = Field(default_factory=dict)
+
+	created_at: datetime = Field(default_factory=datetime.utcnow)
+	is_deleted: bool = False
+
+	def z_score(self) -> float:
+		"""Return z-score magnitude of this anomaly."""
+		if self.baseline_std <= 0:
+			return 0.0
+		return abs((self.observed_value - self.baseline_mean) / self.baseline_std)
+
+
+# ─── Exports ──────────────────────────────────────────────────────────────────
+
 __all__ = [
-	'MetricType', 'AlertSeverity', 'AlertStatus', 'AlertConditionType',
-	'DashboardType', 'DataRetentionPolicy', 'MonitoringScope',
-	'MonitoringMetric', 'MonitoringAlert', 'MonitoringRule',
-	'MonitoringDashboard', 'MonitoringQuery', 'MonitoringTarget'
+	"uuid7str",
+	"MetricType", "AlertSeverity", "AlertStatus", "AlertConditionType",
+	"DashboardType", "DataRetentionPolicy", "MonitoringScope", "SLOStatus",
+	"MonitoringMetric", "MonitoringAlert", "MonitoringRule", "MonitoringDashboard",
+	"MonitoringQuery", "MonitoringTarget",
+	"SLO", "HealthCheck", "TraceSpan", "LogEntry", "AnomalyDetection",
 ]

@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "telecom_qos",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "telecom_qos": {
+      "capability": "telecom_qos"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

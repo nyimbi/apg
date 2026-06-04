@@ -162,7 +162,7 @@ def mock_transcription_service():
 	service = AsyncMock()
 	
 	async def mock_create_transcription_job(**kwargs):
-		from ..models import APTranscriptionJob, ProcessingStatus
+		from ...models import APTranscriptionJob, ProcessingStatus
 		from uuid_extensions import uuid7str
 		from datetime import datetime
 		
@@ -193,7 +193,7 @@ def mock_synthesis_service():
 	service = AsyncMock()
 	
 	async def mock_synthesize_text(**kwargs):
-		from ..models import APVoiceSynthesisJob, ProcessingStatus
+		from ...models import APVoiceSynthesisJob, ProcessingStatus
 		from uuid_extensions import uuid7str
 		from datetime import datetime
 		
@@ -224,7 +224,7 @@ def mock_analysis_service():
 	service = AsyncMock()
 	
 	async def mock_analyze_sentiment(**kwargs):
-		from ..models import APAudioAnalysisJob, ProcessingStatus
+		from ...models import APAudioAnalysisJob, ProcessingStatus
 		from uuid_extensions import uuid7str
 		from datetime import datetime
 		

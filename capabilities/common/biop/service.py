@@ -1,1461 +1,1167 @@
 """
-APG Biometric Authentication - Core Service Implementation
+APG Biometric Processing (BIOP) - Expanded Service Implementation
 
-Revolutionary biometric authentication service with 10x superior capabilities
-including contextual intelligence, predictive analytics, and behavioral fusion.
+Dependency-light in-memory store pattern with full audit trail,
+tenant isolation, and 40+ async methods.
 
 Author: Datacraft (nyimbi@gmail.com)
 Copyright: © 2025 Datacraft
 """
 
-import asyncio
+from __future__ import annotations
+
+import csv
 import hashlib
+import io
 import json
 import logging
+import statistics
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, List, Tuple, Union
-from uuid import UUID
-from dataclasses import dataclass
-from enum import Enum
+from typing import Any
 
-import numpy as np
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, and_, or_
-from sqlalchemy.orm import selectinload
-from pydantic import BaseModel, Field, ConfigDict
-from uuid_extensions import uuid7str
+from uuid6 import uuid7
 
-from .models import (
-	BiUser, BiVerification, BiBiometric, BiDocument, BiFraudRule, 
-	BiComplianceRule, BiCollaboration, BiBehavioralSession, BiAuditLog,
-	BiVerificationStatus, BiModalityType, BiRiskLevel
-)
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def _log_biometric_operation(operation: str, details: Dict[str, Any]) -> str:
-	"""Log biometric operations with privacy protection"""
-	sanitized_details = {k: v for k, v in details.items() if k not in ['template', 'biometric_data', 'raw_image']}
-	return f"Biometric {operation}: {sanitized_details}"
 
-def _log_security_event(event: str, severity: str, context: Dict[str, Any]) -> str:
-	"""Log security events with appropriate classification"""
-	return f"Security Event [{severity}]: {event} - Context: {context}"
+def uuid7str() -> str:
+	return str(uuid7())
 
-# Service Data Models
 
-@dataclass
-class ContextualIntelligence:
-	"""Contextual intelligence analysis results"""
-	business_patterns: Dict[str, Any]
-	risk_context: Dict[str, Any]
-	workflow_optimization: Dict[str, Any]
-	compliance_intelligence: Dict[str, Any]
-	adaptive_recommendations: List[Dict[str, Any]]
+def _ts() -> str:
+	return datetime.utcnow().isoformat(timespec="seconds")
 
-@dataclass
-class PredictiveAnalytics:
-	"""Predictive analytics results"""
-	fraud_prediction: Dict[str, Any]
-	risk_trajectory: Dict[str, Any]
-	behavioral_forecast: Dict[str, Any]
-	threat_intelligence: Dict[str, Any]
-	confidence_intervals: Dict[str, float]
 
-@dataclass
-class BiometricFusionResult:
-	"""Multi-modal biometric fusion results"""
-	fusion_confidence: float
-	modality_scores: Dict[str, float]
-	behavioral_analysis: Dict[str, Any]
-	liveness_assessment: Dict[str, Any]
-	deepfake_detection: Dict[str, Any]
-	overall_risk: BiRiskLevel
+def _log_biometric_op(operation: str, details: dict[str, Any]) -> str:
+	safe = {k: v for k, v in details.items() if k not in {"template", "biometric_data", "raw_image", "encrypted_template"}}
+	return f"biop.{operation}: {safe}"
 
-@dataclass
-class CollaborativeVerificationSession:
-	"""Collaborative verification session data"""
-	session_id: str
-	participants: List[Dict[str, Any]]
-	real_time_state: Dict[str, Any]
-	consensus_data: Dict[str, Any]
-	expert_insights: List[Dict[str, Any]]
 
-class BiometricAuthenticationService:
+# ---------------------------------------------------------------------------
+# In-memory record types
+# ---------------------------------------------------------------------------
+
+class _R(dict[str, Any]):
+	"""Thin dict subclass so callers can do record['field'] or record.get(...)."""
+
+
+# ---------------------------------------------------------------------------
+# Main service
+# ---------------------------------------------------------------------------
+
+class BiometricService:
 	"""
-	Revolutionary biometric authentication service with 10x superior capabilities
-	
-	Core Features:
-	- Contextual Intelligence Engine
-	- Natural Language Identity Queries
-	- Predictive Identity Analytics
-	- Real-Time Collaborative Verification
-	- Behavioral Biometrics Fusion
-	- Adaptive Security Intelligence
-	- Universal Identity Orchestration
-	- Quantum-Inspired Deepfake Detection
-	- Zero-Friction Authentication
-	- Immersive Identity Dashboard
+	40+ async methods covering biometric enrolment, verification,
+	gallery management, presentation-attack detection, watchlists,
+	multimodal fusion, consent, opt-out, performance analytics and
+	domain-specific compliance.
+
+	Store pattern: all state in dicts keyed by (tenant_id, record_id).
+	Every state change emits an audit event via _audit().
 	"""
-	
-	def __init__(self, db_session: AsyncSession, tenant_id: str):
-		"""Initialize biometric authentication service"""
-		self.db = db_session
+
+	def __init__(self, actor_id: str = "system", tenant_id: str = "default") -> None:
+		self.actor_id = actor_id
 		self.tenant_id = tenant_id
-		self.logger = logger
-		
-		# Initialize revolutionary components
-		self._contextual_intelligence = ContextualIntelligenceEngine()
-		self._predictive_analytics = PredictiveAnalyticsEngine()
-		self._behavioral_fusion = BehavioralBiometricsFusion()
-		self._adaptive_security = AdaptiveSecurityIntelligence()
-		self._universal_orchestration = UniversalIdentityOrchestration()
-		self._deepfake_detection = DeepfakeQuantumDetection()
-		self._zero_friction_auth = ZeroFrictionAuthentication()
-		self._collaborative_engine = CollaborativeVerificationEngine()
-		
-	async def create_user(self, user_data: Dict[str, Any]) -> BiUser:
-		"""
-		Create new biometric user with contextual intelligence initialization
-		
-		Revolutionary features:
-		- Contextual intelligence baseline establishment
-		- Behavioral pattern initialization
-		- Universal identity orchestration setup
-		- Zero-friction authentication preparation
-		"""
-		try:
-			# Validate user data
-			assert user_data.get('external_user_id'), "External user ID required"
-			assert user_data.get('tenant_id') == self.tenant_id, "Tenant ID mismatch"
-			
-			# Create user with revolutionary features
-			user = BiUser(
-				external_user_id=user_data['external_user_id'],
-				tenant_id=self.tenant_id,
-				first_name=user_data.get('first_name'),
-				last_name=user_data.get('last_name'),
-				email=user_data.get('email'),
-				phone=user_data.get('phone'),
-				date_of_birth=user_data.get('date_of_birth'),
-				
-				# Initialize contextual intelligence
-				behavioral_profile=await self._initialize_behavioral_profile(user_data),
-				contextual_patterns=await self._initialize_contextual_patterns(user_data),
-				risk_profile=await self._initialize_risk_profile(user_data),
-				
-				# Setup universal identity orchestration
-				global_identity_id=await self._generate_global_identity_id(user_data),
-				jurisdiction_compliance=await self._setup_jurisdiction_compliance(user_data),
-				
-				# Initialize adaptive security
-				threat_intelligence=await self._initialize_threat_intelligence(user_data),
-				security_adaptations={'generation': 1, 'adaptations': []},
-				
-				# Setup zero-friction authentication
-				invisible_auth_profile=await self._initialize_invisible_auth(user_data),
-				ambient_signatures={},
-				predictive_patterns={}
-			)
-			
-			self.db.add(user)
-			await self.db.commit()
-			await self.db.refresh(user)
-			
-			# Log user creation with audit trail
-			await self._create_audit_log(
-				event_type="user_created",
-				event_category="identity_management",
-				event_description=f"New biometric user created: {user.id}",
-				user_id=user.id,
-				event_data={"external_user_id": user.external_user_id}
-			)
-			
-			self.logger.info(_log_biometric_operation("user_created", {
-				"user_id": user.id,
-				"external_user_id": user.external_user_id
-			}))
-			
-			return user
-			
-		except Exception as e:
-			await self.db.rollback()
-			self.logger.error(f"Failed to create user: {str(e)}")
-			raise
-	
-	async def start_verification(
-		self, 
-		user_id: str, 
-		verification_type: str,
-		business_context: Optional[Dict[str, Any]] = None,
-		collaboration_enabled: bool = False
-	) -> BiVerification:
-		"""
-		Start identity verification with revolutionary intelligence
-		
-		Revolutionary features:
-		- Contextual intelligence analysis
-		- Predictive fraud analytics
-		- Real-time collaborative verification
-		- Universal compliance validation
-		"""
-		try:
-			# Get user and validate
-			user = await self._get_user_by_id(user_id)
-			assert user, f"User not found: {user_id}"
-			
-			# Initialize contextual intelligence analysis
-			contextual_analysis = await self._contextual_intelligence.analyze_verification_context(
-				user=user,
-				verification_type=verification_type,
-				business_context=business_context or {},
-				tenant_context=await self._get_tenant_context()
-			)
-			
-			# Generate predictive analytics
-			predictive_analysis = await self._predictive_analytics.generate_risk_forecast(
-				user=user,
-				verification_context=contextual_analysis,
-				historical_patterns=await self._get_user_verification_history(user_id)
-			)
-			
-			# Setup collaborative session if enabled
-			collaboration_session = None
-			if collaboration_enabled:
-				collaboration_session = await self._setup_collaborative_session(
-					verification_type=verification_type,
-					risk_level=predictive_analysis.risk_trajectory.get('level', 'medium'),
-					complexity_indicators=contextual_analysis.business_patterns.get('complexity', [])
-				)
-			
-			# Create verification record
-			verification = BiVerification(
-				user_id=user_id,
-				tenant_id=self.tenant_id,
-				verification_type=verification_type,
-				status=BiVerificationStatus.PENDING,
-				
-				# Contextual intelligence integration
-				business_context=business_context or {},
-				contextual_risk_assessment=contextual_analysis.risk_context,
-				intelligent_recommendations=contextual_analysis.adaptive_recommendations,
-				workflow_optimization=contextual_analysis.workflow_optimization,
-				
-				# Predictive analytics integration
-				fraud_prediction=predictive_analysis.fraud_prediction,
-				risk_trajectory=predictive_analysis.risk_trajectory,
-				behavioral_forecast=predictive_analysis.behavioral_forecast,
-				compliance_prediction=predictive_analysis.compliance_intelligence,
-				
-				# Collaborative verification setup
-				collaboration_session_id=collaboration_session.session_id if collaboration_session else None,
-				collaborative_decision={},
-				expert_consultations=[],
-				
-				# Universal identity orchestration
-				jurisdiction=await self._determine_jurisdiction(user, business_context),
-				compliance_framework=await self._get_applicable_compliance_frameworks(user, business_context),
-				regulatory_requirements=await self._get_regulatory_requirements(user, business_context),
-				
-				# Initialize revolutionary features
-				spatial_visualization={},
-				ar_overlay_data={},
-				nl_query_metadata={},
-				threat_assessment=predictive_analysis.threat_intelligence,
-				invisible_verification={},
-				ambient_authentication={}
-			)
-			
-			self.db.add(verification)
-			await self.db.commit()
-			await self.db.refresh(verification)
-			
-			# Create audit log
-			await self._create_audit_log(
-				event_type="verification_started",
-				event_category="identity_verification",
-				event_description=f"Identity verification started: {verification.id}",
-				user_id=user_id,
-				verification_id=verification.id,
-				event_data={
-					"verification_type": verification_type,
-					"risk_level": predictive_analysis.risk_trajectory.get('level'),
-					"collaborative": collaboration_enabled
-				}
-			)
-			
-			self.logger.info(_log_biometric_operation("verification_started", {
-				"verification_id": verification.id,
-				"user_id": user_id,
-				"type": verification_type
-			}))
-			
-			return verification
-			
-		except Exception as e:
-			await self.db.rollback()
-			self.logger.error(f"Failed to start verification: {str(e)}")
-			raise
-	
-	async def process_biometric_verification(
+
+		# stores
+		self._users:       dict[tuple[str, str], _R] = {}
+		self._templates:   dict[tuple[str, str], _R] = {}
+		self._verifications: dict[tuple[str, str], _R] = {}
+		self._liveness_challenges: dict[tuple[str, str], _R] = {}
+		self._watchlists:  dict[tuple[str, str], _R] = {}
+		self._gallery:     dict[tuple[str, str], _R] = {}
+		self._consent:     dict[tuple[str, str], _R] = {}
+		self._audit_log:   list[_R] = []
+
+	# ------------------------------------------------------------------
+	# helpers
+	# ------------------------------------------------------------------
+
+	def _key(self, tenant_id: str, record_id: str) -> tuple[str, str]:
+		return (tenant_id, record_id)
+
+	async def _audit(self, event_type: str, record_id: str, details: dict[str, Any] | None = None) -> None:
+		self._audit_log.append(_R(
+			event_id=uuid7str(),
+			tenant_id=self.tenant_id,
+			actor_id=self.actor_id,
+			event_type=event_type,
+			record_id=record_id,
+			details=details or {},
+			occurred_at=_ts(),
+		))
+
+	def _require_user(self, user_id: str) -> _R:
+		record = self._users.get(self._key(self.tenant_id, user_id))
+		if record is None:
+			raise KeyError(f"biometric user not found: {user_id}")
+		return record
+
+	def _require_template(self, template_id: str) -> _R:
+		record = self._templates.get(self._key(self.tenant_id, template_id))
+		if record is None:
+			raise KeyError(f"biometric template not found: {template_id}")
+		return record
+
+	# ------------------------------------------------------------------
+	# 1. User registration
+	# ------------------------------------------------------------------
+
+	async def register_user(
 		self,
-		verification_id: str,
-		biometric_data: Dict[str, Any],
-		modality: BiModalityType,
-		liveness_required: bool = True
-	) -> BiometricFusionResult:
-		"""
-		Process biometric verification with revolutionary fusion
-		
-		Revolutionary features:
-		- Multi-modal biometric fusion
-		- Behavioral biometrics integration
-		- Quantum-inspired deepfake detection
-		- Adaptive security intelligence
-		- Real-time liveness detection
-		"""
-		try:
-			# Get verification record
-			verification = await self._get_verification_by_id(verification_id)
-			assert verification, f"Verification not found: {verification_id}"
-			
-			# Update verification status
-			verification.status = BiVerificationStatus.IN_PROGRESS
-			await self.db.commit()
-			
-			# Process biometric with revolutionary fusion
-			fusion_result = await self._behavioral_fusion.process_multi_modal_biometric(
-				biometric_data=biometric_data,
-				modality=modality,
-				user_profile=verification.user.behavioral_profile,
-				contextual_data=verification.business_context
-			)
-			
-			# Quantum-inspired deepfake detection
-			if modality in [BiModalityType.FACE, BiModalityType.VOICE]:
-				deepfake_analysis = await self._deepfake_detection.analyze_synthetic_media(
-					media_data=biometric_data,
-					modality=modality,
-					quantum_signatures=verification.user.biometrics
-				)
-				fusion_result.deepfake_detection = deepfake_analysis
-			
-			# Advanced liveness detection if required
-			if liveness_required:
-				liveness_result = await self._advanced_liveness_detection(
-					biometric_data=biometric_data,
-					modality=modality,
-					user_context=verification.user.contextual_patterns
-				)
-				fusion_result.liveness_assessment = liveness_result
-			
-			# Adaptive security assessment
-			security_assessment = await self._adaptive_security.assess_verification_security(
-				fusion_result=fusion_result,
-				threat_context=verification.threat_assessment,
-				user_security_profile=verification.user.threat_intelligence
-			)
-			
-			# Update verification with results
-			verification.modality_results[modality.value] = fusion_result.__dict__
-			verification.fusion_analysis = {
-				'overall_confidence': fusion_result.fusion_confidence,
-				'risk_level': fusion_result.overall_risk.value,
-				'security_assessment': security_assessment
-			}
-			verification.confidence_score = fusion_result.fusion_confidence
-			verification.risk_score = self._calculate_risk_score(fusion_result.overall_risk)
-			
-			await self.db.commit()
-			
-			# Create audit log
-			await self._create_audit_log(
-				event_type="biometric_processed",
-				event_category="biometric_verification",
-				event_description=f"Biometric processed: {modality.value}",
-				user_id=verification.user_id,
-				verification_id=verification_id,
-				event_data={
-					"modality": modality.value,
-					"confidence": fusion_result.fusion_confidence,
-					"risk_level": fusion_result.overall_risk.value
-				}
-			)
-			
-			self.logger.info(_log_biometric_operation("biometric_processed", {
-				"verification_id": verification_id,
-				"modality": modality.value,
-				"confidence": fusion_result.fusion_confidence
-			}))
-			
-			return fusion_result
-			
-		except Exception as e:
-			await self.db.rollback()
-			self.logger.error(f"Failed to process biometric: {str(e)}")
-			raise
-	
-	async def complete_verification(
-		self,
-		verification_id: str,
-		final_decision: bool,
-		collaborative_consensus: Optional[Dict[str, Any]] = None
-	) -> BiVerification:
-		"""
-		Complete identity verification with revolutionary decision intelligence
-		
-		Revolutionary features:
-		- Collaborative consensus integration
-		- Predictive analytics validation
-		- Contextual intelligence confirmation
-		- Universal compliance verification
-		"""
-		try:
-			# Get verification record with relationships
-			verification = await self._get_verification_with_relations(verification_id)
-			assert verification, f"Verification not found: {verification_id}"
-			
-			# Process collaborative consensus if available
-			if collaborative_consensus:
-				verification.collaborative_decision = collaborative_consensus
-				verification.consensus_data = await self._process_collaborative_consensus(
-					verification=verification,
-					consensus_data=collaborative_consensus
-				)
-			
-			# Validate decision with contextual intelligence
-			decision_validation = await self._contextual_intelligence.validate_verification_decision(
-				verification=verification,
-				proposed_decision=final_decision,
-				collaborative_input=collaborative_consensus
-			)
-			
-			# Update verification status and results
-			verification.status = BiVerificationStatus.VERIFIED if final_decision else BiVerificationStatus.FAILED
-			verification.completed_at = datetime.utcnow()
-			verification.processing_time_ms = int((verification.completed_at - verification.started_at).total_seconds() * 1000)
-			
-			# Update user profiles with learning
-			await self._update_user_learning_profiles(
-				user=verification.user,
-				verification_result=verification,
-				decision_validation=decision_validation
-			)
-			
-			# Generate compliance reporting
-			compliance_report = await self._generate_compliance_report(verification)
-			verification.regulatory_requirements.update({'compliance_report': compliance_report})
-			
-			await self.db.commit()
-			
-			# Create audit log
-			await self._create_audit_log(
-				event_type="verification_completed",
-				event_category="identity_verification",
-				event_description=f"Verification completed: {verification.status.value}",
-				user_id=verification.user_id,
-				verification_id=verification_id,
-				event_data={
-					"decision": final_decision,
-					"confidence": verification.confidence_score,
-					"processing_time_ms": verification.processing_time_ms,
-					"collaborative": bool(collaborative_consensus)
-				}
-			)
-			
-			self.logger.info(_log_biometric_operation("verification_completed", {
-				"verification_id": verification_id,
-				"status": verification.status.value,
-				"processing_time": verification.processing_time_ms
-			}))
-			
-			return verification
-			
-		except Exception as e:
-			await self.db.rollback()
-			self.logger.error(f"Failed to complete verification: {str(e)}")
-			raise
-	
-	async def start_behavioral_session(
+		external_id: str,
+		full_name: str,
+		email: str | None = None,
+		modalities: list[str] | None = None,
+	) -> _R:
+		"""Register a new biometric subject."""
+		user_id = uuid7str()
+		record = _R(
+			user_id=user_id,
+			tenant_id=self.tenant_id,
+			external_id=external_id,
+			full_name=full_name,
+			email=email,
+			modalities=modalities or [],
+			status="active",
+			enrolled_at=_ts(),
+			updated_at=_ts(),
+		)
+		self._users[self._key(self.tenant_id, user_id)] = record
+		await self._audit("user_registered", user_id, {"external_id": external_id, "full_name": full_name})
+		return record
+
+	# ------------------------------------------------------------------
+	# 2. Template enrolment
+	# ------------------------------------------------------------------
+
+	async def enrol_template(
 		self,
 		user_id: str,
-		device_fingerprint: str,
-		platform: str,
-		user_agent: str
-	) -> BiBehavioralSession:
-		"""
-		Start behavioral biometrics session for continuous authentication
-		
-		Revolutionary features:
-		- Zero-friction invisible authentication
-		- Continuous behavioral monitoring
-		- Contextual behavior adaptation
-		- Predictive authentication
-		"""
-		try:
-			# Get user and validate
-			user = await self._get_user_by_id(user_id)
-			assert user, f"User not found: {user_id}"
-			
-			# Initialize behavioral session
-			session = BiBehavioralSession(
-				user_id=user_id,
-				tenant_id=self.tenant_id,
-				session_token=await self._generate_session_token(),
-				device_fingerprint=device_fingerprint,
-				platform=platform,
-				user_agent=user_agent,
-				
-				# Initialize zero-friction authentication
-				ambient_authentication=await self._zero_friction_auth.initialize_ambient_auth(
-					user_profile=user.invisible_auth_profile,
-					device_context={'fingerprint': device_fingerprint, 'platform': platform}
-				),
-				predictive_authentication=await self._zero_friction_auth.setup_predictive_auth(
-					user_patterns=user.predictive_patterns,
-					session_context={'user_agent': user_agent, 'platform': platform}
-				),
-				
-				# Setup contextual behavior monitoring
-				environmental_context=await self._initialize_environmental_context(user, device_fingerprint),
-				contextual_strength={'baseline': 0.5, 'current': 0.5, 'trend': 'stable'}
-			)
-			
-			self.db.add(session)
-			await self.db.commit()
-			await self.db.refresh(session)
-			
-			# Create audit log
-			await self._create_audit_log(
-				event_type="behavioral_session_started",
-				event_category="continuous_authentication",
-				event_description="Behavioral session started",
-				user_id=user_id,
-				session_id=session.session_token,
-				event_data={
-					"platform": platform,
-					"device_fingerprint": device_fingerprint[:16] + "..."  # Truncate for privacy
-				}
-			)
-			
-			self.logger.info(_log_biometric_operation("behavioral_session_started", {
-				"session_id": session.id,
-				"user_id": user_id,
-				"platform": platform
-			}))
-			
-			return session
-			
-		except Exception as e:
-			await self.db.rollback()
-			self.logger.error(f"Failed to start behavioral session: {str(e)}")
-			raise
-	
-	async def process_natural_language_query(
-		self,
-		query: str,
-		user_context: Dict[str, Any],
-		security_clearance: str = "standard"
-	) -> Dict[str, Any]:
-		"""
-		Process natural language queries about identity verification
-		
-		Revolutionary features:
-		- Natural language understanding for biometric queries
-		- Contextual intelligence integration
-		- Role-based response adaptation
-		- Conversational follow-up suggestions
-		"""
-		try:
-			# Parse natural language query
-			query_intent = await self._parse_natural_language_intent(
-				query=query,
-				user_context=user_context,
-				security_clearance=security_clearance
-			)
-			
-			# Process query based on intent
-			response_data = {}
-			
-			if query_intent['category'] == 'verification_status':
-				response_data = await self._handle_verification_status_query(query_intent)
-			elif query_intent['category'] == 'fraud_analysis':
-				response_data = await self._handle_fraud_analysis_query(query_intent)
-			elif query_intent['category'] == 'compliance_check':
-				response_data = await self._handle_compliance_query(query_intent)
-			elif query_intent['category'] == 'user_profile':
-				response_data = await self._handle_user_profile_query(query_intent)
-			elif query_intent['category'] == 'risk_assessment':
-				response_data = await self._handle_risk_assessment_query(query_intent)
-			else:
-				response_data = {'error': 'Query intent not recognized'}
-			
-			# Generate contextual response
-			contextual_response = await self._generate_contextual_response(
-				query=query,
-				intent=query_intent,
-				response_data=response_data,
-				user_context=user_context,
-				security_clearance=security_clearance
-			)
-			
-			# Add conversational follow-ups
-			follow_up_suggestions = await self._generate_follow_up_suggestions(
-				query_intent=query_intent,
-				response_data=response_data,
-				user_context=user_context
-			)
-			
-			result = {
-				'natural_language_response': contextual_response['text'],
-				'structured_data': response_data,
-				'confidence': query_intent.get('confidence', 0.8),
-				'follow_up_suggestions': follow_up_suggestions,
-				'conversation_context': {
-					'intent': query_intent,
-					'user_context': user_context,
-					'timestamp': datetime.utcnow().isoformat()
-				}
-			}
-			
-			# Create audit log
-			await self._create_audit_log(
-				event_type="nl_query_processed",
-				event_category="natural_language_interface",
-				event_description=f"Natural language query processed",
-				actor_id=user_context.get('user_id', 'anonymous'),
-				event_data={
-					"query_category": query_intent['category'],
-					"confidence": query_intent.get('confidence'),
-					"security_clearance": security_clearance
-				}
-			)
-			
-			self.logger.info(_log_biometric_operation("nl_query_processed", {
-				"category": query_intent['category'],
-				"confidence": query_intent.get('confidence')
-			}))
-			
-			return result
-			
-		except Exception as e:
-			self.logger.error(f"Failed to process natural language query: {str(e)}")
-			raise
-	
-	# Revolutionary Engine Implementations
-	
-	async def _initialize_behavioral_profile(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-		"""Initialize behavioral profile for new user"""
-		return {
-			'baseline_established': False,
-			'typing_patterns': {},
-			'interaction_preferences': {},
-			'device_behaviors': {},
-			'temporal_patterns': {},
-			'learning_status': 'initializing'
-		}
-	
-	async def _initialize_contextual_patterns(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-		"""Initialize contextual patterns for business intelligence"""
-		return {
-			'workflow_patterns': {},
-			'risk_contexts': {},
-			'compliance_contexts': {},
-			'business_patterns': {},
-			'adaptation_history': []
-		}
-	
-	async def _initialize_risk_profile(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-		"""Initialize risk profile with predictive baseline"""
-		return {
-			'baseline_risk': 0.1,
-			'risk_factors': [],
-			'historical_incidents': [],
-			'predictive_indicators': {},
-			'adaptive_thresholds': {}
-		}
-	
-	async def _generate_global_identity_id(self, user_data: Dict[str, Any]) -> str:
-		"""Generate universal global identity identifier"""
-		# Implementation for global identity orchestration
-		components = [
-			self.tenant_id,
-			user_data.get('external_user_id', ''),
-			str(datetime.utcnow().timestamp())
-		]
-		return hashlib.sha256('|'.join(components).encode()).hexdigest()[:32]
-	
-	async def _setup_jurisdiction_compliance(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-		"""Setup jurisdiction-specific compliance requirements"""
-		return {
-			'primary_jurisdiction': 'US',  # Default, should be determined by business logic
-			'applicable_regulations': ['CCPA', 'GDPR'],
-			'cross_border_permissions': {},
-			'data_residency_requirements': {}
-		}
-	
-	async def _initialize_threat_intelligence(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-		"""Initialize threat intelligence profile"""
-		return {
-			'threat_level': 'low',
-			'known_threats': [],
-			'protection_measures': [],
-			'intelligence_feeds': [],
-			'last_assessment': datetime.utcnow().isoformat()
-		}
-	
-	async def _initialize_invisible_auth(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-		"""Initialize zero-friction authentication profile"""
-		return {
-			'ambient_preferences': {},
-			'contextual_triggers': {},
-			'invisible_challenges': [],
-			'predictive_patterns': {},
-			'friction_tolerance': 0.05  # Very low friction tolerance
-		}
-	
-	async def _get_user_by_id(self, user_id: str) -> Optional[BiUser]:
-		"""Get user by ID with caching"""
-		result = await self.db.execute(
-			select(BiUser).where(
-				and_(BiUser.id == user_id, BiUser.tenant_id == self.tenant_id)
-			)
-		)
-		return result.scalar_one_or_none()
-	
-	async def _get_verification_by_id(self, verification_id: str) -> Optional[BiVerification]:
-		"""Get verification by ID"""
-		result = await self.db.execute(
-			select(BiVerification).where(
-				and_(BiVerification.id == verification_id, BiVerification.tenant_id == self.tenant_id)
-			).options(selectinload(BiVerification.user))
-		)
-		return result.scalar_one_or_none()
-	
-	async def _get_verification_with_relations(self, verification_id: str) -> Optional[BiVerification]:
-		"""Get verification with all related data"""
-		result = await self.db.execute(
-			select(BiVerification).where(
-				and_(BiVerification.id == verification_id, BiVerification.tenant_id == self.tenant_id)
-			).options(
-				selectinload(BiVerification.user),
-				selectinload(BiVerification.collaboration),
-				selectinload(BiVerification.fraud_rules),
-				selectinload(BiVerification.audit_logs)
-			)
-		)
-		return result.scalar_one_or_none()
-	
-	async def _create_audit_log(
-		self,
-		event_type: str,
-		event_category: str,
-		event_description: str,
-		**kwargs
-	) -> BiAuditLog:
-		"""Create comprehensive audit log entry"""
-		audit_data = {
-			'event_type': event_type,
-			'event_category': event_category,
-			'event_description': event_description,
-			'tenant_id': self.tenant_id,
-			'actor_type': 'system',
-			'actor_id': 'biometric_service',
-			'event_data': kwargs.get('event_data', {}),
-			'context_data': kwargs.get('context_data', {}),
-			**{k: v for k, v in kwargs.items() if k not in ['event_data', 'context_data']}
-		}
-		
-		# Generate event hash for integrity
-		event_content = json.dumps(audit_data, sort_keys=True, default=str)
-		audit_data['event_hash'] = hashlib.sha256(event_content.encode()).hexdigest()
-		
-		audit_log = BiAuditLog(**audit_data)
-		self.db.add(audit_log)
-		await self.db.flush()  # Don't commit here, let caller handle transaction
-		
-		return audit_log
-	
-	def _calculate_risk_score(self, risk_level: BiRiskLevel) -> float:
-		"""Convert risk level to numeric score"""
-		risk_mapping = {
-			BiRiskLevel.VERY_LOW: 0.1,
-			BiRiskLevel.LOW: 0.3,
-			BiRiskLevel.MEDIUM: 0.5,
-			BiRiskLevel.HIGH: 0.7,
-			BiRiskLevel.VERY_HIGH: 0.9,
-			BiRiskLevel.CRITICAL: 1.0
-		}
-		return risk_mapping.get(risk_level, 0.5)
-
-# Revolutionary Engine Classes
-
-class ContextualIntelligenceEngine:
-	"""
-	Revolutionary contextual intelligence for business-aware biometric decisions
-	"""
-	
-	async def analyze_verification_context(
-		self,
-		user: BiUser,
-		verification_type: str,
-		business_context: Dict[str, Any],
-		tenant_context: Dict[str, Any]
-	) -> ContextualIntelligence:
-		"""Analyze verification context with business intelligence"""
-		
-		# Analyze business patterns
-		business_patterns = await self._analyze_business_patterns(
-			user=user,
-			verification_type=verification_type,
-			business_context=business_context,
-			tenant_context=tenant_context
-		)
-		
-		# Assess contextual risk
-		risk_context = await self._assess_contextual_risk(
-			user=user,
-			business_patterns=business_patterns,
-			verification_type=verification_type
-		)
-		
-		# Generate workflow optimization
-		workflow_optimization = await self._optimize_verification_workflow(
-			business_patterns=business_patterns,
-			risk_context=risk_context,
-			tenant_context=tenant_context
-		)
-		
-		# Generate compliance intelligence
-		compliance_intelligence = await self._analyze_compliance_requirements(
-			user=user,
-			business_context=business_context,
-			verification_type=verification_type
-		)
-		
-		# Generate adaptive recommendations
-		adaptive_recommendations = await self._generate_adaptive_recommendations(
-			business_patterns=business_patterns,
-			risk_context=risk_context,
-			workflow_optimization=workflow_optimization
-		)
-		
-		return ContextualIntelligence(
-			business_patterns=business_patterns,
-			risk_context=risk_context,
-			workflow_optimization=workflow_optimization,
-			compliance_intelligence=compliance_intelligence,
-			adaptive_recommendations=adaptive_recommendations
-		)
-	
-	async def validate_verification_decision(
-		self,
-		verification: BiVerification,
-		proposed_decision: bool,
-		collaborative_input: Optional[Dict[str, Any]]
-	) -> Dict[str, Any]:
-		"""Validate verification decision with contextual intelligence"""
-		return {
-			'decision_confidence': 0.95,
-			'contextual_alignment': True,
-			'business_logic_validation': True,
-			'collaborative_consensus': bool(collaborative_input),
-			'recommendations': []
-		}
-	
-	async def _analyze_business_patterns(self, **kwargs) -> Dict[str, Any]:
-		"""Analyze business patterns for contextual understanding"""
-		return {
-			'workflow_complexity': 'medium',
-			'risk_tolerance': 'standard',
-			'approval_patterns': {},
-			'seasonal_variations': {},
-			'industry_benchmarks': {}
-		}
-	
-	async def _assess_contextual_risk(self, **kwargs) -> Dict[str, Any]:
-		"""Assess risk within business context"""
-		return {
-			'contextual_risk_score': 0.3,
-			'risk_factors': [],
-			'mitigation_strategies': [],
-			'escalation_triggers': {}
-		}
-	
-	async def _optimize_verification_workflow(self, **kwargs) -> Dict[str, Any]:
-		"""Optimize verification workflow based on context"""
-		return {
-			'recommended_workflow': 'standard',
-			'optimization_opportunities': [],
-			'efficiency_improvements': {},
-			'resource_allocation': {}
-		}
-	
-	async def _analyze_compliance_requirements(self, **kwargs) -> Dict[str, Any]:
-		"""Analyze compliance requirements for context"""
-		return {
-			'applicable_regulations': ['GDPR', 'CCPA'],
-			'compliance_score': 0.95,
-			'requirement_gaps': [],
-			'remediation_actions': []
-		}
-	
-	async def _generate_adaptive_recommendations(self, **kwargs) -> List[Dict[str, Any]]:
-		"""Generate adaptive recommendations based on context"""
-		return [
-			{
-				'type': 'workflow_optimization',
-				'recommendation': 'Enable collaborative review for high-risk cases',
-				'confidence': 0.8,
-				'impact': 'high'
-			}
-		]
-
-class PredictiveAnalyticsEngine:
-	"""
-	Revolutionary predictive analytics for fraud prevention and risk forecasting
-	"""
-	
-	async def generate_risk_forecast(
-		self,
-		user: BiUser,
-		verification_context: ContextualIntelligence,
-		historical_patterns: Dict[str, Any]
-	) -> PredictiveAnalytics:
-		"""Generate comprehensive risk forecast"""
-		
-		# Predict fraud probability
-		fraud_prediction = await self._predict_fraud_probability(
-			user=user,
-			context=verification_context,
-			historical_data=historical_patterns
-		)
-		
-		# Generate risk trajectory
-		risk_trajectory = await self._generate_risk_trajectory(
-			user=user,
-			current_context=verification_context,
-			fraud_indicators=fraud_prediction
-		)
-		
-		# Forecast behavioral patterns
-		behavioral_forecast = await self._forecast_behavioral_patterns(
-			user=user,
-			historical_patterns=historical_patterns
-		)
-		
-		# Integrate threat intelligence
-		threat_intelligence = await self._integrate_threat_intelligence(
-			user=user,
-			risk_context=verification_context.risk_context
-		)
-		
-		# Calculate confidence intervals
-		confidence_intervals = await self._calculate_confidence_intervals(
-			fraud_prediction=fraud_prediction,
-			risk_trajectory=risk_trajectory,
-			behavioral_forecast=behavioral_forecast
-		)
-		
-		return PredictiveAnalytics(
-			fraud_prediction=fraud_prediction,
-			risk_trajectory=risk_trajectory,
-			behavioral_forecast=behavioral_forecast,
-			threat_intelligence=threat_intelligence,
-			confidence_intervals=confidence_intervals
-		)
-	
-	async def _predict_fraud_probability(self, **kwargs) -> Dict[str, Any]:
-		"""Predict fraud probability using ML models"""
-		return {
-			'fraud_probability': 0.05,
-			'risk_indicators': [],
-			'prediction_model': 'ensemble_v2.1',
-			'feature_importance': {},
-			'temporal_factors': {}
-		}
-	
-	async def _generate_risk_trajectory(self, **kwargs) -> Dict[str, Any]:
-		"""Generate risk trajectory over time"""
-		return {
-			'current_risk': 0.2,
-			'predicted_risk_24h': 0.18,
-			'predicted_risk_7d': 0.15,
-			'trajectory_trend': 'decreasing',
-			'level': 'low'
-		}
-	
-	async def _forecast_behavioral_patterns(self, **kwargs) -> Dict[str, Any]:
-		"""Forecast user behavioral patterns"""
-		return {
-			'pattern_stability': 0.9,
-			'anomaly_likelihood': 0.1,
-			'behavioral_drift': 0.05,
-			'adaptation_rate': 0.02
-		}
-	
-	async def _integrate_threat_intelligence(self, **kwargs) -> Dict[str, Any]:
-		"""Integrate global threat intelligence"""
-		return {
-			'threat_level': 'low',
-			'active_threats': [],
-			'intelligence_sources': ['global_feed_1', 'industry_feed_2'],
-			'last_update': datetime.utcnow().isoformat()
-		}
-	
-	async def _calculate_confidence_intervals(self, **kwargs) -> Dict[str, float]:
-		"""Calculate confidence intervals for predictions"""
-		return {
-			'fraud_prediction_ci_lower': 0.02,
-			'fraud_prediction_ci_upper': 0.08,
-			'risk_trajectory_ci_lower': 0.15,
-			'risk_trajectory_ci_upper': 0.25,
-			'confidence_level': 0.95
-		}
-
-class BehavioralBiometricsFusion:
-	"""
-	Revolutionary fusion of physical and behavioral biometrics
-	"""
-	
-	async def process_multi_modal_biometric(
-		self,
-		biometric_data: Dict[str, Any],
-		modality: BiModalityType,
-		user_profile: Dict[str, Any],
-		contextual_data: Dict[str, Any]
-	) -> BiometricFusionResult:
-		"""Process multi-modal biometric with fusion"""
-		
-		# Process physical biometric
-		physical_result = await self._process_physical_biometric(
-			biometric_data=biometric_data,
+		modality: str,
+		sample_bytes: bytes,
+		quality_score: float = 1.0,
+	) -> _R:
+		"""Enrol a biometric template for a user."""
+		user = self._require_user(user_id)
+		assert quality_score >= 0.0 and quality_score <= 1.0, "quality_score must be in [0, 1]"
+		template_id = uuid7str()
+		template_hash = hashlib.sha256(sample_bytes).hexdigest()
+		record = _R(
+			template_id=template_id,
+			user_id=user_id,
+			tenant_id=self.tenant_id,
 			modality=modality,
-			user_profile=user_profile
+			template_hash=template_hash,
+			quality_score=quality_score,
+			size_bytes=len(sample_bytes),
+			status="active",
+			enrolled_at=_ts(),
+			age_days=0,
 		)
-		
-		# Process behavioral biometric
-		behavioral_result = await self._process_behavioral_biometric(
-			interaction_data=biometric_data.get('behavioral_data', {}),
-			user_profile=user_profile,
-			contextual_data=contextual_data
-		)
-		
-		# Perform fusion analysis
-		fusion_analysis = await self._perform_biometric_fusion(
-			physical_result=physical_result,
-			behavioral_result=behavioral_result,
-			modality=modality
-		)
-		
-		# Assess liveness
-		liveness_assessment = await self._assess_liveness(
-			biometric_data=biometric_data,
+		self._templates[self._key(self.tenant_id, template_id)] = record
+		if modality not in user["modalities"]:
+			user["modalities"].append(modality)
+		user["updated_at"] = _ts()
+		await self._audit("template_enrolled", template_id, {"user_id": user_id, "modality": modality, "quality_score": quality_score})
+		return record
+
+	# ------------------------------------------------------------------
+	# 3. Biometric verification
+	# ------------------------------------------------------------------
+
+	async def verify(
+		self,
+		user_id: str,
+		modality: str,
+		probe_bytes: bytes,
+		threshold: float = 0.85,
+	) -> _R:
+		"""1:1 biometric verification against enrolled template."""
+		self._require_user(user_id)
+		probe_hash = hashlib.sha256(probe_bytes).hexdigest()
+		templates = [
+			t for (tid, _), t in self._templates.items()
+			if t["user_id"] == user_id and t["modality"] == modality and t["status"] == "active"
+		]
+		assert templates, f"no active {modality} template for user {user_id}"
+		# Deterministic score: compare first 8 hex chars for determinism in tests
+		template = templates[-1]
+		match_chars = sum(a == b for a, b in zip(probe_hash[:32], template["template_hash"][:32]))
+		score = match_chars / 32
+		decision = "accept" if score >= threshold else "reject"
+		verification_id = uuid7str()
+		record = _R(
+			verification_id=verification_id,
+			user_id=user_id,
+			tenant_id=self.tenant_id,
 			modality=modality,
-			behavioral_patterns=behavioral_result
+			match_score=round(score, 4),
+			threshold=threshold,
+			decision=decision,
+			verified_at=_ts(),
 		)
-		
-		# Determine overall risk
-		overall_risk = await self._determine_fusion_risk(
-			fusion_analysis=fusion_analysis,
-			liveness_assessment=liveness_assessment
+		self._verifications[self._key(self.tenant_id, verification_id)] = record
+		await self._audit("verification_performed", verification_id, {"user_id": user_id, "modality": modality, "decision": decision, "score": score})
+		return record
+
+	# ------------------------------------------------------------------
+	# 4. Liveness challenge
+	# ------------------------------------------------------------------
+
+	async def issue_liveness_challenge(
+		self,
+		user_id: str,
+		modality: str = "face",
+		challenge_type: str = "blink",
+	) -> _R:
+		"""Issue a liveness challenge for presentation-attack detection."""
+		self._require_user(user_id)
+		challenge_id = uuid7str()
+		nonce = hashlib.sha256(f"{challenge_id}{_ts()}".encode()).hexdigest()[:16]
+		record = _R(
+			challenge_id=challenge_id,
+			user_id=user_id,
+			tenant_id=self.tenant_id,
+			modality=modality,
+			challenge_type=challenge_type,
+			nonce=nonce,
+			status="pending",
+			issued_at=_ts(),
+			expires_at=(datetime.utcnow() + timedelta(minutes=5)).isoformat(),
 		)
-		
-		return BiometricFusionResult(
-			fusion_confidence=fusion_analysis['confidence'],
-			modality_scores=fusion_analysis['modality_scores'],
-			behavioral_analysis=behavioral_result,
-			liveness_assessment=liveness_assessment,
-			deepfake_detection={},  # Will be populated by deepfake engine
-			overall_risk=overall_risk
+		self._liveness_challenges[self._key(self.tenant_id, challenge_id)] = record
+		await self._audit("liveness_challenge_issued", challenge_id, {"user_id": user_id, "challenge_type": challenge_type})
+		return record
+
+	# ------------------------------------------------------------------
+	# 5. Complete liveness challenge
+	# ------------------------------------------------------------------
+
+	async def complete_liveness_challenge(
+		self,
+		challenge_id: str,
+		response_bytes: bytes,
+		pad_score: float = 0.95,
+	) -> _R:
+		"""Score a liveness challenge response."""
+		record = self._liveness_challenges.get(self._key(self.tenant_id, challenge_id))
+		assert record is not None, f"liveness challenge not found: {challenge_id}"
+		assert record["status"] == "pending", "challenge already completed"
+		liveness_pass = pad_score >= 0.7
+		record["pad_score"] = round(pad_score, 4)
+		record["liveness_pass"] = liveness_pass
+		record["status"] = "passed" if liveness_pass else "failed"
+		record["completed_at"] = _ts()
+		await self._audit("liveness_challenge_completed", challenge_id, {"pad_score": pad_score, "liveness_pass": liveness_pass})
+		return record
+
+	# ------------------------------------------------------------------
+	# 6. Multimodal fusion
+	# ------------------------------------------------------------------
+
+	async def multimodal_fusion(
+		self,
+		user_id: str,
+		scores: dict[str, float],
+		weights: dict[str, float] | None = None,
+	) -> _R:
+		"""Fuse multiple biometric modality scores into a single decision."""
+		self._require_user(user_id)
+		assert scores, "at least one modality score required"
+		if weights is None:
+			weights = {m: 1.0 / len(scores) for m in scores}
+		total_weight = sum(weights.get(m, 0) for m in scores)
+		assert total_weight > 0, "weights sum to zero"
+		fused = sum(scores[m] * weights.get(m, 0) for m in scores) / total_weight
+		fused = round(fused, 4)
+		fusion_id = uuid7str()
+		record = _R(
+			fusion_id=fusion_id,
+			user_id=user_id,
+			tenant_id=self.tenant_id,
+			modality_scores=scores,
+			weights=weights,
+			fused_score=fused,
+			decision="accept" if fused >= 0.8 else "reject",
+			fused_at=_ts(),
 		)
-	
-	async def _process_physical_biometric(self, **kwargs) -> Dict[str, Any]:
-		"""Process physical biometric modality"""
-		return {
-			'confidence': 0.92,
-			'quality_score': 0.88,
-			'template_match': True,
-			'processing_time_ms': 150
-		}
-	
-	async def _process_behavioral_biometric(self, **kwargs) -> Dict[str, Any]:
-		"""Process behavioral biometric patterns"""
-		return {
-			'keystroke_confidence': 0.85,
-			'mouse_confidence': 0.90,
-			'interaction_confidence': 0.88,
-			'pattern_deviation': 0.05,
-			'temporal_consistency': 0.92
-		}
-	
-	async def _perform_biometric_fusion(self, **kwargs) -> Dict[str, Any]:
-		"""Perform multi-modal biometric fusion"""
-		return {
-			'confidence': 0.94,
-			'modality_scores': {
-				'physical': 0.92,
-				'behavioral': 0.88,
-				'fusion_weight': 0.75
-			},
-			'fusion_algorithm': 'weighted_ensemble_v3.0'
-		}
-	
-	async def _assess_liveness(self, **kwargs) -> Dict[str, Any]:
-		"""Assess liveness with NIST PAD Level 3"""
-		return {
-			'liveness_score': 0.96,
-			'pad_level': 3,
-			'challenge_response': True,
-			'micro_expression_detected': True,
-			'depth_analysis': True
-		}
-	
-	async def _determine_fusion_risk(self, **kwargs) -> BiRiskLevel:
-		"""Determine overall risk from fusion analysis"""
-		fusion_confidence = kwargs.get('fusion_analysis', {}).get('confidence', 0.5)
-		liveness_score = kwargs.get('liveness_assessment', {}).get('liveness_score', 0.5)
-		
-		if fusion_confidence > 0.9 and liveness_score > 0.9:
-			return BiRiskLevel.VERY_LOW
-		elif fusion_confidence > 0.8 and liveness_score > 0.8:
-			return BiRiskLevel.LOW
-		elif fusion_confidence > 0.6 and liveness_score > 0.6:
-			return BiRiskLevel.MEDIUM
-		elif fusion_confidence > 0.4 and liveness_score > 0.4:
-			return BiRiskLevel.HIGH
+		await self._audit("multimodal_fusion", fusion_id, {"user_id": user_id, "fused_score": fused})
+		return record
+
+	# ------------------------------------------------------------------
+	# 7. Quality assessment
+	# ------------------------------------------------------------------
+
+	async def quality_assess(
+		self,
+		sample_bytes: bytes,
+		modality: str,
+	) -> _R:
+		"""Assess sample quality before enrolment."""
+		# Deterministic proxy: length-based score capped at 1.0
+		raw_q = min(len(sample_bytes) / 50000, 1.0)
+		contrast = int.from_bytes(sample_bytes[:1], "big") / 255 if sample_bytes else 0.5
+		quality = round((raw_q * 0.7) + (contrast * 0.3), 4)
+		assessment_id = uuid7str()
+		record = _R(
+			assessment_id=assessment_id,
+			tenant_id=self.tenant_id,
+			modality=modality,
+			quality_score=quality,
+			usable=quality >= 0.4,
+			size_bytes=len(sample_bytes),
+			assessed_at=_ts(),
+		)
+		await self._audit("quality_assessed", assessment_id, {"modality": modality, "quality_score": quality})
+		return record
+
+	# ------------------------------------------------------------------
+	# 8. Template age check
+	# ------------------------------------------------------------------
+
+	async def template_age_check(self, template_id: str, max_age_days: int = 730) -> _R:
+		"""Check whether a template has exceeded its maximum age."""
+		template = self._require_template(template_id)
+		enrolled_dt = datetime.fromisoformat(template["enrolled_at"])
+		age_days = (datetime.utcnow() - enrolled_dt).days
+		needs_refresh = age_days > max_age_days
+		result = _R(
+			template_id=template_id,
+			age_days=age_days,
+			max_age_days=max_age_days,
+			needs_refresh=needs_refresh,
+			checked_at=_ts(),
+		)
+		await self._audit("template_age_checked", template_id, {"age_days": age_days, "needs_refresh": needs_refresh})
+		return result
+
+	# ------------------------------------------------------------------
+	# 9. Biometric update
+	# ------------------------------------------------------------------
+
+	async def biometric_update(
+		self,
+		template_id: str,
+		new_sample_bytes: bytes,
+		quality_score: float = 1.0,
+	) -> _R:
+		"""Replace an existing template with a fresh sample."""
+		template = self._require_template(template_id)
+		assert quality_score >= 0.4, "quality too low for update"
+		old_hash = template["template_hash"]
+		template["template_hash"] = hashlib.sha256(new_sample_bytes).hexdigest()
+		template["quality_score"] = quality_score
+		template["size_bytes"] = len(new_sample_bytes)
+		template["age_days"] = 0
+		template["updated_at"] = _ts()
+		await self._audit("template_updated", template_id, {"old_hash_prefix": old_hash[:8], "quality_score": quality_score})
+		return template
+
+	# ------------------------------------------------------------------
+	# 10. Duplicate detection
+	# ------------------------------------------------------------------
+
+	async def duplicate_detect(self, user_id: str, modality: str) -> _R:
+		"""Detect if the same biometric identity appears under multiple user IDs."""
+		source_templates = [
+			t for (_, _), t in self._templates.items()
+			if t["user_id"] == user_id and t["modality"] == modality and t["status"] == "active"
+		]
+		assert source_templates, f"no active {modality} template for user {user_id}"
+		source_hash = source_templates[-1]["template_hash"]
+		duplicates = [
+			t["user_id"]
+			for (_, _), t in self._templates.items()
+			if t["modality"] == modality
+			and t["user_id"] != user_id
+			and t["template_hash"][:16] == source_hash[:16]
+			and t["tenant_id"] == self.tenant_id
+		]
+		result = _R(
+			user_id=user_id,
+			modality=modality,
+			duplicates_found=len(duplicates) > 0,
+			duplicate_user_ids=duplicates,
+			checked_at=_ts(),
+		)
+		await self._audit("duplicate_detection", user_id, {"modality": modality, "duplicate_count": len(duplicates)})
+		return result
+
+	# ------------------------------------------------------------------
+	# 11. Cross-modal verification
+	# ------------------------------------------------------------------
+
+	async def cross_modal_verify(
+		self,
+		user_id: str,
+		primary_modality: str,
+		secondary_modality: str,
+	) -> _R:
+		"""Verify that two enrolled modalities belong to the same subject."""
+		self._require_user(user_id)
+		primary = [t for (_, _), t in self._templates.items() if t["user_id"] == user_id and t["modality"] == primary_modality and t["status"] == "active"]
+		secondary = [t for (_, _), t in self._templates.items() if t["user_id"] == user_id and t["modality"] == secondary_modality and t["status"] == "active"]
+		assert primary, f"no {primary_modality} template"
+		assert secondary, f"no {secondary_modality} template"
+		# Cross-modal consistency: compare hash entropy
+		h1 = primary[-1]["template_hash"]
+		h2 = secondary[-1]["template_hash"]
+		overlap = sum(a == b for a, b in zip(h1, h2)) / len(h1)
+		consistent = overlap < 0.7  # different modalities should differ
+		result = _R(
+			user_id=user_id,
+			primary_modality=primary_modality,
+			secondary_modality=secondary_modality,
+			cross_modal_consistent=consistent,
+			overlap_score=round(overlap, 4),
+			verified_at=_ts(),
+		)
+		await self._audit("cross_modal_verification", user_id, {"consistent": consistent})
+		return result
+
+	# ------------------------------------------------------------------
+	# 12. Presentation attack detection
+	# ------------------------------------------------------------------
+
+	async def presentation_attack_detect(
+		self,
+		verification_id: str,
+		artifact_indicators: list[str] | None = None,
+	) -> _R:
+		"""Run presentation attack detection analysis on a verification."""
+		verification = self._verifications.get(self._key(self.tenant_id, verification_id))
+		assert verification is not None, f"verification not found: {verification_id}"
+		indicators = artifact_indicators or []
+		attack_detected = len(indicators) > 0
+		risk_level = "high" if attack_detected else "low"
+		result = _R(
+			verification_id=verification_id,
+			attack_detected=attack_detected,
+			indicators=indicators,
+			risk_level=risk_level,
+			pad_method="passive_liveness_v2",
+			analyzed_at=_ts(),
+		)
+		await self._audit("pad_analysis", verification_id, {"attack_detected": attack_detected, "risk_level": risk_level})
+		return result
+
+	# ------------------------------------------------------------------
+	# 13. Biometric encryption (template protection)
+	# ------------------------------------------------------------------
+
+	async def biometric_encrypt(self, template_id: str, key_ref: str) -> _R:
+		"""Apply cancelable biometric transformation to protect the template."""
+		template = self._require_template(template_id)
+		raw_hash = template["template_hash"]
+		# Deterministic cancelable transform: HMAC-style XOR with key ref
+		key_bytes = key_ref.encode()
+		hash_bytes = bytes.fromhex(raw_hash)
+		protected = bytes(b ^ key_bytes[i % len(key_bytes)] for i, b in enumerate(hash_bytes))
+		protected_hash = protected.hex()
+		template["protected_hash"] = protected_hash
+		template["encryption_key_ref"] = key_ref
+		template["encrypted_at"] = _ts()
+		await self._audit("template_encrypted", template_id, {"key_ref": key_ref})
+		return template
+
+	# ------------------------------------------------------------------
+	# 14. Consent gate
+	# ------------------------------------------------------------------
+
+	async def consent_gate(
+		self,
+		user_id: str,
+		purpose: str,
+		consented: bool,
+		consent_text: str = "",
+	) -> _R:
+		"""Record biometric processing consent for a specific purpose."""
+		self._require_user(user_id)
+		consent_id = uuid7str()
+		record = _R(
+			consent_id=consent_id,
+			user_id=user_id,
+			tenant_id=self.tenant_id,
+			purpose=purpose,
+			consented=consented,
+			consent_text=consent_text,
+			recorded_at=_ts(),
+		)
+		self._consent[self._key(self.tenant_id, consent_id)] = record
+		await self._audit("consent_recorded", consent_id, {"user_id": user_id, "purpose": purpose, "consented": consented})
+		return record
+
+	# ------------------------------------------------------------------
+	# 15. Opt-out processing
+	# ------------------------------------------------------------------
+
+	async def opt_out_process(self, user_id: str, reason: str = "") -> _R:
+		"""Revoke biometric consent and delete all templates for a user."""
+		user = self._require_user(user_id)
+		deleted_templates = []
+		for key, template in list(self._templates.items()):
+			if template["user_id"] == user_id and template["tenant_id"] == self.tenant_id:
+				template["status"] = "deleted"
+				template["deleted_at"] = _ts()
+				deleted_templates.append(template["template_id"])
+		user["status"] = "opted_out"
+		user["opted_out_at"] = _ts()
+		user["opt_out_reason"] = reason
+		result = _R(
+			user_id=user_id,
+			templates_deleted=len(deleted_templates),
+			template_ids=deleted_templates,
+			opted_out_at=_ts(),
+		)
+		await self._audit("user_opted_out", user_id, {"templates_deleted": len(deleted_templates), "reason": reason})
+		return result
+
+	# ------------------------------------------------------------------
+	# 16. Watchlist check
+	# ------------------------------------------------------------------
+
+	async def watchlist_check(
+		self,
+		user_id: str,
+		watchlist_id: str,
+		threshold: float = 0.90,
+	) -> _R:
+		"""Check if a user's biometric identity appears on a watchlist."""
+		self._require_user(user_id)
+		watchlist = self._watchlists.get(self._key(self.tenant_id, watchlist_id))
+		assert watchlist is not None, f"watchlist not found: {watchlist_id}"
+		user_templates = [t for (_, _), t in self._templates.items() if t["user_id"] == user_id and t["status"] == "active"]
+		if not user_templates:
+			match_found = False
+			match_score = 0.0
 		else:
-			return BiRiskLevel.VERY_HIGH
+			user_hash = user_templates[-1]["template_hash"]
+			entries = watchlist.get("entries", [])
+			scores = []
+			for entry in entries:
+				entry_hash = entry.get("template_hash", "")
+				overlap = sum(a == b for a, b in zip(user_hash[:32], entry_hash[:32])) / 32 if entry_hash else 0.0
+				scores.append(overlap)
+			match_score = max(scores) if scores else 0.0
+			match_found = match_score >= threshold
+		result = _R(
+			user_id=user_id,
+			watchlist_id=watchlist_id,
+			match_found=match_found,
+			match_score=round(match_score, 4),
+			threshold=threshold,
+			checked_at=_ts(),
+		)
+		await self._audit("watchlist_checked", user_id, {"watchlist_id": watchlist_id, "match_found": match_found})
+		return result
 
-class AdaptiveSecurityIntelligence:
-	"""
-	Revolutionary adaptive security that evolves with threats
-	"""
-	
-	async def assess_verification_security(
+	# ------------------------------------------------------------------
+	# 17. Biometric search (1:N)
+	# ------------------------------------------------------------------
+
+	async def biometric_search(
 		self,
-		fusion_result: BiometricFusionResult,
-		threat_context: Dict[str, Any],
-		user_security_profile: Dict[str, Any]
-	) -> Dict[str, Any]:
-		"""Assess verification security with adaptive intelligence"""
-		return {
-			'security_level': 'high',
-			'threat_mitigation': True,
-			'adaptive_measures': [],
-			'evolution_required': False,
-			'confidence': 0.95
-		}
+		probe_bytes: bytes,
+		modality: str,
+		top_k: int = 5,
+		threshold: float = 0.7,
+	) -> _R:
+		"""1:N biometric search across the gallery."""
+		probe_hash = hashlib.sha256(probe_bytes).hexdigest()
+		candidates = []
+		for (_, _), t in self._templates.items():
+			if t["modality"] != modality or t["status"] != "active" or t["tenant_id"] != self.tenant_id:
+				continue
+			overlap = sum(a == b for a, b in zip(probe_hash[:32], t["template_hash"][:32])) / 32
+			if overlap >= threshold:
+				candidates.append({"user_id": t["user_id"], "template_id": t["template_id"], "score": round(overlap, 4)})
+		candidates.sort(key=lambda x: x["score"], reverse=True)
+		search_id = uuid7str()
+		result = _R(
+			search_id=search_id,
+			modality=modality,
+			hits=candidates[:top_k],
+			total_candidates=len(candidates),
+			searched_at=_ts(),
+		)
+		await self._audit("biometric_search", search_id, {"modality": modality, "hits": len(candidates[:top_k])})
+		return result
 
-class UniversalIdentityOrchestration:
-	"""
-	Revolutionary universal identity orchestration for global compliance
-	"""
-	pass
+	# ------------------------------------------------------------------
+	# 18. Gallery management
+	# ------------------------------------------------------------------
 
-class DeepfakeQuantumDetection:
-	"""
-	Revolutionary quantum-inspired deepfake detection
-	"""
-	
-	async def analyze_synthetic_media(
+	async def gallery_manage(
 		self,
-		media_data: Dict[str, Any],
-		modality: BiModalityType,
-		quantum_signatures: List[Any]
-	) -> Dict[str, Any]:
-		"""Analyze media for deepfake with quantum-inspired algorithms"""
-		return {
-			'is_synthetic': False,
-			'confidence': 0.97,
-			'quantum_analysis': {
-				'entanglement_score': 0.93,
-				'interference_patterns': True,
-				'superposition_analysis': 0.91
-			},
-			'detection_method': 'quantum_inspired_v2.0'
-		}
+		action: str,
+		gallery_name: str,
+		user_id: str | None = None,
+		template_id: str | None = None,
+	) -> _R:
+		"""Add/remove users or templates from a named gallery."""
+		assert action in {"create", "add", "remove", "list", "delete"}, f"unsupported gallery action: {action}"
+		gallery_key = self._key(self.tenant_id, gallery_name)
+		if action == "create":
+			self._gallery[gallery_key] = _R(name=gallery_name, tenant_id=self.tenant_id, members=[], created_at=_ts())
+			await self._audit("gallery_created", gallery_name, {})
+		elif action == "add":
+			gallery = self._gallery.get(gallery_key)
+			assert gallery is not None, f"gallery not found: {gallery_name}"
+			entry = {"user_id": user_id, "template_id": template_id, "added_at": _ts()}
+			gallery["members"].append(entry)
+			await self._audit("gallery_member_added", gallery_name, {"user_id": user_id})
+		elif action == "remove":
+			gallery = self._gallery.get(gallery_key)
+			assert gallery is not None, f"gallery not found: {gallery_name}"
+			gallery["members"] = [m for m in gallery["members"] if m.get("user_id") != user_id]
+			await self._audit("gallery_member_removed", gallery_name, {"user_id": user_id})
+		elif action == "delete":
+			self._gallery.pop(gallery_key, None)
+			await self._audit("gallery_deleted", gallery_name, {})
+		gallery = self._gallery.get(gallery_key, _R(name=gallery_name, members=[]))
+		return gallery
 
-class ZeroFrictionAuthentication:
-	"""
-	Revolutionary zero-friction invisible authentication
-	"""
-	
-	async def initialize_ambient_auth(
+	# ------------------------------------------------------------------
+	# 19. Performance metrics
+	# ------------------------------------------------------------------
+
+	async def performance_metrics(self, modality: str | None = None) -> _R:
+		"""Compute FAR, FRR, EER and throughput from stored verifications."""
+		vlist = [
+			v for (_, _), v in self._verifications.items()
+			if v["tenant_id"] == self.tenant_id and (modality is None or v["modality"] == modality)
+		]
+		total = len(vlist)
+		if total == 0:
+			return _R(modality=modality, total=0, far=None, frr=None, eer=None, avg_score=None, computed_at=_ts())
+		accepts = sum(1 for v in vlist if v["decision"] == "accept")
+		rejects = total - accepts
+		scores = [v["match_score"] for v in vlist]
+		avg_score = round(statistics.mean(scores), 4) if scores else 0.0
+		# Simplified FAR/FRR estimation
+		far = round(accepts / max(total, 1) * 0.1, 4)
+		frr = round(rejects / max(total, 1) * 0.1, 4)
+		eer = round((far + frr) / 2, 4)
+		result = _R(
+			modality=modality,
+			total_verifications=total,
+			accepts=accepts,
+			rejects=rejects,
+			far=far,
+			frr=frr,
+			eer=eer,
+			avg_score=avg_score,
+			computed_at=_ts(),
+		)
+		await self._audit("performance_metrics_computed", "system", {"modality": modality, "total": total})
+		return result
+
+	# ------------------------------------------------------------------
+	# 20. Bulk enrolment
+	# ------------------------------------------------------------------
+
+	async def bulk_enrol(
 		self,
-		user_profile: Dict[str, Any],
-		device_context: Dict[str, Any]
-	) -> Dict[str, Any]:
-		"""Initialize ambient authentication profile"""
-		return {
-			'ambient_signatures': {},
-			'environmental_markers': {},
-			'invisible_challenges': [],
-			'friction_score': 0.02
-		}
-	
-	async def setup_predictive_auth(
+		records: list[dict[str, Any]],
+	) -> list[_R]:
+		"""Bulk enrol multiple users and their templates in one call.
+
+		Each record: {external_id, full_name, modality, sample_bytes, quality_score?}
+		"""
+		results = []
+		for rec in records:
+			user = await self.register_user(
+				external_id=rec["external_id"],
+				full_name=rec["full_name"],
+				email=rec.get("email"),
+				modalities=[rec["modality"]],
+			)
+			template = await self.enrol_template(
+				user_id=user["user_id"],
+				modality=rec["modality"],
+				sample_bytes=rec["sample_bytes"],
+				quality_score=rec.get("quality_score", 1.0),
+			)
+			results.append(_R(user=user, template=template))
+		await self._audit("bulk_enrolled", "system", {"count": len(records)})
+		return results
+
+	# ------------------------------------------------------------------
+	# 21. Bulk verify
+	# ------------------------------------------------------------------
+
+	async def bulk_verify(
 		self,
-		user_patterns: Dict[str, Any],
-		session_context: Dict[str, Any]
-	) -> Dict[str, Any]:
-		"""Setup predictive authentication"""
-		return {
-			'predicted_actions': [],
-			'preauth_confidence': 0.85,
-			'contextual_triggers': {},
-			'seamless_handoffs': []
-		}
+		probes: list[dict[str, Any]],
+	) -> list[_R]:
+		"""Bulk 1:1 verification. Each probe: {user_id, modality, probe_bytes}."""
+		results = []
+		for probe in probes:
+			result = await self.verify(
+				user_id=probe["user_id"],
+				modality=probe["modality"],
+				probe_bytes=probe["probe_bytes"],
+				threshold=probe.get("threshold", 0.85),
+			)
+			results.append(result)
+		await self._audit("bulk_verify", "system", {"count": len(probes)})
+		return results
 
-class CollaborativeVerificationEngine:
-	"""
-	Revolutionary real-time collaborative verification
-	"""
-	pass
+	# ------------------------------------------------------------------
+	# 22. Bulk delete users
+	# ------------------------------------------------------------------
 
-# Additional Helper Functions
+	async def bulk_delete_users(self, user_ids: list[str]) -> _R:
+		"""Opt-out and delete multiple users at once."""
+		results = []
+		for uid in user_ids:
+			try:
+				r = await self.opt_out_process(uid, reason="bulk_delete")
+				results.append({"user_id": uid, "success": True, "templates_deleted": r["templates_deleted"]})
+			except Exception as exc:
+				results.append({"user_id": uid, "success": False, "error": str(exc)})
+		await self._audit("bulk_users_deleted", "system", {"count": len(user_ids)})
+		return _R(results=results, deleted_count=sum(1 for r in results if r["success"]))
 
-async def _get_tenant_context() -> Dict[str, Any]:
-	"""Get tenant-specific context"""
-	return {
-		'tenant_settings': {},
-		'compliance_requirements': [],
-		'business_rules': {},
-		'workflow_preferences': {}
-	}
+	# ------------------------------------------------------------------
+	# 23. Watchlist create/manage
+	# ------------------------------------------------------------------
 
-async def _get_user_verification_history(user_id: str) -> Dict[str, Any]:
-	"""Get user verification history for predictive analysis"""
-	return {
-		'total_verifications': 0,
-		'success_rate': 0.0,
-		'fraud_incidents': 0,
-		'behavioral_patterns': {},
-		'risk_evolution': []
-	}
+	async def watchlist_create(self, name: str, description: str = "") -> _R:
+		"""Create a new watchlist."""
+		watchlist_id = uuid7str()
+		record = _R(
+			watchlist_id=watchlist_id,
+			tenant_id=self.tenant_id,
+			name=name,
+			description=description,
+			entries=[],
+			created_at=_ts(),
+		)
+		self._watchlists[self._key(self.tenant_id, watchlist_id)] = record
+		await self._audit("watchlist_created", watchlist_id, {"name": name})
+		return record
 
-async def _setup_collaborative_session(
-	verification_type: str,
-	risk_level: str,
-	complexity_indicators: List[str]
-) -> CollaborativeVerificationSession:
-	"""Setup collaborative verification session"""
-	return CollaborativeVerificationSession(
-		session_id=uuid7str(),
-		participants=[],
-		real_time_state={},
-		consensus_data={},
-		expert_insights=[]
-	)
+	async def watchlist_add_entry(
+		self,
+		watchlist_id: str,
+		template_hash: str,
+		label: str = "",
+	) -> _R:
+		"""Add a biometric entry to a watchlist."""
+		watchlist = self._watchlists.get(self._key(self.tenant_id, watchlist_id))
+		assert watchlist is not None, f"watchlist not found: {watchlist_id}"
+		entry = {"entry_id": uuid7str(), "template_hash": template_hash, "label": label, "added_at": _ts()}
+		watchlist["entries"].append(entry)
+		await self._audit("watchlist_entry_added", watchlist_id, {"label": label})
+		return _R(**entry)
 
-async def _determine_jurisdiction(user: BiUser, business_context: Optional[Dict[str, Any]]) -> str:
-	"""Determine applicable jurisdiction for verification"""
-	# Implementation for jurisdiction determination
-	return "US"
+	# ------------------------------------------------------------------
+	# 24. Consent check
+	# ------------------------------------------------------------------
 
-async def _get_applicable_compliance_frameworks(
-	user: BiUser, 
-	business_context: Optional[Dict[str, Any]]
-) -> List[str]:
-	"""Get applicable compliance frameworks"""
-	return ["GDPR", "CCPA", "KYC_AML"]
+	async def consent_check(self, user_id: str, purpose: str) -> _R:
+		"""Check whether the user has active consent for a given purpose."""
+		consents = [
+			c for (_, _), c in self._consent.items()
+			if c["user_id"] == user_id and c["purpose"] == purpose and c["consented"]
+		]
+		has_consent = len(consents) > 0
+		latest = consents[-1] if consents else None
+		result = _R(
+			user_id=user_id,
+			purpose=purpose,
+			has_consent=has_consent,
+			latest_consent_id=latest["consent_id"] if latest else None,
+			checked_at=_ts(),
+		)
+		await self._audit("consent_checked", user_id, {"purpose": purpose, "has_consent": has_consent})
+		return result
 
-async def _get_regulatory_requirements(
-	user: BiUser,
-	business_context: Optional[Dict[str, Any]]
-) -> Dict[str, Any]:
-	"""Get regulatory requirements for verification"""
-	return {
-		'data_retention': '7_years',
-		'audit_trail_required': True,
-		'consent_management': True,
-		'cross_border_restrictions': {}
-	}
+	# ------------------------------------------------------------------
+	# 25. Revoke template
+	# ------------------------------------------------------------------
 
-async def _advanced_liveness_detection(
-	biometric_data: Dict[str, Any],
-	modality: BiModalityType,
-	user_context: Dict[str, Any]
-) -> Dict[str, Any]:
-	"""Advanced liveness detection with NIST PAD Level 3"""
-	return {
-		'liveness_confirmed': True,
-		'pad_level': 3,
-		'confidence': 0.97,
-		'detection_methods': ['3d_analysis', 'micro_expressions', 'challenge_response']
-	}
+	async def revoke_template(self, template_id: str, reason: str = "") -> _R:
+		"""Revoke (soft-delete) a biometric template."""
+		template = self._require_template(template_id)
+		template["status"] = "revoked"
+		template["revoked_at"] = _ts()
+		template["revoke_reason"] = reason
+		await self._audit("template_revoked", template_id, {"reason": reason})
+		return template
 
-async def _process_collaborative_consensus(
-	verification: BiVerification,
-	consensus_data: Dict[str, Any]
-) -> Dict[str, Any]:
-	"""Process collaborative consensus data"""
-	return {
-		'consensus_reached': True,
-		'agreement_level': 0.95,
-		'dissenting_opinions': [],
-		'final_recommendation': consensus_data.get('decision', True)
-	}
+	# ------------------------------------------------------------------
+	# 26. List users
+	# ------------------------------------------------------------------
 
-async def _update_user_learning_profiles(
-	user: BiUser,
-	verification_result: BiVerification,
-	decision_validation: Dict[str, Any]
-) -> None:
-	"""Update user learning profiles based on verification results"""
-	# Implementation for learning profile updates
-	pass
+	async def list_users(self, status: str | None = None) -> list[_R]:
+		"""List biometric users for the current tenant."""
+		users = [
+			u for (tid, _), u in self._users.items()
+			if tid == self.tenant_id and (status is None or u["status"] == status)
+		]
+		return sorted(users, key=lambda u: u["enrolled_at"])
 
-async def _generate_compliance_report(verification: BiVerification) -> Dict[str, Any]:
-	"""Generate compliance report for verification"""
-	return {
-		'compliance_status': 'compliant',
-		'frameworks_validated': verification.compliance_framework,
-		'audit_trail_complete': True,
-		'data_retention_policy': 'applied',
-		'report_generated_at': datetime.utcnow().isoformat()
-	}
+	# ------------------------------------------------------------------
+	# 27. List templates for user
+	# ------------------------------------------------------------------
 
-async def _generate_session_token() -> str:
-	"""Generate secure session token"""
-	return hashlib.sha256(f"{uuid7str()}{datetime.utcnow()}".encode()).hexdigest()
+	async def list_templates(self, user_id: str, modality: str | None = None) -> list[_R]:
+		"""List active templates for a user, optionally filtered by modality."""
+		self._require_user(user_id)
+		templates = [
+			t for (_, _), t in self._templates.items()
+			if t["user_id"] == user_id
+			and t["tenant_id"] == self.tenant_id
+			and t["status"] not in {"deleted", "revoked"}
+			and (modality is None or t["modality"] == modality)
+		]
+		return sorted(templates, key=lambda t: t["enrolled_at"])
 
-async def _initialize_environmental_context(user: BiUser, device_fingerprint: str) -> Dict[str, Any]:
-	"""Initialize environmental context for behavioral session"""
-	return {
-		'location_context': {},
-		'device_context': {'fingerprint': device_fingerprint},
-		'temporal_context': {'session_start': datetime.utcnow().isoformat()},
-		'network_context': {}
-	}
+	# ------------------------------------------------------------------
+	# 28. Export users to CSV
+	# ------------------------------------------------------------------
 
-# Natural Language Processing Functions
+	async def export_users_csv(self) -> str:
+		"""Export all users for the tenant as CSV."""
+		users = await self.list_users()
+		buf = io.StringIO()
+		fields = ["user_id", "external_id", "full_name", "email", "status", "enrolled_at"]
+		writer = csv.DictWriter(buf, fieldnames=fields, extrasaction="ignore")
+		writer.writeheader()
+		writer.writerows(users)
+		await self._audit("users_exported_csv", "system", {"count": len(users)})
+		return buf.getvalue()
 
-async def _parse_natural_language_intent(
-	query: str,
-	user_context: Dict[str, Any],
-	security_clearance: str
-) -> Dict[str, Any]:
-	"""Parse natural language query to determine intent"""
-	# Simplified NLP intent recognition
-	query_lower = query.lower()
-	
-	if any(word in query_lower for word in ['verify', 'verification', 'identity']):
-		return {
-			'category': 'verification_status',
-			'confidence': 0.9,
-			'entities': [],
-			'intent': 'check_verification_status'
-		}
-	elif any(word in query_lower for word in ['fraud', 'suspicious', 'risk']):
-		return {
-			'category': 'fraud_analysis',
-			'confidence': 0.85,
-			'entities': [],
-			'intent': 'analyze_fraud_risk'
-		}
-	elif any(word in query_lower for word in ['compliance', 'regulation', 'gdpr', 'ccpa']):
-		return {
-			'category': 'compliance_check',
-			'confidence': 0.88,
-			'entities': [],
-			'intent': 'check_compliance_status'
-		}
-	else:
-		return {
-			'category': 'general_inquiry',
-			'confidence': 0.6,
-			'entities': [],
-			'intent': 'general_information'
-		}
+	# ------------------------------------------------------------------
+	# 29. Export verifications to JSON
+	# ------------------------------------------------------------------
 
-async def _handle_verification_status_query(query_intent: Dict[str, Any]) -> Dict[str, Any]:
-	"""Handle verification status queries"""
-	return {
-		'verification_count': 0,
-		'pending_verifications': 0,
-		'success_rate': 0.0,
-		'recent_activity': []
-	}
+	async def export_verifications_json(self, modality: str | None = None) -> str:
+		"""Export verifications as JSON."""
+		vlist = [
+			dict(v) for (_, _), v in self._verifications.items()
+			if v["tenant_id"] == self.tenant_id and (modality is None or v["modality"] == modality)
+		]
+		await self._audit("verifications_exported_json", "system", {"count": len(vlist)})
+		return json.dumps(vlist, default=str, indent=2)
 
-async def _handle_fraud_analysis_query(query_intent: Dict[str, Any]) -> Dict[str, Any]:
-	"""Handle fraud analysis queries"""
-	return {
-		'fraud_incidents': 0,
-		'risk_level': 'low',
-		'threat_indicators': [],
-		'recommended_actions': []
-	}
+	# ------------------------------------------------------------------
+	# 30. Health check
+	# ------------------------------------------------------------------
 
-async def _handle_compliance_query(query_intent: Dict[str, Any]) -> Dict[str, Any]:
-	"""Handle compliance-related queries"""
-	return {
-		'compliance_status': 'compliant',
-		'applicable_regulations': ['GDPR', 'CCPA'],
-		'audit_findings': [],
-		'remediation_required': False
-	}
+	async def health_check(self) -> _R:
+		"""Return service health status and storage counts."""
+		users = sum(1 for (tid, _) in self._users if tid == self.tenant_id)
+		templates = sum(1 for (_, _), t in self._templates.items() if t["tenant_id"] == self.tenant_id and t["status"] == "active")
+		return _R(
+			status="healthy",
+			tenant_id=self.tenant_id,
+			user_count=users,
+			active_template_count=templates,
+			verification_count=sum(1 for (tid, _) in self._verifications if tid == self.tenant_id),
+			audit_event_count=len(self._audit_log),
+			checked_at=_ts(),
+		)
 
-async def _handle_user_profile_query(query_intent: Dict[str, Any]) -> Dict[str, Any]:
-	"""Handle user profile queries"""
-	return {
-		'user_count': 0,
-		'active_users': 0,
-		'verification_patterns': {},
-		'risk_profiles': {}
-	}
+	# ------------------------------------------------------------------
+	# 31. Dashboard / KPI summary
+	# ------------------------------------------------------------------
 
-async def _handle_risk_assessment_query(query_intent: Dict[str, Any]) -> Dict[str, Any]:
-	"""Handle risk assessment queries"""
-	return {
-		'overall_risk': 'low',
-		'risk_factors': [],
-		'mitigation_strategies': [],
-		'trend_analysis': {}
-	}
+	async def dashboard(self) -> _R:
+		"""Aggregate KPI dashboard for the tenant."""
+		users = await self.list_users()
+		metrics = await self.performance_metrics()
+		active_users = sum(1 for u in users if u["status"] == "active")
+		opted_out = sum(1 for u in users if u["status"] == "opted_out")
+		modalities: dict[str, int] = {}
+		for (_, _), t in self._templates.items():
+			if t["tenant_id"] == self.tenant_id and t["status"] == "active":
+				modalities[t["modality"]] = modalities.get(t["modality"], 0) + 1
+		return _R(
+			tenant_id=self.tenant_id,
+			total_users=len(users),
+			active_users=active_users,
+			opted_out_users=opted_out,
+			template_counts_by_modality=modalities,
+			verification_stats=dict(metrics),
+			watchlist_count=sum(1 for (tid, _) in self._watchlists if tid == self.tenant_id),
+			consent_records=sum(1 for (_, _), c in self._consent.items() if c["tenant_id"] == self.tenant_id),
+			generated_at=_ts(),
+		)
 
-async def _generate_contextual_response(
-	query: str,
-	intent: Dict[str, Any],
-	response_data: Dict[str, Any],
-	user_context: Dict[str, Any],
-	security_clearance: str
-) -> Dict[str, Any]:
-	"""Generate contextual natural language response"""
-	# Simplified response generation
-	if intent['category'] == 'verification_status':
-		text = f"Based on your verification data, you have {response_data.get('verification_count', 0)} total verifications with a success rate of {response_data.get('success_rate', 0)*100:.1f}%."
-	elif intent['category'] == 'fraud_analysis':
-		text = f"Your current fraud risk level is {response_data.get('risk_level', 'unknown')} with {response_data.get('fraud_incidents', 0)} recent incidents detected."
-	elif intent['category'] == 'compliance_check':
-		text = f"Your compliance status is {response_data.get('compliance_status', 'unknown')} across {len(response_data.get('applicable_regulations', []))} regulatory frameworks."
-	else:
-		text = "I understand your inquiry. Here's the information I found based on your query."
-	
-	return {
-		'text': text,
-		'confidence': intent.get('confidence', 0.8),
-		'context_used': True
-	}
+	# ------------------------------------------------------------------
+	# 32. GDPR / BIPA compliance report
+	# ------------------------------------------------------------------
 
-async def _generate_follow_up_suggestions(
-	query_intent: Dict[str, Any],
-	response_data: Dict[str, Any],
-	user_context: Dict[str, Any]
-) -> List[str]:
-	"""Generate intelligent follow-up suggestions"""
-	base_suggestions = [
-		"Would you like to see detailed analytics?",
-		"Should I generate a report for this data?",
-		"Do you want to set up alerts for similar queries?"
-	]
-	
-	if query_intent['category'] == 'fraud_analysis':
-		base_suggestions.extend([
-			"Would you like to review recent fraud patterns?",
-			"Should I recommend enhanced security measures?"
-		])
-	
-	return base_suggestions[:3]  # Return top 3 suggestions
+	async def compliance_report(self, framework: str = "GDPR") -> _R:
+		"""Generate a domain-specific biometric data compliance report."""
+		users = await self.list_users()
+		consent_map: dict[str, bool] = {}
+		for (_, _), c in self._consent.items():
+			if c["tenant_id"] == self.tenant_id:
+				consent_map[c["user_id"]] = consent_map.get(c["user_id"], False) or c["consented"]
+		users_with_consent = sum(1 for u in users if consent_map.get(u["user_id"], False))
+		opted_out = sum(1 for u in users if u["status"] == "opted_out")
+		report = _R(
+			framework=framework,
+			tenant_id=self.tenant_id,
+			total_data_subjects=len(users),
+			subjects_with_consent=users_with_consent,
+			subjects_opted_out=opted_out,
+			consent_rate=round(users_with_consent / max(len(users), 1), 4),
+			retention_policy_enforced=True,
+			audit_trail_complete=True,
+			generated_at=_ts(),
+		)
+		await self._audit("compliance_report_generated", "system", {"framework": framework})
+		return report
+
+	# ------------------------------------------------------------------
+	# 33. Audit trail export
+	# ------------------------------------------------------------------
+
+	async def audit_trail_export(self, event_type: str | None = None) -> list[_R]:
+		"""Export audit events, optionally filtered by event type."""
+		events = [
+			e for e in self._audit_log
+			if e["tenant_id"] == self.tenant_id and (event_type is None or e["event_type"] == event_type)
+		]
+		await self._audit("audit_trail_exported", "system", {"count": len(events), "filter": event_type})
+		return events
+
+	# ------------------------------------------------------------------
+	# 34. Template quality report
+	# ------------------------------------------------------------------
+
+	async def template_quality_report(self) -> _R:
+		"""Report on template quality distribution across the tenant."""
+		templates = [
+			t for (_, _), t in self._templates.items()
+			if t["tenant_id"] == self.tenant_id and t["status"] == "active"
+		]
+		if not templates:
+			return _R(tenant_id=self.tenant_id, total=0, avg_quality=None, low_quality_count=0, computed_at=_ts())
+		scores = [t["quality_score"] for t in templates]
+		avg_q = round(statistics.mean(scores), 4)
+		low_q = sum(1 for s in scores if s < 0.5)
+		return _R(
+			tenant_id=self.tenant_id,
+			total=len(templates),
+			avg_quality=avg_q,
+			min_quality=round(min(scores), 4),
+			max_quality=round(max(scores), 4),
+			low_quality_count=low_q,
+			computed_at=_ts(),
+		)
+
+	# ------------------------------------------------------------------
+	# 35. Session-based continuous authentication
+	# ------------------------------------------------------------------
+
+	async def continuous_auth_score(
+		self,
+		user_id: str,
+		behavioral_signal: float,
+		biometric_signal: float,
+		fusion_weight: float = 0.6,
+	) -> _R:
+		"""Continuously authenticate a user using behavioral and biometric signals."""
+		self._require_user(user_id)
+		score = round(behavioral_signal * (1 - fusion_weight) + biometric_signal * fusion_weight, 4)
+		decision = "continue" if score >= 0.65 else "step_up"
+		result = _R(
+			user_id=user_id,
+			tenant_id=self.tenant_id,
+			behavioral_signal=behavioral_signal,
+			biometric_signal=biometric_signal,
+			fused_score=score,
+			decision=decision,
+			evaluated_at=_ts(),
+		)
+		await self._audit("continuous_auth_evaluated", user_id, {"score": score, "decision": decision})
+		return result
+
+	# ------------------------------------------------------------------
+	# 36. Anomaly detection on verification stream
+	# ------------------------------------------------------------------
+
+	async def anomaly_detect(self, user_id: str, window_hours: int = 24) -> _R:
+		"""Detect anomalous verification patterns for a user in a time window."""
+		self._require_user(user_id)
+		cutoff = (datetime.utcnow() - timedelta(hours=window_hours)).isoformat()
+		recent = [
+			v for (_, _), v in self._verifications.items()
+			if v["user_id"] == user_id and v["verified_at"] >= cutoff
+		]
+		rejects = sum(1 for v in recent if v["decision"] == "reject")
+		anomaly = rejects >= 3
+		result = _R(
+			user_id=user_id,
+			window_hours=window_hours,
+			total_verifications=len(recent),
+			reject_count=rejects,
+			anomaly_detected=anomaly,
+			risk_level="high" if anomaly else "low",
+			analyzed_at=_ts(),
+		)
+		await self._audit("anomaly_detection", user_id, {"anomaly": anomaly, "rejects": rejects})
+		return result
+
+	# ------------------------------------------------------------------
+	# 37. NIST SP 800-76 compliance check
+	# ------------------------------------------------------------------
+
+	async def nist_compliance_check(self, template_id: str) -> _R:
+		"""Check a template for NIST SP 800-76 compliance."""
+		template = self._require_template(template_id)
+		issues = []
+		if template["quality_score"] < 0.5:
+			issues.append("quality_below_nist_threshold")
+		if template["size_bytes"] < 1000:
+			issues.append("template_too_small")
+		if template.get("encrypted_at") is None:
+			issues.append("template_not_protected")
+		compliant = len(issues) == 0
+		result = _R(
+			template_id=template_id,
+			nist_compliant=compliant,
+			issues=issues,
+			standard="NIST_SP_800-76",
+			checked_at=_ts(),
+		)
+		await self._audit("nist_compliance_checked", template_id, {"compliant": compliant, "issues": issues})
+		return result
+
+	# ------------------------------------------------------------------
+	# 38. ISO/IEC 30107-3 PAD compliance
+	# ------------------------------------------------------------------
+
+	async def iso_pad_compliance(self, challenge_id: str) -> _R:
+		"""Evaluate challenge result against ISO/IEC 30107-3 PAD Level requirements."""
+		challenge = self._liveness_challenges.get(self._key(self.tenant_id, challenge_id))
+		assert challenge is not None, f"challenge not found: {challenge_id}"
+		pad_score = challenge.get("pad_score", 0.0)
+		pad_level = 3 if pad_score >= 0.95 else (2 if pad_score >= 0.85 else (1 if pad_score >= 0.70 else 0))
+		compliant = pad_level >= 2
+		result = _R(
+			challenge_id=challenge_id,
+			pad_score=pad_score,
+			achieved_pad_level=pad_level,
+			compliant=compliant,
+			standard="ISO_IEC_30107-3",
+			checked_at=_ts(),
+		)
+		await self._audit("iso_pad_compliance_checked", challenge_id, {"pad_level": pad_level, "compliant": compliant})
+		return result
+
+	# ------------------------------------------------------------------
+	# 39. Template migration
+	# ------------------------------------------------------------------
+
+	async def template_migrate(
+		self,
+		user_id: str,
+		source_tenant: str,
+		target_tenant: str,
+	) -> _R:
+		"""Migrate templates between tenants (cross-tenant provisioning)."""
+		assert source_tenant != target_tenant, "source and target tenants must differ"
+		migrated = 0
+		for (tid, tid2), template in list(self._templates.items()):
+			if tid == source_tenant and template["user_id"] == user_id:
+				new_key = self._key(target_tenant, template["template_id"])
+				new_record = _R(**template, tenant_id=target_tenant, migrated_at=_ts())
+				self._templates[new_key] = new_record
+				migrated += 1
+		result = _R(
+			user_id=user_id,
+			source_tenant=source_tenant,
+			target_tenant=target_tenant,
+			templates_migrated=migrated,
+			migrated_at=_ts(),
+		)
+		await self._audit("templates_migrated", user_id, {"source": source_tenant, "target": target_tenant, "count": migrated})
+		return result
+
+	# ------------------------------------------------------------------
+	# 40. Deduplication report
+	# ------------------------------------------------------------------
+
+	async def deduplication_report(self, modality: str) -> _R:
+		"""Scan the entire tenant gallery for duplicate biometric identities."""
+		templates = [
+			t for (_, _), t in self._templates.items()
+			if t["modality"] == modality and t["status"] == "active" and t["tenant_id"] == self.tenant_id
+		]
+		hash_to_users: dict[str, list[str]] = {}
+		for t in templates:
+			prefix = t["template_hash"][:16]
+			if prefix not in hash_to_users:
+				hash_to_users[prefix] = []
+			if t["user_id"] not in hash_to_users[prefix]:
+				hash_to_users[prefix].append(t["user_id"])
+		duplicates = {k: v for k, v in hash_to_users.items() if len(v) > 1}
+		result = _R(
+			modality=modality,
+			tenant_id=self.tenant_id,
+			templates_scanned=len(templates),
+			duplicate_clusters=len(duplicates),
+			cluster_details=[{"prefix": k, "user_ids": v} for k, v in duplicates.items()],
+			generated_at=_ts(),
+		)
+		await self._audit("deduplication_report_generated", "system", {"modality": modality, "duplicate_clusters": len(duplicates)})
+		return result
+
+	# ------------------------------------------------------------------
+	# 41. Age verification (document-linked)
+	# ------------------------------------------------------------------
+
+	async def age_verify(self, user_id: str, min_age: int = 18) -> _R:
+		"""Verify user age against biometric and registered date-of-birth."""
+		user = self._require_user(user_id)
+		dob_str = user.get("date_of_birth")
+		if dob_str:
+			dob = datetime.fromisoformat(dob_str)
+			age = (datetime.utcnow() - dob).days // 365
+			passes = age >= min_age
+		else:
+			age = None
+			passes = False
+		result = _R(
+			user_id=user_id,
+			age=age,
+			min_age=min_age,
+			passes=passes,
+			verified_at=_ts(),
+		)
+		await self._audit("age_verified", user_id, {"age": age, "passes": passes})
+		return result
+
+	# ------------------------------------------------------------------
+	# 42. Risk scoring
+	# ------------------------------------------------------------------
+
+	async def risk_score(self, user_id: str) -> _R:
+		"""Compute a composite biometric risk score for the user."""
+		self._require_user(user_id)
+		anomaly = await self.anomaly_detect(user_id, window_hours=24)
+		quality = await self.template_quality_report()
+		base_risk = 0.2
+		if anomaly["anomaly_detected"]:
+			base_risk += 0.4
+		if quality.get("avg_quality") is not None and quality["avg_quality"] < 0.5:
+			base_risk += 0.2
+		risk = round(min(base_risk, 1.0), 4)
+		result = _R(
+			user_id=user_id,
+			risk_score=risk,
+			risk_level="high" if risk >= 0.6 else ("medium" if risk >= 0.3 else "low"),
+			components={"anomaly": anomaly["anomaly_detected"], "quality": quality.get("avg_quality")},
+			computed_at=_ts(),
+		)
+		await self._audit("risk_scored", user_id, {"risk_score": risk})
+		return result

@@ -147,7 +147,21 @@ RULES: list[dict[str, Any]] = [
 	{"name": "agency_ai_agent_runtime_supported", "description": "Agency AI agents must use a supported runtime.", "condition": {"operation": "register_agency_ai_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "agency_agent_runtime_not_supported", "required_action": "select_supported_runtime"}},
 	{"name": "agency_ai_agent_role_supported", "description": "Agency AI agents must use a supported role.", "condition": {"operation": "register_agency_ai_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "agency_agent_role_not_supported", "required_action": "select_supported_role"}},
 	{"name": "privileged_agency_agent_action_requires_human_approval", "description": "Privileged agency-agent actions require human approval.", "condition": {"operation": "agency_agent_action", "privileged_scope": True, "human_approval_recorded": False}, "effect": {"decision": "deny", "reason": "human_approval_required", "required_action": "record_human_approval"}},
+
+	# Cross-tenant and privilege escalation guards
+	{"name": "cross_tenant_agency_access_denied", "description": "Agency banking resources cannot be accessed across tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_access_denied", "required_action": "use_tenant_scoped_credentials"}},
+	{"name": "privilege_escalation_denied", "description": "Agency banking privilege escalation without approval is denied.", "condition": {"privilege_escalation_attempt": True, "approval_recorded": False}, "effect": {"decision": "deny", "reason": "privilege_escalation_denied", "required_action": "obtain_escalation_approval"}},
+
+	# Africa-specific agency banking rules
+	{"name": "ke_cbk_agent_licence_required", "description": "Kenya CBK requires agent banking licence for all agency operations.", "condition": {"operation": "register_agent", "country": "KE", "cbk_agent_licence_present": False}, "effect": {"decision": "deny", "reason": "ke_cbk_agent_licence_required", "required_action": "attach_cbk_agent_licence"}},
+	{"name": "mpesa_agent_float_minimum", "description": "M-Pesa agents must maintain minimum float balance.", "condition": {"operation": "process_mobile_money", "provider": "mpesa", "float_below_minimum": True}, "effect": {"decision": "deny", "reason": "mpesa_agent_float_minimum_not_met", "required_action": "top_up_agent_float"}},
+	{"name": "mpesa_agent_float_aml_screening", "description": "M-Pesa agent float top-ups above threshold require AML screening.", "condition": {"operation": "float_top_up", "provider": "mpesa", "large_float": True, "aml_screened": False}, "effect": {"decision": "require_review", "reason": "mpesa_agent_float_aml_screening_required", "required_action": "screen_agent_float_top_up"}},
+	{"name": "mobile_money_agency_kyc_required", "description": "Mobile money agency customers require tiered KYC per CBK guidelines.", "condition": {"operation": "open_agent_account", "kyc_tier_assigned": False}, "effect": {"decision": "deny", "reason": "mobile_money_kyc_tier_required", "required_action": "assign_kyc_tier"}},
+	{"name": "agent_cash_limit_enforced", "description": "Agent daily cash transaction limit is enforced per CBK guidelines.", "condition": {"operation": "process_cash", "daily_cash_limit_exceeded": True}, "effect": {"decision": "deny", "reason": "agent_cash_limit_exceeded", "required_action": "defer_to_next_day_or_branch"}},
+	{"name": "ng_cbn_agent_banking_guidelines", "description": "Nigeria CBN agent banking guidelines require CBN-approved principal institution.", "condition": {"operation": "register_agent", "country": "NG", "cbn_principal_approved": False}, "effect": {"decision": "deny", "reason": "ng_cbn_principal_institution_required", "required_action": "attach_cbn_approved_principal"}},
+	{"name": "agent_biometric_verification_required", "description": "High-value agency transactions require biometric verification.", "condition": {"operation": "process_transaction", "high_value": True, "biometric_verified": False}, "effect": {"decision": "require_review", "reason": "agent_biometric_verification_required", "required_action": "complete_biometric_verification"}},
 ]
+
 
 
 def _configuration_schema() -> dict[str, Any]:

@@ -554,6 +554,270 @@ class RecsService:
 		self._record_audit(tenant_id, model.id, "model_state_changed", actor, "allow", (reason,))
 		return model.to_dict()
 
+	def cold_start_handle(
+		self,
+		profile_id: str,
+		tenant_id: str,
+		strategy: str = "popular_items",
+		fallback_item_ids: list[str] | None = None,
+		limit: int = 5,
+		actor: str = "recs",
+	) -> dict[str, Any]:
+		"""Generate recommendations for a new profile with no interaction history."""
+		self._require_tenant(tenant_id)
+		profile = self._profiles.get(profile_id)
+		if profile is None:
+			profile_dict = self.record_profile(profile_id=profile_id, tenant_id=tenant_id, consent_recorded=True, actor=actor)
+			profile = self._profiles[profile_id]
+		# use fallback items or any active catalog items
+		candidates = list(fallback_item_ids or [])
+		if not candidates:
+			candidates = [item.id for item in self._catalog_items.values() if item.tenant_id == tenant_id and item.status == "active"][:limit * 2]
+		result = {
+			"profile_id": profile_id,
+			"tenant_id": tenant_id,
+			"strategy": strategy,
+			"candidate_count": len(candidates),
+			"recommendations": [{"item_id": cid, "rank": i + 1, "reason": strategy} for i, cid in enumerate(candidates[:limit])],
+			"generated_at": utc_now(),
+		}
+		self._record_audit(tenant_id, profile_id, "cold_start_recommendations_generated", actor, "allow")
+		return result
+
+	def diversity_inject(
+		self,
+		recommendation_set_id: str,
+		tenant_id: str,
+		diversity_factor: float = 0.3,
+		actor: str = "recs",
+	) -> dict[str, Any]:
+		"""Re-rank a recommendation set to inject category diversity."""
+		rec_set = self._require_recommendation_set(recommendation_set_id, tenant_id)
+		assert 0.0 <= diversity_factor <= 1.0, "diversity_factor must be 0..1"
+		recs = list(rec_set.recommendations)
+		seen_categories: set[str] = set()
+		diverse: list = []
+		deferred: list = []
+		for r in recs:
+			item = self._catalog_items.get(r.item_id)
+			cat = item.category if item else "unknown"
+			if cat not in seen_categories or len(diverse) < 2:
+				seen_categories.add(cat)
+				diverse.append(r)
+			else:
+				deferred.append(r)
+		reranked = diverse + deferred
+		return {
+			"recommendation_set_id": recommendation_set_id,
+			"tenant_id": tenant_id,
+			"diversity_factor": diversity_factor,
+			"original_count": len(recs),
+			"reranked_recommendations": [{"item_id": r.item_id, "rank": i + 1, "score": r.score} for i, r in enumerate(reranked)],
+			"unique_categories": len(seen_categories),
+		}
+
+	def serendipity_boost(
+		self,
+		recommendation_set_id: str,
+		tenant_id: str,
+		boost_fraction: float = 0.2,
+		actor: str = "recs",
+	) -> dict[str, Any]:
+		"""Replace a fraction of recommendations with novel/unexpected items."""
+		rec_set = self._require_recommendation_set(recommendation_set_id, tenant_id)
+		assert 0.0 <= boost_fraction <= 1.0, "boost_fraction must be 0..1"
+		recs = list(rec_set.recommendations)
+		n_boost = max(1, int(len(recs) * boost_fraction))
+		# novel items: catalog items not in current set
+		current_ids = {r.item_id for r in recs}
+		novel_candidates = [i.id for i in self._catalog_items.values() if i.tenant_id == tenant_id and i.id not in current_ids and i.status == "active"][:n_boost]
+		return {
+			"recommendation_set_id": recommendation_set_id,
+			"tenant_id": tenant_id,
+			"boost_fraction": boost_fraction,
+			"boosted_count": len(novel_candidates),
+			"novel_item_ids": novel_candidates,
+		}
+
+	def recency_weight(
+		self,
+		profile_id: str,
+		tenant_id: str,
+		days_window: int = 30,
+		decay_factor: float = 0.9,
+		actor: str = "recs",
+	) -> dict[str, Any]:
+		"""Compute recency-weighted interaction scores for a profile."""
+		self._require_tenant(tenant_id)
+		events = [e for e in self._interaction_events.values() if e.tenant_id == tenant_id and e.profile_id == profile_id]
+		item_scores: dict[str, float] = {}
+		for e in events:
+			w = e.weight * (decay_factor ** max(0, days_window - 1))
+			item_scores[e.item_id] = item_scores.get(e.item_id, 0.0) + w
+		ranked = sorted(item_scores.items(), key=lambda x: -x[1])
+		return {
+			"profile_id": profile_id,
+			"tenant_id": tenant_id,
+			"days_window": days_window,
+			"decay_factor": decay_factor,
+			"item_scores": [{"item_id": k, "weighted_score": round(v, 4)} for k, v in ranked],
+		}
+
+	def multi_objective_rank(
+		self,
+		recommendation_set_id: str,
+		tenant_id: str,
+		objectives: dict[str, float],
+		actor: str = "recs",
+	) -> dict[str, Any]:
+		"""Re-rank recommendations using weighted multi-objective scoring."""
+		rec_set = self._require_recommendation_set(recommendation_set_id, tenant_id)
+		total_weight = sum(objectives.values()) or 1.0
+		reranked = []
+		for r in rec_set.recommendations:
+			composite = sum(
+				objectives.get(k, 0.0) / total_weight * getattr(r, k, r.score)
+				for k in objectives
+			)
+			reranked.append({"item_id": r.item_id, "composite_score": round(composite, 4)})
+		reranked.sort(key=lambda x: -x["composite_score"])
+		for i, item in enumerate(reranked):
+			item["rank"] = i + 1
+		return {
+			"recommendation_set_id": recommendation_set_id,
+			"tenant_id": tenant_id,
+			"objectives": objectives,
+			"reranked": reranked,
+		}
+
+	def session_based_rec(
+		self,
+		tenant_id: str,
+		session_events: list[dict[str, Any]],
+		limit: int = 5,
+		actor: str = "recs",
+	) -> dict[str, Any]:
+		"""Generate recommendations from a transient session event sequence (no persistent profile)."""
+		self._require_tenant(tenant_id)
+		assert bool(session_events), "session_events required"
+		interacted_ids = [e.get("item_id") for e in session_events if e.get("item_id")]
+		candidates = [
+			i for i in self._catalog_items.values()
+			if i.tenant_id == tenant_id and i.id not in set(interacted_ids) and i.status == "active"
+		][:limit]
+		return {
+			"tenant_id": tenant_id,
+			"session_length": len(session_events),
+			"recommendations": [{"item_id": c.id, "rank": i + 1, "reason": "session_affinity"} for i, c in enumerate(candidates)],
+		}
+
+	def knowledge_graph_rec(
+		self,
+		profile_id: str,
+		tenant_id: str,
+		entity_id: str,
+		relationship_types: list[str] | None = None,
+		limit: int = 5,
+		actor: str = "recs",
+	) -> dict[str, Any]:
+		"""Generate recommendations by traversing item relationship graph (simulated)."""
+		self._require_tenant(tenant_id)
+		related = [
+			i for i in self._catalog_items.values()
+			if i.tenant_id == tenant_id and i.id != entity_id and i.status == "active"
+		][:limit]
+		return {
+			"profile_id": profile_id,
+			"tenant_id": tenant_id,
+			"seed_entity_id": entity_id,
+			"relationship_types": relationship_types or ["similar", "complementary"],
+			"recommendations": [{"item_id": r.id, "rank": i + 1, "reason": "knowledge_graph"} for i, r in enumerate(related)],
+		}
+
+	def explainable_rec(
+		self,
+		recommendation_set_id: str,
+		tenant_id: str,
+		actor: str = "recs",
+	) -> dict[str, Any]:
+		"""Attach human-readable explanations to each item in a recommendation set."""
+		rec_set = self._require_recommendation_set(recommendation_set_id, tenant_id)
+		explained = []
+		for r in rec_set.recommendations:
+			item = self._catalog_items.get(r.item_id)
+			name = item.name if item else r.item_id
+			explained.append({
+				"item_id": r.item_id,
+				"item_name": name,
+				"rank": r.rank,
+				"score": r.score,
+				"explanation": r.reason or f"Recommended because it matches your interests (score={r.score:.2f})",
+			})
+		return {
+			"recommendation_set_id": recommendation_set_id,
+			"tenant_id": tenant_id,
+			"explained_items": explained,
+			"explanation_model": "rule_based_v1",
+		}
+
+	def rec_ab_test(
+		self,
+		experiment_id: str,
+		tenant_id: str,
+		profile_id: str,
+		variant_a_model_id: str,
+		variant_b_model_id: str,
+		actor: str = "recs",
+	) -> dict[str, Any]:
+		"""Assign a profile to an A/B variant and record the assignment."""
+		self._require_tenant(tenant_id)
+		variant = "A" if hash(f"{profile_id}:{experiment_id}") % 2 == 0 else "B"
+		assigned_model = variant_a_model_id if variant == "A" else variant_b_model_id
+		assignment = {
+			"experiment_id": experiment_id,
+			"tenant_id": tenant_id,
+			"profile_id": profile_id,
+			"variant": variant,
+			"assigned_model_id": assigned_model,
+			"assigned_at": utc_now(),
+		}
+		self._record_audit(tenant_id, experiment_id, "rec_ab_test_assignment", actor, "allow")
+		return assignment
+
+	def rec_analytics(
+		self,
+		tenant_id: str,
+		period: str = "all",
+		actor: str = "recs",
+	) -> dict[str, Any]:
+		"""Compute recommendation system analytics: CTR, coverage, diversity, feedback rates."""
+		self._require_tenant(tenant_id)
+		rec_sets = [r for r in self._recommendation_sets.values() if r.tenant_id == tenant_id]
+		feedback_all = [f for f in self._feedback.values() if f.tenant_id == tenant_id]
+		clicks = [f for f in feedback_all if f.event_type in {"click", "view"}]
+		conversions = [f for f in feedback_all if f.event_type == "purchase"]
+		catalog_size = len([i for i in self._catalog_items.values() if i.tenant_id == tenant_id])
+		covered_items: set[str] = set()
+		for rs in rec_sets:
+			for r in rs.recommendations:
+				covered_items.add(r.item_id)
+		ctr = round(len(clicks) / max(sum(len(rs.recommendations) for rs in rec_sets), 1), 4)
+		cvr = round(len(conversions) / max(len(clicks), 1), 4)
+		return {
+			"tenant_id": tenant_id,
+			"period": period,
+			"recommendation_set_count": len(rec_sets),
+			"feedback_count": len(feedback_all),
+			"click_count": len(clicks),
+			"conversion_count": len(conversions),
+			"ctr": ctr,
+			"cvr": cvr,
+			"item_coverage_pct": round(len(covered_items) / max(catalog_size, 1) * 100, 2),
+			"model_count": len([m for m in self._models.values() if m.tenant_id == tenant_id]),
+			"experiment_count": len([e for e in self._experiments.values() if e.tenant_id == tenant_id]),
+			"computed_at": utc_now(),
+		}
+
 	def create_record(
 		self,
 		record_id: str,

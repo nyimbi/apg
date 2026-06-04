@@ -14,7 +14,7 @@ from typing import List, Dict, Any
 
 from uuid_extensions import uuid7str
 
-from ..models import (
+from ...models import (
 	ARCustomer, ARInvoice, ARPayment, ARCollectionActivity, ARCreditAssessment, ARDispute,
 	ARCustomerType, ARCustomerStatus, ARInvoiceStatus, ARPaymentStatus, 
 	ARCollectionPriority, ARCreditRiskLevel, ARDisputeStatus

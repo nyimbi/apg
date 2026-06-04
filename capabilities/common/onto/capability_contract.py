@@ -395,6 +395,31 @@ def streaming_manifest() -> dict[str, Any]:
 	}
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.onto.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"ontology_created",
+		"ontology_updated",
+		"ontology_published",
+		"ontology_deprecated",
+		"concept_created",
+		"concept_updated",
+		"concept_deprecated",
+		"relationship_defined",
+		"relationship_removed",
+		"mapping_created",
+		"import_completed",
+		"agent_registered",
+	],
+	"guardrails": [
+		"onto_batch_requires_bytewax",
+		"onto_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	config = deepcopy(DEFAULT_CONFIGURATION)
 	config["tenant_id"] = tenant_id
@@ -404,7 +429,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		"capability": "onto",
 		"display_name": "Ontology Management",
 		"provides": ["ontology_management", "semantic_vocabulary_governance", "ontology_agent_composition"],
-		"requires": ["kngr", "meta", "nlpc", "grph", "srch", "aicr", "conf", "auth", "audl"],
+		"requires": ["meta", "nlpc", "grph", "srch", "aicr", "conf", "auth", "audl"],
 		"configuration": config,
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},
@@ -417,7 +442,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"requires_theme": True,
 		},
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": deepcopy(STREAMING),
 		"theme": deepcopy(THEME),
 	}
 

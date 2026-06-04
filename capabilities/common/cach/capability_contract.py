@@ -609,6 +609,30 @@ def streaming_manifest() -> dict[str, Any]:
 	}
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.cach.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"namespace_created",
+		"namespace_updated",
+		"namespace_evicted",
+		"cache_warmed",
+		"cache_invalidated",
+		"tier_promoted",
+		"tier_demoted",
+		"eviction_policy_changed",
+		"freshness_review_required",
+		"adapter_health_changed",
+		"agent_registered",
+	],
+	"guardrails": [
+		"cach_batch_requires_bytewax",
+		"cach_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable CACH capability contract."""
 	config = CapabilityConfiguration()
@@ -626,7 +650,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		},
 		"ui": ui_manifest(),
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": STREAMING,
 		"review_evidence": {
 			"durable_statuses": [
 				"pending",

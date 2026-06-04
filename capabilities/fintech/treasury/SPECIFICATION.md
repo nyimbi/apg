@@ -1,0 +1,9 @@
+# Treasury Management System Specification
+
+## Purpose
+
+This capability provides treasury management system functionality.
+
+## Scope
+
+See `cap_spec.md` for the full capability specification.

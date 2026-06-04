@@ -307,6 +307,31 @@ THEME: dict[str, Any] = {
 }
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.ztna.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"policy_created",
+		"policy_updated",
+		"policy_activated",
+		"policy_deactivated",
+		"access_granted",
+		"access_denied",
+		"session_established",
+		"session_terminated",
+		"trust_score_evaluated",
+		"device_posture_checked",
+		"micro_segment_created",
+		"agent_registered",
+	],
+	"guardrails": [
+		"ztna_batch_requires_bytewax",
+		"ztna_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable ZTNA capability contract."""
 	config = deepcopy(DEFAULT_CONFIGURATION)
@@ -320,7 +345,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": deepcopy(STREAMING),
 		"ui": {
 			"shell": "apg_python",
 			"view_module": "views.py",

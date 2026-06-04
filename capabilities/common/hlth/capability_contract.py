@@ -686,6 +686,30 @@ def streaming_manifest() -> dict[str, Any]:
 	}
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.hlth.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"health_check_registered",
+		"health_check_executed",
+		"health_check_passed",
+		"health_check_failed",
+		"diagnostic_run_started",
+		"diagnostic_run_completed",
+		"incident_raised",
+		"incident_resolved",
+		"sla_breached",
+		"recovery_action_triggered",
+		"agent_registered",
+	],
+	"guardrails": [
+		"hlth_batch_requires_bytewax",
+		"hlth_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable HLTH capability contract."""
 	config = CapabilityConfiguration()
@@ -703,7 +727,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		},
 		"ui": ui_manifest(),
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": STREAMING,
 		"review_evidence": {
 			"durable_statuses": [
 				"pending",

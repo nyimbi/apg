@@ -1,53 +1,31 @@
-"""APG CKM Notification System capability package."""
+"""APG Notification System capability.
 
+Standalone package: ``pip install apg-ckm-not``
+
+Quick start::
+
+    from apg_ckm_not import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : ckm_not
+Provides      : notification_delivery, template_management, campaign_orchestration, preference_center, channel_provider_registry, engagement_analytics
+"""
 from __future__ import annotations
 
-from .capability_contract import (
-	SUPPORTED_CHANNELS,
-	SUPPORTED_NOTIFICATION_AGENT_ROLES,
-	SUPPORTED_NOTIFICATION_AGENT_RUNTIMES,
-	evaluate_capability_rules,
-	get_capability_contract,
-	streaming_manifest,
+__version__  = "1.0.0"
+__package_name__ = "apg-ckm-not"
+__capability_id__ = "ckm_not"
+
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
 )
-from .lifecycle import (
-	NotificationAgent,
-	NotificationDelivery,
-	NotificationLifecycleService,
-	NotificationPreference,
-	NotificationProvider,
-	NotificationTemplate,
-)
-
-
-__version__ = "1.0.0"
-__author__ = "Datacraft"
-
-APG_CAPABILITY_INFO = {
-	"id": "ckm_not",
-	"name": "Notification System",
-	"version": __version__,
-	"description": "Tenant-scoped notification templates, campaigns, delivery governance, preferences, provider registry, and AI-agent review guardrails.",
-	"category": "ckm",
-	"provides": get_capability_contract()["provides"],
-	"requires": get_capability_contract()["requires"],
-	"supported_channels": SUPPORTED_CHANNELS,
-	"supported_agent_runtimes": SUPPORTED_NOTIFICATION_AGENT_RUNTIMES,
-	"streaming": streaming_manifest(),
-}
 
 __all__ = [
-	"APG_CAPABILITY_INFO",
-	"NotificationAgent",
-	"NotificationDelivery",
-	"NotificationLifecycleService",
-	"NotificationPreference",
-	"NotificationProvider",
-	"NotificationTemplate",
-	"SUPPORTED_CHANNELS",
-	"SUPPORTED_NOTIFICATION_AGENT_ROLES",
-	"SUPPORTED_NOTIFICATION_AGENT_RUNTIMES",
-	"evaluate_capability_rules",
-	"get_capability_contract",
-	"streaming_manifest",
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
 ]

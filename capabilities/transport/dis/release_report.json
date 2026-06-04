@@ -1,0 +1,21 @@
+{
+  "evidence": {
+    "contracts": {
+      "capability_contract": {
+        "display_name": "Dispatch Operations",
+        "errors": []
+      }
+    },
+    "self_test": {
+      "capability": "transport_dis",
+      "passed": true,
+      "status": "ok"
+    },
+    "semantic_model": {
+      "capability": "transport_dis",
+      "format": "apg.semantic-model.v1"
+    }
+  },
+  "format": "apg.release-report.v1",
+  "ok": true
+}

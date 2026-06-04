@@ -1,48 +1,31 @@
-"""Financial Management General Ledger APG capability packet."""
+"""APG glr_general_ledger capability.
 
-from .api import (
-	capability_status,
-	create_account,
-	create_allocation,
-	create_journal_batch,
-	create_journal_entry,
-	create_record,
-	list_records,
-	open_period,
-	post_journal,
-	record_dimension,
-	register_glr_agent,
-	reverse_journal,
-	service,
+Standalone package: ``pip install apg-fin-general_ledger``
+
+Quick start::
+
+    from apg_fin_general_ledger import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : glr_general_ledger
+Provides      : chart_of_accounts_lifecycle, ledger_dimension_management, accounting_period_lifecycle, journal_batch_lifecycle, journal_entry_lifecycle, journal_posting_workflow
+"""
+from __future__ import annotations
+
+__version__  = "2.1.0"
+__package_name__ = "apg-fin-general_ledger"
+__capability_id__ = "glr_general_ledger"
+
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
 )
-from .capability_contract import (
-	GLR_EVENT_STREAM,
-	SUPPORTED_GLR_AGENT_ROLES,
-	SUPPORTED_GLR_AGENT_RUNTIMES,
-	evaluate_capability_rules,
-	get_capability_contract,
-)
-from .service import GLRService, GeneralLedgerService
 
 __all__ = [
-	"GLRService",
-	"GLR_EVENT_STREAM",
-	"GeneralLedgerService",
-	"SUPPORTED_GLR_AGENT_ROLES",
-	"SUPPORTED_GLR_AGENT_RUNTIMES",
-	"capability_status",
-	"create_account",
-	"create_allocation",
-	"create_journal_batch",
-	"create_journal_entry",
-	"create_record",
-	"evaluate_capability_rules",
-	"get_capability_contract",
-	"list_records",
-	"open_period",
-	"post_journal",
-	"record_dimension",
-	"register_glr_agent",
-	"reverse_journal",
-	"service",
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
 ]

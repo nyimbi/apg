@@ -133,7 +133,20 @@ RULES: list[dict[str, Any]] = [
 	{"name": "crypto_agent_runtime_supported", "condition": {"operation": "register_crypto_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "crypto_agent_runtime_not_supported", "required_action": "select_supported_runtime"}},
 	{"name": "crypto_agent_role_supported", "condition": {"operation": "register_crypto_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "crypto_agent_role_not_supported", "required_action": "select_supported_role"}},
 	{"name": "privileged_crypto_agent_action_requires_human_approval", "condition": {"operation": "crypto_agent_action", "privileged_scope": True, "human_approval_recorded": False}, "effect": {"decision": "deny", "reason": "human_approval_required", "required_action": "record_human_approval"}},
+
+	# Cross-tenant and privilege escalation guards
+	{"name": "cross_tenant_crypto_access_denied", "description": "Crypto resources cannot be accessed across tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_access_denied", "required_action": "use_tenant_scoped_credentials"}},
+	{"name": "privilege_escalation_denied", "description": "Crypto privilege escalation without approval is denied.", "condition": {"privilege_escalation_attempt": True, "approval_recorded": False}, "effect": {"decision": "deny", "reason": "privilege_escalation_denied", "required_action": "obtain_escalation_approval"}},
+
+	# Africa-specific crypto rules
+	{"name": "ke_cma_vasp_licence_required", "description": "Kenya CMA Virtual Asset Service Provider licence required for crypto operations.", "condition": {"operation": "register_crypto_service", "country": "KE", "cma_vasp_licence_present": False}, "effect": {"decision": "deny", "reason": "ke_cma_vasp_licence_required", "required_action": "obtain_cma_vasp_licence"}},
+	{"name": "ke_cbk_crypto_notification_required", "description": "Kenya CBK notification required for licensed crypto PSP operations.", "condition": {"operation": "register_crypto_service", "country": "KE", "cbk_notified": False}, "effect": {"decision": "deny", "reason": "ke_cbk_crypto_notification_required", "required_action": "notify_cbk_of_crypto_operations"}},
+	{"name": "ng_sec_digital_assets_compliance", "description": "Nigeria SEC Digital Assets rulebook compliance required.", "condition": {"operation": "register_crypto_service", "country": "NG", "ng_sec_digital_assets_compliant": False}, "effect": {"decision": "deny", "reason": "ng_sec_digital_assets_compliance_required", "required_action": "comply_with_ng_sec_digital_assets_rulebook"}},
+	{"name": "crypto_to_mobile_money_aml_required", "description": "Crypto to mobile money conversion requires AML/KYC verification.", "condition": {"operation": "crypto_to_mobile_money", "aml_verified": False}, "effect": {"decision": "deny", "reason": "crypto_mobile_money_aml_required", "required_action": "verify_aml_before_conversion"}},
+	{"name": "mobile_money_crypto_onramp_kyc", "description": "Mobile money crypto on-ramp requires full KYC.", "condition": {"operation": "mobile_money_to_crypto", "full_kyc_present": False}, "effect": {"decision": "deny", "reason": "mobile_money_crypto_onramp_kyc_required", "required_action": "complete_full_kyc"}},
+	{"name": "crypto_sanctions_screening_required", "description": "Crypto wallet addresses must be screened against sanctions lists.", "condition": {"operation": "crypto_transfer", "sanctions_screened": False}, "effect": {"decision": "deny", "reason": "crypto_sanctions_screening_required", "required_action": "screen_crypto_address"}},
 ]
+
 
 
 def get_capability_contract(tenant_id: str = "default") -> dict[str, Any]:

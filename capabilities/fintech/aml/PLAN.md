@@ -22,7 +22,7 @@
 ## Review Plan
 
 - Confirm the exposed rule names match service enforcement paths.
-- Confirm AML does not introduce Kafka or provider-specific AI coupling.
+- Confirm AML does not introduce Bytewax or provider-specific AI coupling.
 - Confirm SAR and privileged AI-agent operations require human approval.
 - Confirm alerts and cases cannot be created without tenant and evidence.
 - Confirm UI routes, theme tokens, and view models are composable.

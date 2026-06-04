@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "fintech_treasury",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "fintech_treasury": {
+      "capability": "fintech_treasury"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

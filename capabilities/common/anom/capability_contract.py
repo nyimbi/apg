@@ -336,6 +336,31 @@ def streaming_manifest() -> dict[str, Any]:
 	}
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.anom.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"source_registered",
+		"source_updated",
+		"baseline_created",
+		"baseline_reset",
+		"anomaly_detected",
+		"signal_raised",
+		"signal_triaged",
+		"investigation_opened",
+		"investigation_closed",
+		"feedback_recorded",
+		"alert_dispatched",
+		"agent_registered",
+	],
+	"guardrails": [
+		"anom_batch_requires_bytewax",
+		"anom_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable ANOM capability contract."""
 	config = deepcopy(DEFAULT_CONFIGURATION)
@@ -359,7 +384,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"requires_theme": True,
 		},
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": deepcopy(STREAMING),
 		"theme": deepcopy(THEME),
 	}
 

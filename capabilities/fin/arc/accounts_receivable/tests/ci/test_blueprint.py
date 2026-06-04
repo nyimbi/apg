@@ -30,7 +30,7 @@ from ..blueprint import (
 	get_ar_configuration, validate_ar_setup, get_ar_dashboard_widgets,
 	get_ar_reports
 )
-from ..models import (
+from ...models import (
 	ARCustomer, ARInvoice, ARPayment, ARCollectionActivity,
 	ARCustomerType, ARCustomerStatus, ARInvoiceStatus, ARPaymentStatus
 )

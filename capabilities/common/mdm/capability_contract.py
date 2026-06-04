@@ -654,6 +654,31 @@ def streaming_manifest() -> dict[str, Any]:
 	}
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.mdm.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"entity_created",
+		"entity_updated",
+		"entity_merged",
+		"entity_deactivated",
+		"golden_record_created",
+		"golden_record_updated",
+		"duplicate_detected",
+		"match_review_completed",
+		"domain_created",
+		"stewardship_assigned",
+		"data_quality_assessed",
+		"agent_registered",
+	],
+	"guardrails": [
+		"mdm_batch_requires_bytewax",
+		"mdm_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable MDM capability contract."""
 	config = CapabilityConfiguration()
@@ -671,7 +696,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		},
 		"ui": ui_manifest(),
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": STREAMING,
 		"review_evidence": {
 			"durable_statuses": [
 				"pending",

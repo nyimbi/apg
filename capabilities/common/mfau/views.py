@@ -2,10 +2,107 @@
 
 from __future__ import annotations
 
-from typing import Any
+import os as _ctx_os
+import base64 as _ctx_b64
+import binascii as _ctx_binascii
+import json as _ctx_json
+from typing import Any, Any as _Any, Dict as _Dict, List as _List, Optional as _Optional
 
 from .capability_contract import get_capability_contract
 from .mfa_runtime import MfauService
+
+
+# ---------------------------------------------------------------------------
+# Context resolution helpers (Flask)
+# ---------------------------------------------------------------------------
+
+
+def _clean_text(value: _Any) -> _Optional[str]:
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+
+def _object_value(source: _Any, name: str) -> _Any:
+	if source is None:
+		return None
+	if isinstance(source, dict):
+		return source.get(name)
+	return getattr(source, name, None)
+
+
+def _mapping_value(source: _Any, name: str) -> _Any:
+	if source is None:
+		return None
+	getter = getattr(source, "get", None)
+	return getter(name) if getter else None
+
+
+def _resolve_current_user_id() -> str:
+	"""Resolve user id from Flask context: g > session > request attrs > headers > query > env."""
+	try:
+		from flask import g as _g, session as _session, request as _req
+		# 1. g.current_user
+		cu = getattr(_g, "current_user", None)
+		if isinstance(cu, dict) and cu.get("user_id"):
+			return str(cu["user_id"])
+		if isinstance(cu, str) and cu:
+			return cu
+		# 2. request.current_user attribute
+		rcu = getattr(_req, "current_user", None)
+		if isinstance(rcu, dict) and rcu.get("user_id"):
+			return str(rcu["user_id"])
+		# 3. session
+		su = _session.get("user_id")
+		if su:
+			return str(su)
+		# 4. Headers
+		hu = _req.headers.get("X-APG-User-ID") or _req.headers.get("X-User-ID")
+		if hu:
+			return str(hu)
+		# 5. Query params
+		qu = _req.args.get("user_id")
+		if qu:
+			return str(qu)
+	except Exception:
+		pass
+	# 6. Env fallback
+	return _ctx_os.getenv("APG_DEFAULT_USER_ID", "anonymous")
+
+
+def _resolve_current_tenant_id() -> str:
+	"""Resolve tenant id from Flask context: g > session > request attrs > headers > query > env."""
+	try:
+		from flask import g as _g, session as _session, request as _req
+		# 1. g.current_user
+		cu = getattr(_g, "current_user", None)
+		if isinstance(cu, dict) and cu.get("tenant_id"):
+			return str(cu["tenant_id"])
+		# 2. request.current_user attribute
+		rcu = getattr(_req, "current_user", None)
+		if isinstance(rcu, dict) and rcu.get("tenant_id"):
+			return str(rcu["tenant_id"])
+		# 3. session
+		st = _session.get("tenant_id")
+		if st:
+			return str(st)
+		# 4. Headers
+		ht = _req.headers.get("X-APG-Tenant-ID") or _req.headers.get("X-Tenant-ID")
+		if ht:
+			return str(ht)
+		# 5. Query params
+		qt = _req.args.get("tenant_id") or _req.args.get("tenant")
+		if qt:
+			return str(qt)
+	except Exception:
+		pass
+	# 6. Env fallback
+	return _ctx_os.getenv("APG_DEFAULT_TENANT_ID", "default")
+
+
+class MFAUserProfileView:
+	"""Flask-AppBuilder view for MFA user profile management."""
 
 
 def route_manifest(tenant_id: str = "default") -> dict[str, Any]:

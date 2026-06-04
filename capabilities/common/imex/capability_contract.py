@@ -338,7 +338,7 @@ def agent_manifest() -> dict[str, Any]:
 		"supported_runtimes": list(SUPPORTED_IMEX_AGENT_RUNTIMES),
 		"supported_roles": list(SUPPORTED_IMEX_AGENT_ROLES),
 		"privileged_roles": list(PRIVILEGED_IMEX_AGENT_ROLES),
-		"requires": ["scope", "owner", "purpose", "contribution_disclosure"],
+		
 		"approval": "human approval is required before privileged transfer agents mutate transfer state",
 		"external_runtimes_are_adapters": True,
 	}
@@ -410,6 +410,31 @@ def review_evidence_manifest() -> dict[str, Any]:
 	}
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.imex.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"import_job_created",
+		"import_job_started",
+		"import_job_completed",
+		"import_job_failed",
+		"export_job_created",
+		"export_job_started",
+		"export_job_completed",
+		"export_job_failed",
+		"transfer_approved",
+		"transfer_rejected",
+		"bulk_operation_processed",
+		"agent_registered",
+	],
+	"guardrails": [
+		"imex_batch_requires_bytewax",
+		"imex_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable IMEX capability contract."""
 	config = CapabilityConfiguration()
@@ -423,7 +448,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		"configuration_schema": config.schema,
 		"rule_engine": {"type": "deterministic", "rules": [rule.__dict__ for rule in default_rules()]},
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": STREAMING,
 		"review_evidence": review_evidence_manifest(),
 		"ui": ui_manifest(),
 		"theme": {"name": theme.name, "tokens": theme.tokens, "components": theme.components},

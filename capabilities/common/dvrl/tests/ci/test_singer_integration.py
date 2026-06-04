@@ -12,9 +12,9 @@ from datetime import datetime, timezone
 from typing import Dict, Any
 
 # Import all DVRL components
-from ..service import DVRLService
+from ...service import DVRLService
 from ..singer_integration import SingerTapManager, SingerTapConnector
-from ..models import DataSourceType
+from ...models import DataSourceType
 
 
 async def test_singer_tap_manager_initialization():

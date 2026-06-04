@@ -23,6 +23,16 @@ from .ast_builder import (
 	ModuleDeclaration,
 	PropertyDeclaration,
 )
+
+# New entity types introduced in language design pass — map to stable semantic kind strings
+_NEW_ENTITY_KIND_MAP: dict[EntityType, str] = {
+	EntityType.ENUM: "enum",
+	EntityType.STATEMACHINE: "statemachine",
+	EntityType.MIGRATION: "migration",
+	EntityType.DEPLOYMENT: "deployment",
+	EntityType.MARKETPLACE: "marketplace",
+	EntityType.EVENT_STORE: "event_store",
+}
 from .graphs import SUPPORTED_GRAPH_KINDS, build_graph_from_module
 from .parser import APGParser, APGSyntaxError
 from .semantic_analyzer import SemanticAnalyzer, SemanticError
@@ -409,6 +419,9 @@ def _entity_kind(entity: EntityDeclaration) -> str:
 		return "app"
 	if isinstance(entity, DatabaseDeclaration):
 		return "database"
+	# New entity types added in language design pass
+	if entity.entity_type in _NEW_ENTITY_KIND_MAP:
+		return _NEW_ENTITY_KIND_MAP[entity.entity_type]
 	return entity.entity_type.value
 
 

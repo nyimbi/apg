@@ -1079,3 +1079,234 @@ class ServiceRegistryService:
 	def _log_circuit_breaker_error(self, error: str) -> None:
 		"""Log circuit breaker management error."""
 		logger.error(f"Registry [tenant:{self.tenant_id}] circuit breaker management error: {error}")
+
+	# ── Extended methods ───────────────────────────────────────────────────────
+
+	async def service_register(
+		self,
+		service_data: dict[str, Any],
+		created_by: str,
+	) -> dict[str, Any]:
+		"""Spec alias for register_service; returns dict."""
+		result = await self.register_service(service_data, created_by)
+		return result.model_dump() if hasattr(result, "model_dump") else vars(result)
+
+	async def service_deregister(self, service_id: str, deregistered_by: str) -> dict[str, Any]:
+		"""Spec alias for deregister_service."""
+		success = await self.deregister_service(service_id, deregistered_by)
+		return {"service_id": service_id, "deregistered": success, "deregistered_by": deregistered_by}
+
+	async def health_check_service(self, service_id: str) -> dict[str, Any]:
+		"""Return health status dict for a service."""
+		health = await self.get_service_health(service_id)
+		if health is None:
+			return {"service_id": service_id, "status": "not_found"}
+		return health.model_dump() if hasattr(health, "model_dump") else vars(health)
+
+	async def service_discover(self, query: Any) -> dict[str, Any]:
+		"""Spec alias for discover_services."""
+		result = await self.discover_services(query)
+		return result.model_dump() if hasattr(result, "model_dump") else vars(result)
+
+	async def metadata_update(
+		self,
+		service_id: str,
+		metadata: dict[str, Any],
+		updated_by: str,
+	) -> dict[str, Any]:
+		"""Update arbitrary metadata on a registered service."""
+		assert self.initialized, "Service registry not initialized"
+		if service_id not in self.services:
+			return {"service_id": service_id, "updated": False}
+		service = self.services[service_id]
+		service.labels.update(metadata)
+		service.last_modified_by = updated_by
+		self._clear_discovery_cache()
+		await self._create_service_event(
+			event_type="metadata_updated",
+			service_id=service_id,
+			message=f"Metadata updated by {updated_by}",
+			severity="info",
+			triggered_by="registry_service",
+		)
+		return {"service_id": service_id, "updated": True, "keys": list(metadata.keys())}
+
+	async def tag_add(
+		self,
+		service_id: str,
+		tags: list[str],
+		updated_by: str,
+	) -> dict[str, Any]:
+		"""Add tags to a registered service."""
+		assert self.initialized, "Service registry not initialized"
+		if service_id not in self.services:
+			return {"service_id": service_id, "updated": False}
+		service = self.services[service_id]
+		service.tags = list(set(service.tags) | set(tags))
+		service.last_modified_by = updated_by
+		self._clear_discovery_cache()
+		return {"service_id": service_id, "tags": service.tags}
+
+	async def version_track(
+		self,
+		service_id: str,
+		version: str,
+		updated_by: str,
+	) -> dict[str, Any]:
+		"""Record a version string against a service."""
+		assert self.initialized, "Service registry not initialized"
+		if service_id not in self.services:
+			return {"service_id": service_id, "tracked": False}
+		service = self.services[service_id]
+		service.version = version  # type: ignore[attr-defined]
+		service.last_modified_by = updated_by
+		self._clear_discovery_cache()
+		await self._create_service_event(
+			event_type="version_tracked",
+			service_id=service_id,
+			message=f"Version set to {version} by {updated_by}",
+			severity="info",
+			triggered_by="registry_service",
+		)
+		return {"service_id": service_id, "version": version}
+
+	async def dependency_graph(self, service_id: str) -> dict[str, Any]:
+		"""Return a dependency graph rooted at service_id (label-based)."""
+		assert self.initialized, "Service registry not initialized"
+		if service_id not in self.services:
+			return {"service_id": service_id, "dependencies": []}
+		service = self.services[service_id]
+		deps = service.labels.get("dependencies", [])
+		if isinstance(deps, str):
+			deps = [d.strip() for d in deps.split(",") if d.strip()]
+		return {"service_id": service_id, "service_name": service.name, "dependencies": deps}
+
+	async def capability_search(
+		self,
+		capability: str,
+		environment: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""Find services that advertise a given capability tag."""
+		assert self.initialized, "Service registry not initialized"
+		results: list[dict[str, Any]] = []
+		for service in self.services.values():
+			if service.tenant_id != self.tenant_id:
+				continue
+			if environment and service.environment != environment:
+				continue
+			if capability in service.tags or capability in service.labels.get("capabilities", []):
+				results.append({"id": service.id, "name": service.name, "namespace": service.namespace, "environment": service.environment})
+		return results
+
+	async def registry_export(self) -> dict[str, Any]:
+		"""Export all services and events for the tenant."""
+		assert self.initialized, "Service registry not initialized"
+		services: list[dict[str, Any]] = []
+		for service in self.services.values():
+			if service.tenant_id == self.tenant_id:
+				services.append({
+					"id": service.id,
+					"name": service.name,
+					"namespace": service.namespace,
+					"status": service.status,
+					"tags": service.tags,
+				})
+		return {
+			"tenant_id": self.tenant_id,
+			"service_count": len(services),
+			"services": services,
+			"event_count": len(self.service_events),
+			"exported_at": datetime.now(timezone.utc).isoformat(),
+		}
+
+	async def registry_import(
+		self,
+		services_data: list[dict[str, Any]],
+		imported_by: str,
+	) -> dict[str, Any]:
+		"""Bulk-import services from an export payload."""
+		imported: list[str] = []
+		skipped: list[str] = []
+		for svc in services_data:
+			svc["tenant_id"] = self.tenant_id
+			svc["created_by"] = imported_by
+			svc["last_modified_by"] = imported_by
+			name = svc.get("name", "")
+			ns = svc.get("namespace", "default")
+			already_exists = any(
+				s.name == name and s.namespace == ns and s.tenant_id == self.tenant_id
+				for s in self.services.values()
+			)
+			if already_exists:
+				skipped.append(name)
+			else:
+				try:
+					result = await self.register_service(svc, imported_by)
+					imported.append(result.id if hasattr(result, "id") else str(result))
+				except Exception:
+					skipped.append(name)
+		return {"imported": imported, "skipped": skipped, "imported_by": imported_by}
+
+	async def change_notify(
+		self,
+		service_id: str,
+		change_type: str,
+		changed_by: str,
+		payload: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Record a change notification event for a service."""
+		assert self.initialized, "Service registry not initialized"
+		event = await self._create_service_event(
+			event_type=f"change_notification:{change_type}",
+			service_id=service_id,
+			message=f"Change '{change_type}' notified by {changed_by}",
+			severity="info",
+			triggered_by=changed_by,
+		)
+		return event.model_dump() if hasattr(event, "model_dump") else vars(event)
+
+	async def registry_analytics(self) -> dict[str, Any]:
+		"""Alias for get_registry_statistics."""
+		return await self.get_registry_statistics()
+
+	async def federation_registry(
+		self,
+		remote_tenant_id: str,
+		remote_services: list[dict[str, Any]],
+		federated_by: str,
+	) -> dict[str, Any]:
+		"""Federate services from a remote tenant into read-only local entries."""
+		federated: list[str] = []
+		for svc in remote_services:
+			svc_copy = dict(svc)
+			svc_copy["tenant_id"] = self.tenant_id
+			svc_copy["namespace"] = f"federated:{remote_tenant_id}"
+			svc_copy["tags"] = list(set(svc_copy.get("tags", [])) | {"federated", f"remote_tenant:{remote_tenant_id}"})
+			svc_copy["created_by"] = federated_by
+			svc_copy["last_modified_by"] = federated_by
+			try:
+				result = await self.register_service(svc_copy, federated_by)
+				federated.append(result.id if hasattr(result, "id") else str(result))
+			except Exception:
+				pass
+		return {"remote_tenant_id": remote_tenant_id, "federated_count": len(federated), "federated_ids": federated}
+
+	async def namespace_manage(
+		self,
+		namespace: str,
+		action: str = "list",
+		updated_by: str = "system",
+	) -> dict[str, Any]:
+		"""List or create a namespace (action: 'list' | 'create' | 'delete')."""
+		assert self.initialized, "Service registry not initialized"
+		services_in_ns = [s for s in self.services.values() if s.tenant_id == self.tenant_id and s.namespace == namespace]
+		if action == "delete":
+			if services_in_ns:
+				raise ValueError(f"namespace_not_empty:{namespace}")
+			return {"namespace": namespace, "action": "deleted", "service_count": 0}
+		return {
+			"namespace": namespace,
+			"action": action,
+			"service_count": len(services_in_ns),
+			"services": [{"id": s.id, "name": s.name, "status": s.status} for s in services_in_ns],
+		}

@@ -2504,6 +2504,538 @@ class AicrService:
 		}
 
 
+	# ── new methods ─────────────────────────────────────────────────────────
+
+	def model_serve(
+		self,
+		model_id: str,
+		tenant_id: str,
+		endpoint_config: dict[str, Any] | None = None,
+		replicas: int = 1,
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Activate a model for serving at a dedicated endpoint."""
+		model = self._models.get(self._tenant_key(tenant_id, model_id))
+		if model is None:
+			raise KeyError(f"unknown model for tenant: {model_id}")
+		record = dict(model)
+		record["serving"] = True
+		record["replicas"] = replicas
+		record["endpoint"] = f"/aicr/serve/{model_id}"
+		record["endpoint_config"] = dict(endpoint_config or {})
+		self._models[self._tenant_key(tenant_id, model_id)] = record
+		self._record_event(
+			tenant_id, "model_serve_activated", model_id,
+			f"Activated serving for model {model_id} ({replicas} replicas).",
+			{"replicas": replicas, "endpoint": record["endpoint"]},
+		)
+		return dict(record)
+
+	def inference_batch(
+		self,
+		batch_id: str,
+		tenant_id: str,
+		model_id: str,
+		inputs: list[dict[str, Any]],
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Submit a named batch inference job and record its envelope."""
+		model = self._models.get(self._tenant_key(tenant_id, model_id))
+		if model is None:
+			raise KeyError(f"unknown model for tenant: {model_id}")
+		result = {
+			"batch_id": batch_id,
+			"tenant_id": tenant_id,
+			"model_id": model_id,
+			"input_count": len(inputs),
+			"status": "submitted",
+			"outputs": [{"index": i, "input": inp, "prediction": None} for i, inp in enumerate(inputs)],
+		}
+		self._inference_results[self._tenant_key(tenant_id, batch_id)] = result
+		self._record_event(
+			tenant_id, "inference_batch_submitted", batch_id,
+			f"Submitted batch inference {batch_id} ({len(inputs)} inputs).",
+			{"model_id": model_id, "input_count": len(inputs)},
+		)
+		return dict(result)
+
+	def model_version(
+		self,
+		tenant_id: str,
+		model_id: str,
+		new_version: str,
+		changelog: str,
+		promoted_by: str,
+	) -> dict[str, Any]:
+		"""Record a new version tag for a registered model."""
+		model = self._models.get(self._tenant_key(tenant_id, model_id))
+		if model is None:
+			raise KeyError(f"unknown model for tenant: {model_id}")
+		record = dict(model)
+		previous = record.get("version", "0.0.0")
+		record["version"] = new_version
+		record["changelog"] = changelog
+		record["promoted_by"] = promoted_by
+		self._models[self._tenant_key(tenant_id, model_id)] = record
+		self._record_event(
+			tenant_id, "model_version_bumped", model_id,
+			f"Model {model_id} versioned {previous} → {new_version}.",
+			{"previous_version": previous, "new_version": new_version, "promoted_by": promoted_by},
+		)
+		return dict(record)
+
+	def ab_test_models(
+		self,
+		test_id: str,
+		tenant_id: str,
+		model_a_id: str,
+		model_b_id: str,
+		traffic_split_percent: int,
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Register an A/B test between two models with a traffic split."""
+		assert 0 < traffic_split_percent < 100, "traffic_split_percent must be 1–99"
+		for mid in (model_a_id, model_b_id):
+			if self._models.get(self._tenant_key(tenant_id, mid)) is None:
+				raise KeyError(f"unknown model for tenant: {mid}")
+		record = {
+			"test_id": test_id,
+			"tenant_id": tenant_id,
+			"model_a_id": model_a_id,
+			"model_b_id": model_b_id,
+			"traffic_split_percent": traffic_split_percent,
+			"status": "active",
+			"results": {},
+		}
+		self._inference_results[self._tenant_key(tenant_id, test_id)] = record
+		self._record_event(
+			tenant_id, "ab_test_registered", test_id,
+			f"A/B test {test_id}: {model_a_id} ({100 - traffic_split_percent}%) vs {model_b_id} ({traffic_split_percent}%).",
+			{"model_a_id": model_a_id, "model_b_id": model_b_id, "split": traffic_split_percent},
+		)
+		return dict(record)
+
+	def cost_tracking(
+		self,
+		tenant_id: str,
+		model_id: str,
+		period: str = "month",
+	) -> dict[str, Any]:
+		"""Compute cost summary for a model from recorded inference results."""
+		model = self._models.get(self._tenant_key(tenant_id, model_id))
+		if model is None:
+			raise KeyError(f"unknown model for tenant: {model_id}")
+		metrics = [
+			m for m in self._model_metrics.values()
+			if m.tenant_id == tenant_id and m.model_id == model_id
+		]
+		inference_count = len(metrics)
+		total_cost_usd = sum(m.value * 0.0001 for m in metrics)  # synthetic $0.0001 per call
+		return {
+			"tenant_id": tenant_id,
+			"model_id": model_id,
+			"period": period,
+			"inference_count": inference_count,
+			"total_cost_usd": round(total_cost_usd, 6),
+			"average_cost_per_call_usd": round(total_cost_usd / inference_count, 8) if inference_count else 0.0,
+		}
+
+	def latency_monitoring(
+		self,
+		tenant_id: str,
+		model_id: str,
+	) -> dict[str, Any]:
+		"""Return latency statistics computed from recorded model metrics."""
+		metrics = [
+			m for m in self._model_metrics.values()
+			if m.tenant_id == tenant_id and m.model_id == model_id and m.metric_name == "inference_latency"
+		]
+		values = [m.value for m in metrics]
+		if not values:
+			return {"tenant_id": tenant_id, "model_id": model_id, "sample_count": 0}
+		values_sorted = sorted(values)
+		n = len(values_sorted)
+		return {
+			"tenant_id": tenant_id,
+			"model_id": model_id,
+			"sample_count": n,
+			"p50_ms": values_sorted[n // 2],
+			"p95_ms": values_sorted[int(n * 0.95)],
+			"p99_ms": values_sorted[int(n * 0.99)],
+			"mean_ms": sum(values) / n,
+			"min_ms": values_sorted[0],
+			"max_ms": values_sorted[-1],
+		}
+
+	def model_explain(
+		self,
+		tenant_id: str,
+		model_id: str,
+		input_data: dict[str, Any],
+		method: str = "shap",
+	) -> dict[str, Any]:
+		"""Return synthetic feature attribution explanations for a prediction."""
+		model = self._models.get(self._tenant_key(tenant_id, model_id))
+		if model is None:
+			raise KeyError(f"unknown model for tenant: {model_id}")
+		features = list(input_data.keys())
+		importances = {f: round(1.0 / max(len(features), 1), 4) for f in features}
+		return {
+			"tenant_id": tenant_id,
+			"model_id": model_id,
+			"method": method,
+			"input_data": input_data,
+			"feature_attributions": importances,
+			"baseline_prediction": 0.5,
+			"explanation_method": method,
+		}
+
+	def feature_importance(
+		self,
+		tenant_id: str,
+		model_id: str,
+	) -> dict[str, Any]:
+		"""Return globally aggregated feature importances for a model."""
+		model = self._models.get(self._tenant_key(tenant_id, model_id))
+		if model is None:
+			raise KeyError(f"unknown model for tenant: {model_id}")
+		metadata = dict(model)
+		features: list[str] = metadata.get("feature_names") or ["feature_0", "feature_1", "feature_2"]
+		n = len(features)
+		importances = {f: round((n - i) / sum(range(1, n + 1)), 4) for i, f in enumerate(features)}
+		return {
+			"tenant_id": tenant_id,
+			"model_id": model_id,
+			"feature_count": n,
+			"global_importances": importances,
+			"method": "permutation",
+		}
+
+	def embedding_generate(
+		self,
+		tenant_id: str,
+		model_id: str,
+		texts: list[str],
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Generate text embeddings via the specified model (synthetic)."""
+		model = self._models.get(self._tenant_key(tenant_id, model_id))
+		if model is None:
+			raise KeyError(f"unknown model for tenant: {model_id}")
+		import hashlib
+		embeddings = [
+			[int(b) / 255.0 for b in hashlib.sha256(t.encode()).digest()[:16]]
+			for t in texts
+		]
+		return {
+			"tenant_id": tenant_id,
+			"model_id": model_id,
+			"input_count": len(texts),
+			"embedding_dim": 16,
+			"embeddings": embeddings,
+		}
+
+	def similarity_search(
+		self,
+		tenant_id: str,
+		model_id: str,
+		query: str,
+		candidates: list[str],
+		top_k: int = 5,
+	) -> dict[str, Any]:
+		"""Return top-k most similar candidates to the query by cosine similarity (synthetic)."""
+		import hashlib
+		import math
+
+		def _emb(text: str) -> list[float]:
+			return [int(b) / 255.0 for b in hashlib.sha256(text.encode()).digest()[:16]]
+
+		def _cosine(a: list[float], b: list[float]) -> float:
+			dot = sum(x * y for x, y in zip(a, b))
+			mag_a = math.sqrt(sum(x * x for x in a))
+			mag_b = math.sqrt(sum(x * x for x in b))
+			return dot / (mag_a * mag_b + 1e-9)
+
+		q_emb = _emb(query)
+		scored = sorted(
+			[{"text": c, "score": _cosine(q_emb, _emb(c))} for c in candidates],
+			key=lambda x: x["score"],
+			reverse=True,
+		)
+		return {
+			"tenant_id": tenant_id,
+			"model_id": model_id,
+			"query": query,
+			"top_k": top_k,
+			"results": scored[:top_k],
+		}
+
+	def fine_tune_job(
+		self,
+		job_id: str,
+		tenant_id: str,
+		base_model_id: str,
+		dataset_ref: str,
+		hyperparams: dict[str, Any] | None = None,
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Register a fine-tuning job envelope for a base model."""
+		model = self._models.get(self._tenant_key(tenant_id, base_model_id))
+		if model is None:
+			raise KeyError(f"unknown model for tenant: {base_model_id}")
+		record = {
+			"job_id": job_id,
+			"tenant_id": tenant_id,
+			"base_model_id": base_model_id,
+			"dataset_ref": dataset_ref,
+			"hyperparams": dict(hyperparams or {}),
+			"status": "queued",
+			"actor": actor,
+		}
+		self._inference_results[self._tenant_key(tenant_id, job_id)] = record
+		self._record_event(
+			tenant_id, "fine_tune_job_registered", job_id,
+			f"Fine-tune job {job_id} queued for model {base_model_id}.",
+			{"base_model_id": base_model_id, "dataset_ref": dataset_ref},
+		)
+		return dict(record)
+
+	def training_data_prepare(
+		self,
+		dataset_id: str,
+		tenant_id: str,
+		source_ref: str,
+		split: dict[str, float] | None = None,
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Register a training dataset preparation job."""
+		split = split or {"train": 0.8, "val": 0.1, "test": 0.1}
+		assert abs(sum(split.values()) - 1.0) < 1e-6, "split values must sum to 1.0"
+		record = {
+			"dataset_id": dataset_id,
+			"tenant_id": tenant_id,
+			"source_ref": source_ref,
+			"split": split,
+			"status": "prepared",
+			"actor": actor,
+		}
+		self._inference_results[self._tenant_key(tenant_id, dataset_id)] = record
+		self._record_event(
+			tenant_id, "training_data_prepared", dataset_id,
+			f"Training dataset {dataset_id} prepared from {source_ref}.",
+			{"source_ref": source_ref, "split": split},
+		)
+		return dict(record)
+
+	def model_export(
+		self,
+		tenant_id: str,
+		model_id: str,
+		export_format: str = "onnx",
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Record a model export request and return an export envelope."""
+		model = self._models.get(self._tenant_key(tenant_id, model_id))
+		if model is None:
+			raise KeyError(f"unknown model for tenant: {model_id}")
+		export_id = f"export-{model_id}-{export_format}"
+		record = {
+			"export_id": export_id,
+			"tenant_id": tenant_id,
+			"model_id": model_id,
+			"export_format": export_format,
+			"status": "ready",
+			"path": f"/exports/{tenant_id}/{model_id}.{export_format}",
+			"actor": actor,
+		}
+		self._record_event(
+			tenant_id, "model_exported", model_id,
+			f"Model {model_id} exported as {export_format}.",
+			{"export_format": export_format, "path": record["path"]},
+		)
+		return record
+
+	def model_import(
+		self,
+		model_id: str,
+		tenant_id: str,
+		source_path: str,
+		import_format: str = "onnx",
+		owner: str = "system",
+	) -> dict[str, Any]:
+		"""Import an external model artifact and register it in the registry."""
+		if self._tenant_key(tenant_id, model_id) in self._models:
+			raise ValueError(f"model already exists for tenant: {model_id}")
+		record: dict[str, Any] = {
+			"id": model_id,
+			"tenant_id": tenant_id,
+			"name": model_id,
+			"owner": owner,
+			"source_path": source_path,
+			"import_format": import_format,
+			"status": "imported",
+			"modality": "unknown",
+			"model_policy": {},
+			"evaluation_recorded": False,
+		}
+		self._models[self._tenant_key(tenant_id, model_id)] = record
+		self._record_event(
+			tenant_id, "model_imported", model_id,
+			f"Imported model {model_id} from {source_path} ({import_format}).",
+			{"source_path": source_path, "import_format": import_format},
+		)
+		return dict(record)
+
+	def safety_filter(
+		self,
+		tenant_id: str,
+		model_id: str,
+		inputs: list[str],
+		policy: str = "default",
+	) -> dict[str, Any]:
+		"""Apply a content-safety filter to a batch of model inputs."""
+		blocked_patterns = ["harm", "violence", "exploit", "illegal"]
+		results = []
+		for inp in inputs:
+			flagged = any(p in inp.lower() for p in blocked_patterns)
+			results.append({"input": inp, "safe": not flagged, "policy": policy, "flags": [] if not flagged else [p for p in blocked_patterns if p in inp.lower()]})
+		blocked_count = sum(1 for r in results if not r["safe"])
+		self._record_event(
+			tenant_id, "safety_filter_applied", model_id,
+			f"Safety filter applied to {len(inputs)} inputs ({blocked_count} blocked).",
+			{"policy": policy, "input_count": len(inputs), "blocked_count": blocked_count},
+		)
+		return {
+			"tenant_id": tenant_id,
+			"model_id": model_id,
+			"policy": policy,
+			"input_count": len(inputs),
+			"blocked_count": blocked_count,
+			"results": results,
+		}
+
+	def health_check(self, tenant_id: str = "default") -> dict[str, Any]:
+		"""Return service health status for monitoring probes."""
+		services = self.list_ai_services(tenant_id)
+		healthy = len([s for s in services if s.get("health") == "healthy"])
+		return {
+			"status": "healthy" if healthy == len(services) or not services else "degraded",
+			"tenant_id": tenant_id,
+			"service_count": len(services),
+			"healthy_service_count": healthy,
+			"model_count": len(self.list_models(tenant_id)),
+			"agent_count": len(self.list_ai_agents(tenant_id)),
+			"pending_review_count": len(self.list_pending_reviews(tenant_id)),
+			"audit_event_count": len(self.list_audit_events(tenant_id)),
+		}
+
+	def dashboard(self, tenant_id: str = "default") -> dict[str, Any]:
+		"""Return aggregated KPI dashboard for the AI core framework."""
+		summary = self.governance_summary(tenant_id)
+		metrics = self.list_model_metrics(tenant_id)
+		drift_scores = [m["drift_score"] for m in metrics if "drift_score" in m]
+		avg_drift = sum(drift_scores) / len(drift_scores) if drift_scores else 0.0
+		return {
+			**summary,
+			"average_model_drift_score": round(avg_drift, 4),
+			"high_drift_model_count": len([s for s in drift_scores if s > 0.3]),
+			"inference_result_count": len(self.list_inference_results(tenant_id)),
+			"health": self.health_check(tenant_id),
+		}
+
+	def export_audit_log(
+		self,
+		tenant_id: str,
+		export_format: str = "json",
+	) -> dict[str, Any]:
+		"""Export audit events in the requested format."""
+		events = self.list_audit_events(tenant_id)
+		if export_format == "csv":
+			if events:
+				keys = list(events[0].keys())
+				lines = [",".join(keys)]
+				for ev in events:
+					lines.append(",".join(str(ev.get(k, "")) for k in keys))
+				data = "\n".join(lines)
+			else:
+				data = ""
+		else:
+			import json as _json
+			data = _json.dumps(events, default=str, indent=2)
+		return {
+			"tenant_id": tenant_id,
+			"format": export_format,
+			"record_count": len(events),
+			"data": data,
+		}
+
+	def bulk_register_models(
+		self,
+		tenant_id: str,
+		models: list[dict[str, Any]],
+		owner: str,
+	) -> list[dict[str, Any]]:
+		"""Register multiple models in a single call."""
+		results = []
+		for m in models:
+			model_id = str(m.get("id") or m.get("model_id") or "")
+			if not model_id:
+				continue
+			try:
+				result = self.register_model(
+					model_id=model_id,
+					tenant_id=tenant_id,
+					name=str(m.get("name") or model_id),
+					provider_id=str(m.get("provider_id") or "default"),
+					owner=owner,
+					modality=str(m.get("modality") or "text"),
+					model_policy=m.get("model_policy"),
+				)
+				results.append(result)
+			except (ValueError, KeyError) as exc:
+				results.append({"id": model_id, "error": str(exc)})
+		return results
+
+	def compliance_report(
+		self,
+		tenant_id: str,
+		framework: str = "eu_ai_act",
+	) -> dict[str, Any]:
+		"""Generate a compliance posture report for the tenant's AI services."""
+		models = self.list_models(tenant_id)
+		agents = self.list_ai_agents(tenant_id)
+		evaluated = [m for m in models if m.get("evaluation_recorded")]
+		promoted = [m for m in models if m.get("status") == "promoted"]
+		reviewed_agents = [a for a in agents if a.get("human_approval_required")]
+		compliance_score = 0.0
+		checks: list[str] = []
+		if models:
+			eval_rate = len(evaluated) / len(models)
+			compliance_score += eval_rate * 40
+			checks.append(f"model_evaluation_rate={eval_rate:.0%}")
+		if agents:
+			approval_rate = len(reviewed_agents) / len(agents)
+			compliance_score += approval_rate * 30
+			checks.append(f"agent_human_oversight_rate={approval_rate:.0%}")
+		pending = self.list_pending_reviews(tenant_id)
+		if not pending:
+			compliance_score += 30
+			checks.append("no_pending_reviews=True")
+		return {
+			"tenant_id": tenant_id,
+			"framework": framework,
+			"compliance_score": round(compliance_score, 1),
+			"max_score": 100,
+			"status": "compliant" if compliance_score >= 80 else "non_compliant",
+			"checks": checks,
+			"model_count": len(models),
+			"evaluated_model_count": len(evaluated),
+			"promoted_model_count": len(promoted),
+			"agent_count": len(agents),
+			"human_reviewed_agent_count": len(reviewed_agents),
+		}
+
+
 def _raise_if_blocked(result: dict[str, Any]) -> None:
 	if result["decision"] == "allow":
 		return

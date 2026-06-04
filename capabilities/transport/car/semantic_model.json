@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "transport_car",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "transport_car": {
+      "capability": "transport_car"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

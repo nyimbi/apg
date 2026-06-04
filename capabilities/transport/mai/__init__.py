@@ -1,10 +1,31 @@
+"""APG Vehicle Maintenance capability.
+
+Standalone package: ``pip install apg-transport-mai``
+
+Quick start::
+
+    from apg_transport_mai import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : transport_mai
+Provides      : preventive_maintenance_schedule_workflow, workshop_management_workflow, parts_inventory_workflow, warranty_tracking_workflow, roadworthiness_compliance_workflow
 """
-Maintenance Planning (MAI) - Transport Sub-Module
+from __future__ import annotations
 
-Vehicle maintenance management including preventive maintenance, repair scheduling,
-maintenance records, and fleet reliability.
-"""
+__version__  = "1.0.0"
+__package_name__ = "apg-transport-mai"
+__capability_id__ = "transport_mai"
 
-__version__ = "1.0.0"
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
+)
 
-__all__ = []
+__all__ = [
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
+]

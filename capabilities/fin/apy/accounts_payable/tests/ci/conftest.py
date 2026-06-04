@@ -20,13 +20,13 @@ from pytest_httpserver import HTTPServer
 from werkzeug import Response
 
 # Import test targets
-from ..models import (
+from ...models import (
 	APVendor, APInvoice, APPayment, APApprovalWorkflow,
 	VendorStatus, VendorType, InvoiceStatus, PaymentStatus, PaymentMethod,
 	ContactInfo, PaymentTerms, TaxInfo, VendorPerformanceMetrics,
 	create_sample_vendor, create_sample_invoice
 )
-from ..service import (
+from ...service import (
 	APVendorService, APInvoiceService, APPaymentService,
 	APWorkflowService, APAnalyticsService
 )

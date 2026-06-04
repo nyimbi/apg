@@ -1,16 +1,31 @@
-"""APG Decentralized Finance executable capability package."""
+"""APG Decentralized Finance capability.
 
-from .capability_contract import CAPABILITY_ID, CAPABILITY_NAME, CAPABILITY_VERSION, get_capability_contract
-from .service import DecentralizedFinanceService, FintechDeFiService
+Standalone package: ``pip install apg-fintech-defi``
+
+Quick start::
+
+    from apg_fintech_defi import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : fintech_defi
+Provides      : defi_protocol_workflow, defi_position_workflow, defi_action_workflow, defi_yield_strategy_workflow, defi_reward_workflow, defi_governance_workflow
+"""
+from __future__ import annotations
+
+__version__  = "1.1.0"
+__package_name__ = "apg-fintech-defi"
+__capability_id__ = "fintech_defi"
+
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
+)
 
 __all__ = [
-	"CAPABILITY_ID",
-	"CAPABILITY_NAME",
-	"CAPABILITY_VERSION",
-	"DecentralizedFinanceService",
-	"FintechDeFiService",
-	"get_capability_contract",
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
 ]
-
-__version__ = CAPABILITY_VERSION
-__status__ = "Executable"

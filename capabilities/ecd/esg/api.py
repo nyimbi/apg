@@ -2,7 +2,119 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
+
+try:
+	from fastapi import Request
+	from fastapi.security import HTTPAuthorizationCredentials
+except ImportError:  # pragma: no cover
+	Request = object  # type: ignore
+	HTTPAuthorizationCredentials = object  # type: ignore
+
+
+def _clean_text(value):
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+
+def _object_value(source, name):
+	if source is None:
+		return None
+	if isinstance(source, dict):
+		return source.get(name)
+	return getattr(source, name, None)
+
+
+def _mapping_value(source, name):
+	if source is None:
+		return None
+	getter = getattr(source, "get", None)
+	return getter(name) if getter else None
+
+
+def _decode_bearer_claims(credentials):
+	try:
+		import base64 as _b64, json as _json
+		token = getattr(credentials, "credentials", None) or str(credentials)
+		parts = token.split(".")
+		if len(parts) >= 2:
+			padded = parts[1] + "=" * (4 - len(parts[1]) % 4)
+			return _json.loads(_b64.urlsafe_b64decode(padded))
+	except Exception:
+		pass
+	return {}
+
+
+async def get_current_user(request: Request, credentials=None):
+	"""Resolve current user from JWT claims, request state, headers, or env vars.
+
+	Priority: Bearer JWT > request.state.current_user > X-APG-* headers > env vars
+	"""
+	# 1. JWT Bearer token claims
+	if credentials is not None:
+		scheme = getattr(credentials, "scheme", "")
+		if str(scheme).lower() == "bearer":
+			claims = _decode_bearer_claims(credentials)
+			if claims.get("sub") or claims.get("user_id"):
+				return {
+					"user_id": claims.get("sub") or claims.get("user_id", ""),
+					"tenant_id": claims.get("tenant_id") or claims.get("tid", os.getenv("APG_DEFAULT_TENANT_ID", "default")),
+					"permissions": claims.get("permissions", ["esg:read"]),
+				}
+
+	# 2. Check request.state.current_user
+	state = getattr(request, "state", None)
+	current_user = _object_value(state, "current_user")
+	if isinstance(current_user, dict) and current_user.get("user_id"):
+		return {
+			"user_id": current_user["user_id"],
+			"tenant_id": current_user.get("tenant_id", "default"),
+			"permissions": current_user.get("permissions", ["esg:read"]),
+		}
+
+	# 3. Headers
+	headers = getattr(request, "headers", {})
+	header_user = headers.get("X-APG-User-ID") or headers.get("X-User-ID")
+	header_tenant = headers.get("X-APG-Tenant-ID") or headers.get("X-Tenant-ID")
+	header_perms_raw = headers.get("X-APG-Permissions")
+	if header_user:
+		permissions = [p.strip() for p in header_perms_raw.split(",")] if header_perms_raw else ["esg:read"]
+		return {
+			"user_id": header_user,
+			"tenant_id": header_tenant or os.getenv("APG_DEFAULT_TENANT_ID", "default"),
+			"permissions": permissions,
+		}
+
+	# 4. Query string / query params
+	try:
+		query = getattr(request, "query_params", {}) or {}
+		q_user = _mapping_value(query, "user_id")
+		q_tenant = _mapping_value(query, "tenant_id") or _mapping_value(query, "tenant")
+		if q_user:
+			return {"user_id": q_user, "tenant_id": q_tenant or os.getenv("APG_DEFAULT_TENANT_ID", "default"), "permissions": ["esg:read"]}
+	except Exception:
+		pass
+
+	# 5. Env fallback
+	return {
+		"user_id": os.getenv("APG_DEFAULT_USER_ID", "anonymous"),
+		"tenant_id": os.getenv("APG_DEFAULT_TENANT_ID", "default"),
+		"permissions": ["esg:read"],
+	}
+
+
+async def get_esg_service():
+	"""FastAPI dependency that returns the shared ESG service instance."""
+	return _service_singleton()
+
+
+# ============================================================================
+# Dependency Injection
+# ============================================================================
+
 
 try:
 	from .service import ESGManagementLifecycleService
@@ -13,8 +125,33 @@ except ImportError:  # pragma: no cover
 _SERVICE = ESGManagementLifecycleService()
 
 
-def service() -> ESGManagementLifecycleService:
+def _service_singleton():
 	return _SERVICE
+
+
+def service():
+	return _SERVICE
+
+
+def _resolve_tenant_from_request(request=None):
+	"""Resolve tenant id from request context."""
+	try:
+		import importlib as _il
+		_mod = _il.import_module("capabilities.common.request_context")
+		return _mod.get_tenant_id_from_context()
+	except Exception:
+		pass
+	if request is not None:
+		headers = getattr(request, "headers", {})
+		t = headers.get("X-APG-Tenant-ID") or headers.get("X-Tenant-ID")
+		if t:
+			return str(t)
+	return os.getenv("APG_DEFAULT_TENANT_ID", "default")
+
+
+def get_tenant_id(request=None, credentials=None):
+	"""Resolve tenant id — compatibility wrapper."""
+	return _resolve_tenant_from_request(request)
 
 
 def create_esg_profile(payload: dict[str, Any]) -> dict[str, Any]:

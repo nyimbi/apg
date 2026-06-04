@@ -1,115 +1,65 @@
+"""APG Configuration Management capability.
+
+Standalone package: ``pip install apg-common-conf``
+
+Quick start::
+
+    from apg_common_conf import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : conf
+Provides      : conf_operations, conf_agents, review_evidence
 """
-APG Configuration Management Capability - Production Infrastructure Automation
+from __future__ import annotations
 
-AI-native configuration management system providing measurable improvement over industry
-leaders through predictive intelligence, universal abstraction, and autonomous operations.
+__version__  = "1.0.0"
+__package_name__ = "apg-common-conf"
+__capability_id__ = "conf"
 
-© 2025 Datacraft - www.datacraft.co.ke
-Author: Nyimbi Odero <nyimbi@gmail.com>
-"""
-
-from .service import ConfService, ProductionConfigurationManager, create_configuration_manager, get_config_manager
-from .models import (
-	# Core Models
-	CMResource, CMTemplate, CMPolicy, CMEnvironment, CMDeployment,
-	ConfigurationDSL, ValidationResult, ExecutionResult, AIInsight, CMMetrics,
-	
-	# Enums
-	ResourceState, DeploymentStatus, PolicyAction, ResourceType,
-	PolicyType, CloudProvider, ComplianceFramework,
-	
-	# Validators
-	validate_resource_name, validate_tenant_id, validate_configuration_spec
-)
-from .capability_contract import (
-	get_capability_contract,
-	evaluate_capability_rules
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
 )
 
+from .service import (  # noqa: E402
+    ProductionConfigurationManager,
+    create_configuration_manager,
+    get_config_manager,
+)
 
-def register_capability() -> dict:
-	"""Register the configuration management capability with the APG composition engine."""
-	contract = get_capability_contract()
-	return {
-		"name": "conf",
-		"display_name": "Configuration Management",
-		"description": "AI-native configuration governance, deployment, and drift remediation",
-		"version": "1.0.0",
-		"dependencies": [
-			"auth_rbac",
-			"audit_compliance",
-			"ai_orchestration",
-			"notification_engine"
-		],
-		"configuration": contract["configuration"],
-		"configuration_schema": contract["configuration_schema"],
-		"rule_engine": contract["rule_engine"],
-		"capabilities": {
-			"resources": "Manage declarative infrastructure resources",
-			"templates": "Compose reusable configuration templates",
-			"policies": "Enforce configuration governance and compliance",
-			"change_approvals": "Review and approve governed configuration promotions",
-			"deployments": "Coordinate controlled rollout workflows",
-			"gitops": "Manage GitOps-driven configuration promotion",
-			"drift_management": "Detect and review configuration drift remediation",
-			"configuration_agents": "Register and govern configuration review agents",
-			"review_evidence": "Persist review-required and denied configuration governance decisions with policy evidence",
-			"audit_events": "Expose configuration governance evidence",
-			"capability_rules": "Evaluate deterministic capability-specific rules",
-			"visual_theming": "Apply tenant-aware configuration workspace theming"
-		},
-		"endpoints": {
-			"resources": "/api/v1/config/resources",
-			"templates": "/api/v1/config/templates",
-			"changes": "/api/v1/config/changes",
-			"approvals": "/api/v1/config/approvals",
-			"deployments": "/api/v1/config/deployments",
-			"drift": "/api/v1/config/drift",
-			"drift_remediation": "/api/v1/config/drift/remediation",
-			"agents": "/api/v1/config/agents",
-			"pending_reviews": "/api/v1/config/pending-reviews",
-			"batches": "/api/v1/config/batches",
-			"audit": "/api/v1/config/audit",
-			"insights": "/api/v1/config/insights",
-			"metrics": "/api/v1/config/metrics"
-		},
-		"ui_components": {
-			route["name"]: route["path"]
-			for route in contract["ui"]["routes"]
-		},
-		"ui_manifest": contract["ui"],
-		"theme": contract["theme"],
-		"permissions": [
-			"conf:view",
-			"conf:create",
-			"conf:edit",
-			"conf:deploy",
-			"conf:approve",
-			"conf:remediate",
-			"conf:agent_manage",
-			"conf:admin"
-		]
-	}
+# Alias used by tests
+RevolutionaryConfigurationManager = ProductionConfigurationManager
 
-# Export main components
+from .models import (  # noqa: E402
+    CMResource,
+    CMTemplate,
+    CMPolicy,
+    CMEnvironment,
+    CMDeployment,
+    ResourceState,
+    DeploymentStatus,
+    ResourceType,
+    CloudProvider,
+)
+
 __all__ = [
-	# Service Layer
-	"ConfService",
-	"ProductionConfigurationManager",
-	"create_configuration_manager",
-	"get_config_manager",
-	"register_capability",
-	"get_capability_contract",
-	"evaluate_capability_rules",
-	
-	# Core Models
-	"CMResource", "CMTemplate", "CMPolicy", "CMEnvironment", "CMDeployment",
-	"ConfigurationDSL", "ValidationResult", "ExecutionResult", "AIInsight", "CMMetrics",
-	
-	# Enums
-	"ResourceState", "DeploymentStatus", "PolicyAction", "ResourceType",
-	"PolicyType", "CloudProvider", "ComplianceFramework",
-	
-	# Validators
-	"validate_resource_name", "validate_tenant_id", "validate_configuration_spec"
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
+    "ProductionConfigurationManager",
+    "RevolutionaryConfigurationManager",
+    "create_configuration_manager",
+    "get_config_manager",
+    "CMResource",
+    "CMTemplate",
+    "CMPolicy",
+    "CMEnvironment",
+    "CMDeployment",
+    "ResourceState",
+    "DeploymentStatus",
+    "ResourceType",
+    "CloudProvider",
 ]

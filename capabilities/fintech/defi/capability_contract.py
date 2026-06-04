@@ -118,7 +118,20 @@ RULES: list[dict[str, Any]] = [
 	{"name": "defi_agent_runtime_supported", "condition": {"operation": "register_defi_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "defi_agent_runtime_not_supported", "required_action": "select_supported_runtime"}},
 	{"name": "defi_agent_role_supported", "condition": {"operation": "register_defi_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "defi_agent_role_not_supported", "required_action": "select_supported_role"}},
 	{"name": "privileged_defi_agent_action_requires_human_approval", "condition": {"operation": "defi_agent_action", "privileged_scope": True, "human_approval_recorded": False}, "effect": {"decision": "deny", "reason": "human_approval_required", "required_action": "record_human_approval"}},
+
+	# Cross-tenant and privilege escalation guards
+	{"name": "cross_tenant_defi_access_denied", "description": "DeFi resources cannot be accessed across tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_access_denied", "required_action": "use_tenant_scoped_credentials"}},
+	{"name": "privilege_escalation_denied", "description": "DeFi privilege escalation without approval is denied.", "condition": {"privilege_escalation_attempt": True, "approval_recorded": False}, "effect": {"decision": "deny", "reason": "privilege_escalation_denied", "required_action": "obtain_escalation_approval"}},
+
+	# Africa-specific DeFi rules
+	{"name": "ke_defi_regulatory_notification_required", "description": "Kenya DeFi protocol deployments require CBK/CMA regulatory notification.", "condition": {"operation": "deploy_protocol", "country": "KE", "regulatory_notification_filed": False}, "effect": {"decision": "deny", "reason": "ke_defi_regulatory_notification_required", "required_action": "file_regulatory_notification"}},
+	{"name": "mobile_money_defi_bridge_kyc_required", "description": "Mobile money to DeFi bridge transactions require KYC.", "condition": {"operation": "mobile_money_defi_bridge", "kyc_verified": False}, "effect": {"decision": "deny", "reason": "mobile_money_defi_bridge_kyc_required", "required_action": "verify_kyc_before_bridge"}},
+	{"name": "mpesa_defi_onramp_aml_required", "description": "M-Pesa DeFi on-ramp transactions require AML screening.", "condition": {"operation": "mpesa_defi_onramp", "aml_screened": False}, "effect": {"decision": "deny", "reason": "mpesa_defi_onramp_aml_required", "required_action": "screen_aml_before_onramp"}},
+	{"name": "ke_kes_stablecoin_cbk_approval", "description": "KES-pegged stablecoins require CBK approval.", "condition": {"operation": "issue_stablecoin", "peg_currency": "KES", "cbk_approval_present": False}, "effect": {"decision": "deny", "reason": "ke_kes_stablecoin_cbk_approval_required", "required_action": "obtain_cbk_stablecoin_approval"}},
+	{"name": "defi_sanctions_screening_required", "description": "DeFi wallet addresses must be screened against sanctions lists.", "condition": {"operation": "defi_transaction", "sanctions_screened": False}, "effect": {"decision": "deny", "reason": "defi_sanctions_screening_required", "required_action": "screen_defi_wallet_address"}},
+	{"name": "defi_smart_contract_audit_required", "description": "DeFi protocol smart contracts require security audit before deployment.", "condition": {"operation": "deploy_protocol", "smart_contract_audited": False}, "effect": {"decision": "deny", "reason": "smart_contract_audit_required", "required_action": "complete_smart_contract_audit"}},
 ]
+
 
 
 def get_capability_contract(tenant_id: str = "default") -> dict[str, Any]:

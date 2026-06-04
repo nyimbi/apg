@@ -55,7 +55,7 @@ with payments, wallets, KYC, AML, and fraud.
   require human approval evidence.
 - Payout release requires settlement reference and provider receipt.
 - Refunds require transfer reference, reason, and reviewer.
-- Remittance batch/event lifecycles must use Bytewax, not Kafka.
+- Remittance batch/event lifecycles must use Bytewax, not Bytewax.
 - Privileged AI-agent actions require human approval.
 
 ## Non-Goals

@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "healthcare_pha",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "healthcare_pha": {
+      "capability": "healthcare_pha"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

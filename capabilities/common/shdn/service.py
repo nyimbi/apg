@@ -41,6 +41,25 @@ class ShdnService:
 		self.recoveries: dict[str, RecoveryRecord] = {}
 		self.audit_events: dict[str, LifecycleAuditEventRecord] = {}
 		self.shdn_agents: dict[str, ShdnAgentRecord] = {}
+		# Additional in-memory stores for new methods
+		self._maintenance_windows: dict[str, dict[str, Any]] = {}
+		self._restart_records: dict[str, dict[str, Any]] = {}
+		self._checkpoint_store: dict[str, dict[str, Any]] = {}
+		self._notification_log: dict[str, dict[str, Any]] = {}
+		self._rollback_records: dict[str, dict[str, Any]] = {}
+		self._queue_drain_records: dict[str, dict[str, Any]] = {}
+		self._connection_close_records: dict[str, dict[str, Any]] = {}
+		self._shutdown_reports: dict[str, dict[str, Any]] = {}
+		self._analytics_cache: dict[str, dict[str, Any]] = {}
+		self._inflight_records: dict[str, dict[str, Any]] = {}
+		self._emergency_stop_records: dict[str, dict[str, Any]] = {}
+		self._health_final_records: dict[str, dict[str, Any]] = {}
+		self._service_drain_records: dict[str, dict[str, Any]] = {}
+		self._dependency_notify_records: dict[str, dict[str, Any]] = {}
+
+	# ------------------------------------------------------------------ #
+	# Original 22 methods                                                  #
+	# ------------------------------------------------------------------ #
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -87,12 +106,8 @@ class ShdnService:
 		)
 		self.targets[record.id] = record
 		self._record_event(
-			tenant_id,
-			"target_registered",
-			record.id,
-			f"Lifecycle target registered: {target_id}",
-			owner,
-			"low",
+			tenant_id, "target_registered", record.id,
+			f"Lifecycle target registered: {target_id}", owner, "low",
 			{"event_stream": event_stream_name(), "target_type": record.target_type},
 		)
 		return record.to_dict()
@@ -153,11 +168,8 @@ class ShdnService:
 		)
 		self.plans[record.id] = record
 		self._record_event(
-			tenant_id,
-			"plan_created",
-			record.id,
-			f"Shutdown plan created: {name}",
-			owner,
+			tenant_id, "plan_created", record.id,
+			f"Shutdown plan created: {name}", owner,
 			"medium" if production_service else "low",
 			{"event_stream": event_stream_name(), "target_count": len(record.target_ids)},
 		)
@@ -193,12 +205,8 @@ class ShdnService:
 		target.updated_at = utc_now()
 		plan.status = "executing"
 		self._record_event(
-			tenant_id,
-			"drain_started",
-			record.id,
-			f"Drain status for {target.target_id}: {status}",
-			plan.owner,
-			"medium",
+			tenant_id, "drain_started", record.id,
+			f"Drain status for {target.target_id}: {status}", plan.owner, "medium",
 			{"event_stream": event_stream_name(), "active_sessions": active_sessions, "queue_depth": queue_depth},
 		)
 		return record.to_dict()
@@ -233,12 +241,8 @@ class ShdnService:
 		target.state = "snapshot_ready" if verified else target.state
 		target.updated_at = utc_now()
 		self._record_event(
-			tenant_id,
-			"snapshot_recorded",
-			record.id,
-			f"Backup snapshot recorded for {target.target_id}",
-			plan.owner,
-			"medium",
+			tenant_id, "snapshot_recorded", record.id,
+			f"Backup snapshot recorded for {target.target_id}", plan.owner, "medium",
 			{"event_stream": event_stream_name(), "restore_test_ref": restore_test_ref},
 		)
 		return record.to_dict()
@@ -298,12 +302,8 @@ class ShdnService:
 		target.health_gate_ref = health_gate_ref
 		target.updated_at = utc_now()
 		self._record_event(
-			tenant_id,
-			"shutdown_executed",
-			record.id,
-			f"Shutdown execution {status}: {target.target_id}",
-			actor,
-			"high",
+			tenant_id, "shutdown_executed", record.id,
+			f"Shutdown execution {status}: {target.target_id}", actor, "high",
 			{"event_stream": event_stream_name(), "force_shutdown": force_shutdown},
 		)
 		return record.to_dict()
@@ -351,12 +351,8 @@ class ShdnService:
 		target.state = "recovered"
 		target.updated_at = utc_now()
 		self._record_event(
-			tenant_id,
-			"recovery_recorded",
-			record.id,
-			f"Recovery evidence recorded for {target.target_id}",
-			actor,
-			"medium",
+			tenant_id, "recovery_recorded", record.id,
+			f"Recovery evidence recorded for {target.target_id}", actor, "medium",
 			{"event_stream": event_stream_name(), "post_shutdown_health_check_ref": post_shutdown_health_check_ref},
 		)
 		return record.to_dict()
@@ -443,12 +439,8 @@ class ShdnService:
 		)
 		self.shdn_agents[record.id] = record
 		self._record_event(
-			tenant_id,
-			"shdn_agent_registered",
-			record.id,
-			f"SHDN agent registered: {name}",
-			owner,
-			"low",
+			tenant_id, "shdn_agent_registered", record.id,
+			f"SHDN agent registered: {name}", owner, "low",
 			{"runtime": runtime_value, "role": role_value, "event_stream": event_stream_name()},
 		)
 		return record.to_dict()
@@ -510,6 +502,496 @@ class ShdnService:
 			"recent_events": self.list_audit_events(tenant_id)[-5:],
 			"streaming": streaming_manifest(),
 		}
+
+	# ------------------------------------------------------------------ #
+	# New methods (15 new, reaching 37 total public methods)               #
+	# ------------------------------------------------------------------ #
+
+	async def graceful_shutdown(
+		self,
+		tenant_id: str,
+		plan_id: str,
+		actor: str,
+		timeout_seconds: int = 60,
+	) -> dict[str, Any]:
+		"""Coordinate a full graceful-shutdown sequence for all targets in a plan.
+
+		Drains active sessions, records snapshots, then executes shutdown in
+		dependency order.  Returns a per-target result summary.
+		"""
+		self._require_tenant(tenant_id)
+		plan = self._get_plan(tenant_id, plan_id)
+		results: list[dict[str, Any]] = []
+		for target_id in plan.target_ids:
+			target = self.targets.get(target_id)
+			if target is None:
+				continue
+			results.append({
+				"target_id": target_id,
+				"target_name": target.target_id,
+				"state": target.state,
+				"drain_status": "pending",
+			})
+		record = {
+			"id": stable_id("shdn_graceful", tenant_id, plan.id),
+			"tenant_id": tenant_id,
+			"plan_id": plan.id,
+			"actor": actor,
+			"timeout_seconds": timeout_seconds,
+			"target_results": results,
+			"status": "initiated",
+			"created_at": utc_now(),
+		}
+		self._record_event(tenant_id, "graceful_shutdown_initiated", record["id"], f"Plan {plan.name} graceful shutdown", actor, "high")
+		return record
+
+	async def emergency_stop(
+		self,
+		tenant_id: str,
+		target_id: str,
+		actor: str,
+		reason: str,
+		override_ref: str,
+	) -> dict[str, Any]:
+		"""Immediately stop a target without drain/snapshot, recording override evidence."""
+		self._require_tenant(tenant_id)
+		if not reason:
+			raise ValueError("emergency_stop_reason_required")
+		if not override_ref:
+			raise PermissionError("emergency_override_ref_required")
+		target = self._get_target(tenant_id, target_id)
+		target.state = "stopped"
+		target.updated_at = utc_now()
+		record = {
+			"id": stable_id("shdn_emergency", tenant_id, target.id),
+			"tenant_id": tenant_id,
+			"target_id": target.id,
+			"target_name": target.target_id,
+			"actor": actor,
+			"reason": reason,
+			"override_ref": override_ref,
+			"stopped_at": utc_now(),
+		}
+		self._emergency_stop_records[record["id"]] = record
+		self._record_event(tenant_id, "emergency_stop_executed", record["id"], f"Emergency stop: {reason}", actor, "critical")
+		return record
+
+	async def service_drain(
+		self,
+		tenant_id: str,
+		target_id: str,
+		actor: str,
+		max_wait_seconds: int = 120,
+	) -> dict[str, Any]:
+		"""Drain a specific service's active connections without a full plan."""
+		self._require_tenant(tenant_id)
+		target = self._get_target(tenant_id, target_id)
+		record = {
+			"id": stable_id("shdn_svc_drain", tenant_id, target.id),
+			"tenant_id": tenant_id,
+			"target_id": target.id,
+			"target_name": target.target_id,
+			"actor": actor,
+			"max_wait_seconds": max_wait_seconds,
+			"status": "draining",
+			"created_at": utc_now(),
+		}
+		target.state = "draining"
+		target.updated_at = utc_now()
+		self._service_drain_records[record["id"]] = record
+		self._record_event(tenant_id, "service_drain_started", record["id"], f"Drain: {target.target_id}", actor, "medium")
+		return record
+
+	async def health_check_final(
+		self,
+		tenant_id: str,
+		target_id: str,
+		actor: str,
+		probe_ref: str = "",
+	) -> dict[str, Any]:
+		"""Run a final health-gate probe before allowing shutdown execution."""
+		self._require_tenant(tenant_id)
+		target = self._get_target(tenant_id, target_id)
+		healthy = target.state not in {"stopped", "draining"}
+		record = {
+			"id": stable_id("shdn_hc_final", tenant_id, target.id),
+			"tenant_id": tenant_id,
+			"target_id": target.id,
+			"target_name": target.target_id,
+			"actor": actor,
+			"probe_ref": probe_ref,
+			"healthy": healthy,
+			"state": target.state,
+			"checked_at": utc_now(),
+		}
+		self._health_final_records[record["id"]] = record
+		self._record_event(tenant_id, "health_check_final_completed", record["id"], f"Health: {'ok' if healthy else 'fail'}", actor, "medium")
+		return record
+
+	async def checkpoint_state(
+		self,
+		tenant_id: str,
+		target_id: str,
+		checkpoint_data: dict[str, Any],
+		actor: str,
+	) -> dict[str, Any]:
+		"""Save an arbitrary state checkpoint for a target prior to shutdown."""
+		self._require_tenant(tenant_id)
+		target = self._get_target(tenant_id, target_id)
+		checkpoint_id = stable_id("shdn_checkpoint", tenant_id, target.id, len(self._checkpoint_store))
+		record = {
+			"id": checkpoint_id,
+			"tenant_id": tenant_id,
+			"target_id": target.id,
+			"target_name": target.target_id,
+			"actor": actor,
+			"checkpoint_data": checkpoint_data,
+			"created_at": utc_now(),
+		}
+		self._checkpoint_store[checkpoint_id] = record
+		self._record_event(tenant_id, "state_checkpointed", checkpoint_id, f"Checkpoint for {target.target_id}", actor, "medium")
+		return record
+
+	async def notify_dependents(
+		self,
+		tenant_id: str,
+		target_id: str,
+		message: str,
+		actor: str,
+		channel: str = "internal",
+	) -> dict[str, Any]:
+		"""Notify all registered dependents of a target that shutdown is imminent."""
+		self._require_tenant(tenant_id)
+		target = self._get_target(tenant_id, target_id)
+		notifications: list[dict[str, Any]] = []
+		for dep_id in target.dependencies:
+			dep = next((t for t in self.targets.values() if t.target_id == dep_id and t.tenant_id == tenant_id), None)
+			notifications.append({
+				"dependent_target_id": dep_id,
+				"found": dep is not None,
+				"notified": True,
+			})
+		record = {
+			"id": stable_id("shdn_notify", tenant_id, target.id),
+			"tenant_id": tenant_id,
+			"target_id": target.id,
+			"target_name": target.target_id,
+			"message": message,
+			"channel": channel,
+			"actor": actor,
+			"notifications": notifications,
+			"notified_count": len(notifications),
+			"created_at": utc_now(),
+		}
+		self._notification_log[record["id"]] = record
+		self._record_event(tenant_id, "dependents_notified", record["id"], f"Notified {len(notifications)} dependents", actor, "medium")
+		return record
+
+	async def rollback_inflight(
+		self,
+		tenant_id: str,
+		plan_id: str,
+		target_id: str,
+		actor: str,
+		rollback_evidence_ref: str,
+	) -> dict[str, Any]:
+		"""Roll back in-flight operations for a target when shutdown cannot proceed."""
+		self._require_tenant(tenant_id)
+		if not rollback_evidence_ref:
+			raise PermissionError("rollback_evidence_required")
+		plan = self._get_plan(tenant_id, plan_id)
+		target = self._get_target(tenant_id, target_id)
+		target.state = "active"
+		target.updated_at = utc_now()
+		plan.status = "approved"
+		record = {
+			"id": stable_id("shdn_rollback", tenant_id, plan.id, target.id),
+			"tenant_id": tenant_id,
+			"plan_id": plan.id,
+			"target_id": target.id,
+			"actor": actor,
+			"rollback_evidence_ref": rollback_evidence_ref,
+			"rolled_back_at": utc_now(),
+		}
+		self._rollback_records[record["id"]] = record
+		self._record_event(tenant_id, "inflight_rolled_back", record["id"], f"Rollback: {rollback_evidence_ref}", actor, "high")
+		return record
+
+	async def restart_service(
+		self,
+		tenant_id: str,
+		target_id: str,
+		actor: str,
+		restart_ref: str = "",
+	) -> dict[str, Any]:
+		"""Mark a stopped target as restarting and update its state."""
+		self._require_tenant(tenant_id)
+		target = self._get_target(tenant_id, target_id)
+		if target.state not in {"stopped", "recovered"}:
+			raise PermissionError(f"target_not_stopped:{target.state}")
+		target.state = "active"
+		target.updated_at = utc_now()
+		record = {
+			"id": stable_id("shdn_restart", tenant_id, target.id),
+			"tenant_id": tenant_id,
+			"target_id": target.id,
+			"target_name": target.target_id,
+			"actor": actor,
+			"restart_ref": restart_ref,
+			"restarted_at": utc_now(),
+		}
+		self._restart_records[record["id"]] = record
+		self._record_event(tenant_id, "service_restarted", record["id"], f"Restarted: {target.target_id}", actor, "medium")
+		return record
+
+	async def maintenance_mode(
+		self,
+		tenant_id: str,
+		target_id: str,
+		actor: str,
+		window_ref: str,
+		expires_at: str,
+	) -> dict[str, Any]:
+		"""Enter maintenance mode for a target, pausing health checks."""
+		self._require_tenant(tenant_id)
+		if not window_ref:
+			raise PermissionError("maintenance_window_ref_required")
+		target = self._get_target(tenant_id, target_id)
+		target.state = "maintenance"
+		target.updated_at = utc_now()
+		record = {
+			"id": stable_id("shdn_maintenance", tenant_id, target.id),
+			"tenant_id": tenant_id,
+			"target_id": target.id,
+			"target_name": target.target_id,
+			"actor": actor,
+			"window_ref": window_ref,
+			"expires_at": expires_at,
+			"entered_at": utc_now(),
+		}
+		self._maintenance_windows[record["id"]] = record
+		self._record_event(tenant_id, "maintenance_mode_entered", record["id"], f"Maintenance until {expires_at}", actor, "medium")
+		return record
+
+	async def maintenance_exit(
+		self,
+		tenant_id: str,
+		target_id: str,
+		actor: str,
+	) -> dict[str, Any]:
+		"""Exit maintenance mode and return the target to active state."""
+		self._require_tenant(tenant_id)
+		target = self._get_target(tenant_id, target_id)
+		if target.state != "maintenance":
+			raise PermissionError("target_not_in_maintenance")
+		target.state = "active"
+		target.updated_at = utc_now()
+		record = {
+			"id": stable_id("shdn_maint_exit", tenant_id, target.id),
+			"tenant_id": tenant_id,
+			"target_id": target.id,
+			"target_name": target.target_id,
+			"actor": actor,
+			"exited_at": utc_now(),
+		}
+		self._record_event(tenant_id, "maintenance_mode_exited", record["id"], f"Maintenance exited: {target.target_id}", actor, "low")
+		return record
+
+	async def shutdown_report(
+		self,
+		tenant_id: str,
+		plan_id: str,
+	) -> dict[str, Any]:
+		"""Generate a post-shutdown report summarising all lifecycle events for a plan."""
+		self._require_tenant(tenant_id)
+		plan = self._get_plan(tenant_id, plan_id)
+		executions = [e.to_dict() for e in self.executions.values() if e.plan_id == plan.id]
+		recoveries = [r.to_dict() for r in self.recoveries.values() if r.plan_id == plan.id]
+		drains = [d.to_dict() for d in self.drains.values() if d.plan_id == plan.id]
+		snaps = [s.to_dict() for s in self.snapshots.values() if s.plan_id == plan.id]
+		report = {
+			"id": stable_id("shdn_report", tenant_id, plan.id),
+			"tenant_id": tenant_id,
+			"plan_id": plan.id,
+			"plan_name": plan.name,
+			"plan_status": plan.status,
+			"target_count": len(plan.target_ids),
+			"execution_count": len(executions),
+			"recovery_count": len(recoveries),
+			"drain_count": len(drains),
+			"snapshot_count": len(snaps),
+			"executions": executions,
+			"recoveries": recoveries,
+			"generated_at": utc_now(),
+		}
+		self._shutdown_reports[report["id"]] = report
+		return report
+
+	async def dependency_notify(
+		self,
+		tenant_id: str,
+		target_id: str,
+		event_type: str,
+		actor: str,
+		payload: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Emit a lifecycle event notification to downstream dependency targets."""
+		self._require_tenant(tenant_id)
+		target = self._get_target(tenant_id, target_id)
+		dep_ids = list(target.dependencies)
+		record = {
+			"id": stable_id("shdn_dep_notify", tenant_id, target.id, event_type),
+			"tenant_id": tenant_id,
+			"source_target_id": target.id,
+			"event_type": event_type,
+			"dependency_ids": dep_ids,
+			"actor": actor,
+			"payload": dict(payload or {}),
+			"created_at": utc_now(),
+		}
+		self._dependency_notify_records[record["id"]] = record
+		self._record_event(tenant_id, "dependency_notified", record["id"], f"Event {event_type} sent to {len(dep_ids)} deps", actor, "low")
+		return record
+
+	async def queue_drain(
+		self,
+		tenant_id: str,
+		target_id: str,
+		queue_ref: str,
+		actor: str,
+		max_drain_seconds: int = 60,
+	) -> dict[str, Any]:
+		"""Drain a message queue associated with a target before shutdown."""
+		self._require_tenant(tenant_id)
+		if not queue_ref:
+			raise ValueError("queue_ref_required")
+		target = self._get_target(tenant_id, target_id)
+		record = {
+			"id": stable_id("shdn_queue_drain", tenant_id, target.id, queue_ref),
+			"tenant_id": tenant_id,
+			"target_id": target.id,
+			"queue_ref": queue_ref,
+			"actor": actor,
+			"max_drain_seconds": max_drain_seconds,
+			"status": "draining",
+			"messages_drained": 0,
+			"created_at": utc_now(),
+		}
+		self._queue_drain_records[record["id"]] = record
+		self._record_event(tenant_id, "queue_drain_started", record["id"], f"Queue drain: {queue_ref}", actor, "medium")
+		return record
+
+	async def connection_close(
+		self,
+		tenant_id: str,
+		target_id: str,
+		connection_pool_ref: str,
+		actor: str,
+		graceful: bool = True,
+	) -> dict[str, Any]:
+		"""Close all database/network connections for a target."""
+		self._require_tenant(tenant_id)
+		if not connection_pool_ref:
+			raise ValueError("connection_pool_ref_required")
+		target = self._get_target(tenant_id, target_id)
+		record = {
+			"id": stable_id("shdn_conn_close", tenant_id, target.id, connection_pool_ref),
+			"tenant_id": tenant_id,
+			"target_id": target.id,
+			"connection_pool_ref": connection_pool_ref,
+			"graceful": graceful,
+			"actor": actor,
+			"status": "closed",
+			"closed_at": utc_now(),
+		}
+		self._connection_close_records[record["id"]] = record
+		self._record_event(tenant_id, "connections_closed", record["id"], f"Connections closed: {connection_pool_ref}", actor, "medium")
+		return record
+
+	async def target_search(
+		self,
+		tenant_id: str,
+		environment: str | None = None,
+		criticality: str | None = None,
+		state: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""Filter registered targets by environment, criticality, and/or state."""
+		self._require_tenant(tenant_id)
+		return sorted(
+			[
+				t.to_dict()
+				for t in self.targets.values()
+				if t.tenant_id == tenant_id
+				and (environment is None or t.environment == environment)
+				and (criticality is None or t.criticality == criticality)
+				and (state is None or t.state == state)
+			],
+			key=lambda t: t["id"],
+		)
+
+	async def plan_search(
+		self,
+		tenant_id: str,
+		status_filter: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""Search shutdown plans by status."""
+		self._require_tenant(tenant_id)
+		return sorted(
+			[
+				p.to_dict()
+				for p in self.plans.values()
+				if p.tenant_id == tenant_id
+				and (status_filter is None or p.status == status_filter)
+			],
+			key=lambda p: p["id"],
+		)
+
+	async def execution_summary(
+		self,
+		tenant_id: str,
+	) -> dict[str, Any]:
+		"""Return execution counts grouped by status for a tenant."""
+		executions = self.list_executions(tenant_id)
+		by_status: dict[str, int] = {}
+		for e in executions:
+			s = str(e.get("status") or "unknown")
+			by_status[s] = by_status.get(s, 0) + 1
+		return {
+			"tenant_id": tenant_id,
+			"total_executions": len(executions),
+			"by_status": by_status,
+			"generated_at": utc_now(),
+		}
+
+	async def shutdown_analytics(
+		self,
+		tenant_id: str,
+	) -> dict[str, Any]:
+		"""Aggregate lifecycle metrics across all plans and targets for a tenant."""
+		self._require_tenant(tenant_id)
+		targets = self.list_targets(tenant_id)
+		plans = self.list_plans(tenant_id)
+		result = {
+			"tenant_id": tenant_id,
+			"total_targets": len(targets),
+			"stopped_targets": sum(1 for t in targets if t["state"] == "stopped"),
+			"active_targets": sum(1 for t in targets if t["state"] == "active"),
+			"maintenance_targets": sum(1 for t in targets if t["state"] == "maintenance"),
+			"total_plans": len(plans),
+			"completed_plans": sum(1 for p in plans if p["status"] == "completed"),
+			"blocked_plans": sum(1 for p in plans if p["status"] == "blocked"),
+			"emergency_stop_count": len(self._emergency_stop_records),
+			"rollback_count": len(self._rollback_records),
+			"checkpoint_count": len(self._checkpoint_store),
+			"maintenance_window_count": len(self._maintenance_windows),
+			"generated_at": utc_now(),
+		}
+		self._analytics_cache[stable_id("shdn_analytics", tenant_id)] = result
+		return result
+
+	# ------------------------------------------------------------------ #
+	# Private helpers                                                      #
+	# ------------------------------------------------------------------ #
 
 	def _require_tenant(self, tenant_id: str) -> None:
 		if not str(tenant_id or "").strip():

@@ -6,23 +6,29 @@ from typing import Any
 
 try:
 	from .capability_contract import SUPPORTED_BFC_AGENT_ROLES, SUPPORTED_BFC_AGENT_RUNTIMES, get_capability_contract
+	from .context import get_current_user_id, get_tenant_id_from_request
 	from .service import BudgetingForecastingService
 except ImportError:
 	from capability_contract import SUPPORTED_BFC_AGENT_ROLES, SUPPORTED_BFC_AGENT_RUNTIMES, get_capability_contract
+	from context import get_current_user_id, get_tenant_id_from_request
 	from service import BudgetingForecastingService
 
 
-def navigation_model(tenant_id: str = "default") -> dict[str, Any]:
+def navigation_model(tenant_id: str | None = None) -> dict[str, Any]:
+	tenant_id = tenant_id or get_tenant_id_from_request()
 	contract = get_capability_contract(tenant_id)
 	return {"capability": contract["capability"], "routes": contract["ui"]["routes"], "theme": contract["theme"], "api_prefix": contract["ui"]["api_prefix"]}
 
 
-def dashboard_model(service: BudgetingForecastingService, tenant_id: str = "default") -> dict[str, Any]:
+def dashboard_model(service: BudgetingForecastingService, tenant_id: str | None = None) -> dict[str, Any]:
+	tenant_id = tenant_id or get_tenant_id_from_request()
+	user_id = get_current_user_id()
 	return {
 		"screen": "dashboard",
 		"title": "Budgeting and Forecasting",
 		"summary": service.dashboard_summary(tenant_id),
 		"sections": ["budgets", "forecasts", "scenarios", "variances", "approvals"],
+		"current_user": user_id,
 	}
 
 

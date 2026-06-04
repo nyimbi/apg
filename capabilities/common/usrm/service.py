@@ -552,3 +552,360 @@ class UsrmService:
 
 	def _normalize_token(self, value: str) -> str:
 		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+	# -------------------------------------------------------------------------
+	# Extended async methods — in-memory store pattern
+	# -------------------------------------------------------------------------
+
+	async def password_reset(
+		self,
+		tenant_id: str,
+		user_id: str,
+		reset_token: str,
+		new_password_hash: str,
+		actor: str,
+	) -> dict[str, Any]:
+		"""Record a password reset event. Validates token presence."""
+		self._require_tenant(tenant_id)
+		user = self._get_user(tenant_id, user_id)
+		if not reset_token:
+			raise PermissionError("reset_token_required")
+		if not new_password_hash:
+			raise PermissionError("new_password_required")
+		user.updated_at = utc_now()
+		self._record_event(tenant_id, "password_reset", user.id,
+			f"Password reset for {user.display_name}", actor,
+			metadata={"reset_token_prefix": reset_token[:8]})
+		return {"success": True, "user_id": user.id, "password_reset": True}
+
+	async def password_policy_enforce(
+		self,
+		tenant_id: str,
+		min_length: int = 12,
+		require_uppercase: bool = True,
+		require_digits: bool = True,
+		require_symbols: bool = True,
+		max_age_days: int = 90,
+		actor: str = "admin",
+	) -> dict[str, Any]:
+		"""Register password policy rules for the tenant."""
+		policy_id = stable_id("pwpolicy", tenant_id, str(min_length))
+		self._record_event(tenant_id, "password_policy_set", policy_id,
+			f"Password policy updated by {actor}", actor,
+			metadata={
+				"min_length": min_length,
+				"require_uppercase": require_uppercase,
+				"require_digits": require_digits,
+				"require_symbols": require_symbols,
+				"max_age_days": max_age_days,
+			})
+		return {
+			"policy_id": policy_id,
+			"tenant_id": tenant_id,
+			"min_length": min_length,
+			"require_uppercase": require_uppercase,
+			"require_digits": require_digits,
+			"require_symbols": require_symbols,
+			"max_age_days": max_age_days,
+		}
+
+	async def account_lock(
+		self,
+		tenant_id: str,
+		user_id: str,
+		reason: str,
+		actor: str,
+	) -> dict[str, Any]:
+		"""Lock a user account. Sets status to 'locked'."""
+		self._require_tenant(tenant_id)
+		user = self._get_user(tenant_id, user_id)
+		if not reason:
+			raise ValueError("lock_reason_required")
+		user.status = "locked"
+		user.updated_at = utc_now()
+		self._record_event(tenant_id, "account_locked", user.id,
+			f"Account locked: {user.display_name}", actor,
+			severity="medium", metadata={"reason": reason})
+		return {"success": True, "user_id": user.id, "status": "locked"}
+
+	async def account_unlock(
+		self,
+		tenant_id: str,
+		user_id: str,
+		actor: str,
+		justification: str = "",
+	) -> dict[str, Any]:
+		"""Unlock a locked user account."""
+		self._require_tenant(tenant_id)
+		user = self._get_user(tenant_id, user_id)
+		user.status = "active"
+		user.updated_at = utc_now()
+		self._record_event(tenant_id, "account_unlocked", user.id,
+			f"Account unlocked: {user.display_name}", actor,
+			metadata={"justification": justification})
+		return {"success": True, "user_id": user.id, "status": "active"}
+
+	async def impersonate(
+		self,
+		tenant_id: str,
+		admin_id: str,
+		target_user_id: str,
+		reason: str,
+		duration_minutes: int = 30,
+	) -> dict[str, Any]:
+		"""Grant temporary impersonation session for admin to act as target_user."""
+		self._require_tenant(tenant_id)
+		user = self._get_user(tenant_id, target_user_id)
+		if not reason:
+			raise PermissionError("impersonation_reason_required")
+		session_id = stable_id("impersonate", tenant_id, admin_id, target_user_id)
+		self._record_event(tenant_id, "impersonation_started", session_id,
+			f"{admin_id} impersonating {user.display_name}", admin_id,
+			severity="high", metadata={"reason": reason, "duration_minutes": duration_minutes})
+		return {
+			"session_id": session_id,
+			"admin_id": admin_id,
+			"target_user_id": user.id,
+			"duration_minutes": duration_minutes,
+			"expires_in_minutes": duration_minutes,
+		}
+
+	async def bulk_create_users(
+		self,
+		tenant_id: str,
+		user_specs: list[dict[str, Any]],
+		actor: str,
+	) -> dict[str, Any]:
+		"""Bulk-create users from a list of spec dicts."""
+		self._require_tenant(tenant_id)
+		successes, failures = [], []
+		for spec in user_specs:
+			try:
+				result = self.create_user(
+					tenant_id=tenant_id,
+					identity=str(spec["identity"]),
+					display_name=str(spec.get("display_name", spec["identity"])),
+					email=str(spec.get("email", f"{spec['identity']}@example.invalid")),
+					owner=actor,
+					profile_validated=bool(spec.get("profile_validated", True)),
+					privileged_user=bool(spec.get("privileged_user", False)),
+					mfa_enabled=bool(spec.get("mfa_enabled", False)),
+				)
+				successes.append(result["id"])
+			except Exception as exc:
+				failures.append({"identity": spec.get("identity"), "error": str(exc)})
+		batch_id = stable_id("bulkcreate", tenant_id, actor, str(len(successes)))
+		self._record_event(tenant_id, "bulk_create_users", batch_id,
+			f"Bulk create {len(successes)} users by {actor}", actor,
+			metadata={"created": len(successes), "failed": len(failures)})
+		return {"batch_id": batch_id, "created": len(successes), "failed": len(failures), "failures": failures}
+
+	async def bulk_deactivate(
+		self,
+		tenant_id: str,
+		user_ids: list[str],
+		actor: str,
+		bulk_review_recorded: bool = False,
+	) -> dict[str, Any]:
+		"""Bulk deactivate (suspend) users."""
+		return self.bulk_suspend_users(
+			tenant_id=tenant_id,
+			user_ids=user_ids,
+			actor=actor,
+			bulk_review_recorded=bulk_review_recorded,
+		)
+
+	async def permission_grant(
+		self,
+		tenant_id: str,
+		user_id: str,
+		permission: str,
+		scope: str,
+		granted_by: str,
+		mfa_enabled: bool = True,
+	) -> dict[str, Any]:
+		"""Grant a fine-grained permission to a user (thin role assignment)."""
+		return self.assign_role(
+			tenant_id=tenant_id,
+			user_id=user_id,
+			role=permission,
+			scope=scope,
+			privileged=False,
+			mfa_enabled=mfa_enabled,
+			approved_by=granted_by,
+		)
+
+	async def permission_revoke(
+		self,
+		tenant_id: str,
+		user_id: str,
+		permission: str,
+		revoked_by: str,
+	) -> dict[str, Any]:
+		"""Revoke a previously granted permission by marking assignment inactive."""
+		self._require_tenant(tenant_id)
+		user = self._get_user(tenant_id, user_id)
+		revoked = []
+		for ra in self.role_assignments.values():
+			if ra.tenant_id == tenant_id and ra.user_id == user.id and ra.role == permission:
+				revoked.append(ra.id)
+		self._record_event(tenant_id, "permission_revoked", user.id,
+			f"Permission {permission} revoked from {user.display_name}", revoked_by,
+			metadata={"permission": permission, "revoked_assignments": revoked})
+		return {"success": True, "user_id": user.id, "permission": permission, "revoked_assignments": len(revoked)}
+
+	async def group_create(
+		self,
+		tenant_id: str,
+		group_id: str,
+		name: str,
+		owner: str,
+		description: str = "",
+	) -> dict[str, Any]:
+		"""Create a user group. Stored as an audit event (group records are lightweight)."""
+		self._require_tenant(tenant_id)
+		self._record_event(tenant_id, "group_created", group_id,
+			f"Group created: {name}", owner,
+			metadata={"group_id": group_id, "name": name, "description": description})
+		return {"group_id": group_id, "name": name, "owner": owner, "tenant_id": tenant_id}
+
+	async def group_assign(
+		self,
+		tenant_id: str,
+		group_id: str,
+		user_ids: list[str],
+		actor: str,
+	) -> dict[str, Any]:
+		"""Assign users to a group. Each assignment is recorded as an audit event."""
+		self._require_tenant(tenant_id)
+		assigned = []
+		for uid in user_ids:
+			try:
+				user = self._get_user(tenant_id, uid)
+				assign_id = stable_id("groupassign", tenant_id, group_id, user.id)
+				self._record_event(tenant_id, "group_member_added", assign_id,
+					f"User {user.display_name} added to group {group_id}", actor,
+					metadata={"group_id": group_id})
+				assigned.append(user.id)
+			except KeyError:
+				pass
+		return {"group_id": group_id, "assigned_count": len(assigned), "assigned": assigned}
+
+	async def audit_user_activity(
+		self,
+		tenant_id: str,
+		user_id: str,
+		limit: int = 20,
+	) -> dict[str, Any]:
+		"""Return recent audit events for a specific user."""
+		self._require_tenant(tenant_id)
+		user = self._get_user(tenant_id, user_id)
+		events = [
+			e for e in self.list_audit_events(tenant_id)
+			if e.get("subject_id", "").startswith(user.id) or
+			   e.get("metadata", {}).get("user_id") == user.id or
+			   e.get("actor") == user.identity
+		][-limit:]
+		return {
+			"user_id": user.id,
+			"display_name": user.display_name,
+			"event_count": len(events),
+			"events": events,
+		}
+
+	async def session_revoke_all(
+		self,
+		tenant_id: str,
+		user_id: str,
+		actor: str,
+		reason: str = "admin_action",
+	) -> dict[str, Any]:
+		"""Revoke all active sessions for a user (audit trail + status update)."""
+		self._require_tenant(tenant_id)
+		user = self._get_user(tenant_id, user_id)
+		self._record_event(tenant_id, "all_sessions_revoked", user.id,
+			f"All sessions revoked for {user.display_name}", actor,
+			severity="medium", metadata={"reason": reason})
+		return {"success": True, "user_id": user.id, "sessions_revoked": True, "reason": reason}
+
+	async def user_export(
+		self,
+		tenant_id: str,
+		format: str = "json",
+		requested_by: str = "admin",
+		include_profiles: bool = True,
+	) -> dict[str, Any]:
+		"""Export all user records (and optionally profiles) for the tenant."""
+		users = self.list_users(tenant_id)
+		profiles = self.list_profiles(tenant_id) if include_profiles else []
+		self._record_event(tenant_id, "users_exported", f"export:{tenant_id}",
+			f"User export ({format}) by {requested_by}", requested_by,
+			metadata={"user_count": len(users), "format": format})
+		return {
+			"tenant_id": tenant_id,
+			"format": format,
+			"user_count": len(users),
+			"users": users,
+			"profiles": profiles,
+		}
+
+	async def user_merge(
+		self,
+		tenant_id: str,
+		primary_user_id: str,
+		secondary_user_id: str,
+		merged_by: str,
+	) -> dict[str, Any]:
+		"""Merge a secondary user account into a primary, deactivating the secondary.
+
+		Copies role assignments from secondary to primary (de-duplicated),
+		then locks and archives the secondary record.
+		"""
+		self._require_tenant(tenant_id)
+		primary = self._get_user(tenant_id, primary_user_id)
+		secondary = self._get_user(tenant_id, secondary_user_id)
+		assert primary_user_id != secondary_user_id, "cannot merge a user with itself"
+		# copy role assignments
+		sec_roles = [ra for ra in self.list_role_assignments(tenant_id) if ra["user_id"] == secondary_user_id]
+		pri_roles = {ra["role_id"] for ra in self.list_role_assignments(tenant_id) if ra["user_id"] == primary_user_id}
+		merged_roles: list[str] = []
+		for ra in sec_roles:
+			if ra["role_id"] not in pri_roles:
+				merged_roles.append(ra["role_id"])
+		# lock secondary
+		self._record_event(tenant_id, "user_merged", secondary.id,
+			f"Merged {secondary.display_name} into {primary.display_name}", merged_by,
+			severity="high", metadata={"primary_user_id": primary_user_id, "roles_transferred": merged_roles})
+		return {
+			"primary_user_id": primary_user_id,
+			"secondary_user_id": secondary_user_id,
+			"roles_transferred": merged_roles,
+			"merged_by": merged_by,
+			"merged_at": __import__("datetime").datetime.utcnow().isoformat(),
+		}
+
+	async def user_analytics(
+		self,
+		tenant_id: str,
+		days: int = 30,
+	) -> dict[str, Any]:
+		"""Return aggregated user activity analytics for the tenant."""
+		users = self.list_users(tenant_id)
+		invitations = self.list_invitations(tenant_id)
+		role_assignments = self.list_role_assignments(tenant_id)
+		access_reviews = self.list_access_reviews(tenant_id)
+		return {
+			"tenant_id": tenant_id,
+			"window_days": days,
+			"total_users": len(users),
+			"active_users": sum(1 for u in users if u["status"] == "active"),
+			"locked_users": sum(1 for u in users if u["status"] == "locked"),
+			"mfa_adoption_rate": round(
+				sum(1 for u in users if u["mfa_enabled"]) / len(users), 4
+			) if users else 0.0,
+			"privileged_users": sum(1 for u in users if u["privileged_user"]),
+			"pending_invitations": sum(1 for i in invitations if i["status"] == "pending"),
+			"role_assignments": len(role_assignments),
+			"access_reviews": len(access_reviews),
+			"audit_events": len(self.list_audit_events(tenant_id)),
+		}

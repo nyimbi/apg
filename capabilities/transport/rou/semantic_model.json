@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "transport_rou",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "transport_rou": {
+      "capability": "transport_rou"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

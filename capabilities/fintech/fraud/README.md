@@ -1,195 +1,110 @@
 # Fraud Detection
 
-`fintech_fraud` is the APG package-backed Fraud Detection capability. It
-provides executable fraud prevention, transaction risk decisioning, account
-takeover detection, device risk, case investigation, and chargeback evidence
-workflows for generated APG fintech applications.
+## Overview
+Fraud Detection provides real-time transaction risk scoring, multi-factor decision making (approve, step-up, hold, block, review), account takeover detection, device risk assessment, chargeback evidence management, and fraud case investigation. It acts as the cross-cutting fraud control layer across all payment-generating capabilities — every financial operation that carries a monetary amount requires a fraud signal before authorization can proceed.
 
-The capability is dependency-light and provider-neutral. It exposes a Python
-contract, deterministic rules, runtime service methods, process-local API
-helpers, UI view models, theme metadata, Bytewax lifecycle metadata, and release
-evidence without requiring live payment rails, device providers, card networks,
-model vendors, or AI vendors.
+Fraud signals require KYC linkage (no anonymous fraud scoring). Hold and block decisions require both a reason and human approval. Step-up decisions require an auth challenge reference. All fraud lifecycle events stream to `apg.fintech.fraud.lifecycle` via Bytewax.
 
-Kafka is intentionally not part of this package. Fraud lifecycle events are
-declared for Bytewax through `apg.fintech.fraud.lifecycle`.
+## Capability ID
+`fintech_fraud`  Version: 1.1.0
 
-## What It Provides
+## Provides
+| Service | Description |
+|---------|-------------|
+| fraud_signal_scoring | Score payment, wallet, login, device, refund, and chargeback signals with 0–100 risk score |
+| transaction_risk_decisioning | Record approve/step-up/hold/block/review decisions with evidence gates |
+| account_takeover_detection | Flag and review account takeover indicators |
+| device_risk_detection | Score device anomalies and bind device risk to transactions |
+| chargeback_evidence_workflow | Capture and manage chargeback evidence records |
+| fraud_case_management | Open, investigate, and resolve fraud cases with disposition and reviewer |
+| fraud_agent_workflow | Register AI agents for transaction risk analysis, chargeback review, and investigation |
 
-- Fraud signal scoring for payment, wallet, login, device, refund, and
-  chargeback events.
-- Transaction risk decisioning: approve, review, step-up, hold, and block.
-- Account takeover, device anomaly, geography anomaly, velocity, chargeback, and
-  AML-link review surfaces.
-- Fraud case creation and resolution.
-- Chargeback evidence workflow metadata.
-- Provider-neutral fraud agents for Codex, Claude Code, OpenCode, and Pi.
-- UI route metadata for dashboards, signal queues, decision consoles, cases,
-  chargebacks, devices, agents, and settings.
-- Theme tokens and component metadata for generated application shells.
-- Local tests and release evidence for compiler/package integration.
+## Requires
+| Capability | Purpose |
+|------------|---------|
+| auth | Authentication |
+| audl | Audit trail |
+| ntfy | Risk analyst notifications |
+| nlpc | NLP processing |
+| keym | Key management |
+| fintech_payments | Payment transaction source |
+| fintech_wallets | Wallet transfer source |
+| fintech_kyc | KYC profile linking (mandatory per fraud signal) |
+| fintech_aml | AML alert cross-reference |
 
-## Package Shape
+## Configuration Reference
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| scoring.review_threshold | number | 45 | Score triggering review flag |
+| scoring.step_up_threshold | number | 60 | Score triggering step-up |
+| scoring.hold_threshold | number | 75 | Score triggering hold |
+| scoring.block_threshold | number | 90 | Score triggering block |
+| scoring.max_score | number | 100 | Maximum fraud risk score |
+| decisions.supported_decisions | list | approve, step_up, hold, block, review | Valid decision values |
 
-```text
-capabilities/fintech/fraud/
-  SPECIFICATION.md
-  PLAN.md
-  README.md
-  cap_spec.md
-  capability_contract.py
-  models.py
-  fraud_runtime.py
-  service.py
-  api.py
-  views.py
-  app.py
-  semantic_model.json
-  package_manifest.json
-  release_report.json
-  tests/test_package_contract.py
-```
+## API Routes
+| Name | Path | Method | Permission | Group |
+|------|------|--------|------------|-------|
+| dashboard | /fintech-fraud/dashboard | GET | fintech_fraud:view | Overview |
+| signals | /fintech-fraud/signals | GET/POST | fintech_fraud:score | Signals |
+| decisions | /fintech-fraud/decisions | GET/POST | fintech_fraud:decide | Decisions |
+| cases | /fintech-fraud/cases | GET/POST | fintech_fraud:investigate | Cases |
+| chargebacks | /fintech-fraud/chargebacks | GET/POST | fintech_fraud:chargebacks | Evidence |
+| devices | /fintech-fraud/devices | GET/POST | fintech_fraud:devices | Signals |
+| agents | /fintech-fraud/agents | GET/POST | fintech_fraud:admin | Automation |
+| settings | /fintech-fraud/settings | GET/POST | fintech_fraud:admin | Administration |
 
-## Local Usage
+## Business Rules
+| Rule | Condition | Effect |
+|------|-----------|--------|
+| signal_requires_kyc_link | Signal without KYC profile | deny |
+| money_amount_positive | Money-bearing signal with non-positive amount | deny |
+| risk_score_range | Score outside 0–100 | deny |
+| high_risk_score_requires_review | Score > review_threshold without review | require_review |
+| velocity_requires_review | Velocity indicator without review | require_review |
+| device_anomaly_requires_review | Device anomaly without review | require_review |
+| aml_alert_requires_review | Signal linked to AML alert without review | require_review |
+| chargeback_requires_evidence | Chargeback signal without evidence | deny |
+| step_up_requires_challenge | Step-up decision without challenge reference | deny |
+| hold_or_block_requires_reason | Hold or block without reason | deny |
+| hold_or_block_requires_human_approval | Hold or block without human approval | deny |
+| case_resolution_requires_disposition | Case resolved without disposition | deny |
+| fraud_batch_requires_bytewax | Batch without Bytewax | deny |
+| fraud_event_requires_bytewax | Event without Bytewax | deny |
 
-Inspect the APG contract:
+## Data Models
+| Model | Key Fields |
+|-------|-----------|
+| FraudSignal | id, subject_reference, kyc_profile_id, signal_type, channel, source_reference, amount, currency, risk_score, status |
+| FraudDecision | id, signal_id, decision, reason, challenge_reference, human_approval_reference, reviewer_id |
+| FraudCase | id, signal_id, case_type, investigator_id, evidence_references, status, disposition |
+| ChargebackEvidence | id, transaction_reference, evidence_references |
+| DeviceRisk | id, signal_id, device_reference, anomaly_flags, risk_score |
 
-```bash
-./.venv/bin/apg capabilities inspect fintech_fraud --json
-```
+## Streaming Events
+Events emitted to the fintech event stream via Bytewax.
+| Event | Trigger |
+|-------|---------|
+| fraud_signal_scored | Signal scored and stored |
+| fraud_decision_recorded | Risk decision recorded |
+| fraud_case_opened | Investigation case opened |
+| fraud_case_resolved | Case resolved with disposition |
+| fraud_agent_registered | AI agent registered |
 
-Run the local self-test:
+## Edge Cases Handled
+- KYC linkage is mandatory on every signal — anonymous fraud scoring is architecturally blocked; this prevents scoring bypass via identity-free payment paths
+- Hold and block decisions require BOTH a reason AND human approval — either missing component produces a deny; reason alone or approval alone is insufficient
+- Step-up decisions require an auth challenge reference — a step-up without a challenge is a logic error and is rejected to prevent phantom step-up records
+- Chargeback signals specifically require evidence references at signal time — chargebacks without evidence cannot be scored, preventing unsupported chargeback abuse
+- The score range 0–100 is enforced; a caller passing a score of 101 is rejected even if the decision would be `block` regardless
 
-```bash
-./.venv/bin/python capabilities/fintech/fraud/app.py
-```
+## Composability
+- **Upstream**: `fintech_kyc` provides the KYC profile linkage required per signal; `fintech_aml` alert presence is checked as an additional fraud indicator; `fintech_payments` and `fintech_wallets` are primary signal sources
+- **Downstream**: `fintech_cards` reads fraud decisions as authorization gates; `fintech_remittance` reads fraud decisions as transfer gates; `fintech_bnpl` requires fraud evidence at checkout
+- **Peer**: Deployed alongside `fintech_aml` (complementary financial crime detection) and `fintech_kyc` (identity foundation)
 
-Run the focused tests:
-
-```bash
-./.venv/bin/pytest -q capabilities/fintech/fraud/tests/test_package_contract.py
-```
-
-Use the service directly:
-
-```python
-from capabilities.fintech.fraud import FraudDetectionService
-
-service = FraudDetectionService()
-signal = service.score_signal(
-    "signal-1",
-    "tenant-a",
-    "customer-a",
-    "kyc-profile-a",
-    "payment",
-    "mobile",
-    "payment-1",
-    120.00,
-    "KES",
-    52,
-    review_id="review-1",
-)
-service.record_decision(
-    "decision-1",
-    "tenant-a",
-    signal["id"],
-    "step_up",
-    reviewer_id="analyst-a",
-    challenge_reference="challenge-1",
-)
-case = service.open_case(
-    "case-1",
-    "tenant-a",
-    signal["id"],
-    "transaction_fraud",
-    "investigator-a",
-    [signal["id"]],
-)
-service.resolve_case(case["id"], "tenant-a", "customer_verified", "fraud-manager")
-```
-
-## Rule Engine
-
-The deterministic rule engine is defined in `capability_contract.py` and is
-enforced by `service.py`.
-
-Rules cover:
-
-- tenant context;
-- write-policy evidence;
-- signal subject, type, channel, source, and KYC linkage;
-- money-bearing event amount and currency;
-- risk score range and high-risk review;
-- velocity, device, geography, AML, and chargeback indicators;
-- supported decisions;
-- challenge evidence for step-up;
-- reason and human approval for hold/block;
-- case signal, type, investigator, evidence, disposition, and reviewer;
-- Bytewax routing for fraud batches and events;
-- supported AI-agent runtimes and roles;
-- human approval for privileged fraud-agent actions.
-
-Evaluate a rule context:
-
-```bash
-./.venv/bin/apg capabilities evaluate-rules fintech_fraud \
-  --context-json '{"tenant_context_present": false}' \
-  --json
-```
-
-## UI Composition
-
-The package publishes framework-neutral route and view-model metadata:
-
-- `/fintech-fraud/dashboard`
-- `/fintech-fraud/signals`
-- `/fintech-fraud/decisions`
-- `/fintech-fraud/cases`
-- `/fintech-fraud/chargebacks`
-- `/fintech-fraud/devices`
-- `/fintech-fraud/agents`
-- `/fintech-fraud/settings`
-
-Generated applications can mount these screens in any shell that understands APG
-route descriptors and theme tokens.
-
-## AI Agent Composition
-
-Fraud agents are first-class configuration entries, not hard-coded provider
-calls. Supported runtimes are:
-
-- `codex`
-- `claude_code`
-- `opencode`
-- `pi`
-
-Supported roles are:
-
-- `fraud_ops_reviewer`
-- `transaction_risk_analyst`
-- `chargeback_reviewer`
-- `device_risk_reviewer`
-- `case_investigator`
-
-Privileged agent actions require human approval evidence.
-
-## Verification
-
-Focused verification for this package:
-
-```bash
-./.venv/bin/python -m py_compile capabilities/fintech/fraud/__init__.py capabilities/fintech/fraud/capability_contract.py capabilities/fintech/fraud/models.py capabilities/fintech/fraud/fraud_runtime.py capabilities/fintech/fraud/service.py capabilities/fintech/fraud/api.py capabilities/fintech/fraud/views.py capabilities/fintech/fraud/app.py capabilities/fintech/fraud/tests/test_package_contract.py
-./.venv/bin/pytest -q capabilities/fintech/fraud/tests/test_package_contract.py
-./.venv/bin/python capabilities/fintech/fraud/app.py
-./.venv/bin/apg capabilities inspect fintech_fraud --json
-./.venv/bin/apg capabilities publish-plan capabilities/fintech/fraud --json
-./.venv/bin/apg capabilities implementation-audit --root capabilities/fintech/fraud --json
-./.venv/bin/apg capabilities lifecycle-audit --root capabilities/fintech/fraud --json
-```
-
-## Known Gaps
-
-- Live model inference and training are adapter boundaries.
-- Live device fingerprinting and behavioral biometrics are adapter boundaries.
-- Live card-network chargeback submission is out of scope for the local package.
-- Durable Bytewax topology deployment is not part of this package.
+## Development Notes
+- Score thresholds (45/60/75/90) are configured defaults; they are not enforced by the rule engine directly — the rule engine checks the `high_risk_score`, `velocity_indicator`, etc. flags set by the caller based on these thresholds
+- Both batch operations (`fraud_batch`) and individual events (`fraud_event`) require Bytewax routing — two separate `_ne` guard rules
+- `SUPPORTED_SIGNAL_TYPES` includes `agent_review` for signals generated by AI agents acting as fraud reviewers
+- Case resolution requires disposition; valid dispositions are service-layer defined, not constrained by the rule engine to a fixed list

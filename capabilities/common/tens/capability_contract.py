@@ -228,6 +228,18 @@ RULES: list[dict[str, Any]] = [
 		"condition": {"operation": "batch_tenant_mapping", "event_stream_ne": "bytewax"},
 		"effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "route_batch_tenant_mapping_to_bytewax"},
 	},
+	{
+		"name": "write_requires_policy",
+		"description": "Tenant mapping write operations require an explicit authorization policy.",
+		"condition": {"operation_type": "write", "write_policy_present": False},
+		"effect": {"decision": "deny", "reason": "tens_write_policy_required", "required_action": "attach_write_policy"},
+	},
+	{
+		"name": "privilege_escalation_denied",
+		"description": "Tenant mapping operators cannot self-grant elevated permissions.",
+		"condition": {"operation": "assign_tens_permission", "target_tier_exceeds_actor_tier": True},
+		"effect": {"decision": "deny", "reason": "privilege_escalation_prevented", "required_action": "route_to_higher_authority_approver"},
+	},
 ]
 
 

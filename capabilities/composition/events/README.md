@@ -1,624 +1,148 @@
-# APG Event Streaming Bus
-
-Enterprise-grade event streaming platform providing real-time event-driven communication, stream processing, and message orchestration for the APG ecosystem.
+# Event Streaming Bus
 
 ## Overview
 
-The APG Event Streaming Bus is a foundational capability that enables:
+The Event Streaming Bus is the foundational messaging backbone for the APG composition layer. It provides Bytewax-powered event streams with schema validation, producer attribution, consumer group management, stateful stream processors, dead-letter handling, and approved event replay. Every other composition capability routes its lifecycle events through this bus.
+
+The business value is a durable, auditable communication fabric that decouples producers from consumers across capability boundaries. Schema compatibility enforcement prevents breaking changes from silently corrupting downstream processors. Dead-letter streams and bounded retry policies ensure no event is silently lost. The replay approval gate prevents unauthorized state reconstruction from historical data.
+
+## Capability ID
+
+`composition_events`  Version: see `package_manifest.json`
+
+## Provides
+
+| Service | Description |
+|---------|-------------|
+| event_stream_registry | Define and manage named Bytewax streams with retention and partition policies |
+| bytewax_event_publishing | Publish single events and batches with source attribution and correlation |
+| event_schema_registry | Register, version, and validate event schemas with compatibility checks |
+| subscription_lifecycle | Create and manage consumer subscriptions with delivery modes and retry policies |
+| stream_processor_topology | Register and operate Bytewax stream processors (filter, map, aggregate, join, window) |
+| dead_letter_operations | Capture, inspect, and reprocess failed events |
+| event_agents | AI agent workbench for stream architecture and schema review |
+
+## Requires
+
+| Capability | Purpose |
+|------------|---------|
+| auth | Authenticate producers and consumers |
+| audl | Persist operation audit records |
+| ntfy | Send dead-letter and processor degradation alerts |
+| registry | Register this capability in the global catalog |
+| composition_access | Enforce policy on all stream write operations |
+
+## Configuration Reference
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| tenant_id | string | "default" | Tenant scope for all operations |
+| streams.bytewax_stream_required | bool | true | All streams must be backed by Bytewax |
+| streams.retention_policy_required | bool | true | Streams require an explicit retention policy |
+| streams.schema_required_for_pii | bool | true | PII-carrying streams require a schema |
+| publishing.source_capability_required | bool | true | Published events must declare their source capability |
+| publishing.correlation_required | bool | true | Events must carry correlation or causation context |
+| publishing.batch_size_limit | int | 1000 | Maximum events per batch publish call |
+| subscriptions.dead_letter_required_for_retrying | bool | true | Retrying subscriptions require a dead-letter stream |
+| processors.bytewax_required | bool | true | All processors must run on Bytewax |
+| processors.checkpoint_required | bool | true | Processors require checkpoint configuration |
+| event_agents.max_autonomous_scope | string | "recommend_and_validate" | Ceiling on autonomous agent actions |
+| observability.event_stream | string | "apg.composition.events.lifecycle" | Bytewax stream name for bus lifecycle events |
+
+## API Routes
+
+| Name | Path | Method | Permission | Group |
+|------|------|--------|------------|-------|
+| dashboard | /composition-events/dashboard | GET | composition_events:view | Overview |
+| streams | /composition-events/streams | GET/POST | composition_events:manage_streams | Streams |
+| schemas | /composition-events/schemas | GET/POST | composition_events:govern | Governance |
+| subscriptions | /composition-events/subscriptions | GET/POST | composition_events:operate | Consumers |
+| processors | /composition-events/processors | GET/POST | composition_events:operate | Processing |
+| dead_letters | /composition-events/dead-letters | GET/POST | composition_events:operate | Operations |
+| agents | /composition-events/agents | GET/POST | composition_events:admin | Automation |
+| settings | /composition-events/settings | GET/PUT | composition_events:admin | Administration |
+
+REST API prefix: `/composition-events/api/v1`
+
+## Business Rules
+
+| Rule | Condition | Effect |
+|------|-----------|--------|
+| tenant_context_required | No tenant context present | deny |
+| event_write_requires_policy | write operation without policy attached | deny |
+| stream_requires_owner | create_stream without owner | deny |
+| stream_requires_retention_policy | create_stream without retention policy | deny |
+| pii_stream_requires_schema | create PII stream without schema | deny |
+| stream_requires_bytewax | create_stream not via bytewax | deny |
+| breaking_schema_requires_review | register schema with breaking_change=true without review | require_review |
+| publish_requires_source_capability | publish_event without source_capability | deny |
+| publish_requires_correlation | publish_event without correlation context | deny |
+| publish_requires_bytewax | publish_event not via bytewax | deny |
+| batch_publish_limit | batch_publish with batch_size > 1000 | deny |
+| batch_publish_requires_bytewax | batch_publish not via bytewax | deny |
+| subscription_requires_owner | create_subscription without consumer owner | deny |
+| retry_subscription_requires_dead_letter | create retrying subscription without dead-letter stream | deny |
+| stateful_processor_requires_review | register stateful processor without review | require_review |
+| processor_requires_checkpoint | register_processor without checkpoint | deny |
+| processor_requires_bytewax | register_processor not on bytewax | deny |
+| replay_requires_approval | replay_events without approval | deny |
+| event_agent_runtime_supported | register_event_agent with unsupported runtime | deny |
+| event_agent_role_supported | register_event_agent with unsupported role | deny |
+| privileged_agent_event_action_requires_human_approval | agent proposes privileged action without human approval | deny |
+
+## Data Models
+
+| Model | Key Fields |
+|-------|-----------|
+| ESEvent | event_id, event_type, source_capability, aggregate_id, sequence_number, correlation_id, causation_id, tenant_id, status, priority, payload, schema_id, stream_id |
+| ESStream | stream_id, stream_name, bytewax_stream_name, partitions, replication_factor, retention_time_ms, compression_type, source_capability, tenant_id, status |
+| ESSubscription | subscription_id, stream_id, consumer_group_id, event_type_patterns, delivery_mode, batch_size, retry_policy, dead_letter_enabled, dead_letter_stream |
+| ESConsumerGroup | group_id, group_name, stream_id, session_timeout_ms, active_consumers, total_lag, tenant_id |
+| ESSchema | schema_id, schema_name, schema_version, schema_definition, schema_format, event_type, compatibility_level |
+| ESStreamProcessor | processor_id, processor_name, processor_type, stream_id, output_stream_id, stateful, checkpoint_interval_ms, parallelism, status |
+| ESEventProcessingHistory | history_id, event_id, processor_name, processing_stage, status, started_at, duration_ms |
+| ESStreamAssignment | assignment_id, event_id, stream_id, partition_id, offset, published_at, consumed_count |
+| ESMetrics | metric_id, metric_name, metric_type, stream_id, metric_value, time_bucket, aggregation_period |
+| ESAuditLog | audit_id, event_id, operation_type, actor_id, operation_details, tenant_id |
 
-- **Real-time Event Streaming** - High-throughput event publishing and consumption with priority handling
-- **Event Sourcing & CQRS** - Immutable event logs with optimistic concurrency control and aggregate reconstruction
-- **Stream Processing** - Real-time filtering, mapping, aggregation, windowing, and complex event processing
-- **Enhanced Schema Registry** - Schema evolution, validation, and compatibility management
-- **Consumer Management** - Advanced consumer group operations with lag monitoring and rebalancing
-- **Cross-Capability Integration** - Event-driven communication between APG capabilities
-- **Multi-tenant Isolation** - Secure separation of event data across tenants
-- **Enterprise Monitoring** - Comprehensive processing history, audit trails, and real-time metrics
+Pydantic API models: `EventCreate`, `EventResponse`, `StreamCreate`, `StreamResponse`, `ConsumerGroupCreate`, `ConsumerGroupResponse`, `StreamProcessorCreate`, `StreamProcessorResponse`.
 
-## Key Features
+## Streaming Events
 
-### 🚀 High Performance
-- **1M+ events/second** throughput per node
-- **<10ms latency** for 95th percentile event processing
-- **Horizontal scaling** to 100+ nodes
-- **Linear performance scaling** with cluster size
+Events emitted to the bus's own lifecycle stream via Bytewax (`apg.composition.events.lifecycle`).
 
-### 🔒 Enterprise Security
-- **Multi-tenant isolation** with strict data separation
-- **OAuth 2.0/JWT authentication** for API access
-- **Role-based access control** for streams and subscriptions
-- **End-to-end encryption** (TLS 1.3 in transit, AES-256 at rest)
+| Event | Trigger |
+|-------|---------|
+| stream_created | New stream registered |
+| schema_registered | Schema version added to registry |
+| event_published | Single event appended to a stream |
+| event_batch_published | Batch of events appended |
+| subscription_created | Consumer subscription activated |
+| processor_registered | Stream processor registered |
+| dead_letter_recorded | Failed event moved to dead-letter stream |
+| events_replayed | Approved replay operation executed |
+| event_agent_registered | New event agent registered |
 
-### 🔄 Event Processing
-- **Exactly-once delivery** semantics where needed
-- **At-least-once** and **at-most-once** delivery modes
-- **Priority-based routing** with HIGH, NORMAL, LOW, and CRITICAL priorities
-- **Dead letter queues** for failed message handling
-- **Automatic retry** with exponential backoff and configurable retry policies
-- **Event compression** with GZIP, SNAPPY, LZ4, and ZSTD support
-- **Multiple serialization formats** (JSON, Avro, Protobuf)
-- **Schema validation** with evolution support
+Stream states: `draft → active → paused → review_required → processing → degraded → blocked → retired`
 
-### 📊 Real-time Analytics
-- **Stream aggregation** with tumbling, hopping, and session windows
-- **Complex event processing** for pattern detection and correlation
-- **Event correlation** across time windows with causation tracking
-- **Real-time dashboards** with enhanced enterprise metrics
-- **Stream processor management** with start/stop/metrics monitoring
-- **Consumer lag monitoring** with automatic rebalancing
-- **Processing history tracking** with detailed audit trails
-- **Performance metrics** with duration tracking and error analysis
+## Edge Cases Handled
 
-## Quick Start
+- The bus emits its own lifecycle events to itself (`apg.composition.events.lifecycle`); this creates a bootstrapping dependency that is resolved by initializing the lifecycle stream before any other stream at tenant setup time.
+- Stateful processors require review before registration because they carry state across restarts; a misconfigured state store can corrupt aggregate reconstructions for the entire tenant.
+- Batch publishing is capped at 1000 events per call by rule (`batch_publish_limit`); callers must split larger batches, which prevents memory exhaustion in the Bytewax dataflow worker.
+- Retrying subscriptions without a dead-letter stream are blocked at creation, not at first failure; this prevents silent event loss that only becomes visible under error conditions.
+- Breaking schema changes produce `require_review` rather than `deny`, allowing forward progress with an explicit audit trail while still preventing silent incompatible schema deployments.
+- The `_install_compat_init` mechanism on SQLAlchemy models handles legacy keyword aliases (`metadata` → `event_metadata`, `timestamp` → `event_timestamp`) to maintain backward compatibility with older event producers.
 
-### 1. Installation
+## Composability
 
-```bash
-# Install dependencies
-pip install -r requirements.txt
+- **Upstream**: `composition_access` (policy enforcement on writes), `auth` (producer and consumer identity)
+- **Downstream**: All composition capabilities (`access`, `config`, `gateway`, `orchestration`, `registry`) publish their lifecycle events here; domain capabilities use this bus for cross-capability integration events
+- **Peer**: `audl` (receives audit log records for retention), `ntfy` (receives dead-letter and degradation alerts), `composition_registry` (stream and schema metadata discovered by registry)
 
-# Initialize database schema
-python -m alembic upgrade head
+## Development Notes
 
-# Start the service
-python -m uvicorn api:app --host 0.0.0.0 --port 8080
-```
-
-### 2. Create Your First Stream
-
-```python
-from event_streaming_bus import StreamManagementService, StreamConfig
-from event_streaming_bus.models import CompressionType, SerializationFormat
-
-# Initialize service
-stream_service = StreamManagementService()
-
-# Create stream configuration
-stream_config = StreamConfig(
-    stream_name="user_events",
-    topic_name="apg-user-events",
-    source_capability="user_management",
-    partitions=6,
-    replication_factor=3,
-    compression_type=CompressionType.SNAPPY,
-    default_serialization=SerializationFormat.JSON,
-    retention_time_ms=604800000  # 7 days
-)
-
-# Create the stream
-stream_id = await stream_service.create_stream(
-    stream_config=stream_config,
-    tenant_id="your_tenant",
-    user_id="your_user"
-)
-```
-
-### 3. Publish Events
-
-```python
-from event_streaming_bus import EventPublishingService, EventConfig
-from event_streaming_bus.models import EventPriority, CompressionType, SerializationFormat
-
-# Initialize publishing service
-publishing_service = EventPublishingService()
-
-# Create event configuration with enterprise features
-event_config = EventConfig(
-    event_type="user.created",
-    source_capability="user_management",
-    aggregate_id="user_123",
-    aggregate_type="User",
-    priority=EventPriority.HIGH,
-    compression_type=CompressionType.SNAPPY,
-    serialization_format=SerializationFormat.JSON,
-    schema_id="sch_user_created_v1",
-    max_retries=5
-)
-
-# Publish event with enhanced payload
-event_id = await publishing_service.publish_event(
-    event_config=event_config,
-    payload={
-        "user_name": "john.doe",
-        "email": "john.doe@company.com",
-        "department": "Engineering",
-        "created_at": "2025-01-26T10:30:00Z",
-        "verification_status": "pending"
-    },
-    stream_id=stream_id,
-    tenant_id="your_tenant",
-    user_id="your_user"
-)
-```
-
-### 4. Subscribe to Events
-
-```python
-from event_streaming_bus import ConsumerManagementService, SubscriptionConfig
-from event_streaming_bus.models import DeliveryMode
-
-# Initialize consumer management service
-consumer_service = ConsumerManagementService()
-
-# Create subscription configuration with advanced features
-subscription_config = SubscriptionConfig(
-    subscription_name="user_notifications",
-    stream_id=stream_id,
-    consumer_group_id="notification_service",
-    consumer_name="notification_consumer",
-    event_type_patterns=["user.*", "profile.updated"],
-    delivery_mode=DeliveryMode.EXACTLY_ONCE,
-    batch_size=50,
-    max_wait_time_ms=1000,
-    webhook_url="https://your-service.com/webhook",
-    webhook_timeout_ms=5000,
-    dead_letter_enabled=True,
-    retry_policy={
-        "max_retries": 3,
-        "retry_delay_ms": 1000,
-        "exponential_backoff": True
-    }
-)
-
-# Create subscription
-subscription_id = await consumer_service.create_subscription(
-    config=subscription_config,
-    tenant_id="your_tenant",
-    created_by="your_user"
-)
-```
-
-## API Reference
-
-### REST API
-
-The Event Streaming Bus provides a comprehensive REST API:
-
-#### Event Publishing
-```
-POST   /api/v1/events                    # Publish single event
-POST   /api/v1/events/batch              # Publish event batch
-GET    /api/v1/events/{event_id}         # Get event by ID
-POST   /api/v1/events/query              # Query events with filters
-```
-
-#### Stream Management
-```
-GET    /api/v1/streams                   # List streams
-POST   /api/v1/streams                   # Create stream
-GET    /api/v1/streams/{id}              # Get stream details
-GET    /api/v1/streams/{id}/events       # Get stream events
-GET    /api/v1/streams/{id}/metrics      # Get stream metrics
-```
-
-#### Event Sourcing & CQRS
-```
-POST   /api/v1/event-sourcing/append     # Append event to aggregate
-POST   /api/v1/event-sourcing/reconstruct # Reconstruct aggregate state
-GET    /api/v1/event-sourcing/aggregate/{id}/events # Get aggregate events
-```
-
-#### Stream Processing
-```
-POST   /api/v1/stream-processors         # Create stream processor
-GET    /api/v1/stream-processors         # List stream processors
-POST   /api/v1/stream-processors/{id}/start # Start processor
-POST   /api/v1/stream-processors/{id}/stop  # Stop processor
-GET    /api/v1/stream-processors/{id}/metrics # Get processor metrics
-```
-
-#### Consumer Management
-```
-POST   /api/v1/consumer-groups           # Create consumer group
-GET    /api/v1/consumer-groups           # List consumer groups
-GET    /api/v1/consumer-groups/{id}/lag  # Get consumer lag
-POST   /api/v1/consumer-groups/{id}/rebalance # Trigger rebalance
-
-POST   /api/v1/subscriptions             # Create subscription
-GET    /api/v1/subscriptions             # List subscriptions
-GET    /api/v1/subscriptions/{id}/status # Get subscription status
-DELETE /api/v1/subscriptions/{id}        # Cancel subscription
-```
-
-#### Enhanced Schema Registry
-```
-POST   /api/v1/schemas                   # Register schema (legacy)
-POST   /api/v1/schemas/enhanced          # Register enhanced schema
-GET    /api/v1/schemas                   # List schemas
-GET    /api/v1/schemas/{id}              # Get schema details
-POST   /api/v1/schemas/{id}/validate     # Validate event against schema
-GET    /api/v1/schemas/evolution/{type}  # Get schema evolution history
-```
-
-### WebSocket API
-
-Real-time streaming via WebSocket:
-
-```
-/ws/events/{stream_name}                 # Real-time event stream
-/ws/subscriptions/{subscription_id}      # Subscription updates
-/ws/monitoring                           # Real-time metrics
-```
-
-### Python SDK
-
-```python
-from event_streaming_bus import (
-    EventStreamingService,
-    EventPublishingService,
-    EventConsumptionService,
-    StreamProcessingService,
-    EventSourcingService,
-    SchemaRegistryService,
-    StreamManagementService,
-    ConsumerManagementService,
-    APGEventStreamingIntegration
-)
-
-# Core services
-streaming = EventStreamingService()
-publishing = EventPublishingService()
-consumption = EventConsumptionService()
-processing = StreamProcessingService()
-
-# Enterprise services
-sourcing = EventSourcingService()
-schema_registry = SchemaRegistryService()
-stream_management = StreamManagementService()
-consumer_management = ConsumerManagementService()
-
-# APG platform integration
-integration = APGEventStreamingIntegration(
-    event_streaming_service=streaming,
-    publishing_service=publishing,
-    consumption_service=consumption,
-    sourcing_service=sourcing,
-    schema_registry_service=schema_registry,
-    stream_management_service=stream_management,
-    consumer_management_service=consumer_management
-)
-```
-
-## Architecture
-
-### Core Components
-
-```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                       APG Event Streaming Bus Enterprise                        │
-├──────────────────────────────────────────────────────────────────────────────┤
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
-│  │   Web UI     │  │  REST API    │  │  WebSocket   │  │   GraphQL    │     │
-│  │ Dashboard    │  │   Layer      │  │   Gateway    │  │   Gateway    │     │
-│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘     │
-├──────────────────────────────────────────────────────────────────────────────┤
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
-│  │   Event      │  │   Stream     │  │  Enhanced    │  │   Consumer   │     │
-│  │ Publishing   │  │ Processing   │  │   Schema     │  │ Management   │     │
-│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘     │
-├──────────────────────────────────────────────────────────────────────────────┤
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
-│  │    Event     │  │   Stream     │  │  Processing  │  │    Audit     │     │
-│  │  Sourcing    │  │ Assignment   │  │   History    │  │   Trails     │     │
-│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘     │
-├──────────────────────────────────────────────────────────────────────────────┤
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
-│  │   Bytewax    │  │    Redis     │  │ PostgreSQL   │  │ Monitoring   │     │
-│  │  Dataflows   │  │   Streams    │  │  Database    │  │ & Metrics    │     │
-│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘     │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Event Flow
-
-```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│  Producer   │───▶│   Schema    │───▶│   Bytewax     │───▶│  Stream     │
-│ Application │    │ Validation  │    │  Dataflow   │    │ Processor   │
-└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
-       │                  │                  │                  │
-       ▼                  ▼                  ▼                  ▼
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│    Event    │    │   Priority  │    │   Event     │    │  Consumer   │
-│  Sourcing   │    │  Routing    │    │ Assignment  │    │   Groups    │
-└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
-       │                  │                  │                  │
-       ▼                  ▼                  ▼                  ▼
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│ Processing  │    │   Audit     │    │   Dead      │    │  Consumer   │
-│  History    │    │   Logs      │    │  Letter     │    │ Application │
-└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
-```
-
-## Configuration
-
-### Environment Variables
-
-```bash
-# Database Configuration
-DATABASE_URL=postgresql://user:pass@localhost:5432/apg_esb
-DATABASE_POOL_SIZE=20
-DATABASE_MAX_OVERFLOW=30
-
-# Bytewax Configuration
-BYTEWAX_FLOW_ID=apg-event-streaming
-BYTEWAX_WORKERS_PER_PROCESS=2
-BYTEWAX_RECOVERY_DIR=/app/data/bytewax-recovery
-BYTEWAX_EPOCH_INTERVAL_MS=1000
-
-# Redis Configuration
-REDIS_URL=redis://localhost:6379/0
-REDIS_MAX_CONNECTIONS=100
-
-# API Configuration
-API_HOST=0.0.0.0
-API_PORT=8080
-API_WORKERS=4
-API_MAX_CONNECTIONS=1000
-
-# Security Configuration
-JWT_SECRET_KEY=your-secret-key
-JWT_ALGORITHM=HS256
-JWT_EXPIRATION_HOURS=24
-
-# Monitoring Configuration
-METRICS_ENABLED=true
-METRICS_PORT=9090
-TRACING_ENABLED=true
-JAEGER_ENDPOINT=http://localhost:14268/api/traces
-```
-
-### Stream Configuration
-
-```yaml
-# streams.yaml
-streams:
-  user_events:
-    partitions: 6
-    replication_factor: 3
-    retention_time_ms: 604800000  # 7 days
-    compression_type: snappy
-    cleanup_policy: delete
-
-  order_events:
-    partitions: 12
-    replication_factor: 3
-    retention_time_ms: 2592000000  # 30 days
-    compression_type: lz4
-    cleanup_policy: compact
-```
-
-## Monitoring and Operations
-
-### Metrics
-
-The Event Streaming Bus exposes comprehensive metrics:
-
-- **Throughput**: Events per second by stream
-- **Latency**: End-to-end processing latency percentiles
-- **Consumer Lag**: Backlog size per consumer group
-- **Error Rates**: Failed events and retry counts
-- **Resource Usage**: CPU, memory, and disk utilization
-
-### Health Checks
-
-```bash
-# Service health
-curl http://localhost:8080/health
-
-# Detailed status
-curl http://localhost:8080/api/v1/status
-
-# Bytewax dataflow health
-curl http://localhost:8080/api/v1/bytewax/health
-
-# Database health
-curl http://localhost:8080/api/v1/database/health
-```
-
-### Logging
-
-Structured logging with configurable levels:
-
-```json
-{
-  "timestamp": "2025-01-26T10:30:00.000Z",
-  "level": "INFO",
-  "logger": "event_streaming_bus.publishing",
-  "message": "Event published successfully",
-  "event_id": "evt_123",
-  "stream_id": "user_events",
-  "tenant_id": "tenant_001",
-  "duration_ms": 5.2
-}
-```
-
-## Development
-
-### Prerequisites
-
-- Python 3.11+
-- Bytewax Python runtime pinned by `requirements-prod.txt`
-- Redis 7.0+
-- PostgreSQL 15+
-
-### Setup Development Environment
-
-```bash
-# Clone repository
-git clone <repository-url>
-cd event_streaming_bus
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-pip install -r requirements-dev.txt
-
-# Setup pre-commit hooks
-pre-commit install
-
-# Run tests
-python run_tests.py --all
-```
-
-### Running Tests
-
-```bash
-# Quick tests (unit only)
-python run_tests.py
-
-# All tests
-python run_tests.py --all
-
-# Specific test categories
-python run_tests.py --unit
-python run_tests.py --integration
-python run_tests.py --performance
-
-# Generate coverage report
-python run_tests.py --report
-
-# Run linting
-python run_tests.py --lint
-```
-
-### Code Quality
-
-The project maintains high code quality standards:
-
-- **Test Coverage**: >95% required for enterprise features
-- **Type Hints**: Full typing coverage with strict mypy configuration
-- **Linting**: Ruff for Python linting and formatting
-- **Documentation**: Comprehensive docstrings, examples, and API documentation
-- **Security**: Regular security audits and dependency scanning
-- **Performance**: Continuous performance benchmarking and optimization
-
-## Deployment
-
-### Docker Deployment
-
-```bash
-# Build image
-docker build -t apg-event-streaming-bus .
-
-# Run container
-docker run -d \
-  --name esb \
-  -p 8080:8080 \
-  -e DATABASE_URL=postgresql://... \
-  -e BYTEWAX_FLOW_ID=apg-esb-production-flow \
-  -e BYTEWAX_RECOVERY_DIR=/app/data/bytewax-recovery \
-  -e REDIS_URL=redis://redis:6379 \
-  apg-event-streaming-bus
-```
-
-### Kubernetes Deployment
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: event-streaming-bus
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: event-streaming-bus
-  template:
-    metadata:
-      labels:
-        app: event-streaming-bus
-    spec:
-      containers:
-      - name: esb
-        image: apg-event-streaming-bus:latest
-        ports:
-        - containerPort: 8080
-        env:
-        - name: DATABASE_URL
-          valueFrom:
-            secretKeyRef:
-              name: esb-secrets
-              key: database-url
-        resources:
-          requests:
-            memory: "512Mi"
-            cpu: "500m"
-          limits:
-            memory: "2Gi"
-            cpu: "2000m"
-```
-
-### Production Considerations
-
-- **Resource Planning**: Plan for 2-4 CPU cores and 4-8GB RAM per instance
-- **Storage**: Use SSD storage for Bytewax recovery state, stream snapshots, and database
-- **Networking**: Configure proper network segmentation and security groups
-- **Monitoring**: Set up comprehensive monitoring and alerting
-- **Backup**: Implement regular backups of PostgreSQL and Bytewax recovery directories
-- **Security**: Use TLS for all communications and proper authentication
-
-## Troubleshooting
-
-### Common Issues
-
-**High Consumer Lag**
-```bash
-# Check APG stream status
-curl http://localhost:8080/api/v1/streams
-
-# Scale up consumers
-kubectl scale deployment consumer --replicas=6
-```
-
-**Memory Issues**
-```bash
-# Check memory usage
-curl http://localhost:8080/api/v1/metrics | grep memory
-
-# Tune Bytewax worker parallelism
-export BYTEWAX_WORKERS_PER_PROCESS=2
-```
-
-**Network Connectivity**
-```bash
-# Check Bytewax dataflow configuration
-printenv BYTEWAX_FLOW_ID BYTEWAX_RECOVERY_DIR BYTEWAX_WORKERS_PER_PROCESS
-
-# Test Redis connectivity
-redis-cli ping
-
-# Test database connectivity
-psql $DATABASE_URL -c "SELECT 1"
-```
-
-### Debug Mode
-
-Enable debug logging:
-
-```bash
-export LOG_LEVEL=DEBUG
-export BYTEWAX_LOG_LEVEL=DEBUG
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-© 2025 Datacraft. All rights reserved.
-
-## Support
-
-- **Documentation**: [API Reference](docs/api.md)
-- **Examples**: [examples/](examples/)
-- **Issues**: [GitHub Issues](https://github.com/datacraft/apg-event-streaming-bus/issues)
-- **Email**: support@datacraft.co.ke
+- The `ESStream` model requires both `stream_name` and `bytewax_stream_name`; the compat init defaults `bytewax_stream_name` to `stream_name` if not provided, but they can differ when the Bytewax topic name follows a different naming convention.
+- `ESStreamProcessor.stateful=True` triggers the `stateful_processor_requires_review` rule; always set `state_store_config` and `changelog_stream` before attempting to register a stateful processor.
+- The `_install_compat_init` pattern patches `__init__` on SQLAlchemy model classes at module load time; it is fragile under multiple inheritance and should not be extended to new models without careful testing.
+- Key files: `capability_contract.py` (executable contract and rule engine), `models.py` (SQLAlchemy + Pydantic models), `service.py` (lifecycle operations), `api.py` (API helpers), `views.py` (UI model helpers).

@@ -1,82 +1,31 @@
-"""APG Digital Forms and eSign (ESGN) capability registration."""
+"""APG Digital Forms and eSign capability.
 
+Standalone package: ``pip install apg-common-esgn``
+
+Quick start::
+
+    from apg_common_esgn import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : esgn
+Provides      : digital_forms, signature_envelopes, signing_ceremonies, evidence_packages, signing_agent_composition, form_workflows
+"""
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any
-
-from .capability_contract import evaluate_capability_rules, get_capability_contract
-
-__version__ = "1.0.0"
+__version__  = "1.0.0"
+__package_name__ = "apg-common-esgn"
 __capability_id__ = "esgn"
-__capability_name__ = "Digital Forms and eSign"
-__apg_dependencies__ = ["auth", "encr", "audl", "comp", "aicr"]
 
-capability_metadata: dict[str, Any] = {
-	"name": "esgn",
-	"version": __version__,
-	"display_name": __capability_name__,
-	"description": "Digital form templates, submissions, e-signature envelopes, signing ceremonies, evidence, first-class signing agents, Bytewax lifecycle governance, and compliance controls",
-	"category": "collaboration_communication",
-	"subcategory": "digital_forms_esign",
-	"vendor": "Datacraft",
-	"author": "APG Platform Team",
-	"license": "Commercial",
-	"created_at": datetime.now(timezone.utc),
-	"dependencies": __apg_dependencies__,
-	"provides": ["digital_forms", "signature_envelopes", "signing_ceremonies", "evidence_packages", "signing_agent_composition", "bytewax_lifecycle_governance", "form_workflows"],
-	"permissions": ["esgn:view", "esgn:create_forms", "esgn:send_envelopes", "esgn:sign", "esgn:manage_templates", "esgn:audit", "esgn:admin"]
-}
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
+)
 
-
-def register_capability() -> dict[str, Any]:
-	"""Register ESGN with the APG composition engine."""
-	contract = get_capability_contract()
-	return {
-		"name": "esgn",
-		"aliases": ["esign", "digital_forms", "electronic_signature"],
-		"display_name": capability_metadata["display_name"],
-		"description": capability_metadata["description"],
-		"version": capability_metadata["version"],
-		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["wflo", "ntfy", "idfd", "dlpd", "nlpc", "them"],
-		"configuration": contract["configuration"],
-		"configuration_schema": contract["configuration_schema"],
-		"rule_engine": contract["rule_engine"],
-		"capabilities": {
-			"digital_forms": "Create, validate, publish, and submit governed digital forms",
-			"signature_envelopes": "Prepare signature envelopes, recipients, routing, and reminders",
-			"signing_ceremonies": "Run identity-verified electronic signature ceremonies",
-			"evidence_packages": "Assemble encrypted audit evidence for completed signatures",
-			"signing_agent_composition": "Register provider-neutral first-class signing agents with scope, owner, purpose, disclosure, and approval guardrails",
-			"bytewax_lifecycle_governance": "Validate template, submission, envelope, signature, evidence, signing-agent, and audit lifecycle batches through Bytewax stream metadata",
-			"capability_rules": "Evaluate deterministic digital-form and e-signature rules",
-			"visual_theming": "Apply forms and signing theme tokens and components"
-		},
-		"endpoints": {
-			"forms": "/esgn/api/v1/forms",
-			"submissions": "/esgn/api/v1/submissions",
-			"envelopes": "/esgn/api/v1/envelopes",
-			"signing": "/esgn/api/v1/signing",
-			"agents": "/esgn/api/v1/agents",
-			"lifecycle": "/esgn/api/v1/lifecycle",
-			"evidence": "/esgn/api/v1/evidence",
-			"streaming": "/esgn/api/v1/streaming"
-		},
-		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
-		"ui_manifest": contract["ui"],
-		"theme": contract["theme"],
-		"agents": contract["agents"],
-		"streaming": contract["streaming"],
-		"permissions": capability_metadata["permissions"]
-	}
-
-
-def get_capability_info() -> dict[str, Any]:
-	"""Get ESGN capability information for composition and marketplace discovery."""
-	info = capability_metadata.copy()
-	info["contract"] = get_capability_contract()
-	return info
-
-
-__all__ = ["capability_metadata", "register_capability", "get_capability_info", "get_capability_contract", "evaluate_capability_rules", "__version__", "__capability_id__", "__capability_name__", "__apg_dependencies__"]
+__all__ = [
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
+]

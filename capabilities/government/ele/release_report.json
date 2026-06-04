@@ -1,0 +1,21 @@
+{
+  "evidence": {
+    "contracts": {
+      "capability_contract": {
+        "display_name": "Electoral and Civil Registration",
+        "errors": []
+      }
+    },
+    "self_test": {
+      "capability": "government_ele",
+      "passed": true,
+      "status": "ok"
+    },
+    "semantic_model": {
+      "capability": "government_ele",
+      "format": "apg.semantic-model.v1"
+    }
+  },
+  "format": "apg.release-report.v1",
+  "ok": true
+}

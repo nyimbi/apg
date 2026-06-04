@@ -1,0 +1,2383 @@
+{
+  "app": {
+    "description": "Alert Management package-backed APG capability",
+    "entity_count": 11,
+    "name": "intel_alerts",
+    "version": "1.1.0"
+  },
+  "capabilities": {
+    "intel_alerts": {
+      "configuration": {
+        "adapters": {
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "geospatial": "geos",
+          "graph": "grph",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "rag": "ragn"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "name_required": true,
+          "scope_required": true,
+          "supported_roles": [
+            "rule_steward",
+            "signal_triage",
+            "alert_reviewer",
+            "escalation_reviewer",
+            "notification_reviewer",
+            "resolution_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "alerts": {
+          "evidence_required": true,
+          "signal_required": true,
+          "supported_alert_types": [
+            "early_warning",
+            "critical_alert",
+            "watchlist_hit",
+            "incident_alert",
+            "fraud_alert",
+            "threat_alert",
+            "system_alert"
+          ],
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "assignments": {
+          "alert_required": true,
+          "assignee_required": true,
+          "evidence_required": true,
+          "supported_assignment_types": [
+            "analyst",
+            "supervisor",
+            "incident_commander",
+            "case_owner",
+            "field_team",
+            "partner_owner"
+          ]
+        },
+        "authorities": {
+          "approver_required": true,
+          "evidence_required": true,
+          "expiry_required": true,
+          "supported_authority_types": [
+            "mission_order",
+            "legal_mandate",
+            "partner_authority",
+            "consent",
+            "incident_response_authority",
+            "public_interest_authority"
+          ],
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ]
+        },
+        "escalations": {
+          "alert_required": true,
+          "approval_required": true,
+          "evidence_required": true,
+          "supported_escalation_types": [
+            "supervisor",
+            "incident_team",
+            "case_team",
+            "executive",
+            "partner",
+            "field_team",
+            "watch_center"
+          ],
+          "target_required": true
+        },
+        "governance": {
+          "alert_suppression_denied": true,
+          "audit_events": true,
+          "autonomous_closure_denied": true,
+          "cross_tenant_alert_denied": true,
+          "evidence_fabrication_denied": true,
+          "lawful_authority_required": true,
+          "policy_attached_for_writes": true,
+          "privacy_bypass_denied": true,
+          "require_tenant_context": true,
+          "severity_downgrade_denied": true,
+          "unapproved_escalation_denied": true,
+          "unapproved_notification_denied": true
+        },
+        "notifications": {
+          "alert_required": true,
+          "approval_required": true,
+          "evidence_required": true,
+          "recipient_required": true,
+          "supported_notification_types": [
+            "in_app",
+            "email",
+            "sms",
+            "secure_message",
+            "webhook",
+            "case_note",
+            "briefing_queue"
+          ]
+        },
+        "observability": {
+          "event_stream": "apg.intel.alerts.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "resolutions": {
+          "alert_required": true,
+          "approval_required": true,
+          "evidence_required": true,
+          "supported_resolution_types": [
+            "confirmed",
+            "false_positive",
+            "duplicate",
+            "mitigated",
+            "escalated",
+            "closed",
+            "monitoring"
+          ]
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "rules": {
+          "evidence_required": true,
+          "owner_required": true,
+          "supported_rule_types": [
+            "threshold",
+            "anomaly",
+            "watchlist",
+            "correlation",
+            "prediction",
+            "geofence",
+            "case_trigger",
+            "manual"
+          ],
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "workspace_required": true
+        },
+        "signals": {
+          "confidence_required": true,
+          "evidence_required": true,
+          "rule_required": true,
+          "supported_signal_types": [
+            "metric",
+            "indicator",
+            "event",
+            "forecast",
+            "threat",
+            "case_update",
+            "geospatial",
+            "partner_notice"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "intel_alerts_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_alerts": true,
+          "enable_assignments": true,
+          "enable_authorities": true,
+          "enable_dashboard": true,
+          "enable_escalations": true,
+          "enable_notifications": true,
+          "enable_resolutions": true,
+          "enable_reviews": true,
+          "enable_rules": true,
+          "enable_signals": true,
+          "enable_workspaces": true
+        },
+        "workspaces": {
+          "authority_required": true,
+          "evidence_required": true,
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ],
+          "supported_workspace_types": [
+            "watch_center",
+            "threat_alerting",
+            "incident_alerting",
+            "fraud_alerting",
+            "public_safety_alerting",
+            "executive_alerting",
+            "partner_alerting"
+          ]
+        }
+      },
+      "name": "Alert Management",
+      "provides": [
+        "alert_authority_workflow",
+        "alert_workspace_workflow",
+        "alert_rule_workflow",
+        "alert_signal_workflow",
+        "alert_record_workflow",
+        "alert_escalation_workflow",
+        "alert_notification_workflow",
+        "alert_assignment_workflow",
+        "alert_resolution_workflow",
+        "alert_review_workflow",
+        "alert_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "grph",
+        "ragn",
+        "geos"
+      ],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation_type": "write",
+              "policy_attached": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "alert_policy_required",
+              "required_action": "attach_alert_policy"
+            },
+            "name": "alert_write_requires_policy"
+          },
+          {
+            "condition": {
+              "authority_type_supported": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_type_not_supported",
+              "required_action": "select_supported_authority_type"
+            },
+            "name": "authority_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_authority",
+              "scope_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_scope_required",
+              "required_action": "attach_scope_reference"
+            },
+            "name": "authority_scope_required"
+          },
+          {
+            "condition": {
+              "classification_supported": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "classification_not_supported",
+              "required_action": "select_supported_classification"
+            },
+            "name": "authority_classification_supported"
+          },
+          {
+            "condition": {
+              "approver_present": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_approver_required",
+              "required_action": "record_approver"
+            },
+            "name": "authority_approver_required"
+          },
+          {
+            "condition": {
+              "expiry_present": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_expiry_required",
+              "required_action": "set_expiry"
+            },
+            "name": "authority_expiry_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_authority"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "authority_evidence_required",
+              "required_action": "attach_authority_evidence"
+            },
+            "name": "authority_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_workspace",
+              "workspace_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "workspace_type_not_supported",
+              "required_action": "select_supported_workspace_type"
+            },
+            "name": "workspace_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_workspace",
+              "workspace_name_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "workspace_name_required",
+              "required_action": "name_workspace"
+            },
+            "name": "workspace_name_required"
+          },
+          {
+            "condition": {
+              "classification_supported": false,
+              "operation": "record_workspace"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "classification_not_supported",
+              "required_action": "select_supported_classification"
+            },
+            "name": "workspace_classification_supported"
+          },
+          {
+            "condition": {
+              "authority_present": false,
+              "operation": "record_workspace"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "lawful_authority_required",
+              "required_action": "select_authority"
+            },
+            "name": "workspace_authority_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_workspace"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "workspace_evidence_required",
+              "required_action": "attach_workspace_evidence"
+            },
+            "name": "workspace_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_rule",
+              "workspace_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "workspace_required",
+              "required_action": "select_workspace"
+            },
+            "name": "rule_workspace_required"
+          },
+          {
+            "condition": {
+              "operation": "record_rule",
+              "rule_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "rule_type_not_supported",
+              "required_action": "select_supported_rule_type"
+            },
+            "name": "rule_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_rule",
+              "rule_reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "rule_reference_required",
+              "required_action": "attach_rule_reference"
+            },
+            "name": "rule_reference_required"
+          },
+          {
+            "condition": {
+              "operation": "record_rule",
+              "severity_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "severity_not_supported",
+              "required_action": "select_supported_severity"
+            },
+            "name": "rule_severity_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_rule",
+              "owner_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "rule_owner_required",
+              "required_action": "assign_rule_owner"
+            },
+            "name": "rule_owner_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_rule"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "rule_evidence_required",
+              "required_action": "attach_rule_evidence"
+            },
+            "name": "rule_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_signal",
+              "rule_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "rule_required",
+              "required_action": "select_rule"
+            },
+            "name": "signal_rule_required"
+          },
+          {
+            "condition": {
+              "operation": "record_signal",
+              "signal_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "signal_type_not_supported",
+              "required_action": "select_supported_signal_type"
+            },
+            "name": "signal_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_signal",
+              "signal_reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "signal_reference_required",
+              "required_action": "attach_signal_reference"
+            },
+            "name": "signal_reference_required"
+          },
+          {
+            "condition": {
+              "confidence_valid": false,
+              "operation": "record_signal"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "confidence_score_invalid",
+              "required_action": "set_confidence_0_to_1"
+            },
+            "name": "signal_confidence_valid"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_signal"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "signal_evidence_required",
+              "required_action": "attach_signal_evidence"
+            },
+            "name": "signal_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_alert",
+              "signal_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "signal_required",
+              "required_action": "select_signal"
+            },
+            "name": "alert_signal_required"
+          },
+          {
+            "condition": {
+              "alert_type_supported": false,
+              "operation": "record_alert"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "alert_type_not_supported",
+              "required_action": "select_supported_alert_type"
+            },
+            "name": "alert_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_alert",
+              "severity_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "severity_not_supported",
+              "required_action": "select_supported_severity"
+            },
+            "name": "alert_severity_supported"
+          },
+          {
+            "condition": {
+              "alert_reference_present": false,
+              "operation": "record_alert"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "alert_reference_required",
+              "required_action": "attach_alert_reference"
+            },
+            "name": "alert_reference_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_alert"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "alert_evidence_required",
+              "required_action": "attach_alert_evidence"
+            },
+            "name": "alert_evidence_required"
+          },
+          {
+            "condition": {
+              "alert_present": false,
+              "operation": "record_escalation"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "alert_required",
+              "required_action": "select_alert"
+            },
+            "name": "escalation_alert_required"
+          },
+          {
+            "condition": {
+              "escalation_type_supported": false,
+              "operation": "record_escalation"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "escalation_type_not_supported",
+              "required_action": "select_supported_escalation_type"
+            },
+            "name": "escalation_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_escalation",
+              "target_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "escalation_target_required",
+              "required_action": "attach_escalation_target"
+            },
+            "name": "escalation_target_required"
+          },
+          {
+            "condition": {
+              "approval_present": false,
+              "operation": "record_escalation"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "escalation_approval_required",
+              "required_action": "attach_escalation_approval"
+            },
+            "name": "escalation_approval_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_escalation"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "escalation_evidence_required",
+              "required_action": "attach_escalation_evidence"
+            },
+            "name": "escalation_evidence_required"
+          },
+          {
+            "condition": {
+              "alert_present": false,
+              "operation": "record_notification"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "alert_required",
+              "required_action": "select_alert"
+            },
+            "name": "notification_alert_required"
+          },
+          {
+            "condition": {
+              "notification_type_supported": false,
+              "operation": "record_notification"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "notification_type_not_supported",
+              "required_action": "select_supported_notification_type"
+            },
+            "name": "notification_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_notification",
+              "recipient_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "recipient_reference_required",
+              "required_action": "attach_recipient_reference"
+            },
+            "name": "notification_recipient_required"
+          },
+          {
+            "condition": {
+              "approval_present": false,
+              "operation": "record_notification"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "notification_approval_required",
+              "required_action": "attach_notification_approval"
+            },
+            "name": "notification_approval_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_notification"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "notification_evidence_required",
+              "required_action": "attach_notification_evidence"
+            },
+            "name": "notification_evidence_required"
+          },
+          {
+            "condition": {
+              "alert_present": false,
+              "operation": "record_assignment"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "alert_required",
+              "required_action": "select_alert"
+            },
+            "name": "assignment_alert_required"
+          },
+          {
+            "condition": {
+              "assignment_type_supported": false,
+              "operation": "record_assignment"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "assignment_type_not_supported",
+              "required_action": "select_supported_assignment_type"
+            },
+            "name": "assignment_type_supported"
+          },
+          {
+            "condition": {
+              "assignee_present": false,
+              "operation": "record_assignment"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "assignee_required",
+              "required_action": "assign_alert_owner"
+            },
+            "name": "assignment_assignee_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_assignment"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "assignment_evidence_required",
+              "required_action": "attach_assignment_evidence"
+            },
+            "name": "assignment_evidence_required"
+          },
+          {
+            "condition": {
+              "alert_present": false,
+              "operation": "record_resolution"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "alert_required",
+              "required_action": "select_alert"
+            },
+            "name": "resolution_alert_required"
+          },
+          {
+            "condition": {
+              "operation": "record_resolution",
+              "resolution_type_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "resolution_type_not_supported",
+              "required_action": "select_supported_resolution_type"
+            },
+            "name": "resolution_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_resolution",
+              "resolution_reference_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "resolution_reference_required",
+              "required_action": "attach_resolution_reference"
+            },
+            "name": "resolution_reference_required"
+          },
+          {
+            "condition": {
+              "approval_present": false,
+              "operation": "record_resolution"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "resolution_approval_required",
+              "required_action": "attach_resolution_approval"
+            },
+            "name": "resolution_approval_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_resolution"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "resolution_evidence_required",
+              "required_action": "attach_resolution_evidence"
+            },
+            "name": "resolution_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "status_supported": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_status_not_supported",
+              "required_action": "select_supported_status"
+            },
+            "name": "review_status_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_review",
+              "reviewer_present": false
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "reviewer_required",
+              "required_action": "assign_reviewer"
+            },
+            "name": "review_reviewer_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_review"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "review_evidence_required",
+              "required_action": "attach_review_evidence"
+            },
+            "name": "review_evidence_required"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "alert_batch"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_alert_batch_to_bytewax"
+            },
+            "name": "alert_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_alert_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "alert_agent_runtime_not_supported",
+              "required_action": "select_supported_runtime"
+            },
+            "name": "alert_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_alert_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "alert_agent_role_not_supported",
+              "required_action": "select_supported_role"
+            },
+            "name": "alert_agent_role_supported"
+          },
+          {
+            "condition": {
+              "agent_name_present": false,
+              "operation": "register_alert_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "alert_agent_name_required",
+              "required_action": "name_alert_agent"
+            },
+            "name": "alert_agent_name_required"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "operation": "register_alert_agent"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "alert_agent_scope_required",
+              "required_action": "bound_alert_agent_scope"
+            },
+            "name": "alert_agent_scope_required"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "alert_agent_action",
+              "privileged_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_alert_agent_action_requires_human_approval"
+          },
+          {
+            "condition": {
+              "operation": "alert_agent_action",
+              "unapproved_escalation_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "unapproved_escalation_scope_denied",
+              "required_action": "remove_unapproved_escalation_scope"
+            },
+            "name": "unapproved_escalation_action_denied"
+          },
+          {
+            "condition": {
+              "operation": "alert_agent_action",
+              "unapproved_notification_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "unapproved_notification_scope_denied",
+              "required_action": "remove_unapproved_notification_scope"
+            },
+            "name": "unapproved_notification_action_denied"
+          },
+          {
+            "condition": {
+              "alert_suppression_scope": true,
+              "operation": "alert_agent_action"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "alert_suppression_scope_denied",
+              "required_action": "remove_alert_suppression_scope"
+            },
+            "name": "alert_suppression_action_denied"
+          },
+          {
+            "condition": {
+              "evidence_fabrication_scope": true,
+              "operation": "alert_agent_action"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "evidence_fabrication_scope_denied",
+              "required_action": "remove_evidence_fabrication_scope"
+            },
+            "name": "evidence_fabrication_action_denied"
+          },
+          {
+            "condition": {
+              "operation": "alert_agent_action",
+              "privacy_bypass_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "privacy_bypass_scope_denied",
+              "required_action": "remove_privacy_bypass_scope"
+            },
+            "name": "privacy_bypass_action_denied"
+          },
+          {
+            "condition": {
+              "autonomous_closure_scope": true,
+              "operation": "alert_agent_action"
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "autonomous_closure_scope_denied",
+              "required_action": "remove_autonomous_closure_scope"
+            },
+            "name": "autonomous_closure_action_denied"
+          },
+          {
+            "condition": {
+              "operation": "alert_agent_action",
+              "severity_downgrade_scope": true
+            },
+            "effect": {
+              "decision": "deny",
+              "reason": "severity_downgrade_scope_denied",
+              "required_action": "remove_severity_downgrade_scope"
+            },
+            "name": "severity_downgrade_action_denied"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation_type": "write",
+            "policy_attached": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "alert_policy_required",
+            "required_action": "attach_alert_policy"
+          },
+          "name": "alert_write_requires_policy"
+        },
+        {
+          "condition": {
+            "authority_type_supported": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_type_not_supported",
+            "required_action": "select_supported_authority_type"
+          },
+          "name": "authority_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_authority",
+            "scope_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_scope_required",
+            "required_action": "attach_scope_reference"
+          },
+          "name": "authority_scope_required"
+        },
+        {
+          "condition": {
+            "classification_supported": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "classification_not_supported",
+            "required_action": "select_supported_classification"
+          },
+          "name": "authority_classification_supported"
+        },
+        {
+          "condition": {
+            "approver_present": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_approver_required",
+            "required_action": "record_approver"
+          },
+          "name": "authority_approver_required"
+        },
+        {
+          "condition": {
+            "expiry_present": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_expiry_required",
+            "required_action": "set_expiry"
+          },
+          "name": "authority_expiry_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_authority"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "authority_evidence_required",
+            "required_action": "attach_authority_evidence"
+          },
+          "name": "authority_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_workspace",
+            "workspace_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "workspace_type_not_supported",
+            "required_action": "select_supported_workspace_type"
+          },
+          "name": "workspace_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_workspace",
+            "workspace_name_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "workspace_name_required",
+            "required_action": "name_workspace"
+          },
+          "name": "workspace_name_required"
+        },
+        {
+          "condition": {
+            "classification_supported": false,
+            "operation": "record_workspace"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "classification_not_supported",
+            "required_action": "select_supported_classification"
+          },
+          "name": "workspace_classification_supported"
+        },
+        {
+          "condition": {
+            "authority_present": false,
+            "operation": "record_workspace"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "lawful_authority_required",
+            "required_action": "select_authority"
+          },
+          "name": "workspace_authority_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_workspace"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "workspace_evidence_required",
+            "required_action": "attach_workspace_evidence"
+          },
+          "name": "workspace_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_rule",
+            "workspace_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "workspace_required",
+            "required_action": "select_workspace"
+          },
+          "name": "rule_workspace_required"
+        },
+        {
+          "condition": {
+            "operation": "record_rule",
+            "rule_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "rule_type_not_supported",
+            "required_action": "select_supported_rule_type"
+          },
+          "name": "rule_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_rule",
+            "rule_reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "rule_reference_required",
+            "required_action": "attach_rule_reference"
+          },
+          "name": "rule_reference_required"
+        },
+        {
+          "condition": {
+            "operation": "record_rule",
+            "severity_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "severity_not_supported",
+            "required_action": "select_supported_severity"
+          },
+          "name": "rule_severity_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_rule",
+            "owner_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "rule_owner_required",
+            "required_action": "assign_rule_owner"
+          },
+          "name": "rule_owner_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_rule"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "rule_evidence_required",
+            "required_action": "attach_rule_evidence"
+          },
+          "name": "rule_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_signal",
+            "rule_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "rule_required",
+            "required_action": "select_rule"
+          },
+          "name": "signal_rule_required"
+        },
+        {
+          "condition": {
+            "operation": "record_signal",
+            "signal_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "signal_type_not_supported",
+            "required_action": "select_supported_signal_type"
+          },
+          "name": "signal_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_signal",
+            "signal_reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "signal_reference_required",
+            "required_action": "attach_signal_reference"
+          },
+          "name": "signal_reference_required"
+        },
+        {
+          "condition": {
+            "confidence_valid": false,
+            "operation": "record_signal"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "confidence_score_invalid",
+            "required_action": "set_confidence_0_to_1"
+          },
+          "name": "signal_confidence_valid"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_signal"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "signal_evidence_required",
+            "required_action": "attach_signal_evidence"
+          },
+          "name": "signal_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_alert",
+            "signal_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "signal_required",
+            "required_action": "select_signal"
+          },
+          "name": "alert_signal_required"
+        },
+        {
+          "condition": {
+            "alert_type_supported": false,
+            "operation": "record_alert"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "alert_type_not_supported",
+            "required_action": "select_supported_alert_type"
+          },
+          "name": "alert_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_alert",
+            "severity_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "severity_not_supported",
+            "required_action": "select_supported_severity"
+          },
+          "name": "alert_severity_supported"
+        },
+        {
+          "condition": {
+            "alert_reference_present": false,
+            "operation": "record_alert"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "alert_reference_required",
+            "required_action": "attach_alert_reference"
+          },
+          "name": "alert_reference_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_alert"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "alert_evidence_required",
+            "required_action": "attach_alert_evidence"
+          },
+          "name": "alert_evidence_required"
+        },
+        {
+          "condition": {
+            "alert_present": false,
+            "operation": "record_escalation"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "alert_required",
+            "required_action": "select_alert"
+          },
+          "name": "escalation_alert_required"
+        },
+        {
+          "condition": {
+            "escalation_type_supported": false,
+            "operation": "record_escalation"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "escalation_type_not_supported",
+            "required_action": "select_supported_escalation_type"
+          },
+          "name": "escalation_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_escalation",
+            "target_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "escalation_target_required",
+            "required_action": "attach_escalation_target"
+          },
+          "name": "escalation_target_required"
+        },
+        {
+          "condition": {
+            "approval_present": false,
+            "operation": "record_escalation"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "escalation_approval_required",
+            "required_action": "attach_escalation_approval"
+          },
+          "name": "escalation_approval_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_escalation"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "escalation_evidence_required",
+            "required_action": "attach_escalation_evidence"
+          },
+          "name": "escalation_evidence_required"
+        },
+        {
+          "condition": {
+            "alert_present": false,
+            "operation": "record_notification"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "alert_required",
+            "required_action": "select_alert"
+          },
+          "name": "notification_alert_required"
+        },
+        {
+          "condition": {
+            "notification_type_supported": false,
+            "operation": "record_notification"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "notification_type_not_supported",
+            "required_action": "select_supported_notification_type"
+          },
+          "name": "notification_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_notification",
+            "recipient_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "recipient_reference_required",
+            "required_action": "attach_recipient_reference"
+          },
+          "name": "notification_recipient_required"
+        },
+        {
+          "condition": {
+            "approval_present": false,
+            "operation": "record_notification"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "notification_approval_required",
+            "required_action": "attach_notification_approval"
+          },
+          "name": "notification_approval_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_notification"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "notification_evidence_required",
+            "required_action": "attach_notification_evidence"
+          },
+          "name": "notification_evidence_required"
+        },
+        {
+          "condition": {
+            "alert_present": false,
+            "operation": "record_assignment"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "alert_required",
+            "required_action": "select_alert"
+          },
+          "name": "assignment_alert_required"
+        },
+        {
+          "condition": {
+            "assignment_type_supported": false,
+            "operation": "record_assignment"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "assignment_type_not_supported",
+            "required_action": "select_supported_assignment_type"
+          },
+          "name": "assignment_type_supported"
+        },
+        {
+          "condition": {
+            "assignee_present": false,
+            "operation": "record_assignment"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "assignee_required",
+            "required_action": "assign_alert_owner"
+          },
+          "name": "assignment_assignee_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_assignment"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "assignment_evidence_required",
+            "required_action": "attach_assignment_evidence"
+          },
+          "name": "assignment_evidence_required"
+        },
+        {
+          "condition": {
+            "alert_present": false,
+            "operation": "record_resolution"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "alert_required",
+            "required_action": "select_alert"
+          },
+          "name": "resolution_alert_required"
+        },
+        {
+          "condition": {
+            "operation": "record_resolution",
+            "resolution_type_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "resolution_type_not_supported",
+            "required_action": "select_supported_resolution_type"
+          },
+          "name": "resolution_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_resolution",
+            "resolution_reference_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "resolution_reference_required",
+            "required_action": "attach_resolution_reference"
+          },
+          "name": "resolution_reference_required"
+        },
+        {
+          "condition": {
+            "approval_present": false,
+            "operation": "record_resolution"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "resolution_approval_required",
+            "required_action": "attach_resolution_approval"
+          },
+          "name": "resolution_approval_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_resolution"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "resolution_evidence_required",
+            "required_action": "attach_resolution_evidence"
+          },
+          "name": "resolution_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "status_supported": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_status_not_supported",
+            "required_action": "select_supported_status"
+          },
+          "name": "review_status_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_review",
+            "reviewer_present": false
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "reviewer_required",
+            "required_action": "assign_reviewer"
+          },
+          "name": "review_reviewer_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_review"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "review_evidence_required",
+            "required_action": "attach_review_evidence"
+          },
+          "name": "review_evidence_required"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "alert_batch"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_alert_batch_to_bytewax"
+          },
+          "name": "alert_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_alert_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "alert_agent_runtime_not_supported",
+            "required_action": "select_supported_runtime"
+          },
+          "name": "alert_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_alert_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "alert_agent_role_not_supported",
+            "required_action": "select_supported_role"
+          },
+          "name": "alert_agent_role_supported"
+        },
+        {
+          "condition": {
+            "agent_name_present": false,
+            "operation": "register_alert_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "alert_agent_name_required",
+            "required_action": "name_alert_agent"
+          },
+          "name": "alert_agent_name_required"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "operation": "register_alert_agent"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "alert_agent_scope_required",
+            "required_action": "bound_alert_agent_scope"
+          },
+          "name": "alert_agent_scope_required"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "alert_agent_action",
+            "privileged_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_alert_agent_action_requires_human_approval"
+        },
+        {
+          "condition": {
+            "operation": "alert_agent_action",
+            "unapproved_escalation_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "unapproved_escalation_scope_denied",
+            "required_action": "remove_unapproved_escalation_scope"
+          },
+          "name": "unapproved_escalation_action_denied"
+        },
+        {
+          "condition": {
+            "operation": "alert_agent_action",
+            "unapproved_notification_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "unapproved_notification_scope_denied",
+            "required_action": "remove_unapproved_notification_scope"
+          },
+          "name": "unapproved_notification_action_denied"
+        },
+        {
+          "condition": {
+            "alert_suppression_scope": true,
+            "operation": "alert_agent_action"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "alert_suppression_scope_denied",
+            "required_action": "remove_alert_suppression_scope"
+          },
+          "name": "alert_suppression_action_denied"
+        },
+        {
+          "condition": {
+            "evidence_fabrication_scope": true,
+            "operation": "alert_agent_action"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "evidence_fabrication_scope_denied",
+            "required_action": "remove_evidence_fabrication_scope"
+          },
+          "name": "evidence_fabrication_action_denied"
+        },
+        {
+          "condition": {
+            "operation": "alert_agent_action",
+            "privacy_bypass_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "privacy_bypass_scope_denied",
+            "required_action": "remove_privacy_bypass_scope"
+          },
+          "name": "privacy_bypass_action_denied"
+        },
+        {
+          "condition": {
+            "autonomous_closure_scope": true,
+            "operation": "alert_agent_action"
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "autonomous_closure_scope_denied",
+            "required_action": "remove_autonomous_closure_scope"
+          },
+          "name": "autonomous_closure_action_denied"
+        },
+        {
+          "condition": {
+            "operation": "alert_agent_action",
+            "severity_downgrade_scope": true
+          },
+          "effect": {
+            "decision": "deny",
+            "reason": "severity_downgrade_scope_denied",
+            "required_action": "remove_severity_downgrade_scope"
+          },
+          "name": "severity_downgrade_action_denied"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "agents": {
+          "component": "AlertAgentWorkbench",
+          "permission": "intel_alerts:admin",
+          "route": "/intel-alerts/agents"
+        },
+        "alerts": {
+          "component": "AlertQueue",
+          "permission": "intel_alerts:alerts",
+          "route": "/intel-alerts/alerts"
+        },
+        "assignments": {
+          "component": "AlertAssignmentConsole",
+          "permission": "intel_alerts:assignments",
+          "route": "/intel-alerts/assignments"
+        },
+        "authorities": {
+          "component": "AlertAuthorityConsole",
+          "permission": "intel_alerts:authorities",
+          "route": "/intel-alerts/authorities"
+        },
+        "dashboard": {
+          "component": "AlertDashboard",
+          "permission": "intel_alerts:view",
+          "route": "/intel-alerts/dashboard"
+        },
+        "escalations": {
+          "component": "AlertEscalationConsole",
+          "permission": "intel_alerts:escalations",
+          "route": "/intel-alerts/escalations"
+        },
+        "notifications": {
+          "component": "AlertNotificationConsole",
+          "permission": "intel_alerts:notifications",
+          "route": "/intel-alerts/notifications"
+        },
+        "resolutions": {
+          "component": "AlertResolutionConsole",
+          "permission": "intel_alerts:resolutions",
+          "route": "/intel-alerts/resolutions"
+        },
+        "reviews": {
+          "component": "AlertReviewConsole",
+          "permission": "intel_alerts:reviews",
+          "route": "/intel-alerts/reviews"
+        },
+        "rules": {
+          "component": "AlertRuleWorkbench",
+          "permission": "intel_alerts:rules",
+          "route": "/intel-alerts/rules"
+        },
+        "settings": {
+          "component": "AlertSettings",
+          "permission": "intel_alerts:admin",
+          "route": "/intel-alerts/settings"
+        },
+        "signals": {
+          "component": "AlertSignalLedger",
+          "permission": "intel_alerts:signals",
+          "route": "/intel-alerts/signals"
+        },
+        "workspaces": {
+          "component": "AlertWorkspaceConsole",
+          "permission": "intel_alerts:workspaces",
+          "route": "/intel-alerts/workspaces"
+        }
+      },
+      "streaming": {
+        "events": [
+          "alert_authority_recorded",
+          "alert_workspace_recorded",
+          "alert_rule_recorded",
+          "alert_signal_recorded",
+          "alert_recorded",
+          "alert_escalation_recorded",
+          "alert_notification_recorded",
+          "alert_assignment_recorded",
+          "alert_resolution_recorded",
+          "alert_review_recorded",
+          "alert_agent_registered"
+        ],
+        "guardrails": [
+          "alert_batch_requires_bytewax",
+          "privileged_alert_agent_action_requires_human_approval",
+          "unapproved_escalation_action_denied",
+          "unapproved_notification_action_denied",
+          "alert_suppression_action_denied",
+          "evidence_fabrication_action_denied",
+          "privacy_bypass_action_denied",
+          "autonomous_closure_action_denied",
+          "severity_downgrade_action_denied"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.intel.alerts.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "agents": {
+            "icon": "bot",
+            "status_indicator": "agent-runtime-chip"
+          },
+          "alerts": {
+            "icon": "bell-ring",
+            "status_indicator": "severity-chip"
+          },
+          "assignments": {
+            "icon": "user-check",
+            "status_indicator": "assignment-chip"
+          },
+          "authorities": {
+            "icon": "shield-check",
+            "status_indicator": "authority-chip"
+          },
+          "escalations": {
+            "icon": "arrow-up-right",
+            "status_indicator": "escalation-chip"
+          },
+          "notifications": {
+            "icon": "send",
+            "status_indicator": "notification-chip"
+          },
+          "resolutions": {
+            "icon": "check-circle",
+            "status_indicator": "resolution-chip"
+          },
+          "reviews": {
+            "icon": "clipboard-check",
+            "status_indicator": "review-chip"
+          },
+          "rules": {
+            "icon": "list-checks",
+            "status_indicator": "rule-chip"
+          },
+          "signals": {
+            "icon": "activity",
+            "status_indicator": "signal-chip"
+          },
+          "workspaces": {
+            "icon": "layout-dashboard",
+            "status_indicator": "workspace-chip"
+          }
+        },
+        "name": "intel_alerts_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#0F766E",
+          "color.danger": "#991B1B",
+          "color.primary": "#B91C1C",
+          "color.success": "#166534",
+          "color.warning": "#A16207",
+          "density": "compact",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563"
+        }
+      },
+      "ui": {
+        "api_prefix": "/intel-alerts/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "AlertDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/intel-alerts/dashboard",
+            "permission": "intel_alerts:view"
+          },
+          {
+            "component": "AlertAuthorityConsole",
+            "name": "authorities",
+            "nav_group": "Governance",
+            "path": "/intel-alerts/authorities",
+            "permission": "intel_alerts:authorities"
+          },
+          {
+            "component": "AlertWorkspaceConsole",
+            "name": "workspaces",
+            "nav_group": "Planning",
+            "path": "/intel-alerts/workspaces",
+            "permission": "intel_alerts:workspaces"
+          },
+          {
+            "component": "AlertRuleWorkbench",
+            "name": "rules",
+            "nav_group": "Configuration",
+            "path": "/intel-alerts/rules",
+            "permission": "intel_alerts:rules"
+          },
+          {
+            "component": "AlertSignalLedger",
+            "name": "signals",
+            "nav_group": "Signals",
+            "path": "/intel-alerts/signals",
+            "permission": "intel_alerts:signals"
+          },
+          {
+            "component": "AlertQueue",
+            "name": "alerts",
+            "nav_group": "Operations",
+            "path": "/intel-alerts/alerts",
+            "permission": "intel_alerts:alerts"
+          },
+          {
+            "component": "AlertEscalationConsole",
+            "name": "escalations",
+            "nav_group": "Operations",
+            "path": "/intel-alerts/escalations",
+            "permission": "intel_alerts:escalations"
+          },
+          {
+            "component": "AlertNotificationConsole",
+            "name": "notifications",
+            "nav_group": "Dissemination",
+            "path": "/intel-alerts/notifications",
+            "permission": "intel_alerts:notifications"
+          },
+          {
+            "component": "AlertAssignmentConsole",
+            "name": "assignments",
+            "nav_group": "Operations",
+            "path": "/intel-alerts/assignments",
+            "permission": "intel_alerts:assignments"
+          },
+          {
+            "component": "AlertResolutionConsole",
+            "name": "resolutions",
+            "nav_group": "Operations",
+            "path": "/intel-alerts/resolutions",
+            "permission": "intel_alerts:resolutions"
+          },
+          {
+            "component": "AlertReviewConsole",
+            "name": "reviews",
+            "nav_group": "Governance",
+            "path": "/intel-alerts/reviews",
+            "permission": "intel_alerts:reviews"
+          },
+          {
+            "component": "AlertAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/intel-alerts/agents",
+            "permission": "intel_alerts:admin"
+          },
+          {
+            "component": "AlertSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/intel-alerts/settings",
+            "permission": "intel_alerts:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      },
+      "version": "1.1.0"
+    }
+  },
+  "composition": {
+    "agent_teams": {
+      "alert_operations": {
+        "roles": [
+          "rule_steward",
+          "signal_triage",
+          "alert_reviewer",
+          "escalation_reviewer",
+          "notification_reviewer",
+          "resolution_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {
+      "intel_alerts": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "grph",
+        "ragn",
+        "geos"
+      ]
+    }
+  },
+  "contracts": {
+    "intel_alerts": {
+      "configuration": {
+        "adapters": {
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "geospatial": "geos",
+          "graph": "grph",
+          "nlp": "nlpc",
+          "notifications": "ntfy",
+          "rag": "ragn"
+        },
+        "agents": {
+          "enabled": true,
+          "human_approval_required_for_privileged_actions": true,
+          "name_required": true,
+          "scope_required": true,
+          "supported_roles": [
+            "rule_steward",
+            "signal_triage",
+            "alert_reviewer",
+            "escalation_reviewer",
+            "notification_reviewer",
+            "resolution_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "alerts": {
+          "evidence_required": true,
+          "signal_required": true,
+          "supported_alert_types": [
+            "early_warning",
+            "critical_alert",
+            "watchlist_hit",
+            "incident_alert",
+            "fraud_alert",
+            "threat_alert",
+            "system_alert"
+          ],
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "assignments": {
+          "alert_required": true,
+          "assignee_required": true,
+          "evidence_required": true,
+          "supported_assignment_types": [
+            "analyst",
+            "supervisor",
+            "incident_commander",
+            "case_owner",
+            "field_team",
+            "partner_owner"
+          ]
+        },
+        "authorities": {
+          "approver_required": true,
+          "evidence_required": true,
+          "expiry_required": true,
+          "supported_authority_types": [
+            "mission_order",
+            "legal_mandate",
+            "partner_authority",
+            "consent",
+            "incident_response_authority",
+            "public_interest_authority"
+          ],
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ]
+        },
+        "escalations": {
+          "alert_required": true,
+          "approval_required": true,
+          "evidence_required": true,
+          "supported_escalation_types": [
+            "supervisor",
+            "incident_team",
+            "case_team",
+            "executive",
+            "partner",
+            "field_team",
+            "watch_center"
+          ],
+          "target_required": true
+        },
+        "governance": {
+          "alert_suppression_denied": true,
+          "audit_events": true,
+          "autonomous_closure_denied": true,
+          "cross_tenant_alert_denied": true,
+          "evidence_fabrication_denied": true,
+          "lawful_authority_required": true,
+          "policy_attached_for_writes": true,
+          "privacy_bypass_denied": true,
+          "require_tenant_context": true,
+          "severity_downgrade_denied": true,
+          "unapproved_escalation_denied": true,
+          "unapproved_notification_denied": true
+        },
+        "notifications": {
+          "alert_required": true,
+          "approval_required": true,
+          "evidence_required": true,
+          "recipient_required": true,
+          "supported_notification_types": [
+            "in_app",
+            "email",
+            "sms",
+            "secure_message",
+            "webhook",
+            "case_note",
+            "briefing_queue"
+          ]
+        },
+        "observability": {
+          "event_stream": "apg.intel.alerts.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "resolutions": {
+          "alert_required": true,
+          "approval_required": true,
+          "evidence_required": true,
+          "supported_resolution_types": [
+            "confirmed",
+            "false_positive",
+            "duplicate",
+            "mitigated",
+            "escalated",
+            "closed",
+            "monitoring"
+          ]
+        },
+        "reviews": {
+          "evidence_required": true,
+          "reviewer_required": true,
+          "supported_statuses": [
+            "approved",
+            "rejected",
+            "needs_changes",
+            "escalated"
+          ]
+        },
+        "rules": {
+          "evidence_required": true,
+          "owner_required": true,
+          "supported_rule_types": [
+            "threshold",
+            "anomaly",
+            "watchlist",
+            "correlation",
+            "prediction",
+            "geofence",
+            "case_trigger",
+            "manual"
+          ],
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "workspace_required": true
+        },
+        "signals": {
+          "confidence_required": true,
+          "evidence_required": true,
+          "rule_required": true,
+          "supported_signal_types": [
+            "metric",
+            "indicator",
+            "event",
+            "forecast",
+            "threat",
+            "case_update",
+            "geospatial",
+            "partner_notice"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "intel_alerts_control"
+        },
+        "ui": {
+          "enable_agents": true,
+          "enable_alerts": true,
+          "enable_assignments": true,
+          "enable_authorities": true,
+          "enable_dashboard": true,
+          "enable_escalations": true,
+          "enable_notifications": true,
+          "enable_resolutions": true,
+          "enable_reviews": true,
+          "enable_rules": true,
+          "enable_signals": true,
+          "enable_workspaces": true
+        },
+        "workspaces": {
+          "authority_required": true,
+          "evidence_required": true,
+          "supported_classifications": [
+            "unclassified",
+            "confidential",
+            "secret",
+            "top_secret"
+          ],
+          "supported_workspace_types": [
+            "watch_center",
+            "threat_alerting",
+            "incident_alerting",
+            "fraud_alerting",
+            "public_safety_alerting",
+            "executive_alerting",
+            "partner_alerting"
+          ]
+        }
+      },
+      "id": "intel_alerts",
+      "provides": [
+        "alert_authority_workflow",
+        "alert_workspace_workflow",
+        "alert_rule_workflow",
+        "alert_signal_workflow",
+        "alert_record_workflow",
+        "alert_escalation_workflow",
+        "alert_notification_workflow",
+        "alert_assignment_workflow",
+        "alert_resolution_workflow",
+        "alert_review_workflow",
+        "alert_agent_workflow"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "grph",
+        "ragn",
+        "geos"
+      ]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 7,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "intel_alerts": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}

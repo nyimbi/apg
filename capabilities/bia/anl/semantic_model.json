@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "bia_anl",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "bia_anl": {
+      "capability": "bia_anl"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

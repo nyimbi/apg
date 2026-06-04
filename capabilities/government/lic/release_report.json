@@ -1,0 +1,21 @@
+{
+  "evidence": {
+    "contracts": {
+      "capability_contract": {
+        "display_name": "Licensing and Permits",
+        "errors": []
+      }
+    },
+    "self_test": {
+      "capability": "government_lic",
+      "passed": true,
+      "status": "ok"
+    },
+    "semantic_model": {
+      "capability": "government_lic",
+      "format": "apg.semantic-model.v1"
+    }
+  },
+  "format": "apg.release-report.v1",
+  "ok": true
+}

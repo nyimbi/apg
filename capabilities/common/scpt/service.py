@@ -730,3 +730,219 @@ class ScptService:
 		if tenant_id is not None:
 			values = [value for value in values if value.tenant_id == tenant_id]
 		return [value.to_dict() for value in values]
+
+	# ── Extended methods ───────────────────────────────────────────────────────
+
+	def script_create(
+		self,
+		tenant_id: str,
+		name: str,
+		language: str,
+		source: str,
+		owner: str,
+		package_policy_id: str | None = None,
+		sandbox_id: str | None = None,
+		tags: list[str] | None = None,
+	) -> dict[str, Any]:
+		"""Spec alias for create_script."""
+		return self.create_script(tenant_id, name, language, source, owner, package_policy_id=package_policy_id, sandbox_id=sandbox_id, tags=tags)
+
+	def script_run(
+		self,
+		tenant_id: str,
+		script_id: str,
+		requested_by: str,
+		sandbox_id: str | None = None,
+		input_payload: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Spec alias for execute_script."""
+		return self.execute_script(tenant_id, script_id, sandbox_id, requested_by, input_payload)
+
+	def script_schedule(
+		self,
+		tenant_id: str,
+		script_id: str,
+		cron: str,
+		owner: str,
+		sandbox_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Attach a cron schedule to a published script (stored in metadata)."""
+		script = self._require_owned(self._scripts, script_id, tenant_id, "script_not_found")
+		script.tags = list(set(script.tags or []) | {f"cron:{cron}"})
+		script.updated_at = utc_now()
+		self._record_event(tenant_id, "script_scheduled", script_id, f"Script {script.name} scheduled: {cron}", owner)
+		return {**script.to_dict(), "cron": cron, "sandbox_id": sandbox_id or script.sandbox_id}
+
+	def script_debug(
+		self,
+		tenant_id: str,
+		script_id: str,
+		debug_input: dict[str, Any] | None = None,
+		requested_by: str = "developer",
+	) -> dict[str, Any]:
+		"""Execute a script in debug mode (dry-run marker in input)."""
+		payload = {"__debug__": True, **(debug_input or {})}
+		return self.execute_script(tenant_id, script_id, None, requested_by, payload)
+
+	def script_version(
+		self,
+		tenant_id: str,
+		script_id: str,
+	) -> dict[str, Any]:
+		"""Return version metadata for a script."""
+		script = self._require_owned(self._scripts, script_id, tenant_id, "script_not_found")
+		return {
+			"id": script.id,
+			"name": script.name,
+			"state": script.state,
+			"source_checksum": script.source_checksum,
+			"created_at": script.created_at,
+			"updated_at": script.updated_at,
+			"published_at": script.published_at,
+		}
+
+	def variable_inject(
+		self,
+		tenant_id: str,
+		script_id: str,
+		variables: dict[str, Any],
+		actor: str,
+	) -> dict[str, Any]:
+		"""Inject runtime variables into a script's metadata."""
+		script = self._require_owned(self._scripts, script_id, tenant_id, "script_not_found")
+		script.tags = list(set(script.tags or []) | {f"var:{k}" for k in variables})
+		script.updated_at = utc_now()
+		self._record_event(tenant_id, "variables_injected", script_id, f"Variables injected into {script.name}", actor)
+		return {**script.to_dict(), "injected_variables": list(variables.keys())}
+
+	def secret_access(
+		self,
+		tenant_id: str,
+		script_id: str,
+		secret_ref: str,
+		accessed_by: str,
+	) -> dict[str, Any]:
+		"""Record that a script accessed a secret (audit only; no real fetch)."""
+		script = self._require_owned(self._scripts, script_id, tenant_id, "script_not_found")
+		policy = self._package_policies.get(script.package_policy_id or "")
+		if policy and not policy.secret_access_allowed:
+			raise PermissionError("secret_access_not_allowed_by_policy")
+		self._record_event(tenant_id, "secret_accessed", script_id, f"Secret {secret_ref} accessed by {script.name}", accessed_by)
+		return {"script_id": script_id, "secret_ref": secret_ref, "accessed_by": accessed_by, "allowed": True}
+
+	def output_capture(
+		self,
+		tenant_id: str,
+		execution_id: str,
+	) -> dict[str, Any]:
+		"""Return captured output from a completed execution."""
+		execution = self._require_owned(self._executions, execution_id, tenant_id, "execution_not_found")
+		return {
+			"execution_id": execution_id,
+			"status": execution.status,
+			"output": execution.output,
+			"logs": execution.logs,
+			"error": execution.error,
+		}
+
+	def execution_timeout(
+		self,
+		tenant_id: str,
+		execution_id: str,
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Force-complete an execution as timed_out."""
+		return self.complete_execution(
+			tenant_id=tenant_id,
+			execution_id=execution_id,
+			exit_code=1,
+			timed_out=True,
+			error="execution_timeout_forced",
+			completion_evidence_ref="system://timeout",
+		)
+
+	def sandbox_isolate(
+		self,
+		tenant_id: str,
+		sandbox_id: str,
+		actor: str,
+	) -> dict[str, Any]:
+		"""Put sandbox into isolated/quarantine state."""
+		return self.change_sandbox_state(tenant_id, sandbox_id, "isolated", actor, "isolated_by_operator")
+
+	def dependency_install(
+		self,
+		tenant_id: str,
+		script_id: str,
+		packages: list[str],
+		actor: str,
+	) -> dict[str, Any]:
+		"""Record package dependency installation against a script's policy."""
+		script = self._require_owned(self._scripts, script_id, tenant_id, "script_not_found")
+		policy_id = script.package_policy_id
+		if not policy_id:
+			raise KeyError("package_policy_not_found")
+		policy = self._require_owned(self._package_policies, policy_id, tenant_id, "package_policy_not_found")
+		blocked = [p for p in packages if p in policy.blocked_imports]
+		if blocked:
+			raise PermissionError(f"blocked_packages:{','.join(blocked)}")
+		policy.allowed_packages = sorted(set(policy.allowed_packages) | set(packages))
+		policy.updated_at = utc_now()
+		self._record_event(tenant_id, "dependencies_installed", script_id, f"Packages installed: {packages}", actor)
+		return {"script_id": script_id, "installed_packages": packages, "policy_id": policy_id}
+
+	def script_share(
+		self,
+		tenant_id: str,
+		script_id: str,
+		shared_with: list[str],
+		actor: str,
+	) -> dict[str, Any]:
+		"""Record sharing of a published script with other tenants/users."""
+		script = self._require_owned(self._scripts, script_id, tenant_id, "script_not_found")
+		if script.state != "published":
+			raise PermissionError("published_script_required_for_sharing")
+		self._record_event(tenant_id, "script_shared", script_id, f"Script {script.name} shared with {shared_with}", actor)
+		return {"script_id": script_id, "shared_with": shared_with, "actor": actor}
+
+	def template_library(
+		self,
+		tenant_id: str,
+		language: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""List published scripts that can serve as templates."""
+		scripts = self.list_scripts(tenant_id)
+		return [s for s in scripts if s["state"] == "published" and (language is None or s["language"] == language)]
+
+	def execution_analytics(
+		self,
+		tenant_id: str,
+	) -> dict[str, Any]:
+		"""Aggregate execution statistics for the tenant."""
+		executions = self.list_executions(tenant_id)
+		return {
+			"total": len(executions),
+			"succeeded": sum(1 for e in executions if e["status"] == "succeeded"),
+			"failed": sum(1 for e in executions if e["status"] == "failed"),
+			"timed_out": sum(1 for e in executions if e.get("timed_out")),
+			"cancelled": sum(1 for e in executions if e["status"] == "cancelled"),
+			"avg_runtime_seconds": sum(e.get("runtime_seconds", 0) for e in executions) / max(len(executions), 1),
+		}
+
+	def script_lint(
+		self,
+		tenant_id: str,
+		script_id: str,
+	) -> dict[str, Any]:
+		"""Run static validation on a script's source."""
+		script = self._require_owned(self._scripts, script_id, tenant_id, "script_not_found")
+		errors: list[str] = []
+		if script.language == "python":
+			errors = validate_python_source(script.source)
+		return {
+			"script_id": script_id,
+			"language": script.language,
+			"errors": errors,
+			"passed": len(errors) == 0,
+			"dangerous_permissions": list(script.dangerous_permissions),
+		}

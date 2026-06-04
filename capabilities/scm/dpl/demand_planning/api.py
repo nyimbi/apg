@@ -79,7 +79,7 @@ def handle_async_result(async_func):
 		loop = asyncio.new_event_loop()
 		asyncio.set_event_loop(loop)
 	
-	return loop.run_until_complete(async_func)
+	return asyncio.run(async_func)
 
 @ns.route('/forecasts')
 class ForecastListAPI(Resource):

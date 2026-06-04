@@ -3,9 +3,102 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+import base64
+import binascii
+import json
+import logging
+import os
+from typing import Any, Dict, Optional
+
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from starlette.requests import Request
 
 from .service import CompositionEventsService
+
+logger = logging.getLogger(__name__)
+security = HTTPBearer(auto_error=False)
+
+
+def _clean_text(value: Any) -> Optional[str]:
+	"""Return a non-empty stripped string or None."""
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+
+def _decode_jwt_claims(token: str) -> Optional[Dict[str, Any]]:
+	"""Decode JWT payload without signature verification."""
+	try:
+		parts = token.split(".")
+		if len(parts) < 2:
+			return None
+		payload = parts[1]
+		padding = "=" * (-len(payload) % 4)
+		data = base64.urlsafe_b64decode(f"{payload}{padding}".encode("ascii"))
+		return json.loads(data.decode("utf-8"))
+	except (binascii.Error, json.JSONDecodeError, Exception):
+		return None
+
+
+async def get_current_user(
+	request: Request,
+	credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> Dict[str, Any]:
+	"""Resolve current user from JWT claims, headers, or environment."""
+	if credentials and credentials.credentials:
+		claims = _decode_jwt_claims(credentials.credentials)
+		if claims:
+			user_id = _clean_text(claims.get("sub") or claims.get("user_id"))
+			tenant_id = _clean_text(claims.get("tenant_id") or claims.get("org_id"))
+			permissions = claims.get("permissions") or []
+			if user_id:
+				return {
+					"user_id": user_id,
+					"tenant_id": tenant_id or os.getenv("APG_DEFAULT_TENANT_ID", os.getenv("APG_TENANT_ID", "default")),
+					"permissions": permissions,
+				}
+
+	headers = getattr(request, "headers", {})
+	query_params = getattr(request, "query_params", {})
+
+	def _hget(*keys: str) -> Optional[str]:
+		for k in keys:
+			v = _clean_text(headers.get(k))
+			if v:
+				return v
+		return None
+
+	def _qget(*keys: str) -> Optional[str]:
+		for k in keys:
+			v = _clean_text(query_params.get(k))
+			if v:
+				return v
+		return None
+
+	return {
+		"user_id": (
+			_hget("X-APG-User-ID", "X-User-ID")
+			or _qget("user_id", "user")
+			or os.getenv("APG_DEFAULT_USER_ID", os.getenv("APG_USER_ID", "system"))
+		),
+		"tenant_id": (
+			_hget("X-APG-Tenant-ID", "X-Tenant-ID")
+			or _qget("tenant_id", "tenant")
+			or os.getenv("APG_DEFAULT_TENANT_ID", os.getenv("APG_TENANT_ID", "default"))
+		),
+		"permissions": [],
+	}
+
+
+async def get_event_streaming_service(request: Request) -> "CompositionEventsService":
+	"""FastAPI dependency: resolve the event streaming service from app state or default."""
+	state = getattr(getattr(request, "app", None), "state", None)
+	service = getattr(state, "event_streaming_service", None)
+	if service is not None:
+		return service
+	return SERVICE
 
 
 SERVICE = CompositionEventsService()

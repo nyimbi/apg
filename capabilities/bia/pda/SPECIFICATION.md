@@ -1,0 +1,9 @@
+# Predictive Analytics Specification
+
+## Purpose
+
+This capability provides predictive analytics functionality.
+
+## Scope
+
+See `cap_spec.md` for the full capability specification.

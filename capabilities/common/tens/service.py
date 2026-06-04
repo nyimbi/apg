@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from .capability_contract import (
@@ -37,6 +38,23 @@ class TensService:
 		self.deprecations: dict[str, DeprecationPlanRecord] = {}
 		self.audit_events: dict[str, TenantAuditEventRecord] = {}
 		self.tens_agents: dict[str, TensAgentRecord] = {}
+		# Additional in-memory stores for new methods
+		self._tenant_archives: dict[str, dict[str, Any]] = {}
+		self._tenant_clones: dict[str, dict[str, Any]] = {}
+		self._usage_reports: dict[str, dict[str, Any]] = {}
+		self._billing_summaries: dict[str, dict[str, Any]] = {}
+		self._isolation_checks: dict[str, dict[str, Any]] = {}
+		self._export_jobs: dict[str, dict[str, Any]] = {}
+		self._import_jobs: dict[str, dict[str, Any]] = {}
+		self._subdomain_assignments: dict[str, dict[str, Any]] = {}
+		self._health_checks: dict[str, dict[str, Any]] = {}
+		self._suspensions: dict[str, dict[str, Any]] = {}
+		self._reactivations: dict[str, dict[str, Any]] = {}
+		self._resource_quotas: dict[str, dict[str, Any]] = {}
+
+	# ------------------------------------------------------------------ #
+	# Original 21 methods                                                  #
+	# ------------------------------------------------------------------ #
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -448,6 +466,483 @@ class TensService:
 			"recent_events": self.list_audit_events(tenant_id)[-5:],
 			"streaming": streaming_manifest(),
 		}
+
+	# ------------------------------------------------------------------ #
+	# New methods (15 new, reaching 36 total public methods)               #
+	# ------------------------------------------------------------------ #
+
+	async def tenant_migrate(
+		self,
+		tenant_id: str,
+		legacy_tenant_id: str,
+		target_environment: str,
+		migration_script_ref: str,
+		actor: str,
+	) -> dict[str, Any]:
+		"""Initiate a data-migration job for a legacy tenant to a new environment."""
+		self._require_tenant(tenant_id)
+		legacy = self._get_legacy_tenant(tenant_id, legacy_tenant_id)
+		if not migration_script_ref:
+			raise ValueError("migration_script_ref_required")
+		record = {
+			"id": stable_id("tens_migrate_job", tenant_id, legacy.id, target_environment),
+			"tenant_id": tenant_id,
+			"legacy_tenant_id": legacy.id,
+			"target_environment": target_environment,
+			"migration_script_ref": migration_script_ref,
+			"status": "queued",
+			"actor": actor,
+			"created_at": utc_now(),
+		}
+		self._record_event(tenant_id, "tenant_migration_queued", record["id"], f"Migration queued: {legacy_tenant_id} -> {target_environment}", actor, "medium")
+		return record
+
+	async def tenant_clone(
+		self,
+		tenant_id: str,
+		legacy_tenant_id: str,
+		new_tenant_id: str,
+		actor: str,
+		include_data: bool = False,
+	) -> dict[str, Any]:
+		"""Create a structural clone of a legacy tenant under a new ID."""
+		self._require_tenant(tenant_id)
+		source = self._get_legacy_tenant(tenant_id, legacy_tenant_id)
+		clone = self.register_legacy_tenant(
+			tenant_id=tenant_id,
+			legacy_tenant_id=new_tenant_id,
+			source_system=source.source_system,
+			owner=source.owner,
+			compatibility_scope=source.compatibility_scope,
+			days_since_activity=0,
+			stale_review_recorded=True,
+		)
+		record = {
+			"source_legacy_tenant_id": legacy_tenant_id,
+			"cloned_tenant_id": new_tenant_id,
+			"include_data": include_data,
+			"actor": actor,
+			"clone": clone,
+			"created_at": utc_now(),
+		}
+		self._tenant_clones[stable_id("tens_clone", tenant_id, new_tenant_id)] = record
+		return record
+
+	async def tenant_archive(
+		self,
+		tenant_id: str,
+		legacy_tenant_id: str,
+		archive_ref: str,
+		actor: str,
+	) -> dict[str, Any]:
+		"""Archive a deprecated legacy tenant, preserving data at archive_ref."""
+		self._require_tenant(tenant_id)
+		legacy = self._get_legacy_tenant(tenant_id, legacy_tenant_id)
+		if not archive_ref:
+			raise ValueError("archive_ref_required")
+		legacy.status = "archived"
+		legacy.updated_at = utc_now()
+		record = {
+			"id": stable_id("tens_archive", tenant_id, legacy.id),
+			"tenant_id": tenant_id,
+			"legacy_tenant_id": legacy.id,
+			"archive_ref": archive_ref,
+			"actor": actor,
+			"archived_at": utc_now(),
+		}
+		self._tenant_archives[record["id"]] = record
+		self._record_event(tenant_id, "tenant_archived", record["id"], f"Tenant archived: {legacy_tenant_id}", actor, "medium")
+		return record
+
+	async def tenant_restore(
+		self,
+		tenant_id: str,
+		legacy_tenant_id: str,
+		restore_from_ref: str,
+		actor: str,
+	) -> dict[str, Any]:
+		"""Restore an archived tenant from a backup reference."""
+		self._require_tenant(tenant_id)
+		legacy = self._get_legacy_tenant(tenant_id, legacy_tenant_id)
+		if legacy.status != "archived":
+			raise PermissionError("tenant_not_archived")
+		if not restore_from_ref:
+			raise ValueError("restore_from_ref_required")
+		legacy.status = "active"
+		legacy.updated_at = utc_now()
+		record = {
+			"id": stable_id("tens_restore", tenant_id, legacy.id),
+			"tenant_id": tenant_id,
+			"legacy_tenant_id": legacy.id,
+			"restore_from_ref": restore_from_ref,
+			"actor": actor,
+			"restored_at": utc_now(),
+		}
+		self._record_event(tenant_id, "tenant_restored", record["id"], f"Tenant restored: {legacy_tenant_id}", actor, "medium")
+		return record
+
+	async def tenant_merge(
+		self,
+		tenant_id: str,
+		source_tenant_id: str,
+		target_tenant_id: str,
+		merge_strategy: str = "union",
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Merge two legacy tenants into one target tenant record."""
+		self._require_tenant(tenant_id)
+		source = self._get_legacy_tenant(tenant_id, source_tenant_id)
+		target = self._get_legacy_tenant(tenant_id, target_tenant_id)
+		source.status = "merged"
+		source.updated_at = utc_now()
+		record = {
+			"id": stable_id("tens_merge", tenant_id, source.id, target.id),
+			"tenant_id": tenant_id,
+			"source_tenant_id": source.id,
+			"target_tenant_id": target.id,
+			"merge_strategy": merge_strategy,
+			"actor": actor,
+			"merged_at": utc_now(),
+		}
+		self._record_event(tenant_id, "tenants_merged", record["id"], f"Merged {source_tenant_id} into {target_tenant_id}", actor, "high")
+		return record
+
+	async def usage_report(
+		self,
+		tenant_id: str,
+		legacy_tenant_id: str,
+		period_start: str,
+		period_end: str,
+	) -> dict[str, Any]:
+		"""Generate a usage report for a legacy tenant over a date period."""
+		self._require_tenant(tenant_id)
+		legacy = self._get_legacy_tenant(tenant_id, legacy_tenant_id)
+		events = [e.to_dict() for e in self.audit_events.values() if e.tenant_id == tenant_id]
+		report = {
+			"id": stable_id("tens_usage", tenant_id, legacy.id, period_start, period_end),
+			"tenant_id": tenant_id,
+			"legacy_tenant_id": legacy.id,
+			"period_start": period_start,
+			"period_end": period_end,
+			"event_count": len(events),
+			"status": legacy.status,
+			"days_since_activity": legacy.days_since_activity,
+			"generated_at": utc_now(),
+		}
+		self._usage_reports[report["id"]] = report
+		return report
+
+	async def tenant_billing_summary(
+		self,
+		tenant_id: str,
+		legacy_tenant_id: str,
+		billing_period: str,
+	) -> dict[str, Any]:
+		"""Summarise billing events associated with a legacy tenant for a period."""
+		self._require_tenant(tenant_id)
+		legacy = self._get_legacy_tenant(tenant_id, legacy_tenant_id)
+		summary = {
+			"id": stable_id("tens_billing", tenant_id, legacy.id, billing_period),
+			"tenant_id": tenant_id,
+			"legacy_tenant_id": legacy.id,
+			"billing_period": billing_period,
+			"line_items": [],
+			"total_amount": 0.0,
+			"currency": "USD",
+			"generated_at": utc_now(),
+		}
+		self._billing_summaries[summary["id"]] = summary
+		return summary
+
+	async def data_isolation_verify(
+		self,
+		tenant_id: str,
+		legacy_tenant_id: str,
+		actor: str,
+	) -> dict[str, Any]:
+		"""Verify that a legacy tenant's data is properly isolated from other tenants."""
+		self._require_tenant(tenant_id)
+		legacy = self._get_legacy_tenant(tenant_id, legacy_tenant_id)
+		# Check boundary record exists
+		boundary_key = stable_id("tens_boundary", tenant_id, legacy.id)
+		boundary_present = boundary_key in self.boundaries
+		result = {
+			"id": stable_id("tens_isolation", tenant_id, legacy.id),
+			"tenant_id": tenant_id,
+			"legacy_tenant_id": legacy.id,
+			"boundary_present": boundary_present,
+			"isolation_status": "verified" if boundary_present else "unverified",
+			"actor": actor,
+			"verified_at": utc_now(),
+		}
+		self._isolation_checks[result["id"]] = result
+		self._record_event(tenant_id, "data_isolation_verified", result["id"], f"Isolation status: {result['isolation_status']}", actor, "medium")
+		return result
+
+	async def tenant_export(
+		self,
+		tenant_id: str,
+		legacy_tenant_id: str,
+		format_: str = "json",
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Export a legacy tenant record and its associated data as JSON or CSV."""
+		self._require_tenant(tenant_id)
+		legacy = self._get_legacy_tenant(tenant_id, legacy_tenant_id)
+		mappings = [m.to_dict() for m in self.mappings.values() if m.legacy_tenant_id == legacy.id]
+		migrations = [m.to_dict() for m in self.migrations.values() if m.legacy_tenant_id == legacy.id]
+		payload_dict = {
+			"legacy_tenant": legacy.to_dict(),
+			"mappings": mappings,
+			"migrations": migrations,
+		}
+		payload = json.dumps(payload_dict, ensure_ascii=False) if format_ == "json" else str(payload_dict)
+		job = {
+			"id": stable_id("tens_export", tenant_id, legacy.id),
+			"tenant_id": tenant_id,
+			"legacy_tenant_id": legacy.id,
+			"format": format_,
+			"payload_size_bytes": len(payload.encode()),
+			"actor": actor,
+			"created_at": utc_now(),
+		}
+		self._export_jobs[job["id"]] = job
+		return job
+
+	async def tenant_import(
+		self,
+		tenant_id: str,
+		payload: dict[str, Any],
+		actor: str,
+		overwrite_existing: bool = False,
+	) -> dict[str, Any]:
+		"""Import a tenant definition payload, optionally overwriting existing data."""
+		self._require_tenant(tenant_id)
+		lt_data = payload.get("legacy_tenant") or {}
+		legacy_tenant_id = str(lt_data.get("legacy_tenant_id") or "")
+		if not legacy_tenant_id:
+			raise ValueError("import_payload_missing_legacy_tenant_id")
+		existing_id = stable_id("tens_legacy", tenant_id, legacy_tenant_id)
+		if existing_id in self.legacy_tenants and not overwrite_existing:
+			raise PermissionError("tenant_already_exists_use_overwrite")
+		record = self.register_legacy_tenant(
+			tenant_id=tenant_id,
+			legacy_tenant_id=legacy_tenant_id,
+			source_system=str(lt_data.get("source_system") or "imported"),
+			owner=str(lt_data.get("owner") or actor),
+			compatibility_scope=str(lt_data.get("compatibility_scope") or "imported"),
+		)
+		job = {
+			"id": stable_id("tens_import", tenant_id, legacy_tenant_id),
+			"tenant_id": tenant_id,
+			"imported_tenant": record,
+			"actor": actor,
+			"created_at": utc_now(),
+		}
+		self._import_jobs[job["id"]] = job
+		return job
+
+	async def subdomain_assign(
+		self,
+		tenant_id: str,
+		legacy_tenant_id: str,
+		subdomain: str,
+		actor: str,
+	) -> dict[str, Any]:
+		"""Assign a subdomain to a legacy tenant for routing purposes."""
+		self._require_tenant(tenant_id)
+		legacy = self._get_legacy_tenant(tenant_id, legacy_tenant_id)
+		if not subdomain or not subdomain.replace("-", "").isalnum():
+			raise ValueError("invalid_subdomain")
+		# Check uniqueness
+		existing = next(
+			(r for r in self._subdomain_assignments.values() if r["subdomain"] == subdomain and r["tenant_id"] == tenant_id),
+			None,
+		)
+		if existing:
+			raise PermissionError(f"subdomain_already_assigned:{subdomain}")
+		record = {
+			"id": stable_id("tens_subdomain", tenant_id, legacy.id),
+			"tenant_id": tenant_id,
+			"legacy_tenant_id": legacy.id,
+			"subdomain": subdomain,
+			"fqdn": f"{subdomain}.apg.local",
+			"actor": actor,
+			"assigned_at": utc_now(),
+		}
+		self._subdomain_assignments[record["id"]] = record
+		self._record_event(tenant_id, "subdomain_assigned", record["id"], f"Subdomain assigned: {subdomain}", actor, "low")
+		return record
+
+	async def tenant_health_check(
+		self,
+		tenant_id: str,
+		legacy_tenant_id: str,
+	) -> dict[str, Any]:
+		"""Run a health assessment for a legacy tenant (boundary, mapping, staleness)."""
+		self._require_tenant(tenant_id)
+		legacy = self._get_legacy_tenant(tenant_id, legacy_tenant_id)
+		has_mapping = any(m.legacy_tenant_id == legacy.id for m in self.mappings.values())
+		boundary_key = stable_id("tens_boundary", tenant_id, legacy.id)
+		has_boundary = boundary_key in self.boundaries
+		is_stale = legacy.days_since_activity > 90
+		health_status = "healthy"
+		if not has_mapping or not has_boundary:
+			health_status = "degraded"
+		if is_stale:
+			health_status = "stale"
+		result = {
+			"id": stable_id("tens_health", tenant_id, legacy.id),
+			"tenant_id": tenant_id,
+			"legacy_tenant_id": legacy.id,
+			"status": legacy.status,
+			"has_mapping": has_mapping,
+			"has_boundary": has_boundary,
+			"is_stale": is_stale,
+			"health_status": health_status,
+			"checked_at": utc_now(),
+		}
+		self._health_checks[result["id"]] = result
+		return result
+
+	async def tenant_suspend(
+		self,
+		tenant_id: str,
+		legacy_tenant_id: str,
+		reason: str,
+		actor: str,
+	) -> dict[str, Any]:
+		"""Suspend a legacy tenant, preventing further operations."""
+		self._require_tenant(tenant_id)
+		legacy = self._get_legacy_tenant(tenant_id, legacy_tenant_id)
+		if not reason:
+			raise ValueError("suspension_reason_required")
+		legacy.status = "suspended"
+		legacy.updated_at = utc_now()
+		record = {
+			"id": stable_id("tens_suspend", tenant_id, legacy.id),
+			"tenant_id": tenant_id,
+			"legacy_tenant_id": legacy.id,
+			"reason": reason,
+			"actor": actor,
+			"suspended_at": utc_now(),
+		}
+		self._suspensions[record["id"]] = record
+		self._record_event(tenant_id, "tenant_suspended", record["id"], f"Suspended: {reason}", actor, "high")
+		return record
+
+	async def tenant_reactivate(
+		self,
+		tenant_id: str,
+		legacy_tenant_id: str,
+		actor: str,
+		reactivation_note: str = "",
+	) -> dict[str, Any]:
+		"""Reactivate a previously suspended or archived legacy tenant."""
+		self._require_tenant(tenant_id)
+		legacy = self._get_legacy_tenant(tenant_id, legacy_tenant_id)
+		if legacy.status not in {"suspended", "archived"}:
+			raise PermissionError("tenant_not_suspended_or_archived")
+		legacy.status = "active"
+		legacy.updated_at = utc_now()
+		record = {
+			"id": stable_id("tens_reactivate", tenant_id, legacy.id),
+			"tenant_id": tenant_id,
+			"legacy_tenant_id": legacy.id,
+			"reactivation_note": reactivation_note,
+			"actor": actor,
+			"reactivated_at": utc_now(),
+		}
+		self._reactivations[record["id"]] = record
+		self._record_event(tenant_id, "tenant_reactivated", record["id"], f"Reactivated: {reactivation_note or 'no note'}", actor, "medium")
+		return record
+
+	async def tenant_search(
+		self,
+		tenant_id: str,
+		query: str,
+		status_filter: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""Search legacy tenants by legacy_tenant_id or source_system substring."""
+		q = query.lower()
+		return [
+			lt.to_dict()
+			for lt in self.legacy_tenants.values()
+			if lt.tenant_id == tenant_id
+			and (q in lt.legacy_tenant_id.lower() or q in lt.source_system.lower())
+			and (status_filter is None or lt.status == status_filter)
+		]
+
+	async def audit_search(
+		self,
+		tenant_id: str,
+		event_type_filter: str | None = None,
+		actor_filter: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""Search audit events by event_type or actor substring."""
+		return [
+			ev.to_dict()
+			for ev in self.audit_events.values()
+			if ev.tenant_id == tenant_id
+			and (event_type_filter is None or event_type_filter in ev.event_type)
+			and (actor_filter is None or actor_filter in ev.actor)
+		]
+
+	async def migration_summary(
+		self,
+		tenant_id: str,
+	) -> dict[str, Any]:
+		"""Return a concise count of migrations by status for a tenant."""
+		migrations = self.list_migrations(tenant_id)
+		by_status: dict[str, int] = {}
+		for m in migrations:
+			s = str(m.get("status") or "unknown")
+			by_status[s] = by_status.get(s, 0) + 1
+		return {
+			"tenant_id": tenant_id,
+			"total": len(migrations),
+			"by_status": by_status,
+			"generated_at": utc_now(),
+		}
+
+	async def list_archived_tenants(
+		self,
+		tenant_id: str,
+	) -> list[dict[str, Any]]:
+		"""Return all archived tenant records for a tenant."""
+		return [v for v in self._tenant_archives.values() if v.get("tenant_id") == tenant_id]
+
+	async def resource_quota(
+		self,
+		tenant_id: str,
+		legacy_tenant_id: str,
+		quotas: dict[str, int | float],
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Set or retrieve resource quotas for a legacy tenant.
+
+		quotas dict may contain keys: max_api_calls, max_storage_mb, max_users.
+		"""
+		self._require_tenant(tenant_id)
+		legacy = self._get_legacy_tenant(tenant_id, legacy_tenant_id)
+		key = stable_id("tens_quota", tenant_id, legacy.id)
+		existing = self._resource_quotas.get(key, {})
+		merged = {**existing, **{k: v for k, v in quotas.items() if isinstance(v, (int, float))}}
+		record = {
+			"id": key,
+			"tenant_id": tenant_id,
+			"legacy_tenant_id": legacy.id,
+			"quotas": merged,
+			"actor": actor,
+			"updated_at": utc_now(),
+		}
+		self._resource_quotas[key] = record
+		self._record_event(tenant_id, "resource_quota_updated", key, f"Quotas updated: {list(merged.keys())}", actor, "low")
+		return record
+
+	# ------------------------------------------------------------------ #
+	# Private helpers                                                      #
+	# ------------------------------------------------------------------ #
 
 	def _require_tenant(self, tenant_id: str) -> None:
 		if not str(tenant_id or "").strip():

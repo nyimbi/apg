@@ -446,7 +446,67 @@ def default_rules() -> list[CapabilityRule]:
 				"reason": "bytewax_key_stream_required",
 				"required_action": "route_key_lifecycle_through_bytewax"
 			}
-		)
+		),
+		CapabilityRule(
+			name="cross_tenant_key_access_denied",
+			description="Keys are scoped to the owning tenant and cannot be accessed cross-tenant.",
+			condition={"cross_tenant_key_access": True, "cross_tenant_membership_confirmed": False},
+			effect={
+				"decision": "deny",
+				"reason": "cross_tenant_key_access_denied",
+				"required_action": "use_tenant_scoped_key"
+			}
+		),
+		CapabilityRule(
+			name="write_requires_policy",
+			description="Key write and creation operations require an explicit authorization policy.",
+			condition={"operation_type": "write", "write_policy_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "keym_write_policy_required",
+				"required_action": "attach_write_policy"
+			}
+		),
+		CapabilityRule(
+			name="privilege_escalation_denied",
+			description="Key custodians cannot self-grant elevated key management permissions.",
+			condition={"operation": "assign_keym_permission", "target_tier_exceeds_actor_tier": True},
+			effect={
+				"decision": "deny",
+				"reason": "privilege_escalation_prevented",
+				"required_action": "route_to_higher_authority_approver"
+			}
+		),
+		CapabilityRule(
+			name="key_backup_required_before_rotation",
+			description="Keys must be backed up before rotation to enable recovery.",
+			condition={"operation": "rotate_key", "key_backup_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "key_backup_required_before_rotation",
+				"required_action": "backup_key_before_rotation"
+			}
+		),
+		CapabilityRule(
+			name="max_failed_access_attempts_triggers_lockout",
+			description="Exceeding the maximum failed key-access attempts triggers automatic lockout.",
+			condition={"failed_access_attempts_gte": 3, "key_locked": False},
+			effect={
+				"decision": "deny",
+				"reason": "key_access_attempts_exceeded",
+				"required_action": "lock_key_and_notify_owner"
+			}
+		),
+		CapabilityRule(
+			name="key_audit_event_required",
+			description="All key lifecycle operations must produce an immutable audit event.",
+			condition={"key_lifecycle_operation_requested": True, "audit_event_recorded": False},
+			effect={
+				"decision": "deny",
+				"reason": "key_audit_event_required",
+				"required_action": "record_key_audit_event"
+			}
+		),
 	]
 
 
@@ -542,7 +602,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		"capability": "keym",
 		"display_name": "Key Management",
 		"provides": ["keym_operations", "key_lifecycle_governance", "key_agent_composition", "review_evidence"],
-		"requires": ["conf", "auth", "audl", "mten", "secu"],
+		"requires": ["conf", "audl", "mten"],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
 		"rule_engine": {

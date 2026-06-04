@@ -80,7 +80,22 @@ PROVIDES = [
 	"portfolio_review_workflow",
 	"portfolio_agent_workflow",
 ]
-REQUIRES = ["auth", "audl", "ntfy", "nlpc", "keym", "fintech_wealth", "fintech_robo", "fintech_payments", "fintech_wallets", "fintech_kyc", "fintech_aml", "fintech_fraud", "bia", "fin_rpt"]
+REQUIRES = [
+	"auth",
+	"audl",
+	"ntfy",
+	"nlpc",
+	"keym",
+	"fintech_wealth",
+	"fintech_robo",
+	"fintech_payments",
+	"fintech_wallets",
+	"fintech_kyc",
+	"fintech_aml",
+	"fintech_fraud",
+	"bia_anl",
+	"fin_rpt",
+]
 
 UI_ROUTES = [
 	{"name": "dashboard", "path": "/fintech-portfolio/dashboard", "component": "PortfolioDashboard", "permission": "fintech_portfolio:view", "nav_group": "Overview"},
@@ -152,7 +167,20 @@ RULES: list[dict[str, Any]] = [
 	{"name": "portfolio_agent_runtime_supported", "condition": {"operation": "register_portfolio_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "portfolio_agent_runtime_not_supported", "required_action": "select_supported_runtime"}},
 	{"name": "portfolio_agent_role_supported", "condition": {"operation": "register_portfolio_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "portfolio_agent_role_not_supported", "required_action": "select_supported_role"}},
 	{"name": "privileged_portfolio_agent_action_requires_human_approval", "condition": {"operation": "portfolio_agent_action", "privileged_scope": True, "human_approval_recorded": False}, "effect": {"decision": "deny", "reason": "human_approval_required", "required_action": "record_human_approval"}},
+
+	# Cross-tenant and privilege escalation guards
+	{"name": "cross_tenant_portfolio_access_denied", "description": "Portfolio resources cannot be accessed across tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_access_denied", "required_action": "use_tenant_scoped_credentials"}},
+	{"name": "privilege_escalation_denied", "description": "Portfolio privilege escalation without approval is denied.", "condition": {"privilege_escalation_attempt": True, "approval_recorded": False}, "effect": {"decision": "deny", "reason": "privilege_escalation_denied", "required_action": "obtain_escalation_approval"}},
+
+	# Africa-specific portfolio management rules
+	{"name": "ke_cma_investment_adviser_licence", "description": "Kenya CMA investment adviser licence required for portfolio management.", "condition": {"operation": "manage_portfolio", "country": "KE", "cma_investment_adviser_licence_present": False}, "effect": {"decision": "deny", "reason": "ke_cma_investment_adviser_licence_required", "required_action": "obtain_cma_investment_adviser_licence"}},
+	{"name": "ke_nse_securities_compliance", "description": "NSE securities trading requires NSE member broker compliance.", "condition": {"operation": "trade_nse_security", "nse_member_broker_present": False}, "effect": {"decision": "deny", "reason": "ke_nse_member_broker_required", "required_action": "route_through_nse_member_broker"}},
+	{"name": "mobile_money_portfolio_funding_kyc", "description": "Mobile money portfolio funding requires investor KYC.", "condition": {"operation": "fund_portfolio", "method": "mobile_money", "investor_kyc_present": False}, "effect": {"decision": "deny", "reason": "mobile_money_portfolio_funding_kyc_required", "required_action": "complete_investor_kyc"}},
+	{"name": "ke_cma_disclosure_requirements", "description": "Kenya CMA disclosure requirements apply to investment products.", "condition": {"operation": "offer_investment_product", "country": "KE", "cma_disclosure_filed": False}, "effect": {"decision": "deny", "reason": "ke_cma_disclosure_required", "required_action": "file_cma_product_disclosure"}},
+	{"name": "ng_sec_fund_management_compliance", "description": "Nigeria SEC fund management rules compliance required.", "condition": {"operation": "manage_portfolio", "country": "NG", "ng_sec_compliant": False}, "effect": {"decision": "deny", "reason": "ng_sec_fund_management_compliance_required", "required_action": "comply_with_ng_sec_fund_management_rules"}},
+	{"name": "portfolio_aml_screening_required", "description": "Portfolio clients require AML screening.", "condition": {"operation": "onboard_client", "aml_screened": False}, "effect": {"decision": "deny", "reason": "portfolio_client_aml_screening_required", "required_action": "screen_portfolio_client"}},
 ]
+
 
 
 def get_capability_contract(tenant_id: str = "default") -> dict[str, Any]:

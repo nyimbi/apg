@@ -1,624 +1,399 @@
 """
-APG Audit Logging Views
+APG Audit Logging — Flask Blueprint UI views.
 
-Flask-AppBuilder views for governed audit logging UI with real-time dashboards,
-natural language search, and collaborative investigation interfaces.
+Plain Flask blueprint (no flask_appbuilder).
+URL prefix: /audl
 
-© 2025 Datacraft - www.datacraft.co.ke
+Views
+-----
+  GET  /audl/                      dashboard (KPIs, recent events, compliance status)
+  GET  /audl/events                event list with filters
+  GET  /audl/events/<id>           event detail
+  GET  /audl/trails                trail list
+  GET  /audl/trails/<id>           trail detail
+  GET  /audl/compliance            compliance report list
+  GET  /audl/dsr                   data subject request list
+  GET  /audl/dsr/<id>              DSR detail
+  GET  /audl/evidence              evidence package list
+  GET  /audl/tamper                tamper scan list
+  GET  /audl/reports/risk          risk summary report
+
+All views render via render_template() with Jinja2 templates from
+templates/audit/.  JSON fallback is returned when the Accept header
+prefers application/json (useful for headless clients).
+
+© 2025 Datacraft  www.datacraft.co.ke
 Author: Nyimbi Odero <nyimbi@gmail.com>
 """
+from __future__ import annotations
 
-from flask import render_template, request, jsonify, flash
-from flask_appbuilder import ModelView, BaseView, expose, has_access
-from flask_appbuilder.models.mixins import AuditMixin
-from flask_appbuilder.charts.views import DirectByChartView
-from wtforms import Form, StringField, SelectField, TextAreaField, DateTimeField
-from wtforms.validators import DataRequired, Optional
-from wtforms.widgets import TextArea
-from datetime import datetime, timedelta
-import json
 import asyncio
-from typing import Dict, Any, List, Optional
+import logging
+from datetime import datetime, timedelta, timezone
+from typing import Any
 
-from .models import AuditEvent, AuditLevel, AuditEventType, EventSource, ComplianceFramework
-from .service import AuditService
+from flask import (
+	Blueprint,
+	Response,
+	flash,
+	g,
+	jsonify,
+	redirect,
+	render_template,
+	request,
+	url_for,
+)
 
-# APG Integration imports
-try:
-	from ..auth.models import User
-	from ..mten.service import get_current_tenant
-	from ..ntfy.service import NotificationService
-	from ..colb.service import CollaborationService
-except ImportError:
-	# Mock for development
-	User = None
-	get_current_tenant = lambda: "test_tenant"
-	NotificationService = None
-	CollaborationService = None
+from .models import (
+	AuditQueryCreate,
+	ComplianceFramework,
+	ComplianceReportCreate,
+	EvidencePackageCreate,
+	TamperDetectionCreate,
+	uuid7str,
+)
+from .service import AuditLoggingService
 
-class AuditEventSearchForm(Form):
-	"""Advanced audit event search form"""
-	query = StringField(
-		'Natural Language Query',
-		description='Ask questions like "show me failed login attempts last week" or "find admin changes to user permissions"'
-	)
-	event_type = SelectField(
-		'Event Type',
-		choices=[('', 'All Types')] + [(t.value, t.value) for t in AuditEventType],
-		validators=[Optional()]
-	)
-	level = SelectField(
-		'Level',
-		choices=[('', 'All Levels')] + [(l.value, l.value) for l in AuditLevel],
-		validators=[Optional()]
-	)
-	source = SelectField(
-		'Source',
-		choices=[('', 'All Sources')] + [(s.value, s.value) for s in EventSource],
-		validators=[Optional()]
-	)
-	user_id = StringField(
-		'User ID',
-		description='Filter by specific user'
-	)
-	date_start = DateTimeField(
-		'Start Date',
-		validators=[Optional()],
-		default=lambda: datetime.utcnow() - timedelta(days=7)
-	)
-	date_end = DateTimeField(
-		'End Date',
-		validators=[Optional()],
-		default=datetime.utcnow
-	)
-	resource_type = StringField(
-		'Resource Type',
-		description='Filter by resource type (e.g., document, user, system)'
-	)
-	risk_score_min = SelectField(
-		'Minimum Risk Score',
-		choices=[('', 'Any Risk Level'), ('0.3', 'Low'), ('0.6', 'Medium'), ('0.8', 'High'), ('0.9', 'Critical')],
-		validators=[Optional()]
-	)
+log = logging.getLogger(__name__)
 
-class ComplianceReportForm(Form):
-	"""Compliance report generation form"""
-	framework = SelectField(
-		'Compliance Framework',
-		choices=[(f.value, f.value) for f in ComplianceFramework],
-		validators=[DataRequired()]
-	)
-	date_start = DateTimeField(
-		'Report Start Date',
-		validators=[DataRequired()],
-		default=lambda: datetime.utcnow() - timedelta(days=30)
-	)
-	date_end = DateTimeField(
-		'Report End Date',
-		validators=[DataRequired()],
-		default=datetime.utcnow
-	)
-	format = SelectField(
-		'Export Format',
-		choices=[('json', 'JSON'), ('pdf', 'PDF Report'), ('excel', 'Excel Spreadsheet')],
-		validators=[DataRequired()],
-		default='pdf'
-	)
-	include_violations = SelectField(
-		'Include Violations',
-		choices=[('true', 'Yes'), ('false', 'No')],
-		validators=[DataRequired()],
-		default='true'
-	)
-	include_recommendations = SelectField(
-		'Include Recommendations',
-		choices=[('true', 'Yes'), ('false', 'No')],
-		validators=[DataRequired()],
-		default='true'
-	)
+# ---------------------------------------------------------------------------
+# Blueprint
+# ---------------------------------------------------------------------------
 
-class AuditDashboardView(BaseView):
-	"""Production-grade real-time audit dashboard"""
-	
-	route_base = "/audit"
-	default_view = "dashboard"
-	
-	@expose("/")
-	@expose("/dashboard")
-	@has_access
-	def dashboard(self):
-		"""Main audit dashboard with real-time monitoring"""
-		tenant_id = get_current_tenant()
-		
-		# Get recent activity summary
-		try:
-			audit_service = AuditService(tenant_id=tenant_id)
-			loop = asyncio.new_event_loop()
-			asyncio.set_event_loop(loop)
-			
-			try:
-				# Get dashboard metrics
-				metrics = loop.run_until_complete(audit_service.get_metrics())
-				recent_events = loop.run_until_complete(
-					self._get_recent_events(audit_service)
-				)
-				risk_summary = loop.run_until_complete(
-					self._get_risk_summary(audit_service)
-				)
-				compliance_status = loop.run_until_complete(
-					self._get_compliance_status(audit_service)
-				)
-				
-			finally:
-				loop.close()
-				
-		except Exception as e:
-			flash(f"Error loading dashboard data: {str(e)}", "error")
-			metrics = {"status": "error", "metrics": {}, "buffer_size": 0}
-			recent_events = []
-			risk_summary = {}
-			compliance_status = {}
-		
-		return self.render_template(
-			"audit/dashboard.html",
-			metrics=metrics,
-			recent_events=recent_events,
-			risk_summary=risk_summary,
-			compliance_status=compliance_status,
-			tenant_id=tenant_id
+audl_ui = Blueprint(
+	"audl_ui",
+	__name__,
+	url_prefix="/audl",
+	template_folder="templates",
+)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _svc() -> AuditLoggingService:
+	tenant_id = getattr(g, "tenant_id", None) or request.headers.get("X-Tenant-Id", "default")
+	actor_id  = getattr(g, "actor_id",  None) or request.headers.get("X-Actor-Id",  "anonymous")
+	db        = getattr(g, "db_session", None)
+	return AuditLoggingService(db_session=db, tenant_id=tenant_id, actor_id=actor_id)
+
+
+def _run(coro):
+	try:
+		loop = asyncio.get_event_loop()
+		if loop.is_running():
+			import concurrent.futures
+			with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+				return pool.submit(asyncio.run, coro).result()
+		return loop.run_until_complete(coro)
+	except RuntimeError:
+		return asyncio.run(coro)
+
+
+def _wants_json() -> bool:
+	best = request.accept_mimetypes.best_match(["application/json", "text/html"])
+	return best == "application/json"
+
+
+def _render_or_json(template: str, ctx: dict[str, Any], status: int = 200) -> Response:
+	if _wants_json():
+		# Sanitise for JSON: convert pydantic models
+		safe: dict[str, Any] = {}
+		for k, v in ctx.items():
+			if hasattr(v, "model_dump"):
+				safe[k] = v.model_dump(mode="json")
+			elif isinstance(v, list) and v and hasattr(v[0], "model_dump"):
+				safe[k] = [i.model_dump(mode="json") for i in v]
+			else:
+				safe[k] = v
+		return jsonify(safe), status
+	return render_template(template, **ctx), status
+
+
+# ---------------------------------------------------------------------------
+# Dashboard
+# ---------------------------------------------------------------------------
+
+@audl_ui.get("/")
+@audl_ui.get("/dashboard")
+def dashboard():
+	"""
+	Main audit dashboard.
+
+	KPIs: total events (30d), high-risk events, compliance violations, active trails.
+	"""
+	svc  = _svc()
+	now  = datetime.now(timezone.utc)
+	ps   = now - timedelta(days=30)
+
+	try:
+		summary = _run(svc.risk_summary(ps, now))
+		trails  = _run(svc.list_trails(active_only=True))
+	except Exception as exc:
+		log.exception("dashboard error")
+		flash(f"Dashboard data unavailable: {exc}", "error")
+		summary = None
+		trails  = []
+
+	recent_events = sorted(
+		[ev for ev in svc._events.values() if ev.tenant_id == svc.tenant_id],
+		key=lambda e: e.created_at,
+		reverse=True,
+	)[:20]
+
+	ctx = {
+		"summary":       summary,
+		"trails":        trails,
+		"recent_events": recent_events,
+		"tenant_id":     svc.tenant_id,
+		"now":           now,
+	}
+	return _render_or_json("audit/dashboard.html", ctx)
+
+
+# ---------------------------------------------------------------------------
+# Events
+# ---------------------------------------------------------------------------
+
+@audl_ui.get("/events")
+def list_events():
+	"""
+	Event list with optional filter params:
+	  event_type, actor_id, resource_id, date_start, date_end,
+	  risk_min, success, limit, offset
+	"""
+	svc = _svc()
+	p   = request.args
+
+	def _dt(key: str) -> datetime | None:
+		v = p.get(key)
+		return datetime.fromisoformat(v) if v else None
+
+	from .models import AuditEventType, EventSource
+	q = AuditQueryCreate(
+		tenant_id    = svc.tenant_id,
+		query_type   = "structured",
+		event_types  = [AuditEventType(p["event_type"])] if p.get("event_type") else [],
+		actor_ids    = [p["actor_id"]]    if p.get("actor_id")    else [],
+		resource_ids = [p["resource_id"]] if p.get("resource_id") else [],
+		date_start   = _dt("date_start"),
+		date_end     = _dt("date_end"),
+		risk_score_min = float(p["risk_min"]) if p.get("risk_min") else None,
+		success      = None if not p.get("success") else p["success"].lower() == "true",
+		limit        = int(p.get("limit",  100)),
+		offset       = int(p.get("offset", 0)),
+		requested_by = svc.actor_id,
+	)
+	result = _run(svc.audit_trail_search(q))
+	ctx    = {"result": result, "query": q, "tenant_id": svc.tenant_id}
+	return _render_or_json("audit/events.html", ctx)
+
+
+@audl_ui.get("/events/<event_id>")
+def event_detail(event_id: str):
+	"""Full event detail view with integrity status."""
+	svc = _svc()
+	ev  = svc._events.get(event_id)
+	if ev is None or ev.tenant_id != svc.tenant_id:
+		flash("Event not found", "error")
+		return redirect(url_for("audl_ui.list_events"))
+	ctx = {
+		"event":           ev,
+		"integrity_ok":    ev.verify_integrity(),
+		"tenant_id":       svc.tenant_id,
+	}
+	return _render_or_json("audit/event_detail.html", ctx)
+
+
+# ---------------------------------------------------------------------------
+# Trails
+# ---------------------------------------------------------------------------
+
+@audl_ui.get("/trails")
+def list_trails():
+	svc         = _svc()
+	active_only = request.args.get("active_only", "true").lower() != "false"
+	trails      = _run(svc.list_trails(active_only=active_only))
+	ctx         = {"trails": trails, "tenant_id": svc.tenant_id}
+	return _render_or_json("audit/trails.html", ctx)
+
+
+@audl_ui.get("/trails/<trail_id>")
+def trail_detail(trail_id: str):
+	svc = _svc()
+	try:
+		trail = _run(svc.get_trail(trail_id))
+	except KeyError:
+		flash("Trail not found", "error")
+		return redirect(url_for("audl_ui.list_trails"))
+	# Events associated with trail (naive: all events for tenant, in production filter by trail_id FK)
+	trail_events = sorted(
+		[ev for ev in svc._events.values() if ev.tenant_id == svc.tenant_id],
+		key=lambda e: e.created_at, reverse=True,
+	)[:50]
+	ctx = {"trail": trail, "events": trail_events, "tenant_id": svc.tenant_id}
+	return _render_or_json("audit/trail_detail.html", ctx)
+
+
+# ---------------------------------------------------------------------------
+# Compliance reports
+# ---------------------------------------------------------------------------
+
+@audl_ui.get("/compliance")
+def list_compliance_reports():
+	svc     = _svc()
+	reports = [r for r in svc._reports.values() if r.tenant_id == svc.tenant_id]
+	reports.sort(key=lambda r: r.created_at, reverse=True)
+	ctx = {"reports": reports, "frameworks": list(ComplianceFramework), "tenant_id": svc.tenant_id}
+	return _render_or_json("audit/compliance.html", ctx)
+
+
+@audl_ui.post("/compliance/generate")
+def generate_compliance_report():
+	"""
+	Trigger report generation from a form POST.
+
+	Form fields: framework, period_start, period_end, export_format
+	"""
+	svc     = _svc()
+	form    = request.form
+	now     = datetime.now(timezone.utc)
+
+	try:
+		req = ComplianceReportCreate(
+			tenant_id    = svc.tenant_id,
+			framework    = ComplianceFramework(form.get("framework", "GDPR")),
+			period_start = datetime.fromisoformat(form.get("period_start",
+								(now - timedelta(days=30)).isoformat())),
+			period_end   = datetime.fromisoformat(form.get("period_end", now.isoformat())),
+			requested_by = svc.actor_id,
+			export_format= form.get("export_format", "json"),
 		)
-	
-	async def _get_recent_events(self, audit_service: AuditService, limit: int = 50) -> List[Dict]:
-		"""Get recent audit events for dashboard"""
-		# Mock implementation - in production would query actual events
-		from uuid_extensions import uuid7str
-		
-		events = []
-		event_types = list(AuditEventType)
-		levels = list(AuditLevel)
-		
-		for i in range(limit):
-			event = {
-				"id": uuid7str(),
-				"timestamp": (datetime.utcnow() - timedelta(minutes=i*2)).isoformat(),
-				"level": levels[i % len(levels)].value,
-				"event_type": event_types[i % len(event_types)].value,
-				"user_id": f"user_{i % 10}",
-				"action": f"action_{i}",
-				"resource_type": ["document", "user", "system"][i % 3],
-				"resource_id": f"resource_{i}",
-				"risk_score": min(1.0, (i % 10) * 0.1 + 0.1),
-				"success": i % 4 != 0  # 75% success rate
-			}
-			events.append(event)
-		
-		return events
-	
-	async def _get_risk_summary(self, audit_service: AuditService) -> Dict:
-		"""Get risk analysis summary"""
-		return {
-			"critical_events": 12,
-			"high_risk_events": 45,
-			"anomalies_detected": 8,
-			"risk_trend": "increasing",
-			"top_risk_categories": [
-				{"category": "authentication", "count": 23, "avg_risk": 0.7},
-				{"category": "data_access", "count": 34, "avg_risk": 0.4},
-				{"category": "system_config", "count": 12, "avg_risk": 0.8}
-			]
-		}
-	
-	async def _get_compliance_status(self, audit_service: AuditService) -> Dict:
-		"""Get compliance monitoring status"""
-		return {
-			"frameworks": [
-				{"name": "GDPR", "compliance_score": 0.92, "violations": 2, "status": "good"},
-				{"name": "SOX", "compliance_score": 0.88, "violations": 5, "status": "warning"},
-				{"name": "HIPAA", "compliance_score": 0.95, "violations": 1, "status": "excellent"},
-				{"name": "PCI-DSS", "compliance_score": 0.85, "violations": 8, "status": "needs_attention"}
-			],
-			"recent_violations": [
-				{"framework": "SOX", "description": "Unauthorized financial data access", "severity": "high"},
-				{"framework": "GDPR", "description": "Personal data exported without consent", "severity": "critical"}
-			]
-		}
+		report = _run(svc.compliance_report(req))
+		flash(f"Report {report.id} generated ({report.violation_count} violations).", "success")
+	except Exception as exc:
+		log.exception("compliance report generation failed")
+		flash(f"Report generation failed: {exc}", "error")
 
-class AuditSearchView(BaseView):
-	"""Production-grade natural language search interface"""
-	
-	route_base = "/audit/search"
-	
-	@expose("/", methods=["GET", "POST"])
-	@has_access
-	def search(self):
-		"""Advanced audit log search with natural language queries"""
-		form = AuditEventSearchForm(request.form)
-		results = []
-		search_context = None
-		
-		if request.method == "POST" and form.validate():
-			tenant_id = get_current_tenant()
-			
-			try:
-				audit_service = AuditService(tenant_id=tenant_id)
-				loop = asyncio.new_event_loop()
-				asyncio.set_event_loop(loop)
-				
-				try:
-					if form.query.data:
-						# Natural language search
-						results, search_context = loop.run_until_complete(
-							self._natural_language_search(audit_service, form.query.data)
-						)
-					else:
-						# Advanced filter search
-						results = loop.run_until_complete(
-							self._advanced_filter_search(audit_service, form)
-						)
-				finally:
-					loop.close()
-					
-			except Exception as e:
-				flash(f"Search failed: {str(e)}", "error")
-		
-		return self.render_template(
-			"audit/search.html",
-			form=form,
-			results=results,
-			search_context=search_context
-		)
-	
-	async def _natural_language_search(self, audit_service: AuditService, query: str):
-		"""Execute natural language search"""
-		# Mock implementation - in production would use APG NLP service
-		results = []
-		context = {
-			"interpreted_query": f"Searching for: {query}",
-			"query_type": "natural_language",
-			"confidence": 0.92,
-			"suggestions": [
-				"Try: 'show failed login attempts today'",
-				"Try: 'find admin changes to user permissions this week'",
-				"Try: 'list high-risk events from user john.doe'"
-			]
-		}
-		
-		# Generate mock results based on query
-		query_lower = query.lower()
-		event_count = 5 if "failed" in query_lower else 10
-		
-		from uuid_extensions import uuid7str
-		for i in range(event_count):
-			event = AuditEvent(
-				id=uuid7str(),
-				tenant_id="test_tenant",
-				level=AuditLevel.WARNING if "failed" in query_lower else AuditLevel.INFO,
-				event_type=AuditEventType.USER_FAILED_LOGIN if "login" in query_lower else AuditEventType.DATA_READ,
-				source=EventSource.AUTH,
-				category="authentication" if "login" in query_lower else "data_access",
-				user_id=f"user_{i}",
-				action="login_attempt" if "login" in query_lower else f"data_access_{i}",
-				success=False if "failed" in query_lower else True,
-				timestamp=datetime.utcnow() - timedelta(hours=i)
-			)
-			results.append(event)
-		
-		return results, context
-	
-	async def _advanced_filter_search(self, audit_service: AuditService, form):
-		"""Execute advanced filter search"""
-		# Mock implementation
-		results = []
-		from uuid_extensions import uuid7str
-		
-		for i in range(15):
-			event = AuditEvent(
-				id=uuid7str(),
-				tenant_id="test_tenant",
-				level=AuditLevel.INFO,
-				event_type=AuditEventType.DATA_READ,
-				source=EventSource.APG_CORE,
-				category="data_access",
-				user_id=form.user_id.data or f"user_{i}",
-				action=f"filtered_action_{i}",
-				resource_type=form.resource_type.data or "document",
-				resource_id=f"resource_{i}",
-				timestamp=datetime.utcnow() - timedelta(hours=i)
-			)
-			results.append(event)
-		
-		return results
+	return redirect(url_for("audl_ui.list_compliance_reports"))
 
-class ComplianceReportView(BaseView):
-	"""Automated compliance reporting interface"""
-	
-	route_base = "/audit/compliance"
-	
-	@expose("/", methods=["GET", "POST"])
-	@has_access
-	def reports(self):
-		"""Generate and manage compliance reports"""
-		form = ComplianceReportForm(request.form)
-		recent_reports = []
-		
-		if request.method == "POST" and form.validate():
-			tenant_id = get_current_tenant()
-			
-			try:
-				# Generate compliance report
-				report_id = self._generate_compliance_report(tenant_id, form)
-				flash(f"Compliance report generation started. Report ID: {report_id}", "success")
-				
-			except Exception as e:
-				flash(f"Report generation failed: {str(e)}", "error")
-		
-		# Get recent reports
-		recent_reports = self._get_recent_reports()
-		
-		return self.render_template(
-			"audit/compliance.html",
-			form=form,
-			recent_reports=recent_reports
-		)
-	
-	def _generate_compliance_report(self, tenant_id: str, form: ComplianceReportForm) -> str:
-		"""Generate compliance report in background"""
-		from uuid_extensions import uuid7str
-		
-		report_id = uuid7str()
-		
-		# In production, this would trigger background report generation
-		# For now, simulate the process
-		
-		return report_id
-	
-	def _get_recent_reports(self) -> List[Dict]:
-		"""Get recent compliance reports"""
-		from uuid_extensions import uuid7str
-		
-		reports = []
-		frameworks = list(ComplianceFramework)
-		
-		for i in range(10):
-			report = {
-				"id": uuid7str(),
-				"framework": frameworks[i % len(frameworks)].value,
-				"generated_at": (datetime.utcnow() - timedelta(days=i)).isoformat(),
-				"status": ["completed", "generating", "failed"][i % 3],
-				"format": ["pdf", "excel", "json"][i % 3],
-				"file_size": f"{(i+1)*2.3:.1f} MB"
-			}
-			reports.append(report)
-		
-		return reports
 
-class AuditInvestigationView(BaseView):
-	"""Collaborative audit investigation interface"""
-	
-	route_base = "/audit/investigate"
-	
-	@expose("/")
-	@has_access
-	def investigations(self):
-		"""Manage collaborative audit investigations"""
-		tenant_id = get_current_tenant()
-		
-		# Get active investigations
-		active_investigations = self._get_active_investigations(tenant_id)
-		recent_findings = self._get_recent_findings(tenant_id)
-		
-		return self.render_template(
-			"audit/investigations.html",
-			active_investigations=active_investigations,
-			recent_findings=recent_findings
-		)
-	
-	@expose("/create", methods=["GET", "POST"])
-	@has_access
-	def create_investigation(self):
-		"""Create new investigation"""
-		if request.method == "POST":
-			# Create investigation logic
-			investigation_data = request.get_json()
-			investigation_id = self._create_investigation(investigation_data)
-			
-			return jsonify({
-				"success": True,
-				"investigation_id": investigation_id,
-				"message": "Investigation created successfully"
-			})
-		
-		return self.render_template("audit/create_investigation.html")
-	
-	@expose("/<investigation_id>")
-	@has_access
-	def investigation_detail(self, investigation_id: str):
-		"""Investigation detail view with collaborative tools"""
-		investigation = self._get_investigation_details(investigation_id)
-		timeline = self._get_investigation_timeline(investigation_id)
-		collaborators = self._get_investigation_collaborators(investigation_id)
-		
-		return self.render_template(
-			"audit/investigation_detail.html",
-			investigation=investigation,
-			timeline=timeline,
-			collaborators=collaborators
-		)
-	
-	def _get_active_investigations(self, tenant_id: str) -> List[Dict]:
-		"""Get active investigations"""
-		from uuid_extensions import uuid7str
-		
-		investigations = []
-		for i in range(5):
-			investigation = {
-				"id": uuid7str(),
-				"title": f"Investigation {i+1}: Suspicious Activity Analysis",
-				"description": f"Investigating unusual access patterns detected on {datetime.utcnow().date()}",
-				"status": ["active", "pending", "completed"][i % 3],
-				"priority": ["high", "medium", "low"][i % 3],
-				"assigned_to": f"investigator_{i+1}",
-				"created_at": (datetime.utcnow() - timedelta(days=i)).isoformat(),
-				"events_count": (i+1) * 12,
-				"findings_count": i * 3
-			}
-			investigations.append(investigation)
-		
-		return investigations
-	
-	def _get_recent_findings(self, tenant_id: str) -> List[Dict]:
-		"""Get recent investigation findings"""
-		findings = []
-		for i in range(8):
-			finding = {
-				"id": f"finding_{i+1}",
-				"investigation_id": f"inv_{i+1}",
-				"title": f"Finding {i+1}: Unauthorized access detected",
-				"severity": ["critical", "high", "medium", "low"][i % 4],
-				"description": f"Analysis reveals suspicious pattern in audit event {i+1}",
-				"discovered_at": (datetime.utcnow() - timedelta(hours=i*2)).isoformat(),
-				"analyst": f"analyst_{i+1}"
-			}
-			findings.append(finding)
-		
-		return findings
-	
-	def _create_investigation(self, data: Dict) -> str:
-		"""Create new investigation"""
-		from uuid_extensions import uuid7str
-		return uuid7str()
-	
-	def _get_investigation_details(self, investigation_id: str) -> Dict:
-		"""Get investigation details"""
-		return {
-			"id": investigation_id,
-			"title": "Advanced Persistent Threat Investigation",
-			"description": "Investigating coordinated attack patterns across multiple user accounts",
-			"status": "active",
-			"priority": "critical",
-			"created_at": datetime.utcnow().isoformat(),
-			"assigned_investigators": ["analyst1", "analyst2", "security_lead"],
-			"tags": ["apt", "credential_stuffing", "data_exfiltration"],
-			"evidence_count": 47,
-			"timeline_events": 156
-		}
-	
-	def _get_investigation_timeline(self, investigation_id: str) -> List[Dict]:
-		"""Get investigation timeline"""
-		timeline = []
-		for i in range(10):
-			event = {
-				"timestamp": (datetime.utcnow() - timedelta(hours=i*2)).isoformat(),
-				"type": ["evidence_added", "finding_created", "note_added", "status_updated"][i % 4],
-				"title": f"Timeline Event {i+1}",
-				"description": f"Investigation activity: {i+1}",
-				"analyst": f"analyst_{i % 3 + 1}"
-			}
-			timeline.append(event)
-		
-		return timeline
-	
-	def _get_investigation_collaborators(self, investigation_id: str) -> List[Dict]:
-		"""Get investigation collaborators"""
-		return [
-			{"name": "Security Analyst 1", "role": "Lead Investigator", "status": "active"},
-			{"name": "Security Analyst 2", "role": "Evidence Collector", "status": "active"},
-			{"name": "Compliance Officer", "role": "Compliance Review", "status": "reviewing"},
-			{"name": "IT Manager", "role": "Technical Support", "status": "available"}
-		]
+# ---------------------------------------------------------------------------
+# Data Subject Requests
+# ---------------------------------------------------------------------------
 
-class AuditSettingsView(BaseView):
-	"""Audit logging configuration and settings"""
-	
-	route_base = "/audit/settings"
-	
-	@expose("/")
-	@has_access
-	def settings(self):
-		"""Audit logging settings and configuration"""
-		tenant_id = get_current_tenant()
-		
-		# Get current settings
-		current_settings = self._get_current_settings(tenant_id)
-		retention_policies = self._get_retention_policies(tenant_id)
-		alert_rules = self._get_alert_rules(tenant_id)
-		
-		return self.render_template(
-			"audit/settings.html",
-			settings=current_settings,
-			retention_policies=retention_policies,
-			alert_rules=alert_rules
-		)
-	
-	@expose("/update", methods=["POST"])
-	@has_access
-	def update_settings(self):
-		"""Update audit logging settings"""
-		settings_data = request.get_json()
-		
-		try:
-			self._update_settings(settings_data)
-			flash("Settings updated successfully", "success")
-			return jsonify({"success": True})
-		except Exception as e:
-			flash(f"Settings update failed: {str(e)}", "error")
-			return jsonify({"success": False, "error": str(e)})
-	
-	def _get_current_settings(self, tenant_id: str) -> Dict:
-		"""Get current audit settings"""
-		return {
-			"event_retention_days": 365,
-			"high_risk_threshold": 0.7,
-			"real_time_alerting": True,
-			"ml_anomaly_detection": True,
-			"compliance_monitoring": True,
-			"export_encryption": True,
-			"backup_enabled": True,
-			"backup_frequency": "daily"
-		}
-	
-	def _get_retention_policies(self, tenant_id: str) -> List[Dict]:
-		"""Get data retention policies"""
-		return [
-			{"type": "audit_events", "retention_days": 365, "archive_after_days": 90},
-			{"type": "compliance_reports", "retention_days": 2555, "archive_after_days": 365},  # 7 years
-			{"type": "investigation_data", "retention_days": 1825, "archive_after_days": 365},  # 5 years
-			{"type": "system_logs", "retention_days": 90, "archive_after_days": 30}
-		]
-	
-	def _get_alert_rules(self, tenant_id: str) -> List[Dict]:
-		"""Get alerting rules"""
-		return [
-			{
-				"name": "Critical Risk Events",
-				"condition": "risk_score >= 0.9",
-				"enabled": True,
-				"notification_channels": ["email", "slack", "sms"]
-			},
-			{
-				"name": "Multiple Failed Logins",
-				"condition": "failed_login_count >= 5 in 10 minutes",
-				"enabled": True,
-				"notification_channels": ["email", "slack"]
-			},
-			{
-				"name": "Compliance Violations",
-				"condition": "compliance_violation = true",
-				"enabled": True,
-				"notification_channels": ["email", "webhook"]
-			}
-		]
-	
-	def _update_settings(self, settings_data: Dict) -> None:
-		"""Update audit settings"""
-		# In production, this would update database settings
-		pass
+@audl_ui.get("/dsr")
+def list_dsrs():
+	svc  = _svc()
+	dsrs = _run(svc.list_dsrs())
+	ctx  = {"dsrs": dsrs, "tenant_id": svc.tenant_id}
+	return _render_or_json("audit/dsr_list.html", ctx)
 
-# Export all views for APG integration
-__all__ = [
-	"AuditDashboardView",
-	"AuditSearchView", 
-	"ComplianceReportView",
-	"AuditInvestigationView",
-	"AuditSettingsView"
-]
+
+@audl_ui.get("/dsr/<dsr_id>")
+def dsr_detail(dsr_id: str):
+	svc = _svc()
+	rec = svc._dsrs.get(dsr_id)
+	if rec is None or rec.tenant_id != svc.tenant_id:
+		flash("DSR not found", "error")
+		return redirect(url_for("audl_ui.list_dsrs"))
+	ctx = {"dsr": rec, "tenant_id": svc.tenant_id}
+	return _render_or_json("audit/dsr_detail.html", ctx)
+
+
+# ---------------------------------------------------------------------------
+# Evidence packages
+# ---------------------------------------------------------------------------
+
+@audl_ui.get("/evidence")
+def list_evidence_packages():
+	svc      = _svc()
+	packages = _run(svc.list_evidence_packages())
+	ctx      = {"packages": packages, "tenant_id": svc.tenant_id}
+	return _render_or_json("audit/evidence.html", ctx)
+
+
+@audl_ui.get("/evidence/<pkg_id>")
+def evidence_detail(pkg_id: str):
+	svc = _svc()
+	try:
+		pkg = _run(svc.get_evidence_package(pkg_id))
+	except KeyError:
+		flash("Evidence package not found", "error")
+		return redirect(url_for("audl_ui.list_evidence_packages"))
+	ctx = {"package": pkg, "tenant_id": svc.tenant_id}
+	return _render_or_json("audit/evidence_detail.html", ctx)
+
+
+# ---------------------------------------------------------------------------
+# Tamper detection
+# ---------------------------------------------------------------------------
+
+@audl_ui.get("/tamper")
+def list_tamper_scans():
+	svc   = _svc()
+	scans = [s for s in svc._tampers.values() if s.tenant_id == svc.tenant_id]
+	scans.sort(key=lambda s: s.created_at, reverse=True)
+	ctx = {"scans": scans, "tenant_id": svc.tenant_id}
+	return _render_or_json("audit/tamper.html", ctx)
+
+
+@audl_ui.post("/tamper/run")
+def run_tamper_scan():
+	"""Trigger an on-demand tamper detection scan."""
+	svc = _svc()
+	try:
+		scan = _run(svc.tamper_detection(TamperDetectionCreate(
+			tenant_id  = svc.tenant_id,
+			scan_type  = "on-demand",
+			scanned_by = svc.actor_id,
+		)))
+		flash(
+			f"Scan {scan.id}: {scan.events_scanned} events checked, "
+			f"{scan.events_suspect} suspect — status {scan.status}.",
+			"success" if scan.events_suspect == 0 else "warning",
+		)
+	except Exception as exc:
+		log.exception("tamper scan failed")
+		flash(f"Scan failed: {exc}", "error")
+	return redirect(url_for("audl_ui.list_tamper_scans"))
+
+
+# ---------------------------------------------------------------------------
+# Risk summary report
+# ---------------------------------------------------------------------------
+
+@audl_ui.get("/reports/risk")
+def risk_report():
+	"""Risk summary for the last 30 days (or custom window via query params)."""
+	svc = _svc()
+	now = datetime.now(timezone.utc)
+	p   = request.args
+	ps  = datetime.fromisoformat(p["period_start"]) if p.get("period_start") else now - timedelta(days=30)
+	pe  = datetime.fromisoformat(p["period_end"])   if p.get("period_end")   else now
+	summary = _run(svc.risk_summary(ps, pe))
+	ctx     = {"summary": summary, "tenant_id": svc.tenant_id}
+	return _render_or_json("audit/risk_report.html", ctx)
+
+
+# ---------------------------------------------------------------------------
+# Error handlers
+# ---------------------------------------------------------------------------
+
+@audl_ui.errorhandler(404)
+def not_found(e):
+	if _wants_json():
+		return jsonify({"error": "not found"}), 404
+	return render_template("audit/404.html"), 404
+
+
+@audl_ui.errorhandler(500)
+def server_error(e):
+	log.exception("audl_ui unhandled error")
+	if _wants_json():
+		return jsonify({"error": "internal server error"}), 500
+	return render_template("audit/500.html"), 500
+
+
+__all__ = ["audl_ui"]

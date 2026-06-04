@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "pharma_com",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "pharma_com": {
+      "capability": "pharma_com"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

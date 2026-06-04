@@ -387,6 +387,29 @@ def streaming_manifest() -> dict[str, Any]:
 	}
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.grag.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"graph_ingested",
+		"graph_updated",
+		"entity_extracted",
+		"relationship_mapped",
+		"query_executed",
+		"retrieval_completed",
+		"answer_generated",
+		"graph_pruned",
+		"index_refreshed",
+		"agent_registered",
+	],
+	"guardrails": [
+		"grag_batch_requires_bytewax",
+		"grag_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	config = deepcopy(DEFAULT_CONFIGURATION)
 	config["tenant_id"] = tenant_id
@@ -409,7 +432,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"requires_theme": True,
 		},
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": deepcopy(STREAMING),
 		"theme": deepcopy(THEME),
 	}
 

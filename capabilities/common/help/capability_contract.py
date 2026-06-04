@@ -292,6 +292,30 @@ THEME: dict[str, Any] = {
 }
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.help.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"article_created",
+		"article_updated",
+		"article_published",
+		"article_archived",
+		"category_created",
+		"ticket_created",
+		"ticket_resolved",
+		"ticket_closed",
+		"search_executed",
+		"feedback_recorded",
+		"agent_registered",
+	],
+	"guardrails": [
+		"help_batch_requires_bytewax",
+		"help_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable HELP capability contract."""
 	config = deepcopy(DEFAULT_CONFIGURATION)
@@ -314,7 +338,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		},
 		"theme": deepcopy(THEME),
 		"agents": agent_manifest(config),
-		"streaming": streaming_manifest(config),
+		"streaming": deepcopy(STREAMING),
 	}
 
 

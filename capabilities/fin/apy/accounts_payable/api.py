@@ -5,9 +5,29 @@ from __future__ import annotations
 from typing import Any
 
 try:
+	from starlette.requests import Request
+except ImportError:
+	Request = Any  # type: ignore[assignment,misc]
+
+try:
+	from pydantic import BaseModel
+	class APGUserContext(BaseModel):
+		user_id: str
+		tenant_id: str
+		permissions: list[str] = []
+		roles: list[str] = []
+except ImportError:
+	class APGUserContext:  # type: ignore[no-redef]
+		def __init__(self, **kwargs: Any) -> None:
+			for k, v in kwargs.items():
+				setattr(self, k, v)
+
+try:
+	from .context import resolve_apg_user_context
 	from .capability_contract import get_capability_contract
 	from .service import AccountsPayableService
 except ImportError:
+	from context import resolve_apg_user_context  # type: ignore[no-redef]
 	from capability_contract import get_capability_contract
 	from service import AccountsPayableService
 
@@ -130,3 +150,8 @@ def list_records(tenant_id: str = "default") -> list[dict[str, Any]]:
 
 def service() -> AccountsPayableService:
 	return _SERVICE
+
+
+def get_current_user_context(request: Request) -> APGUserContext:
+	"""Resolve APG user context from the current request."""
+	return APGUserContext(**resolve_apg_user_context(request=request))

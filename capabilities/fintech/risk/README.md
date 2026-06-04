@@ -1,83 +1,123 @@
 # FinTech Risk Management
 
-`fintech_risk` is the APG package-backed FinTech Risk Management capability. It
-provides executable risk appetite, profile, exposure, limit, control, stress
-testing, breach, risk event, review, and AI-agent workflows for generated APG
-fintech applications.
+## Overview
+FinTech Risk Management provides the enterprise risk framework for the APG platform: risk appetite registration across credit, market, liquidity, operational, fraud, compliance, model, and third-party domains; tenant-scoped risk profiles for customers, merchants, wallets, accounts, portfolios, loans, agents, and counterparties; exposure tracking with limit enforcement and human-approval-gated overrides; control assurance with effectiveness scoring; stress scenario modeling; limit breach recording; risk event management; and governance reviews.
 
-The package is dependency-light and provider-neutral. It exposes a Python
-contract, deterministic rules, runtime service methods, process-local API
-helpers, UI view models, theme metadata, Bytewax lifecycle metadata, tests, and
-release evidence without requiring live core banking, payment, market-data,
-actuarial, model-vendor, regulator-filing, or AI-vendor integrations.
+Limit overrides require human approval — exceeding a limit without approval is a hard deny. Control effectiveness scores must be in a valid range. Stress scenario probabilities must be in basis points (0–10000). All risk events stream to `apg.fintech.risk.lifecycle` via Bytewax.
 
-## What It Provides
+## Capability ID
+`fintech_risk`  Version: 1.1.0
 
-- Risk appetite registration across credit, market, liquidity, operational,
-  fraud, compliance, model, and third-party domains.
-- Tenant-scoped risk profiles for customers, merchants, wallets, accounts,
-  portfolios, loans, agents, and counterparties.
-- Exposure recording with currency, source, limit, and human-approved override
-  guardrails.
-- Control assurance with owner, evidence, and effectiveness scoring.
-- Stress scenario recording with impact, probability, and mitigation evidence.
-- Limit breach and risk event intake.
-- Review workflows and provider-neutral risk agents for Codex, Claude Code,
-  OpenCode, and Pi.
-- UI route metadata and theme tokens for generated risk consoles.
+## Provides
+| Service | Description |
+|---------|-------------|
+| risk_appetite_workflow | Register risk appetite thresholds by domain with owner and evidence |
+| risk_profile_workflow | Create risk profiles for customers, merchants, accounts, portfolios, and counterparties |
+| risk_exposure_workflow | Record exposures with limit references and human-approval-gated overrides |
+| risk_control_workflow | Evaluate controls with type, owner, evidence, and effectiveness scoring |
+| risk_stress_testing_workflow | Record stress scenarios with impact, probability, and mitigation evidence |
+| risk_limit_breach_workflow | Record limit breaches with severity, exposure, and remediation owner |
+| risk_event_workflow | Open risk events with type, severity, profile, and evidence |
+| risk_review_workflow | Governance reviews for appetite changes, exposures, and breaches |
+| risk_agent_workflow | Register AI agents for exposure monitoring, stress testing, and control assurance |
 
-## Local Usage
+## Requires
+| Capability | Purpose |
+|------------|---------|
+| auth | Authentication |
+| audl | Audit trail |
+| ntfy | Risk officer notifications |
+| nlpc | NLP for risk narrative |
+| keym | Key management |
+| fintech_payments | Payment risk context |
+| fintech_wallets | Wallet risk context |
+| fintech_kyc | Customer identity for risk profiles |
+| fintech_aml | AML risk signals |
+| fintech_fraud | Fraud risk signals |
+| bia | Risk analytics |
+| fin_rpt | Risk reporting |
 
-Inspect the APG contract:
+## Configuration Reference
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| profiles.supported_subject_types | list | customer, merchant, wallet, account, portfolio, loan, agent, counterparty | Risk profile subjects |
+| appetite.supported_domains | list | credit, market, liquidity, operational, fraud, compliance, model, third_party | Risk domains |
+| exposures.supported_types | list | credit_limit, settlement, liquidity, fx, market_value, operational_loss, fraud_loss | Exposure categories |
+| controls.supported_types | list | preventive, detective, corrective, compensating, automated, manual | Control types |
+| events.supported_types | list | limit_breach, control_failure, loss_event, model_drift, policy_exception, third_party_issue | Risk event types |
+| breaches.supported_severities | list | low, medium, high, critical | Breach severity levels |
 
-```bash
-./.venv/bin/apg capabilities inspect fintech_risk --json
-```
+## API Routes
+| Name | Path | Method | Permission | Group |
+|------|------|--------|------------|-------|
+| dashboard | /fintech-risk/dashboard | GET | fintech_risk:view | Overview |
+| appetite | /fintech-risk/appetite | GET/POST | fintech_risk:appetite | Governance |
+| profiles | /fintech-risk/profiles | GET/POST | fintech_risk:profiles | Risk |
+| exposures | /fintech-risk/exposures | GET/POST | fintech_risk:exposures | Risk |
+| controls | /fintech-risk/controls | GET/POST | fintech_risk:controls | Controls |
+| stress_tests | /fintech-risk/stress-tests | GET/POST | fintech_risk:stress | Analytics |
+| breaches | /fintech-risk/breaches | GET/POST | fintech_risk:breaches | Issues |
+| events | /fintech-risk/events | GET/POST | fintech_risk:events | Issues |
+| reviews | /fintech-risk/reviews | GET/POST | fintech_risk:reviews | Governance |
+| agents | /fintech-risk/agents | GET/POST | fintech_risk:admin | Automation |
+| settings | /fintech-risk/settings | GET/POST | fintech_risk:admin | Administration |
 
-Run the local self-test:
+## Business Rules
+| Rule | Condition | Effect |
+|------|-----------|--------|
+| appetite_threshold_required | Risk appetite with zero or negative threshold | deny |
+| profile_kyc_required | Risk profile without KYC evidence | deny |
+| profile_score_range | Score outside valid range | deny |
+| exposure_amount_positive | Zero or negative exposure amount | deny |
+| exposure_limit_required | Exposure without positive limit | deny |
+| limit_override_requires_human_approval | Exposure over limit without approval | deny |
+| control_effectiveness_required | Effectiveness score out of valid range | deny |
+| scenario_probability_valid | Stress scenario probability out of range | deny |
+| scenario_mitigation_required | Stress scenario without mitigation | deny |
+| breach_evidence_required | Limit breach without evidence | deny |
+| breach_owner_required | Limit breach without remediation owner | deny |
+| risk_batch_requires_bytewax | Batch without Bytewax | deny |
+| privileged_risk_agent_action_requires_human_approval | AI agent privileged scope without approval | deny |
 
-```bash
-./.venv/bin/python capabilities/fintech/risk/app.py
-```
+## Data Models
+| Model | Key Fields |
+|-------|-----------|
+| RiskAppetite | id, domain, threshold_amount, currency, owner_id, evidence_reference |
+| RiskProfile | id, subject_reference, subject_type, kyc_reference, exposure_amount, currency, score, source_reference |
+| RiskExposure | id, profile_id, exposure_type, amount, currency, limit_amount, source_reference |
+| ControlEvaluation | id, profile_id, control_type, owner_id, evidence_reference, effectiveness_score |
+| StressScenario | id, profile_id, scenario_type, impact_amount, probability_bps, mitigation_reference |
+| LimitBreach | id, exposure_id, severity, evidence_reference, remediation_owner_id, status |
+| RiskEvent | id, profile_id, event_type, severity, evidence_reference, status |
 
-Run focused tests:
+## Streaming Events
+Events emitted to the fintech event stream via Bytewax.
+| Event | Trigger |
+|-------|---------|
+| risk_appetite_registered | Appetite threshold registered |
+| risk_profile_created | Risk profile created |
+| risk_exposure_recorded | Exposure recorded |
+| risk_control_evaluated | Control assurance recorded |
+| risk_stress_scenario_recorded | Stress scenario recorded |
+| risk_limit_breach_recorded | Limit breach recorded |
+| risk_event_opened | Risk event opened |
+| risk_review_recorded | Review completed |
+| risk_agent_registered | AI agent registered |
 
-```bash
-./.venv/bin/pytest -q capabilities/fintech/risk/tests/test_package_contract.py
-```
+## Edge Cases Handled
+- Limit overrides require human approval as a hard deny (not require_review) — this is stricter than most other capabilities; exceeding a risk limit without approval is denied, not just flagged for review
+- Stress scenario probability is expressed in basis points (0–10000 bps = 0–100%); a probability of 0 bps is valid (tail risk scenario), but values above 10000 are rejected
+- Control effectiveness scores have a valid range enforced by the rule engine; the range is 0–100 (defined by the service layer); the rule fires when the flag `effectiveness_score_valid: False` is set
+- Risk profiles cover both financial subjects (accounts, portfolios) and operational subjects (agents, counterparties); the subject type determines the semantic interpretation of the score
+- `model_drift` is a supported risk event type — this enables operational risk tracking for ML models used in scoring pipelines
 
-Use the service directly:
+## Composability
+- **Upstream**: `fintech_kyc` provides customer identity for risk profile creation; `fintech_aml` and `fintech_fraud` provide fraud and AML risk signals as inputs to profile scoring
+- **Downstream**: `fintech_compliance` reads control evaluation records as compliance control evidence; `fintech_blockchain` and `fintech_crypto` use risk profiles for DeFi and crypto operation governance; `fintech_lending` uses risk profiles for credit application review
+- **Peer**: Deployed alongside `fintech_compliance` (control framework) and `fintech_regtech` (regulatory capital requirements)
 
-```python
-from capabilities.fintech.risk import RiskManagementService
-
-service = RiskManagementService()
-appetite = service.register_appetite(
-    "appetite-1", "tenant-a", "credit", 5000000, "KES", "cro-a", "board-approval-1"
-)
-profile = service.create_profile(
-    "profile-1", "tenant-a", "customer-a", "customer", "kyc-a", 2000000, "KES", 54, "risk-engine-1"
-)
-exposure = service.record_exposure(
-    "exposure-1", "tenant-a", profile["id"], "credit_limit", 1500000, "KES", appetite["threshold_minor"], "loan-ledger-1"
-)
-service.evaluate_control(
-    "control-1", "tenant-a", profile["id"], "preventive", "control-owner-a", "control-evidence-1", 82
-)
-```
-
-## Rule Engine
-
-The deterministic rule engine is defined in `capability_contract.py` and
-enforced by `service.py`. Rules cover tenant context, write-policy evidence,
-risk appetite evidence, profile KYC/source/score, exposure limits, control
-assurance, stress scenarios, breach/event evidence, review evidence, Bytewax
-batch routing, supported AI-agent runtimes and roles, and human approval for
-privileged agent actions.
-
-## Composition
-
-The capability depends on APG auth, audit, notifications, NLP, keys, payments,
-wallets, KYC, AML, fraud, analytics, and reporting contracts. Live banking
-ledgers, market feeds, model engines, regulator filing, and durable Bytewax
-workers remain adapter responsibilities.
+## Development Notes
+- `human_approval_required_for_limit_override` is a governance configuration flag — it makes the limit override a hard deny rather than a require_review; this is intentionally stricter than the pattern elsewhere
+- The `third_party` domain covers third-party vendor risk, not just financial counterparties; this enables vendor risk assessments for technology providers and service partners
+- Risk appetite is per-domain, not per-subject; appetite thresholds apply organization-wide; individual subject exposure limits are separate and linked via the `limit_reference` on exposure records
+- `probability_bps` convention (basis points) avoids floating-point precision issues that arise when storing probabilities as percentages

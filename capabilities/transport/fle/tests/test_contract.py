@@ -60,7 +60,7 @@ def test_rule_tenant_context():
 
 
 def test_rule_batch():
-	assert evaluate_capability_rules({"tenant_context_present": True, "operation": "fleet_batch", "event_stream": "kafka"})["decision"] == "deny"
+	assert evaluate_capability_rules({"tenant_context_present": True, "operation": "fleet_batch", "event_stream": "non_bytewax"})["decision"] == "deny"
 
 
 def test_provides():

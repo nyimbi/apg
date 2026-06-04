@@ -293,7 +293,7 @@ def _execute_async_operation(operation, *args, **kwargs):
 				future = executor.submit(asyncio.run, operation(*args, **kwargs))
 				return future.result(timeout=30)
 		else:
-			return loop.run_until_complete(operation(*args, **kwargs))
+			return asyncio.run(operation(*args, **kwargs))
 	except RuntimeError:
 		# No event loop, create new one
 		return asyncio.run(operation(*args, **kwargs))

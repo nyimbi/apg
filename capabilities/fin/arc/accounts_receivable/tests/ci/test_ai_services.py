@@ -25,7 +25,7 @@ from ..ai_collections_optimization import (
 from ..ai_cashflow_forecasting import (
 	APGCashFlowForecastingService, CashFlowForecastInput, CashFlowDataPoint, CashFlowForecastSummary
 )
-from ..models import (
+from ...models import (
 	ARCustomer, ARInvoice, ARPayment, ARCollectionActivity,
 	ARCustomerType, ARCustomerStatus, ARInvoiceStatus, ARPaymentStatus
 )

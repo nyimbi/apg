@@ -295,6 +295,31 @@ THEME: dict[str, Any] = {
 }
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.ntfy.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"notification_sent",
+		"notification_delivered",
+		"notification_failed",
+		"notification_read",
+		"template_created",
+		"template_updated",
+		"channel_registered",
+		"channel_deactivated",
+		"subscription_created",
+		"subscription_cancelled",
+		"bulk_notification_processed",
+		"agent_registered",
+	],
+	"guardrails": [
+		"ntfy_batch_requires_bytewax",
+		"ntfy_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable NTFY capability contract."""
 	config = deepcopy(DEFAULT_CONFIGURATION)
@@ -317,7 +342,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		},
 		"theme": deepcopy(THEME),
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": deepcopy(STREAMING),
 	}
 
 

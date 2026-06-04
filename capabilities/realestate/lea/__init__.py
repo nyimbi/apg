@@ -1,10 +1,31 @@
+"""APG Lease Management capability.
+
+Standalone package: ``pip install apg-realestate-lea``
+
+Quick start::
+
+    from apg_realestate_lea import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : realestate_lea
+Provides      : lease_abstraction_engine, rent_escalation_scheduler, lease_option_tracker, ifrs16_asc842_compliance, lease_expiry_pipeline, rent_review_workflow
 """
-Leasing Management (LEA) - Real Estate Sub-Module
+from __future__ import annotations
 
-Lease lifecycle management including lease origination, renewals,
-amendments, and lease accounting compliance.
-"""
+__version__  = "1.0.0"
+__package_name__ = "apg-realestate-lea"
+__capability_id__ = "realestate_lea"
 
-__version__ = "1.0.0"
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
+)
 
-__all__ = []
+__all__ = [
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
+]

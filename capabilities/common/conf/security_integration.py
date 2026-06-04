@@ -26,10 +26,16 @@ try:
     from ..secu import SecurityLevel, RiskLevel, ThreatType, SecurityAction
 except ImportError:
     # For direct imports during testing
-    from models import (
-        CMResource, CMDeployment, CMPolicy, ValidationResult, ExecutionResult,
-        ResourceState, DeploymentStatus, PolicyAction, ResourceType, CloudProvider
-    )
+    try:
+        from .models import (
+            CMResource, CMDeployment, CMPolicy, ValidationResult, ExecutionResult,
+            ResourceState, DeploymentStatus, PolicyAction, ResourceType, CloudProvider
+        )
+    except ImportError:
+        from capabilities.common.conf.models import (
+            CMResource, CMDeployment, CMPolicy, ValidationResult, ExecutionResult,
+            ResourceState, DeploymentStatus, PolicyAction, ResourceType, CloudProvider
+        )
     # Create mock security classes for testing
     class SecurityContext:
         def __init__(self, **kwargs):

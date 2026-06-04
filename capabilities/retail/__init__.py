@@ -1,25 +1,11 @@
-"""
-Retail & Wholesale (RTL) Industry Vertical
+"""APG Retail & Wholesale Management capabilities."""
 
-Retail and wholesale industry-specific capabilities including point of sale,
-inventory management, loyalty programs, and omni-channel operations.
-"""
-
-__version__ = "1.0.0"
-
-# Retail sub-modules with 3-character naming
-SUBCAPABILITIES = [
-	"pos",  # Point of Sale
-	"sin",  # Store Inventory
-	"prm",  # Promotion & Discount Management
-	"loy",  # Loyalty Program Management
-	"omc",  # Omni-Channel Fulfillment
+CAPABILITY_IDS = [
+	"retail_loy",
+	"retail_omc",
+	"retail_pos",
+	"retail_prm",
+	"retail_sin",
 ]
 
-__all__ = [
-    "pos",  # Point of Sale
-    "sin",  # Store Inventory
-    "prm",  # Promotion & Discount Management
-    "loy",  # Loyalty Program Management
-    "omc",  # Omni-Channel Fulfillment
-]
+__all__ = ["CAPABILITY_IDS"]

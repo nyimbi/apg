@@ -74,12 +74,10 @@ REQUIRES = [
 	"ntfy",
 	"composition_events",
 	"composition_config",
-	"workflow",
-	"document_management",
-	"supplier_master_data",
-	"carbon_data_provider",
-	"regulatory_content",
-	"risk_policy",
+	"wflo",
+	"grc_doc",
+	"mdm",
+	"grc_rsa",
 ]
 
 

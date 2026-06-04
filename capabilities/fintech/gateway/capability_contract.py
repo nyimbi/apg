@@ -176,10 +176,10 @@ REQUIRES = [
 	"composition_config",
 	"keym",
 	"encr",
-	"cash_management",
-	"accounts_receivable",
-	"customer_relationship_management",
-	"business_intelligence",
+	"cbm_cash_management",
+	"arc_accounts_receivable",
+	"crm_adv",
+	"bia_anl",
 ]
 
 
@@ -304,7 +304,22 @@ RULES: list[dict[str, Any]] = [
 	{"name": "gateway_agent_runtime_supported", "description": "Gateway agents must use an approved runtime.", "condition": {"operation": "register_gateway_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "gateway_agent_runtime_not_supported", "required_action": "select_supported_agent_runtime"}},
 	{"name": "gateway_agent_role_supported", "description": "Gateway agents must use an approved role.", "condition": {"operation": "register_gateway_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "gateway_agent_role_not_supported", "required_action": "select_supported_agent_role"}},
 	{"name": "privileged_gateway_agent_action_requires_human_approval", "description": "Privileged gateway actions proposed by agents require human approval.", "condition": {"operation": "gateway_agent_action", "privileged_scope": True, "human_approval_recorded": False}, "effect": {"decision": "deny", "reason": "human_approval_required", "required_action": "record_human_approval"}},
+
+	# Cross-tenant and privilege escalation guards
+	{"name": "cross_tenant_gateway_access_denied", "description": "Gateway resources cannot be accessed across tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_access_denied", "required_action": "use_tenant_scoped_credentials"}},
+	{"name": "privilege_escalation_denied", "description": "Gateway privilege escalation without approval is denied.", "condition": {"privilege_escalation_attempt": True, "approval_recorded": False}, "effect": {"decision": "deny", "reason": "privilege_escalation_denied", "required_action": "obtain_escalation_approval"}},
+
+	# Africa-specific payment gateway rules
+	{"name": "ke_cbk_psp_licence_required", "description": "Kenya CBK Payment Service Provider licence required for gateway operations.", "condition": {"operation": "register_gateway_provider", "country": "KE", "cbk_psp_licence_present": False}, "effect": {"decision": "deny", "reason": "ke_cbk_psp_licence_required", "required_action": "obtain_cbk_psp_licence"}},
+	{"name": "mpesa_daraja_gateway_credentials_required", "description": "M-Pesa Daraja gateway integration requires registered consumer key and secret.", "condition": {"operation": "register_mpesa_gateway", "mpesa_consumer_key_present": False}, "effect": {"decision": "deny", "reason": "mpesa_daraja_credentials_required", "required_action": "register_mpesa_daraja_credentials"}},
+	{"name": "mpesa_stk_push_gateway_shortcode_required", "description": "M-Pesa STK push gateway requires a registered Safaricom shortcode.", "condition": {"operation": "mpesa_stk_push", "mpesa_shortcode_present": False}, "effect": {"decision": "deny", "reason": "mpesa_shortcode_required", "required_action": "register_mpesa_shortcode"}},
+	{"name": "mobile_money_gateway_kyc_required", "description": "Mobile money gateway transactions require sender KYC.", "condition": {"operation": "process_mobile_money", "kyc_present": False}, "effect": {"decision": "deny", "reason": "mobile_money_gateway_kyc_required", "required_action": "verify_sender_kyc"}},
+	{"name": "ke_gateway_pci_dss_required", "description": "Kenya payment gateway must comply with PCI DSS.", "condition": {"operation": "register_gateway_provider", "country": "KE", "pci_dss_compliant": False}, "effect": {"decision": "deny", "reason": "ke_pci_dss_compliance_required", "required_action": "achieve_pci_dss_compliance"}},
+	{"name": "pesalink_gateway_registered_required", "description": "PesaLink gateway requires registered bank account.", "condition": {"operation": "process_pesalink", "bank_account_registered": False}, "effect": {"decision": "deny", "reason": "pesalink_account_registration_required", "required_action": "register_pesalink_bank_account"}},
+	{"name": "ng_cbn_payment_gateway_licence", "description": "Nigeria CBN payment solution services licence required for gateway operations.", "condition": {"operation": "register_gateway_provider", "country": "NG", "cbn_pss_licence_present": False}, "effect": {"decision": "deny", "reason": "ng_cbn_pss_licence_required", "required_action": "obtain_cbn_payment_solution_licence"}},
+	{"name": "gateway_cbk_large_value_reporting", "description": "Kenya CBK large value payment gateway transactions require regulatory reporting.", "condition": {"operation": "process_payment", "country": "KE", "exceeds_cbk_reporting_threshold": True, "cbk_report_filed": False}, "effect": {"decision": "require_review", "reason": "ke_cbk_large_value_reporting_required", "required_action": "file_cbk_large_value_report"}},
 ]
+
 
 
 def _configuration_schema() -> dict[str, Any]:
@@ -356,6 +371,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 
 	return {
 		"capability": CAPABILITY_ID,
+		"display_name": CAPABILITY_NAME,
 		"name": CAPABILITY_NAME,
 		"version": CAPABILITY_VERSION,
 		"configuration": configuration,

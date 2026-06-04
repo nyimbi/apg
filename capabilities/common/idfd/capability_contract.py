@@ -358,6 +358,31 @@ def streaming_manifest() -> dict[str, Any]:
 	}
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.idfd.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"idp_registered",
+		"idp_updated",
+		"idp_deactivated",
+		"sso_session_started",
+		"sso_session_ended",
+		"federation_trust_created",
+		"federation_trust_revoked",
+		"user_provisioned",
+		"user_deprovisioned",
+		"group_synced",
+		"token_issued",
+		"agent_registered",
+	],
+	"guardrails": [
+		"idfd_batch_requires_bytewax",
+		"idfd_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable IDFD capability contract."""
 	config = deepcopy(DEFAULT_CONFIGURATION)
@@ -381,7 +406,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"requires_theme": True,
 		},
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": deepcopy(STREAMING),
 		"theme": deepcopy(THEME),
 	}
 

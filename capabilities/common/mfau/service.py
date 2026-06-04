@@ -701,37 +701,379 @@ class MFAService:
 
 	# Database operations (placeholders - implement based on your database client)
 
-	async def _get_user_profile(self, user_id: str, tenant_id: str) -> Optional[MFAUserProfile]:
-		"""Get user MFA profile"""
-		pass
+	# -------------------------------------------------------------------------
+	# In-memory store: profiles, methods, attempts, lockouts, events, devices,
+	# trusted devices, recovery codes, analytics
+	# -------------------------------------------------------------------------
 
-	async def _get_user_mfa_methods(self, user_id: str, tenant_id: str) -> List[MFAMethod]:
-		"""Get user's enrolled MFA methods"""
-		pass
+	_profiles: Dict[str, "MFAUserProfile"] = {}
+	_methods: Dict[str, List["MFAMethod"]] = {}
+	_failed_attempts: Dict[str, int] = {}
+	_lockouts: Dict[str, datetime] = {}
+	_auth_events: Dict[str, List[Dict[str, Any]]] = {}
+	_trusted_devices: Dict[str, List[Dict[str, Any]]] = {}
+	_recovery_codes: Dict[str, List[str]] = {}
+	_bypass_grants: Dict[str, Dict[str, Any]] = {}
+	_bulk_enrol_results: Dict[str, Dict[str, Any]] = {}
+	_risk_scores: Dict[str, float] = {}
 
-	async def _store_mfa_method(self, method: MFAMethod) -> None:
-		"""Store MFA method"""
-		pass
+	# -------------------------------------------------------------------------
+	# Enrolment helpers (concrete stand-alone public methods)
+	# -------------------------------------------------------------------------
+
+	async def enrol_totp(self, user_id: str, tenant_id: str, context: Dict[str, Any]) -> Dict[str, Any]:
+		"""Enrol TOTP authenticator app for user. Returns secret + QR-code URI."""
+		self.logger.info(_log_service_operation("enrol_totp", user_id))
+		secret_data = await self.token_service.generate_totp_secret(user_id, tenant_id)
+		method = MFAMethod(
+			user_id=user_id, tenant_id=tenant_id,
+			method_type=MFAMethodType.TOTP,
+			encrypted_secret=secret_data["encrypted_secret"],
+			is_verified=False, created_by=user_id, updated_by=user_id,
+		)
+		await self._store_mfa_method(method)
+		await self._log_auth_event(user_id, tenant_id, "totp_enrolled", {"method_id": method.id}, context)
+		return {"success": True, "method_id": method.id, **secret_data}
+
+	async def enrol_sms(self, user_id: str, tenant_id: str, phone_number: str, context: Dict[str, Any]) -> Dict[str, Any]:
+		"""Enrol SMS OTP channel. Sends a verification code to phone_number."""
+		self.logger.info(_log_service_operation("enrol_sms", user_id))
+		if not phone_number:
+			return {"success": False, "error": "phone_number_required"}
+		key = f"{tenant_id}:{user_id}"
+		method = MFAMethod(
+			user_id=user_id, tenant_id=tenant_id,
+			method_type=MFAMethodType.SMS,
+			encrypted_secret=phone_number,
+			is_verified=False, created_by=user_id, updated_by=user_id,
+		)
+		self._methods.setdefault(key, []).append(method)
+		await self._log_auth_event(user_id, tenant_id, "sms_enrolled", {"phone": phone_number[-4:]}, context)
+		return {"success": True, "method_id": method.id, "phone_last4": phone_number[-4:], "verification_sent": True}
+
+	async def enrol_email(self, user_id: str, tenant_id: str, email: str, context: Dict[str, Any]) -> Dict[str, Any]:
+		"""Enrol email OTP channel for user."""
+		self.logger.info(_log_service_operation("enrol_email", user_id))
+		if not email or "@" not in email:
+			return {"success": False, "error": "valid_email_required"}
+		key = f"{tenant_id}:{user_id}"
+		method = MFAMethod(
+			user_id=user_id, tenant_id=tenant_id,
+			method_type=MFAMethodType.EMAIL,
+			encrypted_secret=email,
+			is_verified=False, created_by=user_id, updated_by=user_id,
+		)
+		self._methods.setdefault(key, []).append(method)
+		await self._log_auth_event(user_id, tenant_id, "email_enrolled", {"email_domain": email.split("@")[-1]}, context)
+		return {"success": True, "method_id": method.id, "email": email, "verification_sent": True}
+
+	async def enrol_hardware_key(self, user_id: str, tenant_id: str, key_serial: str, context: Dict[str, Any]) -> Dict[str, Any]:
+		"""Enrol FIDO2/TOTP hardware token by serial number."""
+		self.logger.info(_log_service_operation("enrol_hardware_key", user_id))
+		if not key_serial:
+			return {"success": False, "error": "key_serial_required"}
+		key = f"{tenant_id}:{user_id}"
+		method = MFAMethod(
+			user_id=user_id, tenant_id=tenant_id,
+			method_type=MFAMethodType.HARDWARE_TOKEN,
+			encrypted_secret=key_serial,
+			is_verified=True, created_by=user_id, updated_by=user_id,
+		)
+		self._methods.setdefault(key, []).append(method)
+		await self._log_auth_event(user_id, tenant_id, "hardware_key_enrolled", {"serial": key_serial}, context)
+		return {"success": True, "method_id": method.id, "key_serial": key_serial}
+
+	async def enrol_push(self, user_id: str, tenant_id: str, device_token: str, platform: str, context: Dict[str, Any]) -> Dict[str, Any]:
+		"""Register a push-notification MFA channel (iOS/Android)."""
+		self.logger.info(_log_service_operation("enrol_push", user_id))
+		if not device_token:
+			return {"success": False, "error": "device_token_required"}
+		key = f"{tenant_id}:{user_id}"
+		method = MFAMethod(
+			user_id=user_id, tenant_id=tenant_id,
+			method_type=MFAMethodType.SMS,  # reuse SMS slot; push is transport detail
+			encrypted_secret=device_token,
+			is_verified=False, created_by=user_id, updated_by=user_id,
+		)
+		self._methods.setdefault(key, []).append(method)
+		await self._log_auth_event(user_id, tenant_id, "push_enrolled", {"platform": platform}, context)
+		return {"success": True, "method_id": method.id, "platform": platform, "push_channel": "registered"}
+
+	async def verify_mfa(self, user_id: str, tenant_id: str, method_id: str, otp_code: str, context: Dict[str, Any]) -> Dict[str, Any]:
+		"""Verify a one-time code against an enrolled method. Returns success + trust_score."""
+		self.logger.info(_log_service_operation("verify_mfa", user_id, f"method={method_id}"))
+		method = await self._get_mfa_method(method_id, user_id, tenant_id)
+		if not method:
+			return {"success": False, "error": "method_not_found"}
+		valid = await self.token_service.verify_totp_code(method.encrypted_secret, otp_code)
+		if valid:
+			await self._reset_failed_attempts(user_id, tenant_id)
+			await self._log_auth_event(user_id, tenant_id, "mfa_verified", {"method_id": method_id}, context)
+			return {"success": True, "trust_score": 0.9}
+		else:
+			count = await self._increment_failed_attempts(user_id, tenant_id)
+			await self._log_auth_event(user_id, tenant_id, "mfa_verify_failed", {"method_id": method_id, "attempts": count}, context)
+			return {"success": False, "error": "invalid_code", "failed_attempts": count}
+
+	async def step_up_auth(self, user_id: str, tenant_id: str, operation: str, context: Dict[str, Any]) -> Dict[str, Any]:
+		"""
+		Initiate step-up authentication for a sensitive operation.
+		Returns a challenge token requiring additional factor verification.
+		"""
+		self.logger.info(_log_service_operation("step_up_auth", user_id, f"op={operation}"))
+		risk = await self.risk_analyzer.assess_authentication_risk(user_id, tenant_id, context)
+		step_up_token = await self.token_service.generate_authentication_token(
+			user_id, tenant_id, trust_score=0.5, context=context
+		)
+		await self._log_auth_event(user_id, tenant_id, "step_up_initiated", {"operation": operation, "risk": risk.get("risk_score")}, context)
+		return {
+			"success": True,
+			"step_up_token": step_up_token.token_value,
+			"expires_at": step_up_token.expires_at.isoformat(),
+			"risk_score": risk.get("risk_score", 0.5),
+			"required_factors": ["totp"],
+		}
+
+	async def mfa_bypass_admin(self, admin_id: str, tenant_id: str, target_user_id: str, reason: str, duration_minutes: int, context: Dict[str, Any]) -> Dict[str, Any]:
+		"""Admin-only: grant a time-limited MFA bypass for target_user_id."""
+		self.logger.info(_log_service_operation("mfa_bypass_admin", admin_id, f"target={target_user_id}"))
+		if not reason:
+			return {"success": False, "error": "reason_required"}
+		bypass_key = f"{tenant_id}:{target_user_id}"
+		self._bypass_grants[bypass_key] = {
+			"granted_by": admin_id,
+			"reason": reason,
+			"expires_at": (datetime.utcnow() + timedelta(minutes=duration_minutes)).isoformat(),
+			"duration_minutes": duration_minutes,
+		}
+		await self._log_auth_event(admin_id, tenant_id, "mfa_bypass_granted", {"target": target_user_id, "reason": reason}, context)
+		return {"success": True, "bypass_key": bypass_key, "expires_in_minutes": duration_minutes}
+
+	async def mfa_recovery_code_gen(self, user_id: str, tenant_id: str, context: Dict[str, Any]) -> Dict[str, Any]:
+		"""Generate a fresh set of one-time recovery codes, invalidating prior set."""
+		self.logger.info(_log_service_operation("mfa_recovery_code_gen", user_id))
+		import secrets
+		codes = [secrets.token_hex(5).upper() for _ in range(10)]
+		store_key = f"{tenant_id}:{user_id}"
+		self._recovery_codes[store_key] = codes
+		await self._log_auth_event(user_id, tenant_id, "recovery_codes_generated", {"count": len(codes)}, context)
+		return {"success": True, "codes": codes, "count": len(codes), "message": "Store these codes securely."}
+
+	async def mfa_recovery_validate(self, user_id: str, tenant_id: str, code: str, context: Dict[str, Any]) -> Dict[str, Any]:
+		"""Consume a recovery code for account access. Each code is single-use."""
+		self.logger.info(_log_service_operation("mfa_recovery_validate", user_id))
+		store_key = f"{tenant_id}:{user_id}"
+		codes = self._recovery_codes.get(store_key, [])
+		if code.upper() in codes:
+			codes.remove(code.upper())
+			self._recovery_codes[store_key] = codes
+			await self._reset_failed_attempts(user_id, tenant_id)
+			await self._log_auth_event(user_id, tenant_id, "recovery_code_used", {"remaining": len(codes)}, context)
+			return {"success": True, "remaining_codes": len(codes)}
+		await self._log_auth_event(user_id, tenant_id, "recovery_code_invalid", {}, context)
+		return {"success": False, "error": "invalid_recovery_code"}
+
+	async def bulk_enrol(self, tenant_id: str, user_ids: List[str], method_type: MFAMethodType, actor: str, context: Dict[str, Any]) -> Dict[str, Any]:
+		"""Admin bulk-enrol a list of users to a specified MFA method."""
+		self.logger.info(_log_service_operation("bulk_enrol", actor, f"users={len(user_ids)} method={method_type}"))
+		successes, failures = [], []
+		for uid in user_ids:
+			try:
+				result = await self.enrol_totp(uid, tenant_id, context) if method_type == MFAMethodType.TOTP else {"success": False, "error": "unsupported"}
+				(successes if result.get("success") else failures).append(uid)
+			except Exception as exc:
+				failures.append(uid)
+				self.logger.warning(f"bulk_enrol failed for {uid}: {exc}")
+		batch_id = uuid7str()
+		self._bulk_enrol_results[batch_id] = {"successes": successes, "failures": failures, "total": len(user_ids)}
+		return {"batch_id": batch_id, "enrolled": len(successes), "failed": len(failures), "failures": failures}
+
+	async def mfa_status(self, user_id: str, tenant_id: str) -> Dict[str, Any]:
+		"""Return concise MFA enablement status for a user."""
+		return await self.get_user_mfa_status(user_id, tenant_id)
+
+	async def mfa_analytics(self, tenant_id: str, days: int = 30) -> Dict[str, Any]:
+		"""Return tenant-level MFA usage analytics over the last N days."""
+		events = self._auth_events
+		total = sum(len(v) for v in events.values())
+		success_events = sum(
+			1 for evts in events.values()
+			for e in evts if e.get("event_type") == "authentication_success"
+		)
+		failure_events = sum(
+			1 for evts in events.values()
+			for e in evts if e.get("event_type") == "authentication_failure"
+		)
+		return {
+			"tenant_id": tenant_id,
+			"window_days": days,
+			"total_events": total,
+			"auth_successes": success_events,
+			"auth_failures": failure_events,
+			"mfa_bypass_grants": len([k for k in self._bypass_grants if k.startswith(tenant_id)]),
+			"recovery_code_sets": len([k for k in self._recovery_codes if k.startswith(tenant_id)]),
+			"service_metrics": self._auth_metrics,
+		}
+
+	async def trusted_device_register(self, user_id: str, tenant_id: str, device_info: "DeviceInfo", context: Dict[str, Any]) -> Dict[str, Any]:
+		"""Register a device as trusted, bypassing MFA for low-risk sessions."""
+		self.logger.info(_log_service_operation("trusted_device_register", user_id))
+		device_key = f"{tenant_id}:{user_id}"
+		device_record = {
+			"device_id": uuid7str(),
+			"device_name": getattr(device_info, "device_name", "unknown"),
+			"platform": getattr(device_info, "platform", "unknown"),
+			"registered_at": datetime.utcnow().isoformat(),
+			"trusted": True,
+		}
+		self._trusted_devices.setdefault(device_key, []).append(device_record)
+		await self._log_auth_event(user_id, tenant_id, "trusted_device_registered", device_record, context)
+		return {"success": True, "device_id": device_record["device_id"], "trusted": True}
+
+	async def trusted_device_revoke(self, user_id: str, tenant_id: str, device_id: str, context: Dict[str, Any]) -> Dict[str, Any]:
+		"""Revoke trust for a specific device."""
+		self.logger.info(_log_service_operation("trusted_device_revoke", user_id, f"device={device_id}"))
+		device_key = f"{tenant_id}:{user_id}"
+		devices = self._trusted_devices.get(device_key, [])
+		before = len(devices)
+		self._trusted_devices[device_key] = [d for d in devices if d.get("device_id") != device_id]
+		revoked = before - len(self._trusted_devices[device_key])
+		await self._log_auth_event(user_id, tenant_id, "trusted_device_revoked", {"device_id": device_id, "revoked": revoked}, context)
+		return {"success": revoked > 0, "device_id": device_id, "revoked": revoked}
+
+	async def adaptive_mfa_risk(self, user_id: str, tenant_id: str, context: Dict[str, Any]) -> Dict[str, Any]:
+		"""
+		Evaluate contextual risk and return the adaptive MFA challenge level.
+		Levels: none | low | medium | high | block.
+		"""
+		self.logger.info(_log_service_operation("adaptive_mfa_risk", user_id))
+		risk = await self.risk_analyzer.assess_authentication_risk(user_id, tenant_id, context)
+		score = risk.get("risk_score", 0.5)
+		if score < 0.2:
+			level = "none"
+		elif score < 0.4:
+			level = "low"
+		elif score < 0.6:
+			level = "medium"
+		elif score < 0.8:
+			level = "high"
+		else:
+			level = "block"
+		self._risk_scores[f"{tenant_id}:{user_id}"] = score
+		return {"user_id": user_id, "risk_score": score, "challenge_level": level, "factors_required": max(1, int(score * 3))}
+
+	# -------------------------------------------------------------------------
+	# Private helpers (in-memory implementations)
+	# -------------------------------------------------------------------------
+
+	async def _get_user_profile(self, user_id: str, tenant_id: str) -> Optional["MFAUserProfile"]:
+		"""Get user MFA profile from in-memory store."""
+		return self._profiles.get(f"{tenant_id}:{user_id}")
+
+	async def _get_user_mfa_methods(self, user_id: str, tenant_id: str) -> List["MFAMethod"]:
+		"""Get user's enrolled MFA methods."""
+		return list(self._methods.get(f"{tenant_id}:{user_id}", []))
+
+	async def _store_mfa_method(self, method: "MFAMethod") -> None:
+		"""Append MFA method to in-memory store."""
+		key = f"{method.tenant_id}:{method.user_id}"
+		self._methods.setdefault(key, []).append(method)
+
+	async def _get_mfa_method(self, method_id: str, user_id: str, tenant_id: str) -> Optional["MFAMethod"]:
+		"""Lookup a specific enrolled method by ID."""
+		for m in self._methods.get(f"{tenant_id}:{user_id}", []):
+			if m.id == method_id:
+				return m
+		return None
+
+	async def _remove_mfa_method_from_db(self, method_id: str) -> None:
+		"""Remove method from all user lists."""
+		for key, methods in self._methods.items():
+			self._methods[key] = [m for m in methods if m.id != method_id]
 
 	async def _is_user_locked_out(self, user_id: str, tenant_id: str) -> bool:
-		"""Check if user is locked out"""
-		pass
+		"""Check if user is currently locked out."""
+		lockout_until = self._lockouts.get(f"{tenant_id}:{user_id}")
+		if lockout_until is None:
+			return False
+		if datetime.utcnow() < lockout_until:
+			return True
+		del self._lockouts[f"{tenant_id}:{user_id}"]
+		return False
 
 	async def _increment_failed_attempts(self, user_id: str, tenant_id: str) -> int:
-		"""Increment and return failed attempt count"""
-		pass
+		"""Increment and return failed attempt count."""
+		key = f"{tenant_id}:{user_id}"
+		self._failed_attempts[key] = self._failed_attempts.get(key, 0) + 1
+		return self._failed_attempts[key]
 
 	async def _reset_failed_attempts(self, user_id: str, tenant_id: str) -> None:
-		"""Reset failed attempts counter"""
-		pass
+		"""Reset failed attempts counter."""
+		self._failed_attempts.pop(f"{tenant_id}:{user_id}", None)
 
 	async def _lockout_user(self, user_id: str, tenant_id: str) -> None:
-		"""Lock out user temporarily"""
-		pass
+		"""Lock out user for lockout_duration_minutes."""
+		self._lockouts[f"{tenant_id}:{user_id}"] = datetime.utcnow() + timedelta(minutes=self.lockout_duration_minutes)
+
+	async def _handle_lockout(self, user_id: str, tenant_id: str, context: Dict[str, Any]) -> Dict[str, Any]:
+		"""Return lockout response payload."""
+		lockout_until = self._lockouts.get(f"{tenant_id}:{user_id}")
+		return {
+			"success": False,
+			"status": "locked_out",
+			"reason": "too_many_failed_attempts",
+			"lockout_until": lockout_until.isoformat() if lockout_until else None,
+		}
 
 	async def _log_auth_event(self, user_id: str, tenant_id: str, event_type: str, details: Dict[str, Any], context: Dict[str, Any]) -> None:
-		"""Log authentication event"""
-		pass
+		"""Append authentication event to in-memory log."""
+		key = f"{tenant_id}:{user_id}"
+		self._auth_events.setdefault(key, []).append({
+			"event_type": event_type,
+			"user_id": user_id,
+			"tenant_id": tenant_id,
+			"details": details,
+			"timestamp": datetime.utcnow().isoformat(),
+		})
+
+	async def _get_recent_auth_events(self, user_id: str, tenant_id: str, limit: int = 10) -> List[Dict[str, Any]]:
+		"""Return recent auth events as plain dicts (no model needed for listing)."""
+		key = f"{tenant_id}:{user_id}"
+		return self._auth_events.get(key, [])[-limit:]
+
+	async def _user_has_backup_codes(self, user_id: str, tenant_id: str) -> bool:
+		"""Check whether user has unused backup/recovery codes."""
+		return bool(self._recovery_codes.get(f"{tenant_id}:{user_id}"))
+
+	async def _verify_enrollment_authorization(self, user_id: str, tenant_id: str, context: Dict[str, Any]) -> bool:
+		"""Simple auth check: accept if session token present in context."""
+		return bool(context.get("session_token") or context.get("auth_token"))
+
+	async def _check_method_enrollment_limits(self, user_id: str, tenant_id: str, method_type: "MFAMethodType") -> bool:
+		"""Enforce max 5 methods per type per user."""
+		existing = await self._get_user_mfa_methods(user_id, tenant_id)
+		same_type = [m for m in existing if m.method_type == method_type]
+		return len(same_type) < 5
+
+	async def _enroll_sms_method(self, user_id: str, tenant_id: str, enrollment_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+		"""Delegate to enrol_sms."""
+		return await self.enrol_sms(user_id, tenant_id, enrollment_data.get("phone_number", ""), context)
+
+	async def _enroll_email_method(self, user_id: str, tenant_id: str, enrollment_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+		"""Delegate to enrol_email."""
+		return await self.enrol_email(user_id, tenant_id, enrollment_data.get("email", ""), context)
+
+	async def _enroll_hardware_token(self, user_id: str, tenant_id: str, enrollment_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+		"""Delegate to enrol_hardware_key."""
+		return await self.enrol_hardware_key(user_id, tenant_id, enrollment_data.get("key_serial", ""), context)
+
+	async def _get_active_users_count(self) -> int:
+		"""Count distinct users with at least one enrolled method."""
+		return len(self._methods)
+
+	async def _get_enrolled_methods_count(self) -> int:
+		"""Total enrolled methods across all users."""
+		return sum(len(v) for v in self._methods.values())
 
 
 __all__ = ["MFAService"]

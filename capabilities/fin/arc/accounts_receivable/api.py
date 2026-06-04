@@ -10,7 +10,7 @@ except ImportError:  # pragma: no cover - supports direct file loading in tests
 	from service import AccountsReceivableService  # type: ignore
 
 
-_SERVICE = AccountsReceivableService()
+_SERVICE = AccountsReceivableService(tenant_id="default")
 
 
 def service() -> AccountsReceivableService:

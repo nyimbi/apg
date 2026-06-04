@@ -680,6 +680,530 @@ class ApigService:
 			or record.get("decision") == "pending"
 		]
 
+	# ── new methods ─────────────────────────────────────────────────────────
+
+	def api_key_create(
+		self,
+		key_id: str,
+		tenant_id: str,
+		consumer_id: str,
+		owner: str,
+		scopes: list[str] | None = None,
+		expiry_days: int = 365,
+	) -> dict[str, Any]:
+		"""Issue a new API key for a consumer with scopes and TTL."""
+		self._enforce_tenant(tenant_id)
+		self._get_consumer(tenant_id, consumer_id)
+		from datetime import datetime, timezone, timedelta
+		import hashlib, secrets
+		raw = secrets.token_hex(32)
+		key_hash = hashlib.sha256(raw.encode()).hexdigest()
+		expires_at = (datetime.now(timezone.utc) + timedelta(days=expiry_days)).isoformat()
+		record = {
+			"key_id": key_id,
+			"tenant_id": tenant_id,
+			"consumer_id": consumer_id,
+			"owner": owner,
+			"scopes": list(scopes or ["read"]),
+			"key_hash": key_hash,
+			"expires_at": expires_at,
+			"status": "active",
+		}
+		self._policies[self._tenant_key(tenant_id, key_id)] = GatewayPolicyRecord(
+			id=key_id,
+			tenant_id=tenant_id,
+			name=f"api_key:{consumer_id}",
+			policy_type="api_key",
+			actor=owner,
+			status="active",
+			decision="allow",
+			matched_rules=[],
+			policy_decision="allow",
+			review_reasons=[],
+			review_evidence={},
+			metadata=record,
+		)
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="api_key_created",
+			subject_id=key_id,
+			message=f"Created API key {key_id} for consumer {consumer_id}.",
+			evidence={"consumer_id": consumer_id, "scopes": record["scopes"], "expires_at": expires_at},
+		)
+		return record
+
+	def api_key_revoke(
+		self,
+		key_id: str,
+		tenant_id: str,
+		actor: str,
+		reason: str = "",
+	) -> dict[str, Any]:
+		"""Revoke an API key immediately."""
+		self._enforce_tenant(tenant_id)
+		policy = self._policies.get(self._tenant_key(tenant_id, key_id))
+		if policy is None or policy.policy_type != "api_key":
+			raise KeyError(f"unknown api_key: {key_id}")
+		metadata = dict(policy.metadata)
+		metadata["status"] = "revoked"
+		metadata["revoked_by"] = actor
+		metadata["revoke_reason"] = reason
+		revoked = GatewayPolicyRecord(
+			id=policy.id,
+			tenant_id=policy.tenant_id,
+			name=policy.name,
+			policy_type=policy.policy_type,
+			actor=actor,
+			status="revoked",
+			decision="allow",
+			matched_rules=[],
+			policy_decision="allow",
+			review_reasons=[],
+			review_evidence={},
+			metadata=metadata,
+		)
+		self._policies[self._tenant_key(tenant_id, key_id)] = revoked
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="api_key_revoked",
+			subject_id=key_id,
+			message=f"Revoked API key {key_id}.",
+			evidence={"actor": actor, "reason": reason},
+		)
+		return metadata
+
+	def rate_limit_apply(
+		self,
+		rule_id: str,
+		tenant_id: str,
+		route_id: str,
+		requests_per_minute: int,
+		actor: str,
+		burst_multiplier: float = 1.5,
+	) -> dict[str, Any]:
+		"""Apply a rate-limiting rule to a route."""
+		self._enforce_tenant(tenant_id)
+		route = self._get_route(tenant_id, route_id)
+		record = {
+			"rule_id": rule_id,
+			"tenant_id": tenant_id,
+			"route_id": route_id,
+			"requests_per_minute": requests_per_minute,
+			"burst_limit": int(requests_per_minute * burst_multiplier),
+			"actor": actor,
+			"status": "active",
+		}
+		self._policies[self._tenant_key(tenant_id, rule_id)] = GatewayPolicyRecord(
+			id=rule_id,
+			tenant_id=tenant_id,
+			name=f"rate_limit:{route_id}",
+			policy_type="rate_limiting",
+			actor=actor,
+			status="active",
+			decision="allow",
+			matched_rules=[],
+			policy_decision="allow",
+			review_reasons=[],
+			review_evidence={},
+			metadata=record,
+		)
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="rate_limit_applied",
+			subject_id=rule_id,
+			message=f"Rate limit {requests_per_minute} rpm applied to route {route_id}.",
+			evidence={"route_id": route_id, "requests_per_minute": requests_per_minute},
+		)
+		return record
+
+	def quota_tracking(
+		self,
+		tenant_id: str,
+		consumer_id: str,
+	) -> dict[str, Any]:
+		"""Return quota usage statistics for a consumer."""
+		self._enforce_tenant(tenant_id)
+		self._get_consumer(tenant_id, consumer_id)
+		routes = self.list_routes(tenant_id)
+		consumer_routes = [r for r in routes if r.get("consumer_id") == consumer_id]
+		total_rps = sum(r.get("requested_rps_limit", 0) for r in consumer_routes)
+		return {
+			"tenant_id": tenant_id,
+			"consumer_id": consumer_id,
+			"route_count": len(consumer_routes),
+			"total_rps_limit": total_rps,
+			"routes": [r["id"] for r in consumer_routes],
+		}
+
+	def transformation_apply(
+		self,
+		transform_id: str,
+		tenant_id: str,
+		route_id: str,
+		request_transforms: dict[str, Any] | None = None,
+		response_transforms: dict[str, Any] | None = None,
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Register request/response transformation rules for a route."""
+		self._enforce_tenant(tenant_id)
+		self._get_route(tenant_id, route_id)
+		record = {
+			"transform_id": transform_id,
+			"tenant_id": tenant_id,
+			"route_id": route_id,
+			"request_transforms": dict(request_transforms or {}),
+			"response_transforms": dict(response_transforms or {}),
+			"actor": actor,
+			"status": "active",
+		}
+		self._policies[self._tenant_key(tenant_id, transform_id)] = GatewayPolicyRecord(
+			id=transform_id,
+			tenant_id=tenant_id,
+			name=f"transform:{route_id}",
+			policy_type="transformation",
+			actor=actor,
+			status="active",
+			decision="allow",
+			matched_rules=[],
+			policy_decision="allow",
+			review_reasons=[],
+			review_evidence={},
+			metadata=record,
+		)
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="transformation_applied",
+			subject_id=transform_id,
+			message=f"Transformation {transform_id} applied to route {route_id}.",
+			evidence={"route_id": route_id},
+		)
+		return record
+
+	def mock_endpoint(
+		self,
+		mock_id: str,
+		tenant_id: str,
+		path: str,
+		methods: list[str],
+		response_body: dict[str, Any],
+		status_code: int = 200,
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Register a mock endpoint that returns a canned response."""
+		self._enforce_tenant(tenant_id)
+		record = {
+			"mock_id": mock_id,
+			"tenant_id": tenant_id,
+			"path": path,
+			"methods": [m.upper() for m in methods],
+			"response_body": response_body,
+			"status_code": status_code,
+			"actor": actor,
+			"status": "active",
+		}
+		self._policies[self._tenant_key(tenant_id, mock_id)] = GatewayPolicyRecord(
+			id=mock_id,
+			tenant_id=tenant_id,
+			name=f"mock:{path}",
+			policy_type="mock",
+			actor=actor,
+			status="active",
+			decision="allow",
+			matched_rules=[],
+			policy_decision="allow",
+			review_reasons=[],
+			review_evidence={},
+			metadata=record,
+		)
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="mock_endpoint_registered",
+			subject_id=mock_id,
+			message=f"Mock endpoint {mock_id} registered at {path}.",
+			evidence={"path": path, "status_code": status_code},
+		)
+		return record
+
+	def documentation_generate(
+		self,
+		tenant_id: str,
+		gateway_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Generate OpenAPI-style documentation from registered routes and upstreams."""
+		routes = self.list_routes(tenant_id)
+		upstreams = self.list_upstreams(tenant_id)
+		paths: dict[str, Any] = {}
+		for route in routes:
+			path = route["path"]
+			paths.setdefault(path, {})
+			for method in route.get("methods", []):
+				paths[path][method.lower()] = {
+					"summary": f"Route to {route.get('upstream_id')}",
+					"security": [{"BearerAuth": []}] if route.get("auth_policy_attached") else [],
+					"x-rate-limit": route.get("requested_rps_limit"),
+					"x-exposure": route.get("route_exposure"),
+				}
+		return {
+			"tenant_id": tenant_id,
+			"openapi": "3.1.0",
+			"info": {"title": f"APG Gateway API (tenant={tenant_id})", "version": "1.0.0"},
+			"paths": paths,
+			"upstream_count": len(upstreams),
+			"route_count": len(routes),
+		}
+
+	def version_manage(
+		self,
+		version_id: str,
+		tenant_id: str,
+		route_id: str,
+		api_version: str,
+		actor: str,
+		deprecated: bool = False,
+	) -> dict[str, Any]:
+		"""Register an API version tag for a route."""
+		self._enforce_tenant(tenant_id)
+		self._get_route(tenant_id, route_id)
+		record = {
+			"version_id": version_id,
+			"tenant_id": tenant_id,
+			"route_id": route_id,
+			"api_version": api_version,
+			"deprecated": deprecated,
+			"actor": actor,
+			"status": "active",
+		}
+		self._policies[self._tenant_key(tenant_id, version_id)] = GatewayPolicyRecord(
+			id=version_id,
+			tenant_id=tenant_id,
+			name=f"version:{route_id}:{api_version}",
+			policy_type="versioning",
+			actor=actor,
+			status="active",
+			decision="allow",
+			matched_rules=[],
+			policy_decision="allow",
+			review_reasons=[],
+			review_evidence={},
+			metadata=record,
+		)
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="api_version_registered",
+			subject_id=version_id,
+			message=f"Registered version {api_version} for route {route_id}.",
+			evidence={"api_version": api_version, "deprecated": deprecated},
+		)
+		return record
+
+	def deprecation_notice(
+		self,
+		notice_id: str,
+		tenant_id: str,
+		route_id: str,
+		sunset_date: str,
+		migration_url: str,
+		actor: str,
+	) -> dict[str, Any]:
+		"""Attach a deprecation notice to a route with a sunset date."""
+		self._enforce_tenant(tenant_id)
+		route = self._get_route(tenant_id, route_id)
+		record = {
+			"notice_id": notice_id,
+			"tenant_id": tenant_id,
+			"route_id": route_id,
+			"route_path": route.path,
+			"sunset_date": sunset_date,
+			"migration_url": migration_url,
+			"actor": actor,
+			"status": "active",
+		}
+		self._policies[self._tenant_key(tenant_id, notice_id)] = GatewayPolicyRecord(
+			id=notice_id,
+			tenant_id=tenant_id,
+			name=f"deprecation:{route_id}",
+			policy_type="deprecation",
+			actor=actor,
+			status="active",
+			decision="allow",
+			matched_rules=[],
+			policy_decision="allow",
+			review_reasons=[],
+			review_evidence={},
+			metadata=record,
+		)
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="deprecation_notice_created",
+			subject_id=notice_id,
+			message=f"Deprecation notice for {route.path} — sunset {sunset_date}.",
+			evidence={"sunset_date": sunset_date, "migration_url": migration_url},
+		)
+		return record
+
+	def developer_portal(
+		self,
+		tenant_id: str,
+	) -> dict[str, Any]:
+		"""Return a developer portal payload with discoverable API catalogue."""
+		routes = self.list_routes(tenant_id)
+		consumers = self.list_consumers(tenant_id)
+		docs = self.documentation_generate(tenant_id)
+		public_routes = [r for r in routes if r.get("route_exposure") == "public"]
+		return {
+			"tenant_id": tenant_id,
+			"portal_title": f"Developer Portal — tenant {tenant_id}",
+			"public_api_count": len(public_routes),
+			"consumer_count": len(consumers),
+			"openapi_spec": docs,
+			"public_routes": public_routes,
+		}
+
+	def usage_analytics(
+		self,
+		tenant_id: str,
+		route_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Return usage analytics aggregated from traffic shift and deployment records."""
+		routes = self.list_routes(tenant_id)
+		if route_id:
+			routes = [r for r in routes if r["id"] == route_id]
+		shifts = self.list_traffic_shifts(tenant_id)
+		deployments = self.list_deployments(tenant_id)
+		total_rps = sum(r.get("requested_rps_limit", 0) for r in routes)
+		return {
+			"tenant_id": tenant_id,
+			"route_count": len(routes),
+			"total_rps_capacity": total_rps,
+			"traffic_shift_count": len(shifts),
+			"deployment_count": len(deployments),
+			"active_deployments": len([d for d in deployments if d.get("status") == "deployed"]),
+		}
+
+	def sla_monitoring(
+		self,
+		tenant_id: str,
+	) -> dict[str, Any]:
+		"""Return SLA compliance metrics for the gateway."""
+		routes = self.list_routes(tenant_id)
+		upstreams = self.list_upstreams(tenant_id)
+		healthy_upstreams = [u for u in upstreams if u.get("health") == "healthy"]
+		active_routes = [r for r in routes if r.get("status") == "active"]
+		sla_score = (len(healthy_upstreams) / max(len(upstreams), 1)) * 100
+		return {
+			"tenant_id": tenant_id,
+			"sla_score": round(sla_score, 1),
+			"healthy_upstream_count": len(healthy_upstreams),
+			"total_upstream_count": len(upstreams),
+			"active_route_count": len(active_routes),
+			"sla_status": "met" if sla_score >= 99.9 else "at_risk" if sla_score >= 95.0 else "breached",
+		}
+
+	def api_discovery(
+		self,
+		tenant_id: str,
+		keyword: str = "",
+	) -> list[dict[str, Any]]:
+		"""Discover routes matching an optional keyword in path or owner."""
+		routes = self.list_routes(tenant_id)
+		if keyword:
+			kw = keyword.lower()
+			routes = [r for r in routes if kw in r.get("path", "").lower() or kw in r.get("owner", "").lower()]
+		return routes
+
+	def schema_validate(
+		self,
+		tenant_id: str,
+		route_id: str,
+		payload: dict[str, Any],
+		schema: dict[str, Any],
+	) -> dict[str, Any]:
+		"""Validate a payload against a JSON schema for a route (structural check)."""
+		self._enforce_tenant(tenant_id)
+		self._get_route(tenant_id, route_id)
+		required = schema.get("required", [])
+		missing = [k for k in required if k not in payload]
+		extra_props = schema.get("additionalProperties", True)
+		unexpected: list[str] = []
+		if not extra_props:
+			allowed = set(schema.get("properties", {}).keys())
+			unexpected = [k for k in payload if k not in allowed]
+		valid = not missing and not unexpected
+		return {
+			"tenant_id": tenant_id,
+			"route_id": route_id,
+			"valid": valid,
+			"missing_required_fields": missing,
+			"unexpected_fields": unexpected,
+		}
+
+	def security_scan(
+		self,
+		tenant_id: str,
+		route_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Run a security posture scan across routes."""
+		self._enforce_tenant(tenant_id)
+		routes = self.list_routes(tenant_id)
+		if route_id:
+			routes = [r for r in routes if r["id"] == route_id]
+		findings: list[dict[str, Any]] = []
+		for r in routes:
+			if not r.get("auth_policy_attached"):
+				findings.append({"route_id": r["id"], "severity": "high", "issue": "no_auth_policy"})
+			if not r.get("threat_policy_attached"):
+				findings.append({"route_id": r["id"], "severity": "medium", "issue": "no_threat_policy"})
+			if not r.get("mtls_enabled") and r.get("route_exposure") == "public":
+				findings.append({"route_id": r["id"], "severity": "high", "issue": "public_route_no_mtls"})
+		return {
+			"tenant_id": tenant_id,
+			"routes_scanned": len(routes),
+			"finding_count": len(findings),
+			"high_severity": len([f for f in findings if f["severity"] == "high"]),
+			"medium_severity": len([f for f in findings if f["severity"] == "medium"]),
+			"findings": findings,
+			"status": "clean" if not findings else "issues_found",
+		}
+
+	def health_check(self, tenant_id: str = "default") -> dict[str, Any]:
+		"""Return gateway service health."""
+		summary = self.gateway_summary(tenant_id)
+		return {
+			"status": "healthy",
+			"tenant_id": tenant_id,
+			"upstream_count": summary["upstream_count"],
+			"active_route_count": summary["active_route_count"],
+			"pending_review_count": summary["pending_review_count"],
+		}
+
+	def dashboard(self, tenant_id: str = "default") -> dict[str, Any]:
+		"""Return aggregated KPI dashboard."""
+		summary = self.gateway_summary(tenant_id)
+		sla = self.sla_monitoring(tenant_id)
+		scan = self.security_scan(tenant_id)
+		return {
+			**summary,
+			"sla": sla,
+			"security_findings": scan["finding_count"],
+			"health": self.health_check(tenant_id),
+		}
+
+	def export_routes(
+		self,
+		tenant_id: str,
+		export_format: str = "json",
+	) -> dict[str, Any]:
+		"""Export route definitions."""
+		routes = self.list_routes(tenant_id)
+		if export_format == "csv":
+			keys = list(routes[0].keys()) if routes else []
+			lines = [",".join(keys)] + [",".join(str(r.get(k, "")) for k in keys) for r in routes]
+			data = "\n".join(lines)
+		else:
+			import json as _json
+			data = _json.dumps(routes, default=str, indent=2)
+		return {"tenant_id": tenant_id, "format": export_format, "count": len(routes), "data": data}
+
 	def list_records(self, tenant_id: str | None = None, record_type: str | None = None) -> list[dict[str, Any]]:
 		collections = {
 			"upstreams": self.list_upstreams,

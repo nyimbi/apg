@@ -73,7 +73,7 @@ svc._events  # list[dict] — all events this session
 # e.g. {"event_type": "vehicle.registered", "entity_id": "...", "tenant_id": "..."}
 ```
 
-In production, wire this to APG's messaging infrastructure (Kafka/Bytewax/APG mqeb).
+In production, wire this to APG's messaging infrastructure (Bytewax/Bytewax/APG mqeb).
 
 ---
 

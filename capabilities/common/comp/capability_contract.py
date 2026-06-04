@@ -328,6 +328,32 @@ THEME: dict[str, Any] = {
 }
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.comp.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"framework_registered",
+		"framework_updated",
+		"control_created",
+		"control_tested",
+		"evidence_collected",
+		"assessment_started",
+		"assessment_completed",
+		"finding_raised",
+		"finding_remediated",
+		"attestation_recorded",
+		"report_generated",
+		"regulatory_export_approved",
+		"agent_registered",
+	],
+	"guardrails": [
+		"comp_batch_requires_bytewax",
+		"comp_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable COMP capability contract."""
 	config = deepcopy(DEFAULT_CONFIGURATION)
@@ -350,7 +376,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		},
 		"theme": deepcopy(THEME),
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": deepcopy(STREAMING),
 	}
 
 

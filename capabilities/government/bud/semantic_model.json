@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "government_bud",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "government_bud": {
+      "capability": "government_bud"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "realestate_ren",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "realestate_ren": {
+      "capability": "realestate_ren"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

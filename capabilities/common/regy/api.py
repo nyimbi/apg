@@ -136,13 +136,13 @@ except ImportError:
 							loop = asyncio.new_event_loop()
 							try:
 								events._set_running_loop(None)
-								result = loop.run_until_complete(result)
+								result = asyncio.run(result)
 							finally:
 								pending = [task for task in asyncio.all_tasks(loop) if not task.done()]
 								for task in pending:
 									task.cancel()
 								if pending:
-									loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+									asyncio.run(asyncio.gather(*pending, return_exceptions=True))
 								loop.close()
 								events._set_running_loop(previous_loop)
 				except HTTPException as exc:

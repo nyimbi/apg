@@ -205,6 +205,36 @@ RULES: list[dict[str, Any]] = [
 		"condition": {"operation": "batch_lifecycle_mutation", "event_stream_ne": "bytewax"},
 		"effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "route_batch_lifecycle_mutation_to_bytewax"},
 	},
+	{
+		"name": "tenant_context_required",
+		"description": "All shutdown and lifecycle operations require tenant context.",
+		"condition": {"tenant_context_present": False},
+		"effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"},
+	},
+	{
+		"name": "write_requires_policy",
+		"description": "Shutdown write operations require an explicit authorization policy.",
+		"condition": {"operation_type": "write", "write_policy_present": False},
+		"effect": {"decision": "deny", "reason": "shdn_write_policy_required", "required_action": "attach_write_policy"},
+	},
+	{
+		"name": "privilege_escalation_denied",
+		"description": "Shutdown operators cannot self-grant elevated lifecycle control permissions.",
+		"condition": {"operation": "assign_shdn_permission", "target_tier_exceeds_actor_tier": True},
+		"effect": {"decision": "deny", "reason": "privilege_escalation_prevented", "required_action": "route_to_higher_authority_approver"},
+	},
+	{
+		"name": "cross_tenant_shutdown_denied",
+		"description": "Shutdown operations may not target resources in other tenants.",
+		"condition": {"cross_tenant_access": True, "cross_tenant_membership_confirmed": False},
+		"effect": {"decision": "deny", "reason": "cross_tenant_shutdown_denied", "required_action": "use_tenant_scoped_resource"},
+	},
+	{
+		"name": "shutdown_audit_event_required",
+		"description": "All shutdown lifecycle state changes must produce an immutable audit event.",
+		"condition": {"shutdown_state_change_requested": True, "audit_event_recorded": False},
+		"effect": {"decision": "deny", "reason": "shutdown_audit_event_required", "required_action": "record_shutdown_audit_event"},
+	},
 ]
 
 

@@ -131,6 +131,7 @@ RULES: list[dict[str, Any]] = [
 	{"name": "walt_agent_runtime_supported", "description": "Wallet/payment agents must use an approved runtime.", "condition": {"operation": "register_walt_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "walt_agent_runtime_not_supported", "required_action": "select_supported_agent_runtime"}},
 	{"name": "walt_agent_role_supported", "description": "Wallet/payment agents must use an approved role.", "condition": {"operation": "register_walt_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "walt_agent_role_not_supported", "required_action": "select_supported_agent_role"}},
 	{"name": "privileged_agent_payment_action_requires_human_approval", "description": "Privileged payment actions proposed by agents require human approval.", "condition": {"operation": "agent_payment_action", "privileged_scope": True, "human_approval_recorded": False}, "effect": {"decision": "deny", "reason": "human_approval_required", "required_action": "record_human_approval"}},
+	{"name": "write_requires_policy", "description": "Wallet and payment write operations require an explicit authorization policy.", "condition": {"operation_type": "write", "write_policy_present": False}, "effect": {"decision": "deny", "reason": "walt_write_policy_required", "required_action": "attach_write_policy"}},
 ]
 
 UI_ROUTES: list[dict[str, str]] = [

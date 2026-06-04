@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "apg-education-lms"
+version = "1.0.0"
+description = "APG Learning Management System — education domain capability"
+readme = "README.md"
+license = {text = "Proprietary"}
+requires-python = ">=3.11"
+keywords = ["apg", "datacraft", "capability", "education", "lms"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+        "pydantic>=2.0",
+    "uuid6>=0.4",
+    "sqlalchemy>=2.0",
+    "flask>=3.0",
+]
+
+[project.optional-dependencies]
+streaming = ["bytewax>=0.18"]
+nlp       = ["transformers>=4.30", "sentence-transformers>=2.2"]
+vision    = ["opencv-python>=4.0", "Pillow>=10.0"]
+geo       = ["shapely>=2.0", "geopy>=2.4"]
+crypto    = ["cryptography>=41.0"]
+full      = [
+    "apg-education-lms[streaming]",
+    "apg-education-lms[nlp]",
+    "apg-education-lms[vision]",
+    "apg-education-lms[geo]",
+    "apg-education-lms[crypto]",
+]
+
+[project.urls]
+Homepage   = "https://www.datacraft.co.ke"
+Repository = "https://github.com/datacraft/apg"
+Changelog  = "https://github.com/datacraft/apg/blob/main/capabilities/education/lms/CHANGELOG.md"
+
+
+[project.scripts]
+apg-education-lms = "apg_education_lms.app:main"
+[project.entry-points."apg.capabilities"]
+education_lms = "apg_education_lms:get_capability_contract"
+
+[tool.setuptools]
+package-dir = {"apg_education_lms" = "."}
+packages    = ["apg_education_lms"]
+
+[tool.setuptools.package-data]
+"apg_education_lms" = ["py.typed", "README.md", "*.pyi"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

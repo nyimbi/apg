@@ -271,7 +271,7 @@ def create_personalization_api(app: Flask) -> Api:
 				loop = asyncio.new_event_loop()
 				asyncio.set_event_loop(loop)
 				try:
-					result = loop.run_until_complete(
+					result = asyncio.run(
 						service.personalize_notification(
 							notification_template=template,
 							user_id=data['user_id'],
@@ -312,7 +312,7 @@ def create_personalization_api(app: Flask) -> Api:
 				loop = asyncio.new_event_loop()
 				asyncio.set_event_loop(loop)
 				try:
-					result = loop.run_until_complete(
+					result = asyncio.run(
 						service.personalize_campaign(
 							campaign=campaign,
 							target_users=data['target_users'],
@@ -344,7 +344,7 @@ def create_personalization_api(app: Flask) -> Api:
 				loop = asyncio.new_event_loop()
 				asyncio.set_event_loop(loop)
 				try:
-					insights = loop.run_until_complete(
+					insights = asyncio.run(
 						service.get_personalization_insights(
 							user_id=user_id,
 							include_predictions=include_predictions
@@ -378,7 +378,7 @@ def create_personalization_api(app: Flask) -> Api:
 				loop = asyncio.new_event_loop()
 				asyncio.set_event_loop(loop)
 				try:
-					loop.run_until_complete(
+					asyncio.run(
 						service.update_user_preferences(
 							user_id=user_id,
 							preferences=data,
@@ -410,7 +410,7 @@ def create_personalization_api(app: Flask) -> Api:
 				loop = asyncio.new_event_loop()
 				asyncio.set_event_loop(loop)
 				try:
-					result = loop.run_until_complete(
+					result = asyncio.run(
 						service.generate_personalized_content(
 							user_id=data['user_id'],
 							content_type=data['content_type'],
@@ -440,7 +440,7 @@ def create_personalization_api(app: Flask) -> Api:
 				loop = asyncio.new_event_loop()
 				asyncio.set_event_loop(loop)
 				try:
-					result = loop.run_until_complete(
+					result = asyncio.run(
 						service.analyze_user_behavior(
 							user_id=data['user_id'],
 							analysis_type=data.get('analysis_type', 'comprehensive')
@@ -486,7 +486,7 @@ def create_personalization_api(app: Flask) -> Api:
 				loop = asyncio.new_event_loop()
 				asyncio.set_event_loop(loop)
 				try:
-					health = loop.run_until_complete(service.health_check())
+					health = asyncio.run(service.health_check())
 					status_code = 200 if health['status'] == 'healthy' else 503
 					return health, status_code
 				finally:

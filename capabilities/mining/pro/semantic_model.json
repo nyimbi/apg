@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "mining_pro",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "mining_pro": {
+      "capability": "mining_pro"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

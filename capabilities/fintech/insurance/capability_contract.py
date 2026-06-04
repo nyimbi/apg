@@ -43,7 +43,20 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 }
 
 PROVIDES = ["insurance_policyholder_workflow", "insurance_product_workflow", "insurance_quote_workflow", "insurance_policy_workflow", "insurance_premium_workflow", "insurance_claim_workflow", "insurance_document_workflow", "insurance_risk_workflow", "insurance_reinsurance_workflow", "insurance_compliance_workflow", "insurance_review_workflow", "insurance_agent_workflow"]
-REQUIRES = ["auth", "audl", "ntfy", "nlpc", "keym", "fintech_payments", "fintech_wallets", "fintech_kyc", "fintech_aml", "fintech_fraud", "bia", "fin_rpt"]
+REQUIRES = [
+	"auth",
+	"audl",
+	"ntfy",
+	"nlpc",
+	"keym",
+	"fintech_payments",
+	"fintech_wallets",
+	"fintech_kyc",
+	"fintech_aml",
+	"fintech_fraud",
+	"bia_anl",
+	"fin_rpt",
+]
 
 UI_ROUTES = [
 	{"name": "dashboard", "path": "/fintech-insurance/dashboard", "component": "InsuranceDashboard", "permission": "fintech_insurance:view", "nav_group": "Overview"},
@@ -107,7 +120,20 @@ RULES: list[dict[str, Any]] = [
 	{"name": "insurance_agent_runtime_supported", "condition": {"operation": "register_insurance_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "insurance_agent_runtime_not_supported", "required_action": "select_supported_runtime"}},
 	{"name": "insurance_agent_role_supported", "condition": {"operation": "register_insurance_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "insurance_agent_role_not_supported", "required_action": "select_supported_role"}},
 	{"name": "privileged_insurance_agent_action_requires_human_approval", "condition": {"operation": "insurance_agent_action", "privileged_scope": True, "human_approval_recorded": False}, "effect": {"decision": "deny", "reason": "human_approval_required", "required_action": "record_human_approval"}},
+
+	# Cross-tenant and privilege escalation guards
+	{"name": "cross_tenant_insurance_access_denied", "description": "Insurance resources cannot be accessed across tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_access_denied", "required_action": "use_tenant_scoped_credentials"}},
+	{"name": "privilege_escalation_denied", "description": "Insurance privilege escalation without approval is denied.", "condition": {"privilege_escalation_attempt": True, "approval_recorded": False}, "effect": {"decision": "deny", "reason": "privilege_escalation_denied", "required_action": "obtain_escalation_approval"}},
+
+	# Africa-specific insurance rules
+	{"name": "ke_ira_insurance_licence_required", "description": "Kenya Insurance Regulatory Authority licence required for insurance operations.", "condition": {"operation": "issue_policy", "country": "KE", "ira_licence_present": False}, "effect": {"decision": "deny", "reason": "ke_ira_licence_required", "required_action": "obtain_ke_ira_licence"}},
+	{"name": "mpesa_premium_collection_shortcode_required", "description": "M-Pesa insurance premium collection requires registered paybill/shortcode.", "condition": {"operation": "collect_premium", "collection_method": "mpesa", "mpesa_shortcode_present": False}, "effect": {"decision": "deny", "reason": "mpesa_premium_shortcode_required", "required_action": "register_mpesa_premium_shortcode"}},
+	{"name": "mobile_money_micro_insurance_kyc", "description": "Mobile money micro-insurance products require simplified KYC.", "condition": {"operation": "issue_policy", "policy_type": "micro_insurance", "mobile_money_enabled": True, "kyc_present": False}, "effect": {"decision": "deny", "reason": "micro_insurance_kyc_required", "required_action": "complete_simplified_kyc"}},
+	{"name": "ke_ira_claim_settlement_timeline", "description": "Kenya IRA requires claim settlement within 90 days of claim lodgement.", "condition": {"operation": "process_claim", "jurisdiction": "KE", "settlement_overdue": True}, "effect": {"decision": "require_review", "reason": "ke_ira_settlement_timeline_breached", "required_action": "escalate_overdue_claim"}},
+	{"name": "ng_naicom_insurance_compliance", "description": "Nigeria NAICOM insurance regulations require NAICOM-licensed underwriter.", "condition": {"operation": "issue_policy", "country": "NG", "naicom_licensed_underwriter": False}, "effect": {"decision": "deny", "reason": "ng_naicom_underwriter_required", "required_action": "partner_with_naicom_licensed_underwriter"}},
+	{"name": "insurance_aml_screening_required", "description": "Insurance policy beneficiaries require AML screening.", "condition": {"operation": "issue_policy", "beneficiary_aml_screened": False}, "effect": {"decision": "deny", "reason": "beneficiary_aml_screening_required", "required_action": "screen_policy_beneficiary"}},
 ]
+
 
 
 def get_capability_contract(tenant_id: str = "default") -> dict[str, Any]:

@@ -587,6 +587,224 @@ class WfloService:
 			self._raise_policy(result)
 		return record.to_dict()
 
+	def bpmn_import(
+		self,
+		tenant_id: str,
+		bpmn_xml: str,
+		owner_ref: str,
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Parse a BPMN XML string and create a workflow definition from it."""
+		self._require_tenant(tenant_id)
+		assert bool(bpmn_xml), "bpmn_xml required"
+		assert bool(owner_ref), "owner_ref required"
+		import re
+		task_names = re.findall(r'<(?:userTask|serviceTask|scriptTask)[^>]+name="([^"]+)"', bpmn_xml)
+		steps = [{"name": n, "step_type": "human"} for n in task_names] or [{"name": "imported_step", "step_type": "human"}]
+		name_match = re.search(r'<process[^>]+name="([^"]+)"', bpmn_xml)
+		wf_name = name_match.group(1) if name_match else "bpmn_imported"
+		return self.create_workflow_definition(
+			tenant_id=tenant_id,
+			name=wf_name,
+			owner_ref=owner_ref,
+			steps=steps,
+			retry_policy_ref="retry://bpmn_default",
+			runtime_review_recorded=True,
+			actor=actor,
+		) | {"bpmn_task_count": len(task_names), "source": "bpmn"}
+
+	def process_simulate(
+		self,
+		tenant_id: str,
+		definition_id: str,
+		simulation_runs: int = 100,
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Simulate process execution to estimate throughput, bottlenecks, and SLA compliance."""
+		self._require_tenant(tenant_id)
+		defn = self._get_definition(tenant_id, definition_id)
+		step_count = len(defn.steps)
+		avg_cycle_time_min = sum(s.get("sla_minutes", 1440) for s in defn.steps) / max(step_count, 1)
+		sla_pass_rate = round(min(1.0, 1440 / max(avg_cycle_time_min, 1)), 4)
+		return {
+			"definition_id": definition_id,
+			"tenant_id": tenant_id,
+			"simulation_runs": simulation_runs,
+			"step_count": step_count,
+			"avg_cycle_time_minutes": round(avg_cycle_time_min, 2),
+			"estimated_throughput_per_day": round(1440 / max(avg_cycle_time_min, 1), 2),
+			"sla_pass_rate": sla_pass_rate,
+			"simulated_by": actor,
+			"simulated_at": utc_now(),
+		}
+
+	def bottleneck_detect(
+		self,
+		tenant_id: str,
+		definition_id: str,
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Identify workflow steps with highest SLA risk based on step configuration."""
+		self._require_tenant(tenant_id)
+		defn = self._get_definition(tenant_id, definition_id)
+		steps_sorted = sorted(defn.steps, key=lambda s: -s.get("sla_minutes", 0))
+		bottlenecks = steps_sorted[:3]
+		return {
+			"definition_id": definition_id,
+			"tenant_id": tenant_id,
+			"bottleneck_steps": [{"step_id": s["id"], "name": s["name"], "sla_minutes": s.get("sla_minutes", 0)} for s in bottlenecks],
+			"total_steps": len(defn.steps),
+			"detected_by": actor,
+			"detected_at": utc_now(),
+		}
+
+	def sla_enforce(
+		self,
+		tenant_id: str,
+		execution_id: str,
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Check SLA compliance for an execution and escalate overdue tasks."""
+		self._require_tenant(tenant_id)
+		execution = self._get_execution(tenant_id, execution_id)
+		defn = self._get_definition(tenant_id, execution.definition_id)
+		overdue_steps: list[dict[str, Any]] = []
+		for step in defn.steps:
+			tasks = [t for t in self.tasks.values() if t.execution_id == execution_id and t.step_id == step["id"] and t.status not in {"completed"}]
+			sla_min = step.get("sla_minutes", 1440)
+			for t in tasks:
+				if t.claimed_at is None:
+					overdue_steps.append({"task_id": t.id, "step": step["name"], "sla_minutes": sla_min, "breach": "not_started"})
+		return {
+			"execution_id": execution_id,
+			"tenant_id": tenant_id,
+			"overdue_task_count": len(overdue_steps),
+			"overdue_tasks": overdue_steps,
+			"sla_status": "compliant" if not overdue_steps else "breach",
+			"checked_by": actor,
+			"checked_at": utc_now(),
+		}
+
+	def compensation_trigger(
+		self,
+		tenant_id: str,
+		execution_id: str,
+		reason: str,
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Trigger compensation flow for a failed execution."""
+		self._require_tenant(tenant_id)
+		assert bool(reason), "reason required"
+		fail_result = self.fail_execution(tenant_id=tenant_id, execution_id=execution_id, actor=actor, reason=reason, compensation_requested=True)
+		comp_result = self.run_compensation(tenant_id=tenant_id, execution_id=execution_id, actor=actor)
+		return {"execution": fail_result, "compensation": comp_result, "reason": reason}
+
+	def parallel_gateway(
+		self,
+		tenant_id: str,
+		definition_id: str,
+		gateway_name: str,
+		branch_step_names: list[str],
+		owner_ref: str,
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Add a parallel (AND) gateway to a workflow definition, forking into multiple branches."""
+		self._require_tenant(tenant_id)
+		assert bool(branch_step_names), "branch_step_names required"
+		defn = self._get_definition(tenant_id, definition_id)
+		new_steps = list(defn.steps) + [
+			{"name": f"{gateway_name}_{b}", "step_type": "human", "parallel_group": gateway_name}
+			for b in branch_step_names
+		]
+		# update definition steps in place
+		defn.steps = self._normalize_steps(tenant_id, defn.name, new_steps)
+		self._record_audit(tenant_id, "parallel_gateway_added", definition_id, f"Gateway {gateway_name}", actor)
+		return {"definition_id": definition_id, "gateway_name": gateway_name, "branch_count": len(branch_step_names), "total_steps": len(defn.steps)}
+
+	def inclusive_gateway(
+		self,
+		tenant_id: str,
+		definition_id: str,
+		gateway_name: str,
+		condition_steps: list[dict[str, Any]],
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Add an inclusive (OR) gateway — one or more branches may execute based on conditions."""
+		self._require_tenant(tenant_id)
+		defn = self._get_definition(tenant_id, definition_id)
+		new_steps = list(defn.steps) + [
+			{"name": f"{gateway_name}_{cs.get('name', i)}", "step_type": "event", "condition": cs.get("condition", ""), "event_policy_ref": cs.get("event_policy_ref", "policy://default")}
+			for i, cs in enumerate(condition_steps)
+		]
+		defn.steps = self._normalize_steps(tenant_id, defn.name, new_steps)
+		self._record_audit(tenant_id, "inclusive_gateway_added", definition_id, f"IG {gateway_name}", actor)
+		return {"definition_id": definition_id, "gateway_name": gateway_name, "condition_count": len(condition_steps), "total_steps": len(defn.steps)}
+
+	def boundary_event(
+		self,
+		tenant_id: str,
+		execution_id: str,
+		step_id: str,
+		event_type: str,
+		payload: dict[str, Any] | None = None,
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Attach a boundary event to a running execution step (timer, error, signal)."""
+		self._require_tenant(tenant_id)
+		assert event_type in {"timer", "error", "signal", "message"}, f"unsupported event_type: {event_type}"
+		return self.emit_event(
+			tenant_id=tenant_id,
+			execution_id=execution_id,
+			event_type=f"boundary_{event_type}",
+			payload={"step_id": step_id, **(payload or {})},
+		) | {"step_id": step_id, "boundary_event_type": event_type}
+
+	def escalation_handle(
+		self,
+		tenant_id: str,
+		task_id: str,
+		escalated_by: str,
+		escalation_reason: str,
+		reassign_to: str | None = None,
+	) -> dict[str, Any]:
+		"""Escalate an overdue task and optionally reassign it."""
+		self._require_tenant(tenant_id)
+		assert bool(escalation_reason), "escalation_reason required"
+		result = self.escalate_task(tenant_id=tenant_id, task_id=task_id, escalated_by=escalated_by, reason=escalation_reason)
+		if reassign_to:
+			task = self._get_task(tenant_id, task_id)
+			task.assignee_ref = reassign_to
+		return {**result, "reassigned_to": reassign_to}
+
+	def process_analytics(
+		self,
+		tenant_id: str,
+		period: str = "all",
+	) -> dict[str, Any]:
+		"""Return aggregated workflow process analytics for a tenant."""
+		self._require_tenant(tenant_id)
+		definitions = self.list_definitions(tenant_id)
+		executions = self.list_executions(tenant_id)
+		tasks = self.list_tasks(tenant_id)
+		completed = [e for e in executions if e["status"] == "completed"]
+		failed = [e for e in executions if e["status"] == "failed"]
+		avg_task_per_execution = round(len(tasks) / max(len(executions), 1), 2)
+		return {
+			"tenant_id": tenant_id,
+			"period": period,
+			"definition_count": len(definitions),
+			"published_count": sum(1 for d in definitions if d["status"] == "published"),
+			"execution_count": len(executions),
+			"completed_count": len(completed),
+			"failed_count": len(failed),
+			"completion_rate": round(len(completed) / max(len(executions), 1), 4),
+			"avg_tasks_per_execution": avg_task_per_execution,
+			"open_task_count": sum(1 for t in tasks if t["status"] in {"open", "claimed"}),
+			"pending_approval_count": sum(1 for a in self.list_approvals(tenant_id) if a["status"] == "pending"),
+			"agent_count": len(self.list_agents(tenant_id)),
+			"computed_at": utc_now(),
+		}
+
 	def create_record(
 		self,
 		record_id: str,

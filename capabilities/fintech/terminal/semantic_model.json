@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "fintech_terminal",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "fintech_terminal": {
+      "capability": "fintech_terminal"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

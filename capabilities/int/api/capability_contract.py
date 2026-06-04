@@ -162,9 +162,8 @@ REQUIRES = [
 	"ntfy",
 	"composition_events",
 	"composition_config",
-	"policy_management",
+	"grc_pol",
 	"service_discovery",
-	"developer_portal",
 ]
 
 

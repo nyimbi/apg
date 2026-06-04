@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+import importlib.metadata
 import importlib.util
 import sys
 from dataclasses import dataclass
@@ -39,12 +41,42 @@ class CapabilityContractRecord:
 
 
 def discover_contract_paths(root: Path | str | None = None) -> list[Path]:
-	"""Return all capability contract files under the capabilities tree."""
+	"""Return all capability contract files — filesystem tree and installed packages.
+
+	Filesystem discovery: walks the capabilities tree under *root*.
+	Entry-point discovery: checks the ``apg.capabilities`` entry-point group so
+	that independently-installed ``apg-*`` packages are also found without
+	needing to be present in the source tree.
+	"""
 	base = Path(root) if root is not None else Path(__file__).resolve().parent
-	return sorted(
+	paths: set[Path] = set(
 		path for path in base.glob("**/" + CONTRACT_FILENAME)
 		if path.name == CONTRACT_FILENAME and "__pycache__" not in path.parts
 	)
+
+	# Discover capabilities installed as standalone PyPI packages.
+	try:
+		for ep in importlib.metadata.entry_points(group="apg.capabilities"):
+			try:
+				module = ep.load()
+				if callable(module):
+					# Entry point points directly to get_capability_contract function;
+					# derive the contract file from its module's __file__.
+					import inspect
+					src = inspect.getfile(module)
+					contract_path = Path(src).parent / CONTRACT_FILENAME
+				elif hasattr(module, "__file__") and module.__file__:
+					contract_path = Path(module.__file__).parent / CONTRACT_FILENAME
+				else:
+					continue
+				if contract_path.exists():
+					paths.add(contract_path.resolve())
+			except Exception:
+				pass
+	except Exception:
+		pass
+
+	return sorted(paths)
 
 
 def load_contract_registry(
@@ -310,13 +342,5 @@ def _matches(condition: dict[str, Any], context: dict[str, Any]) -> bool:
 
 
 def _copy_contract(contract: dict[str, Any]) -> dict[str, Any]:
-	"""Copy plain contract data while keeping dependency surface minimal."""
-	copied: dict[str, Any] = {}
-	for key, value in contract.items():
-		if isinstance(value, dict):
-			copied[key] = _copy_contract(value)
-		elif isinstance(value, list):
-			copied[key] = [_copy_contract(item) if isinstance(item, dict) else item for item in value]
-		else:
-			copied[key] = value
-	return copied
+	"""Deep-copy a capability contract, safely handling any circular references."""
+	return copy.deepcopy(contract)

@@ -1,0 +1,21 @@
+{
+  "evidence": {
+    "contracts": {
+      "capability_contract": {
+        "display_name": "Electronic Medical Records",
+        "errors": []
+      }
+    },
+    "self_test": {
+      "capability": "healthcare_emr",
+      "passed": true,
+      "status": "ok"
+    },
+    "semantic_model": {
+      "capability": "healthcare_emr",
+      "format": "apg.semantic-model.v1"
+    }
+  },
+  "format": "apg.release-report.v1",
+  "ok": true
+}

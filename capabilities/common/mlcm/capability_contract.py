@@ -348,6 +348,31 @@ def streaming_manifest() -> dict[str, Any]:
 	}
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.mlcm.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"model_registered",
+		"model_versioned",
+		"model_promoted",
+		"model_deprecated",
+		"model_retired",
+		"experiment_started",
+		"experiment_completed",
+		"evaluation_recorded",
+		"drift_detected",
+		"retraining_triggered",
+		"deployment_approved",
+		"agent_registered",
+	],
+	"guardrails": [
+		"mlcm_batch_requires_bytewax",
+		"mlcm_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable MLCM capability contract."""
 	config = deepcopy(DEFAULT_CONFIGURATION)
@@ -371,7 +396,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"requires_theme": True,
 		},
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": deepcopy(STREAMING),
 		"theme": deepcopy(THEME),
 	}
 

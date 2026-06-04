@@ -141,7 +141,20 @@ RULES: list[dict[str, Any]] = [
 	{"name": "bnpl_agent_runtime_supported", "description": "BNPL agents must use a supported runtime.", "condition": {"operation": "register_bnpl_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "bnpl_agent_runtime_not_supported", "required_action": "select_supported_agent_runtime"}},
 	{"name": "bnpl_agent_role_supported", "description": "BNPL agents must use a supported role.", "condition": {"operation": "register_bnpl_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "bnpl_agent_role_not_supported", "required_action": "select_supported_agent_role"}},
 	{"name": "privileged_bnpl_agent_action_requires_human_approval", "description": "Privileged BNPL-agent actions require human approval.", "condition": {"operation": "bnpl_agent_action", "privileged_scope": True, "human_approval_recorded": False}, "effect": {"decision": "deny", "reason": "human_approval_required", "required_action": "record_human_approval"}},
+
+	# Cross-tenant and privilege escalation guards
+	{"name": "cross_tenant_bnpl_access_denied", "description": "BNPL resources cannot be accessed across tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_access_denied", "required_action": "use_tenant_scoped_credentials"}},
+	{"name": "privilege_escalation_denied", "description": "BNPL privilege escalation without approval is denied.", "condition": {"privilege_escalation_attempt": True, "approval_recorded": False}, "effect": {"decision": "deny", "reason": "privilege_escalation_denied", "required_action": "obtain_escalation_approval"}},
+
+	# Africa-specific BNPL rules
+	{"name": "ke_cbk_digital_credit_licence", "description": "Kenya CBK digital credit provider licence required for BNPL lending.", "condition": {"operation": "create_bnpl_plan", "country": "KE", "cbk_digital_credit_licence_present": False}, "effect": {"decision": "deny", "reason": "ke_cbk_digital_credit_licence_required", "required_action": "obtain_cbk_digital_credit_licence"}},
+	{"name": "mpesa_bnpl_repayment_channel_required", "description": "M-Pesa BNPL plans must have M-Pesa repayment channel configured.", "condition": {"operation": "create_bnpl_plan", "repayment_channel": "mpesa", "mpesa_shortcode_present": False}, "effect": {"decision": "deny", "reason": "mpesa_repayment_shortcode_required", "required_action": "configure_mpesa_repayment_shortcode"}},
+	{"name": "mobile_money_bnpl_kyc_required", "description": "Mobile money BNPL customers require CBK-tier KYC.", "condition": {"operation": "create_bnpl_plan", "payment_method": "mobile_money", "kyc_tier_compliant": False}, "effect": {"decision": "deny", "reason": "mobile_money_bnpl_kyc_required", "required_action": "complete_mobile_money_kyc"}},
+	{"name": "ke_bnpl_interest_rate_cap", "description": "Kenya interest rate cap regulations apply to BNPL plans.", "condition": {"operation": "create_bnpl_plan", "country": "KE", "exceeds_ke_interest_rate_cap": True}, "effect": {"decision": "deny", "reason": "ke_interest_rate_cap_exceeded", "required_action": "reduce_bnpl_interest_rate"}},
+	{"name": "ng_fccpc_bnpl_guidelines", "description": "Nigeria FCCPC lending guidelines apply to BNPL plans.", "condition": {"operation": "create_bnpl_plan", "country": "NG", "fccpc_compliant": False}, "effect": {"decision": "deny", "reason": "ng_fccpc_compliance_required", "required_action": "comply_with_fccpc_guidelines"}},
+	{"name": "bnpl_credit_bureau_check_required", "description": "BNPL plans require credit bureau check for amounts above threshold.", "condition": {"operation": "create_bnpl_plan", "high_value": True, "credit_bureau_checked": False}, "effect": {"decision": "require_review", "reason": "credit_bureau_check_required", "required_action": "perform_credit_bureau_check"}},
 ]
+
 
 
 def _configuration_schema() -> dict[str, Any]:

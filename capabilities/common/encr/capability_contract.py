@@ -423,7 +423,67 @@ def default_rules() -> list[CapabilityRule]:
 				"reason": "bytewax_crypto_stream_required",
 				"required_action": "route_crypto_lifecycle_through_bytewax"
 			}
-		)
+		),
+		CapabilityRule(
+			name="cross_tenant_key_access_denied",
+			description="Cryptographic keys are scoped to the requesting tenant and cannot be accessed cross-tenant.",
+			condition={"cross_tenant_key_access": True, "cross_tenant_membership_confirmed": False},
+			effect={
+				"decision": "deny",
+				"reason": "cross_tenant_key_access_denied",
+				"required_action": "use_tenant_scoped_key_domain"
+			}
+		),
+		CapabilityRule(
+			name="write_requires_policy",
+			description="Encryption write operations require an explicit authorization policy.",
+			condition={"operation_type": "write", "write_policy_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "encr_write_policy_required",
+				"required_action": "attach_write_policy"
+			}
+		),
+		CapabilityRule(
+			name="key_delete_requires_approval",
+			description="Key deletion requires explicit dual-control approval.",
+			condition={"operation": "delete_key", "delete_approved": False},
+			effect={
+				"decision": "deny",
+				"reason": "key_delete_approval_required",
+				"required_action": "record_key_delete_approval"
+			}
+		),
+		CapabilityRule(
+			name="privilege_escalation_denied",
+			description="Crypto operators cannot self-grant elevated cryptographic permissions.",
+			condition={"operation": "assign_crypto_permission", "target_tier_exceeds_actor_tier": True},
+			effect={
+				"decision": "deny",
+				"reason": "privilege_escalation_prevented",
+				"required_action": "route_to_higher_authority_approver"
+			}
+		),
+		CapabilityRule(
+			name="key_domain_requires_tenant_binding",
+			description="Key domains must be bound to a tenant before any keys can be created.",
+			condition={"operation": "create_key", "key_domain_tenant_bound": False},
+			effect={
+				"decision": "deny",
+				"reason": "key_domain_tenant_binding_required",
+				"required_action": "bind_key_domain_to_tenant"
+			}
+		),
+		CapabilityRule(
+			name="crypto_operation_requires_audit_event",
+			description="All cryptographic operations must produce an immutable audit event.",
+			condition={"crypto_operation_requested": True, "audit_event_recorded": False},
+			effect={
+				"decision": "deny",
+				"reason": "crypto_audit_event_required",
+				"required_action": "record_crypto_audit_event"
+			}
+		),
 	]
 
 

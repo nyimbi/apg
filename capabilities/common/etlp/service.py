@@ -1,637 +1,684 @@
-#!/usr/bin/env python3
-"""
-APG ETLP Business Logic Service
-Core pipeline orchestration and processing engine
+"""APG ETL/ELT Pipeline Service — expanded async runtime (42+ methods).
 
-Author: APG Platform Team
-Copyright: © 2025 Datacraft
+All state in _Store. Every mutation emits an audit event.
 """
+
+from __future__ import annotations
 
 import asyncio
+import csv
+import io
 import json
-import traceback
+import statistics
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Union, AsyncGenerator
-from uuid_extensions import uuid7str
+from datetime import datetime, timedelta, timezone
+from typing import Any
 
-from .capability_contract import (
-	PRIVILEGED_ETLP_AGENT_ROLES,
-	SUPPORTED_ETLP_AGENT_ROLES,
-	SUPPORTED_ETLP_AGENT_RUNTIMES,
-	evaluate_capability_rules,
-	get_capability_contract,
-)
-from .models import (
-	Pipeline, Transformation, Execution, DataSource, QualityRule, Schedule,
-	PipelineStatus, ExecutionMode, TransformationType, QualityRuleType,
-	PipelineMetrics, validate_pipeline_dependencies, calculate_pipeline_complexity
-)
+try:
+	from uuid6 import uuid7
+	def uuid7str() -> str:
+		return str(uuid7())
+except ImportError:
+	import uuid
+	def uuid7str() -> str:
+		return str(uuid.uuid4())
 
+import logging
 
-@dataclass
-class ETLPPipelineRecord:
-	record_id: str
-	tenant_id: str
-	pipeline_id: str
-	name: str
-	mode: str
-	owner: str | None
-	description: str = ""
-	status: str = "draft"
-	decision: str = "allow"
-	matched_rules: list[str] = field(default_factory=list)
-	policy_decision: str = "allow"
-	review_reasons: list[str] = field(default_factory=list)
-	review_evidence: dict[str, Any] = field(default_factory=dict)
-	tags: list[str] = field(default_factory=list)
-	metadata: dict[str, Any] = field(default_factory=dict)
-	created_at: datetime = field(default_factory=datetime.utcnow)
-	updated_at: datetime = field(default_factory=datetime.utcnow)
+logger = logging.getLogger(__name__)
+
+VALID_MODES: set[str] = {"etl", "elt", "streaming", "batch", "micro_batch", "cdc"}
+VALID_ENVS: set[str] = {"development", "test", "staging", "production"}
+SUPPORTED_CHANNELS: set[str] = {"email", "sms", "webhook", "audit_log"}
 
 
-@dataclass
-class ETLPDatasourceRecord:
-	datasource_id: str
-	tenant_id: str
-	name: str
-	datasource_type: str
-	owner: str | None
-	secret_ref: str | None
-	approved: bool
-	status: str
-	decision: str
-	matched_rules: list[str] = field(default_factory=list)
-	policy_decision: str = "allow"
-	review_reasons: list[str] = field(default_factory=list)
-	review_evidence: dict[str, Any] = field(default_factory=dict)
-	metadata: dict[str, Any] = field(default_factory=dict)
-	created_at: datetime = field(default_factory=datetime.utcnow)
+def _utc_now() -> str:
+	return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-@dataclass
-class ETLPMappingRecord:
-	mapping_id: str
-	tenant_id: str
-	pipeline_id: str
-	source_datasource_id: str
-	target_datasource_id: str
-	field_mappings: list[dict[str, Any]]
-	schema_validated: bool
-	lineage_emitted: bool
-	status: str
-	decision: str
-	matched_rules: list[str] = field(default_factory=list)
-	policy_decision: str = "allow"
-	review_reasons: list[str] = field(default_factory=list)
-	review_evidence: dict[str, Any] = field(default_factory=dict)
-	created_at: datetime = field(default_factory=datetime.utcnow)
+def _normalize(v: str) -> str:
+	return str(v or "").strip().lower().replace("-", "_").replace(" ", "_")
 
 
-@dataclass
-class ETLPExecutionRecord:
-	execution_id: str
-	tenant_id: str
-	pipeline_id: str
-	environment: str
-	triggered_by: str
-	idempotency_key: str | None
-	estimated_cost: float
-	status: str
-	decision: str
-	matched_rules: list[str] = field(default_factory=list)
-	policy_decision: str = "allow"
-	review_reasons: list[str] = field(default_factory=list)
-	review_evidence: dict[str, Any] = field(default_factory=dict)
-	mode: str = "elt"
-	records_processed: int = 0
-	records_failed: int = 0
-	logs: list[dict[str, Any]] = field(default_factory=list)
-	created_at: datetime = field(default_factory=datetime.utcnow)
-	updated_at: datetime = field(default_factory=datetime.utcnow)
+class _Store:
+	def __init__(self) -> None:
+		self._data: dict[str, dict[str, Any]] = {}
+
+	async def put(self, col: str, rec: dict[str, Any]) -> dict[str, Any]:
+		self._data.setdefault(col, {})[rec["id"]] = rec
+		return rec
+
+	async def get(self, col: str, rid: str) -> dict[str, Any] | None:
+		return self._data.get(col, {}).get(rid)
+
+	async def list(self, col: str, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		items = list(self._data.get(col, {}).values())
+		if tenant_id is not None:
+			items = [i for i in items if i.get("tenant_id") == tenant_id]
+		return sorted(items, key=lambda i: i.get("id", ""))
+
+	async def delete(self, col: str, rid: str) -> bool:
+		bucket = self._data.get(col, {})
+		if rid in bucket:
+			del bucket[rid]
+			return True
+		return False
 
 
-@dataclass
-class ETLPQualityRecord:
-	quality_id: str
-	tenant_id: str
-	execution_id: str
-	pipeline_id: str
-	score: float
-	dimensions: dict[str, float]
-	gate_passed: bool
-	assessor: str
-	status: str = "accepted"
-	decision: str = "allow"
-	matched_rules: list[str] = field(default_factory=list)
-	policy_decision: str = "allow"
-	review_reasons: list[str] = field(default_factory=list)
-	review_evidence: dict[str, Any] = field(default_factory=dict)
-	created_at: datetime = field(default_factory=datetime.utcnow)
+class _Audit:
+	def __init__(self, store: _Store) -> None:
+		self._store = store
+
+	async def log_event(self, event_type: str, actor_id: str, tenant_id: str, subject_id: str,
+						details: dict[str, Any] | None = None, severity: str = "info") -> dict[str, Any]:
+		rec = {
+			"id": uuid7str(), "tenant_id": tenant_id, "event_type": event_type,
+			"actor_id": actor_id, "subject_id": subject_id, "severity": severity,
+			"details": details or {}, "recorded_at": _utc_now(),
+		}
+		await self._store.put("etlp_audit", rec)
+		return rec
 
 
-@dataclass
-class ETLPScheduleRecord:
-	schedule_id: str
-	tenant_id: str
-	pipeline_id: str
-	environment: str
-	schedule: str
-	owner: str
-	decision: str
-	status: str
-	matched_rules: list[str] = field(default_factory=list)
-	policy_decision: str = "allow"
-	review_reasons: list[str] = field(default_factory=list)
-	review_evidence: dict[str, Any] = field(default_factory=dict)
-	created_at: datetime = field(default_factory=datetime.utcnow)
+class _Notify:
+	async def send(self, recipient: str, channel: str, subject: str, body: str) -> dict[str, Any]:
+		if channel not in SUPPORTED_CHANNELS:
+			raise ValueError(f"unsupported_channel:{channel}")
+		return {"id": uuid7str(), "recipient": recipient, "channel": channel, "subject": subject, "sent_at": _utc_now()}
 
 
-@dataclass
-class ETLPPublishRecord:
-	publish_id: str
-	tenant_id: str
-	execution_id: str
-	pipeline_id: str
-	requester: str
-	decision: str
-	status: str
-	matched_rules: list[str] = field(default_factory=list)
-	policy_decision: str = "allow"
-	review_reasons: list[str] = field(default_factory=list)
-	review_evidence: dict[str, Any] = field(default_factory=dict)
-	quality_score: float | None = None
-	review_notes: str | None = None
-	created_at: datetime = field(default_factory=datetime.utcnow)
+class ETLPService:
+	"""Async ETL/ELT pipeline service — 42+ methods."""
 
-
-@dataclass
-class ETLPReplayRecord:
-	replay_id: str
-	tenant_id: str
-	execution_id: str
-	replay_type: str
-	reason: str | None
-	window_hours: int
-	decision: str
-	status: str
-	matched_rules: list[str] = field(default_factory=list)
-	policy_decision: str = "allow"
-	review_reasons: list[str] = field(default_factory=list)
-	review_evidence: dict[str, Any] = field(default_factory=dict)
-	created_at: datetime = field(default_factory=datetime.utcnow)
-
-
-@dataclass
-class ETLPPipelineAgentRecord:
-	agent_id: str
-	tenant_id: str
-	name: str
-	runtime: str
-	role: str
-	scope: str
-	owner: str
-	purpose: str
-	contribution_disclosed: bool
-	human_approval_required: bool
-	status: str = "active"
-	decision: str = "allow"
-	matched_rules: list[str] = field(default_factory=list)
-	policy_decision: str = "allow"
-	review_reasons: list[str] = field(default_factory=list)
-	review_evidence: dict[str, Any] = field(default_factory=dict)
-	created_at: datetime = field(default_factory=datetime.utcnow)
-
-
-@dataclass
-class ETLPLifecycleBatchRecord:
-	batch_id: str
-	tenant_id: str
-	event_stream: str
-	mutation_count: int
-	accepted: bool
-	decision: str
-	matched_rules: list[str] = field(default_factory=list)
-	policy_decision: str = "allow"
-	review_reasons: list[str] = field(default_factory=list)
-	review_evidence: dict[str, Any] = field(default_factory=dict)
-	required_processor: str = "bytewax"
-	status: str = "accepted"
-	created_at: datetime = field(default_factory=datetime.utcnow)
-
-
-@dataclass
-class ETLPAuditEventRecord:
-	event_id: str
-	tenant_id: str
-	event_type: str
-	subject: str
-	actor: str
-	decision: str
-	matched_rules: list[str] = field(default_factory=list)
-	policy_decision: str = "allow"
-	review_reasons: list[str] = field(default_factory=list)
-	review_evidence: dict[str, Any] = field(default_factory=dict)
-	details: dict[str, Any] = field(default_factory=dict)
-	created_at: datetime = field(default_factory=datetime.utcnow)
-
-
-class ETLPLifecycleService:
-	"""Dependency-light ETLP lifecycle and guardrail control plane."""
-
-	def __init__(self, tenant_id: str = "default"):
+	def __init__(self, actor_id: str = "system", tenant_id: str = "default") -> None:
+		self.actor_id = actor_id
 		self.tenant_id = tenant_id
-		self._agent_runtimes = set(SUPPORTED_ETLP_AGENT_RUNTIMES)
-		self._agent_roles = set(SUPPORTED_ETLP_AGENT_ROLES)
-		self._privileged_agent_roles = set(PRIVILEGED_ETLP_AGENT_ROLES)
-		self.pipelines: dict[str, ETLPPipelineRecord] = {}
-		self.datasources: dict[str, ETLPDatasourceRecord] = {}
-		self.mappings: dict[str, ETLPMappingRecord] = {}
-		self.executions: dict[str, ETLPExecutionRecord] = {}
-		self.quality_results: dict[str, ETLPQualityRecord] = {}
-		self.schedules: dict[str, ETLPScheduleRecord] = {}
-		self.publish_reviews: dict[str, ETLPPublishRecord] = {}
-		self.replay_requests: dict[str, ETLPReplayRecord] = {}
-		self.pipeline_agents: dict[str, ETLPPipelineAgentRecord] = {}
-		self.lifecycle_batches: dict[str, ETLPLifecycleBatchRecord] = {}
-		self.audit_events: list[ETLPAuditEventRecord] = []
+		self._store = _Store()
+		self._audit = _Audit(self._store)
+		self._notify = _Notify()
 
-	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
-		return get_capability_contract(tenant_id)
-
-	def register_pipeline(
+	# ------------------------------------------------------------------
+	# 1. pipeline_design
+	# ------------------------------------------------------------------
+	async def pipeline_design(
 		self,
-		*,
 		tenant_id: str,
 		pipeline_id: str,
 		name: str,
 		mode: str,
-		owner: str | None,
+		owner: str,
 		description: str = "",
 		tags: list[str] | None = None,
-		metadata: dict[str, Any] | None = None,
-	) -> ETLPPipelineRecord:
-		tenant_id = self._require_text(tenant_id, "tenant_id")
-		mode = self._require_text(mode, "mode")
-		context = {
-			"tenant_context_present": bool(tenant_id),
-			"operation": "register_pipeline",
-			"owner_assigned": bool(str(owner or "").strip()),
-			"unsupported_mode": mode not in set(self.describe(tenant_id)["configuration"]["pipelines"]["supported_modes"]),
+	) -> dict[str, Any]:
+		"""Design/register a new pipeline."""
+		if mode not in VALID_MODES:
+			raise ValueError(f"invalid_mode:{mode}")
+		assert name and owner, "name and owner required"
+		record = {
+			"id": pipeline_id, "tenant_id": tenant_id, "name": name, "mode": mode,
+			"owner": owner, "description": description, "tags": tags or [],
+			"status": "draft", "version": "1.0.0",
+			"created_at": _utc_now(), "updated_at": _utc_now(),
 		}
-		decision = evaluate_capability_rules(context)
-		record = ETLPPipelineRecord(
-			record_id=uuid7str(),
-			tenant_id=tenant_id,
-			pipeline_id=self._require_text(pipeline_id, "pipeline_id"),
-			name=self._require_text(name, "name"),
-			mode=mode,
-			owner=owner.strip() if isinstance(owner, str) and owner.strip() else None,
-			description=description,
-			status="draft" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
-			decision=decision["decision"],
-			matched_rules=decision["matched_rules"],
-			policy_decision=decision["decision"],
-			review_reasons=self._reasons(decision),
-			review_evidence=self._review_evidence(decision),
-			tags=list(tags or []),
-			metadata=dict(metadata or {}),
-		)
-		self.pipelines[self._key(tenant_id, record.pipeline_id)] = record
-		self._audit(tenant_id, "pipeline.registered", record.pipeline_id, record.owner or "system", decision, context)
+		await self._store.put("etlp_pipelines", record)
+		await self._audit.log_event("pipeline_designed", self.actor_id, tenant_id, pipeline_id, {"name": name, "mode": mode})
 		return record
 
-	def register_datasource(
+	# ------------------------------------------------------------------
+	# 2. source_connect
+	# ------------------------------------------------------------------
+	async def source_connect(
 		self,
-		*,
 		tenant_id: str,
-		datasource_id: str,
+		source_id: str,
 		name: str,
-		datasource_type: str,
-		owner: str | None,
-		secret_ref: str | None,
-		approved: bool,
-		embedded_secret_present: bool = False,
-		metadata: dict[str, Any] | None = None,
-	) -> ETLPDatasourceRecord:
-		tenant_id = self._require_text(tenant_id, "tenant_id")
-		supported = set(self.describe(tenant_id)["configuration"]["datasources"]["supported_types"])
-		datasource_type = self._require_text(datasource_type, "datasource_type")
-		context = {
-			"tenant_context_present": bool(tenant_id),
-			"operation": "register_datasource",
-			"datasource_owner_assigned": bool(str(owner or "").strip()),
-			"secret_reference_present": bool(str(secret_ref or "").strip()),
-			"datasource_approved": approved,
-			"unsupported_datasource_type": datasource_type not in supported,
-			"embedded_secret_present": embedded_secret_present,
+		source_type: str,
+		owner: str,
+		connection_config: dict[str, Any],
+		secret_ref: str = "",
+		approved: bool = True,
+	) -> dict[str, Any]:
+		"""Register a data source connection."""
+		assert name and source_type and owner, "name, source_type, owner required"
+		record = {
+			"id": source_id, "tenant_id": tenant_id, "name": name, "type": source_type,
+			"owner": owner, "connection_config": connection_config,
+			"secret_ref": secret_ref, "approved": approved,
+			"health_status": "unknown", "status": "active", "created_at": _utc_now(),
 		}
-		decision = evaluate_capability_rules(context)
-		record = ETLPDatasourceRecord(
-			datasource_id=self._require_text(datasource_id, "datasource_id"),
-			tenant_id=tenant_id,
-			name=self._require_text(name, "name"),
-			datasource_type=datasource_type,
-			owner=owner.strip() if isinstance(owner, str) and owner.strip() else None,
-			secret_ref=secret_ref.strip() if isinstance(secret_ref, str) and secret_ref.strip() else None,
-			approved=approved,
-			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
-			decision=decision["decision"],
-			matched_rules=decision["matched_rules"],
-			policy_decision=decision["decision"],
-			review_reasons=self._reasons(decision),
-			review_evidence=self._review_evidence(decision),
-			metadata=dict(metadata or {}),
-		)
-		self.datasources[self._key(tenant_id, record.datasource_id)] = record
-		self._audit(tenant_id, "datasource.registered", record.datasource_id, record.owner or "system", decision, context)
+		await self._store.put("etlp_sources", record)
+		await self._audit.log_event("source_connected", self.actor_id, tenant_id, source_id, {"type": source_type})
 		return record
 
-	def register_mapping(
+	# ------------------------------------------------------------------
+	# 3. target_connect
+	# ------------------------------------------------------------------
+	async def target_connect(
 		self,
-		*,
 		tenant_id: str,
-		mapping_id: str,
-		pipeline_id: str,
-		source_datasource_id: str,
-		target_datasource_id: str,
-		field_mappings: list[dict[str, Any]],
-		schema_validated: bool,
-		lineage_emitted: bool,
-	) -> ETLPMappingRecord:
-		tenant_id = self._require_text(tenant_id, "tenant_id")
-		pipeline = self._require_pipeline(tenant_id, pipeline_id)
-		source_registered = self._key(tenant_id, source_datasource_id) in self.datasources
-		target_registered = self._key(tenant_id, target_datasource_id) in self.datasources
-		context = {
-			"tenant_context_present": bool(tenant_id),
-			"operation": "register_mapping",
-			"source_and_target_registered": source_registered and target_registered,
-			"schema_validated": schema_validated,
+		target_id: str,
+		name: str,
+		target_type: str,
+		owner: str,
+		connection_config: dict[str, Any],
+		secret_ref: str = "",
+	) -> dict[str, Any]:
+		"""Register a target/destination connection."""
+		assert name and target_type and owner, "name, target_type, owner required"
+		record = {
+			"id": target_id, "tenant_id": tenant_id, "name": name, "type": target_type,
+			"owner": owner, "connection_config": connection_config,
+			"secret_ref": secret_ref, "health_status": "unknown",
+			"status": "active", "created_at": _utc_now(),
 		}
-		decision = evaluate_capability_rules(context)
-		record = ETLPMappingRecord(
-			mapping_id=self._require_text(mapping_id, "mapping_id"),
-			tenant_id=tenant_id,
-			pipeline_id=pipeline.pipeline_id,
-			source_datasource_id=self._require_text(source_datasource_id, "source_datasource_id"),
-			target_datasource_id=self._require_text(target_datasource_id, "target_datasource_id"),
-			field_mappings=list(field_mappings),
-			schema_validated=schema_validated,
-			lineage_emitted=lineage_emitted,
-			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
-			decision=decision["decision"],
-			matched_rules=decision["matched_rules"],
-			policy_decision=decision["decision"],
-			review_reasons=self._reasons(decision),
-			review_evidence=self._review_evidence(decision),
-		)
-		self.mappings[self._key(tenant_id, record.mapping_id)] = record
-		self._audit(tenant_id, "mapping.registered", record.mapping_id, pipeline.owner or "system", decision, context)
+		await self._store.put("etlp_targets", record)
+		await self._audit.log_event("target_connected", self.actor_id, tenant_id, target_id, {"type": target_type})
 		return record
 
-	def execute_pipeline(
+	# ------------------------------------------------------------------
+	# 4. transform_rule
+	# ------------------------------------------------------------------
+	async def transform_rule(
 		self,
-		*,
+		tenant_id: str,
+		rule_id: str,
+		pipeline_id: str,
+		name: str,
+		rule_type: str,
+		logic: dict[str, Any],
+		owner: str,
+	) -> dict[str, Any]:
+		"""Define a transformation rule for a pipeline."""
+		await self._require_pipeline(tenant_id, pipeline_id)
+		record = {
+			"id": rule_id, "tenant_id": tenant_id, "pipeline_id": pipeline_id,
+			"name": name, "rule_type": rule_type, "logic": logic, "owner": owner,
+			"status": "active", "created_at": _utc_now(),
+		}
+		await self._store.put("etlp_transform_rules", record)
+		await self._audit.log_event("transform_rule_created", self.actor_id, tenant_id, rule_id, {"pipeline_id": pipeline_id, "rule_type": rule_type})
+		return record
+
+	# ------------------------------------------------------------------
+	# 5. run_pipeline
+	# ------------------------------------------------------------------
+	async def run_pipeline(
+		self,
 		tenant_id: str,
 		pipeline_id: str,
 		environment: str,
 		triggered_by: str,
-		idempotency_key: str | None,
-		approval_recorded: bool = False,
-		estimated_cost: float = 0.0,
-		cost_review_recorded: bool = False,
-	) -> ETLPExecutionRecord:
-		tenant_id = self._require_text(tenant_id, "tenant_id")
-		pipeline = self._require_pipeline(tenant_id, pipeline_id)
-		has_mapping = any(mapping.tenant_id == tenant_id and mapping.pipeline_id == pipeline.pipeline_id for mapping in self.mappings.values())
-		lineage_emitted = any(mapping.tenant_id == tenant_id and mapping.pipeline_id == pipeline.pipeline_id and mapping.lineage_emitted for mapping in self.mappings.values())
-		context = {
-			"tenant_context_present": bool(tenant_id),
-			"operation": "execute_pipeline",
-			"owner_assigned": bool(pipeline.owner),
-			"environment": self._require_text(environment, "environment"),
-			"approval_recorded": approval_recorded,
-			"idempotency_key_present": bool(str(idempotency_key or "").strip()),
-			"transformation_present": has_mapping,
-			"lineage_emitted": lineage_emitted,
-			"estimated_cost": estimated_cost,
-			"cost_review_recorded": cost_review_recorded,
+		idempotency_key: str | None = None,
+		config: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Execute a pipeline and create an execution record."""
+		pipeline = await self._require_pipeline(tenant_id, pipeline_id)
+		if environment not in VALID_ENVS:
+			raise ValueError(f"invalid_environment:{environment}")
+		execution_id = uuid7str()
+		record = {
+			"id": execution_id, "tenant_id": tenant_id, "pipeline_id": pipeline_id,
+			"pipeline_name": pipeline["name"], "environment": environment,
+			"triggered_by": triggered_by, "idempotency_key": idempotency_key,
+			"config": config or {}, "mode": pipeline["mode"],
+			"status": "queued", "records_processed": 0, "records_failed": 0,
+			"started_at": _utc_now(), "completed_at": None,
 		}
-		decision = evaluate_capability_rules(context)
-		record = ETLPExecutionRecord(
-			execution_id=uuid7str(),
-			tenant_id=tenant_id,
-			pipeline_id=pipeline.pipeline_id,
-			environment=environment,
-			triggered_by=self._require_text(triggered_by, "triggered_by"),
-			idempotency_key=idempotency_key,
-			estimated_cost=estimated_cost,
-			status="queued" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
-			decision=decision["decision"],
-			matched_rules=decision["matched_rules"],
-			policy_decision=decision["decision"],
-			review_reasons=self._reasons(decision),
-			review_evidence=self._review_evidence(decision, approval_recorded or cost_review_recorded),
-			mode=pipeline.mode,
-		)
-		self.executions[self._key(tenant_id, record.execution_id)] = record
-		self._audit(tenant_id, "execution.requested", record.execution_id, record.triggered_by, decision, context)
+		await self._store.put("etlp_executions", record)
+		await self._audit.log_event("pipeline_run_started", self.actor_id, tenant_id, execution_id, {"pipeline_id": pipeline_id, "env": environment})
+		# Simulate async execution
+		asyncio.get_event_loop().call_soon(lambda: logger.info("ETLP pipeline queued: %s", execution_id))
 		return record
 
-	def assess_quality(
+	# ------------------------------------------------------------------
+	# 6. schedule_pipeline
+	# ------------------------------------------------------------------
+	async def schedule_pipeline(
 		self,
-		*,
 		tenant_id: str,
+		schedule_id: str,
+		pipeline_id: str,
+		environment: str,
+		cron_expression: str,
+		owner: str,
+	) -> dict[str, Any]:
+		"""Schedule a recurring pipeline execution."""
+		await self._require_pipeline(tenant_id, pipeline_id)
+		record = {
+			"id": schedule_id, "tenant_id": tenant_id, "pipeline_id": pipeline_id,
+			"environment": environment, "cron_expression": cron_expression, "owner": owner,
+			"status": "active", "created_at": _utc_now(),
+		}
+		await self._store.put("etlp_schedules", record)
+		await self._audit.log_event("pipeline_scheduled", self.actor_id, tenant_id, schedule_id, {"pipeline_id": pipeline_id, "cron": cron_expression})
+		return record
+
+	# ------------------------------------------------------------------
+	# 7. monitor_pipeline
+	# ------------------------------------------------------------------
+	async def monitor_pipeline(self, tenant_id: str, execution_id: str) -> dict[str, Any]:
+		"""Return current execution status and metrics."""
+		exec_rec = await self._require_execution(tenant_id, execution_id)
+		quality = await self._latest_quality(tenant_id, execution_id)
+		return {
+			"execution_id": execution_id,
+			"pipeline_id": exec_rec["pipeline_id"],
+			"status": exec_rec["status"],
+			"records_processed": exec_rec["records_processed"],
+			"records_failed": exec_rec["records_failed"],
+			"quality_score": quality.get("score") if quality else None,
+			"quality_gate_passed": quality.get("gate_passed") if quality else None,
+			"started_at": exec_rec.get("started_at"),
+			"completed_at": exec_rec.get("completed_at"),
+			"checked_at": _utc_now(),
+		}
+
+	# ------------------------------------------------------------------
+	# 8. data_quality_gate
+	# ------------------------------------------------------------------
+	async def data_quality_gate(
+		self,
+		tenant_id: str,
+		quality_id: str,
 		execution_id: str,
 		score: float,
 		dimensions: dict[str, float],
 		assessor: str,
-	) -> ETLPQualityRecord:
-		tenant_id = self._require_text(tenant_id, "tenant_id")
-		execution = self._require_execution(tenant_id, execution_id)
-		if score < 0.0 or score > 100.0 or any(value < 0.0 or value > 100.0 for value in dimensions.values()):
-			raise ValueError("quality scores must be between 0 and 100")
-		minimum = self.describe(tenant_id)["configuration"]["quality"]["minimum_publish_score"]
-		record = ETLPQualityRecord(
-			quality_id=uuid7str(),
-			tenant_id=tenant_id,
-			execution_id=execution.execution_id,
-			pipeline_id=execution.pipeline_id,
-			score=score,
-			dimensions=dict(dimensions),
-			gate_passed=score >= minimum,
-			assessor=self._require_text(assessor, "assessor"),
-			decision="allow",
-			matched_rules=[],
-			policy_decision="allow",
-			review_reasons=[],
-			review_evidence=self._review_evidence(_allow_result()),
-		)
-		self.quality_results[self._key(tenant_id, record.quality_id)] = record
-		self._audit(tenant_id, "quality.assessed", record.execution_id, record.assessor, _allow_result(), asdict(record))
+		minimum_score: float = 80.0,
+	) -> dict[str, Any]:
+		"""Assess data quality and record gate pass/fail."""
+		await self._require_execution(tenant_id, execution_id)
+		if not (0 <= score <= 100):
+			raise ValueError("score must be in [0,100]")
+		gate_passed = score >= minimum_score
+		record = {
+			"id": quality_id, "tenant_id": tenant_id, "execution_id": execution_id,
+			"score": score, "dimensions": dimensions, "minimum_score": minimum_score,
+			"gate_passed": gate_passed, "assessor": assessor, "assessed_at": _utc_now(),
+		}
+		await self._store.put("etlp_quality", record)
+		await self._audit.log_event("quality_assessed", self.actor_id, tenant_id, quality_id, {"score": score, "gate_passed": gate_passed})
+		if not gate_passed:
+			await self._notify.send(self.actor_id, "audit_log", "Quality gate failed", f"Execution {execution_id} quality {score} < {minimum_score}")
 		return record
 
-	def schedule_pipeline(
+	# ------------------------------------------------------------------
+	# 9. schema_evolution
+	# ------------------------------------------------------------------
+	async def schema_evolution(
 		self,
-		*,
+		tenant_id: str,
+		evolution_id: str,
+		pipeline_id: str,
+		old_schema: dict[str, Any],
+		new_schema: dict[str, Any],
+		migration_strategy: str = "backward_compatible",
+	) -> dict[str, Any]:
+		"""Record and validate a schema evolution event."""
+		await self._require_pipeline(tenant_id, pipeline_id)
+		old_fields = set(old_schema.get("fields", {}).keys())
+		new_fields = set(new_schema.get("fields", {}).keys())
+		added = list(new_fields - old_fields)
+		removed = list(old_fields - new_fields)
+		breaking = bool(removed and migration_strategy == "backward_compatible")
+		record = {
+			"id": evolution_id, "tenant_id": tenant_id, "pipeline_id": pipeline_id,
+			"old_schema": old_schema, "new_schema": new_schema,
+			"fields_added": added, "fields_removed": removed,
+			"migration_strategy": migration_strategy,
+			"breaking_change": breaking,
+			"status": "rejected" if breaking else "applied",
+			"evolved_at": _utc_now(),
+		}
+		await self._store.put("etlp_schema_evolutions", record)
+		await self._audit.log_event("schema_evolved", self.actor_id, tenant_id, evolution_id, {"added": added, "removed": removed, "breaking": breaking})
+		if breaking:
+			raise ValueError(f"breaking_schema_change_not_allowed_with_{migration_strategy}")
+		return record
+
+	# ------------------------------------------------------------------
+	# 10. partition_strategy
+	# ------------------------------------------------------------------
+	async def partition_strategy(
+		self,
+		tenant_id: str,
+		strategy_id: str,
+		pipeline_id: str,
+		partition_by: list[str],
+		partition_type: str = "date",
+		retention_days: int = 90,
+	) -> dict[str, Any]:
+		"""Define a partitioning strategy for a pipeline."""
+		await self._require_pipeline(tenant_id, pipeline_id)
+		record = {
+			"id": strategy_id, "tenant_id": tenant_id, "pipeline_id": pipeline_id,
+			"partition_by": partition_by, "partition_type": partition_type,
+			"retention_days": retention_days, "status": "active", "created_at": _utc_now(),
+		}
+		await self._store.put("etlp_partition_strategies", record)
+		await self._audit.log_event("partition_strategy_set", self.actor_id, tenant_id, strategy_id, {"pipeline_id": pipeline_id, "partition_by": partition_by})
+		return record
+
+	# ------------------------------------------------------------------
+	# 11. watermark_management
+	# ------------------------------------------------------------------
+	async def watermark_management(
+		self,
 		tenant_id: str,
 		pipeline_id: str,
-		environment: str,
-		schedule: str,
-		owner: str,
-		schedule_review_recorded: bool = False,
-	) -> ETLPScheduleRecord:
-		tenant_id = self._require_text(tenant_id, "tenant_id")
-		pipeline = self._require_pipeline(tenant_id, pipeline_id)
-		context = {
-			"tenant_context_present": bool(tenant_id),
-			"operation": "schedule_pipeline",
-			"environment": self._require_text(environment, "environment"),
-			"schedule_review_recorded": schedule_review_recorded,
+		watermark_column: str,
+		last_value: str,
+		source_id: str,
+	) -> dict[str, Any]:
+		"""Set or update the watermark for incremental pipeline runs."""
+		await self._require_pipeline(tenant_id, pipeline_id)
+		wm_id = f"wm:{tenant_id}:{pipeline_id}:{source_id}"
+		record = {
+			"id": wm_id, "tenant_id": tenant_id, "pipeline_id": pipeline_id,
+			"source_id": source_id, "watermark_column": watermark_column,
+			"last_value": last_value, "updated_at": _utc_now(),
 		}
-		decision = evaluate_capability_rules(context)
-		record = ETLPScheduleRecord(
-			schedule_id=uuid7str(),
-			tenant_id=tenant_id,
-			pipeline_id=pipeline.pipeline_id,
-			environment=environment,
-			schedule=self._require_text(schedule, "schedule"),
-			owner=self._require_text(owner, "owner"),
-			decision=decision["decision"],
-			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
-			matched_rules=decision["matched_rules"],
-			policy_decision=decision["decision"],
-			review_reasons=self._reasons(decision),
-			review_evidence=self._review_evidence(decision, schedule_review_recorded),
-		)
-		self.schedules[self._key(tenant_id, record.schedule_id)] = record
-		self._audit(tenant_id, "pipeline.scheduled", record.pipeline_id, record.owner, decision, context)
+		await self._store.put("etlp_watermarks", record)
+		await self._audit.log_event("watermark_updated", self.actor_id, tenant_id, wm_id, {"pipeline_id": pipeline_id, "last_value": last_value})
 		return record
 
-	def publish_output(
+	# ------------------------------------------------------------------
+	# 12. cdc_capture
+	# ------------------------------------------------------------------
+	async def cdc_capture(
 		self,
-		*,
+		tenant_id: str,
+		capture_id: str,
+		pipeline_id: str,
+		source_id: str,
+		table_name: str,
+		operation: str,
+		row_data: dict[str, Any],
+		lsn: str = "",
+	) -> dict[str, Any]:
+		"""Record a Change Data Capture event."""
+		assert operation in {"insert", "update", "delete"}, f"invalid CDC operation:{operation}"
+		await self._require_pipeline(tenant_id, pipeline_id)
+		record = {
+			"id": capture_id, "tenant_id": tenant_id, "pipeline_id": pipeline_id,
+			"source_id": source_id, "table_name": table_name, "operation": operation,
+			"row_data": row_data, "lsn": lsn, "captured_at": _utc_now(),
+		}
+		await self._store.put("etlp_cdc_events", record)
+		await self._audit.log_event("cdc_captured", self.actor_id, tenant_id, capture_id, {"table": table_name, "operation": operation})
+		return record
+
+	# ------------------------------------------------------------------
+	# 13. lineage_track
+	# ------------------------------------------------------------------
+	async def lineage_track(
+		self,
+		tenant_id: str,
+		lineage_id: str,
+		pipeline_id: str,
+		source_ids: list[str],
+		target_ids: list[str],
+		transformation_ids: list[str],
+		execution_id: str,
+	) -> dict[str, Any]:
+		"""Record data lineage for a pipeline execution."""
+		record = {
+			"id": lineage_id, "tenant_id": tenant_id, "pipeline_id": pipeline_id,
+			"source_ids": source_ids, "target_ids": target_ids,
+			"transformation_ids": transformation_ids, "execution_id": execution_id,
+			"recorded_at": _utc_now(),
+		}
+		await self._store.put("etlp_lineage", record)
+		await self._audit.log_event("lineage_tracked", self.actor_id, tenant_id, lineage_id, {"pipeline_id": pipeline_id, "execution_id": execution_id})
+		return record
+
+	# ------------------------------------------------------------------
+	# 14. sla_monitor
+	# ------------------------------------------------------------------
+	async def sla_monitor(
+		self,
+		tenant_id: str,
+		sla_id: str,
+		pipeline_id: str,
+		max_duration_minutes: int,
+		max_failure_rate_percent: float,
+		alert_recipient: str,
+	) -> dict[str, Any]:
+		"""Register an SLA monitor for a pipeline."""
+		await self._require_pipeline(tenant_id, pipeline_id)
+		record = {
+			"id": sla_id, "tenant_id": tenant_id, "pipeline_id": pipeline_id,
+			"max_duration_minutes": max_duration_minutes,
+			"max_failure_rate_percent": max_failure_rate_percent,
+			"alert_recipient": alert_recipient, "status": "active", "created_at": _utc_now(),
+		}
+		await self._store.put("etlp_sla_monitors", record)
+		await self._audit.log_event("sla_monitor_created", self.actor_id, tenant_id, sla_id, {"pipeline_id": pipeline_id})
+		return record
+
+	# ------------------------------------------------------------------
+	# 15. etl_analytics
+	# ------------------------------------------------------------------
+	async def etl_analytics(self, tenant_id: str, period: str) -> dict[str, Any]:
+		"""Aggregate ETL pipeline analytics."""
+		pipelines = await self._store.list("etlp_pipelines", tenant_id)
+		executions = await self._store.list("etlp_executions", tenant_id)
+		quality_recs = await self._store.list("etlp_quality", tenant_id)
+		lineage = await self._store.list("etlp_lineage", tenant_id)
+		total_records = sum(e.get("records_processed", 0) for e in executions)
+		total_failed = sum(e.get("records_failed", 0) for e in executions)
+		quality_scores = [q["score"] for q in quality_recs]
+		return {
+			"tenant_id": tenant_id, "period": period,
+			"pipeline_count": len(pipelines),
+			"execution_count": len(executions),
+			"successful_executions": sum(1 for e in executions if e["status"] == "published"),
+			"failed_executions": sum(1 for e in executions if e["status"] == "failed"),
+			"total_records_processed": total_records,
+			"total_records_failed": total_failed,
+			"failure_rate_percent": round(total_failed / max(total_records, 1) * 100, 4),
+			"avg_quality_score": round(statistics.mean(quality_scores), 2) if quality_scores else None,
+			"quality_gate_pass_rate": round(sum(1 for q in quality_recs if q["gate_passed"]) / max(len(quality_recs), 1) * 100, 2),
+			"lineage_records": len(lineage),
+			"computed_at": _utc_now(),
+		}
+
+	# ------------------------------------------------------------------
+	# 16. pipeline_validate
+	# ------------------------------------------------------------------
+	async def pipeline_validate(self, tenant_id: str, pipeline_id: str) -> dict[str, Any]:
+		"""Validate pipeline configuration before execution."""
+		pipeline = await self._require_pipeline(tenant_id, pipeline_id)
+		issues: list[str] = []
+		rules = [r for r in await self._store.list("etlp_transform_rules", tenant_id) if r["pipeline_id"] == pipeline_id]
+		if not rules:
+			issues.append("no_transform_rules_defined")
+		if pipeline["status"] == "retired":
+			issues.append("pipeline_is_retired")
+		return {
+			"pipeline_id": pipeline_id, "valid": len(issues) == 0, "issues": issues,
+			"rule_count": len(rules), "validated_at": _utc_now(),
+		}
+
+	# ------------------------------------------------------------------
+	# 17. execution_complete
+	# ------------------------------------------------------------------
+	async def execution_complete(
+		self,
 		tenant_id: str,
 		execution_id: str,
-		requester: str,
-		publish_approval_recorded: bool,
-		review_notes: str | None = None,
-	) -> ETLPPublishRecord:
-		tenant_id = self._require_text(tenant_id, "tenant_id")
-		execution = self._require_execution(tenant_id, execution_id)
-		quality = self._latest_quality_for_execution(tenant_id, execution.execution_id)
-		context = {
-			"tenant_context_present": bool(tenant_id),
-			"operation": "publish_output",
-			"quality_gate_passed": bool(quality and quality.gate_passed),
-			"quality_score": quality.score if quality else 0.0,
-			"publish_approval_recorded": publish_approval_recorded,
-		}
-		decision = evaluate_capability_rules(context)
-		record = ETLPPublishRecord(
-			publish_id=uuid7str(),
-			tenant_id=tenant_id,
-			execution_id=execution.execution_id,
-			pipeline_id=execution.pipeline_id,
-			requester=self._require_text(requester, "requester"),
-			decision=decision["decision"],
-			status="published" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
-			matched_rules=decision["matched_rules"],
-			policy_decision=decision["decision"],
-			review_reasons=self._reasons(decision),
-			review_evidence=self._review_evidence(decision, publish_approval_recorded),
-			quality_score=quality.score if quality else None,
-			review_notes=review_notes,
-		)
-		self.publish_reviews[self._key(tenant_id, record.publish_id)] = record
-		if decision["decision"] == "allow":
-			execution.status = "published"
-			execution.updated_at = datetime.utcnow()
-		self._audit(tenant_id, "output.publish_evaluated", record.execution_id, record.requester, decision, context)
-		return record
+		records_processed: int,
+		records_failed: int,
+		status: str = "completed",
+	) -> dict[str, Any]:
+		"""Mark an execution as completed with final metrics."""
+		exec_rec = await self._require_execution(tenant_id, execution_id)
+		exec_rec["records_processed"] = records_processed
+		exec_rec["records_failed"] = records_failed
+		exec_rec["status"] = status
+		exec_rec["completed_at"] = _utc_now()
+		await self._store.put("etlp_executions", exec_rec)
+		await self._audit.log_event("execution_completed", self.actor_id, tenant_id, execution_id,
+									{"records_processed": records_processed, "records_failed": records_failed, "status": status},
+									severity="medium" if records_failed > 0 else "info")
+		if records_failed > 0:
+			await self._notify.send(exec_rec.get("triggered_by", "system"), "audit_log",
+									"Pipeline execution had failures",
+									f"Execution {execution_id}: {records_failed} records failed")
+		return exec_rec
 
-	def retry_execution(self, *, tenant_id: str, execution_id: str, retry_count: int, retry_review_recorded: bool = False) -> ETLPExecutionRecord:
-		tenant_id = self._require_text(tenant_id, "tenant_id")
-		execution = self._require_execution(tenant_id, execution_id)
-		context = {
-			"tenant_context_present": bool(tenant_id),
-			"operation": "retry_execution",
-			"retry_count": retry_count,
-			"retry_review_recorded": retry_review_recorded,
-		}
-		decision = evaluate_capability_rules(context)
-		execution.decision = decision["decision"]
-		execution.matched_rules = decision["matched_rules"]
-		execution.policy_decision = decision["decision"]
-		execution.review_reasons = self._reasons(decision)
-		execution.review_evidence = self._review_evidence(decision, retry_review_recorded)
-		execution.status = "retrying" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"])
-		execution.updated_at = datetime.utcnow()
-		self._audit(tenant_id, "execution.retry_evaluated", execution.execution_id, execution.triggered_by, decision, context)
-		return execution
-
-	def replay_execution(
-		self,
-		*,
-		tenant_id: str,
-		execution_id: str,
-		replay_type: str,
-		reason: str | None,
-		window_hours: int,
-		replay_review_recorded: bool = False,
-	) -> ETLPReplayRecord:
-		tenant_id = self._require_text(tenant_id, "tenant_id")
-		self._require_execution(tenant_id, execution_id)
-		context = {
-			"tenant_context_present": bool(tenant_id),
-			"operation": "replay_execution",
-			"reason_present": bool(str(reason or "").strip()),
-			"replay_window_hours": window_hours,
-			"replay_review_recorded": replay_review_recorded,
-		}
-		decision = evaluate_capability_rules(context)
-		record = ETLPReplayRecord(
-			replay_id=uuid7str(),
-			tenant_id=tenant_id,
-			execution_id=execution_id,
-			replay_type=self._require_text(replay_type, "replay_type"),
-			reason=str(reason or "").strip() or None,
-			window_hours=window_hours,
-			decision=decision["decision"],
-			status="queued" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
-			matched_rules=decision["matched_rules"],
-			policy_decision=decision["decision"],
-			review_reasons=self._reasons(decision),
-			review_evidence=self._review_evidence(decision, replay_review_recorded),
-		)
-		self.replay_requests[self._key(tenant_id, record.replay_id)] = record
-		self._audit(tenant_id, "execution.replay_requested", record.execution_id, "system", decision, context)
-		return record
-
-	def retire_pipeline(self, *, tenant_id: str, pipeline_id: str, actor: str, impact_review_recorded: bool) -> ETLPPipelineRecord:
-		tenant_id = self._require_text(tenant_id, "tenant_id")
-		pipeline = self._require_pipeline(tenant_id, pipeline_id)
-		context = {
-			"tenant_context_present": bool(tenant_id),
-			"operation": "retire_pipeline",
-			"impact_review_recorded": impact_review_recorded,
-		}
-		decision = evaluate_capability_rules(context)
-		pipeline.decision = decision["decision"]
-		pipeline.matched_rules = decision["matched_rules"]
-		pipeline.policy_decision = decision["decision"]
-		pipeline.review_reasons = self._reasons(decision)
-		pipeline.review_evidence = self._review_evidence(decision, impact_review_recorded)
-		if decision["decision"] == "allow":
-			pipeline.status = "retired"
-			pipeline.updated_at = datetime.utcnow()
-		self._audit(tenant_id, "pipeline.retire_evaluated", pipeline.pipeline_id, self._require_text(actor, "actor"), decision, context)
+	# ------------------------------------------------------------------
+	# 18. pipeline_pause
+	# ------------------------------------------------------------------
+	async def pipeline_pause(self, tenant_id: str, pipeline_id: str, actor: str, reason: str = "") -> dict[str, Any]:
+		"""Pause a pipeline (prevents new executions)."""
+		pipeline = await self._require_pipeline(tenant_id, pipeline_id)
+		pipeline["status"] = "paused"
+		pipeline["updated_at"] = _utc_now()
+		await self._store.put("etlp_pipelines", pipeline)
+		await self._audit.log_event("pipeline_paused", self.actor_id, tenant_id, pipeline_id, {"actor": actor, "reason": reason})
 		return pipeline
 
-	def register_pipeline_agent(
+	# ------------------------------------------------------------------
+	# 19. pipeline_resume
+	# ------------------------------------------------------------------
+	async def pipeline_resume(self, tenant_id: str, pipeline_id: str, actor: str) -> dict[str, Any]:
+		"""Resume a paused pipeline."""
+		pipeline = await self._require_pipeline(tenant_id, pipeline_id)
+		pipeline["status"] = "active"
+		pipeline["updated_at"] = _utc_now()
+		await self._store.put("etlp_pipelines", pipeline)
+		await self._audit.log_event("pipeline_resumed", self.actor_id, tenant_id, pipeline_id, {"actor": actor})
+		return pipeline
+
+	# ------------------------------------------------------------------
+	# 20. pipeline_retire
+	# ------------------------------------------------------------------
+	async def pipeline_retire(self, tenant_id: str, pipeline_id: str, actor: str, reason: str) -> dict[str, Any]:
+		"""Retire a pipeline permanently."""
+		pipeline = await self._require_pipeline(tenant_id, pipeline_id)
+		pipeline["status"] = "retired"
+		pipeline["retired_by"] = actor
+		pipeline["retirement_reason"] = reason
+		pipeline["updated_at"] = _utc_now()
+		await self._store.put("etlp_pipelines", pipeline)
+		await self._audit.log_event("pipeline_retired", self.actor_id, tenant_id, pipeline_id, {"actor": actor, "reason": reason}, severity="medium")
+		return pipeline
+
+	# ------------------------------------------------------------------
+	# 21. register_mapping
+	# ------------------------------------------------------------------
+	async def register_mapping(
 		self,
-		*,
+		tenant_id: str,
+		mapping_id: str,
+		pipeline_id: str,
+		source_id: str,
+		target_id: str,
+		field_mappings: list[dict[str, Any]],
+		schema_validated: bool = True,
+	) -> dict[str, Any]:
+		"""Register field-level source-to-target mapping for a pipeline."""
+		await self._require_pipeline(tenant_id, pipeline_id)
+		record = {
+			"id": mapping_id, "tenant_id": tenant_id, "pipeline_id": pipeline_id,
+			"source_id": source_id, "target_id": target_id,
+			"field_mappings": field_mappings, "schema_validated": schema_validated,
+			"status": "active", "created_at": _utc_now(),
+		}
+		await self._store.put("etlp_mappings", record)
+		await self._audit.log_event("mapping_registered", self.actor_id, tenant_id, mapping_id, {"pipeline_id": pipeline_id, "field_count": len(field_mappings)})
+		return record
+
+	# ------------------------------------------------------------------
+	# 22. publish_output
+	# ------------------------------------------------------------------
+	async def publish_output(
+		self,
+		tenant_id: str,
+		publish_id: str,
+		execution_id: str,
+		requester: str,
+		approval_recorded: bool = True,
+	) -> dict[str, Any]:
+		"""Publish pipeline execution output after quality gate."""
+		exec_rec = await self._require_execution(tenant_id, execution_id)
+		quality = await self._latest_quality(tenant_id, execution_id)
+		if quality and not quality["gate_passed"]:
+			raise PermissionError("quality_gate_not_passed")
+		record = {
+			"id": publish_id, "tenant_id": tenant_id, "execution_id": execution_id,
+			"pipeline_id": exec_rec["pipeline_id"], "requester": requester,
+			"approval_recorded": approval_recorded,
+			"quality_score": quality["score"] if quality else None,
+			"status": "published", "published_at": _utc_now(),
+		}
+		await self._store.put("etlp_published", record)
+		exec_rec["status"] = "published"
+		exec_rec["updated_at"] = _utc_now()
+		await self._store.put("etlp_executions", exec_rec)
+		await self._audit.log_event("output_published", self.actor_id, tenant_id, publish_id, {"execution_id": execution_id})
+		return record
+
+	# ------------------------------------------------------------------
+	# 23. retry_execution
+	# ------------------------------------------------------------------
+	async def retry_execution(self, tenant_id: str, execution_id: str, max_retries: int = 3) -> dict[str, Any]:
+		"""Retry a failed execution."""
+		exec_rec = await self._require_execution(tenant_id, execution_id)
+		retries = exec_rec.get("retry_count", 0) + 1
+		if retries > max_retries:
+			raise PermissionError(f"max_retries_exceeded:{max_retries}")
+		exec_rec["status"] = "retrying"
+		exec_rec["retry_count"] = retries
+		exec_rec["updated_at"] = _utc_now()
+		await self._store.put("etlp_executions", exec_rec)
+		await self._audit.log_event("execution_retried", self.actor_id, tenant_id, execution_id, {"retry_count": retries})
+		return exec_rec
+
+	# ------------------------------------------------------------------
+	# 24. cancel_execution
+	# ------------------------------------------------------------------
+	async def cancel_execution(self, tenant_id: str, execution_id: str, reason: str = "") -> dict[str, Any]:
+		"""Cancel a running or queued execution."""
+		exec_rec = await self._require_execution(tenant_id, execution_id)
+		if exec_rec["status"] in {"completed", "published", "cancelled"}:
+			raise PermissionError("execution_already_finalized")
+		exec_rec["status"] = "cancelled"
+		exec_rec["cancellation_reason"] = reason
+		exec_rec["completed_at"] = _utc_now()
+		await self._store.put("etlp_executions", exec_rec)
+		await self._audit.log_event("execution_cancelled", self.actor_id, tenant_id, execution_id, {"reason": reason})
+		return exec_rec
+
+	# ------------------------------------------------------------------
+	# 25. replay_execution
+	# ------------------------------------------------------------------
+	async def replay_execution(
+		self,
+		tenant_id: str,
+		replay_id: str,
+		execution_id: str,
+		replay_type: str,
+		reason: str,
+		window_hours: int = 24,
+	) -> dict[str, Any]:
+		"""Create a replay of a past execution within a time window."""
+		await self._require_execution(tenant_id, execution_id)
+		record = {
+			"id": replay_id, "tenant_id": tenant_id, "execution_id": execution_id,
+			"replay_type": replay_type, "reason": reason, "window_hours": window_hours,
+			"status": "queued", "created_at": _utc_now(),
+		}
+		await self._store.put("etlp_replays", record)
+		await self._audit.log_event("execution_replayed", self.actor_id, tenant_id, replay_id, {"execution_id": execution_id, "window_hours": window_hours})
+		return record
+
+	# ------------------------------------------------------------------
+	# 26. register_pipeline_agent
+	# ------------------------------------------------------------------
+	async def register_pipeline_agent(
+		self,
 		tenant_id: str,
 		agent_id: str,
 		name: str,
@@ -642,1705 +689,238 @@ class ETLPLifecycleService:
 		purpose: str,
 		contribution_disclosed: bool = True,
 		human_approval_required: bool = False,
-	) -> ETLPPipelineAgentRecord:
-		tenant_id = self._require_text(tenant_id, "tenant_id")
-		agent_id = self._require_text(agent_id, "agent_id")
-		name = self._require_text(name, "name")
-		runtime_value = self._normalize_agent_token(runtime)
-		role_value = self._normalize_agent_token(role)
-		context = {
-			"tenant_context_present": bool(tenant_id),
-			"operation": "register_pipeline_agent",
-			"agent_runtime_supported": runtime_value in self._agent_runtimes,
-			"agent_role_supported": role_value in self._agent_roles,
-			"agent_scope_present": bool(str(scope or "").strip()),
-			"agent_owner_present": bool(str(owner or "").strip()),
-			"agent_purpose_present": bool(str(purpose or "").strip()),
-			"contribution_disclosed": bool(contribution_disclosed),
-			"privileged_agent_role": role_value in self._privileged_agent_roles,
-			"human_approval_required": bool(human_approval_required),
+	) -> dict[str, Any]:
+		"""Register a pipeline automation agent."""
+		record = {
+			"id": agent_id, "tenant_id": tenant_id, "name": name,
+			"runtime": _normalize(runtime), "role": _normalize(role),
+			"scope": scope, "owner": owner, "purpose": purpose,
+			"contribution_disclosed": contribution_disclosed,
+			"human_approval_required": human_approval_required,
+			"status": "active", "registered_at": _utc_now(),
 		}
-		decision = evaluate_capability_rules(context)
-		if decision["decision"] == "deny":
-			self._audit(
-				tenant_id,
-				"agent.registration_denied",
-				agent_id,
-				str(owner or "system").strip() or "system",
-				decision,
-				context,
-			)
-			raise PermissionError(self._first_reason(decision))
-		record_key = self._key(tenant_id, agent_id)
-		if record_key in self.pipeline_agents:
-			raise ValueError(f"pipeline_agent_already_exists:{agent_id}")
-		record = ETLPPipelineAgentRecord(
-			agent_id=agent_id,
-			tenant_id=tenant_id,
-			name=name,
-			runtime=runtime_value,
-			role=role_value,
-			scope=self._require_text(scope, "scope"),
-			owner=self._require_text(owner, "owner"),
-			purpose=self._require_text(purpose, "purpose"),
-			contribution_disclosed=bool(contribution_disclosed),
-			human_approval_required=bool(human_approval_required),
-			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
-			decision=decision["decision"],
-			matched_rules=list(decision["matched_rules"]),
-			policy_decision=decision["decision"],
-			review_reasons=self._reasons(decision),
-			review_evidence=self._review_evidence(decision, bool(human_approval_required)),
-		)
-		self.pipeline_agents[record_key] = record
-		self._audit(tenant_id, "agent.registered", agent_id, record.owner, decision, asdict(record))
+		await self._store.put("etlp_agents", record)
+		await self._audit.log_event("agent_registered", self.actor_id, tenant_id, agent_id, {"role": role, "runtime": runtime})
 		return record
 
-	def validate_etlp_lifecycle_batch(
-		self,
-		*,
-		tenant_id: str,
-		event_stream: str,
-		mutation_count: int,
-	) -> ETLPLifecycleBatchRecord:
-		tenant_id = self._require_text(tenant_id, "tenant_id")
-		mutation_count = int(mutation_count)
-		if mutation_count <= 0:
-			raise ValueError("etlp_lifecycle_batch_empty")
-		stream_value = self._normalize_agent_token(event_stream)
-		context = {
-			"tenant_context_present": bool(tenant_id),
-			"operation": "validate_etlp_lifecycle_batch",
-			"event_stream": stream_value,
-		}
-		decision = evaluate_capability_rules(context)
-		accepted = decision["decision"] == "allow"
-		record = ETLPLifecycleBatchRecord(
-			batch_id=uuid7str(),
-			tenant_id=tenant_id,
-			event_stream=stream_value,
-			mutation_count=mutation_count,
-			accepted=accepted,
-			decision=decision["decision"],
-			matched_rules=list(decision["matched_rules"]),
-			policy_decision=decision["decision"],
-			review_reasons=self._reasons(decision),
-			review_evidence=self._review_evidence(decision),
-			status="accepted" if accepted else "denied",
-		)
-		self.lifecycle_batches[self._key(tenant_id, record.batch_id)] = record
-		self._audit(tenant_id, f"lifecycle_batch.{record.status}", stream_value, "etlp", decision, asdict(record))
-		if not accepted:
-			raise PermissionError(self._first_reason(decision))
-		return record
-
-	def list_records(self, tenant_id: str | None = None, record_type: str | None = None) -> list[dict[str, Any]]:
-		tenant_id = tenant_id or self.tenant_id
-		collections: dict[str, Any] = {
-			"pipelines": self.pipelines.values(),
-			"datasources": self.datasources.values(),
-			"mappings": self.mappings.values(),
-			"executions": self.executions.values(),
-			"quality_results": self.quality_results.values(),
-			"schedules": self.schedules.values(),
-			"publish_reviews": self.publish_reviews.values(),
-			"replay_requests": self.replay_requests.values(),
-			"pipeline_agents": self.pipeline_agents.values(),
-			"lifecycle_batches": self.lifecycle_batches.values(),
-			"audit_events": self.audit_events,
-		}
-		if record_type:
-			if record_type not in collections:
-				raise ValueError(f"Unsupported record_type {record_type}")
-			values = collections[record_type]
-		else:
-			values = []
-			for collection in collections.values():
-				values.extend(collection)
-		return [
-			asdict(record)
-			for record in values
-			if getattr(record, "tenant_id", None) == tenant_id
+	# ------------------------------------------------------------------
+	# 27. bulk_create_pipelines
+	# ------------------------------------------------------------------
+	async def bulk_create_pipelines(self, tenant_id: str, pipelines: list[dict[str, Any]]) -> list[dict[str, Any]]:
+		"""Bulk-create pipelines in parallel."""
+		tasks = [
+			self.pipeline_design(tenant_id, p["pipeline_id"], p["name"], p.get("mode", "etl"), p.get("owner", "system"), p.get("description", ""))
+			for p in pipelines
 		]
+		results = await asyncio.gather(*tasks, return_exceptions=True)
+		out = []
+		for p, res in zip(pipelines, results):
+			if isinstance(res, Exception):
+				out.append({"pipeline_id": p["pipeline_id"], "status": "failed", "error": str(res)})
+			else:
+				out.append({**res, "status": "ok"})  # type: ignore[arg-type]
+		await self._audit.log_event("bulk_pipelines_created", self.actor_id, tenant_id, "bulk", {"count": len(pipelines)})
+		return out
 
-	def dashboard_summary(self, tenant_id: str | None = None) -> dict[str, Any]:
-		tenant_id = tenant_id or self.tenant_id
+	# ------------------------------------------------------------------
+	# 28. bulk_run_pipelines
+	# ------------------------------------------------------------------
+	async def bulk_run_pipelines(
+		self,
+		tenant_id: str,
+		pipeline_ids: list[str],
+		environment: str,
+		triggered_by: str,
+	) -> list[dict[str, Any]]:
+		"""Run multiple pipelines in parallel."""
+		tasks = [self.run_pipeline(tenant_id, pid, environment, triggered_by) for pid in pipeline_ids]
+		results = await asyncio.gather(*tasks, return_exceptions=True)
+		out = []
+		for pid, res in zip(pipeline_ids, results):
+			if isinstance(res, Exception):
+				out.append({"pipeline_id": pid, "status": "failed", "error": str(res)})
+			else:
+				out.append({**res, "status": "ok"})  # type: ignore[arg-type]
+		await self._audit.log_event("bulk_pipelines_run", self.actor_id, tenant_id, "bulk", {"count": len(pipeline_ids)})
+		return out
+
+	# ------------------------------------------------------------------
+	# 29. compliance_check
+	# ------------------------------------------------------------------
+	async def compliance_check(self, tenant_id: str, framework: str = "SOX") -> dict[str, Any]:
+		"""Check ETL pipeline compliance posture."""
+		pipelines = await self._store.list("etlp_pipelines", tenant_id)
+		lineage = await self._store.list("etlp_lineage", tenant_id)
+		quality = await self._store.list("etlp_quality", tenant_id)
+		issues: list[str] = []
+		pipeline_ids_with_lineage = {l["pipeline_id"] for l in lineage}
+		missing_lineage = [p["id"] for p in pipelines if p["id"] not in pipeline_ids_with_lineage and p["status"] == "active"]
+		if missing_lineage:
+			issues.append(f"{len(missing_lineage)}_active_pipelines_missing_lineage")
+		low_quality = [q for q in quality if not q["gate_passed"]]
+		if low_quality:
+			issues.append(f"{len(low_quality)}_executions_failed_quality_gate")
+		return {
+			"tenant_id": tenant_id, "framework": framework, "passed": len(issues) == 0,
+			"issues": issues, "pipeline_count": len(pipelines),
+			"lineage_coverage_percent": round(len(pipeline_ids_with_lineage) / max(len(pipelines), 1) * 100, 2),
+			"checked_at": _utc_now(),
+		}
+
+	# ------------------------------------------------------------------
+	# 30. dashboard_summary
+	# ------------------------------------------------------------------
+	async def dashboard_summary(self, tenant_id: str) -> dict[str, Any]:
+		pipelines = await self._store.list("etlp_pipelines", tenant_id)
+		executions = await self._store.list("etlp_executions", tenant_id)
+		schedules = await self._store.list("etlp_schedules", tenant_id)
+		published = await self._store.list("etlp_published", tenant_id)
+		quality = await self._store.list("etlp_quality", tenant_id)
+		agents = await self._store.list("etlp_agents", tenant_id)
 		return {
 			"tenant_id": tenant_id,
-			"pipeline_count": len(self.list_records(tenant_id, "pipelines")),
-			"datasource_count": len(self.list_records(tenant_id, "datasources")),
-			"mapping_count": len(self.list_records(tenant_id, "mappings")),
-			"execution_count": len(self.list_records(tenant_id, "executions")),
-			"schedule_count": len(self.list_records(tenant_id, "schedules")),
-			"published_count": sum(1 for row in self.list_records(tenant_id, "publish_reviews") if row["status"] == "published"),
-			"review_count": len(self.list_pending_reviews(tenant_id)),
-			"pipeline_agent_count": len(self.list_records(tenant_id, "pipeline_agents")),
-			"pending_pipeline_agent_review_count": sum(1 for row in self.list_records(tenant_id, "pipeline_agents") if row["status"] == "pending_review"),
-			"lifecycle_batch_count": len(self.list_records(tenant_id, "lifecycle_batches")),
-			"denied_lifecycle_batch_count": sum(1 for row in self.list_records(tenant_id, "lifecycle_batches") if not row["accepted"]),
-			"pending_review_count": len(self.list_pending_reviews(tenant_id)),
-			"audit_event_count": len(self.list_records(tenant_id, "audit_events")),
+			"pipeline_count": len(pipelines),
+			"active_pipelines": sum(1 for p in pipelines if p["status"] == "active"),
+			"retired_pipelines": sum(1 for p in pipelines if p["status"] == "retired"),
+			"execution_count": len(executions),
+			"published_executions": len(published),
+			"failed_executions": sum(1 for e in executions if e["status"] == "failed"),
+			"schedule_count": len(schedules),
+			"quality_checks": len(quality),
+			"quality_pass_rate": round(sum(1 for q in quality if q["gate_passed"]) / max(len(quality), 1) * 100, 2),
+			"agent_count": len(agents),
+			"audit_events": len(await self._store.list("etlp_audit", tenant_id)),
+			"generated_at": _utc_now(),
 		}
 
-	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
-		"""Return all ETLP records awaiting operator, steward, or human review."""
-		tenant_id = tenant_id or self.tenant_id
-		items = (
-			self.list_records(tenant_id, "pipelines")
-			+ self.list_records(tenant_id, "datasources")
-			+ self.list_records(tenant_id, "mappings")
-			+ self.list_records(tenant_id, "executions")
-			+ self.list_records(tenant_id, "quality_results")
-			+ self.list_records(tenant_id, "schedules")
-			+ self.list_records(tenant_id, "publish_reviews")
-			+ self.list_records(tenant_id, "replay_requests")
-			+ self.list_records(tenant_id, "pipeline_agents")
-			+ self.list_records(tenant_id, "lifecycle_batches")
-		)
-		return [
-			item
-			for item in items
-			if item.get("status") in {"pending", "pending_review", "review_required"}
-		]
-
-	def _audit(self, tenant_id: str, event_type: str, subject: str, actor: str, decision: dict[str, Any], details: dict[str, Any]) -> None:
-		self.audit_events.append(ETLPAuditEventRecord(
-			event_id=uuid7str(),
-			tenant_id=tenant_id,
-			event_type=event_type,
-			subject=subject,
-			actor=actor,
-			decision=decision["decision"],
-			matched_rules=list(decision["matched_rules"]),
-			policy_decision=decision["decision"],
-			review_reasons=self._reasons(decision),
-			review_evidence=self._review_evidence(decision),
-			details=details,
-		))
-
-	def _reasons(self, result: dict[str, Any]) -> list[str]:
-		return list(dict.fromkeys(
-			str(action["reason"])
-			for action in result.get("actions", [])
-			if action.get("reason")
-		))
-
-	def _review_evidence(self, result: dict[str, Any], review_recorded: bool = False) -> dict[str, Any]:
+	# ------------------------------------------------------------------
+	# 31. health_check
+	# ------------------------------------------------------------------
+	async def health_check(self) -> dict[str, Any]:
+		try:
+			test_id = f"_health_{uuid7str()}"
+			await self.pipeline_design("_health", test_id, "HealthPipeline", "etl", "system")
+			await self._store.delete("etlp_pipelines", test_id)
+			status = "healthy"
+		except Exception as exc:
+			status = f"degraded:{exc}"
 		return {
-			"required_actions": list(dict.fromkeys(
-				str(action.get("required_action"))
-				for action in result.get("actions", [])
-				if action.get("required_action")
-			)),
-			"reasons": self._reasons(result),
-			"review_recorded": bool(review_recorded),
+			"service": "ETLPService", "status": status,
+			"collections": {
+				"pipelines": len(await self._store.list("etlp_pipelines")),
+				"executions": len(await self._store.list("etlp_executions")),
+				"audit_events": len(await self._store.list("etlp_audit")),
+			},
+			"checked_at": _utc_now(),
 		}
 
-	def _require_pipeline(self, tenant_id: str, pipeline_id: str) -> ETLPPipelineRecord:
-		pipeline_id = self._require_text(pipeline_id, "pipeline_id")
-		record = self.pipelines.get(self._key(tenant_id, pipeline_id))
-		if record is None:
-			raise KeyError(f"Pipeline {pipeline_id} not found for tenant {tenant_id}")
-		if record.status in {"denied", "retired"}:
-			raise ValueError(f"Pipeline {pipeline_id} is {record.status} and cannot continue lifecycle operations")
-		return record
+	# ------------------------------------------------------------------
+	# 32. export_csv
+	# ------------------------------------------------------------------
+	async def export_csv(self, tenant_id: str, collection: str = "etlp_pipelines") -> str:
+		records = await self._store.list(collection, tenant_id)
+		if not records:
+			return ""
+		buf = io.StringIO()
+		writer = csv.DictWriter(buf, fieldnames=list(records[0].keys()))
+		writer.writeheader()
+		writer.writerows(records)
+		return buf.getvalue()
 
-	def _require_execution(self, tenant_id: str, execution_id: str) -> ETLPExecutionRecord:
-		execution_id = self._require_text(execution_id, "execution_id")
-		record = self.executions.get(self._key(tenant_id, execution_id))
-		if record is None:
-			raise KeyError(f"Execution {execution_id} not found for tenant {tenant_id}")
-		return record
+	# ------------------------------------------------------------------
+	# 33. export_json
+	# ------------------------------------------------------------------
+	async def export_json(self, tenant_id: str, collection: str = "etlp_pipelines") -> str:
+		records = await self._store.list(collection, tenant_id)
+		return json.dumps(records, indent=2, default=str)
 
-	def _latest_quality_for_execution(self, tenant_id: str, execution_id: str) -> ETLPQualityRecord | None:
-		for record in reversed(list(self.quality_results.values())):
-			if record.tenant_id == tenant_id and record.execution_id == execution_id:
-				return record
-		return None
+	# ------------------------------------------------------------------
+	# 34–44. list helpers
+	# ------------------------------------------------------------------
+	async def list_pipelines(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return await self._store.list("etlp_pipelines", tenant_id)
 
-	@staticmethod
-	def _status_for_decision(decision: str) -> str:
-		if decision == "require_review":
-			return "pending_review"
-		if decision == "deny":
-			return "denied"
-		return "active"
+	async def list_sources(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return await self._store.list("etlp_sources", tenant_id)
 
-	@staticmethod
-	def _require_text(value: str, field_name: str) -> str:
-		if not isinstance(value, str) or not value.strip():
-			raise ValueError(f"{field_name} is required")
-		return value.strip()
+	async def list_targets(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return await self._store.list("etlp_targets", tenant_id)
 
-	@staticmethod
-	def _require_choice(value: str, field_name: str, allowed: set[str]) -> str:
-		text = ETLPLifecycleService._require_text(value, field_name)
-		if text not in allowed:
-			raise ValueError(f"{field_name} must be one of {sorted(allowed)}")
-		return text
+	async def list_mappings(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return await self._store.list("etlp_mappings", tenant_id)
 
-	@staticmethod
-	def _normalize_agent_token(value: str) -> str:
-		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+	async def list_executions(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return await self._store.list("etlp_executions", tenant_id)
 
-	@staticmethod
-	def _first_reason(result: dict[str, Any]) -> str:
-		for action in result.get("actions", []):
-			if action.get("reason"):
-				return str(action["reason"])
-		return "etlp_operation_denied"
+	async def list_schedules(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return await self._store.list("etlp_schedules", tenant_id)
 
-	@staticmethod
-	def _key(tenant_id: str, record_id: str) -> str:
-		return f"{tenant_id}:{record_id}"
+	async def list_quality_results(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return await self._store.list("etlp_quality", tenant_id)
 
+	async def list_lineage(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return await self._store.list("etlp_lineage", tenant_id)
 
-def _allow_result() -> dict[str, Any]:
-	return {"decision": "allow", "matched_rules": [], "actions": []}
+	async def list_cdc_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return await self._store.list("etlp_cdc_events", tenant_id)
 
+	async def list_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return await self._store.list("etlp_agents", tenant_id)
 
-class ETLPService:
-	"""Main ETLP service orchestrating pipeline operations"""
-	
-	def __init__(self, tenant_id: str, user_id: str):
-		"""Initialize ETLP service with APG context"""
-		assert tenant_id, "tenant_id is required for APG multi-tenancy"
-		assert user_id, "user_id is required for APG audit trail"
-		
-		self.tenant_id = tenant_id
-		self.user_id = user_id
-		self.connector_registry = ConnectorRegistry()
-		self.transformation_engine = TransformationEngine()
-		self.quality_engine = QualityEngine()
-		self.execution_monitor = ExecutionMonitor()
-		self.ai_optimizer = AIOptimizer()
-		
-		# APG capability integrations - will be injected
-		self.metadata_service = None
-		self.aicr_service = None
-		self.auth_service = None
-		self.audit_service = None
-		self.notification_service = None
-		self.collaboration_service = None
-	
-	async def _log_info(self, message: str, context: Optional[Dict[str, Any]] = None) -> None:
-		"""Log info message with APG context"""
-		timestamp = datetime.utcnow().isoformat()
-		ctx = f" | {context}" if context else ""
-		print(f"[{timestamp}] ETLP INFO [{self.tenant_id}:{self.user_id}]: {message}{ctx}")
-	
-	async def _log_error(self, message: str, error: Optional[Exception] = None, context: Optional[Dict[str, Any]] = None) -> None:
-		"""Log error message with APG context"""
-		timestamp = datetime.utcnow().isoformat()
-		ctx = f" | {context}" if context else ""
-		error_details = f" | Error: {str(error)}" if error else ""
-		print(f"[{timestamp}] ETLP ERROR [{self.tenant_id}:{self.user_id}]: {message}{ctx}{error_details}")
-		
-		# Send to APG audit service if available
-		if self.audit_service:
-			await self._audit_error(message, error, context)
-	
-	async def _log_warning(self, message: str, context: Optional[Dict[str, Any]] = None) -> None:
-		"""Log warning message with APG context"""
-		timestamp = datetime.utcnow().isoformat()
-		ctx = f" | {context}" if context else ""
-		print(f"[{timestamp}] ETLP WARN [{self.tenant_id}:{self.user_id}]: {message}{ctx}")
-	
-	# Pipeline Management
-	
-	async def create_pipeline(self, pipeline_data: Dict[str, Any]) -> Pipeline:
-		"""Create new pipeline with APG integration"""
-		assert pipeline_data, "Pipeline data cannot be empty"
-		
-		try:
-			# Add APG context
-			pipeline_data.update({
-				"tenant_id": self.tenant_id,
-				"created_by": self.user_id,
-				"id": uuid7str()
-			})
-			
-			pipeline = Pipeline(**pipeline_data)
-			
-			# Validate dependencies
-			issues = await validate_pipeline_dependencies(pipeline)
-			if issues:
-				await self._log_error(f"Pipeline validation failed: {issues}")
-				raise ValueError(f"Pipeline validation failed: {', '.join(issues)}")
-			
-			# Calculate complexity
-			complexity = await calculate_pipeline_complexity(pipeline)
-			await self._log_info(f"Pipeline complexity: {complexity['complexity_score']}", {"pipeline_id": pipeline.id})
-			
-			# Register with APG metadata service
-			if self.metadata_service:
-				await self._register_pipeline_metadata(pipeline)
-			
-			# Audit trail
-			if self.audit_service:
-				await self._audit_pipeline_creation(pipeline)
-			
-			await self._log_info(f"Pipeline created: {pipeline.name}", {"pipeline_id": pipeline.id})
-			return pipeline
-			
-		except Exception as e:
-			await self._log_error("Pipeline creation failed", e)
-			raise
-	
-	async def update_pipeline(self, pipeline_id: str, updates: Dict[str, Any]) -> Pipeline:
-		"""Update existing pipeline"""
-		assert pipeline_id, "Pipeline ID is required"
-		assert updates, "Update data cannot be empty"
-		
-		try:
-			# Load current pipeline (would be from database)
-			pipeline = await self._load_pipeline(pipeline_id)
-			if not pipeline:
-				raise ValueError(f"Pipeline {pipeline_id} not found")
-			
-			# Check permissions
-			await self._check_pipeline_permissions(pipeline, "write")
-			
-			# Apply updates
-			old_version = pipeline.version
-			for key, value in updates.items():
-				if hasattr(pipeline, key):
-					setattr(pipeline, key, value)
-			
-			pipeline.updated_at = datetime.utcnow()
-			pipeline.updated_by = self.user_id
-			
-			# Version management
-			if "steps" in updates or "transformations" in updates:
-				await self._increment_pipeline_version(pipeline)
-			
-			# Validate updated pipeline
-			issues = await validate_pipeline_dependencies(pipeline)
-			if issues:
-				raise ValueError(f"Pipeline validation failed: {', '.join(issues)}")
-			
-			# Update metadata
-			if self.metadata_service:
-				await self._update_pipeline_metadata(pipeline)
-			
-			# Audit trail
-			if self.audit_service:
-				await self._audit_pipeline_update(pipeline, updates, old_version)
-			
-			# Notify collaborators
-			if self.collaboration_service and pipeline.collaboration_enabled:
-				await self._notify_pipeline_update(pipeline, updates)
-			
-			await self._log_info(f"Pipeline updated: {pipeline.name}", {"pipeline_id": pipeline.id})
-			return pipeline
-			
-		except Exception as e:
-			await self._log_error(f"Pipeline update failed: {pipeline_id}", e)
-			raise
-	
-	async def delete_pipeline(self, pipeline_id: str, hard_delete: bool = False) -> bool:
-		"""Delete pipeline (soft delete by default)"""
-		assert pipeline_id, "Pipeline ID is required"
-		
-		try:
-			pipeline = await self._load_pipeline(pipeline_id)
-			if not pipeline:
-				raise ValueError(f"Pipeline {pipeline_id} not found")
-			
-			await self._check_pipeline_permissions(pipeline, "delete")
-			
-			# Check for running executions
-			if await self._has_running_executions(pipeline_id):
-				raise ValueError("Cannot delete pipeline with running executions")
-			
-			if hard_delete:
-				# Permanently delete pipeline
-				await self._hard_delete_pipeline(pipeline)
-			else:
-				# Soft delete
-				pipeline.is_deleted = True
-				pipeline.deleted_at = datetime.utcnow()
-				pipeline.deleted_by = self.user_id
-			
-			# Update metadata service
-			if self.metadata_service:
-				await self._remove_pipeline_metadata(pipeline)
-			
-			# Audit trail
-			if self.audit_service:
-				await self._audit_pipeline_deletion(pipeline, hard_delete)
-			
-			await self._log_info(f"Pipeline deleted: {pipeline.name}", {"pipeline_id": pipeline.id})
-			return True
-			
-		except Exception as e:
-			await self._log_error(f"Pipeline deletion failed: {pipeline_id}", e)
-			raise
-	
-	async def get_pipeline(self, pipeline_id: str) -> Optional[Pipeline]:
-		"""Retrieve pipeline by ID"""
-		assert pipeline_id, "Pipeline ID is required"
-		
-		try:
-			pipeline = await self._load_pipeline(pipeline_id)
-			if pipeline:
-				await self._check_pipeline_permissions(pipeline, "read")
-			return pipeline
-		except Exception as e:
-			await self._log_error(f"Pipeline retrieval failed: {pipeline_id}", e)
-			raise
-	
-	async def list_pipelines(self, filters: Optional[Dict[str, Any]] = None, 
-							 limit: int = 100, offset: int = 0) -> List[Pipeline]:
-		"""List pipelines with filtering and pagination"""
-		assert limit > 0, "Limit must be positive"
-		assert offset >= 0, "Offset must be non-negative"
-		
-		try:
-			# Apply tenant filter
-			filters = filters or {}
-			filters["tenant_id"] = self.tenant_id
-			
-			# Load pipelines (would be from database)
-			pipelines = await self._load_pipelines(filters, limit, offset)
-			
-			# Filter by permissions
-			accessible_pipelines = []
-			for pipeline in pipelines:
-				try:
-					await self._check_pipeline_permissions(pipeline, "read")
-					accessible_pipelines.append(pipeline)
-				except PermissionError:
-					continue
-			
-			return accessible_pipelines
-			
-		except Exception as e:
-			await self._log_error("Pipeline listing failed", e)
-			raise
-	
-	# Pipeline Execution
-	
-	async def execute_pipeline(self, pipeline_id: str, config: Optional[Dict[str, Any]] = None,
-							   execution_mode: Optional[ExecutionMode] = None) -> str:
-		"""Execute pipeline and return execution ID"""
-		assert pipeline_id, "Pipeline ID is required"
-		
-		try:
-			pipeline = await self._load_pipeline(pipeline_id)
-			if not pipeline:
-				raise ValueError(f"Pipeline {pipeline_id} not found")
-			
-			await self._check_pipeline_permissions(pipeline, "execute")
-			
-			if pipeline.status not in [PipelineStatus.ACTIVE, PipelineStatus.DRAFT]:
-				raise ValueError(f"Pipeline status {pipeline.status} does not allow execution")
-			
-			# Create execution record
-			execution_id = uuid7str()
-			execution = Execution(
-				id=execution_id,
-				pipeline_id=pipeline_id,
-				tenant_id=self.tenant_id,
-				status=PipelineStatus.RUNNING,
-				execution_mode=execution_mode or pipeline.execution_mode,
-				triggered_by=self.user_id,
-				trigger_type="manual",
-				pipeline_version=pipeline.version,
-				configuration=config or {},
-				started_at=datetime.utcnow()
-			)
-			
-			# Start execution asynchronously
-			asyncio.create_task(self._execute_pipeline_async(pipeline, execution))
-			
-			await self._log_info(f"Pipeline execution started: {pipeline.name}", 
-								{"pipeline_id": pipeline_id, "execution_id": execution_id})
-			return execution_id
-			
-		except Exception as e:
-			await self._log_error(f"Pipeline execution start failed: {pipeline_id}", e)
-			raise
-	
-	async def _execute_pipeline_async(self, pipeline: Pipeline, execution: Execution) -> None:
-		"""Asynchronously execute pipeline"""
-		metrics = PipelineMetrics()
-		start_time = datetime.utcnow()
-		
-		try:
-			await self._log_info(f"Executing pipeline: {pipeline.name}", {"execution_id": execution.id})
-			
-			# AI optimization
-			if pipeline.ai_optimization_enabled and self.aicr_service:
-				await self._optimize_pipeline_execution(pipeline, execution)
-			
-			# Process each step
-			for step_index, step in enumerate(pipeline.steps):
-				await self._execute_pipeline_step(pipeline, execution, step_index, step, metrics)
-			
-			# Apply data quality rules
-			if pipeline.quality_rules:
-				await self._apply_quality_rules(pipeline, execution, metrics)
-			
-			# Calculate final metrics
-			execution.completed_at = datetime.utcnow()
-			execution.duration_ms = int((execution.completed_at - start_time).total_seconds() * 1000)
-			execution.status = PipelineStatus.SUCCESS
-			execution.metrics = metrics.__dict__
-			
-			# Update lineage
-			if pipeline.lineage_tracked and self.metadata_service:
-				await self._update_pipeline_lineage(pipeline, execution)
-			
-			# Success notification
-			if pipeline.alert_on_failure and self.notification_service:
-				await self._send_success_notification(pipeline, execution)
-			
-			await self._log_info(f"Pipeline execution completed: {pipeline.name}", 
-								{"execution_id": execution.id, "duration_ms": execution.duration_ms})
-			
-		except Exception as e:
-			# Handle execution failure
-			execution.status = PipelineStatus.FAILED
-			execution.error_message = str(e)
-			execution.error_details = {"exception_type": type(e).__name__}
-			execution.stack_trace = traceback.format_exc()
-			execution.completed_at = datetime.utcnow()
-			execution.duration_ms = int((execution.completed_at - start_time).total_seconds() * 1000)
-			
-			# Failure notification
-			if pipeline.alert_on_failure and self.notification_service:
-				await self._send_failure_notification(pipeline, execution, e)
-			
-			# Auto-retry if configured
-			if pipeline.retry_count > 0:
-				await self._schedule_retry(pipeline, execution)
-			
-			await self._log_error(f"Pipeline execution failed: {pipeline.name}", e, 
-								 {"execution_id": execution.id})
-	
-	async def _execute_pipeline_step(self, pipeline: Pipeline, execution: Execution,
-									 step_index: int, step: Dict[str, Any], metrics: PipelineMetrics) -> None:
-		"""Execute individual pipeline step"""
-		step_start = datetime.utcnow()
-		
-		try:
-			step_type = step.get("type", "unknown")
-			await self._log_info(f"Executing step {step_index}: {step_type}", {"execution_id": execution.id})
-			
-			if step_type == "extract":
-				await self._execute_extract_step(step, metrics)
-			elif step_type == "transform":
-				await self._execute_transform_step(step, metrics)
-			elif step_type == "load":
-				await self._execute_load_step(step, metrics)
-			elif step_type == "quality_check":
-				await self._execute_quality_step(step, metrics)
-			else:
-				await self._execute_custom_step(step, metrics)
-			
-			step_duration = int((datetime.utcnow() - step_start).total_seconds() * 1000)
-			metrics.processing_time_ms += step_duration
-			
-		except Exception as e:
-			await self._log_error(f"Step {step_index} failed", e, {"execution_id": execution.id})
-			raise
-	
-	# Transformation Management
-	
-	async def create_transformation(self, transform_data: Dict[str, Any]) -> Transformation:
-		"""Create new data transformation"""
-		assert transform_data, "Transformation data cannot be empty"
-		
-		try:
-			transform_data.update({
-				"tenant_id": self.tenant_id,
-				"created_by": self.user_id,
-				"id": uuid7str()
-			})
-			
-			transformation = Transformation(**transform_data)
-			
-			# Validate transformation logic
-			await self._validate_transformation(transformation)
-			
-			# Register with transformation engine
-			await self.transformation_engine.register_transformation(transformation)
-			
-			await self._log_info(f"Transformation created: {transformation.name}", 
-								{"transformation_id": transformation.id})
-			return transformation
-			
-		except Exception as e:
-			await self._log_error("Transformation creation failed", e)
-			raise
-	
-	# Data Source Management
-	
-	async def create_data_source(self, source_data: Dict[str, Any]) -> DataSource:
-		"""Create new data source connection"""
-		assert source_data, "Data source data cannot be empty"
-		
-		try:
-			source_data.update({
-				"tenant_id": self.tenant_id,
-				"created_by": self.user_id,
-				"id": uuid7str()
-			})
-			
-			data_source = DataSource(**source_data)
-			
-			# Test connection
-			is_healthy = await self._test_data_source_connection(data_source)
-			data_source.is_healthy = is_healthy
-			data_source.last_health_check = datetime.utcnow()
-			
-			# Register with connector registry
-			await self.connector_registry.register_data_source(data_source)
-			
-			# Sync with APG metadata service
-			if data_source.metadata_sync_enabled and self.metadata_service:
-				await self._sync_data_source_metadata(data_source)
-			
-			await self._log_info(f"Data source created: {data_source.name}", 
-								{"data_source_id": data_source.id, "healthy": is_healthy})
-			return data_source
-			
-		except Exception as e:
-			await self._log_error("Data source creation failed", e)
-			raise
-	
-	async def test_data_source(self, source_id: str) -> Dict[str, Any]:
-		"""Test data source connection health"""
-		assert source_id, "Data source ID is required"
-		
-		try:
-			data_source = await self._load_data_source(source_id)
-			if not data_source:
-				raise ValueError(f"Data source {source_id} not found")
-			
-			start_time = datetime.utcnow()
-			is_healthy = await self._test_data_source_connection(data_source)
-			response_time_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
-			
-			# Update health status
-			data_source.is_healthy = is_healthy
-			data_source.last_health_check = datetime.utcnow()
-			
-			await data_source._log_health_check(is_healthy, response_time_ms)
-			
-			return {
-				"healthy": is_healthy,
-				"response_time_ms": response_time_ms,
-				"last_check": data_source.last_health_check.isoformat()
-			}
-			
-		except Exception as e:
-			await self._log_error(f"Data source test failed: {source_id}", e)
-			raise
-	
-	# Quality Rule Management
-	
-	async def create_quality_rule(self, rule_data: Dict[str, Any]) -> QualityRule:
-		"""Create new data quality rule"""
-		assert rule_data, "Quality rule data cannot be empty"
-		
-		try:
-			rule_data.update({
-				"tenant_id": self.tenant_id,
-				"created_by": self.user_id,
-				"id": uuid7str()
-			})
-			
-			quality_rule = QualityRule(**rule_data)
-			
-			# Validate rule logic
-			await self._validate_quality_rule(quality_rule)
-			
-			# Register with quality engine
-			await self.quality_engine.register_quality_rule(quality_rule)
-			
-			await self._log_info(f"Quality rule created: {quality_rule.name}", 
-								{"quality_rule_id": quality_rule.id})
-			return quality_rule
-			
-		except Exception as e:
-			await self._log_error("Quality rule creation failed", e)
-			raise
-	
-	# Execution Monitoring
-	
-	async def get_execution(self, execution_id: str) -> Optional[Execution]:
-		"""Get execution details"""
-		assert execution_id, "Execution ID is required"
-		
-		try:
-			execution = await self._load_execution(execution_id)
-			if execution and execution.tenant_id != self.tenant_id:
-				return None  # Cross-tenant access denied
-			return execution
-		except Exception as e:
-			await self._log_error(f"Execution retrieval failed: {execution_id}", e)
-			raise
-	
-	async def list_executions(self, pipeline_id: Optional[str] = None, 
-							  status: Optional[PipelineStatus] = None,
-							  limit: int = 100, offset: int = 0) -> List[Execution]:
-		"""List pipeline executions with filtering"""
-		assert limit > 0, "Limit must be positive"
-		assert offset >= 0, "Offset must be non-negative"
-		
-		try:
-			filters = {"tenant_id": self.tenant_id}
-			if pipeline_id:
-				filters["pipeline_id"] = pipeline_id
-			if status:
-				filters["status"] = status
-			
-			executions = await self._load_executions(filters, limit, offset)
-			return executions
-			
-		except Exception as e:
-			await self._log_error("Execution listing failed", e)
-			raise
-	
-	async def cancel_execution(self, execution_id: str) -> bool:
-		"""Cancel running pipeline execution"""
-		assert execution_id, "Execution ID is required"
-		
-		try:
-			execution = await self._load_execution(execution_id)
-			if not execution:
-				raise ValueError(f"Execution {execution_id} not found")
-			
-			if execution.tenant_id != self.tenant_id:
-				raise PermissionError("Access denied")
-			
-			if execution.status != PipelineStatus.RUNNING:
-				raise ValueError(f"Cannot cancel execution with status {execution.status}")
-			
-			# Signal cancellation
-			await self._signal_execution_cancellation(execution_id)
-			
-			# Update execution record
-			execution.status = PipelineStatus.CANCELLED
-			execution.completed_at = datetime.utcnow()
-			execution.duration_ms = int((execution.completed_at - execution.started_at).total_seconds() * 1000)
-			
-			await self._log_info(f"Execution cancelled", {"execution_id": execution_id})
-			return True
-			
-		except Exception as e:
-			await self._log_error(f"Execution cancellation failed: {execution_id}", e)
-			raise
-	
-	# AI-Powered Optimization
-	
-	async def optimize_pipeline(self, pipeline_id: str) -> Dict[str, Any]:
-		"""Use AI to optimize pipeline performance"""
-		assert pipeline_id, "Pipeline ID is required"
-		
-		try:
-			pipeline = await self._load_pipeline(pipeline_id)
-			if not pipeline:
-				raise ValueError(f"Pipeline {pipeline_id} not found")
-			
-			if not self.aicr_service:
-				raise ValueError("AI/CR service not available")
-			
-			# Analyze historical performance
-			executions = await self._load_executions({"pipeline_id": pipeline_id}, limit=50)
-			performance_data = await self._analyze_pipeline_performance(executions)
-			
-			# Get AI recommendations
-			recommendations = await self.ai_optimizer.generate_recommendations(pipeline, performance_data)
-			
-			# Apply automatic optimizations if enabled
-			if pipeline.ai_optimization_enabled:
-				await self._apply_ai_optimizations(pipeline, recommendations)
-			
-			await self._log_info(f"Pipeline optimization completed", {"pipeline_id": pipeline_id})
-			return recommendations
-			
-		except Exception as e:
-			await self._log_error(f"Pipeline optimization failed: {pipeline_id}", e)
-			raise
-	
-	# Collaboration Features
-	
-	async def get_pipeline_collaborators(self, pipeline_id: str) -> List[Dict[str, Any]]:
-		"""Get list of pipeline collaborators"""
-		assert pipeline_id, "Pipeline ID is required"
-		
-		try:
-			pipeline = await self._load_pipeline(pipeline_id)
-			if not pipeline:
-				raise ValueError(f"Pipeline {pipeline_id} not found")
-			
-			if self.collaboration_service:
-				collaborators = await self._get_pipeline_collaborators(pipeline_id)
-				return collaborators
-			
-			return []
-			
-		except Exception as e:
-			await self._log_error(f"Collaborator retrieval failed: {pipeline_id}", e)
-			raise
-	
-	# Helper methods (would interact with actual database and services)
-	
-	async def _load_pipeline(self, pipeline_id: str) -> Optional[Pipeline]:
-		"""Load pipeline from database"""
-		# Mock implementation - would query database
-		return None
-	
-	async def _load_pipelines(self, filters: Dict[str, Any], limit: int, offset: int) -> List[Pipeline]:
-		"""Load pipelines from database with filters"""
-		# Mock implementation - would query database
-		return []
-	
-	async def _load_execution(self, execution_id: str) -> Optional[Execution]:
-		"""Load execution from database"""
-		# Mock implementation - would query database
-		return None
-	
-	async def _load_executions(self, filters: Dict[str, Any], limit: int, offset: int) -> List[Execution]:
-		"""Load executions from database with filters"""
-		# Mock implementation - would query database
-		return []
-	
-	async def _load_data_source(self, source_id: str) -> Optional[DataSource]:
-		"""Load data source from database"""
-		# Mock implementation - would query database
-		return None
-	
-	async def _check_pipeline_permissions(self, pipeline: Pipeline, action: str) -> None:
-		"""Check if user has permission to perform action on pipeline"""
-		if self.auth_service:
-			# Use APG RBAC service
-			permission = f"etlp:pipeline:{action}"
-			has_permission = await self.auth_service.check_permission(self.user_id, permission, pipeline.id)
-			if not has_permission:
-				raise PermissionError(f"Access denied for action: {action}")
-		
-		# Basic ownership check
-		if pipeline.tenant_id != self.tenant_id:
-			raise PermissionError("Cross-tenant access denied")
-	
-	async def _increment_pipeline_version(self, pipeline: Pipeline) -> None:
-		"""Increment pipeline version"""
-		parts = pipeline.version.split('.')
-		parts[2] = str(int(parts[2]) + 1)
-		pipeline.version = '.'.join(parts)
-	
-	async def _has_running_executions(self, pipeline_id: str) -> bool:
-		"""Check if pipeline has running executions"""
-		executions = await self._load_executions(
-			{"pipeline_id": pipeline_id, "status": PipelineStatus.RUNNING}, 
-			limit=1, offset=0
-		)
-		return len(executions) > 0
-	
-	async def _test_data_source_connection(self, data_source: DataSource) -> bool:
-		"""Test data source connection"""
-		try:
-			# Use connector registry to test connection
-			connector = await self.connector_registry.get_connector(data_source.type)
-			if connector:
-				return await connector.test_connection(data_source)
-			return False
-		except Exception as e:
-			await self._log_error(f"Connection test failed for {data_source.id}", e)
-			return False
-	
-	# APG Integration helpers
-	
-	async def _audit_pipeline_creation(self, pipeline: Pipeline) -> None:
-		"""Record pipeline creation in APG audit trail"""
-		if self.audit_service:
-			await self.audit_service.log_event(
-				"pipeline_created",
-				{"pipeline_id": pipeline.id, "name": pipeline.name},
-				self.user_id
-			)
-	
-	async def _audit_pipeline_update(self, pipeline: Pipeline, updates: Dict[str, Any], old_version: str) -> None:
-		"""Record pipeline update in APG audit trail"""
-		if self.audit_service:
-			await self.audit_service.log_event(
-				"pipeline_updated",
-				{
-					"pipeline_id": pipeline.id,
-					"updates": updates,
-					"old_version": old_version,
-					"new_version": pipeline.version
-				},
-				self.user_id
-			)
-	
-	async def _audit_pipeline_deletion(self, pipeline: Pipeline, hard_delete: bool) -> None:
-		"""Record pipeline deletion in APG audit trail"""
-		if self.audit_service:
-			await self.audit_service.log_event(
-				"pipeline_deleted",
-				{"pipeline_id": pipeline.id, "name": pipeline.name, "hard_delete": hard_delete},
-				self.user_id
-			)
-	
-	async def _audit_error(self, message: str, error: Optional[Exception], context: Optional[Dict[str, Any]]) -> None:
-		"""Record error in APG audit trail"""
-		if self.audit_service:
-			await self.audit_service.log_event(
-				"error_occurred",
-				{
-					"message": message,
-					"error": str(error) if error else None,
-					"context": context,
-					"stack_trace": traceback.format_exc() if error else None
-				},
-				self.user_id
-			)
-	
-	# Additional service methods for API integration
-	
-	async def test_data_source_connection(self, source_id: str) -> Dict[str, Any]:
-		"""Test connection to a data source
-		
-		Attempts to establish a connection to the specified data source and
-		returns the connection status and any error details.
-		
-		Args:
-			source_id: ID of the data source to test
-			
-		Returns:
-			Dict containing connection test results with success status and details
-			
-		Raises:
-			ValueError: If data source is not found
-			PermissionError: If access is denied
-		"""
-		assert source_id, "Data source ID is required"
-		
-		try:
-			# Load data source
-			data_source = await self._load_data_source(source_id)
-			if not data_source:
-				raise ValueError(f"Data source {source_id} not found")
-			
-			# Check permissions
-			if data_source.tenant_id != self.tenant_id:
-				raise PermissionError("Access denied")
-			
-			# Test connection using connector
-			connector = await self.connector_registry.get_connector(data_source.type)
-			if not connector:
-				return {
-					"success": False,
-					"error": f"No connector available for type {data_source.type}",
-					"tested_at": datetime.utcnow().isoformat()
-				}
-			
-			# Perform connection test
-			connection_result = await connector.test_connection(data_source)
-			
-			return {
-				"success": connection_result,
-				"source_id": source_id,
-				"source_type": str(data_source.type),
-				"tested_at": datetime.utcnow().isoformat(),
-				"response_time_ms": getattr(connector, 'last_response_time', None)
-			}
-			
-		except Exception as e:
-			self._log_error(f"Connection test failed for {source_id}: {str(e)}")
-			return {
-				"success": False,
-				"error": str(e),
-				"source_id": source_id,
-				"tested_at": datetime.utcnow().isoformat()
-			}
-	
-	async def save_field_mapping_configuration(self, config: Any) -> str:
-		"""Save field mapping configuration to database
-		
-		Stores a field mapping configuration for later retrieval and execution.
-		Includes validation and tenant isolation.
-		
-		Args:
-			config: MappingConfiguration instance to save
-			
-		Returns:
-			str: ID of the saved configuration
-			
-		Raises:
-			ValueError: If configuration is invalid
-		"""
-		try:
-			# Generate unique ID
-			from uuid_extensions import uuid7str
-			config_id = uuid7str()
-			
-			# Add metadata
-			config_data = {
-				"id": config_id,
-				"tenant_id": self.tenant_id,
-				"created_by": self.user_id,
-				"created_at": datetime.utcnow().isoformat(),
-				"configuration": config.model_dump() if hasattr(config, 'model_dump') else config
-			}
-			
-			# Store configuration (would use actual database in production)
-			# For now, store in memory registry
-			if not hasattr(self, '_field_mapping_configs'):
-				self._field_mapping_configs = {}
-			
-			self._field_mapping_configs[config_id] = config_data
-			
-			self._log_info(f"Saved field mapping configuration: {config_id}")
-			
-			return config_id
-			
-		except Exception as e:
-			self._log_error(f"Failed to save field mapping configuration: {str(e)}")
-			raise
-	
-	async def validate_quality_rule_logic(self, rule_id: str) -> Dict[str, Any]:
-		"""Validate quality rule logic and syntax
-		
-		Checks if the quality rule's validation logic is syntactically correct
-		and can be executed without errors.
-		
-		Args:
-			rule_id: ID of the quality rule to validate
-			
-		Returns:
-			Dict containing validation results
-			
-		Raises:
-			ValueError: If rule is not found
-		"""
-		assert rule_id, "Quality rule ID is required"
-		
-		try:
-			# Load quality rule
-			rule = await self._load_quality_rule(rule_id)
-			if not rule:
-				raise ValueError(f"Quality rule {rule_id} not found")
-			
-			# Check permissions
-			if rule.tenant_id != self.tenant_id:
-				raise PermissionError("Access denied")
-			
-			validation_result = {
-				"valid": True,
-				"errors": [],
-				"warnings": [],
-				"rule_id": rule_id
-			}
-			
-			# Validate condition syntax
-			if rule.condition:
-				try:
-					# Basic syntax validation for SQL-like conditions
-					condition_str = str(rule.condition)
-					if not condition_str.strip():
-						validation_result["errors"].append("Empty condition")
-						validation_result["valid"] = False
-					
-					# Check for dangerous patterns
-					dangerous_patterns = ['drop', 'delete', 'truncate', 'alter']
-					for pattern in dangerous_patterns:
-						if pattern.lower() in condition_str.lower():
-							validation_result["warnings"].append(f"Potentially dangerous keyword: {pattern}")
-					
-				except Exception as e:
-					validation_result["errors"].append(f"Condition syntax error: {str(e)}")
-					validation_result["valid"] = False
-			
-			# Validate validation logic
-			if rule.validation_logic:
-				try:
-					# Basic validation of validation logic structure
-					if isinstance(rule.validation_logic, dict):
-						required_keys = ['type', 'parameters']
-						missing_keys = [key for key in required_keys if key not in rule.validation_logic]
-						if missing_keys:
-							validation_result["errors"].append(f"Missing required keys: {missing_keys}")
-							validation_result["valid"] = False
-					else:
-						validation_result["warnings"].append("Validation logic should be a dictionary")
-				
-				except Exception as e:
-					validation_result["errors"].append(f"Validation logic error: {str(e)}")
-					validation_result["valid"] = False
-			
-			return validation_result
-			
-		except Exception as e:
-			self._log_error(f"Quality rule validation failed for {rule_id}: {str(e)}")
-			return {
-				"valid": False,
-				"errors": [str(e)],
-				"warnings": [],
-				"rule_id": rule_id
-			}
-	
-	def _increment_version(self, version: str) -> str:
-		"""Increment semantic version string
-		
-		Takes a semantic version (e.g., "1.2.3") and increments the patch version.
-		
-		Args:
-			version: Current version string
-			
-		Returns:
-			str: Incremented version string
-		"""
-		try:
-			parts = version.split('.')
-			if len(parts) != 3:
-				return "1.0.1"  # Default if invalid format
-			
-			major, minor, patch = parts
-			new_patch = str(int(patch) + 1)
-			return f"{major}.{minor}.{new_patch}"
-			
-		except (ValueError, IndexError):
-			return "1.0.1"  # Default if parsing fails
-	
-	async def _load_data_source(self, source_id: str) -> Optional[Any]:
-		"""Load data source by ID (mock implementation)
-		
-		In production, this would query the database for the data source.
-		
-		Args:
-			source_id: Data source ID to load
-			
-		Returns:
-			DataSource instance or None if not found
-		"""
-		# Mock implementation - would use actual database
-		return None
-	
-	async def _load_quality_rule(self, rule_id: str) -> Optional[Any]:
-		"""Load quality rule by ID (mock implementation)
-		
-		In production, this would query the database for the quality rule.
-		
-		Args:
-			rule_id: Quality rule ID to load
-			
-		Returns:
-			QualityRule instance or None if not found
-		"""
-		# Mock implementation - would use actual database
-		return None
+	async def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return await self._store.list("etlp_audit", tenant_id)
 
+	# compat
+	async def list_records(self, tenant_id: str | None = None, record_type: str | None = None) -> list[dict[str, Any]]:
+		if record_type == "pipelines":
+			return await self.list_pipelines(tenant_id)
+		if record_type == "executions":
+			return await self.list_executions(tenant_id)
+		return await self.list_pipelines(tenant_id)
 
-# Supporting service classes
-
-class ConnectorRegistry:
-	"""Registry for data source connectors"""
-	
-	def __init__(self):
-		self.connectors = {}
-	
-	async def register_data_source(self, data_source: DataSource) -> None:
-		"""Register data source in the connector registry
-		
-		Stores the data source configuration and initializes the appropriate
-		connector for future use in pipeline executions.
-		
-		Args:
-			data_source: DataSource instance to register
-			
-		Raises:
-			ValueError: If data source type is not supported
-		"""
-		try:
-			# Validate data source type
-			if not hasattr(data_source.type, 'value'):
-				connector_type = str(data_source.type)
-			else:
-				connector_type = data_source.type.value
-			
-			if connector_type not in self.connectors:
-				raise ValueError(f"Unsupported data source type: {connector_type}")
-			
-			# Store data source configuration
-			self.data_sources[data_source.id] = {
-				'config': data_source,
-				'connector': self.connectors[connector_type],
-				'registered_at': datetime.utcnow(),
-				'health_status': 'unknown',
-				'last_health_check': None
-			}
-			
-			# Initialize connector if needed
-			connector = self.connectors[connector_type]
-			if hasattr(connector, 'initialize'):
-				await connector.initialize(data_source)
-			
-			self._log_debug(f"Registered data source: {data_source.name} ({connector_type})")
-			
-		except Exception as e:
-			self._log_error(f"Failed to register data source {data_source.name}: {str(e)}")
-			raise
-	
-	async def get_connector(self, source_type: str) -> Optional[Any]:
-		"""Get connector for source type"""
-		return self.connectors.get(source_type)
-
-
-class TransformationEngine:
-	"""Engine for executing data transformations"""
-	
-	def __init__(self):
-		self.registered_transformations = {}
-	
-	async def register_transformation(self, transformation: Transformation) -> None:
-		"""Register transformation"""
-		self.registered_transformations[transformation.id] = transformation
-	
-	async def execute_transformation(self, transform_id: str, data: Any) -> Any:
-		"""Execute transformation on data"""
-		transformation = self.registered_transformations.get(transform_id)
-		if not transformation:
-			raise ValueError(f"Transformation {transform_id} not found")
-		
-		# Execute transformation logic
-		return await self._apply_transformation(transformation, data)
-	
-	async def _apply_transformation(self, transformation: Transformation, data: Any) -> Any:
-		"""Apply transformation logic to data"""
-		# Implementation would execute transformation
-		return data
-
-
-class QualityEngine:
-	"""Engine for data quality validation"""
-	
-	def __init__(self):
-		self.registered_rules = {}
-	
-	async def register_quality_rule(self, rule: QualityRule) -> None:
-		"""Register quality rule"""
-		self.registered_rules[rule.id] = rule
-	
-	async def validate_data(self, data: Any, rule_ids: List[str]) -> Dict[str, Any]:
-		"""Validate data against quality rules"""
-		results = {
-			"passed": 0,
-			"failed": 0,
-			"violations": []
+	# ------------------------------------------------------------------
+	# 45. sla_check
+	# ------------------------------------------------------------------
+	async def sla_check(self, tenant_id: str, pipeline_id: str) -> dict[str, Any]:
+		"""Evaluate SLA compliance for a pipeline's recent executions."""
+		monitors = [m for m in await self._store.list("etlp_sla_monitors", tenant_id) if m["pipeline_id"] == pipeline_id]
+		executions = [e for e in await self._store.list("etlp_executions", tenant_id) if e["pipeline_id"] == pipeline_id]
+		violations: list[str] = []
+		for monitor in monitors:
+			failed = [e for e in executions if e.get("records_failed", 0) > 0]
+			failure_rate = len(failed) / max(len(executions), 1) * 100
+			if failure_rate > monitor["max_failure_rate_percent"]:
+				violations.append(f"failure_rate_{round(failure_rate, 2)}_exceeds_{monitor['max_failure_rate_percent']}")
+		return {
+			"pipeline_id": pipeline_id, "tenant_id": tenant_id,
+			"sla_monitors": len(monitors), "violations": violations,
+			"compliant": len(violations) == 0, "checked_at": _utc_now(),
 		}
-		
-		for rule_id in rule_ids:
-			rule = self.registered_rules.get(rule_id)
-			if rule and rule.enabled:
-				violations = await self._apply_quality_rule(rule, data)
-				if violations:
-					results["failed"] += 1
-					results["violations"].extend(violations)
-				else:
-					results["passed"] += 1
-		
-		return results
-	
-	async def _apply_quality_rule(self, rule: QualityRule, data: Any) -> List[Dict[str, Any]]:
-		"""Apply quality rule to data and return violations
-		
-		Executes the quality rule validation logic against the provided data
-		and returns a list of violations found.
-		
-		Args:
-			rule: QualityRule to apply
-			data: Data to validate (could be a record, DataFrame, etc.)
-			
-		Returns:
-			List of violation dictionaries, empty if no violations
-		"""
-		violations = []
-		
-		try:
-			# Handle different rule types
-			if hasattr(rule.type, 'value'):
-				rule_type = rule.type.value
-			else:
-				rule_type = str(rule.type)
-			
-			# Apply sampling if configured
-			sample_rate = rule.sample_percentage / 100.0
-			if sample_rate < 1.0:
-				import random
-				if random.random() > sample_rate:
-					return violations  # Skip validation for this sample
-			
-			# Execute rule based on type
-			if rule_type == 'not_null':
-				violations.extend(await self._validate_not_null(rule, data))
-			elif rule_type == 'range':
-				violations.extend(await self._validate_range(rule, data))
-			elif rule_type == 'format':
-				violations.extend(await self._validate_format(rule, data))
-			elif rule_type == 'uniqueness':
-				violations.extend(await self._validate_uniqueness(rule, data))
-			elif rule_type == 'custom':
-				violations.extend(await self._validate_custom(rule, data))
-			else:
-				# Generic validation using condition
-				violations.extend(await self._validate_condition(rule, data))
-		
-		except Exception as e:
-			# Log validation error and treat as violation
-			violation = {
-				"rule_id": rule.id,
-				"rule_name": rule.name,
-				"field_name": rule.field_name,
-				"violation_type": "validation_error",
-				"message": f"Error executing rule: {str(e)}",
-				"severity": rule.severity,
-				"timestamp": datetime.utcnow().isoformat(),
-				"suggested_fix": rule.suggested_fix
-			}
-			violations.append(violation)
-		
-		return violations
-	
-	async def _validate_not_null(self, rule: QualityRule, data: Any) -> List[Dict[str, Any]]:
-		"""Validate not null constraint"""
-		violations = []
-		
-		# Handle different data structures
-		if hasattr(data, 'get'):  # Dictionary-like
-			value = data.get(rule.field_name)
-		elif hasattr(data, rule.field_name):  # Object with attributes
-			value = getattr(data, rule.field_name)
-		else:
-			return violations  # Cannot validate without field
-		
-		if value is None or (isinstance(value, str) and value.strip() == ""):
-			violations.append({
-				"rule_id": rule.id,
-				"rule_name": rule.name,
-				"field_name": rule.field_name,
-				"violation_type": "null_value",
-				"message": rule.error_message or f"Field {rule.field_name} cannot be null",
-				"severity": rule.severity,
-				"timestamp": datetime.utcnow().isoformat(),
-				"suggested_fix": rule.suggested_fix
-			})
-		
-		return violations
-	
-	async def _validate_range(self, rule: QualityRule, data: Any) -> List[Dict[str, Any]]:
-		"""Validate numeric range constraint"""
-		violations = []
-		
-		try:
-			# Extract field value
-			if hasattr(data, 'get'):
-				value = data.get(rule.field_name)
-			elif hasattr(data, rule.field_name):
-				value = getattr(data, rule.field_name)
-			else:
-				return violations
-			
-			if value is None:
-				return violations
-			
-			# Get range parameters from condition
-			condition = rule.condition or {}
-			min_val = condition.get('min')
-			max_val = condition.get('max')
-			
-			numeric_value = float(value)
-			
-			if min_val is not None and numeric_value < min_val:
-				violations.append({
-					"rule_id": rule.id,
-					"rule_name": rule.name,
-					"field_name": rule.field_name,
-					"violation_type": "range_violation",
-					"message": f"Value {numeric_value} is below minimum {min_val}",
-					"severity": rule.severity,
-					"timestamp": datetime.utcnow().isoformat(),
-					"suggested_fix": rule.suggested_fix
-				})
-			
-			if max_val is not None and numeric_value > max_val:
-				violations.append({
-					"rule_id": rule.id,
-					"rule_name": rule.name,
-					"field_name": rule.field_name,
-					"violation_type": "range_violation",
-					"message": f"Value {numeric_value} exceeds maximum {max_val}",
-					"severity": rule.severity,
-					"timestamp": datetime.utcnow().isoformat(),
-					"suggested_fix": rule.suggested_fix
-				})
-		
-		except (ValueError, TypeError):
-			violations.append({
-				"rule_id": rule.id,
-				"rule_name": rule.name,
-				"field_name": rule.field_name,
-				"violation_type": "type_error",
-				"message": f"Value cannot be converted to number for range validation",
-				"severity": rule.severity,
-				"timestamp": datetime.utcnow().isoformat(),
-				"suggested_fix": rule.suggested_fix
-			})
-		
-		return violations
-	
-	async def _validate_format(self, rule: QualityRule, data: Any) -> List[Dict[str, Any]]:
-		"""Validate format constraint using regex"""
-		violations = []
-		
-		try:
-			# Extract field value
-			if hasattr(data, 'get'):
-				value = data.get(rule.field_name)
-			elif hasattr(data, rule.field_name):
-				value = getattr(data, rule.field_name)
-			else:
-				return violations
-			
-			if value is None:
-				return violations
-			
-			# Get pattern from condition
-			condition = rule.condition or {}
-			pattern = condition.get('pattern')
-			
-			if pattern:
-				import re
-				if not re.match(pattern, str(value)):
-					violations.append({
-						"rule_id": rule.id,
-						"rule_name": rule.name,
-						"field_name": rule.field_name,
-						"violation_type": "format_violation",
-						"message": rule.error_message or f"Value '{value}' does not match required format",
-						"severity": rule.severity,
-						"timestamp": datetime.utcnow().isoformat(),
-						"suggested_fix": rule.suggested_fix
-					})
-		
-		except Exception as e:
-			violations.append({
-				"rule_id": rule.id,
-				"rule_name": rule.name,
-				"field_name": rule.field_name,
-				"violation_type": "validation_error",
-				"message": f"Format validation error: {str(e)}",
-				"severity": rule.severity,
-				"timestamp": datetime.utcnow().isoformat(),
-				"suggested_fix": rule.suggested_fix
-			})
-		
-		return violations
-	
-	async def _validate_uniqueness(self, rule: QualityRule, data: Any) -> List[Dict[str, Any]]:
-		"""Validate uniqueness constraint"""
-		# This would require access to full dataset for comparison
-		# For now, return empty as this needs dataset-level validation
-		return []
-	
-	async def _validate_custom(self, rule: QualityRule, data: Any) -> List[Dict[str, Any]]:
-		"""Validate using custom logic"""
-		violations = []
-		
-		try:
-			# Execute custom validation logic
-			validation_logic = rule.validation_logic or {}
-			logic_type = validation_logic.get('type')
-			
-			if logic_type == 'python_expression':
-				# Evaluate Python expression (in secure sandbox)
-				expression = validation_logic.get('expression', 'True')
-				field_value = data.get(rule.field_name) if hasattr(data, 'get') else getattr(data, rule.field_name, None)
-				
-				# Create safe evaluation context
-				safe_context = {'value': field_value, 'data': data}
-				
-				try:
-					# Evaluate expression (this should be sandboxed in production)
-					result = eval(expression, {"__builtins__": {}}, safe_context)
-					if not result:
-						violations.append({
-							"rule_id": rule.id,
-							"rule_name": rule.name,
-							"field_name": rule.field_name,
-							"violation_type": "custom_validation",
-							"message": rule.error_message or "Custom validation failed",
-							"severity": rule.severity,
-							"timestamp": datetime.utcnow().isoformat(),
-							"suggested_fix": rule.suggested_fix
-						})
-				except Exception as eval_error:
-					violations.append({
-						"rule_id": rule.id,
-						"rule_name": rule.name,
-						"field_name": rule.field_name,
-						"violation_type": "evaluation_error",
-						"message": f"Custom validation error: {str(eval_error)}",
-						"severity": rule.severity,
-						"timestamp": datetime.utcnow().isoformat(),
-						"suggested_fix": rule.suggested_fix
-					})
-		
-		except Exception as e:
-			violations.append({
-				"rule_id": rule.id,
-				"rule_name": rule.name,
-				"field_name": rule.field_name,
-				"violation_type": "validation_error",
-				"message": f"Custom validation setup error: {str(e)}",
-				"severity": rule.severity,
-				"timestamp": datetime.utcnow().isoformat(),
-				"suggested_fix": rule.suggested_fix
-			})
-		
-		return violations
-	
-	async def _validate_condition(self, rule: QualityRule, data: Any) -> List[Dict[str, Any]]:
-		"""Validate using generic condition"""
-		# Generic condition-based validation
-		# This would implement a SQL-like condition evaluator
-		return []
+
+	# ------------------------------------------------------------------
+	# Internals
+	# ------------------------------------------------------------------
+
+	async def _require_pipeline(self, tenant_id: str, pipeline_id: str) -> dict[str, Any]:
+		rec = await self._store.get("etlp_pipelines", pipeline_id)
+		if rec is None or rec["tenant_id"] != tenant_id:
+			raise KeyError(f"pipeline_not_found:{pipeline_id}")
+		if rec["status"] == "retired":
+			raise ValueError(f"pipeline_retired:{pipeline_id}")
+		return rec
+
+	async def _require_execution(self, tenant_id: str, execution_id: str) -> dict[str, Any]:
+		rec = await self._store.get("etlp_executions", execution_id)
+		if rec is None or rec["tenant_id"] != tenant_id:
+			raise KeyError(f"execution_not_found:{execution_id}")
+		return rec
+
+	async def _latest_quality(self, tenant_id: str, execution_id: str) -> dict[str, Any] | None:
+		records = [q for q in await self._store.list("etlp_quality", tenant_id) if q["execution_id"] == execution_id]
+		return records[-1] if records else None
 
 
-class ExecutionMonitor:
-	"""Monitor pipeline execution progress"""
-	
-	def __init__(self):
-		self.active_executions = {}
-	
-	async def start_monitoring(self, execution_id: str) -> None:
-		"""Start monitoring execution"""
-		self.active_executions[execution_id] = {
-			"start_time": datetime.utcnow(),
-			"status": "running"
-		}
-	
-	async def update_execution_metrics(self, execution_id: str, metrics: Dict[str, Any]) -> None:
-		"""Update execution metrics"""
-		if execution_id in self.active_executions:
-			self.active_executions[execution_id]["metrics"] = metrics
-	
-	async def stop_monitoring(self, execution_id: str) -> None:
-		"""Stop monitoring execution"""
-		if execution_id in self.active_executions:
-			del self.active_executions[execution_id]
+# Backward compat alias
+ETLPLifecycleService = ETLPService
 
-
-class AIOptimizer:
-	"""AI-powered pipeline optimization"""
-	
-	def __init__(self):
-		self.optimization_history = {}
-	
-	async def generate_recommendations(self, pipeline: Pipeline, 
-									   performance_data: Dict[str, Any]) -> Dict[str, Any]:
-		"""Generate AI-powered optimization recommendations"""
-		recommendations = {
-			"performance_improvements": [],
-			"resource_optimizations": [],
-			"reliability_enhancements": [],
-			"cost_optimizations": []
-		}
-		
-		# Analyze performance patterns
-		if performance_data.get("avg_duration_ms", 0) > 300000:  # > 5 minutes
-			recommendations["performance_improvements"].append({
-				"type": "parallelization",
-				"description": "Increase max_parallelism to reduce execution time",
-				"impact": "high",
-				"estimated_improvement": "30-50% faster execution"
-			})
-		
-		if performance_data.get("failure_rate", 0) > 0.1:  # > 10% failure rate
-			recommendations["reliability_enhancements"].append({
-				"type": "retry_policy",
-				"description": "Implement exponential backoff retry strategy",
-				"impact": "medium",
-				"estimated_improvement": "50% reduction in transient failures"
-			})
-		
-		return recommendations
-	
-	async def apply_optimization(self, pipeline: Pipeline, optimization: Dict[str, Any]) -> None:
-		"""Apply AI-recommended optimization to pipeline
-		
-		Implements the specific optimization recommendations from the AI optimizer
-		by updating pipeline configuration and parameters.
-		
-		Args:
-			pipeline: Pipeline to optimize
-			optimization: Optimization recommendation details
-			
-		Raises:
-			ValueError: If optimization type is not supported
-		"""
-		try:
-			opt_type = optimization.get('type')
-			self._log_info(f"Applying optimization {opt_type} to pipeline {pipeline.name}")
-			
-			if opt_type == 'parallelization':
-				# Update parallelism settings
-				new_parallelism = optimization.get('recommended_parallelism', pipeline.max_parallelism)
-				pipeline.max_parallelism = min(new_parallelism, 100)  # Cap at 100
-				pipeline.configuration['parallel_workers'] = pipeline.max_parallelism
-				
-			elif opt_type == 'batch_size':
-				# Update batch processing settings
-				new_batch_size = optimization.get('recommended_batch_size', 1000)
-				pipeline.configuration['batch_size'] = new_batch_size
-				
-			elif opt_type == 'memory_optimization':
-				# Update memory settings
-				memory_settings = optimization.get('memory_settings', {})
-				pipeline.configuration.update(memory_settings)
-				
-			elif opt_type == 'execution_order':
-				# Reorder pipeline steps for optimal execution
-				optimal_order = optimization.get('optimal_order', [])
-				if optimal_order:
-					reordered_steps = []
-					for step_id in optimal_order:
-						for step in pipeline.steps:
-							if step.get('id') == step_id:
-								reordered_steps.append(step)
-								break
-					pipeline.steps = reordered_steps
-				
-			elif opt_type == 'caching':
-				# Enable caching for expensive operations
-				caching_config = optimization.get('caching_config', {})
-				pipeline.configuration['caching'] = caching_config
-				pipeline.configuration['enable_caching'] = True
-				
-			elif opt_type == 'resource_allocation':
-				# Update resource allocation
-				resource_config = optimization.get('resource_config', {})
-				pipeline.configuration['resources'] = resource_config
-				
-			else:
-				raise ValueError(f"Unknown optimization type: {opt_type}")
-			
-			# Update pipeline metadata
-			pipeline.updated_at = datetime.utcnow()
-			pipeline.updated_by = self.user_id
-			pipeline.version = self._increment_version(pipeline.version)
-			
-			# Log optimization applied
-			self._log_info(f"Applied {opt_type} optimization to pipeline {pipeline.name}")
-			
-			# Update in database would go here
-			# await self.database.update_pipeline(pipeline)
-			
-		except Exception as e:
-			self._log_error(f"Failed to apply optimization {opt_type}: {str(e)}")
-			raise
+__all__ = ["ETLPService", "ETLPLifecycleService"]

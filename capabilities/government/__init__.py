@@ -7,27 +7,30 @@ case management, regulatory compliance, and public administration.
 
 __version__ = "1.0.0"
 
-# Government sub-modules with 3-character naming
-from .csr import *  # Citizen Services
-from .cas import *  # Case Management
-from .lic import *  # Licensing & Permits
-from .tax import *  # Tax Administration
-from .ele import *  # Elections Management
-from .bud import *  # Public Budgeting
-from .con import *  # Contract Management
-from .law import *  # Law Enforcement
-from .per import *  # Personnel Management
-from .eme import *  # Emergency Management
+# Capability IDs exported for registry discovery
+CAPABILITY_IDS = [
+	"government_bud",  # Budget Management
+	"government_cas",  # Case Management
+	"government_con",  # Government Contracts & Procurement
+	"government_csr",  # Citizen Services Portal
+	"government_ele",  # Electoral & Civil Registration
+	"government_eme",  # Emergency Management
+	"government_law",  # Law Enforcement & Justice
+	"government_lic",  # Licensing & Permits
+	"government_per",  # Permits Management
+	"government_tax",  # Tax Administration
+]
 
 __all__ = [
-    "csr",  # Citizen Services
-    "cas",  # Case Management
-    "lic",  # Licensing & Permits
-    "tax",  # Tax Administration
-    "ele",  # Elections Management
-    "bud",  # Public Budgeting
-    "con",  # Contract Management
-    "law",  # Law Enforcement
-    "per",  # Personnel Management
-    "eme",  # Emergency Management
+	"CAPABILITY_IDS",
+	"bud",
+	"cas",
+	"con",
+	"csr",
+	"ele",
+	"eme",
+	"law",
+	"lic",
+	"per",
+	"tax",
 ]

@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "transport_dis",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "transport_dis": {
+      "capability": "transport_dis"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

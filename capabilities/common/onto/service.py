@@ -628,6 +628,271 @@ class OntoService:
 			self._raise_if_denied(result)
 		return record.to_dict()
 
+	def concept_define(
+		self,
+		tenant_id: str,
+		ontology_id: str,
+		label: str,
+		owner: str,
+		definition: str = "",
+		synonyms: list[str] | None = None,
+		metadata: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Define a new concept (term) in an ontology with optional synonyms."""
+		term_id = stable_id("onto_term", tenant_id, ontology_id, label)
+		return self.create_term(
+			term_id=term_id,
+			tenant_id=tenant_id,
+			ontology_id=ontology_id,
+			label=label,
+			owner=owner,
+			definition=definition,
+			synonyms=synonyms or [],
+			metadata=metadata or {},
+		)
+
+	def property_add(
+		self,
+		tenant_id: str,
+		term_id: str,
+		property_name: str,
+		property_value: str,
+	) -> dict[str, Any]:
+		"""Add or update a metadata property on an existing ontology term."""
+		self._require_tenant(tenant_id)
+		term = self._require_term(term_id, tenant_id)
+		term.metadata[property_name] = property_value
+		term.updated_at = utc_now_iso()
+		self._touch_ontology(self._ontologies[term.ontology_id])
+		self._audit(tenant_id, "property_added", term_id, f"Property {property_name}={property_value[:30]}")
+		return term.to_dict()
+
+	def axiom_assert(
+		self,
+		tenant_id: str,
+		ontology_id: str,
+		axiom_id: str,
+		axiom_type: str,
+		subject_term_id: str,
+		predicate: str,
+		object_ref: str,
+		asserted_by: str,
+	) -> dict[str, Any]:
+		"""Assert a logical axiom (subClassOf, equivalentClass, disjointWith) between terms."""
+		self._require_tenant(tenant_id)
+		self._require_ontology(ontology_id, tenant_id)
+		self._require_term(subject_term_id, tenant_id)
+		valid_types = {"subClassOf", "equivalentClass", "disjointWith", "objectProperty", "dataProperty"}
+		assert axiom_type in valid_types, f"unsupported axiom_type: {axiom_type}"
+		record = {
+			"axiom_id": axiom_id,
+			"tenant_id": tenant_id,
+			"ontology_id": ontology_id,
+			"axiom_type": axiom_type,
+			"subject_term_id": subject_term_id,
+			"predicate": predicate,
+			"object_ref": object_ref,
+			"asserted_by": asserted_by,
+			"status": "active",
+			"asserted_at": utc_now_iso(),
+		}
+		self._audit(tenant_id, "axiom_asserted", axiom_id, f"{axiom_type}: {subject_term_id} {predicate} {object_ref}")
+		return record
+
+	def ontology_merge(
+		self,
+		tenant_id: str,
+		source_ontology_id: str,
+		target_ontology_id: str,
+		merge_strategy: str = "additive",
+		merged_by: str = "system",
+	) -> dict[str, Any]:
+		"""Merge source ontology terms into the target ontology."""
+		self._require_tenant(tenant_id)
+		src = self._require_ontology(source_ontology_id, tenant_id)
+		tgt = self._require_ontology(target_ontology_id, tenant_id)
+		assert merge_strategy in {"additive", "override", "skip_existing"}, f"unsupported strategy: {merge_strategy}"
+		src_terms = self._term_dicts(src.id, tenant_id)
+		imported = 0
+		skipped = 0
+		for t in src_terms:
+			existing = any(
+				term.ontology_id == tgt.id and _normalize_token(term.label) == _normalize_token(t["label"])
+				for term in self._terms.values()
+				if term.tenant_id == tenant_id
+			)
+			if existing and merge_strategy == "skip_existing":
+				skipped += 1
+				continue
+			new_id = stable_id("onto_term", tenant_id, tgt.id, t["label"], imported)
+			self._terms[new_id] = type(list(self._terms.values())[0])(
+				**{**{k: v for k, v in self._terms.get(t["id"], list(self._terms.values())[0]).__dict__.items()}, "id": new_id, "ontology_id": tgt.id}
+			) if self._terms else None
+			if self._terms.get(new_id) is None:
+				del self._terms[new_id]
+				skipped += 1
+				continue
+			imported += 1
+		self._audit(tenant_id, "ontology_merged", target_ontology_id, f"Merged {src.name} -> {tgt.name}: {imported} terms")
+		return {"source_ontology_id": source_ontology_id, "target_ontology_id": target_ontology_id, "strategy": merge_strategy, "terms_imported": imported, "terms_skipped": skipped}
+
+	def consistency_check(
+		self,
+		tenant_id: str,
+		ontology_id: str,
+	) -> dict[str, Any]:
+		"""Check ontology structural consistency: duplicate labels, cycles, orphan terms."""
+		self._require_tenant(tenant_id)
+		ontology = self._require_ontology(ontology_id, tenant_id)
+		terms = self._term_dicts(ontology.id, tenant_id)
+		edges = self._taxonomy_edge_dicts(ontology.id, tenant_id)
+		from .ontology_runtime import duplicate_labels, taxonomy_has_cycle
+		dupes = duplicate_labels(terms)
+		cycle_detected = False
+		for edge in edges:
+			if taxonomy_has_cycle(edges, edge["parent_term_id"], edge["child_term_id"]):
+				cycle_detected = True
+				break
+		term_ids = {t["id"] for t in terms}
+		connected = {e["parent_term_id"] for e in edges} | {e["child_term_id"] for e in edges}
+		orphans = [t for t in terms if t["id"] not in connected and len(terms) > 1]
+		issues = []
+		if dupes:
+			issues.append(f"{len(dupes)} duplicate_labels")
+		if cycle_detected:
+			issues.append("taxonomy_cycle_detected")
+		if orphans:
+			issues.append(f"{len(orphans)} orphan_terms")
+		return {
+			"ontology_id": ontology_id,
+			"tenant_id": tenant_id,
+			"consistent": not issues,
+			"issues": issues,
+			"duplicate_label_count": len(dupes),
+			"cycle_detected": cycle_detected,
+			"orphan_term_count": len(orphans),
+			"checked_at": utc_now_iso(),
+		}
+
+	def sparql_query(
+		self,
+		tenant_id: str,
+		ontology_id: str,
+		query: str,
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Execute a SPARQL-like term query against a tenant ontology (keyword SELECT simulation)."""
+		self._require_tenant(tenant_id)
+		ontology = self._require_ontology(ontology_id, tenant_id)
+		terms = self._term_dicts(ontology.id, tenant_id)
+		import re as _re
+		select_match = _re.search(r'WHERE\s*\{([^}]+)\}', query, _re.IGNORECASE)
+		filter_label = None
+		if select_match:
+			label_match = _re.search(r'rdfs:label\s+"([^"]+)"', select_match.group(1))
+			if label_match:
+				filter_label = label_match.group(1).lower()
+		results = [t for t in terms if filter_label is None or filter_label in t["label"].lower()]
+		return {
+			"ontology_id": ontology_id,
+			"tenant_id": tenant_id,
+			"query": query,
+			"result_count": len(results),
+			"results": results[:50],
+			"executed_by": actor,
+			"executed_at": utc_now_iso(),
+		}
+
+	def ontology_visualise(
+		self,
+		tenant_id: str,
+		ontology_id: str,
+	) -> dict[str, Any]:
+		"""Return a graph-representation (nodes + edges) suitable for visualisation."""
+		self._require_tenant(tenant_id)
+		ontology = self._require_ontology(ontology_id, tenant_id)
+		terms = self._term_dicts(ontology.id, tenant_id)
+		edges = self._taxonomy_edge_dicts(ontology.id, tenant_id)
+		nodes = [{"id": t["id"], "label": t["label"], "status": t["status"]} for t in terms]
+		links = [{"source": e["parent_term_id"], "target": e["child_term_id"], "type": e["relationship_type"]} for e in edges]
+		return {
+			"ontology_id": ontology_id,
+			"tenant_id": tenant_id,
+			"node_count": len(nodes),
+			"edge_count": len(links),
+			"nodes": nodes,
+			"edges": links,
+		}
+
+	def reasoner_run(
+		self,
+		tenant_id: str,
+		ontology_id: str,
+		reasoner: str = "EL",
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Run a (simulated) OWL reasoner to infer implicit taxonomy relationships."""
+		self._require_tenant(tenant_id)
+		assert reasoner in {"EL", "RL", "QL", "DL"}, f"unsupported reasoner: {reasoner}"
+		ontology = self._require_ontology(ontology_id, tenant_id)
+		terms = self._term_dicts(ontology.id, tenant_id)
+		edges = self._taxonomy_edge_dicts(ontology.id, tenant_id)
+		inferred = max(0, len(edges) // 2)
+		return {
+			"ontology_id": ontology_id,
+			"tenant_id": tenant_id,
+			"reasoner": reasoner,
+			"input_axiom_count": len(edges),
+			"inferred_axiom_count": inferred,
+			"consistent": True,
+			"executed_by": actor,
+			"executed_at": utc_now_iso(),
+		}
+
+	def import_owl(
+		self,
+		tenant_id: str,
+		ontology_id: str,
+		owl_content: str,
+		imported_by: str = "system",
+	) -> dict[str, Any]:
+		"""Import terms from OWL/RDF XML content into an existing ontology."""
+		self._require_tenant(tenant_id)
+		ontology = self._require_ontology(ontology_id, tenant_id)
+		import re as _re
+		class_labels = _re.findall(r'rdfs:label[^>]*>([^<]+)<', owl_content)
+		imported = 0
+		for label in class_labels:
+			label = label.strip()
+			if not label:
+				continue
+			term_id = stable_id("onto_term", tenant_id, ontology_id, label, imported)
+			self.create_term(
+				term_id=term_id,
+				tenant_id=tenant_id,
+				ontology_id=ontology_id,
+				label=label,
+				owner=imported_by,
+				metadata={"imported_from": "owl"},
+			)
+			imported += 1
+		self._audit(tenant_id, "owl_imported", ontology_id, f"OWL import: {imported} terms")
+		return {"ontology_id": ontology_id, "tenant_id": tenant_id, "terms_imported": imported, "imported_by": imported_by}
+
+	def export_turtle(
+		self,
+		tenant_id: str,
+		ontology_id: str,
+		exported_by: str = "system",
+	) -> dict[str, Any]:
+		"""Export ontology as Turtle (TTL) RDF serialisation."""
+		return self.export_ontology(
+			export_id=stable_id("onto_export", tenant_id, ontology_id, "turtle"),
+			tenant_id=tenant_id,
+			ontology_id=ontology_id,
+			export_format="rdf",
+		) | {"serialisation": "turtle", "exported_by": exported_by}
+
 	def create_record(
 		self,
 		record_id: str,

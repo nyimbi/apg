@@ -573,6 +573,217 @@ class NcodService:
 		self._audit(tenant_id, "app_state_changed", app.id, reason)
 		return app.to_dict()
 
+	def app_template(
+		self,
+		tenant_id: str,
+		template_name: str,
+		template_type: str = "crud",
+		pages: list[str] | None = None,
+		owner: str = "system",
+	) -> dict[str, Any]:
+		"""Instantiate a pre-built app template (crud, dashboard, form) as a new builder app."""
+		self._require_tenant(tenant_id)
+		assert template_type in {"crud", "dashboard", "form", "wizard", "blank"}, f"unsupported template: {template_type}"
+		app_id = stable_id("ncodapp", tenant_id, template_name, template_type)
+		app = self.create_app(
+			app_id=app_id,
+			tenant_id=tenant_id,
+			name=template_name,
+			owner=owner,
+			description=f"App from {template_type} template",
+			rbac_policy_ref="rbac://template_default",
+			data_residency_policy_ref="residency://template_default",
+			accessibility_checked=True,
+			metadata={"template_type": template_type},
+		)
+		default_pages = pages or (["home", "list", "detail"] if template_type == "crud" else ["dashboard"])
+		for pg in default_pages:
+			self.add_page(
+				page_id=stable_id("ncodpage", tenant_id, app_id, pg),
+				tenant_id=tenant_id,
+				app_id=app_id,
+				name=pg.capitalize(),
+				route=f"/{pg}",
+				metadata={"relationships": True},
+			)
+		return {**app, "template_type": template_type, "pages_created": default_pages}
+
+	def widget_library(
+		self,
+		tenant_id: str,
+		app_id: str,
+		widget_types: list[str] | None = None,
+	) -> dict[str, Any]:
+		"""Return available widget component types and their current overrides for an app."""
+		self._require_tenant(tenant_id)
+		self._require_app(app_id, tenant_id)
+		defaults = widget_types or ["button", "input", "select", "table", "chart", "card", "modal", "form"]
+		existing = self._component_dicts(app_id, tenant_id)
+		existing_types = {c["component_type"] for c in existing}
+		return {
+			"app_id": app_id,
+			"tenant_id": tenant_id,
+			"available_widgets": defaults,
+			"registered_widget_count": len([t for t in existing_types if t in defaults]),
+			"widgets": existing,
+		}
+
+	def data_connector(
+		self,
+		binding_id: str,
+		tenant_id: str,
+		app_id: str,
+		connector_name: str,
+		connector_type: str,
+		endpoint: str,
+		policy_ref: str = "policy://connector_default",
+		scopes: list[str] | None = None,
+	) -> dict[str, Any]:
+		"""Register a named data connector binding for an app."""
+		return self.add_connector_binding(
+			binding_id=binding_id,
+			tenant_id=tenant_id,
+			app_id=app_id,
+			name=connector_name,
+			connector_ref=f"{connector_type}://{endpoint}",
+			policy_ref=policy_ref,
+			scopes=scopes or ["read"],
+		) | {"connector_type": connector_type, "endpoint": endpoint}
+
+	def trigger_define(
+		self,
+		binding_id: str,
+		tenant_id: str,
+		app_id: str,
+		trigger_event: str,
+		workflow_ref: str,
+		conditions: dict[str, Any] | None = None,
+		policy_ref: str = "policy://trigger_default",
+	) -> dict[str, Any]:
+		"""Define an event-based trigger that fires a workflow."""
+		return self.attach_workflow(
+			binding_id=binding_id,
+			tenant_id=tenant_id,
+			app_id=app_id,
+			trigger=trigger_event,
+			workflow_ref=workflow_ref,
+			policy_ref=policy_ref,
+			metadata={"conditions": conditions or {}},
+		)
+
+	def action_block(
+		self,
+		component_id: str,
+		tenant_id: str,
+		page_id: str,
+		action_type: str,
+		action_config: dict[str, Any] | None = None,
+		label: str = "",
+	) -> dict[str, Any]:
+		"""Add an action block component (button/link triggering a workflow or nav action) to a page."""
+		return self.add_component(
+			component_id=component_id,
+			tenant_id=tenant_id,
+			page_id=page_id,
+			component_type="button",
+			name=label or f"action_{action_type}",
+			props={"action_type": action_type, **(action_config or {})},
+			accessibility_label=label or f"Action: {action_type}",
+		)
+
+	def condition_builder(
+		self,
+		tenant_id: str,
+		app_id: str,
+		condition_id: str,
+		expression: str,
+		field_refs: list[str],
+		operator: str = "AND",
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Define a visual condition expression for form validation or display logic."""
+		self._require_tenant(tenant_id)
+		self._require_app(app_id, tenant_id)
+		assert operator in {"AND", "OR", "NOT"}, f"unsupported operator: {operator}"
+		record = {
+			"condition_id": condition_id,
+			"app_id": app_id,
+			"tenant_id": tenant_id,
+			"expression": expression,
+			"field_refs": list(field_refs),
+			"operator": operator,
+			"created_by": actor,
+			"created_at": utc_now_iso(),
+		}
+		self._audit(tenant_id, "condition_defined", condition_id, f"Condition {expression[:40]}")
+		return record
+
+	def preview_deploy(
+		self,
+		validation_id: str,
+		tenant_id: str,
+		app_id: str,
+		environment: str = "preview",
+	) -> dict[str, Any]:
+		"""Run validation and generate a preview deployment URL for an app."""
+		self._require_tenant(tenant_id)
+		validation = self.validate_app(validation_id=validation_id, tenant_id=tenant_id, app_id=app_id)
+		app = self._require_app(app_id, tenant_id)
+		return {
+			**validation,
+			"preview_url": f"https://preview.ncod.internal/{tenant_id}/{app_id}/{app.version}",
+			"environment": environment,
+		}
+
+	def version_control_app(
+		self,
+		tenant_id: str,
+		app_id: str,
+		commit_message: str,
+		tagged_by: str = "system",
+	) -> dict[str, Any]:
+		"""Tag the current app version with a commit message for version-control audit trail."""
+		self._require_tenant(tenant_id)
+		app = self._require_app(app_id, tenant_id)
+		record = {
+			"app_id": app_id,
+			"tenant_id": tenant_id,
+			"version": app.version,
+			"commit_message": commit_message,
+			"tagged_by": tagged_by,
+			"tagged_at": utc_now_iso(),
+		}
+		self._audit(tenant_id, "app_version_tagged", app_id, f"v{app.version}: {commit_message[:60]}")
+		return record
+
+	def ncod_analytics(
+		self,
+		tenant_id: str,
+		period: str = "all",
+	) -> dict[str, Any]:
+		"""Return build, publish, and usage analytics for the no-code builder."""
+		self._require_tenant(tenant_id)
+		apps = [a for a in self._apps.values() if a.tenant_id == tenant_id]
+		published = [a for a in apps if a.status in {"published", "deployed"}]
+		deployments = self.list_deployments(tenant_id)
+		releases = self.list_releases(tenant_id)
+		return {
+			"tenant_id": tenant_id,
+			"period": period,
+			"app_count": len(apps),
+			"published_app_count": len(published),
+			"page_count": len(self.list_pages(tenant_id)),
+			"component_count": len(self.list_components(tenant_id)),
+			"data_binding_count": len(self.list_data_bindings(tenant_id)),
+			"workflow_binding_count": len(self.list_workflow_bindings(tenant_id)),
+			"connector_binding_count": len(self.list_connector_bindings(tenant_id)),
+			"release_count": len(releases),
+			"deployment_count": len(deployments),
+			"builder_agent_count": len(self.list_builder_agents(tenant_id)),
+			"audit_event_count": len(self.list_audit_events(tenant_id)),
+			"computed_at": utc_now_iso(),
+		}
+
 	def create_record(
 		self,
 		record_id: str,

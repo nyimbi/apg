@@ -20,7 +20,7 @@ from ..ai_collections_optimization import (
 	CollectionCampaignPlan, CollectionsOptimizationConfig,
 	APGCollectionsAIService, create_collections_ai_service
 )
-from ..models import (
+from ...models import (
 	ARCustomer, ARInvoice, ARPayment, ARCollectionActivity,
 	ARCustomerStatus, ARCustomerType, ARInvoiceStatus, ARPaymentStatus,
 	ARCollectionPriority

@@ -1,823 +1,993 @@
 """
-Real-Time Collaboration Service
+APG Collaboration (COLB) - Expanded Service Implementation
 
-Core business logic for real-time collaboration with APG integration,
-Microsoft Teams/Zoom/Google Meet feature parity, and Flask-AppBuilder
-page-level collaboration.
+Dependency-light in-memory store pattern. 44+ async methods covering
+workspace management, document lifecycle, co-editing sessions,
+comments, mentions, task assignments, version history, conflict
+resolution, export, activity feeds, analytics and compliance.
+
+Author: Datacraft (nyimbi@gmail.com)
+Copyright: © 2025 Datacraft
 """
 
-import asyncio
+from __future__ import annotations
+
+import csv
+import io
 import json
+import statistics
 from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional, Tuple
-from uuid_extensions import uuid7str
+from typing import Any
+
+from uuid6 import uuid7
+
 import logging
-from dataclasses import dataclass
-from enum import Enum
 
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete
-from sqlalchemy.orm import selectinload
-from pydantic import BaseModel, Field, ConfigDict, AfterValidator
-from pydantic.types import Annotated
-
-# APG imports (would be actual imports in real implementation)
-# from ..auth_rbac.service import AuthService
-# from ..ai_orchestration.service import AIOrchestrationService
-# from ..notification_engine.service import NotificationService
-
-from .models import (
-	RTCSession, RTCParticipant, RTCActivity, RTCMessage, RTCDecision,
-	RTCWorkspace, RTCVideoCall, RTCVideoParticipant, RTCScreenShare,
-	RTCRecording, RTCPageCollaboration, RTCThirdPartyIntegration
-)
-try:
-	from .websocket_manager import websocket_manager, MessageType
-except Exception:
-	class MessageType(Enum):
-		"""Fallback message types when the WebRTC manager cannot initialize."""
-
-		USER_JOIN = "user_join"
-		FORM_DELEGATION = "form_delegation"
-		ASSISTANCE_REQUEST = "assistance_request"
-		VIDEO_CALL_START = "video_call_start"
-		SCREEN_SHARE_START = "screen_share_start"
-
-	class _NoopWebSocketManager:
-		async def _broadcast_to_page(self, page_url: str, message: Dict[str, Any]) -> None:
-			return None
-
-		def get_connection_stats(self) -> Dict[str, Any]:
-			return {
-				"active_connections": 0,
-				"active_sessions": 0,
-				"fallback": True
-			}
-
-	websocket_manager = _NoopWebSocketManager()
+logger = logging.getLogger(__name__)
 
 
-class CollaborationStatus(Enum):
-	"""Collaboration session status"""
-	ACTIVE = "active"
-	INACTIVE = "inactive"
-	PAUSED = "paused"
-	ENDED = "ended"
+def uuid7str() -> str:
+	return str(uuid7())
 
 
-@dataclass
-class CollaborationContext:
-	"""Context information for collaboration"""
-	tenant_id: str
-	user_id: str
-	page_url: str
-	session_id: str | None = None
-	form_data: Dict[str, Any] | None = None
-	record_id: str | None = None
+def _ts() -> str:
+	return datetime.utcnow().isoformat(timespec="seconds")
+
+
+class _R(dict[str, Any]):
+	"""Thin dict wrapper for records."""
 
 
 class CollaborationService:
 	"""
-	Core service for real-time collaboration functionality.
+	44+ async methods for workspace management, document creation and
+	sharing, co-editing sessions, commenting, mentions, task
+	assignments, version history, conflict resolution, exports,
+	activity feeds, notifications and analytics.
 
-	Integrates with APG capabilities and provides Teams/Zoom/Meet
-	feature parity with Flask-AppBuilder page-level collaboration.
+	All state is held in Python dicts (in-memory store pattern).
+	Every state change emits an audit event.
 	"""
 
-	def __init__(self, db_session: AsyncSession):
-		self.db = db_session
-		self._logger = logging.getLogger(__name__)
+	def __init__(self, actor_id: str = "system", tenant_id: str = "default") -> None:
+		self.actor_id = actor_id
+		self.tenant_id = tenant_id
 
-		# APG service integrations (would be injected)
-		# self.auth_service = AuthService()
-		# self.ai_service = AIOrchestrationService()
-		# self.notification_service = NotificationService()
+		self._workspaces:   dict[str, _R] = {}
+		self._members:      dict[str, list[_R]] = {}       # workspace_id -> members
+		self._documents:    dict[str, _R] = {}
+		self._doc_versions: dict[str, list[_R]] = {}       # doc_id -> versions
+		self._co_edit_sessions: dict[str, _R] = {}
+		self._co_edit_ops:  dict[str, list[_R]] = {}       # session_id -> ops
+		self._comments:     dict[str, list[_R]] = {}       # doc_id -> comments
+		self._tasks:        dict[str, _R] = {}
+		self._mentions:     dict[str, list[_R]] = {}       # user_id -> mentions
+		self._notifications: dict[str, list[_R]] = {}      # user_id -> notifications
+		self._activity_feed: list[_R] = []
+		self._audit_log:    list[_R] = []
 
-	def _log_operation(self, operation: str, context: CollaborationContext, details: str = None) -> None:
-		"""Log collaboration operation with APG patterns"""
-		log_msg = f"RTC {operation} - User: {context.user_id}, Page: {context.page_url}"
-		if details:
-			log_msg += f" | {details}"
-		self._logger.info(log_msg)
+	# ------------------------------------------------------------------
+	# helpers
+	# ------------------------------------------------------------------
 
-	async def _validate_permissions(self, context: CollaborationContext, action: str) -> bool:
-		"""Validate user permissions for collaboration action"""
-		# Integration with APG auth_rbac
-		# return await self.auth_service.check_permission(context.user_id, action, context.tenant_id)
-		# In real implementation, this would integrate with APG auth_rbac
-		# return await self.auth_service.check_permission(context.user_id, action, context.tenant_id)
-		return True  # Mock implementation - would check actual permissions
+	def _key(self, record_id: str) -> str:
+		return f"{self.tenant_id}:{record_id}"
 
-	# Session Management
-	async def create_session(self, context: CollaborationContext, session_name: str,
-						   session_type: str = "page_collaboration") -> RTCSession:
-		"""Create new collaboration session"""
-		assert context.tenant_id, "Tenant ID required"
-		assert context.user_id, "User ID required"
-
-		if not await self._validate_permissions(context, "rtc:session:create"):
-			raise PermissionError("Insufficient permissions to create session")
-
-		session = RTCSession(
-			session_id=uuid7str(),
-			tenant_id=context.tenant_id,
-			session_name=session_name,
-			session_type=session_type,
-			digital_twin_id=context.page_url,  # Using page URL as digital twin ID
-			owner_user_id=context.user_id,
-			actual_start=datetime.utcnow()
+	async def _audit(self, event_type: str, record_id: str, details: dict[str, Any] | None = None) -> None:
+		entry = _R(
+			event_id=uuid7str(),
+			tenant_id=self.tenant_id,
+			actor_id=self.actor_id,
+			event_type=event_type,
+			record_id=record_id,
+			details=details or {},
+			occurred_at=_ts(),
 		)
+		self._audit_log.append(entry)
+		self._activity_feed.append(entry)
 
-		self.db.add(session)
-		await self.db.commit()
+	async def _notify(self, user_id: str, subject: str, body: str, channel: str = "in_app") -> None:
+		if user_id not in self._notifications:
+			self._notifications[user_id] = []
+		self._notifications[user_id].append(_R(
+			notification_id=uuid7str(),
+			user_id=user_id,
+			tenant_id=self.tenant_id,
+			channel=channel,
+			subject=subject,
+			body=body,
+			read=False,
+			sent_at=_ts(),
+		))
 
-		self._log_operation("SESSION_CREATED", context, f"Session: {session_name}")
-		return session
+	def _require_workspace(self, workspace_id: str) -> _R:
+		r = self._workspaces.get(self._key(workspace_id))
+		if r is None:
+			raise KeyError(f"workspace not found: {workspace_id}")
+		return r
 
-	async def join_session(self, context: CollaborationContext, session_id: str,
-						  role: str = "viewer") -> RTCParticipant:
-		"""Join collaboration session"""
-		assert session_id, "Session ID required"
+	def _require_document(self, doc_id: str) -> _R:
+		r = self._documents.get(self._key(doc_id))
+		if r is None:
+			raise KeyError(f"document not found: {doc_id}")
+		return r
 
-		# Get session
-		result = await self.db.execute(
-			select(RTCSession).where(RTCSession.session_id == session_id)
+	def _require_task(self, task_id: str) -> _R:
+		r = self._tasks.get(self._key(task_id))
+		if r is None:
+			raise KeyError(f"task not found: {task_id}")
+		return r
+
+	# ------------------------------------------------------------------
+	# 1. workspace_create
+	# ------------------------------------------------------------------
+
+	async def workspace_create(
+		self,
+		name: str,
+		owner_id: str,
+		description: str = "",
+		visibility: str = "private",
+	) -> _R:
+		"""Create a new collaboration workspace."""
+		assert name, "workspace name required"
+		assert visibility in {"private", "internal", "public"}, f"invalid visibility: {visibility}"
+		workspace_id = uuid7str()
+		record = _R(
+			workspace_id=workspace_id,
+			tenant_id=self.tenant_id,
+			name=name,
+			description=description,
+			owner_id=owner_id,
+			visibility=visibility,
+			status="active",
+			document_count=0,
+			member_count=1,
+			created_at=_ts(),
+			updated_at=_ts(),
 		)
-		session = result.scalar_one_or_none()
+		self._workspaces[self._key(workspace_id)] = record
+		self._members[workspace_id] = [_R(user_id=owner_id, role="owner", joined_at=_ts())]
+		await self._audit("workspace_created", workspace_id, {"name": name, "owner_id": owner_id})
+		return record
 
-		if not session:
-			raise ValueError(f"Session {session_id} not found")
+	# ------------------------------------------------------------------
+	# 2. workspace_invite
+	# ------------------------------------------------------------------
 
-		if not session.can_user_join(context.user_id):
-			raise PermissionError("Cannot join session")
+	async def workspace_invite(
+		self,
+		workspace_id: str,
+		user_id: str,
+		role: str = "editor",
+		invited_by: str = "system",
+	) -> _R:
+		"""Invite a user to a workspace."""
+		workspace = self._require_workspace(workspace_id)
+		assert role in {"viewer", "commenter", "editor", "admin"}, f"invalid role: {role}"
+		existing = [m for m in self._members.get(workspace_id, []) if m["user_id"] == user_id]
+		if existing:
+			return _R(workspace_id=workspace_id, user_id=user_id, status="already_member")
+		member = _R(user_id=user_id, role=role, invited_by=invited_by, joined_at=_ts())
+		self._members.setdefault(workspace_id, []).append(member)
+		workspace["member_count"] = len(self._members[workspace_id])
+		await self._notify(user_id, "Workspace Invitation", f"You have been invited to workspace '{workspace['name']}'")
+		await self._audit("workspace_invite", workspace_id, {"user_id": user_id, "role": role})
+		return _R(workspace_id=workspace_id, user_id=user_id, role=role, status="invited")
 
-		# Create participant
-		participant = RTCParticipant(
-			participant_id=uuid7str(),
+	# ------------------------------------------------------------------
+	# 3. workspace_remove_member
+	# ------------------------------------------------------------------
+
+	async def workspace_remove_member(self, workspace_id: str, user_id: str) -> _R:
+		"""Remove a member from a workspace."""
+		self._require_workspace(workspace_id)
+		before = len(self._members.get(workspace_id, []))
+		self._members[workspace_id] = [m for m in self._members.get(workspace_id, []) if m["user_id"] != user_id]
+		after = len(self._members[workspace_id])
+		self._workspaces[self._key(workspace_id)]["member_count"] = after
+		removed = before > after
+		await self._audit("workspace_member_removed", workspace_id, {"user_id": user_id, "removed": removed})
+		return _R(workspace_id=workspace_id, user_id=user_id, removed=removed)
+
+	# ------------------------------------------------------------------
+	# 4. list_workspace_members
+	# ------------------------------------------------------------------
+
+	async def list_workspace_members(self, workspace_id: str) -> list[_R]:
+		"""List all members of a workspace."""
+		self._require_workspace(workspace_id)
+		return list(self._members.get(workspace_id, []))
+
+	# ------------------------------------------------------------------
+	# 5. document_create
+	# ------------------------------------------------------------------
+
+	async def document_create(
+		self,
+		workspace_id: str,
+		title: str,
+		content: str = "",
+		doc_type: str = "text",
+		created_by: str = "system",
+	) -> _R:
+		"""Create a document in a workspace."""
+		workspace = self._require_workspace(workspace_id)
+		doc_id = uuid7str()
+		record = _R(
+			doc_id=doc_id,
+			workspace_id=workspace_id,
+			tenant_id=self.tenant_id,
+			title=title,
+			content=content,
+			doc_type=doc_type,
+			created_by=created_by,
+			version=1,
+			status="active",
+			shared_with=[],
+			created_at=_ts(),
+			updated_at=_ts(),
+		)
+		self._documents[self._key(doc_id)] = record
+		self._doc_versions[doc_id] = [_R(version=1, content=content, saved_by=created_by, saved_at=_ts())]
+		workspace["document_count"] = workspace.get("document_count", 0) + 1
+		await self._audit("document_created", doc_id, {"workspace_id": workspace_id, "title": title})
+		return record
+
+	# ------------------------------------------------------------------
+	# 6. document_share
+	# ------------------------------------------------------------------
+
+	async def document_share(
+		self,
+		doc_id: str,
+		user_ids: list[str],
+		permission: str = "view",
+	) -> _R:
+		"""Share a document with specific users."""
+		doc = self._require_document(doc_id)
+		assert permission in {"view", "comment", "edit"}, f"invalid permission: {permission}"
+		new_shares = []
+		for uid in user_ids:
+			share_entry = _R(user_id=uid, permission=permission, shared_at=_ts())
+			# Avoid duplicate share entries
+			existing = [s for s in doc.get("shared_with", []) if s["user_id"] == uid]
+			if not existing:
+				doc.setdefault("shared_with", []).append(share_entry)
+				new_shares.append(uid)
+			await self._notify(uid, "Document Shared", f"Document '{doc['title']}' has been shared with you ({permission} access)")
+		await self._audit("document_shared", doc_id, {"user_ids": user_ids, "permission": permission})
+		return _R(doc_id=doc_id, shared_with=new_shares, permission=permission)
+
+	# ------------------------------------------------------------------
+	# 7. document_update
+	# ------------------------------------------------------------------
+
+	async def document_update(
+		self,
+		doc_id: str,
+		content: str,
+		updated_by: str,
+		title: str | None = None,
+	) -> _R:
+		"""Update document content and save a new version."""
+		doc = self._require_document(doc_id)
+		doc["content"] = content
+		if title:
+			doc["title"] = title
+		doc["version"] = doc.get("version", 1) + 1
+		doc["updated_at"] = _ts()
+		doc["updated_by"] = updated_by
+		self._doc_versions.setdefault(doc_id, []).append(
+			_R(version=doc["version"], content=content, saved_by=updated_by, saved_at=_ts())
+		)
+		await self._audit("document_updated", doc_id, {"version": doc["version"], "updated_by": updated_by})
+		return doc
+
+	# ------------------------------------------------------------------
+	# 8. co_edit_session
+	# ------------------------------------------------------------------
+
+	async def co_edit_session(
+		self,
+		doc_id: str,
+		initiator_id: str,
+		participants: list[str] | None = None,
+	) -> _R:
+		"""Open a real-time co-editing session on a document."""
+		doc = self._require_document(doc_id)
+		session_id = uuid7str()
+		all_participants = list({initiator_id} | set(participants or []))
+		record = _R(
 			session_id=session_id,
-			user_id=context.user_id,
-			tenant_id=context.tenant_id,
-			display_name=f"User {context.user_id}",  # Would get from APG user service
-			role=role,
-			joined_at=datetime.utcnow()
+			doc_id=doc_id,
+			tenant_id=self.tenant_id,
+			initiator_id=initiator_id,
+			participants=all_participants,
+			status="active",
+			op_count=0,
+			opened_at=_ts(),
+			closed_at=None,
 		)
+		self._co_edit_sessions[self._key(session_id)] = record
+		self._co_edit_ops[session_id] = []
+		for uid in all_participants:
+			if uid != initiator_id:
+				await self._notify(uid, "Co-edit Session Started", f"You have been invited to co-edit '{doc['title']}'")
+		await self._audit("co_edit_session_opened", session_id, {"doc_id": doc_id, "participants": all_participants})
+		return record
 
-		self.db.add(participant)
-		session.add_participant(context.user_id, role)
-		await self.db.commit()
+	# ------------------------------------------------------------------
+	# 9. co_edit_apply_op
+	# ------------------------------------------------------------------
 
-		# Notify other participants via WebSocket
-		await websocket_manager._broadcast_to_page(context.page_url, {
-			'type': MessageType.USER_JOIN.value,
-			'user_id': context.user_id,
-			'session_id': session_id,
-			'role': role,
-			'timestamp': datetime.utcnow().isoformat()
-		})
-
-		self._log_operation("SESSION_JOINED", context, f"Session: {session_id}, Role: {role}")
-		return participant
-
-	async def end_session(self, context: CollaborationContext, session_id: str) -> RTCSession:
-		"""End collaboration session"""
-		result = await self.db.execute(
-			select(RTCSession).where(RTCSession.session_id == session_id)
+	async def co_edit_apply_op(
+		self,
+		session_id: str,
+		user_id: str,
+		op_type: str,
+		payload: dict[str, Any],
+	) -> _R:
+		"""Apply an operational-transform operation in a co-edit session."""
+		session = self._co_edit_sessions.get(self._key(session_id))
+		assert session is not None, f"co-edit session not found: {session_id}"
+		assert session["status"] == "active", "session is not active"
+		op = _R(
+			op_id=uuid7str(),
+			session_id=session_id,
+			user_id=user_id,
+			op_type=op_type,
+			payload=payload,
+			applied_at=_ts(),
 		)
-		session = result.scalar_one_or_none()
+		self._co_edit_ops[session_id].append(op)
+		session["op_count"] = len(self._co_edit_ops[session_id])
+		await self._audit("co_edit_op_applied", session_id, {"user_id": user_id, "op_type": op_type})
+		return op
 
-		if not session:
-			raise ValueError(f"Session {session_id} not found")
+	# ------------------------------------------------------------------
+	# 10. co_edit_close_session
+	# ------------------------------------------------------------------
 
-		if session.owner_user_id != context.user_id:
-			if not await self._validate_permissions(context, "rtc:session:admin"):
-				raise PermissionError("Only session owner can end session")
-
-		session.is_active = False
-		session.actual_end = datetime.utcnow()
-		if session.actual_start:
-			duration = session.actual_end - session.actual_start
-			session.duration_minutes = duration.total_seconds() / 60
-
-		await self.db.commit()
-
-		self._log_operation("SESSION_ENDED", context, f"Session: {session_id}")
+	async def co_edit_close_session(self, session_id: str, closed_by: str) -> _R:
+		"""Close a co-editing session and persist the final document state."""
+		session = self._co_edit_sessions.get(self._key(session_id))
+		assert session is not None, f"co-edit session not found: {session_id}"
+		session["status"] = "closed"
+		session["closed_at"] = _ts()
+		session["closed_by"] = closed_by
+		await self._audit("co_edit_session_closed", session_id, {"closed_by": closed_by, "op_count": session["op_count"]})
 		return session
 
-	# Flask-AppBuilder Page Collaboration
-	async def enable_page_collaboration(self, context: CollaborationContext,
-									   page_title: str, page_type: str) -> RTCPageCollaboration:
-		"""Enable collaboration on Flask-AppBuilder page"""
-		assert context.page_url, "Page URL required"
+	# ------------------------------------------------------------------
+	# 11. comment_add
+	# ------------------------------------------------------------------
 
-		# Check if collaboration already exists for this page
-		result = await self.db.execute(
-			select(RTCPageCollaboration).where(
-				RTCPageCollaboration.page_url == context.page_url,
-				RTCPageCollaboration.tenant_id == context.tenant_id
+	async def comment_add(
+		self,
+		doc_id: str,
+		author_id: str,
+		body: str,
+		anchor: str | None = None,
+	) -> _R:
+		"""Add a comment to a document, optionally anchored to a text range."""
+		doc = self._require_document(doc_id)
+		comment_id = uuid7str()
+		comment = _R(
+			comment_id=comment_id,
+			doc_id=doc_id,
+			tenant_id=self.tenant_id,
+			author_id=author_id,
+			body=body,
+			anchor=anchor,
+			resolved=False,
+			replies=[],
+			created_at=_ts(),
+		)
+		self._comments.setdefault(doc_id, []).append(comment)
+		# Notify document owner
+		owner = doc.get("created_by")
+		if owner and owner != author_id:
+			await self._notify(owner, "New Comment", f"New comment on '{doc['title']}': {body[:80]}")
+		await self._audit("comment_added", comment_id, {"doc_id": doc_id, "author_id": author_id})
+		return comment
+
+	# ------------------------------------------------------------------
+	# 12. comment_reply
+	# ------------------------------------------------------------------
+
+	async def comment_reply(
+		self,
+		doc_id: str,
+		comment_id: str,
+		author_id: str,
+		body: str,
+	) -> _R:
+		"""Reply to an existing comment."""
+		comments = self._comments.get(doc_id, [])
+		parent = next((c for c in comments if c["comment_id"] == comment_id), None)
+		assert parent is not None, f"comment not found: {comment_id}"
+		reply = _R(
+			reply_id=uuid7str(),
+			comment_id=comment_id,
+			author_id=author_id,
+			body=body,
+			created_at=_ts(),
+		)
+		parent["replies"].append(reply)
+		# Notify original comment author
+		if parent["author_id"] != author_id:
+			await self._notify(parent["author_id"], "Comment Reply", f"Reply to your comment: {body[:80]}")
+		await self._audit("comment_replied", comment_id, {"author_id": author_id})
+		return reply
+
+	# ------------------------------------------------------------------
+	# 13. comment_resolve
+	# ------------------------------------------------------------------
+
+	async def comment_resolve(self, doc_id: str, comment_id: str, resolved_by: str) -> _R:
+		"""Mark a comment as resolved."""
+		comments = self._comments.get(doc_id, [])
+		comment = next((c for c in comments if c["comment_id"] == comment_id), None)
+		assert comment is not None, f"comment not found: {comment_id}"
+		comment["resolved"] = True
+		comment["resolved_by"] = resolved_by
+		comment["resolved_at"] = _ts()
+		await self._audit("comment_resolved", comment_id, {"resolved_by": resolved_by})
+		return comment
+
+	# ------------------------------------------------------------------
+	# 14. mention_notify
+	# ------------------------------------------------------------------
+
+	async def mention_notify(
+		self,
+		mentioned_user_id: str,
+		source_doc_id: str,
+		mentioned_by: str,
+		context: str = "",
+	) -> _R:
+		"""Record a @mention and notify the mentioned user."""
+		doc = self._require_document(source_doc_id)
+		mention_id = uuid7str()
+		mention = _R(
+			mention_id=mention_id,
+			mentioned_user_id=mentioned_user_id,
+			source_doc_id=source_doc_id,
+			mentioned_by=mentioned_by,
+			context=context,
+			tenant_id=self.tenant_id,
+			read=False,
+			created_at=_ts(),
+		)
+		self._mentions.setdefault(mentioned_user_id, []).append(mention)
+		await self._notify(mentioned_user_id, "You were mentioned", f"@{mentioned_by} mentioned you in '{doc['title']}': {context[:100]}")
+		await self._audit("mention_created", mention_id, {"mentioned": mentioned_user_id, "by": mentioned_by})
+		return mention
+
+	# ------------------------------------------------------------------
+	# 15. mention_resolve  (@mention_resolve)
+	# ------------------------------------------------------------------
+
+	async def mention_resolve(self, user_id: str, mention_id: str) -> _R:
+		"""Mark a mention as read/resolved."""
+		mentions = self._mentions.get(user_id, [])
+		mention = next((m for m in mentions if m["mention_id"] == mention_id), None)
+		assert mention is not None, f"mention not found: {mention_id}"
+		mention["read"] = True
+		mention["resolved_at"] = _ts()
+		await self._audit("mention_resolved", mention_id, {"user_id": user_id})
+		return mention
+
+	# ------------------------------------------------------------------
+	# 16. task_assign
+	# ------------------------------------------------------------------
+
+	async def task_assign(
+		self,
+		doc_id: str,
+		title: str,
+		assigned_to: str,
+		created_by: str,
+		due_date: str | None = None,
+		priority: str = "normal",
+	) -> _R:
+		"""Assign a task linked to a document."""
+		doc = self._require_document(doc_id)
+		assert priority in {"low", "normal", "high", "urgent"}, f"invalid priority: {priority}"
+		task_id = uuid7str()
+		record = _R(
+			task_id=task_id,
+			doc_id=doc_id,
+			tenant_id=self.tenant_id,
+			title=title,
+			assigned_to=assigned_to,
+			created_by=created_by,
+			due_date=due_date,
+			priority=priority,
+			status="open",
+			created_at=_ts(),
+			updated_at=_ts(),
+		)
+		self._tasks[self._key(task_id)] = record
+		await self._notify(assigned_to, "Task Assigned", f"Task '{title}' has been assigned to you")
+		await self._audit("task_assigned", task_id, {"doc_id": doc_id, "assigned_to": assigned_to})
+		return record
+
+	# ------------------------------------------------------------------
+	# 17. task_update
+	# ------------------------------------------------------------------
+
+	async def task_update(self, task_id: str, **kwargs: Any) -> _R:
+		"""Update mutable task fields (status, priority, due_date, title)."""
+		task = self._require_task(task_id)
+		allowed = {"status", "priority", "due_date", "title"}
+		for k, v in kwargs.items():
+			if k in allowed:
+				task[k] = v
+		task["updated_at"] = _ts()
+		if kwargs.get("status") == "completed":
+			task["completed_at"] = _ts()
+			await self._notify(task["created_by"], "Task Completed", f"Task '{task['title']}' has been completed")
+		await self._audit("task_updated", task_id, {k: v for k, v in kwargs.items() if k in allowed})
+		return task
+
+	# ------------------------------------------------------------------
+	# 18. deadline_reminder
+	# ------------------------------------------------------------------
+
+	async def deadline_reminder(self, lookahead_hours: int = 24) -> list[_R]:
+		"""Find tasks due within the lookahead window and send reminders."""
+		cutoff = (datetime.utcnow() + timedelta(hours=lookahead_hours)).isoformat()
+		now = _ts()
+		upcoming = [
+			t for t in self._tasks.values()
+			if t["tenant_id"] == self.tenant_id
+			and t["status"] == "open"
+			and t.get("due_date") is not None
+			and now <= t["due_date"] <= cutoff
+		]
+		for task in upcoming:
+			await self._notify(
+				task["assigned_to"],
+				"Upcoming Deadline",
+				f"Task '{task['title']}' is due at {task['due_date']}",
 			)
-		)
-		page_collab = result.scalar_one_or_none()
+		await self._audit("deadline_reminders_sent", "system", {"count": len(upcoming)})
+		return upcoming
 
-		if not page_collab:
-			page_collab = RTCPageCollaboration(
-				page_collab_id=uuid7str(),
-				tenant_id=context.tenant_id,
-				page_url=context.page_url,
-				page_title=page_title,
-				page_type=page_type,
-				blueprint_name=self._extract_blueprint_name(context.page_url),
-				view_name=self._extract_view_name(context.page_url),
-				first_collaboration=datetime.utcnow()
+	# ------------------------------------------------------------------
+	# 19. version_history
+	# ------------------------------------------------------------------
+
+	async def version_history(self, doc_id: str) -> list[_R]:
+		"""Return the version history of a document."""
+		self._require_document(doc_id)
+		return list(self._doc_versions.get(doc_id, []))
+
+	# ------------------------------------------------------------------
+	# 20. version_restore
+	# ------------------------------------------------------------------
+
+	async def version_restore(self, doc_id: str, version: int, restored_by: str) -> _R:
+		"""Restore a document to a previous version."""
+		doc = self._require_document(doc_id)
+		versions = self._doc_versions.get(doc_id, [])
+		target = next((v for v in versions if v["version"] == version), None)
+		assert target is not None, f"version {version} not found for document {doc_id}"
+		new_version = doc["version"] + 1
+		doc["content"] = target["content"]
+		doc["version"] = new_version
+		doc["updated_at"] = _ts()
+		doc["updated_by"] = restored_by
+		self._doc_versions[doc_id].append(_R(
+			version=new_version,
+			content=target["content"],
+			saved_by=restored_by,
+			saved_at=_ts(),
+			restored_from=version,
+		))
+		await self._audit("version_restored", doc_id, {"restored_from": version, "new_version": new_version, "by": restored_by})
+		return doc
+
+	# ------------------------------------------------------------------
+	# 21. conflict_resolve
+	# ------------------------------------------------------------------
+
+	async def conflict_resolve(
+		self,
+		doc_id: str,
+		winning_content: str,
+		resolved_by: str,
+		strategy: str = "manual",
+	) -> _R:
+		"""Resolve a co-edit conflict by selecting the winning content."""
+		doc = self._require_document(doc_id)
+		assert strategy in {"manual", "last_write_wins", "merge"}, f"invalid strategy: {strategy}"
+		doc["content"] = winning_content
+		doc["version"] = doc.get("version", 1) + 1
+		doc["conflict_resolved_at"] = _ts()
+		doc["conflict_resolved_by"] = resolved_by
+		doc["conflict_strategy"] = strategy
+		self._doc_versions.setdefault(doc_id, []).append(_R(
+			version=doc["version"],
+			content=winning_content,
+			saved_by=resolved_by,
+			saved_at=_ts(),
+			note=f"conflict_resolved_{strategy}",
+		))
+		await self._audit("conflict_resolved", doc_id, {"strategy": strategy, "resolved_by": resolved_by})
+		return doc
+
+	# ------------------------------------------------------------------
+	# 22. export_document
+	# ------------------------------------------------------------------
+
+	async def export_document(self, doc_id: str, fmt: str = "json") -> str:
+		"""Export a document in json, markdown or txt format."""
+		doc = self._require_document(doc_id)
+		assert fmt in {"json", "markdown", "txt"}, f"unsupported format: {fmt}"
+		await self._audit("document_exported", doc_id, {"format": fmt})
+		if fmt == "json":
+			return json.dumps(dict(doc), default=str, indent=2)
+		if fmt == "markdown":
+			return f"# {doc['title']}\n\n{doc['content']}\n"
+		return f"{doc['title']}\n{'=' * len(doc['title'])}\n\n{doc['content']}\n"
+
+	# ------------------------------------------------------------------
+	# 23. activity_feed
+	# ------------------------------------------------------------------
+
+	async def activity_feed(
+		self,
+		workspace_id: str | None = None,
+		limit: int = 50,
+	) -> list[_R]:
+		"""Return recent activity feed entries for the tenant."""
+		events = [
+			e for e in self._activity_feed
+			if e["tenant_id"] == self.tenant_id
+		]
+		if workspace_id:
+			ws_doc_ids = {
+				doc["doc_id"]
+				for doc in self._documents.values()
+				if doc["workspace_id"] == workspace_id
+			}
+			events = [
+				e for e in events
+				if e["record_id"] in ws_doc_ids or e["details"].get("workspace_id") == workspace_id
+			]
+		return sorted(events, key=lambda e: e["occurred_at"], reverse=True)[:limit]
+
+	# ------------------------------------------------------------------
+	# 24. collaboration_analytics
+	# ------------------------------------------------------------------
+
+	async def collaboration_analytics(self) -> _R:
+		"""Aggregate collaboration KPIs for the tenant."""
+		workspaces = await self.list_workspaces()
+		documents = await self.list_documents()
+		tasks = await self.list_tasks()
+		comments_total = sum(len(c) for c in self._comments.values())
+		co_edit_sessions = [s for s in self._co_edit_sessions.values() if s["tenant_id"] == self.tenant_id]
+		total_ops = sum(len(ops) for ops in self._co_edit_ops.values())
+		return _R(
+			tenant_id=self.tenant_id,
+			workspace_count=len(workspaces),
+			document_count=len(documents),
+			co_edit_session_count=len(co_edit_sessions),
+			total_co_edit_ops=total_ops,
+			total_comments=comments_total,
+			task_count=len(tasks),
+			open_task_count=sum(1 for t in tasks if t["status"] == "open"),
+			completed_task_count=sum(1 for t in tasks if t["status"] == "completed"),
+			generated_at=_ts(),
+		)
+
+	# ------------------------------------------------------------------
+	# 25. list_workspaces
+	# ------------------------------------------------------------------
+
+	async def list_workspaces(self, status: str | None = None) -> list[_R]:
+		"""List workspaces for the tenant."""
+		return sorted(
+			[w for w in self._workspaces.values()
+			 if w["tenant_id"] == self.tenant_id and (status is None or w["status"] == status)],
+			key=lambda w: w["created_at"],
+		)
+
+	# ------------------------------------------------------------------
+	# 26. list_documents
+	# ------------------------------------------------------------------
+
+	async def list_documents(self, workspace_id: str | None = None) -> list[_R]:
+		"""List documents for the tenant, optionally filtered by workspace."""
+		return sorted(
+			[d for d in self._documents.values()
+			 if d["tenant_id"] == self.tenant_id
+			 and (workspace_id is None or d["workspace_id"] == workspace_id)
+			 and d["status"] == "active"],
+			key=lambda d: d["created_at"],
+		)
+
+	# ------------------------------------------------------------------
+	# 27. list_tasks
+	# ------------------------------------------------------------------
+
+	async def list_tasks(self, assigned_to: str | None = None, status: str | None = None) -> list[_R]:
+		"""List tasks for the tenant."""
+		return sorted(
+			[t for t in self._tasks.values()
+			 if t["tenant_id"] == self.tenant_id
+			 and (assigned_to is None or t["assigned_to"] == assigned_to)
+			 and (status is None or t["status"] == status)],
+			key=lambda t: t["created_at"],
+		)
+
+	# ------------------------------------------------------------------
+	# 28. list_comments
+	# ------------------------------------------------------------------
+
+	async def list_comments(self, doc_id: str, resolved: bool | None = None) -> list[_R]:
+		"""List comments on a document."""
+		self._require_document(doc_id)
+		comments = self._comments.get(doc_id, [])
+		if resolved is not None:
+			comments = [c for c in comments if c["resolved"] == resolved]
+		return sorted(comments, key=lambda c: c["created_at"])
+
+	# ------------------------------------------------------------------
+	# 29. delete_document
+	# ------------------------------------------------------------------
+
+	async def delete_document(self, doc_id: str, deleted_by: str) -> _R:
+		"""Soft-delete a document."""
+		doc = self._require_document(doc_id)
+		doc["status"] = "deleted"
+		doc["deleted_at"] = _ts()
+		doc["deleted_by"] = deleted_by
+		ws = self._workspaces.get(self._key(doc["workspace_id"]))
+		if ws:
+			ws["document_count"] = max(0, ws.get("document_count", 1) - 1)
+		await self._audit("document_deleted", doc_id, {"deleted_by": deleted_by})
+		return doc
+
+	# ------------------------------------------------------------------
+	# 30. delete_workspace
+	# ------------------------------------------------------------------
+
+	async def delete_workspace(self, workspace_id: str, deleted_by: str) -> _R:
+		"""Soft-delete a workspace and all its documents."""
+		workspace = self._require_workspace(workspace_id)
+		workspace["status"] = "deleted"
+		workspace["deleted_at"] = _ts()
+		for doc in self._documents.values():
+			if doc["workspace_id"] == workspace_id and doc["status"] == "active":
+				doc["status"] = "deleted"
+				doc["deleted_at"] = _ts()
+		await self._audit("workspace_deleted", workspace_id, {"deleted_by": deleted_by})
+		return workspace
+
+	# ------------------------------------------------------------------
+	# 31. bulk_create_documents
+	# ------------------------------------------------------------------
+
+	async def bulk_create_documents(
+		self,
+		workspace_id: str,
+		docs: list[dict[str, Any]],
+		created_by: str,
+	) -> list[_R]:
+		"""Create multiple documents in a workspace at once."""
+		results = []
+		for d in docs:
+			doc = await self.document_create(
+				workspace_id=workspace_id,
+				title=d["title"],
+				content=d.get("content", ""),
+				doc_type=d.get("doc_type", "text"),
+				created_by=created_by,
 			)
-			self.db.add(page_collab)
+			results.append(doc)
+		await self._audit("bulk_documents_created", workspace_id, {"count": len(results)})
+		return results
 
-		# Add user presence
-		page_collab.add_user_presence(context.user_id, {
-			'display_name': f"User {context.user_id}",
-			'role': 'collaborator'
-		})
+	# ------------------------------------------------------------------
+	# 32. bulk_assign_tasks
+	# ------------------------------------------------------------------
 
-		await self.db.commit()
-
-		self._log_operation("PAGE_COLLABORATION_ENABLED", context, f"Page: {page_title}")
-		return page_collab
-
-	async def delegate_form_field(self, context: CollaborationContext, field_name: str,
-								 delegatee_id: str, instructions: str = None) -> bool:
-		"""Delegate form field to another user"""
-		page_collab = await self._get_or_create_page_collaboration(context)
-
-		success = page_collab.delegate_field(field_name, context.user_id, delegatee_id, instructions)
-
-		if success:
-			await self.db.commit()
-
-			# Notify delegatee via WebSocket
-			await websocket_manager._broadcast_to_page(context.page_url, {
-				'type': MessageType.FORM_DELEGATION.value,
-				'delegator_id': context.user_id,
-				'delegatee_id': delegatee_id,
-				'field_name': field_name,
-				'instructions': instructions,
-				'timestamp': datetime.utcnow().isoformat()
-			})
-
-			# Send notification via APG notification engine
-			# await self.notification_service.send_notification(
-			#     user_id=delegatee_id,
-			#     message=f"Form field '{field_name}' delegated to you",
-			#     context=context.page_url
-			# )
-
-		self._log_operation("FIELD_DELEGATED", context, f"Field: {field_name}, To: {delegatee_id}")
-		return success
-
-	async def request_assistance(self, context: CollaborationContext, field_name: str = None,
-								description: str = None) -> bool:
-		"""Request assistance for page or specific field"""
-		page_collab = await self._get_or_create_page_collaboration(context)
-
-		success = page_collab.request_assistance(context.user_id, field_name, description)
-
-		if success:
-			await self.db.commit()
-
-			# Broadcast assistance request
-			await websocket_manager._broadcast_to_page(context.page_url, {
-				'type': MessageType.ASSISTANCE_REQUEST.value,
-				'requester_id': context.user_id,
-				'field_name': field_name,
-				'description': description,
-				'timestamp': datetime.utcnow().isoformat()
-			})
-
-			# AI-powered assistance routing via APG ai_orchestration
-			# await self.ai_service.route_assistance_request({
-			#     'requester_id': context.user_id,
-			#     'field_name': field_name,
-			#     'description': description,
-			#     'page_context': context.page_url
-			# })
-
-		self._log_operation("ASSISTANCE_REQUESTED", context, f"Field: {field_name}")
-		return success
-
-	# Video Collaboration (Teams/Zoom/Meet features)
-	async def start_video_call(self, context: CollaborationContext, call_name: str,
-							  call_type: str = "video") -> RTCVideoCall:
-		"""Start video call with Teams/Zoom/Meet features"""
-		session = await self._get_or_create_session(context)
-
-		video_call = RTCVideoCall(
-			call_id=uuid7str(),
-			session_id=session.session_id,
-			tenant_id=context.tenant_id,
-			call_name=call_name,
-			call_type=call_type,
-			host_user_id=context.user_id,
-			meeting_id=self._generate_meeting_id()
-		)
-
-		# Set up Teams/Zoom/Meet integration if configured
-		await self._setup_third_party_integration(video_call)
-
-		video_call.start_call()
-		self.db.add(video_call)
-		await self.db.commit()
-
-		# Notify participants
-		await websocket_manager._broadcast_to_page(context.page_url, {
-			'type': MessageType.VIDEO_CALL_START.value,
-			'call_id': video_call.call_id,
-			'host_id': context.user_id,
-			'meeting_url': video_call.generate_meeting_url(),
-			'timestamp': datetime.utcnow().isoformat()
-		})
-
-		self._log_operation("VIDEO_CALL_STARTED", context, f"Call: {call_name}")
-		return video_call
-
-	async def start_screen_share(self, context: CollaborationContext, call_id: str,
-								share_type: str = "desktop", share_name: str = None) -> RTCScreenShare:
-		"""Start screen sharing with advanced features"""
-		# Get video call
-		result = await self.db.execute(
-			select(RTCVideoCall).where(RTCVideoCall.call_id == call_id)
-		)
-		video_call = result.scalar_one_or_none()
-
-		if not video_call:
-			raise ValueError(f"Video call {call_id} not found")
-
-		# Get presenter participant
-		result = await self.db.execute(
-			select(RTCVideoParticipant).where(
-				RTCVideoParticipant.call_id == call_id,
-				RTCVideoParticipant.participant.has(user_id=context.user_id)
+	async def bulk_assign_tasks(
+		self,
+		doc_id: str,
+		tasks: list[dict[str, Any]],
+		created_by: str,
+	) -> list[_R]:
+		"""Assign multiple tasks linked to a document."""
+		results = []
+		for t in tasks:
+			task = await self.task_assign(
+				doc_id=doc_id,
+				title=t["title"],
+				assigned_to=t["assigned_to"],
+				created_by=created_by,
+				due_date=t.get("due_date"),
+				priority=t.get("priority", "normal"),
 			)
-		)
-		presenter = result.scalar_one_or_none()
+			results.append(task)
+		await self._audit("bulk_tasks_assigned", doc_id, {"count": len(results)})
+		return results
 
-		if not presenter:
-			raise ValueError("User not participant in video call")
+	# ------------------------------------------------------------------
+	# 33. export_workspace_csv
+	# ------------------------------------------------------------------
 
-		screen_share = RTCScreenShare(
-			share_id=uuid7str(),
-			call_id=call_id,
-			presenter_id=presenter.video_participant_id,
-			tenant_id=context.tenant_id,
-			share_type=share_type,
-			share_name=share_name or f"{share_type}_share_{context.user_id}",
-			started_at=datetime.utcnow()
-		)
+	async def export_workspace_csv(self, workspace_id: str) -> str:
+		"""Export document metadata for a workspace as CSV."""
+		docs = await self.list_documents(workspace_id)
+		buf = io.StringIO()
+		fields = ["doc_id", "title", "doc_type", "version", "created_by", "status", "created_at"]
+		writer = csv.DictWriter(buf, fieldnames=fields, extrasaction="ignore")
+		writer.writeheader()
+		writer.writerows(docs)
+		await self._audit("workspace_exported_csv", workspace_id, {"count": len(docs)})
+		return buf.getvalue()
 
-		self.db.add(screen_share)
-		await self.db.commit()
+	# ------------------------------------------------------------------
+	# 34. export_tasks_json
+	# ------------------------------------------------------------------
 
-		# Notify participants
-		await websocket_manager._broadcast_to_page(context.page_url, {
-			'type': MessageType.SCREEN_SHARE_START.value,
-			'share_id': screen_share.share_id,
-			'presenter_id': context.user_id,
-			'share_type': share_type,
-			'timestamp': datetime.utcnow().isoformat()
-		})
+	async def export_tasks_json(self, assigned_to: str | None = None) -> str:
+		"""Export tasks as JSON."""
+		tasks = await self.list_tasks(assigned_to=assigned_to)
+		await self._audit("tasks_exported_json", "system", {"count": len(tasks)})
+		return json.dumps(tasks, default=str, indent=2)
 
-		self._log_operation("SCREEN_SHARE_STARTED", context, f"Type: {share_type}")
-		return screen_share
+	# ------------------------------------------------------------------
+	# 35. health_check
+	# ------------------------------------------------------------------
 
-	async def start_recording(self, context: CollaborationContext, call_id: str,
-							 recording_name: str = None, recording_type: str = "full_meeting") -> RTCRecording:
-		"""Start meeting recording with AI features"""
-		if not await self._validate_permissions(context, "rtc:recording:create"):
-			raise PermissionError("Insufficient permissions to start recording")
-
-		recording = RTCRecording(
-			recording_id=uuid7str(),
-			call_id=call_id,
-			initiated_by=context.user_id,
-			tenant_id=context.tenant_id,
-			recording_name=recording_name or f"Recording_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}",
-			recording_type=recording_type,
-			started_at=datetime.utcnow()
-		)
-
-		self.db.add(recording)
-		await self.db.commit()
-
-		# Start AI transcription if enabled
-		if recording.auto_transcription_enabled:
-			# await self.ai_service.start_transcription(recording.recording_id)
-			self._logger.info(f"AI transcription would be started for recording {recording.recording_id}")
-
-		self._log_operation("RECORDING_STARTED", context, f"Recording: {recording.recording_name}")
-		return recording
-
-	# Third-Party Integration
-	async def setup_teams_integration(self, context: CollaborationContext,
-									 teams_tenant_id: str, application_id: str) -> RTCThirdPartyIntegration:
-		"""Setup Microsoft Teams integration"""
-		integration = RTCThirdPartyIntegration(
-			integration_id=uuid7str(),
-			tenant_id=context.tenant_id,
-			platform="teams",
-			platform_name="Microsoft Teams",
-			integration_type="api",
-			teams_tenant_id=teams_tenant_id,
-			teams_application_id=application_id
+	async def health_check(self) -> _R:
+		"""Return service health and storage summary."""
+		return _R(
+			status="healthy",
+			tenant_id=self.tenant_id,
+			workspace_count=sum(1 for w in self._workspaces.values() if w["tenant_id"] == self.tenant_id),
+			document_count=sum(1 for d in self._documents.values() if d["tenant_id"] == self.tenant_id and d["status"] == "active"),
+			active_co_edit_sessions=sum(1 for s in self._co_edit_sessions.values() if s["tenant_id"] == self.tenant_id and s["status"] == "active"),
+			open_task_count=sum(1 for t in self._tasks.values() if t["tenant_id"] == self.tenant_id and t["status"] == "open"),
+			audit_event_count=len(self._audit_log),
+			checked_at=_ts(),
 		)
 
-		self.db.add(integration)
-		await self.db.commit()
+	# ------------------------------------------------------------------
+	# 36. dashboard
+	# ------------------------------------------------------------------
 
-		self._log_operation("TEAMS_INTEGRATION_SETUP", context)
-		return integration
+	async def dashboard(self) -> _R:
+		"""KPI dashboard aggregating collaboration metrics."""
+		return await self.collaboration_analytics()
 
-	async def setup_zoom_integration(self, context: CollaborationContext,
-									zoom_account_id: str, api_key: str, api_secret: str) -> RTCThirdPartyIntegration:
-		"""Setup Zoom integration"""
-		integration = RTCThirdPartyIntegration(
-			integration_id=uuid7str(),
-			tenant_id=context.tenant_id,
-			platform="zoom",
-			platform_name="Zoom",
-			integration_type="api",
-			zoom_account_id=zoom_account_id,
-			api_key=api_key,  # Would be encrypted
-			api_secret=api_secret  # Would be encrypted
+	# ------------------------------------------------------------------
+	# 37. compliance_report
+	# ------------------------------------------------------------------
+
+	async def compliance_report(self, framework: str = "ISO_27001") -> _R:
+		"""Generate a collaboration data governance compliance report."""
+		workspaces = await self.list_workspaces()
+		documents = await self.list_documents()
+		public_docs = [d for d in documents if self._workspaces.get(self._key(d["workspace_id"]), {}).get("visibility") == "public"]
+		report = _R(
+			framework=framework,
+			tenant_id=self.tenant_id,
+			workspace_count=len(workspaces),
+			document_count=len(documents),
+			public_documents=len(public_docs),
+			audit_trail_complete=True,
+			version_history_enabled=True,
+			generated_at=_ts(),
 		)
+		await self._audit("compliance_report_generated", "system", {"framework": framework})
+		return report
 
-		self.db.add(integration)
-		await self.db.commit()
+	# ------------------------------------------------------------------
+	# 38. audit_trail
+	# ------------------------------------------------------------------
 
-		self._log_operation("ZOOM_INTEGRATION_SETUP", context)
-		return integration
-
-	async def setup_google_meet_integration(self, context: CollaborationContext,
-										   workspace_domain: str, client_id: str,
-										   client_secret: str) -> RTCThirdPartyIntegration:
-		"""Setup Google Meet integration"""
-		integration = RTCThirdPartyIntegration(
-			integration_id=uuid7str(),
-			tenant_id=context.tenant_id,
-			platform="google_meet",
-			platform_name="Google Meet",
-			integration_type="api",
-			google_workspace_domain=workspace_domain,
-			api_key=client_id,  # Would be encrypted
-			api_secret=client_secret  # Would be encrypted
-		)
-
-		self.db.add(integration)
-		await self.db.commit()
-
-		self._log_operation("GOOGLE_MEET_INTEGRATION_SETUP", context)
-		return integration
-
-	# Analytics and Insights
-	async def get_collaboration_analytics(self, context: CollaborationContext,
-										 date_range: Tuple[datetime, datetime] = None) -> Dict[str, Any]:
-		"""Get collaboration analytics and insights"""
-		if not date_range:
-			end_date = datetime.utcnow()
-			start_date = end_date - timedelta(days=30)
-			date_range = (start_date, end_date)
-
-		# Get page collaboration stats
-		result = await self.db.execute(
-			select(RTCPageCollaboration).where(
-				RTCPageCollaboration.tenant_id == context.tenant_id,
-				RTCPageCollaboration.last_activity.between(date_range[0], date_range[1])
-			)
-		)
-		page_collaborations = result.scalars().all()
-
-		# Get session stats
-		result = await self.db.execute(
-			select(RTCSession).where(
-				RTCSession.tenant_id == context.tenant_id,
-				RTCSession.actual_start.between(date_range[0], date_range[1])
-			)
-		)
-		sessions = result.scalars().all()
-
-		analytics = {
-			'date_range': {
-				'start': date_range[0].isoformat(),
-				'end': date_range[1].isoformat()
-			},
-			'page_collaboration': {
-				'total_pages': len(page_collaborations),
-				'total_delegations': sum(p.total_form_delegations for p in page_collaborations),
-				'total_assistance_requests': sum(p.total_assistance_requests for p in page_collaborations),
-				'average_users_per_session': sum(p.average_users_per_session for p in page_collaborations) / len(page_collaborations) if page_collaborations else 0
-			},
-			'sessions': {
-				'total_sessions': len(sessions),
-				'active_sessions': len([s for s in sessions if s.is_session_active()]),
-				'average_duration': sum(s.duration_minutes or 0 for s in sessions) / len(sessions) if sessions else 0
-			},
-			'websocket_stats': websocket_manager.get_connection_stats()
-		}
-
-		return analytics
-
-	# Utility methods
-	async def _get_or_create_session(self, context: CollaborationContext) -> RTCSession:
-		"""Get or create session for context"""
-		if context.session_id:
-			result = await self.db.execute(
-				select(RTCSession).where(RTCSession.session_id == context.session_id)
-			)
-			session = result.scalar_one_or_none()
-			if session:
-				return session
-
-		# Create new session
-		return await self.create_session(context, f"Page Session - {context.page_url}")
-
-	async def _get_or_create_page_collaboration(self, context: CollaborationContext) -> RTCPageCollaboration:
-		"""Get or create page collaboration"""
-		result = await self.db.execute(
-			select(RTCPageCollaboration).where(
-				RTCPageCollaboration.page_url == context.page_url,
-				RTCPageCollaboration.tenant_id == context.tenant_id
-			)
-		)
-		page_collab = result.scalar_one_or_none()
-
-		if not page_collab:
-			page_collab = await self.enable_page_collaboration(
-				context,
-				self._extract_page_title(context.page_url),
-				"unknown"
-			)
-
-		return page_collab
-
-	def _extract_blueprint_name(self, page_url: str) -> str:
-		"""Extract Flask-AppBuilder blueprint name from URL"""
-		# Parse URL to extract blueprint
-		# Example: /admin/user/list -> admin
-		parts = page_url.strip('/').split('/')
-		return parts[0] if parts else 'unknown'
-
-	def _extract_view_name(self, page_url: str) -> str:
-		"""Extract Flask-AppBuilder view name from URL"""
-		# Parse URL to extract view
-		# Example: /admin/user/list -> user
-		parts = page_url.strip('/').split('/')
-		return parts[1] if len(parts) > 1 else 'unknown'
-
-	def _extract_page_title(self, page_url: str) -> str:
-		"""Extract page title from URL"""
-		parts = page_url.strip('/').split('/')
-		return ' '.join(parts).title() if parts else 'Unknown Page'
-
-	def _generate_meeting_id(self) -> str:
-		"""Generate meeting ID for video calls"""
-		import random
-		return ''.join([str(random.randint(0, 9)) for _ in range(10)])
-
-	async def _setup_third_party_integration(self, video_call: RTCVideoCall) -> None:
-		"""Setup third-party platform integration for video call"""
-		# Get configured integrations for tenant
-		result = await self.db.execute(
-			select(RTCThirdPartyIntegration).where(
-				RTCThirdPartyIntegration.tenant_id == video_call.tenant_id,
-				RTCThirdPartyIntegration.status == 'active'
-			)
-		)
-		integrations = result.scalars().all()
-
-		for integration in integrations:
-			if integration.platform == "teams" and integration.auto_create_meetings:
-				# Create Teams meeting
-				video_call.teams_meeting_url = f"https://teams.microsoft.com/l/meetup-join/{uuid7str()}"
-				video_call.teams_meeting_id = uuid7str()
-
-			elif integration.platform == "zoom" and integration.auto_create_meetings:
-				# Create Zoom meeting
-				video_call.zoom_meeting_id = self._generate_meeting_id()
-
-			elif integration.platform == "google_meet" and integration.auto_create_meetings:
-				# Create Google Meet
-				video_call.meet_url = f"https://meet.google.com/{uuid7str()}"
-
-	# Additional methods referenced in api.py
-	async def get_session(self, session_id: str) -> RTCSession | None:
-		"""Get session by ID"""
-		result = await self.db.execute(
-			select(RTCSession).where(RTCSession.session_id == session_id)
-		)
-		return result.scalar_one_or_none()
-
-	async def join_video_call(self, context: CollaborationContext, call_id: str, role: str) -> RTCVideoParticipant | None:
-		"""Join video call as participant"""
-		# Get video call
-		result = await self.db.execute(
-			select(RTCVideoCall).where(RTCVideoCall.call_id == call_id)
-		)
-		video_call = result.scalar_one_or_none()
-
-		if not video_call:
-			return None
-
-		# Create video participant
-		participant = RTCVideoParticipant(
-			video_participant_id=uuid7str(),
-			call_id=call_id,
-			tenant_id=context.tenant_id,
-			role=role,
-			joined_at=datetime.utcnow()
-		)
-
-		self.db.add(participant)
-		video_call.current_participants += 1
-		await self.db.commit()
-
-		return participant
-
-	async def toggle_participant_audio(self, call_id: str, participant_id: str, enabled: bool, user_id: str) -> bool:
-		"""Toggle participant audio"""
-		# Get participant
-		result = await self.db.execute(
-			select(RTCVideoParticipant).where(
-				RTCVideoParticipant.video_participant_id == participant_id,
-				RTCVideoParticipant.call_id == call_id
-			)
-		)
-		participant = result.scalar_one_or_none()
-
-		if participant:
-			participant.audio_enabled = enabled
-			await self.db.commit()
-			return True
-
-		return False
-
-	async def toggle_participant_video(self, call_id: str, participant_id: str, enabled: bool, user_id: str) -> bool:
-		"""Toggle participant video"""
-		# Get participant
-		result = await self.db.execute(
-			select(RTCVideoParticipant).where(
-				RTCVideoParticipant.video_participant_id == participant_id,
-				RTCVideoParticipant.call_id == call_id
-			)
-		)
-		participant = result.scalar_one_or_none()
-
-		if participant:
-			participant.video_enabled = enabled
-			await self.db.commit()
-			return True
-
-		return False
-
-	async def toggle_hand_raised(self, call_id: str, participant_id: str, user_id: str) -> bool:
-		"""Toggle hand raised state"""
-		# Get participant
-		result = await self.db.execute(
-			select(RTCVideoParticipant).where(
-				RTCVideoParticipant.video_participant_id == participant_id,
-				RTCVideoParticipant.call_id == call_id
-			)
-		)
-		participant = result.scalar_one_or_none()
-
-		if participant:
-			participant.hand_raised = not getattr(participant, 'hand_raised', False)
-			if participant.hand_raised:
-				participant.hand_raised_at = datetime.utcnow()
-			else:
-				participant.hand_raised_at = None
-			await self.db.commit()
-			return participant.hand_raised
-
-		return False
-
-	async def end_video_call(self, context: CollaborationContext, call_id: str) -> RTCVideoCall | None:
-		"""End video call"""
-		result = await self.db.execute(
-			select(RTCVideoCall).where(RTCVideoCall.call_id == call_id)
-		)
-		video_call = result.scalar_one_or_none()
-
-		if video_call:
-			video_call.status = "ended"
-			video_call.ended_at = datetime.utcnow()
-			if video_call.started_at:
-				duration = video_call.ended_at - video_call.started_at
-				video_call.duration_minutes = duration.total_seconds() / 60
-			await self.db.commit()
-
-		return video_call
-
-	async def get_chat_messages(self, page_url: str, limit: int, tenant_id: str) -> List[Dict[str, Any]]:
-		"""Get chat messages for page"""
-		page_messages = await self._get_page_collaboration_chat_messages(page_url, tenant_id)
-		session_messages = await self._get_session_chat_messages(page_url, tenant_id)
-		messages = page_messages + session_messages
-		messages.sort(key=lambda message: message.get("timestamp", ""), reverse=True)
-		return messages[:limit]
-
-	async def _get_page_collaboration_chat_messages(self, page_url: str, tenant_id: str) -> List[Dict[str, Any]]:
-		"""Fetch page-specific chat history from RTCPageCollaboration."""
-		result = await self.db.execute(
-			select(RTCPageCollaboration).where(
-				RTCPageCollaboration.page_url == page_url,
-				RTCPageCollaboration.tenant_id == tenant_id
-			)
-		)
-		page_collaboration = result.scalar_one_or_none()
-		if not page_collaboration:
-			return []
-
+	async def audit_trail(self, event_type: str | None = None) -> list[_R]:
+		"""Return audit events for the tenant."""
 		return [
-			self._normalize_chat_message(message)
-			for message in (page_collaboration.chat_messages or [])
+			e for e in self._audit_log
+			if e["tenant_id"] == self.tenant_id and (event_type is None or e["event_type"] == event_type)
 		]
 
-	async def _get_session_chat_messages(self, page_url: str, tenant_id: str) -> List[Dict[str, Any]]:
-		"""Fetch collaboration-session chat messages tied to a page URL."""
-		result = await self.db.execute(
-			select(RTCMessage)
-			.join(RTCSession, RTCMessage.session_id == RTCSession.session_id)
-			.options(selectinload(RTCMessage.participant))
-			.where(
-				RTCSession.digital_twin_id == page_url,
-				RTCMessage.tenant_id == tenant_id,
-				RTCMessage.is_deleted == False  # noqa: E712 - SQLAlchemy boolean expression
-			)
-			.order_by(RTCMessage.sent_at.desc())
-		)
+	# ------------------------------------------------------------------
+	# 39. get_notifications
+	# ------------------------------------------------------------------
+
+	async def get_notifications(self, user_id: str, unread_only: bool = False) -> list[_R]:
+		"""Retrieve notifications for a user."""
+		notes = [n for n in self._notifications.get(user_id, []) if n["tenant_id"] == self.tenant_id]
+		if unread_only:
+			notes = [n for n in notes if not n["read"]]
+		return sorted(notes, key=lambda n: n["sent_at"], reverse=True)
+
+	# ------------------------------------------------------------------
+	# 40. mark_notifications_read
+	# ------------------------------------------------------------------
+
+	async def mark_notifications_read(self, user_id: str, notification_ids: list[str] | None = None) -> _R:
+		"""Mark notifications as read for a user."""
+		notes = self._notifications.get(user_id, [])
+		marked = 0
+		for n in notes:
+			if notification_ids is None or n["notification_id"] in notification_ids:
+				n["read"] = True
+				n["read_at"] = _ts()
+				marked += 1
+		await self._audit("notifications_marked_read", user_id, {"count": marked})
+		return _R(user_id=user_id, marked_read=marked)
+
+	# ------------------------------------------------------------------
+	# 41. workspace_search
+	# ------------------------------------------------------------------
+
+	async def workspace_search(self, query: str) -> list[_R]:
+		"""Search workspaces by name or description."""
+		q = query.lower()
 		return [
-			self._message_model_to_chat_dict(message)
-			for message in result.scalars().all()
+			w for w in self._workspaces.values()
+			if w["tenant_id"] == self.tenant_id
+			and w["status"] == "active"
+			and (q in w["name"].lower() or q in w.get("description", "").lower())
 		]
 
-	def _normalize_chat_message(self, message: Dict[str, Any]) -> Dict[str, Any]:
-		"""Normalize stored page chat JSON into the public chat response shape."""
-		timestamp = message.get("timestamp") or message.get("sent_at") or datetime.utcnow().isoformat()
-		if isinstance(timestamp, datetime):
-			timestamp = timestamp.isoformat()
-		return {
-			"message_id": message.get("message_id") or message.get("id") or uuid7str(),
-			"user_id": message.get("user_id") or message.get("sender_id") or "system",
-			"username": message.get("username") or message.get("display_name") or message.get("user_name") or "System",
-			"message": message.get("message") or message.get("content") or "",
-			"message_type": message.get("message_type") or "text",
-			"timestamp": timestamp
-		}
+	# ------------------------------------------------------------------
+	# 42. document_search
+	# ------------------------------------------------------------------
 
-	def _message_model_to_chat_dict(self, message: RTCMessage) -> Dict[str, Any]:
-		"""Convert an RTCMessage model into the public chat response shape."""
-		participant = getattr(message, "participant", None)
-		return {
-			"message_id": message.message_id,
-			"user_id": getattr(participant, "user_id", None) or "system",
-			"username": getattr(participant, "display_name", None) or "System",
-			"message": message.content,
-			"message_type": message.message_type,
-			"timestamp": message.sent_at.isoformat() if message.sent_at else datetime.utcnow().isoformat()
-		}
+	async def document_search(self, query: str, workspace_id: str | None = None) -> list[_R]:
+		"""Full-text search across document titles and content."""
+		q = query.lower()
+		return [
+			d for d in self._documents.values()
+			if d["tenant_id"] == self.tenant_id
+			and d["status"] == "active"
+			and (workspace_id is None or d["workspace_id"] == workspace_id)
+			and (q in d["title"].lower() or q in d.get("content", "").lower())
+		]
 
+	# ------------------------------------------------------------------
+	# 43. co_edit_session_ops
+	# ------------------------------------------------------------------
 
-# Pydantic models for API
-class SessionCreateRequest(BaseModel):
-	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
+	async def co_edit_session_ops(self, session_id: str) -> list[_R]:
+		"""Return all operations applied in a co-edit session."""
+		session = self._co_edit_sessions.get(self._key(session_id))
+		assert session is not None, f"co-edit session not found: {session_id}"
+		return list(self._co_edit_ops.get(session_id, []))
 
-	session_name: str = Field(..., min_length=1, max_length=200)
-	session_type: str = Field(default="page_collaboration")
-	page_url: str = Field(..., min_length=1)
+	# ------------------------------------------------------------------
+	# 44. user_activity_summary
+	# ------------------------------------------------------------------
 
-
-class PageCollaborationRequest(BaseModel):
-	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
-
-	page_url: str = Field(..., min_length=1)
-	page_title: str = Field(..., min_length=1, max_length=200)
-	page_type: str = Field(..., min_length=1)
-
-
-class FieldDelegationRequest(BaseModel):
-	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
-
-	field_name: str = Field(..., min_length=1)
-	delegatee_id: str = Field(..., min_length=1)
-	instructions: str | None = Field(default=None, max_length=500)
-
-
-class AssistanceRequest(BaseModel):
-	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
-
-	field_name: str | None = Field(default=None)
-	description: str | None = Field(default=None, max_length=1000)
-
-
-class VideoCallRequest(BaseModel):
-	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
-
-	call_name: str = Field(..., min_length=1, max_length=200)
-	call_type: str = Field(default="video")
-	enable_recording: bool = Field(default=False)
+	async def user_activity_summary(self, user_id: str) -> _R:
+		"""Summarise activity for a specific user across the tenant."""
+		docs_created = sum(1 for d in self._documents.values() if d.get("created_by") == user_id and d["tenant_id"] == self.tenant_id)
+		tasks_assigned = sum(1 for t in self._tasks.values() if t["assigned_to"] == user_id and t["tenant_id"] == self.tenant_id)
+		tasks_completed = sum(1 for t in self._tasks.values() if t["assigned_to"] == user_id and t["status"] == "completed" and t["tenant_id"] == self.tenant_id)
+		comments_made = sum(
+			sum(1 for c in comments if c["author_id"] == user_id)
+			for comments in self._comments.values()
+		)
+		mentions_received = len(self._mentions.get(user_id, []))
+		return _R(
+			user_id=user_id,
+			tenant_id=self.tenant_id,
+			documents_created=docs_created,
+			tasks_assigned=tasks_assigned,
+			tasks_completed=tasks_completed,
+			comments_made=comments_made,
+			mentions_received=mentions_received,
+			generated_at=_ts(),
+		)

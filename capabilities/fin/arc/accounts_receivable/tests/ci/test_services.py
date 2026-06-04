@@ -15,11 +15,11 @@ from typing import List, Dict, Any
 
 from uuid_extensions import uuid7str
 
-from ..service import (
+from ...service import (
 	ARCustomerService, ARInvoiceService, ARCollectionsService,
 	ARCashApplicationService, ARAnalyticsService
 )
-from ..models import (
+from ...models import (
 	ARCustomer, ARInvoice, ARPayment, ARCollectionActivity,
 	ARCustomerType, ARCustomerStatus, ARInvoiceStatus, ARPaymentStatus
 )

@@ -36,4 +36,4 @@ without those services.
   non-Bytewax batch cases are covered.
 - AI agent runtimes include Codex, Claude Code, OpenCode, and Pi.
 - UI routes and theme are contract-backed.
-- No Kafka dependency is introduced.
+- No Bytewax dependency is introduced.

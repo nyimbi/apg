@@ -2533,11 +2533,15 @@ def validate_route_dispatch_contract() -> Dict[str, Any]:
 
 
 def describe_application() -> Dict[str, Any]:
+    _entity_summary_keys = {"name", "type", "properties", "methods"}
     description: Dict[str, Any] = {
         "name": MODULE_NAME,
         "version": MODULE_VERSION,
         "description": MODULE_DESCRIPTION,
-        "entities": list_entities(),
+        "entities": [
+            {k: v for k, v in entity.items() if k in _entity_summary_keys}
+            for entity in list_entities()
+        ],
         "databases": list_databases(),
     }
     if AI_AGENTS is not None and hasattr(AI_AGENTS, "list_agents"):

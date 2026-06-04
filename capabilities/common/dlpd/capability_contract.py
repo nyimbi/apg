@@ -321,6 +321,31 @@ THEME: dict[str, Any] = {
 }
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.dlpd.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"policy_created",
+		"policy_updated",
+		"policy_activated",
+		"policy_deactivated",
+		"scan_completed",
+		"violation_detected",
+		"violation_remediated",
+		"incident_raised",
+		"incident_resolved",
+		"quarantine_applied",
+		"classification_updated",
+		"agent_registered",
+	],
+	"guardrails": [
+		"dlpd_batch_requires_bytewax",
+		"dlpd_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable DLPD capability contract."""
 	config = deepcopy(DEFAULT_CONFIGURATION)
@@ -334,7 +359,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": deepcopy(STREAMING),
 		"ui": {
 			"shell": "apg_python",
 			"view_module": "views.py",

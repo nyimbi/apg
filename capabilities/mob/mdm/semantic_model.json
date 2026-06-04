@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "mob_mdm",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "mob_mdm": {
+      "capability": "mob_mdm"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

@@ -1,10 +1,31 @@
+"""APG Transport Scheduling capability.
+
+Standalone package: ``pip install apg-transport-sch``
+
+Quick start::
+
+    from apg_transport_sch import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : transport_sch
+Provides      : load_scheduling_workflow, driver_shift_planning_workflow, vehicle_assignment_workflow, charter_management_workflow, schedule_optimisation_workflow
 """
-Scheduling System (SCH) - Transport Sub-Module
+from __future__ import annotations
 
-Transportation scheduling including driver schedules, vehicle assignments,
-delivery windows, and resource optimization.
-"""
+__version__  = "1.0.0"
+__package_name__ = "apg-transport-sch"
+__capability_id__ = "transport_sch"
 
-__version__ = "1.0.0"
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
+)
 
-__all__ = []
+__all__ = [
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
+]

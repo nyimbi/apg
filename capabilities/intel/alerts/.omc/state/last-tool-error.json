@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd /Users/nyimbiodero/src/pjs/apg && python -c \\\"\\nimport asyncio\\nimport sys\\nsys.path.insert(0, '.')\\nfrom decimal import Decimal\\n\\n# ── Models validation ──────────────────────────────...",
+  "error": "Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 88, in <module>\nAssertionError\nModels OK\nRules OK",
+  "timestamp": "2026-06-02T22:52:05.156Z",
+  "retry_count": 1
+}

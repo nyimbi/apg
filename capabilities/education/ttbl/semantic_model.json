@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "education_ttbl",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "education_ttbl": {
+      "capability": "education_ttbl"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

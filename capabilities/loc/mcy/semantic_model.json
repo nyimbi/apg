@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "loc_mcy",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "loc_mcy": {
+      "capability": "loc_mcy"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

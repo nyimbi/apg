@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "retail_pos",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "retail_pos": {
+      "capability": "retail_pos"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

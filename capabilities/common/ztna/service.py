@@ -626,3 +626,408 @@ class ZtnaService:
 
 def _normalize_token(value: str) -> str:
 	return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+
+# ── 14 new methods ───────────────────────────────────────────────────────────
+
+def _access_policy_evaluate(
+	self: "ZtnaService",
+	subject_id: str,
+	resource_id: str,
+	action: str,
+	context: dict[str, Any],
+	actor_id: str = "system",
+) -> dict[str, Any]:
+	"""Evaluate whether subject_id may perform action on resource_id."""
+	try:
+		identity = self._get_identity(subject_id)
+		resource = self._get_resource(resource_id)
+	except KeyError as exc:
+		return {"allowed": False, "reason": str(exc)}
+	allowed = identity.verified and resource.access_level != "classified"
+	decision = "allow" if allowed else "deny"
+	self._audit(identity.tenant_id, "policy_evaluated", resource_id, actor_id,
+		{"subject_id": subject_id, "action": action, "decision": decision})
+	return {
+		"subject_id": subject_id,
+		"resource_id": resource_id,
+		"action": action,
+		"decision": decision,
+		"allowed": allowed,
+		"context": context,
+	}
+
+ZtnaService.access_policy_evaluate = _access_policy_evaluate  # type: ignore[attr-defined]
+
+
+def _device_trust_level(
+	self: "ZtnaService",
+	device_id: str,
+) -> str:
+	"""Return trust level label: high / medium / low / untrusted."""
+	device = self._get_device(device_id)
+	score = device.trust_score
+	if score >= 0.8:
+		return "high"
+	if score >= 0.5:
+		return "medium"
+	if score >= 0.2:
+		return "low"
+	return "untrusted"
+
+ZtnaService.device_trust_level = _device_trust_level  # type: ignore[attr-defined]
+
+
+def _micro_segment_define(
+	self: "ZtnaService",
+	segment_name: str,
+	resources: list[str],
+	allowed_identities: list[str],
+	tenant_id: str,
+	actor_id: str = "system",
+) -> dict[str, Any]:
+	"""Define a micro-segment grouping resources and allowed identities."""
+	self._require_tenant(tenant_id)
+	seg_id = stable_id("mseg", tenant_id, segment_name)
+	self._audit(tenant_id, "micro_segment_defined", seg_id, actor_id,
+		{"resources": resources, "allowed_identities": allowed_identities})
+	return {
+		"segment_id": seg_id,
+		"segment_name": segment_name,
+		"tenant_id": tenant_id,
+		"resources": resources,
+		"allowed_identities": allowed_identities,
+		"created_at": utc_now(),
+	}
+
+ZtnaService.micro_segment_define = _micro_segment_define  # type: ignore[attr-defined]
+
+
+def _session_risk_score(
+	self: "ZtnaService",
+	session_id: str,
+) -> float:
+	"""Return the current risk score for a session (1.0 - trust_score proxy)."""
+	session = self._get_session(session_id)
+	return round(1.0 - bounded_score(session.trust_score), 4)
+
+ZtnaService.session_risk_score = _session_risk_score  # type: ignore[attr-defined]
+
+
+def _continuous_auth_check(
+	self: "ZtnaService",
+	session_id: str,
+) -> bool:
+	"""Return True if the session passes continuous authentication (trust >= 0.5)."""
+	session = self._get_session(session_id)
+	return session.trust_score >= 0.5 and session.status == "active"
+
+ZtnaService.continuous_auth_check = _continuous_auth_check  # type: ignore[attr-defined]
+
+
+def _anomaly_in_session(
+	self: "ZtnaService",
+	session_id: str,
+	events: list[dict[str, Any]],
+	actor_id: str = "system",
+) -> list[dict[str, Any]]:
+	"""Detect anomalous events in a session based on risk_score threshold."""
+	session = self._get_session(session_id)
+	anomalies: list[dict[str, Any]] = []
+	for event in events:
+		rs = float(event.get("risk_score", 0.0))
+		if rs >= 0.7:
+			anomalies.append({**event, "flagged": True, "session_id": session_id})
+			self._audit(session.tenant_id, "session_anomaly_detected", session_id, actor_id,
+				{"event": event, "risk_score": rs})
+	return anomalies
+
+ZtnaService.anomaly_in_session = _anomaly_in_session  # type: ignore[attr-defined]
+
+
+def _terminate_risky_session(
+	self: "ZtnaService",
+	session_id: str,
+	reason: str,
+	actor_id: str = "system",
+) -> dict[str, Any]:
+	"""Terminate a session flagged as high-risk."""
+	session = self._get_session(session_id)
+	session.status = "terminated"
+	session.ended_at = utc_now()
+	self._audit(session.tenant_id, "risky_session_terminated", session_id, actor_id, {"reason": reason})
+	return {"session_id": session_id, "status": "terminated", "reason": reason, "terminated_at": utc_now()}
+
+ZtnaService.terminate_risky_session = _terminate_risky_session  # type: ignore[attr-defined]
+
+
+def _policy_simulate(
+	self: "ZtnaService",
+	subject_id: str,
+	resource_id: str,
+	action: str,
+	actor_id: str = "system",
+) -> dict[str, Any]:
+	"""Simulate a policy evaluation without writing audit events."""
+	try:
+		identity = self._get_identity(subject_id)
+		resource = self._get_resource(resource_id)
+	except KeyError as exc:
+		return {"simulated": True, "allowed": False, "reason": str(exc)}
+	allowed = identity.verified and resource.access_level != "classified"
+	return {
+		"simulated": True,
+		"subject_id": subject_id,
+		"resource_id": resource_id,
+		"action": action,
+		"allowed": allowed,
+		"decision": "allow" if allowed else "deny",
+	}
+
+ZtnaService.policy_simulate = _policy_simulate  # type: ignore[attr-defined]
+
+
+def _ztna_compliance_report(
+	self: "ZtnaService",
+	period: str,
+	actor_id: str = "system",
+) -> dict[str, Any]:
+	"""Generate a ZTNA compliance report summarising posture and access decisions."""
+	all_identities = list(self._identities.values())
+	all_devices = list(self._devices.values())
+	all_sessions = list(self._sessions.values())
+	compliant_devices = sum(1 for d in all_devices if d.compliant)
+	active_sessions = sum(1 for s in all_sessions if s.status == "active")
+	high_trust = sum(1 for d in all_devices if d.trust_score >= 0.8)
+	return {
+		"period": period,
+		"total_identities": len(all_identities),
+		"verified_identities": sum(1 for i in all_identities if i.verified),
+		"total_devices": len(all_devices),
+		"compliant_devices": compliant_devices,
+		"high_trust_devices": high_trust,
+		"total_sessions": len(all_sessions),
+		"active_sessions": active_sessions,
+		"audit_events": len(self._audit_events),
+		"generated_at": utc_now(),
+	}
+
+ZtnaService.ztna_compliance_report = _ztna_compliance_report  # type: ignore[attr-defined]
+
+
+def _trust_score_history(
+	self: "ZtnaService",
+	identity_id: str,
+	limit: int = 20,
+) -> list[dict[str, Any]]:
+	"""Return recent audit events for an identity as a trust score timeline."""
+	events = [
+		e.to_dict() for e in self._audit_events
+		if e.subject_id == identity_id
+	]
+	return sorted(events, key=lambda e: e.get("id", ""), reverse=True)[:limit]
+
+ZtnaService.trust_score_history = _trust_score_history  # type: ignore[attr-defined]
+
+
+def _lateral_movement_detect(
+	self: "ZtnaService",
+	network_events: list[dict[str, Any]],
+	threshold: int = 3,
+) -> dict[str, Any]:
+	"""Detect potential lateral movement: subjects accessing many resources rapidly."""
+	access_counts: dict[str, set[str]] = {}
+	for evt in network_events:
+		subj = evt.get("subject_id", "unknown")
+		res = evt.get("resource_id", "unknown")
+		access_counts.setdefault(subj, set()).add(res)
+	suspects: list[dict[str, Any]] = [
+		{"subject_id": s, "unique_resources_accessed": len(r)}
+		for s, r in access_counts.items()
+		if len(r) >= threshold
+	]
+	return {
+		"events_analysed": len(network_events),
+		"threshold": threshold,
+		"suspects": suspects,
+		"lateral_movement_detected": len(suspects) > 0,
+	}
+
+ZtnaService.lateral_movement_detect = _lateral_movement_detect  # type: ignore[attr-defined]
+
+
+def _ztna_posture_report(
+	self: "ZtnaService",
+	tenant_id: str,
+	actor_id: str = "system",
+) -> dict[str, Any]:
+	"""Return a device posture summary for a tenant."""
+	devices = [d for d in self._devices.values() if d.tenant_id == tenant_id]
+	by_status: dict[str, int] = {}
+	for d in devices:
+		by_status[d.status] = by_status.get(d.status, 0) + 1
+	compliant = sum(1 for d in devices if d.compliant)
+	avg_trust = round(sum(d.trust_score for d in devices) / max(len(devices), 1), 3)
+	return {
+		"tenant_id": tenant_id,
+		"total_devices": len(devices),
+		"compliant_devices": compliant,
+		"non_compliant_devices": len(devices) - compliant,
+		"compliance_rate_pct": round(compliant / max(len(devices), 1) * 100, 1),
+		"avg_trust_score": avg_trust,
+		"by_status": by_status,
+		"generated_at": utc_now(),
+	}
+
+ZtnaService.ztna_posture_report = _ztna_posture_report  # type: ignore[attr-defined]
+
+
+def _ztna_analytics(
+	self: "ZtnaService",
+	period: str,
+	tenant_id: str | None = None,
+) -> dict[str, Any]:
+	"""Return ZTNA analytics for a period."""
+	identities = self._filter(self._identities.values(), tenant_id)
+	devices = self._filter(self._devices.values(), tenant_id)
+	sessions = self._filter(self._sessions.values(), tenant_id)
+	requests = self._filter(self._access_requests.values(), tenant_id)
+	approved = sum(1 for r in requests if r.status == "approved")
+	return {
+		"period": period,
+		"tenant_id": tenant_id,
+		"total_identities": len(identities),
+		"total_devices": len(devices),
+		"total_sessions": len(sessions),
+		"total_access_requests": len(requests),
+		"approved_requests": approved,
+		"approval_rate_pct": round(approved / max(len(requests), 1) * 100, 1),
+		"audit_events": len(self._audit_events),
+		"generated_at": utc_now(),
+	}
+
+ZtnaService.ztna_analytics = _ztna_analytics  # type: ignore[attr-defined]
+
+
+# ── Extended methods injected onto ZtnaService ────────────────────────────────
+
+def access_policy_create_ztna(self, name, resource_id, actions, conditions, tenant_id="default"):
+	"""ZTNA capability: access policy create ztna."""
+	policy={"id":str(__import__("uuid").uuid4()),"name":name,"resource_id":resource_id,"actions":actions,"conditions":conditions,"tenant_id":tenant_id,"status":"active"}
+	self._store.setdefault(f"ztna_policies:{tenant_id}",{})[policy["id"]]=policy
+	return policy
+
+ZtnaService.access_policy_create_ztna = access_policy_create_ztna  # type: ignore[attr-defined]
+
+
+def micro_segment_create(self, segment_name, resources, allowed_identities, tenant_id="default"):
+	"""ZTNA capability: micro segment create."""
+	seg={"id":str(__import__("uuid").uuid4()),"name":segment_name,"resources":resources,"allowed_identities":allowed_identities,"tenant_id":tenant_id}
+	self._store.setdefault(f"ztna_segments:{tenant_id}",{})[seg["id"]]=seg
+	return seg
+
+ZtnaService.micro_segment_create = micro_segment_create  # type: ignore[attr-defined]
+
+
+def access_policy_list(self, tenant_id="default"):
+	"""ZTNA capability: access policy list."""
+	return list(self._store.get(f"ztna_policies:{tenant_id}",{}).values())
+
+ZtnaService.access_policy_list = access_policy_list  # type: ignore[attr-defined]
+
+
+def access_policy_delete(self, policy_id, tenant_id="default"):
+	"""ZTNA capability: access policy delete."""
+	return self._store.get(f"ztna_policies:{tenant_id}",{}).pop(policy_id,None) is not None
+
+ZtnaService.access_policy_delete = access_policy_delete  # type: ignore[attr-defined]
+
+
+def session_list_all(self, tenant_id="default", active_only=True):
+	"""ZTNA capability: session list all."""
+	sessions=list(self._store.get(f"ztna_sessions:{tenant_id}",{}).values())
+	return [s for s in sessions if s.get("status")=="active"] if active_only else sessions
+
+ZtnaService.session_list_all = session_list_all  # type: ignore[attr-defined]
+
+
+def trust_score_history_ztna(self, identity_id, tenant_id="default", limit=20):
+	"""ZTNA capability: trust score history ztna."""
+	events=self._store.get(f"ztna_trust_events:{tenant_id}",[])
+	return [e for e in events if e.get("identity_id")==identity_id][-limit:]
+
+ZtnaService.trust_score_history_ztna = trust_score_history_ztna  # type: ignore[attr-defined]
+
+
+def lateral_movement_detect(self, network_events, tenant_id="default"):
+	"""ZTNA capability: lateral movement detect."""
+	by_id={}
+	for ev in network_events:
+		by_id.setdefault(ev.get("identity_id",""),set()).add(ev.get("resource_id",""))
+	return [{"identity_id":iid,"resources":list(rs),"alert":"lateral_movement"} for iid,rs in by_id.items() if len(rs)>5]
+
+ZtnaService.lateral_movement_detect = lateral_movement_detect  # type: ignore[attr-defined]
+
+
+def ztna_compliance_report_gen(self, period="30d", tenant_id="default"):
+	"""ZTNA capability: ztna compliance report gen."""
+	sessions=list(self._store.get(f"ztna_sessions:{tenant_id}",{}).values())
+	policies=list(self._store.get(f"ztna_policies:{tenant_id}",{}).values())
+	return {"period":period,"tenant_id":tenant_id,"session_count":len(sessions),"active_policies":len([p for p in policies if p.get("status")=="active"]),"ok":True}
+
+ZtnaService.ztna_compliance_report_gen = ztna_compliance_report_gen  # type: ignore[attr-defined]
+
+
+def ztna_posture_summary(self, tenant_id="default"):
+	"""ZTNA capability: ztna posture summary."""
+	devices=list(self._store.get(f"ztna_devices:{tenant_id}",{}).values())
+	compliant=[d for d in devices if d.get("compliant")]
+	return {"total_devices":len(devices),"compliant_devices":len(compliant),"compliance_rate":len(compliant)/len(devices) if devices else 1.0,"tenant_id":tenant_id}
+
+ZtnaService.ztna_posture_summary = ztna_posture_summary  # type: ignore[attr-defined]
+
+
+def ztna_analytics_report(self, period="30d", tenant_id="default"):
+	"""ZTNA capability: ztna analytics report."""
+	sessions=list(self._store.get(f"ztna_sessions:{tenant_id}",{}).values())
+	return {"period":period,"session_count":len(sessions),"unique_identities":len({s.get("identity_id") for s in sessions}),"unique_resources":len({s.get("resource_id") for s in sessions}),"tenant_id":tenant_id}
+
+ZtnaService.ztna_analytics_report = ztna_analytics_report  # type: ignore[attr-defined]
+
+
+def identity_risk_profile_ztna(self, identity_id, tenant_id="default"):
+	"""ZTNA capability: identity risk profile ztna."""
+	sessions=[s for s in self._store.get(f"ztna_sessions:{tenant_id}",{}).values() if s.get("identity_id")==identity_id]
+	denied=[s for s in sessions if s.get("outcome")=="denied"]
+	return {"identity_id":identity_id,"total_sessions":len(sessions),"denied":len(denied),"risk_level":"high" if len(denied)>5 else "medium" if len(denied)>2 else "low","tenant_id":tenant_id}
+
+ZtnaService.identity_risk_profile_ztna = identity_risk_profile_ztna  # type: ignore[attr-defined]
+
+
+def resource_access_audit_ztna(self, resource_id, tenant_id="default"):
+	"""ZTNA capability: resource access audit ztna."""
+	sessions=[s for s in self._store.get(f"ztna_sessions:{tenant_id}",{}).values() if s.get("resource_id")==resource_id]
+	return {"resource_id":resource_id,"total":len(sessions),"allowed":len([s for s in sessions if s.get("outcome")=="allowed"]),"denied":len([s for s in sessions if s.get("outcome")=="denied"]),"tenant_id":tenant_id}
+
+ZtnaService.resource_access_audit_ztna = resource_access_audit_ztna  # type: ignore[attr-defined]
+
+
+def bulk_device_register_ztna(self, devices_list, tenant_id="default"):
+	"""ZTNA capability: bulk device register ztna."""
+	registered=[]
+	for d in devices_list:
+		try:
+			result=self.register_device(d.get("device_id",str(__import__("uuid").uuid4())),d.get("name",""),d.get("platform","unknown"),d.get("identity_id",""),tenant_id)
+			registered.append(result.get("id",""))
+		except Exception:
+			pass
+	return {"registered":registered,"count":len(registered)}
+
+ZtnaService.bulk_device_register_ztna = bulk_device_register_ztna  # type: ignore[attr-defined]
+
+
+def segment_list_all(self, tenant_id="default"):
+	"""ZTNA capability: segment list all."""
+	return list(self._store.get(f"ztna_segments:{tenant_id}",{}).values())
+
+ZtnaService.segment_list_all = segment_list_all  # type: ignore[attr-defined]

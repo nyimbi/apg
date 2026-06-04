@@ -441,7 +441,67 @@ def default_rules() -> list[CapabilityRule]:
 				"reason": "bytewax_event_stream_required",
 				"required_action": "use_bytewax_event_stream"
 			}
-		)
+		),
+		CapabilityRule(
+			name="oauth2_flow_requires_pkce",
+			description="OAuth2 authorization code flows must use PKCE to prevent code interception.",
+			condition={"auth_flow": "oauth2_authorization_code", "pkce_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "pkce_required_for_oauth2_authorization_code",
+				"required_action": "attach_pkce_code_challenge"
+			}
+		),
+		CapabilityRule(
+			name="saml_assertion_requires_signature",
+			description="SAML assertions must be cryptographically signed by the issuing IdP.",
+			condition={"auth_protocol": "saml", "assertion_signed": False},
+			effect={
+				"decision": "deny",
+				"reason": "saml_assertion_signature_required",
+				"required_action": "require_idp_signed_saml_assertion"
+			}
+		),
+		CapabilityRule(
+			name="oidc_id_token_requires_nonce",
+			description="OIDC flows must include a nonce to prevent replay attacks.",
+			condition={"auth_protocol": "oidc", "nonce_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "oidc_nonce_required",
+				"required_action": "include_nonce_in_oidc_request"
+			}
+		),
+		CapabilityRule(
+			name="token_expiry_enforced",
+			description="Expired access tokens must be denied regardless of other claims.",
+			condition={"token_expired": True},
+			effect={
+				"decision": "deny",
+				"reason": "access_token_expired",
+				"required_action": "refresh_or_reauthenticate"
+			}
+		),
+		CapabilityRule(
+			name="write_requires_policy",
+			description="Write operations require an explicit authorization policy.",
+			condition={"operation_type": "write", "authorization_policy_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "write_authorization_policy_required",
+				"required_action": "attach_write_policy"
+			}
+		),
+		CapabilityRule(
+			name="privilege_escalation_denied",
+			description="Users cannot self-assign permissions beyond their current tier.",
+			condition={"operation": "assign_permission", "target_tier_exceeds_actor_tier": True},
+			effect={
+				"decision": "deny",
+				"reason": "privilege_escalation_prevented",
+				"required_action": "route_to_higher_authority_approver"
+			}
+		),
 	]
 
 
@@ -561,7 +621,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"security_agents",
 			"review_evidence"
 		],
-		"requires": ["audl", "mten", "keym", "secu"],
+		"requires": ["audl", "mten", "keym"],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
 		"rule_engine": {

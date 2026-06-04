@@ -6,11 +6,28 @@ from typing import Any
 
 try:
 	from .service import ProductInformationLifecycleService
+	from .context import get_current_permissions, permission_matches
 except ImportError:  # pragma: no cover
 	from service import ProductInformationLifecycleService  # type: ignore
+	from context import get_current_permissions, permission_matches  # type: ignore
 
 
 _SERVICE = ProductInformationLifecycleService()
+
+
+def _get_auth_rbac_service():
+	"""Return the auth RBAC service for permission checks."""
+	try:
+		from ..common.auth import AuthService
+		return AuthService()
+	except Exception:
+		return None
+
+
+def check_permission(permission: str) -> bool:
+	"""Check if the current user has the specified permission."""
+	auth_service = _get_auth_rbac_service()
+	return any(permission_matches(granted, permission) for granted in get_current_permissions())
 
 
 def service() -> ProductInformationLifecycleService:

@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "healthcare_cli",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "healthcare_cli": {
+      "capability": "healthcare_cli"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

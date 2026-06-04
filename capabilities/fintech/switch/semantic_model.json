@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "fintech_switch",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "fintech_switch": {
+      "capability": "fintech_switch"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

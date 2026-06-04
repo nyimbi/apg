@@ -1,9 +1,38 @@
-"""
-Mining Specific Capability
+"""APG Mining & Resources Management capabilities.
 
-Industry-specific ERP functionality for mining and mineral extraction companies.
-Manages mine planning, equipment management, grade control, tenement management, and production reporting.
+Sub-capabilities
+----------------
+mining_exp  Exploration Data Management
+mining_pro  Mine Production Operations
+mining_saf  Mine Safety & Compliance
+mining_eqp  Equipment & Plant Management
+mining_ore  Ore Processing & Metallurgy
+mining_env  Environmental & Rehabilitation
 """
+
+from __future__ import annotations
+
+CAPABILITY_IDS: list[str] = [
+	"mining_exp",
+	"mining_pro",
+	"mining_saf",
+	"mining_eqp",
+	"mining_ore",
+	"mining_env",
+]
+
+DOMAIN = "mining"
+DOMAIN_DISPLAY_NAME = "Mining & Resources Management"
+VERSION = "1.0.0"
+
+__all__ = [
+	"CAPABILITY_IDS",
+	"DOMAIN",
+	"DOMAIN_DISPLAY_NAME",
+	"VERSION",
+]
+
+# ── Legacy metadata kept for backward compatibility ────────────────────────────
 
 from typing import Dict, List, Any
 

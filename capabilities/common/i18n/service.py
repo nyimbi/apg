@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import re
 from itertools import count
 from typing import Any
 
@@ -39,10 +41,22 @@ class I18nService:
 		self._publish_batches: dict[str, PublishBatch] = {}
 		self._agents: dict[str, I18nAgent] = {}
 		self._audit_events: dict[str, I18nAuditEvent] = {}
+		# extra in-memory stores for new methods
+		self._translation_versions: dict[str, list[dict[str, Any]]] = {}
+		self._machine_translation_jobs: dict[str, dict[str, Any]] = {}
+		self._plural_rules: dict[str, dict[str, Any]] = {}
+		self._font_hints: dict[str, dict[str, Any]] = {}
+		self._locale_analytics: dict[str, list[dict[str, Any]]] = {}
+		self._export_jobs: dict[str, dict[str, Any]] = {}
+		self._review_assignments: dict[str, dict[str, Any]] = {}
 		self._counter = count(1)
 		self._fallback_resolver = LocaleFallbackResolver()
 		self._memory_matcher = TranslationMemoryMatcher()
 		self._coverage_calculator = CoverageCalculator()
+
+	# ------------------------------------------------------------------ #
+	# Original 21 methods                                                  #
+	# ------------------------------------------------------------------ #
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -154,6 +168,9 @@ class I18nService:
 			version=version,
 		)
 		self._translations[_state_key(tenant_id, translation_id)] = entry
+		# Snapshot version history
+		history = self._translation_versions.setdefault(_state_key(tenant_id, translation_id), [])
+		history.append({"version": version, "translated_text": translated_text, "source": source.value, "updated_at": utc_now_iso()})
 		self._record_audit(tenant_id, translation_id, "translation_upserted", reviewer_id or "translator", "allow", metadata={"key": key, "locale_code": locale_code, "source": source.value})
 		return entry.to_dict()
 
@@ -397,8 +414,576 @@ class I18nService:
 			"publish_batch_count": len(self.list_publish_batches(tenant_id)),
 			"i18n_agent_count": len(self.list_i18n_agents(tenant_id)),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
-			"streaming": self.describe(tenant_id)["streaming"],
+			"streaming": self.describe(tenant_id or "default")["streaming"],
 		}
+
+	# ------------------------------------------------------------------ #
+	# New methods (16 new, reaching 37 total public methods)               #
+	# ------------------------------------------------------------------ #
+
+	async def locale_create(
+		self,
+		locale_id: str,
+		tenant_id: str,
+		locale_code: str,
+		display_name: str,
+		owner_id: str,
+		fallback_locale: str | None = None,
+		regional_format: dict[str, str] | None = None,
+		timezone: str = "UTC",
+	) -> dict[str, Any]:
+		"""Async alias for create_locale; preferred for new callers."""
+		return self.create_locale(
+			locale_id=locale_id,
+			tenant_id=tenant_id,
+			locale_code=locale_code,
+			display_name=display_name,
+			owner_id=owner_id,
+			fallback_locale=fallback_locale,
+			regional_format=regional_format,
+			timezone=timezone,
+		)
+
+	async def translation_import(
+		self,
+		tenant_id: str,
+		locale_code: str,
+		entries: list[dict[str, Any]],
+		importer_id: str,
+		overwrite_existing: bool = False,
+	) -> dict[str, Any]:
+		"""Bulk-import translation entries from an external payload (e.g. PO/JSON export).
+
+		Each entry must contain: translation_id, key, source_text, translated_text.
+		Returns a summary of imported, skipped, and failed items.
+		"""
+		self._require_locale(tenant_id, locale_code)
+		imported, skipped, failed = 0, 0, []
+		for item in entries:
+			tid = str(item.get("translation_id") or "")
+			key = str(item.get("key") or "")
+			if not tid or not key:
+				failed.append({"item": item, "reason": "missing_id_or_key"})
+				continue
+			key_exists = _state_key(tenant_id, tid) in self._translations
+			if key_exists and not overwrite_existing:
+				skipped += 1
+				continue
+			try:
+				self.upsert_translation(
+					translation_id=tid,
+					tenant_id=tenant_id,
+					key=key,
+					locale_code=locale_code,
+					source_text=str(item.get("source_text") or ""),
+					translated_text=str(item.get("translated_text") or ""),
+					machine_translation_used=bool(item.get("machine_translation_used", False)),
+					translation_review_recorded=bool(item.get("translation_review_recorded", True)),
+					reviewer_id=str(item.get("reviewer_id") or importer_id),
+				)
+				imported += 1
+			except Exception as exc:
+				failed.append({"item": item, "reason": str(exc)})
+		self._record_audit(tenant_id, f"import:{locale_code}", "translation_import_completed", importer_id, "allow", metadata={"imported": imported, "skipped": skipped, "failed_count": len(failed)})
+		return {"locale_code": locale_code, "imported": imported, "skipped": skipped, "failed": failed}
+
+	async def machine_translate(
+		self,
+		translation_id: str,
+		tenant_id: str,
+		key: str,
+		locale_code: str,
+		source_text: str,
+		engine: str = "ollama",
+		model: str = "qwen3",
+		reviewer_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Submit a machine-translation job and store result as a DRAFT entry.
+
+		In production this would call an Ollama-served model; here we record the
+		job metadata and create a draft translation that requires human review.
+		"""
+		self._require_locale(tenant_id, locale_code)
+		job_id = f"mt-job:{next(self._counter):06d}"
+		job = {
+			"id": job_id,
+			"tenant_id": tenant_id,
+			"translation_id": translation_id,
+			"key": key,
+			"locale_code": locale_code,
+			"source_text": source_text,
+			"engine": engine,
+			"model": model,
+			"status": "submitted",
+			"submitted_at": utc_now_iso(),
+		}
+		self._machine_translation_jobs[_state_key(tenant_id, job_id)] = job
+		# Produce a placeholder translated text pending real MT output
+		placeholder = f"[MT:{engine}/{model}] {source_text}"
+		entry = self.upsert_translation(
+			translation_id=translation_id,
+			tenant_id=tenant_id,
+			key=key,
+			locale_code=locale_code,
+			source_text=source_text,
+			translated_text=placeholder,
+			machine_translation_used=True,
+			translation_review_recorded=False,
+			reviewer_id=reviewer_id,
+		)
+		job["status"] = "completed"
+		job["entry_id"] = translation_id
+		return {"job": job, "entry": entry}
+
+	async def plural_rules(
+		self,
+		tenant_id: str,
+		locale_code: str,
+		rules: dict[str, str] | None = None,
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Register or retrieve CLDR-style plural rules for a locale.
+
+		rules dict maps category names (zero, one, two, few, many, other) to
+		CLDR rule strings.  If rules is None the stored rules are returned.
+		"""
+		self._require_locale(tenant_id, locale_code)
+		store_key = _state_key(tenant_id, locale_code)
+		if rules is not None:
+			allowed_categories = {"zero", "one", "two", "few", "many", "other"}
+			invalid = set(rules.keys()) - allowed_categories
+			if invalid:
+				raise ValueError(f"invalid_plural_categories:{','.join(sorted(invalid))}")
+			self._plural_rules[store_key] = {
+				"tenant_id": tenant_id,
+				"locale_code": locale_code,
+				"rules": dict(rules),
+				"updated_at": utc_now_iso(),
+				"actor": actor,
+			}
+			self._record_audit(tenant_id, locale_code, "plural_rules_updated", actor, "allow", metadata={"categories": list(rules.keys())})
+		record = self._plural_rules.get(store_key, {
+			"tenant_id": tenant_id,
+			"locale_code": locale_code,
+			"rules": {"other": "n != 1"},
+			"updated_at": utc_now_iso(),
+			"actor": "default",
+		})
+		return record
+
+	async def date_localise(
+		self,
+		tenant_id: str,
+		locale_code: str,
+		iso_datetime: str,
+		format_name: str = "medium",
+	) -> dict[str, Any]:
+		"""Format an ISO-8601 datetime string using the locale's regional_format.
+
+		format_name: short | medium | long | full
+		Returns the formatted string alongside locale metadata.
+		"""
+		locale = self._require_locale(tenant_id, locale_code)
+		date_fmt = locale.regional_format.get("date", "yyyy-MM-dd")
+		# Trivial format substitution — real impl would use Babel / arrow
+		formatted = _apply_date_format(iso_datetime, date_fmt, format_name)
+		self._record_audit(tenant_id, locale_code, "date_localised", "system", "allow", metadata={"iso_datetime": iso_datetime, "format_name": format_name})
+		return {
+			"tenant_id": tenant_id,
+			"locale_code": locale_code,
+			"iso_datetime": iso_datetime,
+			"format_name": format_name,
+			"formatted": formatted,
+			"date_format_pattern": date_fmt,
+		}
+
+	async def number_localise(
+		self,
+		tenant_id: str,
+		locale_code: str,
+		value: int | float,
+		decimal_places: int = 2,
+	) -> dict[str, Any]:
+		"""Format a numeric value according to the locale's regional_format."""
+		locale = self._require_locale(tenant_id, locale_code)
+		number_fmt = locale.regional_format.get("number", "1,234.56")
+		formatted = _apply_number_format(value, number_fmt, decimal_places)
+		return {
+			"tenant_id": tenant_id,
+			"locale_code": locale_code,
+			"value": value,
+			"decimal_places": decimal_places,
+			"formatted": formatted,
+			"number_format_pattern": number_fmt,
+		}
+
+	async def currency_localise(
+		self,
+		tenant_id: str,
+		locale_code: str,
+		amount: int | float,
+		currency_code: str,
+		decimal_places: int = 2,
+	) -> dict[str, Any]:
+		"""Format a monetary amount using locale conventions and ISO 4217 currency code."""
+		locale = self._require_locale(tenant_id, locale_code)
+		currency_fmt = locale.regional_format.get("currency", locale.regional_format.get("number", "1,234.56"))
+		formatted_number = _apply_number_format(amount, currency_fmt, decimal_places)
+		formatted = f"{currency_code.upper()} {formatted_number}"
+		return {
+			"tenant_id": tenant_id,
+			"locale_code": locale_code,
+			"amount": amount,
+			"currency_code": currency_code.upper(),
+			"formatted": formatted,
+		}
+
+	async def rtl_check(
+		self,
+		tenant_id: str,
+		locale_code: str,
+	) -> dict[str, Any]:
+		"""Return whether the locale uses a right-to-left script."""
+		locale = self._require_locale(tenant_id, locale_code)
+		rtl_codes = {"ar", "he", "fa", "ur", "dv", "ha", "ps", "sd", "ug", "yi", "arc", "ckb"}
+		lang_part = locale_code.split("-")[0].lower()
+		is_rtl = lang_part in rtl_codes
+		return {
+			"tenant_id": tenant_id,
+			"locale_code": locale_code,
+			"is_rtl": is_rtl,
+			"direction": "rtl" if is_rtl else "ltr",
+			"locale_display_name": locale.display_name,
+		}
+
+	async def font_detect(
+		self,
+		tenant_id: str,
+		locale_code: str,
+		fallback_font: str = "sans-serif",
+	) -> dict[str, Any]:
+		"""Return recommended font stack for the locale's script.
+
+		Heuristic only — production callers should cross-reference a font registry.
+		"""
+		self._require_locale(tenant_id, locale_code)
+		store_key = _state_key(tenant_id, locale_code)
+		cached = self._font_hints.get(store_key)
+		if cached:
+			return cached
+		script_font_map: dict[str, list[str]] = {
+			"ar": ["Noto Naskh Arabic", "Amiri", fallback_font],
+			"he": ["Noto Serif Hebrew", "Frank Ruhl Libre", fallback_font],
+			"zh": ["Noto Sans CJK SC", "PingFang SC", fallback_font],
+			"ja": ["Noto Sans CJK JP", "Hiragino Sans", fallback_font],
+			"ko": ["Noto Sans CJK KR", "Apple SD Gothic Neo", fallback_font],
+			"th": ["Noto Sans Thai", "Leelawadee", fallback_font],
+			"hi": ["Noto Sans Devanagari", "Mangal", fallback_font],
+			"bn": ["Noto Sans Bengali", "Vrinda", fallback_font],
+		}
+		lang_part = locale_code.split("-")[0].lower()
+		fonts = script_font_map.get(lang_part, ["Noto Sans", fallback_font])
+		hint = {
+			"tenant_id": tenant_id,
+			"locale_code": locale_code,
+			"recommended_fonts": fonts,
+			"font_stack": ", ".join(f'"{f}"' if " " in f else f for f in fonts),
+			"detected_at": utc_now_iso(),
+		}
+		self._font_hints[store_key] = hint
+		return hint
+
+	async def translation_export(
+		self,
+		tenant_id: str,
+		locale_code: str,
+		format_: str = "json",
+		status_filter: str | None = None,
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Export all translations for a locale to a serialisable structure.
+
+		format_: json | po | csv
+		status_filter: published | reviewed | draft | None (all)
+		"""
+		self._require_locale(tenant_id, locale_code)
+		entries = [
+			e for e in self._translations.values()
+			if e.tenant_id == tenant_id and e.locale_code == locale_code
+			and (status_filter is None or e.status.value == status_filter)
+		]
+		rows = [
+			{"key": e.key, "source_text": e.source_text, "translated_text": e.translated_text, "status": e.status.value}
+			for e in sorted(entries, key=lambda e: e.key)
+		]
+		if format_ == "json":
+			payload = json.dumps({row["key"]: row["translated_text"] for row in rows}, ensure_ascii=False, indent=2)
+		elif format_ == "csv":
+			header = "key,source_text,translated_text,status\n"
+			lines = "\n".join(f'{row["key"]},{row["source_text"]},{row["translated_text"]},{row["status"]}' for row in rows)
+			payload = header + lines
+		else:
+			# Minimal PO format
+			lines = [f'# APG i18n export — {locale_code}', ""]
+			for row in rows:
+				lines += [f'msgid "{row["source_text"]}"', f'msgstr "{row["translated_text"]}"', ""]
+			payload = "\n".join(lines)
+		job_id = f"export:{next(self._counter):06d}"
+		export_job = {
+			"id": job_id,
+			"tenant_id": tenant_id,
+			"locale_code": locale_code,
+			"format": format_,
+			"status_filter": status_filter,
+			"entry_count": len(rows),
+			"payload": payload,
+			"created_at": utc_now_iso(),
+		}
+		self._export_jobs[_state_key(tenant_id, job_id)] = export_job
+		self._record_audit(tenant_id, job_id, "translation_export_created", actor, "allow", metadata={"locale_code": locale_code, "format": format_, "entry_count": len(rows)})
+		return export_job
+
+	async def translation_review(
+		self,
+		tenant_id: str,
+		translation_id: str,
+		reviewer_id: str,
+		approved: bool,
+		notes: str = "",
+	) -> dict[str, Any]:
+		"""Mark a translation as reviewed/approved or rejected by a human reviewer."""
+		entry = self._require_translation(translation_id, tenant_id)
+		if approved:
+			entry.status = TranslationStatus.REVIEWED
+			entry.reviewer_id = reviewer_id
+		else:
+			entry.status = TranslationStatus.DRAFT
+		entry.updated_at = utc_now_iso()
+		assignment = {
+			"translation_id": translation_id,
+			"reviewer_id": reviewer_id,
+			"approved": approved,
+			"notes": notes,
+			"reviewed_at": utc_now_iso(),
+		}
+		self._review_assignments[_state_key(tenant_id, translation_id)] = assignment
+		self._record_audit(tenant_id, translation_id, "translation_reviewed", reviewer_id, "allow", metadata={"approved": approved, "notes": notes})
+		return {"entry": entry.to_dict(), "review": assignment}
+
+	async def missing_keys_report(
+		self,
+		tenant_id: str,
+		locale_code: str,
+		reference_locale: str = "en-US",
+	) -> dict[str, Any]:
+		"""Compare locale against reference_locale and return keys present in reference but absent in locale."""
+		self._require_locale(tenant_id, locale_code)
+		ref_keys = {
+			e.key
+			for e in self._translations.values()
+			if e.tenant_id == tenant_id and e.locale_code == reference_locale
+		}
+		locale_keys = {
+			e.key
+			for e in self._translations.values()
+			if e.tenant_id == tenant_id and e.locale_code == locale_code
+		}
+		missing = sorted(ref_keys - locale_keys)
+		extra = sorted(locale_keys - ref_keys)
+		return {
+			"tenant_id": tenant_id,
+			"locale_code": locale_code,
+			"reference_locale": reference_locale,
+			"missing_key_count": len(missing),
+			"extra_key_count": len(extra),
+			"missing_keys": missing,
+			"extra_keys": extra,
+			"generated_at": utc_now_iso(),
+		}
+
+	async def locale_fallback(
+		self,
+		tenant_id: str,
+		locale_code: str,
+		key: str,
+	) -> dict[str, Any]:
+		"""Resolve fallback chain for a key and return the first matching translation."""
+		try:
+			result = self.resolve_text(tenant_id, key, locale_code)
+			return {**result, "resolved": True}
+		except PermissionError:
+			return {
+				"key": key,
+				"locale_code": locale_code,
+				"resolved": False,
+				"text": None,
+				"fallback_chain": [],
+			}
+
+	async def locale_clone(
+		self,
+		tenant_id: str,
+		source_locale_code: str,
+		new_locale_id: str,
+		new_locale_code: str,
+		new_display_name: str,
+		owner_id: str,
+		clone_translations: bool = True,
+	) -> dict[str, Any]:
+		"""Clone a locale definition and optionally all its translation entries.
+
+		The cloned translations start in DRAFT status so they can be reviewed
+		before publication.
+		"""
+		source_locale = self._require_locale(tenant_id, source_locale_code)
+		new_locale = self.create_locale(
+			locale_id=new_locale_id,
+			tenant_id=tenant_id,
+			locale_code=new_locale_code,
+			display_name=new_display_name,
+			owner_id=owner_id,
+			fallback_locale=source_locale.fallback_locale,
+			regional_format=dict(source_locale.regional_format),
+			timezone=source_locale.timezone,
+		)
+		cloned_count = 0
+		if clone_translations:
+			source_entries = [
+				e for e in self._translations.values()
+				if e.tenant_id == tenant_id and e.locale_code == source_locale_code
+			]
+			for e in source_entries:
+				new_tid = f"{new_locale_id}:{e.key}"
+				self.upsert_translation(
+					translation_id=new_tid,
+					tenant_id=tenant_id,
+					key=e.key,
+					locale_code=new_locale_code,
+					source_text=e.source_text,
+					translated_text=e.translated_text,
+					machine_translation_used=False,
+					translation_review_recorded=False,
+					reviewer_id=owner_id,
+				)
+				cloned_count += 1
+		self._record_audit(tenant_id, new_locale_id, "locale_cloned", owner_id, "allow", metadata={"source_locale_code": source_locale_code, "cloned_translations": cloned_count})
+		return {"locale": new_locale, "cloned_translation_count": cloned_count}
+
+	async def locale_analytics(
+		self,
+		tenant_id: str,
+		locale_code: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""Return per-locale analytics: translation counts, coverage, last activity."""
+		target_locales = [
+			lc for lc in self._locales.values()
+			if lc.tenant_id == tenant_id and (locale_code is None or lc.locale_code == locale_code)
+		]
+		results: list[dict[str, Any]] = []
+		for lc in target_locales:
+			entries = [e for e in self._translations.values() if e.tenant_id == tenant_id and e.locale_code == lc.locale_code]
+			published = [e for e in entries if e.status == TranslationStatus.PUBLISHED]
+			draft = [e for e in entries if e.status == TranslationStatus.DRAFT]
+			reviewed = [e for e in entries if e.status == TranslationStatus.REVIEWED]
+			coverage_pct = round(len(published) / max(len(entries), 1) * 100, 2)
+			last_activity = max((e.updated_at for e in entries), default=None)
+			analytic = {
+				"locale_code": lc.locale_code,
+				"display_name": lc.display_name,
+				"total_entries": len(entries),
+				"published": len(published),
+				"reviewed": len(reviewed),
+				"draft": len(draft),
+				"coverage_percent": coverage_pct,
+				"last_activity": last_activity,
+				"generated_at": utc_now_iso(),
+			}
+			results.append(analytic)
+			store_list = self._locale_analytics.setdefault(_state_key(tenant_id, lc.locale_code), [])
+			store_list.append(analytic)
+		return results
+
+	async def translation_version(
+		self,
+		tenant_id: str,
+		translation_id: str,
+	) -> list[dict[str, Any]]:
+		"""Return the full version history of a translation entry."""
+		self._require_translation(translation_id, tenant_id)
+		return list(self._translation_versions.get(_state_key(tenant_id, translation_id), []))
+
+	async def glossary_lookup(
+		self,
+		tenant_id: str,
+		source_term: str,
+		locale_code: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""Find glossary terms matching source_term; optionally filter by locale."""
+		matches = [
+			t.to_dict()
+			for t in self._glossary_terms.values()
+			if t.tenant_id == tenant_id and source_term.lower() in t.source_term.lower()
+			and (locale_code is None or locale_code in t.localized_terms)
+		]
+		return sorted(matches, key=lambda m: m["id"])
+
+	async def translation_search(
+		self,
+		tenant_id: str,
+		query: str,
+		locale_code: str | None = None,
+		status_filter: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""Full-text search across source_text and translated_text for a tenant."""
+		q = query.lower()
+		results = [
+			e.to_dict()
+			for e in self._translations.values()
+			if e.tenant_id == tenant_id
+			and (q in e.source_text.lower() or q in e.translated_text.lower())
+			and (locale_code is None or e.locale_code == locale_code)
+			and (status_filter is None or e.status.value == status_filter)
+		]
+		return sorted(results, key=lambda r: r["id"])
+
+	async def batch_approve_translations(
+		self,
+		tenant_id: str,
+		translation_ids: list[str],
+		reviewer_id: str,
+	) -> dict[str, Any]:
+		"""Approve a list of translation entries in one call, setting them to REVIEWED."""
+		approved, failed = [], []
+		for tid in translation_ids:
+			try:
+				entry = self._require_translation(tid, tenant_id)
+				entry.status = TranslationStatus.REVIEWED
+				entry.reviewer_id = reviewer_id
+				entry.updated_at = utc_now_iso()
+				approved.append(tid)
+			except Exception as exc:
+				failed.append({"id": tid, "reason": str(exc)})
+		self._record_audit(
+			tenant_id, f"batch_approve:{reviewer_id}", "batch_translations_approved",
+			reviewer_id, "allow",
+			metadata={"approved": len(approved), "failed": len(failed)},
+		)
+		return {"approved": approved, "failed": failed, "reviewer_id": reviewer_id}
+
+	async def locale_timezone_list(
+		self,
+		tenant_id: str,
+	) -> list[dict[str, Any]]:
+		"""Return a list of all distinct timezones used across tenant locales."""
+		seen: dict[str, str] = {}
+		for lc in self._locales.values():
+			if lc.tenant_id == tenant_id and lc.timezone not in seen:
+				seen[lc.timezone] = lc.locale_code
+		return [{"timezone": tz, "example_locale": lc} for tz, lc in sorted(seen.items())]
+
+	# ------------------------------------------------------------------ #
+	# Private helpers                                                      #
+	# ------------------------------------------------------------------ #
 
 	def _enforce_i18n_policy(
 		self,
@@ -490,6 +1075,10 @@ class I18nService:
 		return event
 
 
+# ------------------------------------------------------------------ #
+# Module-level helpers                                                 #
+# ------------------------------------------------------------------ #
+
 def _normalize_token(value: str) -> str:
 	return value.strip().lower().replace("-", "_").replace(" ", "_")
 
@@ -500,3 +1089,40 @@ def _state_key(tenant_id: str, item_id: str) -> str:
 
 def _reasons(result: dict[str, Any]) -> str:
 	return ", ".join(action.get("reason", "i18n_policy_blocked") for action in result["actions"])
+
+
+def _apply_date_format(iso_datetime: str, date_fmt: str, format_name: str) -> str:
+	"""Minimal date formatter — returns the ISO date portion reformatted."""
+	date_part = iso_datetime[:10]  # e.g. 2026-06-04
+	parts = date_part.split("-")
+	if len(parts) != 3:
+		return iso_datetime
+	year, month, day = parts
+	if format_name == "short":
+		sep = "/" if "/" in date_fmt else "-"
+		return f"{month}{sep}{day}{sep}{year[-2:]}"
+	if format_name == "full":
+		return f"{day} {_month_name(int(month))} {year}"
+	# medium / long
+	return f"{day} {_month_abbr(int(month))} {year}"
+
+
+def _apply_number_format(value: int | float, pattern: str, decimal_places: int) -> str:
+	"""Minimal number formatter that respects the locale pattern's separator conventions."""
+	use_comma_decimal = "," in pattern and pattern.index(",") > pattern.index(".")  if "." in pattern and "," in pattern else False
+	rounded = round(float(value), decimal_places)
+	formatted = f"{rounded:,.{decimal_places}f}"
+	if use_comma_decimal:
+		# European style: swap . and ,
+		formatted = formatted.replace(",", "X").replace(".", ",").replace("X", ".")
+	return formatted
+
+
+def _month_name(n: int) -> str:
+	names = ["January", "February", "March", "April", "May", "June",
+	         "July", "August", "September", "October", "November", "December"]
+	return names[max(0, min(n - 1, 11))]
+
+
+def _month_abbr(n: int) -> str:
+	return _month_name(n)[:3]

@@ -111,7 +111,20 @@ RULES: list[dict[str, Any]] = [
 	{"name": "neobanking_agent_runtime_supported", "description": "Neobanking agents must use a supported runtime.", "condition": {"operation": "register_neobanking_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "neobanking_agent_runtime_not_supported", "required_action": "select_supported_agent_runtime"}},
 	{"name": "neobanking_agent_role_supported", "description": "Neobanking agents must use a supported role.", "condition": {"operation": "register_neobanking_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "neobanking_agent_role_not_supported", "required_action": "select_supported_agent_role"}},
 	{"name": "privileged_neobanking_agent_action_requires_human_approval", "description": "Privileged neobanking-agent actions require human approval.", "condition": {"operation": "neobanking_agent_action", "privileged_scope": True, "human_approval_recorded": False}, "effect": {"decision": "deny", "reason": "human_approval_required", "required_action": "record_human_approval"}},
+
+	# Cross-tenant and privilege escalation guards
+	{"name": "cross_tenant_neobanking_access_denied", "description": "Neobanking resources cannot be accessed across tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_access_denied", "required_action": "use_tenant_scoped_credentials"}},
+	{"name": "privilege_escalation_denied", "description": "Neobanking privilege escalation without approval is denied.", "condition": {"privilege_escalation_attempt": True, "approval_recorded": False}, "effect": {"decision": "deny", "reason": "privilege_escalation_denied", "required_action": "obtain_escalation_approval"}},
+
+	# Africa-specific neobanking rules
+	{"name": "ke_cbk_banking_licence_required", "description": "Kenya CBK banking licence (or fintech partnership) required for neobank operations.", "condition": {"operation": "launch_neobank", "country": "KE", "cbk_licence_present": False}, "effect": {"decision": "deny", "reason": "ke_cbk_banking_licence_required", "required_action": "obtain_cbk_banking_licence_or_partnership"}},
+	{"name": "mpesa_neobank_integration_required", "description": "Kenya neobanks must integrate M-Pesa for mobile money.", "condition": {"operation": "launch_neobank", "country": "KE", "mpesa_integrated": False}, "effect": {"decision": "deny", "reason": "mpesa_integration_required", "required_action": "integrate_mpesa_daraja"}},
+	{"name": "mobile_money_neobank_kyc_tier", "description": "Neobank mobile money customers require CBK tiered KYC.", "condition": {"operation": "open_account", "account_type": "mobile_money", "kyc_tier_assigned": False}, "effect": {"decision": "deny", "reason": "cbk_kyc_tier_required", "required_action": "assign_cbk_kyc_tier"}},
+	{"name": "ke_deposit_insurance_required", "description": "Kenya neobanks holding deposits require Kenya Deposit Insurance Corporation membership.", "condition": {"operation": "hold_customer_deposits", "country": "KE", "kdic_member": False}, "effect": {"decision": "deny", "reason": "ke_kdic_membership_required", "required_action": "obtain_kdic_membership"}},
+	{"name": "ng_cbn_neobank_licence_required", "description": "Nigeria CBN payment service bank or microfinance licence required for neobanking.", "condition": {"operation": "launch_neobank", "country": "NG", "cbn_licence_present": False}, "effect": {"decision": "deny", "reason": "ng_cbn_neobank_licence_required", "required_action": "obtain_cbn_neobank_licence"}},
+	{"name": "neobank_aml_transaction_monitoring", "description": "Neobank transactions require real-time AML transaction monitoring.", "condition": {"operation": "process_transaction", "aml_monitoring_active": False}, "effect": {"decision": "deny", "reason": "aml_transaction_monitoring_required", "required_action": "enable_aml_monitoring"}},
 ]
+
 
 
 def _configuration_schema() -> dict[str, Any]:

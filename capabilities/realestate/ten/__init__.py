@@ -1,10 +1,31 @@
+"""APG Tenant Management capability.
+
+Standalone package: ``pip install apg-realestate-ten``
+
+Quick start::
+
+    from apg_realestate_ten import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : realestate_ten
+Provides      : tenant_onboarding_workflow, tenant_communication_portal, service_request_management, tenant_scoring_engine, satisfaction_tracking, tenant_document_management
 """
-Tenant Services (TEN) - Real Estate Sub-Module
+from __future__ import annotations
 
-Tenant relationship management including service requests, communications,
-tenant portals, and satisfaction tracking.
-"""
+__version__  = "1.0.0"
+__package_name__ = "apg-realestate-ten"
+__capability_id__ = "realestate_ten"
 
-__version__ = "1.0.0"
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
+)
 
-__all__ = []
+__all__ = [
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
+]

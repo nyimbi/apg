@@ -223,14 +223,14 @@ class APGCompiler:
 				result.compilation_time = time.time() - start_time
 				return result
 			
-			# Phase 4: Code Generation
-			generated_files = self.code_generator.generate(ast, result.target_language)
+			# Phase 4: Code Generation (including deployment-bundle artefacts)
+			generated_files = self._generate_code(ast, result.target_language)
 			result.generated_files = generated_files
-			
+
 			result.success = True
 			result.compilation_time = time.time() - start_time
 			self.last_result = result
-			
+
 			self.logger.info(f"String compilation successful: {len(generated_files)} files generated")
 			return result
 			
@@ -321,9 +321,16 @@ class APGCompiler:
 			}
 	
 	def _generate_code(self, ast: ModuleDeclaration, target_language: str) -> Dict[str, str]:
-		"""Generate code for target language"""
+		"""Generate code for target language, including deployment-bundle artefacts."""
 		try:
-			return self.code_generator.generate(ast, target_language)
+			files = self.code_generator.generate(ast, target_language)
+			# Add deployment-bundle files (Dockerfile, README, smoke_test, etc.) that
+			# PythonCodeGenerator.generate() intentionally omits so that unit tests
+			# calling PythonCodeGenerator directly get a predictable minimal file set.
+			python_gen = self.code_generator.generators.get("python")
+			if python_gen is not None and hasattr(python_gen, "generate_deployment_bundle"):
+				files.update(python_gen.generate_deployment_bundle(ast))
+			return files
 		except Exception as e:
 			self.logger.error(f"Code generation failed: {e}")
 			raise

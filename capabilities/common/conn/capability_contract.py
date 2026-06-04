@@ -364,7 +364,7 @@ def agent_manifest() -> dict[str, Any]:
 		"supported_runtimes": list(SUPPORTED_CONN_AGENT_RUNTIMES),
 		"supported_roles": list(SUPPORTED_CONN_AGENT_ROLES),
 		"privileged_roles": list(PRIVILEGED_CONN_AGENT_ROLES),
-		"requires": ["scope", "owner", "purpose", "contribution_disclosure"],
+		
 		"approval": "human approval is required before privileged connector agents mutate connector state",
 		"external_runtimes_are_adapters": True,
 	}
@@ -435,6 +435,33 @@ def review_evidence_manifest() -> dict[str, Any]:
 	}
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.conn.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"connector_registered",
+		"connector_updated",
+		"connector_retired",
+		"connection_created",
+		"connection_activated",
+		"connection_deactivated",
+		"flow_created",
+		"flow_executed",
+		"sync_started",
+		"sync_completed",
+		"sync_failed",
+		"quality_gate_passed",
+		"quality_gate_failed",
+		"agent_registered",
+	],
+	"guardrails": [
+		"conn_batch_requires_bytewax",
+		"conn_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable CONN capability contract."""
 	config = CapabilityConfiguration()
@@ -448,7 +475,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		"configuration_schema": config.schema,
 		"rule_engine": {"type": "deterministic", "rules": [rule.__dict__ for rule in default_rules()]},
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": STREAMING,
 		"review_evidence": review_evidence_manifest(),
 		"ui": ui_manifest(),
 		"theme": {"name": theme.name, "tokens": theme.tokens, "components": theme.components},

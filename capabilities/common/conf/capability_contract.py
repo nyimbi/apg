@@ -372,7 +372,67 @@ def default_rules() -> list[CapabilityRule]:
 				"reason": "conf_agent_human_approval_required",
 				"required_action": "record_human_approval"
 			}
-		)
+		),
+		CapabilityRule(
+			name="cross_tenant_config_access_denied",
+			description="Configuration reads and writes are scoped to the requesting tenant.",
+			condition={"cross_tenant_config_access": True, "cross_tenant_membership_confirmed": False},
+			effect={
+				"decision": "deny",
+				"reason": "cross_tenant_config_access_denied",
+				"required_action": "use_tenant_scoped_configuration"
+			}
+		),
+		CapabilityRule(
+			name="write_requires_policy",
+			description="Configuration write operations require an explicit write policy.",
+			condition={"operation_type": "write", "write_policy_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "config_write_policy_required",
+				"required_action": "attach_write_policy"
+			}
+		),
+		CapabilityRule(
+			name="delete_requires_approval",
+			description="Configuration record deletion requires explicit approval.",
+			condition={"operation": "delete_record", "delete_approved": False},
+			effect={
+				"decision": "deny",
+				"reason": "config_delete_approval_required",
+				"required_action": "record_delete_approval"
+			}
+		),
+		CapabilityRule(
+			name="privilege_escalation_denied",
+			description="Configuration operators cannot self-grant elevated configuration access.",
+			condition={"operation": "assign_config_permission", "target_tier_exceeds_actor_tier": True},
+			effect={
+				"decision": "deny",
+				"reason": "privilege_escalation_prevented",
+				"required_action": "route_to_higher_authority_approver"
+			}
+		),
+		CapabilityRule(
+			name="configuration_record_requires_schema_version",
+			description="Configuration records must carry a schema version for compatibility tracking.",
+			condition={"operation": "create_record", "schema_version_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "config_schema_version_required",
+				"required_action": "attach_schema_version"
+			}
+		),
+		CapabilityRule(
+			name="approval_notes_required",
+			description="Configuration change approvals require reviewer notes.",
+			condition={"operation": "approve_change", "approval_notes_attached": False},
+			effect={
+				"decision": "deny",
+				"reason": "approval_notes_required",
+				"required_action": "attach_approval_notes"
+			}
+		),
 	]
 
 

@@ -210,7 +210,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"asset_reliability_analytics",
 			"eam_agents",
 		],
-		"requires": ["auth", "audl", "ntfy", "composition_events", "composition_config", "fixed_asset_management"],
+		"requires": ["auth", "audl", "ntfy", "composition_events", "composition_config"],
 		"configuration": config,
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},

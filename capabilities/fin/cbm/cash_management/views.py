@@ -10,6 +10,73 @@ except ImportError:  # pragma: no cover - supports direct file loading in tests
 	from service import CashManagementService  # type: ignore
 
 
+def _clean_text(value):
+	if value is None:
+		return None
+	return str(value).strip() or None
+
+
+def _object_value(source, name):
+	if source is None:
+		return None
+	if isinstance(source, dict):
+		return source.get(name)
+	return getattr(source, name, None)
+
+
+def _mapping_value(source, name):
+	if source is None:
+		return None
+	getter = getattr(source, "get", None)
+	return getter(name) if getter else None
+
+
+def resolve_tenant_id(appbuilder=None):
+	"""Resolve tenant id from Flask g, AppBuilder user, request headers/query, or env."""
+	import os as _cbm_os  # noqa: PLC0415
+
+	# 1. Flask g.current_user (highest priority — runtime context)
+	try:
+		from flask import g, has_request_context, request, session
+		if has_request_context():
+			cu = getattr(g, "current_user", None)
+			t = _object_value(cu, "tenant_id") if isinstance(cu, dict) else None
+			if t:
+				return str(t)
+			t = getattr(g, "tenant_id", None)
+			if t:
+				return str(t)
+			# Headers
+			t = _mapping_value(request.headers, "X-APG-Tenant-ID") or _mapping_value(request.headers, "X-Tenant-ID")
+			if t:
+				return str(t)
+			# Query
+			t = _mapping_value(request.args, "tenant_id") or _mapping_value(request.args, "tenant")
+			if t:
+				return str(t)
+	except Exception:
+		pass
+
+	# 2. AppBuilder security manager user
+	if appbuilder is not None:
+		try:
+			sm = getattr(appbuilder, "sm", None)
+			cu = getattr(sm, "user", None) if sm else None
+			t = _object_value(cu, "tenant_id")
+			if t:
+				return str(t)
+		except Exception:
+			pass
+
+	# 3. Env fallback
+	return _cbm_os.getenv("APG_DEFAULT_TENANT_ID", "default")
+
+
+# ============================================================================
+# Custom Widgets
+# ============================================================================
+
+
 NAVIGATION = [
 	{"name": "Dashboard", "route": "/cbm-cash-management/dashboard", "icon": "layout-dashboard"},
 	{"name": "Banks", "route": "/cbm-cash-management/banks", "icon": "landmark"},
@@ -108,3 +175,16 @@ def agent_workbench_model(service: CashManagementService, tenant_id: str) -> dic
 	model["records"] = service.list_records("agents", tenant_id)
 	model["actions"] = ["review_cash_position", "review_forecast", "review_reconciliation", "prepare_investment"]
 	return model
+
+
+# ============================================================================
+# Flask-AppBuilder View Base
+# ============================================================================
+
+class CashManagementBaseView:
+	"""Base mixin for FAB views — resolves tenant from AppBuilder context."""
+
+	appbuilder = None
+
+	def _get_tenant_id(self) -> str:
+		return resolve_tenant_id(self.appbuilder)

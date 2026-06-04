@@ -1,87 +1,31 @@
-"""APG Audio Processing (AUDP) capability registration."""
+"""APG Audio Processing capability.
 
+Standalone package: ``pip install apg-common-audp``
+
+Quick start::
+
+    from apg_common_audp import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : audp
+Provides      : audio_transcription, voice_synthesis, audio_analysis, speaker_diarization, audio_enhancement, audio_consent_governance
+"""
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any
-
-from .capability_contract import evaluate_capability_rules, get_capability_contract
-
-__version__ = "1.0.0"
+__version__  = "1.0.0"
+__package_name__ = "apg-common-audp"
 __capability_id__ = "audp"
-__capability_name__ = "Audio Processing"
-__apg_dependencies__ = ["aicr", "nlpc", "mlcm"]
 
-capability_metadata: dict[str, Any] = {
-	"name": "audp",
-	"version": __version__,
-	"display_name": __capability_name__,
-	"description": "Tenant-aware audio transcription, synthesis, analysis, enhancement, speaker diarization, voice-model governance, AI audio-agent coordination, and review evidence",
-	"category": "specialized_ai_analytics",
-	"subcategory": "audio_processing",
-	"vendor": "Datacraft",
-	"author": "APG Platform Team",
-	"license": "Commercial",
-	"created_at": datetime.now(timezone.utc),
-	"dependencies": __apg_dependencies__,
-	"provides": ["audio_transcription", "voice_synthesis", "audio_analysis", "speaker_diarization", "audio_enhancement", "audio_consent_governance", "audio_review_governance", "audio_agents"],
-	"permissions": ["audp:view", "audp:transcribe", "audp:synthesize", "audp:analyze", "audp:manage_models", "audp:govern", "audp:review", "audp:audit", "audp:admin"]
-}
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
+)
 
-__capability_code__ = "AUDIO_PROCESSING"
-__composition_keywords__ = ["processes_audio", "transcription_enabled", "voice_synthesis_capable", "audio_analysis_aware", "real_time_audio"]
-
-
-def register_capability() -> dict[str, Any]:
-	"""Register AUDP with the APG composition engine."""
-	contract = get_capability_contract()
-	return {
-		"name": "audp",
-		"aliases": ["audio_processing", "audio_intelligence", "speech_processing"],
-		"display_name": capability_metadata["display_name"],
-		"description": capability_metadata["description"],
-		"version": capability_metadata["version"],
-		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["colb", "ntfy", "cach", "audl", "bytewax", "moni"],
-		"configuration": contract["configuration"],
-		"configuration_schema": contract["configuration_schema"],
-		"rule_engine": contract["rule_engine"],
-		"capabilities": {
-			"audio_transcription": "Transcribe tenant-scoped audio with language, speaker, and confidence metadata",
-			"voice_synthesis": "Generate governed speech output from approved text and voice models",
-			"audio_analysis": "Analyze sentiment, topics, quality, content class, and acoustic signals",
-			"speaker_diarization": "Identify and segment speakers with consent and retention controls",
-			"audio_consent_governance": "Record and enforce recording and voice-owner consent evidence",
-			"audio_review_governance": "Require human review for low-confidence transcripts and governed synthetic audio",
-			"audio_agents": "Register Codex, Claude Code, OpenCode, Pi, and future runtimes as scoped audio-processing collaborators",
-			"capability_rules": "Evaluate deterministic audio-processing governance rules",
-			"visual_theming": "Apply audio-intelligence theme tokens and components"
-		},
-		"endpoints": {
-			"transcription": "/audp/api/v1/transcription",
-			"synthesis": "/audp/api/v1/synthesis",
-			"analysis": "/audp/api/v1/analysis",
-			"sessions": "/audp/api/v1/sessions",
-			"models": "/audp/api/v1/models",
-			"consents": "/audp/api/v1/consents",
-			"reviews": "/audp/api/v1/reviews",
-			"agents": "/audp/api/v1/agents",
-			"governance_events": "/audp/api/v1/governance-events"
-		},
-		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
-		"ui_manifest": contract["ui"],
-		"theme": contract["theme"],
-		"streaming": contract["streaming"],
-		"permissions": capability_metadata["permissions"]
-	}
-
-
-def get_capability_info() -> dict[str, Any]:
-	"""Get AUDP capability information for composition and marketplace discovery."""
-	info = capability_metadata.copy()
-	info["composition_keywords"] = __composition_keywords__
-	info["contract"] = get_capability_contract()
-	return info
-
-
-__all__ = ["capability_metadata", "register_capability", "get_capability_info", "get_capability_contract", "evaluate_capability_rules", "__version__", "__capability_id__", "__capability_name__", "__capability_code__", "__apg_dependencies__", "__composition_keywords__"]
+__all__ = [
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
+]

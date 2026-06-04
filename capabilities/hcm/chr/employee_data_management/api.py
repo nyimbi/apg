@@ -5,9 +5,11 @@ from __future__ import annotations
 from typing import Any
 
 try:
-	from .service import EmployeeDataManagementService
+	from .context import get_tenant_id_from_request
+	from .service import RevolutionaryEmployeeDataManagementService as EmployeeDataManagementService
 except ImportError:  # pragma: no cover - supports direct file loading in tests
-	from service import EmployeeDataManagementService  # type: ignore
+	from context import get_tenant_id_from_request  # type: ignore
+	from service import RevolutionaryEmployeeDataManagementService as EmployeeDataManagementService  # type: ignore
 
 
 SERVICE = EmployeeDataManagementService()
@@ -18,7 +20,8 @@ def service() -> EmployeeDataManagementService:
 	return SERVICE
 
 
-def capability_status(tenant_id: str = "default") -> dict[str, Any]:
+def capability_status(tenant_id: str | None = None) -> dict[str, Any]:
+	tenant_id = tenant_id or get_tenant_id_from_request()
 	contract = SERVICE.describe(tenant_id)
 	return {
 		"ok": True,

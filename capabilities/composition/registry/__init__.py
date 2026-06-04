@@ -1,51 +1,43 @@
-"""APG capability registry package."""
+"""APG Capability Registry capability.
 
+Standalone package: ``pip install apg-composition-registry``
+
+Quick start::
+
+    from apg_composition_registry import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : composition_registry
+Provides      : capability_catalog_lifecycle, dependency_graph_management, composition_blueprint_validation, version_compatibility_governance, marketplace_publication_governance, registry_discovery
+"""
 from __future__ import annotations
 
-from .capability_contract import (
-	REGISTRY_EVENT_STREAM,
-	SUPPORTED_REGISTRY_AGENT_ROLES,
-	SUPPORTED_REGISTRY_AGENT_RUNTIMES,
-	evaluate_capability_rules,
-	event_stream_name,
-	get_capability_contract,
-	streaming_manifest,
+__version__  = "1.0.0"
+__package_name__ = "apg-composition-registry"
+__capability_id__ = "composition_registry"
+
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
 )
-from .service import CRService, CompositionRegistryService, get_registry_service
+from .models import CRCapability, CRRegistry  # noqa: E402
+from .service import CapabilityRegistryService, CRService  # noqa: E402
 
 
-CAPABILITY_ID = "composition_registry"
-CAPABILITY_NAME = "Capability Registry"
-CAPABILITY_VERSION = "2.1.0"
-
-
-def register_capability() -> dict[str, object]:
-	contract = get_capability_contract()
-	return {
-		"capability": CAPABILITY_ID,
-		"display_name": CAPABILITY_NAME,
-		"version": CAPABILITY_VERSION,
-		"provides": contract["provides"],
-		"requires": contract["requires"],
-		"ui": contract["ui"],
-		"theme": contract["theme"],
-		"streaming": contract["streaming"],
-	}
+class MobileOfflineService:
+    """Stub mobile-offline composition surface for registry consumers."""
 
 
 __all__ = [
-	"CAPABILITY_ID",
-	"CAPABILITY_NAME",
-	"CAPABILITY_VERSION",
-	"CRService",
-	"CompositionRegistryService",
-	"REGISTRY_EVENT_STREAM",
-	"SUPPORTED_REGISTRY_AGENT_ROLES",
-	"SUPPORTED_REGISTRY_AGENT_RUNTIMES",
-	"evaluate_capability_rules",
-	"event_stream_name",
-	"get_capability_contract",
-	"get_registry_service",
-	"register_capability",
-	"streaming_manifest",
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
+    "CRCapability",
+    "CRRegistry",
+    "CRService",
+    "CapabilityRegistryService",
+    "MobileOfflineService",
 ]

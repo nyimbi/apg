@@ -1,81 +1,31 @@
-"""APG Geo-Spatial Services (GEOS) capability registration."""
+"""APG Geo-Spatial Services capability.
 
+Standalone package: ``pip install apg-common-geos``
+
+Quick start::
+
+    from apg_common_geos import get_capability_contract, evaluate_capability_rules
+
+    contract = get_capability_contract(tenant_id="my_org")
+    result   = evaluate_capability_rules({"tenant_context_present": True, "operation_type": "read"})
+
+Capability ID : geos
+Provides      : geofencing, location_events, spatial_analytics, territory_management, location_prediction, location_agents
+"""
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any
-
-from .capability_contract import evaluate_capability_rules, get_capability_contract
-
-__version__ = "1.0.0"
+__version__  = "1.0.0"
+__package_name__ = "apg-common-geos"
 __capability_id__ = "geos"
-__capability_name__ = "Geo-Spatial Services"
-__apg_dependencies__ = ["pred", "aicr", "mdm"]
 
-capability_metadata: dict[str, Any] = {
-	"name": "geos",
-	"version": __version__,
-	"display_name": __capability_name__,
-	"description": "Tenant-aware geofencing, spatial analytics, territory management, location events, AI location-agent coordination, and predictive location intelligence",
-	"category": "specialized_ai_analytics",
-	"subcategory": "geo_spatial_services",
-	"vendor": "Datacraft",
-	"author": "APG Platform Team",
-	"license": "Commercial",
-	"created_at": datetime.now(timezone.utc),
-	"dependencies": __apg_dependencies__,
-	"provides": ["geofencing", "location_events", "spatial_analytics", "territory_management", "location_prediction", "location_agents"],
-	"permissions": ["geos:view", "geos:manage_geofences", "geos:process_events", "geos:analyze", "geos:audit", "geos:admin"]
-}
+from .capability_contract import (  # noqa: E402
+    get_capability_contract,
+    evaluate_capability_rules,
+)
 
-CAPABILITY_METADATA = capability_metadata
-
-
-def register_capability() -> dict[str, Any]:
-	"""Register GEOS with the APG composition engine."""
-	contract = get_capability_contract()
-	return {
-		"name": "geos",
-		"aliases": ["geo_spatial", "geofencing", "location_intelligence"],
-		"display_name": capability_metadata["display_name"],
-		"description": capability_metadata["description"],
-		"version": capability_metadata["version"],
-		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["ntfy", "edge", "audl", "wflo", "bytewax", "moni"],
-		"configuration": contract["configuration"],
-		"configuration_schema": contract["configuration_schema"],
-		"rule_engine": contract["rule_engine"],
-		"capabilities": {
-			"geofencing": "Create and evaluate tenant-scoped geofences and spatial rules",
-			"location_events": "Process enter, exit, dwell, and movement events with policy controls",
-			"spatial_analytics": "Analyze density, proximity, routing, coverage, and territory patterns",
-			"territory_management": "Govern regions, service areas, routing zones, and ownership",
-			"location_agents": "Register Codex, Claude Code, OpenCode, Pi, and future runtimes as scoped location-intelligence collaborators",
-			"capability_rules": "Evaluate deterministic geo-spatial governance rules",
-			"visual_theming": "Apply location-intelligence theme tokens and components"
-		},
-		"endpoints": {
-			"geofences": "/geos/api/v1/geofences",
-			"events": "/geos/api/v1/events",
-			"territories": "/geos/api/v1/territories",
-			"analytics": "/geos/api/v1/analytics",
-			"maps": "/geos/api/v1/maps",
-			"agents": "/geos/api/v1/agents",
-			"audit": "/geos/api/v1/audit"
-		},
-		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
-		"ui_manifest": contract["ui"],
-		"theme": contract["theme"],
-		"streaming": contract["streaming"],
-		"permissions": capability_metadata["permissions"]
-	}
-
-
-def get_capability_info() -> dict[str, Any]:
-	"""Get GEOS capability information for composition and marketplace discovery."""
-	info = capability_metadata.copy()
-	info["contract"] = get_capability_contract()
-	return info
-
-
-__all__ = ["CAPABILITY_METADATA", "capability_metadata", "register_capability", "get_capability_info", "get_capability_contract", "evaluate_capability_rules", "__version__", "__capability_id__", "__capability_name__", "__apg_dependencies__"]
+__all__ = [
+    "__version__",
+    "__capability_id__",
+    "get_capability_contract",
+    "evaluate_capability_rules",
+]

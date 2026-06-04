@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "apg-fintech-risk"
+version = "1.1.0"
+description = "APG FinTech Risk Management — fintech domain capability"
+readme = "README.md"
+license = {text = "Proprietary"}
+requires-python = ">=3.11"
+keywords = ["apg", "datacraft", "capability", "fintech", "risk"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+        "pydantic>=2.0",
+    "uuid6>=0.4",
+    "sqlalchemy>=2.0",
+    "flask>=3.0",
+]
+
+[project.optional-dependencies]
+streaming = ["bytewax>=0.18"]
+nlp       = ["transformers>=4.30", "sentence-transformers>=2.2"]
+vision    = ["opencv-python>=4.0", "Pillow>=10.0"]
+geo       = ["shapely>=2.0", "geopy>=2.4"]
+crypto    = ["cryptography>=41.0"]
+full      = [
+    "apg-fintech-risk[streaming]",
+    "apg-fintech-risk[nlp]",
+    "apg-fintech-risk[vision]",
+    "apg-fintech-risk[geo]",
+    "apg-fintech-risk[crypto]",
+]
+
+[project.urls]
+Homepage   = "https://www.datacraft.co.ke"
+Repository = "https://github.com/datacraft/apg"
+Changelog  = "https://github.com/datacraft/apg/blob/main/capabilities/fintech/risk/CHANGELOG.md"
+
+
+[project.scripts]
+apg-fintech-risk = "apg_fintech_risk.app:main"
+[project.entry-points."apg.capabilities"]
+fintech_risk = "apg_fintech_risk:get_capability_contract"
+
+[tool.setuptools]
+package-dir = {"apg_fintech_risk" = "."}
+packages    = ["apg_fintech_risk"]
+
+[tool.setuptools.package-data]
+"apg_fintech_risk" = ["py.typed", "README.md", "*.pyi"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

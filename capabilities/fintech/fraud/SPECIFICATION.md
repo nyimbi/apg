@@ -64,7 +64,7 @@ Required APG capabilities:
 - `fintech_kyc` for identity risk and customer profile evidence.
 - `fintech_aml` for AML alert/case linkage.
 
-The lifecycle processor is Bytewax. Kafka is intentionally not part of this
+The lifecycle processor is Bytewax. Bytewax is intentionally not part of this
 capability contract.
 
 ## Configuration

@@ -404,6 +404,30 @@ def streaming_manifest() -> dict[str, Any]:
 	}
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.mfau.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"factor_enrolled",
+		"factor_retired",
+		"challenge_issued",
+		"challenge_passed",
+		"challenge_failed",
+		"authentication_completed",
+		"authentication_denied",
+		"adaptive_policy_triggered",
+		"risk_score_evaluated",
+		"session_elevated",
+		"agent_registered",
+	],
+	"guardrails": [
+		"mfau_batch_requires_bytewax",
+		"mfau_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable MFAU capability contract."""
 	config = deepcopy(DEFAULT_CONFIGURATION)
@@ -427,7 +451,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"requires_theme": True,
 		},
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": deepcopy(STREAMING),
 		"theme": deepcopy(THEME),
 	}
 

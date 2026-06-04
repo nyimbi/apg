@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "realestate_prm",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "realestate_prm": {
+      "capability": "realestate_prm"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

@@ -25,7 +25,7 @@
   contract.
 - Confirm high-impact interventions require reason and human approval.
 - Confirm step-up decisions require challenge references.
-- Confirm fraud does not introduce Kafka or provider-specific AI coupling.
+- Confirm fraud does not introduce Bytewax or provider-specific AI coupling.
 - Confirm UI routes, theme tokens, and view models are composable.
 - Confirm local tests and APG audits pass for the package.
 

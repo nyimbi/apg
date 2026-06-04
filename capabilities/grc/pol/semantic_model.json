@@ -1,0 +1,14 @@
+{
+  "app": {
+    "entity_count": 0,
+    "name": "grc_pol",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "grc_pol": {
+      "capability": "grc_pol"
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "ok": true
+}

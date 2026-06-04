@@ -129,7 +129,20 @@ RULES: list[dict[str, Any]] = [
 	{"name": "lending_agent_runtime_supported", "description": "Lending agents must use a supported runtime.", "condition": {"operation": "register_lending_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "lending_agent_runtime_not_supported", "required_action": "select_supported_agent_runtime"}},
 	{"name": "lending_agent_role_supported", "description": "Lending agents must use a supported role.", "condition": {"operation": "register_lending_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "lending_agent_role_not_supported", "required_action": "select_supported_agent_role"}},
 	{"name": "privileged_lending_agent_action_requires_human_approval", "description": "Privileged lending-agent actions require human approval.", "condition": {"operation": "lending_agent_action", "privileged_scope": True, "human_approval_recorded": False}, "effect": {"decision": "deny", "reason": "human_approval_required", "required_action": "record_human_approval"}},
+
+	# Cross-tenant and privilege escalation guards
+	{"name": "cross_tenant_lending_access_denied", "description": "Lending resources cannot be accessed across tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_access_denied", "required_action": "use_tenant_scoped_credentials"}},
+	{"name": "privilege_escalation_denied", "description": "Lending privilege escalation without approval is denied.", "condition": {"privilege_escalation_attempt": True, "approval_recorded": False}, "effect": {"decision": "deny", "reason": "privilege_escalation_denied", "required_action": "obtain_escalation_approval"}},
+
+	# Africa-specific lending rules
+	{"name": "ke_cbk_digital_credit_licence_required", "description": "Kenya CBK digital credit provider licence required for digital lending.", "condition": {"operation": "disburse_loan", "country": "KE", "cbk_digital_credit_licence_present": False}, "effect": {"decision": "deny", "reason": "ke_cbk_digital_credit_licence_required", "required_action": "obtain_cbk_digital_credit_licence"}},
+	{"name": "mpesa_loan_repayment_channel_required", "description": "M-Pesa loan disbursements require M-Pesa repayment channel configured.", "condition": {"operation": "disburse_loan", "disbursement_method": "mpesa", "mpesa_repayment_configured": False}, "effect": {"decision": "deny", "reason": "mpesa_repayment_channel_required", "required_action": "configure_mpesa_repayment_channel"}},
+	{"name": "ke_interest_rate_disclosure_required", "description": "Kenya lending requires total cost of credit disclosure per CBK guidelines.", "condition": {"operation": "issue_loan_offer", "country": "KE", "total_cost_disclosed": False}, "effect": {"decision": "deny", "reason": "ke_total_cost_disclosure_required", "required_action": "disclose_total_cost_of_credit"}},
+	{"name": "mobile_money_loan_kyc_required", "description": "Mobile money loan disbursements require borrower KYC.", "condition": {"operation": "disburse_loan", "disbursement_method": "mobile_money", "borrower_kyc_present": False}, "effect": {"decision": "deny", "reason": "mobile_money_loan_kyc_required", "required_action": "complete_borrower_kyc"}},
+	{"name": "ke_credit_bureau_check_required", "description": "Kenya CBK requires credit bureau check before loan approval.", "condition": {"operation": "approve_loan", "country": "KE", "credit_bureau_checked": False}, "effect": {"decision": "deny", "reason": "ke_credit_bureau_check_required", "required_action": "perform_credit_bureau_check"}},
+	{"name": "ng_fccpc_digital_lending_guidelines", "description": "Nigeria FCCPC digital lending guidelines compliance required.", "condition": {"operation": "disburse_loan", "country": "NG", "fccpc_compliant": False}, "effect": {"decision": "deny", "reason": "ng_fccpc_compliance_required", "required_action": "comply_with_fccpc_digital_lending_guidelines"}},
 ]
+
 
 
 def _configuration_schema() -> dict[str, Any]:

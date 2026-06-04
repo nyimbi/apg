@@ -4,7 +4,7 @@
 
 *Based on comprehensive dependency analysis, business value assessment, and risk mitigation strategies*
 
-© 2025 Datacraft. All rights reserved.  
+© 2025 Datacraft. All rights reserved.
 Author: Nyimbi Odero <nyimbi@gmail.com>
 
 ---
@@ -169,7 +169,7 @@ This document defines the optimal development order for APG's 80+ common capabil
 #### 18. `conn` - Connectors *(Weeks 14-15)*
 - **Priority**: HIGH - Third-party integration
 - **Dependencies**: `apig`, `auth`, `encr`, `audl`
-- **Business Value**: System integration
+- **Business Value**: System integration, Should make extensive use of locally hosted singer.io taps + services
 - **Team**: Integration Team
 
 #### 19. `imex` - Data Import/Export *(Weeks 15-16)*

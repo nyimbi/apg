@@ -6,10 +6,12 @@ from typing import Any
 
 try:
 	from .capability_contract import get_capability_contract
-	from .service import EmployeeDataManagementService
+	from .context import get_tenant_id_from_request
+	from .service import RevolutionaryEmployeeDataManagementService as EmployeeDataManagementService
 except ImportError:  # pragma: no cover - supports direct file loading in tests
 	from capability_contract import get_capability_contract  # type: ignore
-	from service import EmployeeDataManagementService  # type: ignore
+	from context import get_tenant_id_from_request  # type: ignore
+	from service import RevolutionaryEmployeeDataManagementService as EmployeeDataManagementService  # type: ignore
 
 
 NAVIGATION = [
@@ -28,7 +30,8 @@ NAVIGATION = [
 ]
 
 
-def capability_routes(tenant_id: str = "default") -> list[dict[str, str]]:
+def capability_routes(tenant_id: str | None = None) -> list[dict[str, str]]:
+	tenant_id = tenant_id or get_tenant_id_from_request()
 	return list(get_capability_contract(tenant_id)["ui"]["routes"])
 
 
@@ -36,7 +39,8 @@ def _base(screen: str, tenant_id: str) -> dict[str, Any]:
 	return {"screen": screen, "tenant_id": tenant_id, "navigation": NAVIGATION}
 
 
-def dashboard_model(service: EmployeeDataManagementService, tenant_id: str) -> dict[str, Any]:
+def dashboard_model(service: EmployeeDataManagementService, tenant_id: str | None = None) -> dict[str, Any]:
+	tenant_id = tenant_id or get_tenant_id_from_request()
 	model = _base("dashboard", tenant_id)
 	model["summary"] = service.dashboard_summary(tenant_id)
 	model["work_queue"] = {
@@ -48,70 +52,80 @@ def dashboard_model(service: EmployeeDataManagementService, tenant_id: str) -> d
 	return model
 
 
-def employee_registry_model(service: EmployeeDataManagementService, tenant_id: str) -> dict[str, Any]:
+def employee_registry_model(service: EmployeeDataManagementService, tenant_id: str | None = None) -> dict[str, Any]:
+	tenant_id = tenant_id or get_tenant_id_from_request()
 	model = _base("employees", tenant_id)
 	model["records"] = service.list_records("employees", tenant_id)
 	model["columns"] = ["employee_number", "full_name", "work_email", "department_id", "position_id", "manager_id", "status"]
 	return model
 
 
-def department_model(service: EmployeeDataManagementService, tenant_id: str) -> dict[str, Any]:
+def department_model(service: EmployeeDataManagementService, tenant_id: str | None = None) -> dict[str, Any]:
+	tenant_id = tenant_id or get_tenant_id_from_request()
 	model = _base("departments", tenant_id)
 	model["records"] = service.list_records("departments", tenant_id)
 	model["columns"] = ["code", "name", "owner_id", "cost_center", "parent_department_id", "status"]
 	return model
 
 
-def position_model(service: EmployeeDataManagementService, tenant_id: str) -> dict[str, Any]:
+def position_model(service: EmployeeDataManagementService, tenant_id: str | None = None) -> dict[str, Any]:
+	tenant_id = tenant_id or get_tenant_id_from_request()
 	model = _base("positions", tenant_id)
 	model["records"] = service.list_records("positions", tenant_id)
 	model["columns"] = ["code", "title", "department_id", "job_level", "authorized_headcount", "status"]
 	return model
 
 
-def personal_info_model(service: EmployeeDataManagementService, tenant_id: str) -> dict[str, Any]:
+def personal_info_model(service: EmployeeDataManagementService, tenant_id: str | None = None) -> dict[str, Any]:
+	tenant_id = tenant_id or get_tenant_id_from_request()
 	model = _base("personal_info", tenant_id)
 	model["records"] = service.list_records("personal_info", tenant_id)
 	model["columns"] = ["employee_id", "country", "effective_date", "privacy_basis", "status"]
 	return model
 
 
-def emergency_contact_model(service: EmployeeDataManagementService, tenant_id: str) -> dict[str, Any]:
+def emergency_contact_model(service: EmployeeDataManagementService, tenant_id: str | None = None) -> dict[str, Any]:
+	tenant_id = tenant_id or get_tenant_id_from_request()
 	model = _base("contacts", tenant_id)
 	model["records"] = service.list_records("emergency_contacts", tenant_id)
 	model["columns"] = ["employee_id", "name", "relationship", "phone", "status"]
 	return model
 
 
-def employment_history_model(service: EmployeeDataManagementService, tenant_id: str) -> dict[str, Any]:
+def employment_history_model(service: EmployeeDataManagementService, tenant_id: str | None = None) -> dict[str, Any]:
+	tenant_id = tenant_id or get_tenant_id_from_request()
 	model = _base("history", tenant_id)
 	model["records"] = service.list_records("employment_history", tenant_id)
 	model["columns"] = ["employee_id", "event_type", "effective_date", "reason", "approved_by", "status"]
 	return model
 
 
-def skill_model(service: EmployeeDataManagementService, tenant_id: str) -> dict[str, Any]:
+def skill_model(service: EmployeeDataManagementService, tenant_id: str | None = None) -> dict[str, Any]:
+	tenant_id = tenant_id or get_tenant_id_from_request()
 	model = _base("skills", tenant_id)
 	model["records"] = service.list_records("skills", tenant_id)
 	model["columns"] = ["employee_id", "skill_name", "level", "evidence", "status"]
 	return model
 
 
-def certification_model(service: EmployeeDataManagementService, tenant_id: str) -> dict[str, Any]:
+def certification_model(service: EmployeeDataManagementService, tenant_id: str | None = None) -> dict[str, Any]:
+	tenant_id = tenant_id or get_tenant_id_from_request()
 	model = _base("certifications", tenant_id)
 	model["records"] = service.list_records("certifications", tenant_id)
 	model["columns"] = ["employee_id", "name", "issuer", "issued_on", "expires_on", "status"]
 	return model
 
 
-def data_quality_model(service: EmployeeDataManagementService, tenant_id: str) -> dict[str, Any]:
+def data_quality_model(service: EmployeeDataManagementService, tenant_id: str | None = None) -> dict[str, Any]:
+	tenant_id = tenant_id or get_tenant_id_from_request()
 	model = _base("quality", tenant_id)
 	model["records"] = service.list_records("data_quality_issues", tenant_id)
 	model["columns"] = ["domain", "severity", "description", "owner_id", "employee_id", "status"]
 	return model
 
 
-def agent_workbench_model(service: EmployeeDataManagementService, tenant_id: str) -> dict[str, Any]:
+def agent_workbench_model(service: EmployeeDataManagementService, tenant_id: str | None = None) -> dict[str, Any]:
+	tenant_id = tenant_id or get_tenant_id_from_request()
 	model = _base("agents", tenant_id)
 	model["records"] = service.list_records("agents", tenant_id)
 	model["actions"] = ["review_profile", "review_quality", "review_structure", "review_skills", "review_compliance"]

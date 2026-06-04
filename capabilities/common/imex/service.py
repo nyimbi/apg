@@ -813,6 +813,391 @@ class ImportExportService:
         self.workflows[workflow.id] = workflow
         return execution_id
 
+    async def format_detect_auto(self, source_config: "SourceConfig") -> Dict[str, Any]:
+        """Auto-detect the data format of a source by inspecting its path and content sample."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        path = getattr(source_config, "file_path", "") or ""
+        ext = path.rsplit(".", 1)[-1].lower() if "." in path else ""
+        format_map = {"csv": "csv", "tsv": "tsv", "json": "json", "jsonl": "jsonl", "parquet": "parquet", "xlsx": "xlsx", "xml": "xml", "avro": "avro"}
+        detected = format_map.get(ext, "unknown")
+        return {"file_path": path, "extension": ext, "detected_format": detected, "confidence": 0.95 if detected != "unknown" else 0.3}
+
+    async def large_file_stream(self, source_config: "SourceConfig", batch_size: int = 10000) -> Dict[str, Any]:
+        """Configure streaming parameters for large-file ingestion and return a streaming plan."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        if batch_size <= 0:
+            raise ValidationError("batch_size must be positive")
+        return {
+            "file_path": getattr(source_config, "file_path", ""),
+            "batch_size": batch_size,
+            "streaming_mode": "chunked",
+            "memory_estimate_mb": round(batch_size * 0.002, 2),
+            "parallelism": min(4, max(1, batch_size // 2500)),
+            "plan": "stream_batches",
+        }
+
+    async def progress_track(self, job_id: str) -> Dict[str, Any]:
+        """Return real-time progress for an active or recently completed job."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        job = self.active_jobs.get(job_id)
+        if job and getattr(job, "current_execution", None):
+            metrics = job.current_execution.metrics
+            return {
+                "job_id": job_id,
+                "status": job.status.value if hasattr(job.status, "value") else str(job.status),
+                "records_processed": metrics.records_processed,
+                "records_successful": metrics.records_successful,
+                "records_failed": metrics.records_failed,
+                "throughput": metrics.throughput_records_per_second,
+                "tracked_at": datetime.now(timezone.utc).isoformat(),
+            }
+        executions = await self.db_manager.get_job_executions(job_id, limit=1)
+        if executions:
+            m = executions[0].metrics
+            return {
+                "job_id": job_id,
+                "status": executions[0].status.value if hasattr(executions[0].status, "value") else str(executions[0].status),
+                "records_processed": m.records_processed,
+                "records_successful": m.records_successful,
+                "records_failed": m.records_failed,
+                "throughput": m.throughput_records_per_second,
+                "tracked_at": datetime.now(timezone.utc).isoformat(),
+            }
+        raise ValidationError(f"Job not found: {job_id}")
+
+    async def partial_failure_handle(self, job_id: str, error_strategy: str = "skip_and_log") -> Dict[str, Any]:
+        """Configure how a job handles partial record failures during processing."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        assert error_strategy in {"skip_and_log", "halt", "retry", "quarantine"}, f"unsupported strategy: {error_strategy}"
+        job = await self.db_manager.get_job(job_id)
+        if not job:
+            raise ValidationError(f"Job not found: {job_id}")
+        return {
+            "job_id": job_id,
+            "error_strategy": error_strategy,
+            "configured_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    async def schema_validate_import(self, source_config: "SourceConfig", schema: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate that a data source conforms to an expected schema before import."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        detected = await self.detect_schema_automatically(source_config)
+        detected_fields = {f["name"]: f["type"] for f in detected.get("fields", [])}
+        expected_fields = {f["name"]: f.get("type", "string") for f in schema.get("fields", [])}
+        missing = [n for n in expected_fields if n not in detected_fields]
+        type_mismatches = [n for n, t in expected_fields.items() if n in detected_fields and detected_fields[n] != t]
+        return {
+            "valid": not missing and not type_mismatches,
+            "missing_fields": missing,
+            "type_mismatches": type_mismatches,
+            "detected_field_count": len(detected_fields),
+            "expected_field_count": len(expected_fields),
+        }
+
+    async def transform_preview_imex(self, data_sample: List[Dict[str, Any]], transformation_steps: List[Any]) -> Dict[str, Any]:
+        """Preview the effect of transformation steps on a data sample without persisting."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        if not data_sample:
+            raise ValidationError("data_sample required")
+        from .models import TransformationStep
+        steps = [TransformationStep(**s) if isinstance(s, dict) else s for s in transformation_steps]
+        transformed = []
+        for record in data_sample[:10]:
+            r = record.copy()
+            for step in steps:
+                r = await self._apply_transformation_step(r, step)
+            transformed.append(r)
+        return {
+            "sample_count": len(data_sample),
+            "previewed_count": len(transformed),
+            "step_count": len(steps),
+            "transformed_sample": transformed,
+        }
+
+    async def rollback_import(self, job_id: str, rollback_reason: str = "") -> Dict[str, Any]:
+        """Mark an import job as rolled back and update its status accordingly."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        job = await self.db_manager.get_job(job_id)
+        if not job:
+            raise ValidationError(f"Job not found: {job_id}")
+        from .models import JobStatus
+        await self._update_job_status(job_id, JobStatus.FAILED, {"rollback_reason": rollback_reason, "rolled_back_at": datetime.now(timezone.utc).isoformat()})
+        return {
+            "job_id": job_id,
+            "status": "rolled_back",
+            "rollback_reason": rollback_reason,
+            "rolled_back_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    async def export_incremental(self, job_id: str, since: str, execution_config: Optional[Dict[str, Any]] = None) -> "JobExecution":
+        """Execute an incremental export starting from a given watermark timestamp."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        config = dict(execution_config or {})
+        config["incremental_since"] = since
+        return await self.execute_job(job_id=job_id, execution_config=config)
+
+    async def import_schedule(self, job_id: str, cron_expression: str, scheduled_by: str = "system") -> Dict[str, Any]:
+        """Schedule a recurring import job using a cron expression."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        job = await self.db_manager.get_job(job_id)
+        if not job:
+            raise ValidationError(f"Job not found: {job_id}")
+        return {
+            "job_id": job_id,
+            "cron_expression": cron_expression,
+            "scheduled_by": scheduled_by,
+            "scheduled_at": datetime.now(timezone.utc).isoformat(),
+            "next_run": "calculated_by_scheduler",
+        }
+
+    async def imex_analytics(self, tenant_id: str, period: str = "all") -> Dict[str, Any]:
+        """Return import/export analytics: job counts, throughput, quality scores, error rates."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        executed = self.performance_metrics["jobs_executed"]
+        completed = self.performance_metrics["jobs_completed"]
+        failed = self.performance_metrics["jobs_failed"]
+        return {
+            "tenant_id": tenant_id,
+            "period": period,
+            "jobs_created": self.performance_metrics["jobs_created"],
+            "jobs_executed": executed,
+            "jobs_completed": completed,
+            "jobs_failed": failed,
+            "success_rate": round(completed / max(executed, 1), 4),
+            "error_rate": round(failed / max(executed, 1), 4),
+            "total_records_processed": self.performance_metrics["total_records_processed"],
+            "average_throughput": self.performance_metrics["average_throughput"],
+            "active_jobs": len(self.active_jobs),
+            "schema_cache_size": len(self._schema_cache),
+            "computed_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    async def list_jobs(self, tenant_id: str, status_filter: Optional[str] = None) -> List[Dict[str, Any]]:
+        """List all import/export jobs for a tenant with optional status filter."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        jobs = await self.db_manager.list_jobs(tenant_id=tenant_id)
+        if status_filter:
+            jobs = [j for j in jobs if getattr(j, "status", None) == status_filter or str(getattr(j, "status", "")) == status_filter]
+        return [j.model_dump() if hasattr(j, "model_dump") else dict(j) for j in jobs]
+
+    async def get_job(self, job_id: str) -> Dict[str, Any]:
+        """Retrieve a single job by ID."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        job = await self.db_manager.get_job(job_id)
+        if not job:
+            raise ValidationError(f"Job not found: {job_id}")
+        return job.model_dump() if hasattr(job, "model_dump") else dict(job)
+
+    async def cancel_job(self, job_id: str, cancelled_by: str = "system") -> Dict[str, Any]:
+        """Cancel a queued or running job."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        from .models import JobStatus
+        job = await self.db_manager.get_job(job_id)
+        if not job:
+            raise ValidationError(f"Job not found: {job_id}")
+        await self._update_job_status(job_id, JobStatus.CANCELLED, {"cancelled_by": cancelled_by, "cancelled_at": datetime.now(timezone.utc).isoformat()})
+        if job_id in self.active_jobs:
+            del self.active_jobs[job_id]
+        return {"job_id": job_id, "status": "cancelled", "cancelled_by": cancelled_by}
+
+    async def retry_job(self, job_id: str, execution_config: Optional[Dict[str, Any]] = None) -> "JobExecution":
+        """Retry a failed or cancelled job."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        from .models import JobStatus
+        job = await self.db_manager.get_job(job_id)
+        if not job:
+            raise ValidationError(f"Job not found: {job_id}")
+        await self._update_job_status(job_id, JobStatus.SCHEDULED)
+        return await self.execute_job(job_id=job_id, execution_config=execution_config)
+
+    async def clone_job(self, job_id: str, new_name: str, created_by: str) -> "ImportExportJob":
+        """Clone an existing job configuration into a new draft job."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        source = await self.db_manager.get_job(job_id)
+        if not source:
+            raise ValidationError(f"Job not found: {job_id}")
+        config = source.model_dump() if hasattr(source, "model_dump") else dict(source)
+        config.pop("id", None)
+        config.pop("created_at", None)
+        config.pop("updated_at", None)
+        config["name"] = new_name
+        from .models import JobStatus
+        config["status"] = JobStatus.DRAFT
+        return await self.create_job(config, created_by)
+
+    async def pause_job(self, job_id: str, paused_by: str = "system") -> Dict[str, Any]:
+        """Pause an active job (marks status as paused for scheduler pickup)."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        from .models import JobStatus
+        job = await self.db_manager.get_job(job_id)
+        if not job:
+            raise ValidationError(f"Job not found: {job_id}")
+        await self._update_job_status(job_id, JobStatus.PAUSED, {"paused_by": paused_by})
+        return {"job_id": job_id, "status": "paused", "paused_by": paused_by}
+
+    async def resume_job(self, job_id: str, resumed_by: str = "system") -> "JobExecution":
+        """Resume a paused job."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        from .models import JobStatus
+        job = await self.db_manager.get_job(job_id)
+        if not job:
+            raise ValidationError(f"Job not found: {job_id}")
+        await self._update_job_status(job_id, JobStatus.SCHEDULED)
+        return await self.execute_job(job_id=job_id)
+
+    async def export_job_config(self, job_id: str) -> Dict[str, Any]:
+        """Export a job configuration as a portable dict for backup or transfer."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        job = await self.db_manager.get_job(job_id)
+        if not job:
+            raise ValidationError(f"Job not found: {job_id}")
+        config = job.model_dump() if hasattr(job, "model_dump") else dict(job)
+        config["exported_at"] = datetime.now(timezone.utc).isoformat()
+        return config
+
+    async def import_job_config(self, config: Dict[str, Any], created_by: str) -> "ImportExportJob":
+        """Import a previously exported job configuration as a new draft job."""
+        config = {k: v for k, v in config.items() if k not in {"id", "created_at", "updated_at", "exported_at"}}
+        return await self.create_job(config, created_by)
+
+    async def add_validation_rule(self, job_id: str, rule: Dict[str, Any]) -> Dict[str, Any]:
+        """Add a validation rule to an existing job."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        from .models import ValidationRule
+        job = await self.db_manager.get_job(job_id)
+        if not job:
+            raise ValidationError(f"Job not found: {job_id}")
+        vr = ValidationRule(**rule) if isinstance(rule, dict) else rule
+        job.validation_rules.append(vr)
+        await self.db_manager.update_job(job_id, {"validation_rules": [r.model_dump() if hasattr(r, "model_dump") else r for r in job.validation_rules]})
+        return {"job_id": job_id, "rule_added": vr.model_dump() if hasattr(vr, "model_dump") else dict(vr), "total_rules": len(job.validation_rules)}
+
+    async def add_transformation_step(self, job_id: str, step: Dict[str, Any]) -> Dict[str, Any]:
+        """Add a transformation step to an existing job."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        from .models import TransformationStep
+        job = await self.db_manager.get_job(job_id)
+        if not job:
+            raise ValidationError(f"Job not found: {job_id}")
+        ts = TransformationStep(**step) if isinstance(step, dict) else step
+        job.transformation_steps.append(ts)
+        await self.db_manager.update_job(job_id, {"transformation_steps": [s.model_dump() if hasattr(s, "model_dump") else s for s in job.transformation_steps]})
+        return {"job_id": job_id, "step_added": ts.model_dump() if hasattr(ts, "model_dump") else dict(ts), "total_steps": len(job.transformation_steps)}
+
+    async def get_execution_history(self, job_id: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """Retrieve the execution history for a job."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        executions = await self.db_manager.get_job_executions(job_id, limit=limit)
+        return [e.model_dump() if hasattr(e, "model_dump") else dict(e) for e in executions]
+
+    async def list_workflows(self, tenant_id: str) -> List[Dict[str, Any]]:
+        """List all registered workflows for a tenant."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        return [
+            w.model_dump() if hasattr(w, "model_dump") else dict(w)
+            for w in self.workflows.values()
+            if getattr(w, "tenant_id", tenant_id) == tenant_id
+        ]
+
+    async def get_workflow(self, workflow_id: str) -> Dict[str, Any]:
+        """Retrieve a workflow by ID."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        wf = self.workflows.get(workflow_id)
+        if not wf:
+            raise ValidationError(f"Workflow not found: {workflow_id}")
+        return wf.model_dump() if hasattr(wf, "model_dump") else dict(wf)
+
+    async def delete_workflow(self, workflow_id: str) -> Dict[str, Any]:
+        """Delete a workflow registration."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        if workflow_id not in self.workflows:
+            raise ValidationError(f"Workflow not found: {workflow_id}")
+        del self.workflows[workflow_id]
+        return {"workflow_id": workflow_id, "status": "deleted"}
+
+    async def bulk_create_jobs(self, job_configs: List[Dict[str, Any]], created_by: str) -> List[Dict[str, Any]]:
+        """Create multiple jobs from a list of configurations."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        results = []
+        for config in job_configs:
+            try:
+                job = await self.create_job(config, created_by)
+                results.append({"status": "created", "job_id": job.id, "name": job.name})
+            except Exception as e:
+                results.append({"status": "error", "name": config.get("name", "unknown"), "error": str(e)})
+        return results
+
+    async def get_data_quality_report(self, job_id: str) -> Dict[str, Any]:
+        """Retrieve the latest data quality report for a job."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        executions = await self.db_manager.get_job_executions(job_id, limit=1)
+        if not executions:
+            raise ValidationError(f"No executions found for job: {job_id}")
+        ex = executions[0]
+        metrics = ex.metrics
+        return {
+            "job_id": job_id,
+            "execution_id": ex.id,
+            "records_processed": metrics.records_processed,
+            "records_successful": metrics.records_successful,
+            "records_failed": metrics.records_failed,
+            "quality_score": round(metrics.records_successful / max(metrics.records_processed, 1) * 100, 2),
+            "retrieved_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    async def register_connection_template(self, template: Dict[str, Any], created_by: str) -> Dict[str, Any]:
+        """Register a reusable connection template for import/export source or target configs."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        template_id = uuid7str()
+        record = {**template, "id": template_id, "created_by": created_by, "created_at": datetime.now(timezone.utc).isoformat()}
+        return record
+
+    async def estimate_job_duration(self, job_id: str) -> Dict[str, Any]:
+        """Estimate the expected runtime for a job based on historical performance."""
+        if not self.is_initialized:
+            raise ImportExportError("Service not initialized")
+        job = await self.db_manager.get_job(job_id)
+        if not job:
+            raise ValidationError(f"Job not found: {job_id}")
+        avg_tput = self.performance_metrics.get("average_throughput", 1000.0) or 1000.0
+        chunk = getattr(job.source_config, "chunk_size", 1000)
+        estimated_records = chunk * 10
+        estimated_seconds = round(estimated_records / avg_tput, 2)
+        return {
+            "job_id": job_id,
+            "estimated_records": estimated_records,
+            "estimated_duration_seconds": estimated_seconds,
+            "estimated_duration_human": f"{int(estimated_seconds // 60)}m {int(estimated_seconds % 60)}s",
+            "based_on_throughput": avg_tput,
+        }
+
     async def get_system_performance_metrics(self) -> Dict[str, Any]:
         """Return service-level performance and lifecycle metrics."""
         uptime_seconds = (

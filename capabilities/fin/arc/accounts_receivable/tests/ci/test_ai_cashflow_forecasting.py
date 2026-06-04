@@ -21,7 +21,7 @@ from ..ai_cashflow_forecasting import (
 	APGCashFlowForecastingService, create_cashflow_forecasting_service,
 	create_default_forecast_config
 )
-from ..models import (
+from ...models import (
 	ARCustomer, ARInvoice, ARPayment, ARCollectionActivity,
 	ARCustomerStatus, ARCustomerType, ARInvoiceStatus, ARPaymentStatus
 )

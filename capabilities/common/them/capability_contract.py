@@ -201,6 +201,36 @@ RULES: list[dict[str, Any]] = [
 		"condition": {"operation": "batch_theme_rollout", "event_stream_ne": "bytewax"},
 		"effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "route_batch_theme_rollout_to_bytewax"},
 	},
+	{
+		"name": "tenant_context_required",
+		"description": "All theme operations require tenant context.",
+		"condition": {"tenant_context_present": False},
+		"effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"},
+	},
+	{
+		"name": "write_requires_policy",
+		"description": "Theme write operations require an explicit authorization policy.",
+		"condition": {"operation_type": "write", "write_policy_present": False},
+		"effect": {"decision": "deny", "reason": "them_write_policy_required", "required_action": "attach_write_policy"},
+	},
+	{
+		"name": "privilege_escalation_denied",
+		"description": "Theme operators cannot self-grant elevated theme management permissions.",
+		"condition": {"operation": "assign_them_permission", "target_tier_exceeds_actor_tier": True},
+		"effect": {"decision": "deny", "reason": "privilege_escalation_prevented", "required_action": "route_to_higher_authority_approver"},
+	},
+	{
+		"name": "cross_tenant_theme_access_denied",
+		"description": "Theme assets may not cross tenant boundaries without confirmed membership.",
+		"condition": {"cross_tenant_access": True, "cross_tenant_membership_confirmed": False},
+		"effect": {"decision": "deny", "reason": "cross_tenant_theme_access_denied", "required_action": "use_tenant_scoped_theme"},
+	},
+	{
+		"name": "theme_delete_requires_approval",
+		"description": "Theme deletion requires explicit approval to prevent accidental removal of active themes.",
+		"condition": {"operation": "delete_theme", "delete_approved": False},
+		"effect": {"decision": "deny", "reason": "theme_delete_approval_required", "required_action": "record_theme_delete_approval"},
+	},
 ]
 
 UI_ROUTES: list[dict[str, str]] = [
@@ -258,7 +288,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"visual_theming",
 			"them_agents",
 		],
-		"requires": ["conf", "auth", "i18n", "audl", "accs"],
+		"requires": ["conf", "auth", "i18n", "audl"],
 		"configuration": config,
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},

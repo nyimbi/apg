@@ -308,6 +308,31 @@ THEME: dict[str, Any] = {
 }
 
 
+STREAMING: dict[str, Any] = {
+	"processor": "bytewax",
+	"stream": "apg.chat.lifecycle",
+	"key": "tenant_id",
+	"events": [
+		"room_created",
+		"room_updated",
+		"room_archived",
+		"message_sent",
+		"message_edited",
+		"message_deleted",
+		"member_added",
+		"member_removed",
+		"attachment_uploaded",
+		"moderation_action_taken",
+		"retention_applied",
+		"agent_registered",
+	],
+	"guardrails": [
+		"chat_batch_requires_bytewax",
+		"chat_privileged_action_requires_human_approval",
+	],
+}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable CHAT capability contract."""
 	config = deepcopy(DEFAULT_CONFIGURATION)
@@ -330,7 +355,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		},
 		"theme": deepcopy(THEME),
 		"agents": agent_manifest(config),
-		"streaming": streaming_manifest(config),
+		"streaming": deepcopy(STREAMING),
 	}
 
 

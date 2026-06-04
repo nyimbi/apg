@@ -1,0 +1,21 @@
+{
+  "evidence": {
+    "contracts": {
+      "capability_contract": {
+        "display_name": "Network Inventory",
+        "errors": []
+      }
+    },
+    "self_test": {
+      "capability": "telecom_inv",
+      "passed": true,
+      "status": "ok"
+    },
+    "semantic_model": {
+      "capability": "telecom_inv",
+      "format": "apg.semantic-model.v1"
+    }
+  },
+  "format": "apg.release-report.v1",
+  "ok": true
+}
