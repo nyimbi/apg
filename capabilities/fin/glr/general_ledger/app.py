@@ -159,8 +159,8 @@ try:
 			pass
 
 		try:
-			from .api import blueprint as api_bp
-			app.register_blueprint(api_bp, url_prefix="/api/v1")
+			from .api import bp as api_bp
+			app.register_blueprint(api_bp)  # bp already has url_prefix="/api/glr"
 		except (ImportError, AttributeError):
 			pass
 
