@@ -194,7 +194,11 @@ def test_add_insurance():
 def test_merge_patients_requires_approval():
 	s = svc()
 	p1 = make_patient(s)
-	p2 = make_patient(s)
+	p2 = run(s.register_patient(PatientCreate(
+		tenant_id="t", first_name="John", last_name="Jones",
+		date_of_birth=datetime(1985, 3, 10), gender_code="male",
+		phone="555-9999", created_by="registrar",
+	)))
 	try:
 		run(s.merge_patients("t", p1.id, p2.id, ""))
 		assert False

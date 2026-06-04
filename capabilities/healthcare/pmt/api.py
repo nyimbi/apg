@@ -55,7 +55,8 @@ def register_patient():
 	data.setdefault("tenant_id", _tenant())
 	_dt(data, "date_of_birth")
 	try:
-		patient = _run(_svc.register_patient(PatientCreate(**data)))
+		from .models import PatientCreate as PC
+		patient = _run(_svc.register_patient(PC(**data)))
 		return jsonify(patient.model_dump(mode="json")), 201
 	except (PolicyViolationError, ValueError) as e:
 		return _err(str(e), 403 if isinstance(e, PolicyViolationError) else 400)
@@ -102,7 +103,13 @@ def admit_patient():
 def discharge_patient(admission_id: str):
 	data = request.get_json(silent=True) or {}
 	try:
-		admission = _run(_svc.discharge_patient(_tenant(), admission_id, data.get("disposition", ""), data.get("physician_order_present", False)))
+		admission = _run(_svc.discharge_patient(
+			_tenant(), admission_id,
+			data.get("disposition", "home"),
+			physician_order_present=data.get("physician_order_present", False),
+			discharge_type=data.get("discharge_type", "planned"),
+			condition_on_discharge=data.get("condition_on_discharge", "improved"),
+		))
 		if admission is None:
 			return _err("admission_not_found", 404)
 		return jsonify(admission.model_dump(mode="json"))

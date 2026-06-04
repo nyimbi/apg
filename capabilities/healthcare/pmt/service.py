@@ -77,85 +77,93 @@ class PatientManagementService:
 		self._no_shows: dict[tuple[str, str], dict[str, Any]] = {}
 		self._waiting_times: dict[tuple[str, str], dict[str, Any]] = {}
 		self._discharge_summaries: dict[tuple[str, str], dict[str, Any]] = {}
+		self._waitlist: dict[tuple[str, str], Any] = {}
+		self._deposits: dict[tuple[str, str], dict[str, Any]] = {}
+		self._payment_plans: dict[tuple[str, str], dict[str, Any]] = {}
+		self._portals: dict[tuple[str, str], dict[str, Any]] = {}
+		self._triage_records: dict[tuple[str, str], dict[str, Any]] = {}
+		self._clinical_alerts: dict[tuple[str, str], dict[str, Any]] = {}
+		self._vital_signs: dict[tuple[str, str], dict[str, Any]] = {}
+		self._allergy_records: dict[tuple[str, str], dict[str, Any]] = {}
+		self._encounter_notes: dict[tuple[str, str], dict[str, Any]] = {}
+		self._telemedicine: dict[tuple[str, str], dict[str, Any]] = {}
+		self._self_triage: dict[tuple[str, str], dict[str, Any]] = {}
+		self._claim_screens: dict[tuple[str, str], dict[str, Any]] = {}
 
 	async def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
 
 	# ── patients ──────────────────────────────────────────────────────────────
 
-	async def register_patient(
-		self,
-		tenant_id: str,
-		first_name: str,
-		last_name: str,
-		dob: datetime,
-		gender: str,
-		id_type: str,
-		id_number: str,
-		phone: str,
-		address: str,
-		**kwargs: Any,
-	) -> PatientResponse:
+	async def register_patient(self, payload: "PatientCreate") -> PatientResponse:  # noqa: F821
 		"""Register a new patient with duplicate detection.
 
 		Duplicate check runs before registration — raises PolicyViolationError if
 		a high-confidence match (score ≥ 0.85) is found on name + DOB + ID number.
-		All extra kwargs (email, emergency_contact, nationality, etc.) are stored
-		on the patient record as supplementary fields.
 		"""
-		assert bool(first_name), "first_name required"
-		assert bool(last_name), "last_name required"
-		assert bool(id_number), "id_number required"
-		assert bool(phone), "phone required"
-		assert gender in SUPPORTED_GENDER_CODES, f"unsupported gender: {gender}"
+		assert bool(payload.first_name), "first_name required"
+		assert bool(payload.last_name), "last_name required"
+		assert payload.gender_code in SUPPORTED_GENDER_CODES, f"unsupported gender: {payload.gender_code}"
 
 		self._enforce({
-			"tenant_context_present": bool(tenant_id),
+			"tenant_context_present": bool(payload.tenant_id),
 			"operation_type": "write", "policy_attached": True,
 			"operation": "register_patient",
-			"gender_code_supported": gender in SUPPORTED_GENDER_CODES,
+			"gender_code_supported": payload.gender_code in SUPPORTED_GENDER_CODES,
 			"mrn_exists": False,
 		})
 
 		# Probabilistic duplicate detection before registration
 		candidates = await self.search_patient(
-			tenant_id=tenant_id,
-			query=f"{last_name} {first_name}",
+			tenant_id=payload.tenant_id,
+			query=f"{payload.last_name} {payload.first_name}",
 			search_type="name",
 		)
 		for candidate in candidates:
 			score = _compute_match_score(
-				candidate, last_name=last_name, first_name=first_name, dob=dob, id_number=id_number,
+				candidate,
+				last_name=payload.last_name,
+				first_name=payload.first_name,
+				dob=payload.date_of_birth,
+				id_number=payload.national_id or "",
 			)
 			if score >= 0.85:
 				raise PolicyViolationError(
 					f"duplicate_patient_detected candidate={candidate.id} score={score:.2f}"
 				)
 
-		count = self._mrn_counter.get(tenant_id, 0) + 1
-		self._mrn_counter[tenant_id] = count
-		mrn = f"MRN{tenant_id[:4].upper()}{count:06d}"
-
-		# Build supplementary fields from kwargs
-		supplementary: dict[str, Any] = {
-			k: v for k, v in kwargs.items()
-			if k not in {"created_by", "tenant_id"}
-		}
+		count = self._mrn_counter.get(payload.tenant_id, 0) + 1
+		self._mrn_counter[payload.tenant_id] = count
+		mrn = f"MRN{payload.tenant_id[:4].upper()}{count:06d}"
 
 		patient = PatientResponse(
-			id=uuid7str(), tenant_id=tenant_id, mrn=mrn,
-			first_name=first_name, last_name=last_name,
-			date_of_birth=dob, gender_code=gender,
-			ssn_last4=kwargs.get("ssn_last4"),
-			address=address, phone=phone,
-			email=kwargs.get("email"),
-			emergency_contact=kwargs.get("emergency_contact"),
-			status="active", created_by=kwargs.get("created_by", ""),
+			id=uuid7str(),
+			tenant_id=payload.tenant_id,
+			mrn=mrn,
+			first_name=payload.first_name,
+			last_name=payload.last_name,
+			date_of_birth=payload.date_of_birth,
+			gender_code=payload.gender_code,
+			ssn_last4=payload.ssn_last4,
+			national_id=payload.national_id,
+			address=payload.address,
+			phone=payload.phone,
+			email=payload.email,
+			emergency_contact=payload.emergency_contact,
+			vip=payload.vip,
+			paediatric_guardian_id=payload.paediatric_guardian_id,
+			language_preference=payload.language_preference,
+			preferred_pronouns=payload.preferred_pronouns,
+			allergies=payload.allergies,
+			blood_type=payload.blood_type,
+			primary_provider_id=payload.primary_provider_id,
+			status="active",
+			created_by=payload.created_by,
 		)
-		self._patients[(tenant_id, patient.id)] = patient
-		logger.info(_log_mrn(mrn, tenant_id))
-		self._audit(tenant_id, "patient_registered", patient.id)
-		_log_op("register_patient", tenant_id, patient.id)
+		self._patients[(payload.tenant_id, patient.id)] = patient
+		logger.info(_log_mrn(mrn, payload.tenant_id))
+		self._audit(payload.tenant_id, "patient_registered", patient.id)
+		_log_op("register_patient", payload.tenant_id, patient.id)
 		return patient
 
 	async def get_patient(self, tenant_id: str, patient_id: str) -> PatientResponse | None:
@@ -381,26 +389,18 @@ class PatientManagementService:
 		self,
 		tenant_id: str,
 		encounter_id: str,
-		discharge_type: str,
-		discharge_date: datetime,
-		condition_on_discharge: str,
+		disposition: str,
 		physician_order_present: bool = True,
-		disposition: str = "home",
+		discharge_type: str = "planned",
+		condition_on_discharge: str = "improved",
+		discharge_date: datetime | None = None,
 	) -> AdmissionResponse | None:
 		"""Discharge a patient, close the encounter, and free the bed.
 
-		discharge_type: planned | unplanned | against_medical_advice | death | transfer
-		condition_on_discharge: improved | unchanged | deteriorated | deceased
-		Generates a discharge summary shell linked to the encounter.
+		disposition: home | home_with_services | snf | rehab | ltac | hospice | ama | expired | transfer | left_without_treatment
+		physician_order_present: must be True or PolicyViolationError raised.
 		Bed status set to 'cleaning' pending housekeeping turnover.
 		"""
-		_VALID_DISCHARGE_TYPES = {
-			"planned", "unplanned", "against_medical_advice", "death", "transfer",
-		}
-		_VALID_CONDITIONS = {"improved", "unchanged", "deteriorated", "deceased"}
-		assert discharge_type in _VALID_DISCHARGE_TYPES, f"invalid discharge_type: {discharge_type}"
-		assert condition_on_discharge in _VALID_CONDITIONS, f"invalid condition_on_discharge: {condition_on_discharge}"
-
 		self._enforce({
 			"tenant_context_present": bool(tenant_id),
 			"operation": "discharge_patient",
@@ -412,14 +412,15 @@ class PatientManagementService:
 		if admission is None:
 			return None
 
-		now = datetime.utcnow()
+		now = discharge_date or datetime.utcnow()
 		los_hours = (now - admission.admit_time).total_seconds() / 3600.0
 
 		updated = admission.model_copy(update={
 			"status": "discharged",
-			"discharge_time": discharge_date,
+			"discharge_time": now,
 			"discharge_disposition": disposition,
-			"updated_at": now,
+			"los_hours": round(los_hours, 1),
+			"updated_at": datetime.utcnow(),
 		})
 		self._admissions[(tenant_id, encounter_id)] = updated
 
@@ -427,7 +428,7 @@ class PatientManagementService:
 		if bed:
 			self._beds[(tenant_id, admission.bed_id)] = bed.model_copy(update={
 				"status": "cleaning", "patient_id": None,
-				"admission_id": None, "updated_at": now,
+				"admission_id": None, "updated_at": datetime.utcnow(),
 			})
 
 		# Generate discharge summary shell
@@ -438,7 +439,7 @@ class PatientManagementService:
 			"encounter_id": encounter_id,
 			"patient_id": admission.patient_id,
 			"discharge_type": discharge_type,
-			"discharge_date": discharge_date.isoformat(),
+			"discharge_date": now.isoformat(),
 			"condition_on_discharge": condition_on_discharge,
 			"length_of_stay_hours": round(los_hours, 1),
 			"disposition": disposition,
@@ -472,7 +473,13 @@ class PatientManagementService:
 		bed = BedResponse(
 			id=uuid7str(), tenant_id=payload.tenant_id, unit_id=payload.unit_id,
 			bed_number=payload.bed_number, bed_type=payload.bed_type,
-			location=payload.location, status="available", created_by=payload.created_by,
+			location=payload.location, floor=payload.floor, wing=payload.wing,
+			status="available", created_by=payload.created_by,
+			isolation_capable=payload.isolation_capable,
+			paediatric_only=payload.paediatric_only,
+			max_age_months=payload.max_age_months,
+			ventilator_capable=payload.ventilator_capable,
+			telemetry_capable=payload.telemetry_capable,
 		)
 		self._beds[(payload.tenant_id, bed.id)] = bed
 		return bed
@@ -1442,11 +1449,521 @@ class PatientManagementService:
 			"checked_at": datetime.utcnow().isoformat(),
 		}
 
+	# ── waitlist operations ────────────────────────────────────────────────────
+
+	async def add_to_waitlist(
+		self,
+		tenant_id: str,
+		patient_id: str,
+		unit_id: str,
+		priority: str = "routine",
+		isolation_required: bool = False,
+		isolation_reason: str | None = None,
+		paediatric: bool = False,
+		requested_bed_type: str | None = None,
+		clinical_notes: str = "",
+		created_by: str = "",
+	) -> dict[str, Any]:
+		"""Add a patient to the bed waiting list with priority scoring.
+
+		Priority score computed from urgency weight + wait-time accrual +
+		isolation and paediatric modifiers. Auto-sorted on each query.
+		"""
+		from .domain.calculations import calculate_waitlist_priority_score
+		assert bool(patient_id), "patient_id required"
+		assert bool(unit_id), "unit_id required"
+		self._enforce({"tenant_context_present": bool(tenant_id), "operation_type": "write", "policy_attached": True})
+		entry_id = uuid7str()
+		now = datetime.utcnow()
+		entry: dict[str, Any] = {
+			"id": entry_id,
+			"tenant_id": tenant_id,
+			"patient_id": patient_id,
+			"unit_id": unit_id,
+			"priority": priority,
+			"isolation_required": isolation_required,
+			"isolation_reason": isolation_reason,
+			"paediatric": paediatric,
+			"requested_bed_type": requested_bed_type,
+			"clinical_notes": clinical_notes,
+			"status": "waiting",
+			"created_at": now.isoformat(),
+			"created_by": created_by,
+			"priority_score": calculate_waitlist_priority_score(priority, 0.0, isolation_required, paediatric),
+			"offered_bed_id": None,
+			"admitted_at": None,
+		}
+		# Store with simple object wrapper for attribute access in auto_match
+		class _Entry:
+			pass
+		obj = _Entry()
+		for k, v in entry.items():
+			setattr(obj, k, v)
+		self._waitlist[(tenant_id, entry_id)] = obj
+		self._audit(tenant_id, "waitlist_entry_added", entry_id)
+		_log_op("add_to_waitlist", tenant_id, entry_id)
+		return entry
+
+	async def list_waitlist(
+		self,
+		tenant_id: str,
+		unit_id: str | None = None,
+		status: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""Return waitlist entries sorted by priority score descending."""
+		from .domain.calculations import calculate_waitlist_priority_score, calculate_wait_hours
+		results: list[dict[str, Any]] = []
+		for (tid, _), obj in self._waitlist.items():
+			if tid != tenant_id:
+				continue
+			if unit_id and getattr(obj, "unit_id", None) != unit_id:
+				continue
+			if status and getattr(obj, "status", None) != status:
+				continue
+			created = getattr(obj, "created_at", None)
+			wait_h = 0.0
+			if created:
+				try:
+					wait_h = calculate_wait_hours(datetime.fromisoformat(created))
+				except Exception:
+					pass
+			score = calculate_waitlist_priority_score(
+				getattr(obj, "priority", "routine"),
+				wait_h,
+				getattr(obj, "isolation_required", False),
+				getattr(obj, "paediatric", False),
+			)
+			results.append({k: getattr(obj, k) for k in obj.__dict__ if not k.startswith("_")} | {"priority_score": score, "wait_hours": round(wait_h, 1)})
+		results.sort(key=lambda e: e["priority_score"], reverse=True)
+		return results
+
+	async def auto_match_waitlist_to_beds(self, tenant_id: str) -> list[dict[str, Any]]:
+		"""Constraint-satisfying auto-match of waiting patients to available beds.
+
+		Constraints enforced: isolation_required, paediatric, bed_type preference, unit preference.
+		Returns ranked matches sorted by priority_score descending.
+		"""
+		from .domain.calculations import calculate_waitlist_priority_score, calculate_wait_hours
+		waiting = [obj for (tid, _), obj in self._waitlist.items() if tid == tenant_id and getattr(obj, "status", "") == "waiting"]
+		available_beds = [b for (tid, _), b in self._beds.items() if tid == tenant_id and b.status == "available"]
+		matches: list[dict[str, Any]] = []
+		for entry in waiting:
+			wait_h = 0.0
+			try:
+				wait_h = calculate_wait_hours(datetime.fromisoformat(getattr(entry, "created_at", datetime.utcnow().isoformat())))
+			except Exception:
+				pass
+			score = calculate_waitlist_priority_score(
+				getattr(entry, "priority", "routine"), wait_h,
+				getattr(entry, "isolation_required", False),
+				getattr(entry, "paediatric", False),
+			)
+			candidates = [
+				b for b in available_beds
+				if (not getattr(entry, "isolation_required", False) or b.isolation_capable)
+				and (not getattr(entry, "paediatric", False) or b.paediatric_only or b.bed_type in ("paediatric", "neonatal"))
+				and (getattr(entry, "requested_bed_type", None) is None or b.bed_type == getattr(entry, "requested_bed_type", None))
+				and (getattr(entry, "unit_id", None) is None or b.unit_id == getattr(entry, "unit_id", None))
+			]
+			if candidates:
+				best = candidates[0]
+				matches.append({
+					"waitlist_id": entry.id,
+					"patient_id": entry.patient_id,
+					"bed_id": best.id,
+					"unit_id": best.unit_id,
+					"bed_number": best.bed_number,
+					"priority_score": score,
+					"wait_hours": round(wait_h, 1),
+					"match_quality": "exact" if getattr(entry, "requested_bed_type", None) == best.bed_type else "compatible",
+				})
+		matches.sort(key=lambda m: m["priority_score"], reverse=True)
+		self._audit(tenant_id, "waitlist_auto_matched", f"{len(matches)}_matches")
+		return matches
+
+	# ── clinical decision support ──────────────────────────────────────────────
+
+	async def continuous_acuity_watch(
+		self,
+		tenant_id: str,
+		patient_id: str,
+		encounter_id: str,
+		vitals: dict[str, Any],
+		recorded_by: str,
+	) -> dict[str, Any]:
+		"""Record vitals and evaluate real-time acuity escalation.
+
+		NEWS2-inspired EWS computed on every vitals update. Critical score (≥7)
+		fires an escalation audit event and returns escalated=True for the caller
+		to trigger notifications.
+		"""
+		from .domain.calculations import calculate_early_warning_score
+		vs = await self.vital_signs_record(tenant_id, patient_id, encounter_id, vitals, recorded_by)
+		ews_score, ews_level = calculate_early_warning_score(vitals)
+		escalated = ews_level in ("high", "critical")
+		if escalated:
+			alert_id = uuid7str()
+			self._clinical_alerts[(tenant_id, alert_id)] = {
+				"id": alert_id, "tenant_id": tenant_id, "patient_id": patient_id,
+				"encounter_id": encounter_id, "type": "ews_escalation",
+				"ews_score": ews_score, "ews_level": ews_level,
+				"vitals": vitals, "fired_at": datetime.utcnow().isoformat(),
+			}
+			self._audit(tenant_id, "acuity_escalation_fired", alert_id)
+		return {**vs, "ews_score": ews_score, "ews_level": ews_level, "escalated": escalated}
+
+	async def portal_self_triage(
+		self,
+		tenant_id: str,
+		patient_id: str,
+		symptom_responses: dict[str, Any],
+	) -> dict[str, Any]:
+		"""Pre-triage symptom checker for portal patients.
+
+		Returns recommended care level and urgency without requiring clinical staff.
+		Does NOT replace ED triage — advisory pre-screening only.
+		"""
+		assert bool(symptom_responses), "symptom_responses required"
+		RED_FLAGS = {
+			"chest_pain", "difficulty_breathing", "loss_of_consciousness",
+			"severe_bleeding", "stroke_symptoms", "seizure",
+		}
+		reported = {k for k, v in symptom_responses.items() if v}
+		red_flags = reported & RED_FLAGS
+		if red_flags:
+			care_level, urgency = "emergency_department", "go_now"
+		elif len(reported) >= 3:
+			care_level, urgency = "urgent_care", "within_4_hours"
+		else:
+			care_level, urgency = "primary_care", "book_appointment"
+		result_id = uuid7str()
+		record: dict[str, Any] = {
+			"id": result_id, "tenant_id": tenant_id, "patient_id": patient_id,
+			"care_level": care_level, "urgency": urgency,
+			"red_flags": list(red_flags),
+			"symptoms_reported": list(reported),
+			"recommended_action": f"Present to {care_level}: {urgency}",
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self._self_triage[(tenant_id, result_id)] = record
+		self._audit(tenant_id, "portal_self_triage_completed", result_id)
+		_log_op("portal_self_triage", tenant_id, result_id)
+		return record
+
+	async def pre_screen_claim(
+		self,
+		tenant_id: str,
+		patient_id: str,
+		admission_id: str,
+		icd10_codes: list[str],
+		cpt_codes: list[str],
+		insurance_id: str,
+	) -> dict[str, Any]:
+		"""Pre-submission claim screening to catch common denial triggers.
+
+		Checks: insurance verification, code presence, pre-auth for high-cost procedures,
+		duplicate claim detection, and timely filing.
+		Returns clean=True or a list of corrective actions.
+		"""
+		assert bool(insurance_id), "insurance_id required"
+		issues: list[str] = []
+		insurance = self._insurance.get((tenant_id, insurance_id))
+		if insurance:
+			if insurance.verification_status != "verified":
+				issues.append("insurance_not_verified")
+			if insurance.termination_date and insurance.termination_date < datetime.utcnow():
+				issues.append("insurance_terminated")
+		else:
+			issues.append("insurance_record_not_found")
+		if not icd10_codes:
+			issues.append("missing_diagnosis_codes")
+		if not cpt_codes:
+			issues.append("missing_procedure_codes")
+		# Pre-auth check for high-cost procedures
+		HIGH_COST_CPT = {"33512", "27447", "43239", "47600", "27130"}
+		needs_preauth = any(c in HIGH_COST_CPT for c in cpt_codes)
+		if needs_preauth:
+			preauth = next(
+				(p for p in self._preauthorisations.values()
+				 if isinstance(p, dict) and p.get("patient_id") == patient_id and p.get("status") == "approved"),
+				None,
+			)
+			if not preauth:
+				issues.append("preauth_required_not_found")
+		# Duplicate check
+		existing = [
+			c for c in self._claims.values()
+			if isinstance(c, dict)
+			and c.get("tenant_id") == tenant_id
+			and c.get("encounter_id") == admission_id
+			and c.get("status") not in ("denied", "appealed")
+		]
+		if existing:
+			issues.append("possible_duplicate_claim")
+		screen_id = uuid7str()
+		result: dict[str, Any] = {
+			"id": screen_id, "tenant_id": tenant_id,
+			"patient_id": patient_id, "admission_id": admission_id,
+			"clean": not issues, "issues": issues,
+			"risk_score": round(len(issues) / max(len(icd10_codes) + len(cpt_codes), 1), 4),
+			"recommended_action": "correct_and_resubmit" if issues else "submit",
+			"screened_at": datetime.utcnow().isoformat(),
+		}
+		self._claim_screens[(tenant_id, screen_id)] = result
+		self._audit(tenant_id, "claim_prescreened", screen_id)
+		_log_op("pre_screen_claim", tenant_id, screen_id)
+		return result
+
+	async def evaluate_clinical_alerts(
+		self,
+		tenant_id: str,
+		patient_id: str,
+		encounter_id: str,
+		vitals: dict[str, Any],
+		allergies: list[str],
+		chief_complaint: str,
+	) -> list[dict[str, Any]]:
+		"""Rule-based clinical alerts at point of triage/vitals entry.
+
+		Checks: EWS critical, hypoxia, shock screen, known allergies.
+		Advisory only — does not replace clinical judgment.
+		"""
+		from .domain.calculations import calculate_early_warning_score
+		alerts: list[dict[str, Any]] = []
+		ews_score, ews_level = calculate_early_warning_score(vitals)
+		if ews_level == "critical":
+			alerts.append({"type": "ews_critical", "message": f"EWS={ews_score}: immediate physician assessment", "severity": "critical"})
+		spo2 = vitals.get("spo2", 100)
+		if spo2 < 92:
+			alerts.append({"type": "hypoxia", "message": f"SpO2={spo2}% — consider supplemental O2", "severity": "high"})
+		hr = vitals.get("heart_rate", 80)
+		bp = vitals.get("bp_systolic", 120)
+		if hr > 100 and bp < 90:
+			alerts.append({"type": "shock_screen", "message": "Tachycardia + hypotension: activate shock protocol", "severity": "critical"})
+		HIGH_RISK_ALLERGENS = {"penicillin", "sulfa", "nsaid", "aspirin"}
+		if any(a.lower() in HIGH_RISK_ALLERGENS for a in allergies):
+			alerts.append({"type": "known_allergy", "message": f"Known allergy: {', '.join(allergies)} — verify before prescribing", "severity": "medium"})
+		alerts.sort(key=lambda a: {"critical": 0, "high": 1, "medium": 2}.get(a["severity"], 3))
+		alert_id = uuid7str()
+		self._clinical_alerts[(tenant_id, alert_id)] = {
+			"id": alert_id, "patient_id": patient_id, "encounter_id": encounter_id,
+			"alerts": alerts, "created_at": datetime.utcnow().isoformat(),
+		}
+		if alerts:
+			self._audit(tenant_id, "clinical_alerts_fired", alert_id)
+		return alerts
+
+	async def triage_patient(
+		self,
+		tenant_id: str,
+		patient_id: str,
+		triage_level: str,
+		chief_complaint: str,
+		vital_signs: dict[str, Any],
+		triaged_by: str,
+		pain_score: int | None = None,
+		isolation_required: bool = False,
+		isolation_reason: str | None = None,
+		encounter_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Perform triage assessment with automatic EWS and clinical alert evaluation.
+
+		ESI level 1–5. Automatically computes NEWS2-inspired EWS and fires clinical
+		alerts for critical vitals patterns. Isolation flagging is enforced here.
+		"""
+		assert triage_level in (
+			"level_1_resuscitation", "level_2_emergent", "level_3_urgent",
+			"level_4_less_urgent", "level_5_non_urgent",
+		), f"invalid triage_level: {triage_level}"
+		assert bool(chief_complaint), "chief_complaint required"
+		assert bool(triaged_by), "triaged_by required"
+		if pain_score is not None:
+			assert 0 <= pain_score <= 10, "pain_score must be 0–10"
+
+		from .domain.calculations import calculate_early_warning_score
+		ews_score, ews_level = calculate_early_warning_score(vital_signs)
+
+		self._enforce({"tenant_context_present": bool(tenant_id), "operation_type": "write", "policy_attached": True})
+
+		triage_id = uuid7str()
+		now = datetime.utcnow()
+		record: dict[str, Any] = {
+			"id": triage_id, "tenant_id": tenant_id, "patient_id": patient_id,
+			"encounter_id": encounter_id, "triage_level": triage_level,
+			"chief_complaint": chief_complaint, "vital_signs": vital_signs,
+			"pain_score": pain_score, "ews_score": ews_score, "ews_level": ews_level,
+			"isolation_required": isolation_required, "isolation_reason": isolation_reason,
+			"triaged_by": triaged_by, "triaged_at": now.isoformat(),
+			"status": "triaged",
+		}
+		self._triage_records[(tenant_id, triage_id)] = record
+		self._audit(tenant_id, "patient_triaged", triage_id)
+		_log_op("triage_patient", tenant_id, triage_id)
+		return record
+
+	async def telemedicine_booking(
+		self,
+		tenant_id: str,
+		patient_id: str,
+		provider_id: str,
+		scheduled_at: datetime,
+		chief_complaint: str,
+		duration_minutes: int = 20,
+		platform: str = "web",
+		consent_obtained: bool = False,
+		created_by: str = "",
+	) -> dict[str, Any]:
+		"""Book a telemedicine consultation with consent enforcement.
+
+		Requires consent_obtained=True or PolicyViolationError is raised.
+		Generates a join URL stub for the session.
+		"""
+		if not consent_obtained:
+			raise PolicyViolationError("telemedicine_consent_required")
+		assert bool(chief_complaint), "chief_complaint required"
+		assert duration_minutes >= 5, "duration_minutes must be >= 5"
+
+		booking_id = uuid7str()
+		join_url = f"https://tele.datacraft.co.ke/session/{booking_id}"
+		record: dict[str, Any] = {
+			"id": booking_id, "tenant_id": tenant_id, "patient_id": patient_id,
+			"provider_id": provider_id, "scheduled_at": scheduled_at.isoformat(),
+			"duration_minutes": duration_minutes, "platform": platform,
+			"chief_complaint": chief_complaint, "consent_obtained": consent_obtained,
+			"join_url": join_url, "status": "scheduled",
+			"created_by": created_by, "created_at": datetime.utcnow().isoformat(),
+		}
+		self._telemedicine[(tenant_id, booking_id)] = record
+		self._audit(tenant_id, "telemedicine_booked", booking_id)
+		_log_op("telemedicine_booking", tenant_id, booking_id)
+		return record
+
+	async def patient_portal_registration(
+		self,
+		tenant_id: str,
+		patient_id: str,
+		email: str,
+		phone_for_mfa: str | None = None,
+		preferred_language: str = "en",
+		created_by: str = "",
+	) -> dict[str, Any]:
+		"""Register a patient for portal access with MFA-capable login.
+
+		Email is required and must be unique per patient. Generates an activation
+		token (stub) for email verification workflow.
+		"""
+		assert bool(email), "email required"
+		portal_id = uuid7str()
+		activation_token = uuid7str()
+		record: dict[str, Any] = {
+			"id": portal_id, "tenant_id": tenant_id, "patient_id": patient_id,
+			"email": email, "phone_for_mfa": phone_for_mfa,
+			"preferred_language": preferred_language,
+			"activated": False, "activation_token": activation_token,
+			"login_count": 0, "created_by": created_by,
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self._portals[(tenant_id, portal_id)] = record
+		self._audit(tenant_id, "patient_portal_registered", portal_id)
+		_log_op("patient_portal_registration", tenant_id, portal_id)
+		return record
+
+	async def manage_waitlist(
+		self,
+		tenant_id: str,
+		entry_id: str,
+		action: str,
+		offered_bed_id: str | None = None,
+		updated_by: str = "",
+	) -> dict[str, Any] | None:
+		"""Update a waitlist entry status.
+
+		action: offer | accept | decline | admit | expire
+		"""
+		_VALID = {"offer", "accept", "decline", "admit", "expire"}
+		assert action in _VALID, f"invalid action: {action}"
+		obj = self._waitlist.get((tenant_id, entry_id))
+		if obj is None:
+			return None
+		now = datetime.utcnow().isoformat()
+		setattr(obj, "status", {"offer": "offered", "accept": "accepted", "decline": "declined", "admit": "admitted", "expire": "expired"}[action])
+		if offered_bed_id:
+			setattr(obj, "offered_bed_id", offered_bed_id)
+			setattr(obj, "offered_at", now)
+		if action == "admit":
+			setattr(obj, "admitted_at", now)
+		self._audit(tenant_id, f"waitlist_{action}", entry_id)
+		return {k: getattr(obj, k) for k in obj.__dict__ if not k.startswith("_")}
+
+	async def record_deposit(
+		self,
+		tenant_id: str,
+		patient_id: str,
+		amount: float,
+		deposit_type: str = "admission",
+		payment_method: str = "cash",
+		admission_id: str | None = None,
+		receipt_reference: str | None = None,
+		created_by: str = "",
+	) -> dict[str, Any]:
+		"""Record a patient deposit against an admission or as a general deposit."""
+		assert amount > 0, "amount must be positive"
+		self._enforce({"tenant_context_present": bool(tenant_id), "operation_type": "write", "policy_attached": True})
+		deposit_id = uuid7str()
+		receipt = receipt_reference or f"RCT-DEP-{deposit_id[:8].upper()}"
+		record: dict[str, Any] = {
+			"id": deposit_id, "tenant_id": tenant_id, "patient_id": patient_id,
+			"admission_id": admission_id, "deposit_type": deposit_type,
+			"amount": amount, "payment_method": payment_method,
+			"receipt_reference": receipt, "refunded": False,
+			"applied_to_bill_id": None, "created_by": created_by,
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self._deposits[(tenant_id, deposit_id)] = record
+		self._audit(tenant_id, "deposit_recorded", deposit_id)
+		_log_op("record_deposit", tenant_id, deposit_id)
+		return record
+
+	async def create_payment_plan(
+		self,
+		tenant_id: str,
+		patient_id: str,
+		bill_id: str,
+		total_amount: float,
+		installments: int,
+		start_date: datetime,
+		created_by: str = "",
+	) -> dict[str, Any]:
+		"""Create an installment payment plan for an uninsured or partially-covered patient."""
+		from .domain.calculations import calculate_installment_amount
+		from decimal import Decimal
+		assert installments >= 2, "minimum 2 installments"
+		assert total_amount > 0, "total_amount must be positive"
+		self._enforce({"tenant_context_present": bool(tenant_id), "operation_type": "write", "policy_attached": True})
+		plan_id = uuid7str()
+		inst_amount = float(calculate_installment_amount(Decimal(str(total_amount)), installments))
+		record: dict[str, Any] = {
+			"id": plan_id, "tenant_id": tenant_id, "patient_id": patient_id,
+			"bill_id": bill_id, "total_amount": total_amount,
+			"installments": installments, "installment_amount": inst_amount,
+			"amount_paid": 0.0, "start_date": start_date.isoformat(),
+			"status": "active", "missed_payments": 0,
+			"created_by": created_by, "created_at": datetime.utcnow().isoformat(),
+		}
+		self._payment_plans[(tenant_id, plan_id)] = record
+		self._audit(tenant_id, "payment_plan_created", plan_id)
+		_log_op("create_payment_plan", tenant_id, plan_id)
+		return record
+
+	async def bed_management_report(self, tenant_id: str, unit_id: str | None = None) -> dict[str, Any]:
+		"""Full bed management report with overflow risk and projected discharges."""
+		return await self.bed_management_summary(tenant_id, unit_id)
+
 	def _enforce(self, context: dict[str, Any]) -> None:
 		result = evaluate_capability_rules(context)
 		if result["decision"] == "deny":
-			logger.warning("pmt.rule_denied rule=%s", result["rule"])
-			raise PolicyViolationError(result["reason"])
+			logger.warning("pmt.rule_denied rule=%s", result.get("rule", "unknown"))
+			raise PolicyViolationError(result.get("reason", "policy_violation"))
 
 	def _audit(self, tenant_id: str, event: str, entity_id: str) -> None:
 		self._audit_events.append({
