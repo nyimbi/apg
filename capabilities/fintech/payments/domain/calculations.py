@@ -670,3 +670,524 @@ def reconcile_amounts(
 		"variances": variances,
 		"reconciled": len(variances) == 0,
 	}
+
+
+# ---------------------------------------------------------------------------
+# Improvement 1: Semantic duplicate detection
+# ---------------------------------------------------------------------------
+
+def semantic_duplicate_score(
+	ref1: str,
+	ref2: str,
+	phone1: str,
+	phone2: str,
+	amount1: Decimal,
+	amount2: Decimal,
+	seconds_apart: float,
+	window: float = 300,
+) -> float:
+	"""Return 0.0–1.0 probability that two transactions are the same payment.
+
+	Combines: reference similarity (character overlap), phone match, amount match,
+	temporal proximity.  Score > 0.85 → treat as duplicate.
+
+	Args:
+		ref1, ref2: Payment references.
+		phone1, phone2: Normalised MSISDN strings.
+		amount1, amount2: Transaction amounts.
+		seconds_apart: Time delta between transactions.
+		window: Rolling dedup window in seconds (default 300 = 5 min).
+
+	Returns:
+		Float in [0.0, 1.0].
+	"""
+	if phone1 != phone2 or amount1 != amount2:
+		return 0.0
+	if seconds_apart > window:
+		return 0.0
+	longer = max(len(ref1), len(ref2))
+	if longer == 0:
+		return 1.0
+	common = sum(a == b for a, b in zip(ref1, ref2))
+	ref_sim = common / longer
+	time_sim = 1.0 - (seconds_apart / window)
+	return (ref_sim * 0.6) + (time_sim * 0.4)
+
+
+# ---------------------------------------------------------------------------
+# Improvement 2: Float exhaustion forecasting
+# ---------------------------------------------------------------------------
+
+def float_exhaustion_eta(
+	current_float: Decimal,
+	burn_rate_per_hour: Decimal,
+	pending_batch_total: Decimal,
+	safety_buffer_pct: float = 0.15,
+) -> dict[str, Any]:
+	"""Estimate when float will be exhausted given current burn rate.
+
+	Args:
+		current_float: Current agent/wallet float balance.
+		burn_rate_per_hour: Average disbursement rate per hour (historical).
+		pending_batch_total: Total of all queued/pending batch payments.
+		safety_buffer_pct: Safety margin to keep in float (default 15%).
+
+	Returns:
+		Dict with eta_hours, requires_topup, recommended_topup_amount.
+	"""
+	effective_float = current_float * Decimal(str(1 - safety_buffer_pct))
+	if burn_rate_per_hour > 0:
+		hours_to_exhaustion = float(effective_float / burn_rate_per_hour)
+	else:
+		hours_to_exhaustion = 999.0
+	requires_topup = pending_batch_total > effective_float
+	recommended = max(
+		Decimal("0"),
+		pending_batch_total - current_float + (current_float * Decimal("0.20")),
+	).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+	return {
+		"current_float": str(current_float),
+		"effective_float": str(effective_float.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)),
+		"burn_rate_per_hour": str(burn_rate_per_hour),
+		"pending_batch_total": str(pending_batch_total),
+		"eta_hours": round(hours_to_exhaustion, 1),
+		"requires_topup": requires_topup,
+		"recommended_topup": str(recommended),
+		"safety_buffer_pct": safety_buffer_pct,
+	}
+
+
+# ---------------------------------------------------------------------------
+# Improvement 4: Optimal payment route selection
+# ---------------------------------------------------------------------------
+
+def optimal_payment_route(
+	amount: Decimal,
+	recipient_capabilities: list[str],
+	currency: str = "KES",
+	priority: str = "cost",
+) -> list[dict[str, Any]]:
+	"""Rank available payment rails by cost, speed, or reliability.
+
+	Args:
+		amount: Transaction amount.
+		recipient_capabilities: Rails available for this recipient, e.g.
+		    ["mpesa", "airtel", "bank_eft"].
+		currency: ISO currency code.
+		priority: "cost" | "speed" | "reliability".
+
+	Returns:
+		List of route dicts ordered by the selected priority criterion.
+	"""
+	routes: list[dict[str, Any]] = []
+
+	if "mpesa" in recipient_capabilities and currency == "KES":
+		fee = mpesa_fee(amount)
+		routes.append({
+			"method": "mpesa_stk",
+			"fee": str(fee.total),
+			"fee_breakdown": {"base": str(fee.base_fee), "excise": str(fee.excise_duty)},
+			"eta_seconds": 30,
+			"success_rate": 0.97,
+			"cost_score": float(fee.total),
+		})
+
+	if "airtel" in recipient_capabilities and currency == "KES":
+		fee = airtel_money_fee(amount)
+		routes.append({
+			"method": "airtel_money",
+			"fee": str(fee.total),
+			"fee_breakdown": {"base": str(fee.base_fee), "excise": str(fee.excise_duty)},
+			"eta_seconds": 45,
+			"success_rate": 0.94,
+			"cost_score": float(fee.total),
+		})
+
+	if "bank_eft" in recipient_capabilities:
+		fee = bank_eft_fee(amount, currency)
+		routes.append({
+			"method": "bank_eft",
+			"fee": str(fee.total),
+			"fee_breakdown": {"base": str(fee.base_fee), "excise": str(fee.excise_duty), "vat": str(fee.vat)},
+			"eta_seconds": 3600,
+			"success_rate": 0.999,
+			"cost_score": float(fee.total),
+		})
+
+	if "pesalink" in recipient_capabilities and currency == "KES":
+		fee = pesalink_fee(amount)
+		routes.append({
+			"method": "pesalink",
+			"fee": str(fee.total),
+			"fee_breakdown": {"base": str(fee.base_fee), "excise": str(fee.excise_duty)},
+			"eta_seconds": 60,
+			"success_rate": 0.998,
+			"cost_score": float(fee.total),
+		})
+
+	if "mtn" in recipient_capabilities:
+		fee = mtn_momo_fee(amount, currency if currency != "KES" else "UGX")
+		routes.append({
+			"method": "mtn_momo",
+			"fee": str(fee.total),
+			"fee_breakdown": {"base": str(fee.base_fee)},
+			"eta_seconds": 60,
+			"success_rate": 0.93,
+			"cost_score": float(fee.total),
+		})
+
+	if not routes:
+		routes.append({
+			"method": "bank_eft",
+			"fee": str(bank_eft_fee(amount, currency).total),
+			"eta_seconds": 3600,
+			"success_rate": 0.999,
+			"cost_score": float(bank_eft_fee(amount, currency).total),
+		})
+
+	if priority == "cost":
+		routes.sort(key=lambda r: r["cost_score"])
+	elif priority == "speed":
+		routes.sort(key=lambda r: r["eta_seconds"])
+	elif priority == "reliability":
+		routes.sort(key=lambda r: -r["success_rate"])
+
+	for i, r in enumerate(routes):
+		r["rank"] = i + 1
+
+	return routes
+
+
+# ---------------------------------------------------------------------------
+# Improvement 5: Velocity-adaptive transaction limits
+# ---------------------------------------------------------------------------
+
+def behavioral_limit_multiplier(
+	account_age_days: int,
+	total_txn_count: int,
+	success_rate: float,
+	dispute_rate: float,
+	aml_flags: int,
+	kyc_tier: str,
+) -> dict[str, Any]:
+	"""Calculate a dynamic limit multiplier for a customer based on behaviour.
+
+	Base multiplier: 1.0.  Max: 3.0.  Min: 0.5 if flagged.
+
+	Rules:
+	  +0.5 per 90 days of clean history (max +1.5 = 3 quarters)
+	  -0.5 per AML flag
+	  -0.3 if success_rate < 0.9
+	  -0.5 if dispute_rate > 0.005 (0.5%)
+
+	Args:
+		account_age_days: Days since account opened.
+		total_txn_count: Total lifetime transaction count.
+		success_rate: Fraction of transactions that succeeded (0.0–1.0).
+		dispute_rate: Fraction of transactions disputed (0.0–1.0).
+		aml_flags: Number of active AML flags.
+		kyc_tier: KYC tier string (basic/standard/full_kyc/enhanced).
+
+	Returns:
+		Dict with multiplier, effective daily limit (relative), reason, reviewable.
+	"""
+	if aml_flags > 0:
+		return {
+			"multiplier": "0.5",
+			"reason": "aml_flags",
+			"reviewable": True,
+			"kyc_tier": kyc_tier,
+			"aml_flags": aml_flags,
+		}
+
+	multiplier = Decimal("1.0")
+	clean_quarters = min(account_age_days // 90, 3)
+	multiplier += Decimal(str(clean_quarters * 0.5))
+
+	if success_rate < 0.9:
+		multiplier -= Decimal("0.3")
+	if dispute_rate > 0.005:
+		multiplier -= Decimal("0.5")
+
+	multiplier = max(Decimal("0.5"), min(Decimal("3.0"), multiplier))
+	multiplier = multiplier.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+	tier_base_limits = {
+		"basic": Decimal("300000"),
+		"standard": Decimal("1000000"),
+		"full_kyc": Decimal("5000000"),
+		"enhanced": Decimal("999999999"),
+	}
+	base = tier_base_limits.get(kyc_tier, Decimal("300000"))
+	effective = (base * multiplier).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+
+	return {
+		"multiplier": str(multiplier),
+		"base_daily_limit": str(base),
+		"effective_daily_limit": str(effective),
+		"reason": "behavioral_assessment",
+		"reviewable": False,
+		"kyc_tier": kyc_tier,
+		"clean_quarters": clean_quarters,
+		"success_rate": success_rate,
+		"dispute_rate": dispute_rate,
+	}
+
+
+# ---------------------------------------------------------------------------
+# Improvement 6: FX rate lock (micro-hedge)
+# ---------------------------------------------------------------------------
+
+def fx_rate_lock(
+	from_currency: str,
+	to_currency: str,
+	amount: Decimal,
+	lock_duration_seconds: int = 300,
+	spread_bps: int = 150,
+) -> dict[str, Any]:
+	"""Generate a rate-lock quote valid for lock_duration_seconds.
+
+	Guarantees the converted amount for the duration of the lock.  After
+	expiry the rate is re-quoted at current market, with customer notification.
+
+	Args:
+		from_currency: Source currency ISO code.
+		to_currency: Target currency ISO code.
+		amount: Amount to convert.
+		lock_duration_seconds: Seconds the locked rate is guaranteed (default 300).
+		spread_bps: Spread applied to mid-rate (default 150 bps = 1.5%).
+
+	Returns:
+		Dict with lock_id, locked_rate, guaranteed amounts, expiry_iso.
+	"""
+	from datetime import datetime, timezone, timedelta
+
+	result = fx_convert(amount, from_currency, to_currency, spread_bps=spread_bps)
+	expiry = datetime.now(timezone.utc) + timedelta(seconds=lock_duration_seconds)
+	lock_id = f"fxlock-{from_currency}-{to_currency}-{int(amount)}-{int(expiry.timestamp())}"
+
+	return {
+		"lock_id": lock_id,
+		"from_amount": str(amount),
+		"from_currency": from_currency.upper(),
+		"to_amount": str(result.to_amount),
+		"to_currency": to_currency.upper(),
+		"locked_rate": str(result.effective_rate),
+		"mid_rate": str(result.mid_rate),
+		"spread_bps": spread_bps,
+		"guaranteed_to_amount": str(result.to_amount),
+		"expires_at": expiry.isoformat(),
+		"lock_duration_seconds": lock_duration_seconds,
+		"fee": str(result.fee),
+	}
+
+
+# ---------------------------------------------------------------------------
+# Improvement 7: Chargeback win probability scoring
+# ---------------------------------------------------------------------------
+
+def chargeback_win_probability(
+	three_ds_result: str | None,
+	avs_result: str,
+	cvv_result: str,
+	customer_txn_history_count: int,
+	minutes_since_txn: float,
+	dispute_reason: str,
+) -> dict[str, Any]:
+	"""Score the merchant's probability of winning a chargeback dispute.
+
+	Args:
+		three_ds_result: 3DS authentication result (Y/A/N/None).
+		avs_result: Address Verification result (Y/N/P).
+		cvv_result: CVV match result (M/N/P).
+		customer_txn_history_count: Number of prior transactions from this customer.
+		minutes_since_txn: Minutes elapsed since the original transaction.
+		dispute_reason: Dispute reason string (e.g. "unauthorised").
+
+	Returns:
+		Dict with win_probability, evidence_strength, recommended_action.
+	"""
+	score = Decimal("0.5")
+	evidence: list[str] = []
+
+	if three_ds_result in ("Y", "A"):
+		score += Decimal("0.25")
+		evidence.append("3ds_authenticated")
+
+	if avs_result == "Y":
+		score += Decimal("0.10")
+		evidence.append("avs_matched")
+
+	if cvv_result == "M":
+		score += Decimal("0.10")
+		evidence.append("cvv_matched")
+
+	if customer_txn_history_count > 5:
+		score += Decimal("0.05")
+		evidence.append("established_customer")
+
+	# 3DS shifts liability to issuer for unauthorised fraud claims
+	if dispute_reason == "unauthorised" and three_ds_result in ("Y", "A"):
+		score = min(score, Decimal("0.85"))
+		evidence.append("liability_shifted_to_issuer")
+
+	# Time penalty: disputes raised quickly are harder to contest
+	if minutes_since_txn < 5:
+		score -= Decimal("0.05")
+		evidence.append("dispute_very_recent")
+
+	score = min(Decimal("0.95"), max(Decimal("0.05"), score))
+	score = score.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+	if score >= Decimal("0.70"):
+		action = "contest"
+		confidence = "high" if len(evidence) >= 3 else "medium"
+	elif score >= Decimal("0.40"):
+		action = "investigate"
+		confidence = "medium"
+	else:
+		action = "accept"
+		confidence = "low"
+
+	return {
+		"win_probability": str(score),
+		"evidence_strength": evidence,
+		"recommended_action": action,
+		"confidence": confidence,
+		"dispute_reason": dispute_reason,
+	}
+
+
+# ---------------------------------------------------------------------------
+# Improvement 8: Batch failure classification and recovery routing
+# ---------------------------------------------------------------------------
+
+def classify_batch_failure(
+	error_code: str,
+	amount: Decimal,
+	phone: str,
+	kyc_tier: str = "basic",
+) -> dict[str, Any]:
+	"""Classify a batch payment failure and recommend a recovery action.
+
+	Args:
+		error_code: Provider or domain error code string.
+		amount: Original transaction amount.
+		phone: Recipient phone (may be malformed).
+		kyc_tier: KYC tier of the sender.
+
+	Returns:
+		Dict with action (retry|reroute|split|skip|escalate), reason,
+		auto_recoverable, patched_params.
+	"""
+	recovery_map: dict[str, tuple[str, str]] = {
+		"mpesa_invalid_phone":          ("skip",    "Phone not normalised — skip and flag"),
+		"invalid_phone":                ("skip",    "Invalid phone number — skip and flag"),
+		"mpesa_amount_above_maximum":   ("split",   "Split into multiple transactions"),
+		"mpesa_insufficient_float":     ("reroute", "Route via bank EFT"),
+		"kyc_per_txn_limit_exceeded":   ("split",   "Split to respect KYC tier limit"),
+		"duplicate_payment_detected":   ("skip",    "Already paid — skip safely"),
+		"network_timeout":              ("retry",   "Transient network error — retry with backoff"),
+		"provider_timeout":             ("retry",   "Provider timeout — retry with backoff"),
+		"insufficient_balance":         ("escalate","Insufficient sender balance — manual review"),
+		"account_suspended":            ("escalate","Account suspended — compliance review required"),
+	}
+
+	action, reason = recovery_map.get(error_code.lower(), ("escalate", "Manual review required"))
+
+	tier_limits = {
+		"basic": Decimal("150000"),
+		"standard": Decimal("500000"),
+		"full_kyc": Decimal("1000000"),
+		"enhanced": Decimal("999999999"),
+	}
+	patched: dict[str, Any] = {}
+
+	if action == "split":
+		limit = tier_limits.get(kyc_tier, Decimal("150000"))
+		if amount > limit:
+			n = int(amount / limit) + 1
+			per = (amount / Decimal(str(n))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+			patched["split_amounts"] = [str(per)] * n
+			patched["split_count"] = n
+
+	if action == "retry":
+		patched["backoff_ms"] = [5000, 15000, 45000]
+		patched["max_attempts"] = 3
+
+	return {
+		"original_error": error_code,
+		"action": action,
+		"reason": reason,
+		"auto_recoverable": action != "escalate",
+		"patched_params": patched,
+	}
+
+
+# ---------------------------------------------------------------------------
+# Improvement 9: Intraday settlement schedule
+# ---------------------------------------------------------------------------
+
+def intraday_settlement_schedule(
+	transactions: list[dict[str, Any]],
+	cycle_hours: int = 4,
+	processing_fee_bps: int = 200,
+	provisional_credit_pct: float = 0.90,
+) -> list[dict[str, Any]]:
+	"""Generate intraday settlement buckets from a list of completed transactions.
+
+	Splits transactions into cycle buckets and for each calculates:
+	  - provisional_credit: Fraction credited immediately (default 90%).
+	  - final_credit: Residual released at cycle close.
+	  - net_after_fees: Gross minus processing fee.
+
+	Args:
+		transactions: List of completed transaction dicts (must have created_at, amount).
+		cycle_hours: Hours per settlement cycle (e.g. 4 = 6 cycles/day).
+		processing_fee_bps: Processing fee in basis points.
+		provisional_credit_pct: Fraction of net credited immediately.
+
+	Returns:
+		List of settlement cycle dicts ordered by cycle number (most recent first).
+	"""
+	from datetime import datetime, timezone
+
+	cycles: dict[int, list[dict[str, Any]]] = {}
+	now = datetime.now(timezone.utc)
+
+	for txn in transactions:
+		raw = txn.get("created_at", now.isoformat())
+		try:
+			if isinstance(raw, str):
+				dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+			else:
+				dt = raw
+			if dt.tzinfo is None:
+				dt = dt.replace(tzinfo=timezone.utc)
+			age_seconds = (now - dt).total_seconds()
+			cycle_num = max(0, int(age_seconds / (cycle_hours * 3600)))
+		except (ValueError, TypeError):
+			cycle_num = 0
+		cycles.setdefault(cycle_num, []).append(txn)
+
+	results: list[dict[str, Any]] = []
+	for cycle_num, txns in sorted(cycles.items()):
+		gross = sum(Decimal(str(t.get("amount", "0"))) for t in txns)
+		sr = settlement_net(gross, processing_fee_bps)
+		net = sr.net_amount
+		provisional = (net * Decimal(str(provisional_credit_pct))).quantize(
+			Decimal("0.01"), rounding=ROUND_HALF_UP
+		)
+		final = (net - provisional).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+		results.append({
+			"cycle": cycle_num,
+			"cycle_description": f"T+{cycle_num * cycle_hours}h–{(cycle_num + 1) * cycle_hours}h",
+			"txn_count": len(txns),
+			"gross": str(gross),
+			"processing_fee": str(sr.processing_fee),
+			"net": str(net),
+			"provisional_credit": str(provisional),
+			"final_credit": str(final),
+			"provisional_credit_pct": provisional_credit_pct,
+		})
+	return results

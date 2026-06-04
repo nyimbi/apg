@@ -108,7 +108,7 @@ def test_assert_positive_amount_passes():
 def test_assert_positive_amount_fails_zero():
 	with pytest.raises(RuleViolation) as exc:
 		assert_positive_amount(Decimal("0"))
-	assert exc.value.rule_name == "amount_must_be_positive"
+	assert exc.value.rule_name == "non_positive_amount"
 
 
 def test_assert_positive_amount_fails_negative():

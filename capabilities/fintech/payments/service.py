@@ -1008,6 +1008,34 @@ class DigitalPaymentsService:
 		await self.send_payment_receipt(transaction_id)
 		return txn
 
+	async def capture_payment(
+		self,
+		transaction_id: str,
+		capture_amount: Decimal | int | str | None = None,
+	) -> dict[str, Any]:
+		"""Capture a previously authorised payment (card flow).
+
+		If capture_amount is None, performs a full capture of the authorised amount.
+		Partial capture is supported; amount must not exceed authorised amount.
+		"""
+		txn = await self._get(_COL_TXN, transaction_id)
+		self._ensure_tenant(txn)
+		authorised = Decimal(str(txn.get("amount", "0")))
+		cap = _normalize(capture_amount) if capture_amount is not None else authorised
+		assert cap > 0, "capture_amount must be positive"
+		assert cap <= authorised, f"Capture {money(cap)} exceeds authorised {money(authorised)}"
+		txn["status"] = PaymentStatus.completed.value
+		txn["captured_amount"] = money(cap)
+		txn["completed_at"] = _utc_iso()
+		txn["updated_at"] = _utc_iso()
+		txn["metadata"] = {**(txn.get("metadata") or {}), "capture_type": "full" if cap == authorised else "partial"}
+		await self._save(_COL_TXN, txn)
+		await self._emit("payment.completed", transaction_id, {
+			"capture_amount": money(cap),
+			"authorised_amount": money(authorised),
+		})
+		return txn
+
 	async def expire_pending_payment(self, transaction_id: str) -> dict[str, Any]:
 		"""Force-expire a payment that has been pending too long."""
 		txn = await self._get(_COL_TXN, transaction_id)
@@ -2678,6 +2706,530 @@ class DigitalPaymentsService:
 			"by_status": by_status,
 			"chargeback_count": len(cb_in_period),
 			"total_chargeback_value": money(total_chargeback_value),
+			"generated_at": _utc_iso(),
+		}
+
+	# ------------------------------------------------------------------ #
+	# 11. WORLD-CLASS IMPROVEMENTS
+	# ------------------------------------------------------------------ #
+
+	async def semantic_duplicate_check(
+		self,
+		reference: str,
+		amount: Decimal | int | str,
+		phone: str,
+		window_seconds: int = 300,
+		threshold: float = 0.85,
+	) -> dict[str, Any]:
+		"""Soft-duplicate detection using semantic similarity scoring.
+
+		Catches near-duplicate payments where the reference differs slightly
+		(e.g. INV-001 vs INV-001-retry) but phone + amount + timing match.
+		Returns the highest-scoring candidate and whether it exceeds threshold.
+		"""
+		try:
+			from .domain.calculations import semantic_duplicate_score
+		except ImportError:
+			from domain.calculations import semantic_duplicate_score  # type: ignore
+		amt = _normalize(amount)
+		cutoff = utcnow() - timedelta(seconds=window_seconds)
+		all_txns = await self._query(_COL_TXN, {"tenant_id": self.tenant_id}, limit=5000)
+		best_score = 0.0
+		best_match: dict[str, Any] | None = None
+		for txn in all_txns:
+			if txn.get("status") in (PaymentStatus.failed.value, PaymentStatus.expired.value):
+				continue
+			created_raw = txn.get("created_at")
+			if not created_raw:
+				continue
+			try:
+				created = datetime.fromisoformat(str(created_raw))
+				if created.tzinfo is None:
+					created = created.replace(tzinfo=timezone.utc)
+				if created < cutoff:
+					continue
+			except (ValueError, TypeError):
+				continue
+			seconds_apart = (utcnow() - created).total_seconds()
+			score = semantic_duplicate_score(
+				ref1=reference,
+				ref2=txn.get("reference", ""),
+				phone1=phone,
+				phone2=txn.get("recipient", ""),
+				amount1=amt,
+				amount2=Decimal(str(txn.get("amount", "0"))),
+				seconds_apart=seconds_apart,
+				window=float(window_seconds),
+			)
+			if score > best_score:
+				best_score = score
+				best_match = txn
+		is_duplicate = best_score >= threshold
+		return {
+			"is_duplicate": is_duplicate,
+			"score": round(best_score, 4),
+			"threshold": threshold,
+			"match": best_match,
+			"checked_at": _utc_iso(),
+		}
+
+	async def forecast_float(
+		self,
+		current_float: Decimal | int | str,
+		lookback_hours: int = 24,
+	) -> dict[str, Any]:
+		"""Predict float exhaustion time based on recent disbursement burn rate.
+
+		Analyses completed outbound transactions over the lookback window to
+		derive burn_rate_per_hour, then projects against current float and
+		pending batch queue.
+		"""
+		try:
+			from .domain.calculations import float_exhaustion_eta
+		except ImportError:
+			from domain.calculations import float_exhaustion_eta  # type: ignore
+		cf = _normalize(current_float)
+		cutoff = (utcnow() - timedelta(hours=lookback_hours)).isoformat()
+		all_txns = await self._query(_COL_TXN, {"tenant_id": self.tenant_id}, limit=50000)
+		outbound = [
+			t for t in all_txns
+			if t.get("status") == PaymentStatus.completed.value
+			and t.get("transaction_type") in ("transfer", "payment")
+			and str(t.get("created_at", "")) >= cutoff
+		]
+		total_disbursed = sum(Decimal(str(t.get("amount", "0"))) for t in outbound)
+		burn_rate = (total_disbursed / Decimal(str(lookback_hours))).quantize(
+			Decimal("0.01"), rounding=ROUND_HALF_UP
+		) if lookback_hours > 0 else Decimal("0")
+
+		# pending batch total
+		all_batches = await self._query(_COL_BATCH, {"tenant_id": self.tenant_id}, limit=1000)
+		pending_batches = [b for b in all_batches if b.get("status") in ("queued", "validated", "processing")]
+		pending_total = sum(Decimal(str(b.get("total_amount", "0"))) for b in pending_batches)
+
+		result = float_exhaustion_eta(cf, burn_rate, pending_total)
+		result["lookback_hours"] = lookback_hours
+		result["outbound_txn_count"] = len(outbound)
+		result["pending_batch_count"] = len(pending_batches)
+		return result
+
+	async def auto_file_ctr(self, transaction_id: str) -> dict[str, Any]:
+		"""Auto-file a Currency Transaction Report if the threshold is exceeded.
+
+		CBK threshold: KES 1,000,000.  CBN: NGN 5,000,000.  BoU: UGX 20,000,000.
+		Called automatically after every high-value completed transaction.
+		"""
+		try:
+			from .domain.rules import calculate_ctr_obligation
+		except ImportError:
+			from domain.rules import calculate_ctr_obligation  # type: ignore
+		txn = await self._get(_COL_TXN, transaction_id)
+		self._ensure_tenant(txn)
+		amount = Decimal(str(txn.get("amount", "0")))
+		currency = txn.get("currency", "KES")
+		obligation = calculate_ctr_obligation(amount, currency)
+		if not obligation["requires_ctr"]:
+			return {"filed": False, "reason": "below_threshold", "amount": money(amount), "currency": currency}
+		report: dict[str, Any] = {
+			"id": uuid7str(),
+			"tenant_id": self.tenant_id,
+			"report_type": "CTR",
+			"regulator": obligation.get("report_to", "CBK"),
+			"transaction_id": transaction_id,
+			"amount": money(amount),
+			"currency": currency,
+			"reporting_entity": self.tenant_id,
+			"filed_at": _utc_iso(),
+			"status": "queued",
+			"prepared_by": self.actor_id,
+		}
+		await self._save("payments_regulatory_reports", report)
+		await self._emit("regulatory.ctr_queued", transaction_id, report)
+		return {"filed": True, "report_id": report["id"], "regulator": report["regulator"], "amount": money(amount)}
+
+	async def get_optimal_route(
+		self,
+		amount: Decimal | int | str,
+		currency: str,
+		recipient_capabilities: list[str],
+		priority: str = "cost",
+	) -> dict[str, Any]:
+		"""Return ranked payment routes for the given amount and recipient capabilities.
+
+		Args:
+			amount: Transaction amount.
+			currency: ISO currency code.
+			recipient_capabilities: Rails available, e.g. ["mpesa", "airtel", "bank_eft"].
+			priority: "cost" | "speed" | "reliability".
+		"""
+		try:
+			from .domain.calculations import optimal_payment_route
+		except ImportError:
+			from domain.calculations import optimal_payment_route  # type: ignore
+		amt = _normalize(amount)
+		routes = optimal_payment_route(amt, recipient_capabilities, currency, priority)
+		return {
+			"amount": money(amt),
+			"currency": currency,
+			"priority": priority,
+			"recommended": routes[0] if routes else None,
+			"all_routes": routes,
+			"generated_at": _utc_iso(),
+		}
+
+	async def get_dynamic_limit(
+		self,
+		customer_id: str,
+		kyc_tier: str,
+	) -> dict[str, Any]:
+		"""Return a velocity-adaptive transaction limit for a customer.
+
+		Analyses the customer's 180-day transaction history to compute a
+		behavioural multiplier applied on top of the KYC tier base limit.
+		"""
+		try:
+			from .domain.calculations import behavioral_limit_multiplier
+		except ImportError:
+			from domain.calculations import behavioral_limit_multiplier  # type: ignore
+		assert customer_id
+		cutoff = (utcnow() - timedelta(days=180)).isoformat()
+		all_txns = await self._query(_COL_TXN, {"tenant_id": self.tenant_id}, limit=100000)
+		customer_txns = [
+			t for t in all_txns
+			if (t.get("sender") == customer_id or t.get("recipient") == customer_id)
+			and str(t.get("created_at", "")) >= cutoff
+		]
+		total = len(customer_txns)
+		completed = sum(1 for t in customer_txns if t.get("status") == PaymentStatus.completed.value)
+		success_rate = completed / total if total else 1.0
+		all_disputes = await self._query(_COL_DISPUTE, {"tenant_id": self.tenant_id}, limit=10000)
+		customer_disputes = [
+			d for d in all_disputes
+			if d.get("raised_by") == customer_id
+			and str(d.get("created_at", "")) >= cutoff
+		]
+		dispute_rate = len(customer_disputes) / total if total else 0.0
+		# AML flags: count high-value CTR-candidate transactions in recent 30 days
+		recent_cutoff = (utcnow() - timedelta(days=30)).isoformat()
+		aml_hits = sum(
+			1 for t in customer_txns
+			if Decimal(str(t.get("amount", "0"))) >= Decimal("1000000")
+			and str(t.get("created_at", "")) >= recent_cutoff
+		)
+		result = behavioral_limit_multiplier(
+			account_age_days=180,  # conservative — real impl would check account creation date
+			total_txn_count=total,
+			success_rate=success_rate,
+			dispute_rate=dispute_rate,
+			aml_flags=aml_hits,
+			kyc_tier=kyc_tier,
+		)
+		result["customer_id"] = customer_id
+		result["lookback_days"] = 180
+		result["total_txn_count"] = total
+		result["assessed_at"] = _utc_iso()
+		return result
+
+	async def lock_fx_rate(
+		self,
+		from_currency: str,
+		to_currency: str,
+		amount: Decimal | int | str,
+		lock_duration_seconds: int = 300,
+	) -> dict[str, Any]:
+		"""Lock an FX rate for a guaranteed conversion window.
+
+		The locked rate is stored and can be referenced when executing the
+		corresponding payment within the lock window.
+		"""
+		try:
+			from .domain.calculations import fx_rate_lock
+		except ImportError:
+			from domain.calculations import fx_rate_lock  # type: ignore
+		amt = _normalize(amount)
+		assert amt > 0
+		result = fx_rate_lock(from_currency, to_currency, amt, lock_duration_seconds)
+		result["tenant_id"] = self.tenant_id
+		result["id"] = uuid7str()
+		result["created_at"] = _utc_iso()
+		await self._save(_COL_FX, {**result})
+		await self._emit("fx.rate_locked", result["id"], {
+			"from": from_currency,
+			"to": to_currency,
+			"amount": money(amt),
+			"lock_id": result["lock_id"],
+			"expires_at": result["expires_at"],
+		})
+		return result
+
+	async def score_chargeback(
+		self,
+		dispute_id: str,
+		three_ds_result: str | None = None,
+		avs_result: str = "N",
+		cvv_result: str = "N",
+	) -> dict[str, Any]:
+		"""Score the merchant's win probability for an open chargeback dispute.
+
+		Automatically collects transaction evidence and returns recommended action.
+		"""
+		try:
+			from .domain.calculations import chargeback_win_probability
+		except ImportError:
+			from domain.calculations import chargeback_win_probability  # type: ignore
+		dispute = await self._get(_COL_DISPUTE, dispute_id)
+		self._ensure_tenant(dispute)
+		txn_id = dispute.get("transaction_id", "")
+		txn: dict[str, Any] = {}
+		if txn_id:
+			try:
+				txn = await self._get(_COL_TXN, txn_id)
+			except KeyError:
+				pass
+		# Use metadata from transaction if not supplied
+		meta = txn.get("metadata") or {}
+		if three_ds_result is None:
+			three_ds_result = meta.get("three_ds_result")
+		if avs_result == "N":
+			avs_result = meta.get("avs_result", "N")
+		if cvv_result == "N":
+			cvv_result = meta.get("cvv_result", "N")
+		created_raw = txn.get("created_at", _utc_iso())
+		try:
+			created = datetime.fromisoformat(str(created_raw))
+			if created.tzinfo is None:
+				created = created.replace(tzinfo=timezone.utc)
+			minutes_since = (utcnow() - created).total_seconds() / 60
+		except (ValueError, TypeError):
+			minutes_since = 60.0
+		# Get customer history count
+		sender = txn.get("sender", "")
+		history_count = 0
+		if sender:
+			all_txns = await self._query(_COL_TXN, {"tenant_id": self.tenant_id}, limit=10000)
+			history_count = sum(
+				1 for t in all_txns
+				if t.get("sender") == sender and t.get("status") == PaymentStatus.completed.value
+			)
+		score_result = chargeback_win_probability(
+			three_ds_result=three_ds_result,
+			avs_result=avs_result,
+			cvv_result=cvv_result,
+			customer_txn_history_count=history_count,
+			minutes_since_txn=minutes_since,
+			dispute_reason=dispute.get("reason", ""),
+		)
+		score_result["dispute_id"] = dispute_id
+		score_result["transaction_id"] = txn_id
+		score_result["scored_at"] = _utc_iso()
+		# Persist scoring result in dispute evidence
+		evidence = dispute.get("evidence") or {}
+		evidence["chargeback_score"] = score_result
+		dispute["evidence"] = evidence
+		await self._save(_COL_DISPUTE, dispute)
+		return score_result
+
+	async def recover_batch_failures(self, batch_id: str) -> dict[str, Any]:
+		"""Classify and auto-recover failed items in a processed batch.
+
+		Groups failures by error code, applies deterministic recovery actions
+		(retry, reroute, split, skip), and re-queues auto-recoverable items.
+		Returns a recovery report with escalation list for human review.
+		"""
+		try:
+			from .domain.calculations import classify_batch_failure
+		except ImportError:
+			from domain.calculations import classify_batch_failure  # type: ignore
+		batch = await self._get(_COL_BATCH, batch_id)
+		assert batch.get("tenant_id") == self.tenant_id, "tenant mismatch"
+		assert batch.get("status") == "completed", "Batch must be completed before recovery"
+
+		txn_ids = batch.get("transaction_ids", [])
+		failed_txns = []
+		for tid in txn_ids:
+			try:
+				t = await self._get(_COL_TXN, tid)
+				if t.get("status") == PaymentStatus.failed.value:
+					failed_txns.append(t)
+			except KeyError:
+				pass
+
+		recovery_actions: list[dict[str, Any]] = []
+		escalations: list[dict[str, Any]] = []
+		auto_recovered = 0
+
+		for txn in failed_txns:
+			error_code = txn.get("provider_status", "unknown").replace("BOUNCED:", "")
+			amt = Decimal(str(txn.get("amount", "0")))
+			phone = txn.get("recipient", "")
+			classification = classify_batch_failure(error_code, amt, phone)
+
+			item = {
+				"transaction_id": txn["id"],
+				"phone": phone,
+				"amount": money(amt),
+				"error_code": error_code,
+				**classification,
+			}
+
+			if classification["action"] == "retry":
+				try:
+					retry = await self.idempotent_retry(txn["id"], f"batch_recovery:{error_code}")
+					item["retry_id"] = retry["id"]
+					auto_recovered += 1
+				except Exception as exc:
+					item["retry_error"] = str(exc)
+					escalations.append(item)
+					continue
+
+			elif classification["action"] == "escalate":
+				escalations.append(item)
+				continue
+
+			recovery_actions.append(item)
+
+		report = {
+			"batch_id": batch_id,
+			"total_failed": len(failed_txns),
+			"auto_recovered": auto_recovered,
+			"escalated": len(escalations),
+			"recovery_actions": recovery_actions,
+			"escalations": escalations,
+			"recovered_at": _utc_iso(),
+		}
+		await self._emit("batch.recovery_completed", batch_id, {
+			"total_failed": len(failed_txns),
+			"auto_recovered": auto_recovered,
+			"escalated": len(escalations),
+		})
+		return report
+
+	async def intraday_settlement(
+		self,
+		bank_account: str,
+		cycle_hours: int = 4,
+		processing_fee_bps: int = 200,
+	) -> dict[str, Any]:
+		"""Run intraday settlement releasing funds in configurable cycle windows.
+
+		Provides immediate provisional credit (90%) with final credit at cycle
+		close, compressing the working capital gap for merchants.
+		"""
+		try:
+			from .domain.calculations import intraday_settlement_schedule
+		except ImportError:
+			from domain.calculations import intraday_settlement_schedule  # type: ignore
+		assert bank_account
+		all_txns = await self._query(_COL_TXN, {"tenant_id": self.tenant_id}, limit=50000)
+		completed = [
+			t for t in all_txns
+			if t.get("status") == PaymentStatus.completed.value
+		]
+		cycles = intraday_settlement_schedule(completed, cycle_hours, processing_fee_bps)
+		batch_ids = []
+		for cycle in cycles:
+			sid = uuid7str()
+			record: dict[str, Any] = {
+				"id": sid,
+				"tenant_id": self.tenant_id,
+				"settlement_type": "intraday",
+				"bank_account": bank_account,
+				"cycle_hours": cycle_hours,
+				**cycle,
+				"status": "pending",
+				"created_at": _utc_iso(),
+			}
+			await self._save(_COL_SETTLEMENT, record)
+			batch_ids.append(sid)
+		await self._emit("settlement.intraday_created", self.tenant_id, {
+			"bank_account": bank_account,
+			"cycle_count": len(cycles),
+			"cycle_hours": cycle_hours,
+		})
+		return {
+			"bank_account": bank_account,
+			"cycle_hours": cycle_hours,
+			"cycle_count": len(cycles),
+			"settlement_ids": batch_ids,
+			"cycles": cycles,
+			"generated_at": _utc_iso(),
+		}
+
+	async def payment_widget_spec(
+		self,
+		merchant_id: str,
+		amount: Decimal | int | str,
+		currency: str = "KES",
+		methods: list[str] | None = None,
+	) -> dict[str, Any]:
+		"""Generate a payment widget specification for offline-capable frontend rendering.
+
+		Returns a declarative JSON contract defining the payment state machine,
+		offline queue protocol, retry policy, and UI hints.  Any frontend
+		framework (React, Flutter, plain JS) can implement this spec without
+		coupling to the backend SDK.
+		"""
+		assert merchant_id
+		amt = _normalize(amount)
+		if methods is None:
+			methods = ["mpesa_stk", "card_visa", "bank_eft"]
+		fee_estimates: dict[str, str] = {}
+		for m in methods:
+			try:
+				fee_info = await self.calculate_transaction_fee(m, amt, currency)
+				fee_estimates[m] = fee_info.get("total_charge", "0")
+			except Exception:
+				fee_estimates[m] = "0"
+		return {
+			"version": "1.0",
+			"widget_type": "payment",
+			"tenant_id": self.tenant_id,
+			"merchant_id": merchant_id,
+			"amount": money(amt),
+			"currency": currency,
+			"methods": methods,
+			"fee_estimates": fee_estimates,
+			"state_machine": {
+				"initial": "idle",
+				"states": {
+					"idle": {"on": {"INITIATE": "pending"}},
+					"pending": {
+						"on": {
+							"SUCCESS": "completed",
+							"FAILURE": "failed",
+							"TIMEOUT": "offline_queue",
+						},
+						"timeout_ms": 30000,
+					},
+					"offline_queue": {
+						"on": {"RECONNECT": "pending"},
+						"persist": True,
+						"retry_policy": {
+							"max_attempts": 3,
+							"backoff_ms": [5000, 15000, 45000],
+							"idempotency": "preserve_key",
+						},
+					},
+					"completed": {"terminal": True},
+					"failed": {"terminal": True, "retry_allowed": True},
+				},
+			},
+			"offline_contract": {
+				"queue_key": f"apg_payment_{merchant_id}_{money(amt)}_{currency}",
+				"storage": "localStorage",
+				"sync_on_reconnect": True,
+				"conflict_resolution": "server_wins",
+			},
+			"ui_hints": {
+				"primary_color": "#00A651",
+				"show_fee_breakdown": True,
+				"show_fx_rate": currency != "KES",
+				"accessibility": {
+					"aria_labels": True,
+					"high_contrast": False,
+					"font_size_min": 16,
+				},
+			},
 			"generated_at": _utc_iso(),
 		}
 

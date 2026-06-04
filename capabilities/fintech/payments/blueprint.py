@@ -567,7 +567,11 @@ def create_blueprint(
 		Body: reason
 		"""
 		b = _body()
-		result = _run(_svc().process_reversal(txn_id, b.get("reason", "wrong_number")))
+		result = _run(_svc().process_reversal(
+			txn_id,
+			b.get("reason", "wrong_number"),
+			b.get("reversal_code", "REV-MANUAL"),
+		))
 		return _ok(result, 201)
 
 	# ------------------------------------------------------------------ #
@@ -891,6 +895,148 @@ def create_blueprint(
 		"""Payment operations dashboard KPIs."""
 		svc = _svc()
 		result = svc.describe(_tenant())
+		return _ok(result)
+
+	# ------------------------------------------------------------------ #
+	# World-class improvement endpoints
+	# ------------------------------------------------------------------ #
+
+	@bp.post("/duplicate-check")
+	@catch_errors
+	def semantic_duplicate_check():
+		"""Soft-duplicate detection using semantic similarity scoring.
+
+		Body: reference, amount, phone, window_seconds (optional), threshold (optional)
+		"""
+		b = _body()
+		result = _run(_svc().semantic_duplicate_check(
+			reference=b["reference"],
+			amount=Decimal(str(b["amount"])),
+			phone=b["phone"],
+			window_seconds=int(b.get("window_seconds", 300)),
+			threshold=float(b.get("threshold", 0.85)),
+		))
+		return _ok(result)
+
+	@bp.get("/float/forecast")
+	@catch_errors
+	def forecast_float():
+		"""Predict float exhaustion time based on recent burn rate.
+
+		Query: current_float, lookback_hours (optional)
+		"""
+		current = Decimal(str(request.args.get("current_float", "0")))
+		lookback = int(request.args.get("lookback_hours", 24))
+		result = _run(_svc().forecast_float(current, lookback))
+		return _ok(result)
+
+	@bp.post("/transactions/<txn_id>/file-ctr")
+	@catch_errors
+	def file_ctr(txn_id: str):
+		"""Auto-file a Currency Transaction Report for a high-value transaction."""
+		result = _run(_svc().auto_file_ctr(txn_id))
+		return _ok(result)
+
+	@bp.post("/routing/optimal")
+	@catch_errors
+	def optimal_route():
+		"""Return ranked payment routes for a given amount and recipient capabilities.
+
+		Body: amount, currency, recipient_capabilities[], priority (cost|speed|reliability)
+		"""
+		b = _body()
+		result = _run(_svc().get_optimal_route(
+			amount=Decimal(str(b["amount"])),
+			currency=b.get("currency", "KES"),
+			recipient_capabilities=b.get("recipient_capabilities", ["mpesa", "bank_eft"]),
+			priority=b.get("priority", "cost"),
+		))
+		return _ok(result)
+
+	@bp.get("/customers/<customer_id>/dynamic-limit")
+	@catch_errors
+	def dynamic_limit(customer_id: str):
+		"""Return velocity-adaptive transaction limit for a customer.
+
+		Query: kyc_tier
+		"""
+		result = _run(_svc().get_dynamic_limit(
+			customer_id=customer_id,
+			kyc_tier=request.args.get("kyc_tier", "basic"),
+		))
+		return _ok(result)
+
+	@bp.post("/fx/lock")
+	@catch_errors
+	def lock_fx_rate():
+		"""Lock an FX rate for a guaranteed conversion window.
+
+		Body: from_currency, to_currency, amount, lock_duration_seconds (optional)
+		"""
+		b = _body()
+		result = _run(_svc().lock_fx_rate(
+			from_currency=b["from_currency"],
+			to_currency=b["to_currency"],
+			amount=Decimal(str(b["amount"])),
+			lock_duration_seconds=int(b.get("lock_duration_seconds", 300)),
+		))
+		return _ok(result, 201)
+
+	@bp.post("/disputes/<dispute_id>/score")
+	@catch_errors
+	def score_chargeback(dispute_id: str):
+		"""Score merchant win probability for a chargeback dispute.
+
+		Body: three_ds_result (optional), avs_result (optional), cvv_result (optional)
+		"""
+		b = _body()
+		result = _run(_svc().score_chargeback(
+			dispute_id=dispute_id,
+			three_ds_result=b.get("three_ds_result"),
+			avs_result=b.get("avs_result", "N"),
+			cvv_result=b.get("cvv_result", "N"),
+		))
+		return _ok(result)
+
+	@bp.post("/batch/<batch_id>/recover")
+	@catch_errors
+	def recover_batch(batch_id: str):
+		"""Auto-classify and recover failed items in a completed batch."""
+		result = _run(_svc().recover_batch_failures(batch_id))
+		return _ok(result)
+
+	@bp.post("/settlement/intraday")
+	@catch_errors
+	def intraday_settlement():
+		"""Run intraday settlement with provisional credit.
+
+		Body: bank_account, cycle_hours (optional), processing_fee_bps (optional)
+		"""
+		b = _body()
+		result = _run(_svc().intraday_settlement(
+			bank_account=b["bank_account"],
+			cycle_hours=int(b.get("cycle_hours", 4)),
+			processing_fee_bps=int(b.get("processing_fee_bps", 200)),
+		))
+		return _ok(result, 201)
+
+	@bp.get("/merchants/<merchant_id>/widget-spec")
+	@catch_errors
+	def widget_spec(merchant_id: str):
+		"""Generate offline-capable payment widget specification.
+
+		Query: amount, currency, methods (comma-separated, optional)
+		"""
+		amount = Decimal(str(request.args.get("amount", "0")))
+		currency = request.args.get("currency", "KES")
+		methods_raw = request.args.get("methods", "")
+		methods = [m.strip() for m in methods_raw.split(",") if m.strip()] or None
+		result = _run(_svc().payment_widget_spec(
+			merchant_id=merchant_id,
+			amount=amount,
+			currency=currency,
+			methods=methods,
+		))
 		return _ok(result)
 
 	return bp
