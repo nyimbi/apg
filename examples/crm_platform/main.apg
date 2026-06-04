@@ -1,0 +1,108 @@
+// ============================================================================
+// CRM Platform — APG Capability Composition Example
+//
+// Composability pattern: Hub-and-Spoke
+//   auth, audl, ntfy, wflo underpin CRMCore
+//   SalesAssistant AI agent augments the pipeline
+//
+// Copyright (c) 2025 Datacraft — Nyimbi Odero
+// ============================================================================
+
+module crm_platform version 1.0.0 {
+    description: "Composable CRM platform";
+    author: "Datacraft";
+}
+
+table Contact {
+    contact_number: str;
+    first_name: str;
+    last_name: str;
+    email: str;
+    phone: str;
+    company: str;
+    status: str;
+    owner_id: str;
+}
+
+table Account {
+    account_number: str;
+    legal_name: str;
+    industry: str;
+    tier: str;
+    health_score: float;
+    owner_id: str;
+}
+
+table Opportunity {
+    opportunity_number: str;
+    account_id: str;
+    name: str;
+    stage: str;
+    amount: decimal;
+    probability: float;
+    expected_close: datetime;
+    owner_id: str;
+}
+
+capability CRMCore {
+    contract: {
+        id: crm_platform_core,
+        provides: [contact_lifecycle, account_management, opportunity_pipeline, sales_analytics],
+        requires: [auth, audl, ntfy, wflo],
+        configuration: {
+            tenant_id: "default",
+            pipeline_stages: ["prospecting", "qualification", "proposal", "negotiation", "closed_won", "closed_lost"]
+        },
+        rules: [
+            {name: "large_deal_requires_approval", when: "amount > 50000", action: require_review},
+            {name: "discount_cap", when: "discount_pct > 25", action: deny},
+            {name: "cross_tenant_denied", when: "contact_tenant != actor_tenant", action: deny}
+        ],
+        ui: {shell: python, routes: [
+            {name: "Dashboard",   path: "/crm",          component: "CRMDashboard",   permission: "crm:view"},
+            {name: "Contacts",    path: "/crm/contacts", component: "ContactList",     permission: "crm:contacts"},
+            {name: "Pipeline",    path: "/crm/pipeline", component: "Pipeline",        permission: "crm:pipeline"},
+            {name: "Analytics",   path: "/crm/analytics",component: "SalesAnalytics",  permission: "crm:analytics"}
+        ]},
+        theme: {name: crm_theme, tokens: {
+            "color.primary": "#1565C0",
+            "color.accent":  "#FF6D00",
+            "border.radius": "6px"
+        }, components: {opportunities: {icon: "target", status_indicator: "stage-chip"}}}
+    };
+    streaming: {processor: bytewax, state: crm_event_state};
+}
+
+agent SalesAssistant {
+    role: "sales assistant";
+    model: "openai:gpt-4.1-mini";
+    system: "Analyse CRM context and suggest next best actions, talking points, and risk factors.";
+    capabilities: [contact_lifecycle, opportunity_pipeline];
+    tools: [contact_search, deal_analysis];
+    memory: vector sales_memory;
+    configuration: {temperature: 0.2, max_turns: 6};
+}
+
+workflow LeadQualification {
+    steps: str = "new_lead -> researched -> contacted -> qualified -> opportunity_created";
+    human_tasks: [contacted, qualified];
+    assignments: {contacted: sales_rep, qualified: sales_manager};
+    guards: {qualified: "budget_confirmed and timeline_defined"};
+}
+
+workflow DealApproval {
+    steps: str = "submitted -> manager_review -> finance_review -> approved";
+    human_tasks: [manager_review, finance_review];
+    assignments: {manager_review: sales_manager, finance_review: finance_controller};
+    guards: {finance_review: "amount > 100000"};
+}
+
+app CRMPlatform {
+    description: "Enterprise CRM composed from APG capabilities";
+    capabilities: [CRMCore];
+    agents: [SalesAssistant];
+    routes: ["/crm", "/crm/contacts", "/crm/accounts", "/crm/pipeline"];
+    theme: {name: crm_platform_theme, tokens: {"accent": "#FF6D00", "border.radius": "6px"}};
+    runtime: {target: python, deployment: container, streaming: {processor: bytewax}};
+    deployments: {default: local, container: docker};
+}

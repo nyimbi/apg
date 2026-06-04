@@ -1,0 +1,270 @@
+// ============================================================================
+// ERP Platform — APG Capability Composition Example
+//
+// Composability pattern: Hub-and-Spoke + Pipeline
+//   GL is the financial hub; all modules post journals to GL
+//   Procurement -> AP pipeline; Sales -> AR pipeline
+//   HR -> Payroll -> GL pipeline
+//
+// Copyright (c) 2025 Datacraft — Nyimbi Odero
+// ============================================================================
+
+module enterprise_erp version 2.0.0 {
+    description: "Full-suite ERP: Finance, Procurement, Inventory, Sales, HR, Payroll";
+    author: "Datacraft";
+}
+
+// ── Core entity tables ───────────────────────────────────────────────────────
+
+table Vendor {
+    vendor_number: str;
+    legal_name: str;
+    tax_id: str;
+    payment_terms: str;
+    currency: str;
+    bank_account: str;
+    status: str;  // active | on_hold | suspended | blacklisted
+}
+
+table Customer {
+    customer_number: str;
+    legal_name: str;
+    credit_limit: decimal;
+    payment_terms: str;
+    currency: str;
+    status: str;
+}
+
+table InventoryItem {
+    sku: str;
+    description: str;
+    unit_of_measure: str;
+    cost_method: str;   // fifo | lifo | weighted_average | standard
+    reorder_point: int;
+    reorder_qty: int;
+    on_hand: int;
+    reserved: int;
+    on_order: int;
+}
+
+table Employee {
+    employee_number: str;
+    first_name: str;
+    last_name: str;
+    department: str;
+    job_grade: str;
+    basic_salary: decimal;
+    currency: str;
+    employment_type: str;  // permanent | contract | casual
+    tax_pin: str;
+    nssf_number: str;
+    bank_account: str;
+    hire_date: datetime;
+}
+
+table PurchaseOrder {
+    po_number: str;
+    vendor_id: str;
+    order_date: datetime;
+    expected_delivery: datetime;
+    currency: str;
+    total_amount: decimal;
+    status: str;  // draft | approved | sent | received | invoiced | closed
+}
+
+table SalesOrder {
+    order_number: str;
+    customer_id: str;
+    order_date: datetime;
+    required_date: datetime;
+    currency: str;
+    total_amount: decimal;
+    status: str;  // draft | confirmed | picking | shipped | invoiced | closed
+}
+
+// ── ERP Core Capability ───────────────────────────────────────────────────────
+
+capability ERPCore {
+    contract: {
+        id: enterprise_erp_core,
+        provides: [
+            procure_to_pay,
+            order_to_cash,
+            hire_to_retire,
+            inventory_management_workflow,
+            financial_consolidation,
+            management_reporting
+        ],
+        requires: [auth, audl, ntfy, wflo, comp, schd, mqeb],
+        configuration: {
+            tenant_id: "default",
+            functional_currency: "KES",
+            fiscal_year_start: "01-01",
+            multi_currency: true,
+            inventory_valuation: "weighted_average",
+            payroll_country: "KE",
+            require_po_for_ap: true,
+            three_way_match: true
+        },
+        rule_engine: {
+            type: deterministic,
+            default_decision: allow,
+            rules: [
+                {name: "po_required_for_ap",
+                 when: "invoice_type == ap and po_id missing and require_po == true",
+                 action: deny},
+                {name: "three_way_match_required",
+                 when: "three_way_match == true and match_status != matched",
+                 action: require_review},
+                {name: "credit_limit_check",
+                 when: "order_amount > customer_credit_limit",
+                 action: require_review},
+                {name: "negative_inventory_denied",
+                 when: "on_hand - reserved_lt == 0 and allow_backorder == false",
+                 action: deny},
+                {name: "payroll_requires_approved_timesheet",
+                 when: "payroll_run == true and timesheets_approved != true",
+                 action: deny},
+                {name: "vendor_on_hold_denied",
+                 when: "vendor_status == on_hold",
+                 action: deny},
+                {name: "segregation_purchase_approval",
+                 when: "requester_id == approver_id",
+                 action: deny}
+            ]
+        },
+        ui: {shell: python, routes: [
+            {name: "ERP Home",      path: "/erp",                component: "ERPDashboard",    permission: "erp:view",      nav_group: "Overview"},
+            {name: "Procurement",   path: "/erp/procurement",    component: "ProcurementHub",  permission: "erp:procurement",nav_group: "Procurement"},
+            {name: "Payables",      path: "/erp/ap",             component: "APWorkbench",     permission: "erp:ap",        nav_group: "Finance"},
+            {name: "Receivables",   path: "/erp/ar",             component: "ARWorkbench",     permission: "erp:ar",        nav_group: "Finance"},
+            {name: "General Ledger",path: "/erp/gl",             component: "GLWorkbench",     permission: "erp:gl",        nav_group: "Finance"},
+            {name: "Inventory",     path: "/erp/inventory",      component: "InventoryControl",permission: "erp:inventory", nav_group: "Operations"},
+            {name: "Sales Orders",  path: "/erp/sales",          component: "SalesOrderDesk",  permission: "erp:sales",     nav_group: "Operations"},
+            {name: "HR",            path: "/erp/hr",             component: "HRPortal",        permission: "erp:hr",        nav_group: "People"},
+            {name: "Payroll",       path: "/erp/payroll",        component: "PayrollDesk",     permission: "erp:payroll",   nav_group: "People"},
+            {name: "Reports",       path: "/erp/reports",        component: "ReportingHub",    permission: "erp:reports",   nav_group: "Reporting"}
+        ]},
+        theme: {name: erp_theme, tokens: {
+            "color.primary":   "#01579B",
+            "color.accent":    "#006064",
+            "color.success":   "#2E7D32",
+            "color.warning":   "#BF360C",
+            "color.danger":    "#B71C1C",
+            "surface.canvas":  "#F0F4F8",
+            "surface.panel":   "#FFFFFF",
+            "text.primary":    "#1A2332",
+            "text.secondary":  "#607D8B",
+            "border.radius":   "4px",
+            "density":         "compact"
+        }, components: {
+            procurement:  {icon: "shopping-cart",  status_indicator: "po-status-chip"},
+            invoices:     {icon: "file-text",      status_indicator: "invoice-status-chip"},
+            inventory:    {icon: "package",        status_indicator: "stock-level-badge"},
+            employees:    {icon: "users",          status_indicator: "employment-type-chip"}
+        }}
+    };
+    erp_modules: [finance, general_ledger, accounts_payable, accounts_receivable,
+                  procurement, inventory, sales, hr, payroll];
+    approvals: {levels: 3, approvers: [supervisor, manager, director], segregation_of_duties: true};
+    master_data: {entities: [vendor, customer, inventory_item, employee, chart_of_accounts]};
+    streaming: {processor: bytewax, stream: "apg.erp.lifecycle", key: "tenant_id",
+        events: ["po_created", "po_approved", "goods_received", "ap_invoice_matched",
+                 "so_confirmed", "shipment_dispatched", "ar_invoice_posted",
+                 "payroll_run_completed", "journal_posted", "period_closed"]};
+    i18n: {supported_languages: [en, sw], default_language: en, fallback_language: en};
+}
+
+// ── Workflows ─────────────────────────────────────────────────────────────────
+
+workflow ProcureToPay {
+    steps: str = "purchase_requisition -> po_created -> po_approved -> goods_ordered -> goods_received -> invoice_matched -> payment_approved -> payment_processed";
+    human_tasks: [po_approved, payment_approved];
+    assignments: {po_approved: procurement_manager, payment_approved: finance_manager};
+    guards: {
+        po_approved: "budget_available and vendor_approved",
+        payment_approved: "three_way_match_passed and invoice_validated"
+    };
+    compensation: {payment_processed: reverse_payment};
+}
+
+workflow OrderToCash {
+    steps: str = "quote -> so_confirmed -> credit_check -> picking -> quality_check -> dispatched -> ar_invoiced -> payment_received -> closed";
+    human_tasks: [so_confirmed, credit_check];
+    assignments: {so_confirmed: sales_rep, credit_check: credit_controller};
+    guards: {
+        so_confirmed: "customer_active and items_available",
+        ar_invoiced: "delivery_confirmed"
+    };
+}
+
+workflow HireToRetire {
+    steps: str = "job_offer -> onboarding -> probation -> confirmed -> active -> resignation -> offboarding -> terminated";
+    human_tasks: [job_offer, onboarding, probation, offboarding];
+    assignments: {job_offer: hr_manager, onboarding: hr_officer};
+}
+
+workflow MonthEndClose {
+    steps: str = "open -> accruals -> bank_recon -> sub_ledger_recon -> review -> approved -> closed -> locked";
+    human_tasks: [accruals, bank_recon, review, approved];
+    assignments: {review: controller, approved: cfo};
+    guards: {approved: "all_reconciliations_complete and no_outstanding_approvals"};
+}
+
+// ── AI ERP Assistant ──────────────────────────────────────────────────────────
+
+agent ERPAssistant {
+    role: "erp analyst";
+    model: "openai:gpt-4.1-mini";
+    system: "You assist with ERP operations: procurement analysis, cash flow forecasting, payroll queries, and inventory optimisation. Cite relevant standards (IFRS, Kenya Labour Laws, KRA requirements).";
+    capabilities: [financial_consolidation, management_reporting, inventory_management_workflow];
+    tools: [gl_query, vendor_analysis, inventory_forecast, payroll_summary];
+    memory: vector erp_memory;
+    configuration: {temperature: 0.1, max_turns: 6};
+}
+
+// ── Screens ───────────────────────────────────────────────────────────────────
+
+capability ExecutiveERP {
+    contract: {
+        id: executive_erp_view,
+        provides: [executive_erp_dashboard],
+        requires: [enterprise_erp_core],
+        configuration: {tenant_id: "default"},
+        configuration_schema: {required: ["tenant_id", "ui", "theme"]},
+        rule_engine: {type: deterministic, default_decision: allow, rules: [
+            {name: "exec_only", when: "role_not_in_executive", action: deny}
+        ]},
+        ui: {
+            shell: python, requires_theme: true, template_roots: ["templates/erp"],
+            routes: [{name: "Executive", path: "/erp/exec", component: "ERPExecutive", permission: "erp:executive"}]
+        },
+        theme: {name: erp_exec_theme, tokens: {"border.radius": "4px"}, components: {}}
+    };
+    screens: {
+        ExecutiveHome: {
+            route: "/erp/exec",
+            title: "Executive Operations Dashboard",
+            layout: dashboard,
+            contains: [RevenueKPI, CashPosition, OpenOrders, HeadcountSummary],
+            composes: [ProcurementSummary, PayrollSummary],
+            binds: [financial_consolidation.current_month, inventory_management_workflow.value],
+            actions: [export_board_pack, drill_down, schedule_report]
+        }
+    };
+}
+
+app EnterpriseERP {
+    description: "Full-suite ERP composed from APG capabilities";
+    capabilities: [ERPCore, ExecutiveERP];
+    agents: [ERPAssistant];
+    routes: ["/erp", "/erp/procurement", "/erp/ar", "/erp/ap", "/erp/gl", "/erp/payroll"];
+    components: {
+        finance_workbench: {capability: financial_consolidation, route: "/erp/gl"},
+        procurement_desk:  {capability: procure_to_pay,         route: "/erp/procurement"},
+        hr_portal:         {capability: hire_to_retire,         route: "/erp/hr"}
+    };
+    theme: {name: erp_platform_theme, tokens: {"accent": "#006064", "border.radius": "4px"}};
+    runtime: {target: python, deployment: container, streaming: {processor: bytewax}};
+    deployments: {default: local, container: docker, cloud: kubernetes};
+}

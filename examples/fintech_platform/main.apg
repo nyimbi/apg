@@ -1,0 +1,203 @@
+// ============================================================================
+// Fintech Platform — APG Capability Composition Example
+//
+// Composability pattern: Pipeline + Layered
+//   KYC must complete before payments can be processed
+//   AML screens every transaction in the pipeline
+//   Wallets and Lending are downstream of Payments
+//
+// Africa-first: M-Pesa, mobile money, CBK regulatory compliance
+//
+// Copyright (c) 2025 Datacraft — Nyimbi Odero
+// ============================================================================
+
+module fintech_platform version 1.0.0 {
+    description: "Africa-first fintech platform — KYC, Payments, Wallets, Lending, AML";
+    author: "Datacraft";
+}
+
+table Customer {
+    customer_id: str;
+    phone: str;          // primary identifier for mobile money
+    national_id: str;
+    full_name: str;
+    kyc_tier: str;       // basic | standard | full_kyc | enhanced
+    kyc_status: str;     // pending | verified | rejected | expired
+    risk_level: str;     // low | medium | high | very_high
+    daily_limit: decimal;
+    monthly_limit: decimal;
+    currency: str;
+}
+
+table Wallet {
+    wallet_id: str;
+    customer_id: str;
+    wallet_type: str;   // main | savings | escrow | merchant
+    balance: decimal;
+    currency: str;
+    status: str;        // active | frozen | suspended | closed
+    daily_used: decimal;
+    monthly_used: decimal;
+}
+
+table Transaction {
+    transaction_id: str;
+    transaction_type: str; // payment | transfer | withdrawal | deposit | reversal
+    channel: str;          // mpesa | mtn_momo | airtel | card | bank_eft | swift
+    amount: decimal;
+    currency: str;
+    sender_id: str;
+    recipient_id: str;
+    reference: str;
+    status: str;           // pending | completed | failed | reversed
+    aml_status: str;       // cleared | flagged | under_review | blocked
+    fee: decimal;
+}
+
+capability FintechCore {
+    contract: {
+        id: fintech_platform_core,
+        provides: [
+            customer_onboarding_workflow,
+            payment_processing_workflow,
+            wallet_lifecycle,
+            credit_origination_workflow,
+            aml_screening_workflow,
+            regulatory_reporting
+        ],
+        requires: [auth, audl, ntfy, kyc_verification, aml_detection, comp],
+        configuration: {
+            tenant_id: "default",
+            base_currency: "KES",
+            supported_currencies: ["KES", "UGX", "TZS", "USD"],
+            kyc_required_for_payment: true,
+            aml_screen_all: true,
+            cbk_reporting_threshold: 1000000,
+            daily_limit_basic: 300000,
+            daily_limit_standard: 1000000,
+            daily_limit_full_kyc: 5000000,
+            mpesa_business_short_code: "174379",
+            require_liveness_for_full_kyc: true
+        },
+        rule_engine: {
+            type: deterministic,
+            default_decision: allow,
+            rules: [
+                {name: "kyc_required_for_payment",
+                 when: "kyc_status != verified",
+                 action: deny},
+                {name: "basic_kyc_daily_limit",
+                 when: "kyc_tier == basic and transaction_amount + daily_used_gt == 300000",
+                 action: deny},
+                {name: "aml_flagged_transaction_blocked",
+                 when: "aml_status == flagged",
+                 action: deny},
+                {name: "ctr_threshold_requires_report",
+                 when: "amount_gt == 1000000",
+                 action: require_review},
+                {name: "sanctioned_entity_denied",
+                 when: "sanctions_match == true",
+                 action: deny},
+                {name: "duplicate_transaction_check",
+                 when: "duplicate_detected == true",
+                 action: deny},
+                {name: "high_risk_customer_enhanced_dd",
+                 when: "risk_level == high and enhanced_dd_completed != true",
+                 action: require_review},
+                {name: "velocity_breach",
+                 when: "transactions_in_hour_gt == 10",
+                 action: require_review}
+            ]
+        },
+        ui: {shell: python, routes: [
+            {name: "Dashboard",    path: "/fintech",            component: "FintechDashboard", permission: "fintech:view",     nav_group: "Overview"},
+            {name: "Customers",    path: "/fintech/customers",  component: "CustomerRegistry", permission: "fintech:customers",nav_group: "Customers"},
+            {name: "KYC Queue",    path: "/fintech/kyc",        component: "KYCWorkbench",    permission: "fintech:kyc",      nav_group: "Compliance"},
+            {name: "Transactions", path: "/fintech/transactions",component: "TransactionLedger",permission: "fintech:payments", nav_group: "Payments"},
+            {name: "Wallets",      path: "/fintech/wallets",    component: "WalletManager",   permission: "fintech:wallets",  nav_group: "Payments"},
+            {name: "AML Alerts",   path: "/fintech/aml",        component: "AMLWorkbench",    permission: "fintech:compliance",nav_group: "Compliance"},
+            {name: "Lending",      path: "/fintech/lending",    component: "LoanPortfolio",   permission: "fintech:lending",  nav_group: "Credit"},
+            {name: "Reports",      path: "/fintech/reports",    component: "RegulatoryReports",permission: "fintech:reports",  nav_group: "Regulatory"}
+        ]},
+        theme: {name: fintech_theme, tokens: {
+            "color.primary":   "#0D47A1",
+            "color.accent":    "#00897B",
+            "color.success":   "#1B5E20",
+            "color.warning":   "#F57F17",
+            "color.danger":    "#B71C1C",
+            "surface.canvas":  "#F5F9FF",
+            "surface.panel":   "#FFFFFF",
+            "text.primary":    "#0D1B2A",
+            "text.secondary":  "#546E7A",
+            "border.radius":   "8px",
+            "density":         "comfortable"
+        }, components: {
+            customers:    {icon: "user-check",   status_indicator: "kyc-tier-chip"},
+            transactions: {icon: "arrow-right-left", status_indicator: "txn-status-chip"},
+            aml_alerts:   {icon: "shield-exclamation", status_indicator: "aml-risk-chip"}
+        }}
+    };
+    streaming: {
+        processor: bytewax,
+        stream: "apg.fintech.lifecycle",
+        key: "tenant_id",
+        events: [
+            "kyc_started", "kyc_verified", "kyc_rejected",
+            "payment_initiated", "payment_completed", "payment_failed",
+            "wallet_credited", "wallet_debited", "wallet_frozen",
+            "aml_alert_raised", "aml_cleared", "sar_filed",
+            "loan_disbursed", "repayment_received"
+        ],
+        guardrails: [
+            "unverified_kyc_payment_denied",
+            "sanctions_match_blocked",
+            "duplicate_payment_denied",
+            "velocity_breach_requires_review"
+        ]
+    };
+}
+
+workflow CustomerOnboarding {
+    steps: str = "registration -> id_verification -> liveness_check -> pep_screening -> risk_scoring -> kyc_approved -> wallet_created -> active";
+    human_tasks: [pep_screening];
+    assignments: {pep_screening: compliance_officer};
+    guards: {
+        liveness_check: "id_document_verified",
+        kyc_approved: "liveness_passed and pep_clear and risk_score_acceptable",
+        active: "wallet_funded or zero_balance_allowed"
+    };
+}
+
+workflow LoanOrigination {
+    steps: str = "application -> bureau_check -> underwriting -> offer_generated -> accepted -> disbursed";
+    human_tasks: [underwriting];
+    assignments: {underwriting: credit_analyst};
+    guards: {
+        underwriting: "bureau_score available and dsr_within_limit",
+        disbursed: "offer_signed and account_verified"
+    };
+    compensation: {disbursed: reverse_disbursement};
+}
+
+agent FintechRiskOfficer {
+    role: "risk and compliance officer";
+    model: "openai:gpt-4.1-mini";
+    system: "You are a fintech compliance officer for Kenya/East Africa. Review AML alerts, assess transaction patterns, and prepare regulatory submissions to CBK, CMA, and FSCA. Apply FATF recommendations and Kenya AML/CFT framework.";
+    capabilities: [aml_screening_workflow, regulatory_reporting];
+    tools: [transaction_history, customer_risk_profile, watchlist_check, cbk_reporting];
+    memory: vector compliance_memory;
+    configuration: {temperature: 0.0, max_turns: 4};
+    rules: [
+        {name: "no_sar_without_evidence", when: "sar_evidence missing", action: deny}
+    ];
+}
+
+app FintechPlatform {
+    description: "Africa-first fintech platform composed from APG capabilities";
+    capabilities: [FintechCore];
+    agents: [FintechRiskOfficer];
+    routes: ["/fintech", "/fintech/customers", "/fintech/transactions", "/fintech/aml"];
+    theme: {name: fintech_platform_theme, tokens: {"accent": "#00897B", "border.radius": "8px"}};
+    runtime: {target: python, deployment: container, streaming: {processor: bytewax}};
+    deployments: {default: local, container: docker};
+}

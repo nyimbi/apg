@@ -1,0 +1,200 @@
+// ============================================================================
+// Intelligence Platform — APG Capability Composition Example
+//
+// Composability pattern: Pipeline + Sidecar
+//   collection (osint, sigint, humint) -> fusion -> correlation -> alerts
+//   analytics and reporting as sidecars consuming the fused stream
+//
+// Copyright (c) 2025 Datacraft — Nyimbi Odero
+// ============================================================================
+
+module intelligence_platform version 1.0.0 {
+    description: "Threat intelligence platform — collection, fusion, alerting";
+    author: "Datacraft";
+}
+
+table IntelligenceItem {
+    item_id: str;
+    source_type: str;   // osint | sigint | humint | finint | geoint
+    classification: str;// unclassified | confidential | secret | top_secret
+    tlp: str;           // white | green | amber | red
+    subject: str;
+    content: str;
+    confidence: float;
+    collected_at: datetime;
+    collected_by: str;
+    tags: List[str];
+}
+
+table ThreatIndicator {
+    indicator_id: str;
+    ioc_type: str;      // ip_address | domain | file_hash | email | url
+    value: str;
+    severity: str;      // low | medium | high | critical
+    confidence: float;
+    first_seen: datetime;
+    last_seen: datetime;
+    campaign_id: str?;
+    actor_id: str?;
+    stale: bool;
+}
+
+table Alert {
+    alert_id: str;
+    alert_type: str;
+    severity: str;
+    title: str;
+    description: str;
+    indicators: List[str];
+    status: str;         // new | acknowledged | investigating | resolved | false_positive
+    assigned_to: str?;
+    workspace_id: str;
+}
+
+capability IntelPlatformCore {
+    contract: {
+        id: intelligence_platform_core,
+        provides: [
+            intelligence_collection,
+            threat_analysis,
+            indicator_management,
+            alert_lifecycle,
+            intelligence_fusion,
+            analytical_products
+        ],
+        requires: [auth, audl, ntfy, nlpc, geos, grph],
+        configuration: {
+            tenant_id: "default",
+            default_classification: "unclassified",
+            default_tlp: "amber",
+            require_authority: true,
+            auto_correlate: true,
+            alert_sla_critical_minutes: 15,
+            alert_sla_high_minutes: 60,
+            dissemination_requires_approval: true
+        },
+        rule_engine: {
+            type: deterministic,
+            default_decision: allow,
+            rules: [
+                {name: "collection_requires_authority",
+                 when: "operation == collect and authority_ref missing",
+                 action: deny},
+                {name: "secret_requires_clearance",
+                 when: "classification == secret and analyst_clearance_lt == secret",
+                 action: deny},
+                {name: "tlp_red_no_external_share",
+                 when: "tlp == red and recipient_type == external",
+                 action: deny},
+                {name: "autonomous_collection_denied",
+                 when: "collection_mode == autonomous and human_approval_missing == true",
+                 action: deny},
+                {name: "privacy_bypass_denied",
+                 when: "circumvents_privacy_controls == true",
+                 action: deny},
+                {name: "evidence_fabrication_denied",
+                 when: "evidence_source == fabricated",
+                 action: deny},
+                {name: "critical_alert_requires_immediate_ack",
+                 when: "severity == critical and ack_within_minutes_gt == 15",
+                 action: require_review}
+            ]
+        },
+        ui: {shell: python, routes: [
+            {name: "Watch Centre",   path: "/intel",              component: "WatchCentre",    permission: "intel:view",      nav_group: "Operations"},
+            {name: "Alerts",         path: "/intel/alerts",       component: "AlertQueue",     permission: "intel:alerts",    nav_group: "Operations"},
+            {name: "Indicators",     path: "/intel/indicators",   component: "IndicatorBank",  permission: "intel:indicators",nav_group: "Analysis"},
+            {name: "Correlation",    path: "/intel/correlation",  component: "CorrelationMap", permission: "intel:analysis",  nav_group: "Analysis"},
+            {name: "OSINT",          path: "/intel/osint",        component: "OSINTCollector", permission: "intel:collection",nav_group: "Collection"},
+            {name: "Fusion",         path: "/intel/fusion",       component: "FusionWorkspace",permission: "intel:fusion",    nav_group: "Analysis"},
+            {name: "Reports",        path: "/intel/reports",      component: "IntelReports",   permission: "intel:reports",   nav_group: "Products"},
+            {name: "Authorities",    path: "/intel/authorities",  component: "AuthorityLog",   permission: "intel:admin",     nav_group: "Governance"}
+        ]},
+        theme: {name: intel_theme, tokens: {
+            "color.primary":   "#1A237E",
+            "color.accent":    "#B71C1C",
+            "color.success":   "#1B5E20",
+            "color.warning":   "#E65100",
+            "color.danger":    "#880E4F",
+            "surface.canvas":  "#0A0E1A",
+            "surface.panel":   "#111827",
+            "text.primary":    "#E8EAF6",
+            "text.secondary":  "#9FA8DA",
+            "border.radius":   "4px",
+            "density":         "compact"
+        }, components: {
+            alerts:     {icon: "bell-ring",    status_indicator: "severity-chip"},
+            indicators: {icon: "shield-alert", status_indicator: "ioc-type-chip"},
+            collection: {icon: "radar",        status_indicator: "source-type-chip"}
+        }}
+    };
+    streaming: {
+        processor: bytewax,
+        stream: "apg.intel.lifecycle",
+        key: "tenant_id",
+        events: [
+            "intelligence_collected", "indicator_created", "indicator_enriched",
+            "alert_fired", "alert_acknowledged", "alert_resolved",
+            "correlation_found", "product_disseminated", "authority_recorded"
+        ],
+        guardrails: [
+            "autonomous_collection_requires_human_approval",
+            "secret_intel_requires_clearance",
+            "tlp_red_no_external_dissemination",
+            "evidence_fabrication_denied",
+            "privacy_bypass_denied"
+        ]
+    };
+}
+
+agent ThreatAnalyst {
+    role: "threat intelligence analyst";
+    model: "openai:gpt-4.1-mini";
+    system: "You are an intelligence analyst. Assess threats, identify patterns, and produce structured analytical products. Apply ACH (Analysis of Competing Hypotheses) rigorously. Classify outputs appropriately.";
+    capabilities: [threat_analysis, indicator_management, intelligence_fusion];
+    tools: [indicator_search, correlation_query, mitre_attack_lookup, actor_database];
+    memory: vector intel_memory;
+    configuration: {temperature: 0.1, max_turns: 8};
+    rules: [
+        {name: "no_fabrication", when: "evidence_missing", action: deny},
+        {name: "classify_outputs", when: "output_classification missing", action: require_review}
+    ];
+}
+
+agent_team FusionCell {
+    agents: [ThreatAnalyst, ThreatAnalyst];
+    capabilities: [intelligence_fusion, analytical_products];
+    flow: ThreatAnalyst -> ThreatAnalyst;
+}
+
+workflow AlertInvestigation {
+    steps: str = "new -> acknowledged -> under_investigation -> resolved";
+    human_tasks: [acknowledged, under_investigation];
+    assignments: {acknowledged: duty_analyst, under_investigation: senior_analyst};
+    guards: {
+        acknowledged: "analyst_cleared_for_classification",
+        resolved: "resolution_documented and supervisor_notified"
+    };
+    waits: {resolved: resolution_confirmation};
+}
+
+workflow ProductDissemination {
+    steps: str = "draft -> reviewed -> approved -> disseminated";
+    human_tasks: [reviewed, approved];
+    assignments: {reviewed: senior_analyst, approved: chief_analyst};
+    guards: {
+        approved: "tlp_appropriate and classification_correct",
+        disseminated: "recipient_cleared and distribution_list_approved"
+    };
+}
+
+app IntelligencePlatform {
+    description: "Threat intelligence platform composed from APG capabilities";
+    capabilities: [IntelPlatformCore];
+    agents: [ThreatAnalyst, ThreatAnalyst];
+    agent_teams: [FusionCell];
+    routes: ["/intel", "/intel/alerts", "/intel/indicators", "/intel/osint"];
+    theme: {name: intel_platform_theme, tokens: {"accent": "#B71C1C", "border.radius": "4px"}};
+    runtime: {target: python, deployment: container, streaming: {processor: bytewax}};
+    deployments: {default: local, container: docker};
+}

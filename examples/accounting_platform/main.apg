@@ -1,0 +1,226 @@
+// ============================================================================
+// Accounting Platform — APG Capability Composition Example
+//
+// Composability pattern: Layered
+//   GL is the hub; AR and AP feed journals; CBM manages cash
+//   audl provides immutable financial audit trail (required by all)
+//
+// Copyright (c) 2025 Datacraft — Nyimbi Odero
+// ============================================================================
+
+module accounting_platform version 1.0.0 {
+    description: "Double-entry accounting platform — AR, AP, GL, Cash, Reporting";
+    author: "Datacraft";
+}
+
+// ── Core financial tables ─────────────────────────────────────────────────────
+
+table ChartOfAccounts {
+    account_code: str;
+    account_name: str;
+    account_type: str;   // asset | liability | equity | revenue | expense
+    normal_balance: str; // debit | credit
+    currency: str;
+    allow_posting: bool;
+    parent_code: str?;
+}
+
+table JournalEntry {
+    journal_number: str;
+    journal_date: datetime;
+    period: str;
+    journal_type: str;   // standard | adjustment | reversal | accrual
+    description: str;
+    total_debit: decimal;
+    total_credit: decimal;
+    status: str;         // draft | posted | reversed
+    posted_by: str?;
+}
+
+table Invoice {
+    invoice_number: str;
+    invoice_type: str;   // ar | ap
+    counterparty_id: str;
+    invoice_date: datetime;
+    due_date: datetime;
+    currency: str;
+    subtotal: decimal;
+    tax_amount: decimal;
+    total: decimal;
+    status: str;         // draft | posted | paid | overdue | disputed
+}
+
+// ── Accounting capability ─────────────────────────────────────────────────────
+
+capability AccountingCore {
+    contract: {
+        id: accounting_platform_core,
+        provides: [
+            journal_entry_lifecycle,
+            accounts_receivable_workflow,
+            accounts_payable_workflow,
+            cash_management_workflow,
+            financial_statements,
+            period_close_process
+        ],
+        requires: [auth, audl, ntfy, wflo, comp],
+        configuration: {
+            tenant_id: "default",
+            functional_currency: "KES",
+            fiscal_year_start: "01-01",
+            period_lock_days: 10,
+            approval_threshold_ar: 100000,
+            approval_threshold_ap: 50000,
+            require_dual_control: true
+        },
+        rule_engine: {
+            type: deterministic,
+            default_decision: allow,
+            rules: [
+                {name: "journal_must_balance",
+                 when: "total_debit != total_credit",
+                 action: deny},
+                {name: "closed_period_posting_denied",
+                 when: "period_status == closed",
+                 action: deny},
+                {name: "large_ap_requires_approval",
+                 when: "invoice_amount > 50000 and approval_status != approved",
+                 action: require_review},
+                {name: "segregation_of_duties",
+                 when: "preparer_id == approver_id",
+                 action: deny},
+                {name: "ar_write_off_requires_cfo",
+                 when: "operation == write_off and amount > 10000 and cfo_approved != true",
+                 action: deny},
+                {name: "intercompany_requires_matching",
+                 when: "is_intercompany == true and matching_entry_missing == true",
+                 action: require_review}
+            ]
+        },
+        ui: {shell: python, routes: [
+            {name: "GL Dashboard",    path: "/accounting",          component: "GLDashboard",     permission: "accounting:view",   nav_group: "Overview"},
+            {name: "Journal Entries", path: "/accounting/journals", component: "JournalList",     permission: "accounting:journal",nav_group: "General Ledger"},
+            {name: "Chart of Accts",  path: "/accounting/coa",      component: "ChartOfAccounts", permission: "accounting:coa",    nav_group: "General Ledger"},
+            {name: "AR Invoices",     path: "/accounting/ar",       component: "ARInvoices",      permission: "accounting:ar",     nav_group: "Receivables"},
+            {name: "AR Aging",        path: "/accounting/ar/aging", component: "ARAging",         permission: "accounting:ar",     nav_group: "Receivables"},
+            {name: "AP Invoices",     path: "/accounting/ap",       component: "APInvoices",      permission: "accounting:ap",     nav_group: "Payables"},
+            {name: "Payment Runs",    path: "/accounting/ap/runs",  component: "PaymentRuns",     permission: "accounting:ap",     nav_group: "Payables"},
+            {name: "Cash Position",   path: "/accounting/cash",     component: "CashPosition",    permission: "accounting:cash",   nav_group: "Cash"},
+            {name: "P&L",             path: "/accounting/pnl",      component: "IncomeStatement", permission: "accounting:reports",nav_group: "Reports"},
+            {name: "Balance Sheet",   path: "/accounting/bs",       component: "BalanceSheet",    permission: "accounting:reports",nav_group: "Reports"},
+            {name: "Period Close",    path: "/accounting/close",    component: "PeriodClose",     permission: "accounting:admin",  nav_group: "Administration"}
+        ]},
+        theme: {name: accounting_theme, tokens: {
+            "color.primary":   "#0D47A1",
+            "color.accent":    "#01579B",
+            "color.success":   "#1B5E20",
+            "color.warning":   "#E65100",
+            "color.danger":    "#B71C1C",
+            "surface.canvas":  "#FAFAFA",
+            "surface.panel":   "#FFFFFF",
+            "text.primary":    "#212121",
+            "text.secondary":  "#757575",
+            "border.radius":   "4px",
+            "density":         "compact"
+        }, components: {
+            journals:   {icon: "book-open",     status_indicator: "journal-status-chip"},
+            invoices_ar:{icon: "file-invoice",  status_indicator: "ar-status-chip"},
+            invoices_ap:{icon: "receipt",       status_indicator: "ap-status-chip"},
+            cash:       {icon: "banknotes",     status_indicator: "cash-position-badge"}
+        }}
+    };
+    streaming: {
+        processor: bytewax,
+        stream: "apg.accounting.lifecycle",
+        key: "tenant_id",
+        events: [
+            "journal_posted", "journal_reversed",
+            "invoice_created", "invoice_posted", "invoice_paid",
+            "payment_run_processed", "period_closed", "period_locked",
+            "write_off_approved", "bad_debt_provision_updated"
+        ],
+        guardrails: [
+            "unbalanced_journal_denied",
+            "closed_period_posting_denied",
+            "segregation_of_duties_enforced"
+        ]
+    };
+    erp_modules: [finance, general_ledger, accounts_payable, accounts_receivable];
+    approvals: {
+        levels: 2,
+        approvers: [controller, cfo],
+        segregation_of_duties: true
+    };
+    i18n: {
+        supported_languages: [en, sw],
+        default_language: en,
+        fallback_language: en
+    };
+}
+
+// ── Workflows ─────────────────────────────────────────────────────────────────
+
+workflow InvoiceApproval {
+    steps: str = "draft -> validated -> approved -> posted";
+    human_tasks: [validated, approved];
+    assignments: {validated: accountant, approved: controller};
+    guards: {
+        validated: "invoice_lines_balanced and tax_calculated",
+        approved: "amount > 0 and gl_accounts_valid"
+    };
+    compensation: {posted: reverse_invoice};
+}
+
+workflow PeriodClose {
+    steps: str = "open -> accruals_posted -> reconciled -> reviewed -> closed -> locked";
+    human_tasks: [accruals_posted, reconciled, reviewed];
+    assignments: {
+        accruals_posted: accountant,
+        reconciled: senior_accountant,
+        reviewed: controller
+    };
+    guards: {
+        reconciled: "all_bank_accounts_reconciled",
+        reviewed: "trial_balance_balanced and no_outstanding_items",
+        closed: "cfo_sign_off_received"
+    };
+    waits: {locked: period_lock_confirmation};
+}
+
+workflow APPaymentRun {
+    steps: str = "selected -> approved -> processed -> bank_file_generated -> posted";
+    human_tasks: [approved];
+    assignments: {approved: treasury_manager};
+    guards: {approved: "total_amount_within_daily_limit and all_invoices_matched"};
+    compensation: {processed: reverse_payment_run};
+}
+
+// ── AI Accounting Assistant ───────────────────────────────────────────────────
+
+agent AccountingAssistant {
+    role: "accounting analyst";
+    model: "openai:gpt-4.1-mini";
+    system: "You are a chartered accountant assistant. Help with journal classification, anomaly detection, and compliance checks. Always cite the relevant IFRS/GAAP standard.";
+    capabilities: [journal_entry_lifecycle, financial_statements];
+    tools: [coa_search, transaction_history, ifrs_standards_lookup];
+    memory: vector accounting_memory;
+    configuration: {temperature: 0.0, max_turns: 4};
+    rules: [
+        {name: "no_posting_authority", when: "user_requests_direct_post", action: deny}
+    ];
+}
+
+// ── Application Assembly ──────────────────────────────────────────────────────
+
+app AccountingPlatform {
+    description: "IFRS-compliant accounting platform composed from APG capabilities";
+    capabilities: [AccountingCore];
+    agents: [AccountingAssistant];
+    routes: ["/accounting", "/accounting/ar", "/accounting/ap", "/accounting/cash"];
+    screens: {
+        ControllerHome: {route: "/accounting", capability: AccountingCore}
+    };
+    theme: {name: accounting_platform_theme, tokens: {"accent": "#01579B", "border.radius": "4px"}};
+    runtime: {target: python, deployment: container, streaming: {processor: bytewax}};
+    deployments: {default: local, container: docker};
+}

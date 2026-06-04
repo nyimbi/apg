@@ -1,0 +1,209 @@
+// ============================================================================
+// Healthcare Platform — APG Capability Composition Example
+//
+// Composability pattern: Layered + Pipeline
+//   patient_management is the hub; all clinical capabilities depend on it
+//   emr -> pharmacy -> lab forms a clinical pipeline
+//   telemedicine is a separate channel feeding the same EMR
+//
+// Copyright (c) 2025 Datacraft — Nyimbi Odero
+// ============================================================================
+
+module healthcare_platform version 1.0.0 {
+    description: "Clinical information system — EMR, Pharmacy, Lab, Telemedicine";
+    author: "Datacraft";
+}
+
+table Patient {
+    patient_id: str;
+    mrn: str;           // medical record number
+    first_name: str;
+    last_name: str;
+    date_of_birth: datetime;
+    gender: str;
+    national_id: str;
+    phone: str;
+    blood_group: str?;
+    allergies: List[str];
+    active: bool;
+}
+
+table Encounter {
+    encounter_id: str;
+    patient_id: str;
+    encounter_type: str;   // outpatient | inpatient | emergency | telemedicine
+    facility_id: str;
+    attending_clinician: str;
+    admission_date: datetime;
+    discharge_date: datetime?;
+    primary_diagnosis: str?;  // ICD-10 code
+    status: str;              // active | closed | cancelled
+}
+
+table Prescription {
+    prescription_id: str;
+    encounter_id: str;
+    patient_id: str;
+    drug_name: str;
+    dose: str;
+    frequency: str;
+    duration_days: int;
+    route: str;
+    prescriber_id: str;
+    status: str;  // active | dispensed | cancelled | completed
+}
+
+table LabOrder {
+    order_id: str;
+    encounter_id: str;
+    patient_id: str;
+    test_name: str;
+    test_code: str;
+    priority: str;   // routine | urgent | stat
+    ordered_by: str;
+    ordered_at: datetime;
+    status: str;     // ordered | collected | processing | resulted | verified
+}
+
+capability ClinicalCore {
+    contract: {
+        id: healthcare_platform_core,
+        provides: [
+            patient_registration_workflow,
+            clinical_encounter_lifecycle,
+            medication_management,
+            laboratory_workflow,
+            telemedicine_consultation,
+            clinical_decision_support
+        ],
+        requires: [auth, audl, ntfy, wflo, schd],
+        configuration: {
+            tenant_id: "default",
+            facility_name: "APG Health Centre",
+            ehr_standard: "HL7_FHIR_R4",
+            enable_clinical_decision_support: true,
+            controlled_substance_register: true,
+            consent_required_for_treatment: true,
+            hipaa_mode: true,
+            max_prescription_days: 90,
+            critical_lab_alert_minutes: 30
+        },
+        rule_engine: {
+            type: deterministic,
+            default_decision: allow,
+            rules: [
+                {name: "consent_required",
+                 when: "operation == treat and consent_recorded != true",
+                 action: deny},
+                {name: "drug_allergy_check",
+                 when: "allergy_detected == true and override_reason missing",
+                 action: deny},
+                {name: "controlled_substance_limit",
+                 when: "drug_schedule == II and quantity_gt == 30",
+                 action: deny},
+                {name: "prescriber_must_be_licensed",
+                 when: "prescriber_licensed != true",
+                 action: deny},
+                {name: "critical_lab_requires_immediate_notify",
+                 when: "lab_value_critical == true and clinician_notified != true",
+                 action: require_review},
+                {name: "minor_patient_requires_guardian_consent",
+                 when: "patient_age_lt == 18 and guardian_consent missing",
+                 action: require_review},
+                {name: "mental_health_enhanced_privacy",
+                 when: "diagnosis_category == mental_health and access_level_lt == treating_clinician",
+                 action: deny}
+            ]
+        },
+        ui: {shell: python, routes: [
+            {name: "Clinical Dashboard", path: "/clinical",            component: "ClinicalDashboard",  permission: "clinical:view",       nav_group: "Overview"},
+            {name: "Patient Registry",   path: "/clinical/patients",   component: "PatientRegistry",    permission: "clinical:patients",   nav_group: "Patients"},
+            {name: "Encounters",         path: "/clinical/encounters", component: "EncounterList",      permission: "clinical:encounters", nav_group: "Clinical"},
+            {name: "Prescriptions",      path: "/clinical/pharmacy",   component: "PharmacyWorkbench",  permission: "clinical:pharmacy",   nav_group: "Clinical"},
+            {name: "Laboratory",         path: "/clinical/lab",        component: "LabWorkbench",       permission: "clinical:lab",        nav_group: "Clinical"},
+            {name: "Telemedicine",       path: "/clinical/tele",       component: "TeleConsole",        permission: "clinical:tele",       nav_group: "Channels"},
+            {name: "Reports",            path: "/clinical/reports",    component: "ClinicalReports",    permission: "clinical:reports",    nav_group: "Analytics"}
+        ]},
+        theme: {name: clinical_theme, tokens: {
+            "color.primary":   "#006064",
+            "color.accent":    "#00838F",
+            "color.success":   "#2E7D32",
+            "color.warning":   "#E65100",
+            "color.danger":    "#C62828",
+            "surface.canvas":  "#F0F7F7",
+            "surface.panel":   "#FFFFFF",
+            "text.primary":    "#004D40",
+            "text.secondary":  "#607D8B",
+            "border.radius":   "6px",
+            "density":         "comfortable"
+        }, components: {
+            patients:     {icon: "user-heart",   status_indicator: "patient-status-chip"},
+            encounters:   {icon: "stethoscope",  status_indicator: "encounter-type-chip"},
+            prescriptions:{icon: "pill",         status_indicator: "rx-status-chip"},
+            lab_orders:   {icon: "flask",        status_indicator: "lab-priority-chip"}
+        }}
+    };
+    streaming: {
+        processor: bytewax,
+        stream: "apg.clinical.lifecycle",
+        key: "tenant_id",
+        events: [
+            "patient_registered", "encounter_opened", "encounter_closed",
+            "prescription_created", "medication_dispensed", "adverse_event_reported",
+            "lab_ordered", "specimen_collected", "result_verified", "critical_value_alerted",
+            "teleconsult_booked", "teleconsult_completed", "consent_recorded"
+        ],
+        guardrails: [
+            "no_treatment_without_consent",
+            "drug_allergy_check_enforced",
+            "controlled_substance_quantity_limit",
+            "critical_lab_immediate_notification",
+            "mental_health_enhanced_privacy"
+        ]
+    };
+    i18n: {supported_languages: [en, sw], default_language: en, fallback_language: en};
+}
+
+workflow PatientAdmission {
+    steps: str = "registration -> triage -> assigned_to_clinician -> assessment -> treatment_plan -> active_treatment -> discharge_planning -> discharged";
+    human_tasks: [triage, treatment_plan, discharge_planning];
+    assignments: {triage: triage_nurse, treatment_plan: attending_doctor, discharge_planning: care_coordinator};
+    guards: {
+        treatment_plan: "consent_obtained and allergies_checked",
+        discharged: "discharge_summary_complete and follow_up_scheduled"
+    };
+}
+
+workflow PrescriptionLifecycle {
+    steps: str = "prescribed -> drug_interaction_checked -> dispensed -> administered -> completed";
+    human_tasks: [drug_interaction_checked, dispensed];
+    assignments: {drug_interaction_checked: pharmacist, dispensed: pharmacist};
+    guards: {
+        dispensed: "interaction_check_passed and allergy_check_passed and consent_valid",
+        administered: "patient_identified and dose_confirmed"
+    };
+}
+
+agent ClinicalAssistant {
+    role: "clinical decision support";
+    model: "openai:gpt-4.1-mini";
+    system: "You are a clinical decision support system. Provide evidence-based recommendations, drug interaction checks, and diagnostic support. Always recommend clinician review. Cite clinical guidelines (WHO, NICE, Kenya Clinical Guidelines).";
+    capabilities: [clinical_decision_support, medication_management];
+    tools: [drug_database, icd10_lookup, lab_reference_ranges, clinical_guidelines];
+    memory: vector clinical_memory;
+    configuration: {temperature: 0.0, max_turns: 4};
+    rules: [
+        {name: "no_direct_prescribing", when: "action == prescribe", action: deny},
+        {name: "flag_paediatric_dosing", when: "patient_age_lt == 12", action: require_review}
+    ];
+}
+
+app HealthcarePlatform {
+    description: "Clinical information system composed from APG capabilities";
+    capabilities: [ClinicalCore];
+    agents: [ClinicalAssistant];
+    routes: ["/clinical", "/clinical/patients", "/clinical/pharmacy", "/clinical/lab"];
+    theme: {name: healthcare_platform_theme, tokens: {"accent": "#00838F", "border.radius": "6px"}};
+    runtime: {target: python, deployment: container, streaming: {processor: bytewax}};
+    deployments: {default: local, container: docker};
+}

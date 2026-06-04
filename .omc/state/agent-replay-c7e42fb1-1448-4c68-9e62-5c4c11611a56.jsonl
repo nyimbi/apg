@@ -387,3 +387,10 @@
 {"t":0,"agent":"a88e551","agent_type":"general-purpose","event":"agent_start","parent_mode":"none"}
 {"t":0,"agent":"a88e551","agent_type":"general-purpose","event":"agent_stop","success":true,"duration_ms":1010059}
 {"t":0,"agent":"a0efe8c","agent_type":"unknown","event":"agent_stop","success":true}
+{"t":0,"agent":"a39f37b","agent_type":"unknown","event":"agent_stop","success":true}
+{"t":0,"agent":"aeb5a56","agent_type":"general-purpose","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"af2f469","agent_type":"general-purpose","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"aeb5a56","agent_type":"general-purpose","event":"agent_stop","success":true,"duration_ms":345192}
+{"t":0,"agent":"af2f469","agent_type":"general-purpose","event":"agent_stop","success":true,"duration_ms":415917}
+{"t":0,"agent":"a8b7ca0","agent_type":"general-purpose","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a65937b","agent_type":"unknown","event":"agent_stop","success":true}
