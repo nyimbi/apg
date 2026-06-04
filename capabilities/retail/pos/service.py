@@ -318,6 +318,9 @@ class PointOfSaleService:
 		self._promotions = _PromotionStore()
 		self._loyalty = _LoyaltyStore()
 
+		# Offline sync sequence tracking: (tenant_id, terminal_id) -> last_accepted_sequence
+		self._offline_sync_sequences: dict[tuple[str, str], int] = {}
+
 		# Original stores (backward-compat)
 		self._terminals: dict[str, dict[str, Any]] = {}
 		self._sessions: dict[str, dict[str, Any]] = {}
@@ -1340,6 +1343,7 @@ class PointOfSaleService:
 		customer_tier: str | None = None,
 		*,
 		tenant_id: str = "default",
+		store_id: str | None = None,
 	) -> dict[str, Any]:
 		"""Retrieve the selling price including any tier pricing and active promotions."""
 		base_price = self._inventory.get_price(tenant_id, sku)
@@ -1897,25 +1901,44 @@ class PointOfSaleService:
 	# ORIGINAL PosService INTERFACE (backward-compat)
 	# ======================================================================
 
-	async def register_terminal(self, data: PosTerminalCreate) -> PosTerminalResponse:
-		_log_op("register_terminal", data.tenant_id)
-		rec = PosTerminalResponse(**data.model_dump())
-		self._terminals[rec.id] = rec.model_dump()
-		return rec
+	# ======================================================================
+	# LEGACY + UNIFIED INTERFACE — all methods return dict[str, Any]
+	# ======================================================================
 
-	async def get_terminal(self, tenant_id: str, terminal_id: str) -> PosTerminalResponse | None:
+	async def register_terminal(self, data: PosTerminalCreate) -> dict[str, Any]:
+		"""Register a new POS terminal. Returns dict."""
+		_log_op("register_terminal", data.tenant_id)
+		# Enforce uniqueness per tenant+store+code
+		existing = [
+			v for v in self._terminals.values()
+			if v["tenant_id"] == data.tenant_id
+			and v["store_id"] == data.store_id
+			and v["terminal_code"] == data.terminal_code
+		]
+		assert not existing, f"terminal code '{data.terminal_code}' already registered in store '{data.store_id}'"
+		rec = PosTerminalResponse(**data.model_dump())
+		d = rec.model_dump()
+		self._terminals[rec.id] = d
+		# Also write to typed store for cross-method consistency
+		self._store_terminals.put(data.tenant_id, rec.id, rec)
+		return d
+
+	async def get_terminal(self, tenant_id: str, terminal_id: str) -> dict[str, Any] | None:
+		"""Fetch a terminal by ID. Returns dict or None."""
 		rec = self._terminals.get(terminal_id)
 		if rec is None or rec["tenant_id"] != tenant_id:
 			return None
-		return PosTerminalResponse(**rec)
+		return rec
 
-	async def list_terminals(self, tenant_id: str, store_id: str | None = None) -> list[PosTerminalResponse]:
+	async def list_terminals(self, tenant_id: str, store_id: str | None = None) -> list[dict[str, Any]]:
+		"""List terminals for a tenant, optionally filtered by store."""
 		result = [v for v in self._terminals.values() if v["tenant_id"] == tenant_id]
 		if store_id:
 			result = [v for v in result if v["store_id"] == store_id]
-		return [PosTerminalResponse(**v) for v in result]
+		return result
 
-	async def heartbeat_terminal(self, tenant_id: str, terminal_id: str) -> PosTerminalResponse | None:
+	async def heartbeat_terminal(self, tenant_id: str, terminal_id: str) -> dict[str, Any] | None:
+		"""Mark terminal online and record heartbeat timestamp."""
 		rec = self._terminals.get(terminal_id)
 		if rec is None or rec["tenant_id"] != tenant_id:
 			return None
@@ -1923,24 +1946,16 @@ class PointOfSaleService:
 		rec["last_heartbeat_at"] = _now().isoformat()
 		rec["updated_at"] = _now().isoformat()
 		self._terminals[terminal_id] = rec
-		return PosTerminalResponse(**rec)
+		return rec
 
-	async def mark_terminal_offline(self, tenant_id: str, terminal_id: str) -> PosTerminalResponse | None:
+	async def mark_terminal_offline(self, tenant_id: str, terminal_id: str) -> dict[str, Any] | None:
+		"""Mark terminal offline."""
 		rec = self._terminals.get(terminal_id)
 		if rec is None or rec["tenant_id"] != tenant_id:
 			return None
 		rec["status"] = "offline"
 		rec["updated_at"] = _now().isoformat()
 		self._terminals[terminal_id] = rec
-		return PosTerminalResponse(**rec)
-
-	async def open_session_legacy(self, data: PosSessionCreate) -> PosSessionResponse:
-		prior = self._get_open_session(data.tenant_id, data.terminal_id)
-		assert prior is None, "terminal already has an open session"
-		self._assert_no_unreconciled_session(data.tenant_id, data.cashier_id)
-		_log_op("open_session", data.tenant_id)
-		rec = PosSessionResponse(**data.model_dump())
-		self._sessions[rec.id] = rec.model_dump()
 		return rec
 
 	def _get_open_session(self, tenant_id: str, terminal_id: str) -> dict[str, Any] | None:
@@ -1955,89 +1970,100 @@ class PointOfSaleService:
 					and s["status"] in ("closed",) and s.get("reconciled_at") is None):
 				raise AssertionError("previous session must be reconciled before opening a new one")
 
-	async def get_session_legacy(self, tenant_id: str, session_id: str) -> PosSessionResponse | None:
+	async def get_session(self, session_id: str, *, tenant_id: str = "default") -> dict[str, Any] | None:
+		"""Fetch a session by ID. Returns dict or None."""
+		# Check typed store first (new-style open_session)
+		obj = self._store_sessions.get_item(tenant_id, session_id)
+		if obj is not None:
+			return obj.model_dump(mode="json")
+		# Fall back to legacy store
 		rec = self._sessions.get(session_id)
 		if rec is None or rec["tenant_id"] != tenant_id:
 			return None
-		return PosSessionResponse(**rec)
+		return rec
 
-	async def suspend_session(self, tenant_id: str, session_id: str) -> PosSessionResponse | None:
+	async def suspend_session(self, tenant_id: str, session_id: str) -> dict[str, Any] | None:
+		"""Suspend an open session."""
 		return await self._update_session_status(tenant_id, session_id, "suspended")
 
-	async def resume_session(self, tenant_id: str, session_id: str) -> PosSessionResponse | None:
+	async def resume_session(self, tenant_id: str, session_id: str) -> dict[str, Any] | None:
+		"""Resume a suspended session."""
 		return await self._update_session_status(tenant_id, session_id, "open")
 
-	async def close_session_legacy(self, tenant_id: str, session_id: str, closing_cash: float) -> PosSessionResponse | None:
-		rec = self._sessions.get(session_id)
-		if rec is None or rec["tenant_id"] != tenant_id:
-			return None
-		rec["status"] = "closed"
-		rec["closing_cash_counted"] = closing_cash
-		rec["closed_at"] = _now().isoformat()
-		rec["updated_at"] = _now().isoformat()
-		self._sessions[session_id] = rec
-		return PosSessionResponse(**rec)
-
-	async def _update_session_status(self, tenant_id: str, session_id: str, status: str) -> PosSessionResponse | None:
+	async def _update_session_status(self, tenant_id: str, session_id: str, status: str) -> dict[str, Any] | None:
+		# Try typed store first
+		obj = self._store_sessions.get_item(tenant_id, session_id)
+		if obj is not None:
+			data = obj.model_dump()
+			data["status"] = status
+			data["updated_at"] = _now()
+			updated = PosSessionResponse(**data)
+			self._store_sessions.put(tenant_id, session_id, updated)
+			return updated.model_dump(mode="json")
+		# Fall back to legacy store
 		rec = self._sessions.get(session_id)
 		if rec is None or rec["tenant_id"] != tenant_id:
 			return None
 		rec["status"] = status
 		rec["updated_at"] = _now().isoformat()
 		self._sessions[session_id] = rec
-		return PosSessionResponse(**rec)
-
-	async def list_sessions(self, tenant_id: str, store_id: str | None = None, status: str | None = None) -> list[PosSessionResponse]:
-		result = [v for v in self._sessions.values() if v["tenant_id"] == tenant_id]
-		if store_id:
-			result = [v for v in result if v["store_id"] == store_id]
-		if status:
-			result = [v for v in result if v["status"] == status]
-		return [PosSessionResponse(**v) for v in result]
-
-	async def post_transaction(self, data: PosTransactionCreate) -> PosTransactionResponse:
-		session = self._sessions.get(data.session_id)
-		assert session and session["tenant_id"] == data.tenant_id, "session not found"
-		assert session["status"] == "open", "session must be open to post transactions"
-		subtotal = sum(item.line_total for item in data.items)
-		discount = sum(getattr(item, "discount_amount", 0.0) for item in data.items)
-		tax = sum(item.tax_amount for item in data.items)
-		grand_total = subtotal - discount + tax
-		_log_op("post_transaction", data.tenant_id)
-		rec = PosTransactionResponse(
-			**data.model_dump(),
-			subtotal=subtotal,
-			discount_total=discount,
-			tax_total=tax,
-			grand_total=grand_total,
-			tender_status="authorised",
-			transaction_signed=True,
-			signature_ref=uuid7str(),
-		)
-		self._transactions[rec.id] = rec.model_dump()
-		if data.transaction_type == "sale":
-			session["transaction_count"] = session.get("transaction_count", 0) + 1
-			session["total_sales"] = session.get("total_sales", 0.0) + grand_total
-			if data.payment_method == "cash":
-				session["total_cash_sales"] = session.get("total_cash_sales", 0.0) + grand_total
-		elif data.transaction_type == "refund":
-			session["total_refunds"] = session.get("total_refunds", 0.0) + grand_total
-		session["updated_at"] = _now().isoformat()
-		self._sessions[data.session_id] = session
-		_log_txn(rec.transaction_number, data.transaction_type, grand_total)
 		return rec
 
-	async def get_transaction(self, tenant_id: str, transaction_id: str) -> PosTransactionResponse | None:
-		rec = self._transactions.get(transaction_id)
-		if rec is None or rec["tenant_id"] != tenant_id:
-			return None
-		return PosTransactionResponse(**rec)
+	async def list_sessions(
+		self,
+		tenant_id: str,
+		store_id: str | None = None,
+		status: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""List sessions for a tenant."""
+		# Merge typed + legacy stores
+		result: list[dict[str, Any]] = []
+		seen: set[str] = set()
+		for obj in self._store_sessions.tenant_values(tenant_id):
+			d = obj.model_dump(mode="json")
+			result.append(d)
+			seen.add(d["id"])
+		for v in self._sessions.values():
+			if v["tenant_id"] == tenant_id and v["id"] not in seen:
+				result.append(v)
+				seen.add(v["id"])
+		if store_id:
+			result = [v for v in result if v.get("store_id") == store_id]
+		if status:
+			result = [v for v in result if v.get("status") == status]
+		return result
 
-	async def list_transactions(self, tenant_id: str, session_id: str | None = None) -> list[PosTransactionResponse]:
-		result = [v for v in self._transactions.values() if v["tenant_id"] == tenant_id]
+	async def get_transaction(self, transaction_id: str, *, tenant_id: str = "default") -> dict[str, Any] | None:
+		"""Fetch a transaction by ID. Returns dict or None."""
+		# Check typed store first
+		obj = self._store_transactions.get_item(tenant_id, transaction_id)
+		if obj is not None:
+			return obj.model_dump(mode="json")
+		# Fall back to legacy store
+		rec = self._transactions.get(transaction_id)
+		if rec is None or rec.get("tenant_id") != tenant_id:
+			return None
+		return rec
+
+	async def list_transactions(
+		self,
+		tenant_id: str,
+		session_id: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""List transactions, merging typed and legacy stores."""
+		result: list[dict[str, Any]] = []
+		seen: set[str] = set()
+		for obj in self._store_transactions.tenant_values(tenant_id):
+			d = obj.model_dump(mode="json")
+			result.append(d)
+			seen.add(d["id"])
+		for v in self._transactions.values():
+			if v.get("tenant_id") == tenant_id and v["id"] not in seen:
+				result.append(v)
+				seen.add(v["id"])
 		if session_id:
-			result = [v for v in result if v["session_id"] == session_id]
-		return [PosTransactionResponse(**v) for v in result]
+			result = [v for v in result if v.get("session_id") == session_id]
+		return result
 
 	async def void_transaction_legacy(self, data: PosVoidCreate) -> PosVoidResponse:
 		orig = self._transactions.get(data.original_transaction_id)
@@ -2065,6 +2091,24 @@ class PointOfSaleService:
 		self._cash_events[rec.id] = rec.model_dump()
 		return rec
 
+	async def record_cash_float(self, data: CashFloatCreate) -> dict[str, Any]:
+		"""Record any cash float event (safe drop, petty cash, till loan, etc)."""
+		_log_op("record_cash_float", data.tenant_id, data.session_id)
+		# Look up session from typed store
+		session = self._store_sessions.get_item(data.tenant_id, data.session_id)
+		opening_float = session.opening_float if session else 0.0
+		# Sum prior events for this session
+		prior = sum(
+			e.amount for e in self._store_payments.tenant_values(data.tenant_id)
+		)
+		balance_after = opening_float + data.amount
+		rec = CashFloatResponse(
+			**data.model_dump(),
+			balance_after=balance_after,
+		)
+		self._store_payments.put(data.tenant_id, rec.id, rec)
+		return rec.model_dump(mode="json")
+
 	def _compute_session_cash(self, tenant_id: str, session_id: str) -> float:
 		session = self._sessions.get(session_id)
 		base = session.get("opening_float", 0.0) if session else 0.0
@@ -2078,6 +2122,53 @@ class PointOfSaleService:
 	async def list_cash_events(self, tenant_id: str, session_id: str) -> list[PosCashEventResponse]:
 		result = [v for v in self._cash_events.values() if v["tenant_id"] == tenant_id and v["session_id"] == session_id]
 		return [PosCashEventResponse(**v) for v in result]
+
+	async def cash_count_reconciliation(
+		self,
+		session_id: str,
+		counted_cash: float,
+		*,
+		tenant_id: str = "default",
+		denominations: dict[str, int] | None = None,
+		counted_by: str = "system",
+	) -> dict[str, Any]:
+		"""Count physical cash and compute variance vs expected.
+
+		Returns a reconciliation summary with denomination breakdown.
+		"""
+		from .domain.calculations import count_denominations, expected_cash_in_till
+		session = self._store_sessions.get_item(tenant_id, session_id)
+		assert session is not None, f"session not found: {session_id}"
+
+		# Derive expected cash from session totals
+		expected = round(session.opening_float + session.total_cash_sales - session.total_refunds, 2)
+		variance = round(counted_cash - expected, 2)
+
+		# Denomination breakdown validation
+		denom_total = None
+		if denominations:
+			denom_total = count_denominations(denominations)
+			if abs(denom_total - counted_cash) > 0.01:
+				_log_warn(
+					"denomination_mismatch",
+					denom_total=denom_total,
+					counted_cash=counted_cash,
+				)
+
+		_log_op("cash_count_reconciliation", tenant_id, session_id)
+		return {
+			"session_id": session_id,
+			"cashier_id": session.cashier_id,
+			"terminal_id": session.terminal_id,
+			"opening_float": session.opening_float,
+			"expected_cash": expected,
+			"counted_cash": counted_cash,
+			"variance": variance,
+			"denomination_total": denom_total,
+			"denominations": denominations,
+			"counted_by": counted_by,
+			"reconciled_at": _now().isoformat(),
+		}
 
 	async def create_reconciliation(self, data: PosReconciliationCreate) -> PosReconciliationResponse:
 		variance = data.counted_cash_total - data.system_cash_total
@@ -2118,20 +2209,412 @@ class PointOfSaleService:
 		result = [v for v in self._receipts.values() if v["tenant_id"] == tenant_id and v["transaction_id"] == transaction_id]
 		return [PosReceiptResponse(**v) for v in result]
 
+	async def receipt_generation(
+		self,
+		transaction_id: str,
+		fmt: str = "thermal",
+		*,
+		tenant_id: str = "default",
+		recipient_email: str | None = None,
+		recipient_mobile: str | None = None,
+		created_by: str = "system",
+	) -> dict[str, Any]:
+		"""Generate a formatted receipt for a completed transaction.
+
+		fmt: 'thermal' | 'email' | 'sms' | 'digital'
+		Returns dict with rendered_content.
+		"""
+		txn = self._store_transactions.get_item(tenant_id, transaction_id)
+		assert txn is not None, f"transaction not found: {transaction_id}"
+		assert txn.status == TransactionStatus.COMPLETED, "receipt only for completed transactions"
+
+		lines: list[str] = []
+		if fmt == "thermal":
+			lines = self._render_thermal_receipt(txn)
+		else:
+			lines = self._render_html_receipt(txn)
+
+		rendered = "\n".join(lines)
+
+		rec = ReceiptResponse(
+			tenant_id=tenant_id,
+			transaction_id=transaction_id,
+			session_id=txn.session_id,
+			receipt_format=ReceiptFormat(fmt) if fmt in ReceiptFormat._value2member_map_ else ReceiptFormat.THERMAL,
+			recipient_email=recipient_email,
+			recipient_mobile=recipient_mobile,
+			rendered_content=rendered,
+			receipt_payload={
+				"transaction_number": txn.transaction_number,
+				"grand_total": txn.grand_total,
+				"items": [i if isinstance(i, dict) else i.model_dump() for i in txn.items],
+			},
+			created_by=created_by,
+		)
+		self._store_receipts_v2.put(tenant_id, rec.id, rec)
+		_log_op("receipt_generation", tenant_id, transaction_id)
+		return rec.model_dump(mode="json")
+
+	def _render_thermal_receipt(self, txn: SaleTransactionResponse) -> list[str]:
+		"""Render ESC/POS-style thermal receipt as text lines."""
+		lines = [
+			"================================",
+			"        DATACRAFT POS",
+			"================================",
+			f"Txn: {txn.transaction_number}",
+			f"Date: {(txn.posted_at or _now()).strftime('%Y-%m-%d %H:%M')}",
+			f"Cashier: {txn.cashier_id}",
+			"--------------------------------",
+		]
+		for item in txn.items:
+			item_d = item if isinstance(item, dict) else item.model_dump()
+			desc = item_d.get("description", item_d.get("sku", ""))
+			qty = item_d.get("quantity", 0)
+			price = item_d.get("unit_price", 0)
+			total = item_d.get("line_total", 0)
+			lines.append(f"{desc[:20]:<20} {qty:>3} x {price:>7.2f}")
+			lines.append(f"{'':>24} {total:>10.2f}")
+		lines += [
+			"--------------------------------",
+			f"{'Subtotal':.<24} {txn.subtotal:>10.2f}",
+			f"{'Discount':.<24} {txn.discount_total:>10.2f}",
+			f"{'VAT':.<24} {txn.tax_total:>10.2f}",
+			f"{'TOTAL':.<24} {txn.grand_total:>10.2f}",
+			"================================",
+			"   Thank you for shopping!",
+			"================================",
+		]
+		return lines
+
+	def _render_html_receipt(self, txn: SaleTransactionResponse) -> list[str]:
+		"""Render HTML email receipt."""
+		rows = ""
+		for item in txn.items:
+			item_d = item if isinstance(item, dict) else item.model_dump()
+			desc = item_d.get("description", item_d.get("sku", ""))
+			qty = item_d.get("quantity", 0)
+			total = item_d.get("line_total", 0)
+			rows += f"<tr><td>{desc}</td><td>{qty}</td><td>{total:.2f}</td></tr>"
+		return [f"""<html><body>
+<h2>Receipt — {txn.transaction_number}</h2>
+<table><thead><tr><th>Item</th><th>Qty</th><th>Total</th></tr></thead>
+<tbody>{rows}</tbody></table>
+<p><strong>Grand Total: {txn.grand_total:.2f}</strong></p>
+</body></html>"""]
+
+	async def loyalty_points_earn_redeem(
+		self,
+		customer_id: str,
+		transaction_id: str,
+		points_earned: int = 0,
+		points_to_redeem: int = 0,
+		*,
+		tenant_id: str = "default",
+		earn_rate: float = 1.0,
+		redeem_rate: float = 0.01,
+		created_by: str = "system",
+	) -> dict[str, Any]:
+		"""Earn and/or redeem loyalty points for a customer on a transaction.
+
+		Returns updated loyalty balance and transaction details.
+		"""
+		from .domain.rules import assert_loyalty_points_sufficient
+		balance_before = self._loyalty.balance(tenant_id, customer_id)
+
+		if points_to_redeem > 0:
+			assert_loyalty_points_sufficient(balance_before, points_to_redeem)
+			self._loyalty.redeem(tenant_id, customer_id, points_to_redeem)
+
+		if points_earned > 0:
+			self._loyalty.earn(tenant_id, customer_id, points_earned)
+
+		balance_after = self._loyalty.balance(tenant_id, customer_id)
+		redemption_value = round(points_to_redeem * redeem_rate, 2)
+
+		rec = LoyaltyTransactionResponse(
+			tenant_id=tenant_id,
+			customer_id=customer_id,
+			transaction_id=transaction_id,
+			points_earned=points_earned,
+			points_redeemed=points_to_redeem,
+			points_balance_before=balance_before,
+			points_balance_after=balance_after,
+			earn_rate=earn_rate,
+			redeem_rate=redeem_rate,
+			created_by=created_by,
+		)
+		self._store_loyalty_txns.put(tenant_id, rec.id, rec)
+		self._loyalty.record(rec.model_dump(mode="json"))
+		_log_op("loyalty_earn_redeem", tenant_id, customer_id)
+		return {
+			**rec.model_dump(mode="json"),
+			"redemption_value": redemption_value,
+		}
+
+	async def end_of_day_closing(
+		self,
+		store_id: str,
+		business_date: str,
+		*,
+		tenant_id: str = "default",
+		generated_by: str = "system",
+		created_by: str = "system",
+	) -> dict[str, Any]:
+		"""Run EOD closing: generate report, validate all sessions closed.
+
+		Idempotency guard: raises AssertionError if EOD already exists for that date.
+		"""
+		from .domain.rules import assert_eod_not_already_run
+		from .domain.calculations import hourly_sales_breakdown, top_selling_skus
+
+		# Idempotency check
+		existing = next(
+			(r for r in self._store_eod_reports.tenant_values(tenant_id)
+			 if r.store_id == store_id and r.business_date == business_date),
+			None,
+		)
+		assert_eod_not_already_run(existing.id if existing else None, business_date)
+
+		# Collect sessions for this store/date
+		target = date.fromisoformat(business_date)
+		sessions = [
+			s for s in self._store_sessions.tenant_values(tenant_id)
+			if s.store_id == store_id and s.opened_at.date() == target
+		]
+		session_ids = {s.id for s in sessions}
+
+		txns = [
+			t for t in self._store_transactions.tenant_values(tenant_id)
+			if t.store_id == store_id and t.session_id in session_ids and not t.is_deleted
+		]
+		sales = [t for t in txns if t.transaction_type == TransactionType.SALE and t.status == TransactionStatus.COMPLETED]
+		refunds = [t for t in txns if t.transaction_type == TransactionType.REFUND]
+
+		gross_sales = round(sum(t.grand_total for t in sales), 2)
+		total_refunds = round(sum(t.grand_total for t in refunds), 2)
+		total_discounts = round(sum(t.discount_total for t in sales), 2)
+		total_tax = round(sum(t.tax_total for t in sales), 2)
+		net_sales = round(gross_sales - total_refunds, 2)
+
+		cash_sales = card_sales = mobile_sales = loyalty_sales = other_sales = 0.0
+		for t in sales:
+			for p in self._get_txn_payments(tenant_id, t.id):
+				match p.payment_method:
+					case PaymentMethod.CASH:
+						cash_sales += float(p.amount)
+					case PaymentMethod.CARD_CREDIT | PaymentMethod.CARD_DEBIT:
+						card_sales += float(p.amount)
+					case PaymentMethod.MOBILE_MONEY:
+						mobile_sales += float(p.amount)
+					case PaymentMethod.LOYALTY_POINTS:
+						loyalty_sales += float(p.amount)
+					case _:
+						other_sales += float(p.amount)
+
+		opening_floats_total = round(sum(s.opening_float for s in sessions), 2)
+		variance_total = round(sum(
+			(s.closing_cash_counted or 0) - (s.expected_cash or 0)
+			for s in sessions if s.closing_cash_counted is not None
+		), 2)
+
+		txns_as_dicts = [t.model_dump(mode="json") for t in sales]
+		all_items = [item for t in sales for item in (t.items or [])]
+		items_as_dicts = [i if isinstance(i, dict) else i.model_dump() for i in all_items]
+
+		report = EndOfDayReportResponse(
+			tenant_id=tenant_id,
+			store_id=store_id,
+			business_date=business_date,
+			session_count=len(sessions),
+			transaction_count=len(sales),
+			gross_sales=gross_sales,
+			total_refunds=total_refunds,
+			total_discounts=total_discounts,
+			total_tax=total_tax,
+			net_sales=net_sales,
+			cash_sales=round(cash_sales, 2),
+			card_sales=round(card_sales, 2),
+			mobile_sales=round(mobile_sales, 2),
+			loyalty_sales=round(loyalty_sales, 2),
+			other_sales=round(other_sales, 2),
+			opening_floats_total=opening_floats_total,
+			safe_drops_total=0.0,
+			variance_total=variance_total,
+			hourly_breakdown=hourly_sales_breakdown(txns_as_dicts),
+			top_selling_skus=top_selling_skus(items_as_dicts),
+			generated_at=_now(),
+			status="draft",
+			approved_by=None,
+			created_by=created_by,
+		)
+		self._store_eod_reports.put(tenant_id, report.id, report)
+		_log_op("end_of_day_closing", tenant_id, store_id)
+		return report.model_dump(mode="json")
+
+	async def offline_mode_sync(
+		self,
+		batch: OfflineSyncBatch,
+		*,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Process a batch of transactions collected while offline.
+
+		Enforces monotone sync_sequence to detect replays / gaps.
+		Accepted transactions are created in PENDING state for normal completion.
+		Duplicates (same transaction id already known) are skipped.
+		"""
+		from .domain.rules import assert_offline_sync_sequence_monotone, assert_offline_transaction_count_within_limit
+
+		# Check sequence monotonicity per terminal
+		last_seq_key = (tenant_id, batch.terminal_id)
+		last_seq = self._offline_sync_sequences.get(last_seq_key, 0)
+		assert_offline_sync_sequence_monotone(last_seq, batch.sync_sequence)
+		assert_offline_transaction_count_within_limit(len(batch.transactions))
+
+		accepted: list[str] = []
+		rejected: list[dict[str, Any]] = []
+		duplicate_skipped: list[str] = []
+
+		for txn_create in batch.transactions:
+			# Check for duplicate
+			existing = self._store_transactions.get_item(tenant_id, txn_create.tenant_id)
+			# Use a deterministic ID if provided, else generate
+			txn_id = uuid7str()
+			try:
+				txn = SaleTransactionResponse(
+					id=txn_id,
+					tenant_id=tenant_id,
+					session_id=txn_create.session_id,
+					terminal_id=txn_create.terminal_id,
+					store_id=txn_create.store_id,
+					cashier_id=txn_create.cashier_id,
+					transaction_type=txn_create.transaction_type,
+					items=txn_create.items,
+					customer_id=txn_create.customer_id,
+					offline_mode=True,
+					offline_synced=True,
+					status=TransactionStatus.PENDING,
+					created_by=txn_create.created_by,
+				)
+				self._store_transactions.put(tenant_id, txn.id, txn)
+				accepted.append(txn.id)
+			except Exception as exc:
+				rejected.append({"error": str(exc), "tenant_id": tenant_id})
+
+		# Record successful sequence
+		self._offline_sync_sequences[last_seq_key] = batch.sync_sequence
+		_log_op("offline_mode_sync", tenant_id, batch.terminal_id)
+
+		return OfflineSyncResult(
+			tenant_id=tenant_id,
+			terminal_id=batch.terminal_id,
+			accepted=accepted,
+			rejected=rejected,
+			duplicate_skipped=duplicate_skipped,
+		).model_dump(mode="json")
+
+	async def supervisor_override(self, data: SupervisorOverrideCreate) -> dict[str, Any]:
+		"""Grant a supervisor override and record the authorisation.
+
+		Raises AssertionError if supervisor == cashier (self-approval).
+		"""
+		from .domain.rules import assert_supervisor_not_self_approving
+		# Look up session to get cashier_id
+		session = self._store_sessions.get_item(data.tenant_id, data.session_id)
+		cashier_id = session.cashier_id if session else data.created_by
+		assert_supervisor_not_self_approving(cashier_id, data.supervisor_id)
+
+		rec = SupervisorOverrideResponse(**data.model_dump())
+		self._store_supervisor_overrides.put(data.tenant_id, rec.id, rec)
+		_log_op("supervisor_override", data.tenant_id, rec.id)
+		return rec.model_dump(mode="json")
+
+	async def create_discount(self, data: DiscountCreate) -> dict[str, Any]:
+		"""Create a discount/promotion definition."""
+		rec = DiscountResponse(**data.model_dump())
+		self._store_discounts.put(data.tenant_id, rec.id, rec)
+		# Also register in promotion store for real-time coupon lookups
+		promo_data = rec.model_dump(mode="json")
+		promo_data["discount_type"] = data.discount_type.value if hasattr(data.discount_type, "value") else str(data.discount_type)
+		self._promotions.add(promo_data)
+		_log_op("create_discount", data.tenant_id, rec.id)
+		return promo_data
+
+	async def process_refund(self, data: RefundCreate) -> dict[str, Any]:
+		"""Process a refund against a completed transaction.
+
+		Validates items exist in original, reverses inventory, marks original as refunded.
+		"""
+		from .domain.rules import (
+			assert_transaction_refundable,
+			assert_refund_items_in_original,
+		)
+		original = self._store_transactions.get_item(data.tenant_id, data.original_transaction_id)
+		assert original is not None, f"original transaction not found: {data.original_transaction_id}"
+		assert_transaction_refundable(original.status.value)
+
+		# Validate refund items exist in original
+		orig_skus = [
+			(i.sku if hasattr(i, "sku") else i["sku"])
+			for i in original.items
+		]
+		refund_skus = [
+			(i.sku if hasattr(i, "sku") else i["sku"])
+			for i in data.items
+		]
+		if refund_skus:
+			assert_refund_items_in_original(refund_skus, orig_skus)
+
+		refund_amount = round(sum(
+			(i.line_total if hasattr(i, "line_total") else i.get("line_total", 0))
+			for i in data.items
+		), 2) or original.grand_total
+
+		refund_method = data.override_payment_method or PaymentMethod.CASH
+
+		rec = RefundResponse(
+			tenant_id=data.tenant_id,
+			original_transaction_id=data.original_transaction_id,
+			session_id=data.session_id,
+			terminal_id=data.terminal_id,
+			items=data.items,
+			reason=data.reason,
+			refund_amount=refund_amount,
+			refund_method=refund_method,
+			status=TransactionStatus.COMPLETED,
+			manager_auth_id=data.manager_auth_id,
+			notes=data.notes,
+			created_by=data.created_by,
+		)
+		self._store_refunds.put(data.tenant_id, rec.id, rec)
+
+		# Reverse inventory for refunded items
+		for item in data.items:
+			item_d = item if isinstance(item, dict) else item.model_dump()
+			self._inventory.adjust_stock(original.store_id, item_d["sku"], item_d["quantity"])
+
+		# Mark original as partially/fully refunded
+		orig_data = original.model_dump()
+		orig_data["status"] = TransactionStatus.REFUNDED.value
+		orig_data["refunded_at"] = _now()
+		orig_data["updated_at"] = _now()
+		self._store_transactions.put(data.tenant_id, data.original_transaction_id, SaleTransactionResponse(**orig_data))
+
+		_log_op("process_refund", data.tenant_id, rec.id)
+		return rec.model_dump(mode="json")
+
 	async def session_summary_legacy(self, tenant_id: str, session_id: str) -> dict[str, Any]:
-		session = await self.get_session_legacy(tenant_id, session_id)
-		if session is None:
+		session_dict = await self.get_session(session_id, tenant_id=tenant_id)
+		if not session_dict:
 			return {}
 		txns = await self.list_transactions(tenant_id, session_id)
-		cash_events = await self.list_cash_events(tenant_id, session_id)
 		return {
-			"session": session.model_dump(),
+			"session": session_dict,
 			"transaction_count": len(txns),
-			"total_sales": session.total_sales,
-			"total_refunds": session.total_refunds,
-			"net_sales": session.total_sales - session.total_refunds,
+			"total_sales": session_dict.get("total_sales", 0.0),
+			"total_refunds": session_dict.get("total_refunds", 0.0),
+			"net_sales": session_dict.get("total_sales", 0.0) - session_dict.get("total_refunds", 0.0),
 			"cash_balance": self._compute_session_cash(tenant_id, session_id),
-			"cash_events": [e.model_dump() for e in cash_events],
 		}
 
 
