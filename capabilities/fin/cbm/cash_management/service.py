@@ -94,11 +94,16 @@ class CashManagementService:
 
 	def _assert_rules(self, context: dict[str, Any]) -> None:
 		result = evaluate_capability_rules(context)
-		# Only hard-block on explicit deny; require_review creates an audit flag
-		if result.get("decision") == "deny":
-			effects = result.get("effects") or result.get("actions") or []
-			reasons = [e.get("reason", e) if isinstance(e, dict) else str(e) for e in effects]
+		decision = result.get("decision")
+		effects = result.get("effects") or result.get("actions") or []
+		reasons = [e.get("reason", e) if isinstance(e, dict) else str(e) for e in effects]
+		# Hard-block on deny
+		if decision == "deny":
 			raise PermissionError(",".join(reasons) or "operation_denied")
+		# require_review blocks when the review flag was not satisfied in context
+		# (the rule fires because the flag is False — the caller must supply a reviewer)
+		if decision == "require_review":
+			raise PermissionError(",".join(reasons) or "review_required")
 
 	def _emit(self, tenant_id: str, event_type: str, record: dict[str, Any]) -> None:
 		self._audit_events.append({
@@ -817,8 +822,17 @@ class CashManagementService:
 
 	def dashboard_summary(self, tenant_id: str) -> dict[str, Any]:
 		tenant = self._tenant(tenant_id)
+		# Total cash: sum latest position per account
+		acct_ids = [a["id"] for a in self.cash_accounts.values() if a["tenant_id"] == tenant]
+		total_cash = Decimal("0")
+		for aid in acct_ids:
+			positions = [p for p in self.cash_positions.values() if p["tenant_id"] == tenant and p["account_id"] == aid]
+			if positions:
+				latest = max(positions, key=lambda p: p["as_of_date"])
+				total_cash += latest["available_balance"]
 		return {
 			"tenant_id": tenant,
+			"total_cash_balance": total_cash,
 			"bank_count": sum(1 for r in self.banks.values() if r["tenant_id"] == tenant),
 			"cash_account_count": sum(1 for r in self.cash_accounts.values() if r["tenant_id"] == tenant),
 			"cash_position_count": sum(1 for r in self.cash_positions.values() if r["tenant_id"] == tenant),
@@ -843,6 +857,179 @@ class CashManagementService:
 		tenant = self._tenant(tenant_id)
 		store = getattr(self, collection)
 		return [deepcopy(r) for r in store.values() if r["tenant_id"] == tenant]
+
+	# ------------------------------------------------------------------ convenience list methods
+
+	def list_banks(self, tenant_id: str) -> list[dict[str, Any]]:
+		"""Return all bank relationships for tenant."""
+		return self.list_records("banks", tenant_id)
+
+	def list_cash_accounts(self, tenant_id: str) -> list[dict[str, Any]]:
+		"""Return all cash accounts for tenant."""
+		return self.list_records("cash_accounts", tenant_id)
+
+	def list_cash_positions(self, tenant_id: str) -> list[dict[str, Any]]:
+		"""Return all cash positions for tenant."""
+		return self.list_records("cash_positions", tenant_id)
+
+	def list_cash_flows(self, tenant_id: str) -> list[dict[str, Any]]:
+		"""Return all cash flows for tenant."""
+		return self.list_records("cash_flows", tenant_id)
+
+	def list_forecasts(self, tenant_id: str) -> list[dict[str, Any]]:
+		"""Return all forecasts for tenant."""
+		return self.list_records("cash_forecasts", tenant_id)
+
+	def list_reconciliations(self, tenant_id: str) -> list[dict[str, Any]]:
+		"""Return all reconciliations for tenant."""
+		return self.list_records("reconciliations", tenant_id)
+
+	def list_investments(self, tenant_id: str) -> list[dict[str, Any]]:
+		"""Return all investments for tenant."""
+		return self.list_records("investments", tenant_id)
+
+	# ------------------------------------------------------------------ import_bank_statement
+
+	def import_bank_statement(
+		self,
+		statement_id: str,
+		tenant_id: str,
+		account_id: str,
+		raw_content: str,
+		fmt: str = "mt940",
+	) -> dict[str, Any]:
+		"""Import a bank statement in MT940, camt.053, or M-Pesa CSV format.
+
+		Parses transactions from the raw content, stores the statement record,
+		and returns a summary.  Actual line parsing is heuristic for demo purposes —
+		production implementations wire to a dedicated parser library.
+
+		Args:
+			statement_id: Caller-supplied deduplication key.
+			tenant_id: Tenant scope.
+			account_id: Target cash account.
+			raw_content: Raw statement text (MT940 / ISO 20022 XML / M-Pesa CSV).
+			fmt: One of "mt940", "camt053", "mpesa", "manual".
+		"""
+		tenant = self._tenant(tenant_id)
+		account = self.cash_accounts.get(account_id)
+		if not account or account["tenant_id"] != tenant:
+			raise KeyError(f"cash_account_not_found:{account_id}")
+		assert fmt in ("mt940", "camt053", "mpesa", "manual"), f"unsupported_format:{fmt}"
+
+		txn_count = 0
+		closing_balance: Decimal | None = None
+
+		if fmt == "mt940":
+			# Count :61: tags as transactions
+			import re as _re
+			txn_count = len(_re.findall(r"^:61:", raw_content, _re.MULTILINE))
+			# :62F: closing balance tag  e.g.  :62F:C260601KES1500000,00
+			m = _re.search(r":62[FM]:[CD](\d+)[A-Z]{3}([\d,]+)", raw_content)
+			if m:
+				closing_balance = Decimal(m.group(2).replace(",", "."))
+
+		elif fmt == "mpesa":
+			lines = [l for l in raw_content.strip().splitlines() if l.strip()]
+			# Skip header
+			txn_count = max(0, len(lines) - 1)
+
+		elif fmt == "camt053":
+			import re as _re
+			txn_count = len(_re.findall(r"<Ntry>", raw_content))
+
+		record = {
+			"id": self._record_id("stmt", statement_id),
+			"type": "bank_statement_import",
+			"tenant_id": tenant,
+			"account_id": account_id,
+			"format": fmt,
+			"transaction_count": txn_count,
+			"closing_balance": str(closing_balance) if closing_balance is not None else None,
+			"status": "imported",
+			"created_at": _now(),
+		}
+		self._bank_statements[record["id"]] = record
+		self._emit(tenant, "bank_statement_imported", record)
+		return deepcopy(record)
+
+	# ------------------------------------------------------------------ sweep_accounts
+
+	def sweep_accounts(
+		self,
+		sweep_id: str,
+		tenant_id: str,
+		source_account_ids: list[str],
+		target_account_id: str,
+		sweep_date: str,
+	) -> dict[str, Any]:
+		"""Sweep excess cash from source accounts into a concentration account.
+
+		For each source account, if the available balance on sweep_date exceeds
+		the account's minimum_buffer, the excess is notionally transferred to the
+		target account.  A sweep record is returned with per-account detail.
+
+		Args:
+			sweep_id: Deduplication key.
+			tenant_id: Tenant scope.
+			source_account_ids: Accounts to sweep from.
+			target_account_id: Concentration / notional pool account.
+			sweep_date: ISO date string (YYYY-MM-DD).
+		"""
+		tenant = self._tenant(tenant_id)
+		target = self.cash_accounts.get(target_account_id)
+		if not target or target["tenant_id"] != tenant:
+			raise KeyError(f"target_account_not_found:{target_account_id}")
+
+		sweep_lines: list[dict[str, Any]] = []
+		total_swept = Decimal("0")
+
+		for acct_id in source_account_ids:
+			acct = self.cash_accounts.get(acct_id)
+			if not acct or acct["tenant_id"] != tenant:
+				continue
+			# Find latest position on or before sweep_date
+			positions = [
+				p for p in self.cash_positions.values()
+				if p["tenant_id"] == tenant
+				and p["account_id"] == acct_id
+				and p["as_of_date"] <= sweep_date
+			]
+			if not positions:
+				continue
+			latest = max(positions, key=lambda p: p["as_of_date"])
+			balance = latest["available_balance"]
+			buffer = acct.get("minimum_buffer", Decimal("0"))
+			excess = max(Decimal("0"), balance - buffer)
+			if excess > Decimal("0"):
+				sweep_lines.append({
+					"account_id": acct_id,
+					"balance": str(balance),
+					"buffer": str(buffer),
+					"swept_amount": str(excess),
+				})
+				total_swept += excess
+
+		record = {
+			"id": self._record_id("sweep", sweep_id),
+			"type": "cash_sweep",
+			"tenant_id": tenant,
+			"target_account_id": target_account_id,
+			"sweep_date": sweep_date,
+			"sweep_id": sweep_id,
+			"total_swept": str(total_swept),
+			"line_count": len(sweep_lines),
+			"lines": sweep_lines,
+			"status": "completed",
+			"created_at": _now(),
+		}
+		# Store in bank_statements as generic store — or use a dedicated dict if present
+		if hasattr(self, "_sweeps"):
+			self._sweeps[record["id"]] = record  # type: ignore[attr-defined]
+		self._emit(tenant, "cash_sweep_completed", record)
+		return deepcopy(record)
+
+	# ------------------------------------------------------------------ dashboard total_cash_balance
 
 	# ------------------------------------------------------------------
 	# IFRS/GAAP compliance and regulatory reporting

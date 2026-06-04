@@ -19,7 +19,8 @@ from enum import Enum
 
 import numpy as np
 from pydantic import BaseModel, Field, ConfigDict
-from uuid_extensions import uuid7str
+from uuid6 import uuid7
+def uuid7str() -> str: return str(uuid7())
 
 from .models import MonitoringMetric, MonitoringQuery, DataRetentionPolicy
 

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page_title }} — APG Fleet</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/fle.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="fle-app">
+<main class="fle-main">
+  <header class="fle-page-header">
+    <div>
+      <a href="{{ url_for('fle_views.list_drivers') }}" class="fle-breadcrumb"><i class="fa-solid fa-chevron-left"></i> Drivers</a>
+      <h1><i class="fa-solid fa-id-card"></i> {{ driver.name }}</h1>
+    </div>
+    <a href="{{ url_for('fle_views.edit_driver', driver_id=driver.id) }}" class="fle-btn fle-btn-warning"><i class="fa-solid fa-pen"></i> Edit</a>
+  </header>
+
+  <div class="fle-two-col">
+    <section class="fle-card">
+      <h2>Driver Details</h2>
+      <dl class="fle-dl">
+        <dt>Name</dt><dd><strong>{{ driver.name }}</strong></dd>
+        <dt>Employee #</dt><dd>{{ driver.employee_number or '—' }}</dd>
+        <dt>Licence</dt><dd>{{ driver.licence_number }} (Class {{ driver.licence_class.value if driver.licence_class is not string else driver.licence_class|upper }})</dd>
+        <dt>Licence Expiry</dt><dd>{{ driver.licence_expiry[:10] }}</dd>
+        <dt>CPC Expiry</dt><dd>{{ driver.cpc_expiry[:10] if driver.cpc_expiry else '—' }}</dd>
+        <dt>Medical Expiry</dt><dd>{{ driver.medical_expiry[:10] if driver.medical_expiry else '—' }}</dd>
+        <dt>Tacho Card</dt><dd>{{ driver.tacho_card_number or '—' }}</dd>
+        <dt>Phone</dt><dd>{{ driver.phone or '—' }}</dd>
+        <dt>Email</dt><dd>{{ driver.email or '—' }}</dd>
+        <dt>Status</dt><dd><span class="fle-status fle-status-{{ driver.status }}">{{ driver.status|replace('_',' ')|title }}</span></dd>
+      </dl>
+    </section>
+
+    <section class="fle-card">
+      <h2><i class="fa-solid fa-star"></i> Behaviour Score</h2>
+      <div class="fle-score-ring fle-score-{{ score.grade|lower }}">
+        <div class="fle-score-value">{{ "%.0f"|format(score.overall_score) }}</div>
+        <div class="fle-score-grade">Grade {{ score.grade }}</div>
+      </div>
+      <dl class="fle-dl fle-dl-scores">
+        <dt>Speeding</dt><dd>{{ "%.1f"|format(score.speeding_score) }}</dd>
+        <dt>Harsh Braking</dt><dd>{{ "%.1f"|format(score.harsh_braking_score) }}</dd>
+        <dt>Harsh Accel.</dt><dd>{{ "%.1f"|format(score.harsh_acceleration_score) }}</dd>
+        <dt>Cornering</dt><dd>{{ "%.1f"|format(score.cornering_score) }}</dd>
+        <dt>Seatbelt</dt><dd>{{ "%.1f"|format(score.seatbelt_score) }}</dd>
+        <dt>Distraction</dt><dd>{{ "%.1f"|format(score.distraction_score) }}</dd>
+        <dt>Trips</dt><dd>{{ score.trips_count }}</dd>
+        <dt>Distance</dt><dd>{{ "{:,.0f}".format(score.distance_km|float) }} km</dd>
+        <dt>Incidents</dt><dd>{{ score.incidents_count }}</dd>
+      </dl>
+    </section>
+  </div>
+
+  {% if trips %}
+  <section class="fle-card">
+    <h2><i class="fa-solid fa-route"></i> Recent Trips</h2>
+    <table class="fle-table">
+      <thead><tr><th>Origin</th><th>Destination</th><th>Departure</th><th>Status</th><th>Distance</th></tr></thead>
+      <tbody>
+      {% for t in trips %}
+        <tr>
+          <td>{{ t.origin }}</td><td>{{ t.destination }}</td>
+          <td>{{ t.planned_departure[:16].replace('T',' ') }}</td>
+          <td><span class="fle-status fle-status-{{ t.status.value if t.status is not string else t.status }}">{{ (t.status.value if t.status is not string else t.status)|replace('_',' ')|title }}</span></td>
+          <td>{% if t.distance_km %}{{ "{:,.0f}".format(t.distance_km|float) }} km{% else %}—{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+</main>
+</body>
+</html>

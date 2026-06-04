@@ -14,9 +14,18 @@ from .capability_contract import (
 	SUPPORTED_TEST_CATEGORIES, evaluate_capability_rules, get_capability_contract,
 )
 from .models import (
-	CriticalValueNotification, InstrumentCreate, InstrumentResponse,
-	LabOrderCreate, LabOrderResponse, LabResultCreate, LabResultResponse,
-	QCRunCreate, QCRunResponse, SpecimenCreate, SpecimenResponse, uuid7str,
+	AnalyserInterfaceResponse, AnalyserInterfaceUpdate,
+	CriticalValueCreate, CriticalValueNotification,
+	ExternalReferralCreate, ExternalReferralResponse, ExternalReferralUpdate,
+	InstrumentCreate, InstrumentResponse,
+	InstrumentStatus, OrderStatus, SpecimenStatus,
+	LabOrderCreate, LabOrderResponse, LabOrderUpdate,
+	LabResultCreate, LabResultResponse, LabResultUpdate,
+	LabTestCreate, LabTestResponse, LabTestUpdate,
+	QCRunCreate, QCRunResponse, QCRunUpdate,
+	ReferenceRangeCreate, ReferenceRangeResponse, ReferenceRangeUpdate,
+	SpecimenCreate, SpecimenResponse, SpecimenTrackRequest, SpecimenUpdate,
+	uuid7str,
 )
 
 logger = logging.getLogger(__name__)
@@ -78,6 +87,12 @@ class LaboratoryInformationService:
 		self._workload_reports: dict[tuple[str, str], dict[str, Any]] = {}
 		# Previous results store for delta checking — keyed by (tenant_id, patient_id, test_code)
 		self._previous_results: dict[tuple[str, str, str], Any] = {}
+		# New typed stores
+		self._tests: dict[tuple[str, str], LabTestResponse] = {}
+		self._reference_ranges: dict[tuple[str, str], ReferenceRangeResponse] = {}
+		self._referrals: dict[tuple[str, str], ExternalReferralResponse] = {}
+		self._calibrations: dict[tuple[str, str], dict[str, Any]] = {}
+		self._instrument_messages: dict[tuple[str, str], dict[str, Any]] = {}
 
 	async def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -102,7 +117,7 @@ class LaboratoryInformationService:
 			test_name=payload.test_name, test_category=payload.test_category,
 			collection_priority=payload.collection_priority, ordered_by=payload.ordered_by,
 			clinical_indication=payload.clinical_indication, specimen_type=payload.specimen_type,
-			status="pending", created_by=payload.created_by,
+			status=OrderStatus.PENDING, created_by=payload.created_by,
 		)
 		self._orders[(payload.tenant_id, order.id)] = order
 		self._audit(payload.tenant_id, "order_created", order.id)
@@ -148,7 +163,7 @@ class LaboratoryInformationService:
 			"tat_start": now.isoformat(),
 		}
 
-		updated_order = order.model_copy(update={"status": "received", "updated_at": now})
+		updated_order = order.model_copy(update={"status": OrderStatus.RECEIVED, "updated_at": now})
 		self._orders[(tenant_id, order_id)] = updated_order
 		self._audit(tenant_id, "lab_order_received", receipt_id)
 		return record
@@ -157,7 +172,11 @@ class LaboratoryInformationService:
 		order = self._orders.get((tenant_id, order_id))
 		if order is None:
 			return None
-		updated = order.model_copy(update={"status": "cancelled", "updated_at": datetime.utcnow()})
+		updated = order.model_copy(update={
+			"status": OrderStatus.CANCELLED,
+			"cancelled_reason": reason or None,
+			"updated_at": datetime.utcnow(),
+		})
 		self._orders[(tenant_id, order_id)] = updated
 		self._audit(tenant_id, "order_cancelled", order_id)
 		return updated
@@ -194,13 +213,14 @@ class LaboratoryInformationService:
 			id=uuid7str(), tenant_id=payload.tenant_id, order_id=payload.order_id,
 			patient_id=payload.patient_id, specimen_type=payload.specimen_type,
 			collected_by=payload.collected_by, collection_site=payload.collection_site,
-			collection_volume_ml=payload.collection_volume_ml, status="collected",
+			collection_volume_ml=payload.collection_volume_ml,
+			status=SpecimenStatus.COLLECTED,
 			created_by=payload.created_by,
 		)
 		self._specimens[(payload.tenant_id, spec.id)] = spec
 		if order:
 			updated_order = order.model_copy(update={
-				"status": "collected", "specimen_id": spec.id, "updated_at": datetime.utcnow(),
+				"status": OrderStatus.COLLECTED, "specimen_id": spec.id, "updated_at": datetime.utcnow(),
 			})
 			self._orders[(payload.tenant_id, payload.order_id)] = updated_order
 		# Initialise custody chain
@@ -335,7 +355,7 @@ class LaboratoryInformationService:
 		if spec is None:
 			return None
 		updated = spec.model_copy(update={
-			"status": "rejected",
+			"status": SpecimenStatus.REJECTED,
 			"rejection_reason": rejection_reason,
 			"updated_at": datetime.utcnow(),
 		})
@@ -357,7 +377,7 @@ class LaboratoryInformationService:
 		if spec is None:
 			return None
 		updated = spec.model_copy(update={
-			"status": "received", "received_at": datetime.utcnow(), "updated_at": datetime.utcnow(),
+			"status": SpecimenStatus.RECEIVED, "received_at": datetime.utcnow(), "updated_at": datetime.utcnow(),
 		})
 		self._specimens[(tenant_id, specimen_id)] = updated
 		return updated
@@ -618,7 +638,11 @@ class LaboratoryInformationService:
 		assert bool(notified_to), "notified_to required"
 
 		result = self._results.get((tenant_id, result_id))
-		patient_id = result.patient_id if result else ""
+		patient_id = ""
+		if result:
+			spec = self._specimens.get((tenant_id, result.specimen_id))
+			if spec:
+				patient_id = spec.patient_id
 
 		self._enforce({
 			"tenant_context_present": bool(tenant_id),
@@ -876,6 +900,7 @@ class LaboratoryInformationService:
 			id=uuid7str(), tenant_id=tenant_id, result_id=result_id, patient_id=patient_id,
 			analyte=analyte, value=value, unit=unit, severity=severity,
 			notified_to=notified_to, notified_by=notified_by,
+			created_by=notified_by,
 		)
 		self._critical_values[(tenant_id, notif.id)] = notif
 		self._audit(tenant_id, "critical_value_flagged", notif.id)
@@ -988,7 +1013,7 @@ class LaboratoryInformationService:
 			_log_qc_violation(str(rejection_rules), analyser_id, tenant_id)
 			# Place analyser on QC hold
 			self._instruments[(tenant_id, analyser_id)] = inst.model_copy(
-				update={"status": "qc_hold", "updated_at": datetime.utcnow()}
+				update={"status": InstrumentStatus.QC_HOLD, "updated_at": datetime.utcnow()}
 			)
 			self._audit(tenant_id, "analyser_qc_hold", analyser_id)
 
@@ -1022,7 +1047,7 @@ class LaboratoryInformationService:
 			inst = self._instruments.get((payload.tenant_id, payload.instrument_id))
 			if inst:
 				self._instruments[(payload.tenant_id, payload.instrument_id)] = inst.model_copy(
-					update={"status": "qc_hold", "updated_at": datetime.utcnow()}
+					update={"status": InstrumentStatus.QC_HOLD, "updated_at": datetime.utcnow()}
 				)
 		self._audit(payload.tenant_id, "qc_run_completed", qc_run.id)
 		return qc_run
@@ -1289,26 +1314,28 @@ class LaboratoryInformationService:
 			"operation": "refer_to_external_lab",
 		})
 
-		referral_id = uuid7str()
 		now = datetime.utcnow()
-		expected_return = now + timedelta(days=expected_tat_days)
+		expected_tat_hours = expected_tat_days * 24
 
-		record: dict[str, Any] = {
-			"id": referral_id,
-			"tenant_id": tenant_id,
-			"specimen_id": specimen_id,
-			"patient_id": spec.patient_id,
-			"external_lab": external_lab,
-			"courier": courier,
-			"tracking_number": tracking_number,
-			"test_requested": test_requested,
-			"referred_at": now.isoformat(),
-			"expected_return_date": expected_return.isoformat(),
-			"expected_tat_days": expected_tat_days,
-			"status": "in_transit",
-			"result_received": False,
-		}
-		self._external_referrals[(tenant_id, referral_id)] = record
+		# Build typed referral; find any order linked to this specimen
+		order_id = next(
+			(o.id for (tid, _), o in self._orders.items()
+			 if tid == tenant_id and o.specimen_id == specimen_id),
+			specimen_id,  # fallback: use specimen_id as order_id placeholder
+		)
+		referral = ExternalReferralResponse(
+			id=uuid7str(), tenant_id=tenant_id,
+			order_id=order_id, specimen_id=specimen_id,
+			patient_id=spec.patient_id,
+			reference_lab_name=external_lab, reference_lab_code=external_lab,
+			test_code=test_requested or "EXTERNAL", test_name=test_requested or "External Test",
+			tracking_number=tracking_number,
+			expected_tat_hours=expected_tat_hours,
+			dispatched_by=courier, dispatched_at=now,
+			status="dispatched",
+			created_by=courier,
+		)
+		self._referrals[(tenant_id, referral.id)] = referral
 
 		# Update custody chain
 		chain = self._custody_chain.get((tenant_id, specimen_id), [])
@@ -1322,12 +1349,12 @@ class LaboratoryInformationService:
 		self._custody_chain[(tenant_id, specimen_id)] = chain
 
 		# Update specimen status
-		updated_spec = spec.model_copy(update={"status": "referred_external", "updated_at": now})
+		updated_spec = spec.model_copy(update={"updated_at": now})
 		self._specimens[(tenant_id, specimen_id)] = updated_spec
 
 		logger.info(_log_external_referral(specimen_id, external_lab, courier))
-		self._audit(tenant_id, "specimen_referred_to_external_lab", referral_id)
-		return record
+		self._audit(tenant_id, "specimen_referred_to_external_lab", referral.id)
+		return referral.model_dump(mode="json")
 
 	async def receive_external_result(
 		self,
@@ -1345,7 +1372,7 @@ class LaboratoryInformationService:
 		assert bool(result_data), "result_data required"
 		assert bool(verified_by), "verified_by required"
 
-		referral = self._external_referrals.get((tenant_id, referral_id))
+		referral = self._referrals.get((tenant_id, referral_id))
 		if referral is None:
 			raise KeyError(f"referral {referral_id} not found")
 
@@ -1358,13 +1385,22 @@ class LaboratoryInformationService:
 		ext_result_id = uuid7str()
 		now = datetime.utcnow()
 
+		updated = referral.model_copy(update={
+			"status": "resulted",
+			"external_result_id": ext_result_id,
+			"result_received_at": now,
+			"received_at": now,
+			"updated_at": now,
+		})
+		self._referrals[(tenant_id, referral_id)] = updated
+
 		record: dict[str, Any] = {
 			"id": ext_result_id,
 			"tenant_id": tenant_id,
 			"referral_id": referral_id,
-			"specimen_id": referral.get("specimen_id"),
-			"patient_id": referral.get("patient_id"),
-			"external_lab": referral.get("external_lab"),
+			"specimen_id": referral.specimen_id,
+			"patient_id": referral.patient_id,
+			"external_lab": referral.reference_lab_name,
 			"result_data": result_data,
 			"verified_by": verified_by,
 			"received_at": now.isoformat(),
@@ -1372,10 +1408,6 @@ class LaboratoryInformationService:
 			"imported_to_lis": True,
 		}
 		self._external_results[(tenant_id, ext_result_id)] = record
-
-		# Update referral status
-		updated_referral = {**referral, "status": "completed", "result_received": True, "result_id": ext_result_id}
-		self._external_referrals[(tenant_id, referral_id)] = updated_referral
 
 		self._audit(tenant_id, "external_result_received", ext_result_id)
 		return record
@@ -1400,7 +1432,7 @@ class LaboratoryInformationService:
 		results = [r for (tid, _), r in self._results.items() if tid == tenant_id]
 		specimens = [s for (tid, _), s in self._specimens.items() if tid == tenant_id]
 		qc_runs = [q for (tid, _), q in self._qc_runs.items() if tid == tenant_id]
-		referrals = [r for r in self._external_referrals.values() if isinstance(r, dict) and r.get("tenant_id") == tenant_id]
+		referrals = [r for (tid, _), r in self._referrals.items() if tid == tenant_id and not r.is_deleted]
 
 		total_orders = len(orders)
 		total_results = len(results)
@@ -1451,7 +1483,7 @@ class LaboratoryInformationService:
 		results = [r for (tid, _), r in self._results.items() if tid == tenant_id]
 		criticals = [n for (tid, _), n in self._critical_values.items() if tid == tenant_id]
 		instruments = [i for (tid, _), i in self._instruments.items() if tid == tenant_id]
-		referrals = [r for r in self._external_referrals.values() if isinstance(r, dict) and r.get("tenant_id") == tenant_id]
+		referrals = [r for (tid, _), r in self._referrals.items() if tid == tenant_id and not r.is_deleted]
 		return {
 			"tenant_id": tenant_id,
 			"orders": {
@@ -1474,9 +1506,813 @@ class LaboratoryInformationService:
 			},
 			"external_referrals": {
 				"total": len(referrals),
-				"in_transit": sum(1 for r in referrals if r.get("status") == "in_transit"),
+				"in_transit": sum(1 for r in referrals if r.status in {"pending", "dispatched"}),
 			},
 		}
+
+	# ── lab test catalogue ────────────────────────────────────────────────────
+
+	async def create_test(self, payload: LabTestCreate) -> LabTestResponse:
+		"""Add a new diagnostic test to the tenant catalogue."""
+		self._enforce({
+			"tenant_context_present": bool(payload.tenant_id),
+			"operation_type": "write", "policy_attached": True,
+		})
+		test = LabTestResponse(
+			id=uuid7str(), tenant_id=payload.tenant_id,
+			test_code=payload.test_code, test_name=payload.test_name,
+			category=payload.category, specimen_types=payload.specimen_types,
+			loinc_code=payload.loinc_code, cpt_code=payload.cpt_code,
+			snomed_code=payload.snomed_code,
+			turnaround_minutes=payload.turnaround_minutes,
+			stat_turnaround_minutes=payload.stat_turnaround_minutes,
+			active=payload.active, requires_fasting=payload.requires_fasting,
+			requires_consent=payload.requires_consent,
+			price=payload.price, department=payload.department,
+			instructions=payload.instructions,
+			sample_volume_ml=payload.sample_volume_ml,
+			container_type=payload.container_type,
+			storage_temperature=payload.storage_temperature,
+			created_by=payload.created_by,
+		)
+		self._tests[(payload.tenant_id, test.id)] = test
+		self._audit(payload.tenant_id, "test_created", test.id)
+		_log_op("create_test", payload.tenant_id, test.id)
+		return test
+
+	async def get_test(self, tenant_id: str, test_id: str) -> LabTestResponse | None:
+		"""Retrieve a test catalogue entry by ID."""
+		return self._tests.get((tenant_id, test_id))
+
+	async def list_tests(
+		self,
+		tenant_id: str,
+		category: str | None = None,
+		active: bool | None = None,
+	) -> list[LabTestResponse]:
+		"""List test catalogue entries for a tenant with optional filters."""
+		results = [t for (tid, _), t in self._tests.items() if tid == tenant_id and not t.is_deleted]
+		if category:
+			results = [t for t in results if t.category == category]
+		if active is not None:
+			results = [t for t in results if t.active == active]
+		return sorted(results, key=lambda t: t.test_name)
+
+	async def update_test(
+		self, tenant_id: str, test_id: str, payload: LabTestUpdate
+	) -> LabTestResponse | None:
+		"""Update a test catalogue entry with the provided fields."""
+		test = self._tests.get((tenant_id, test_id))
+		if test is None:
+			return None
+		updates = {k: v for k, v in payload.model_dump().items() if v is not None}
+		updates["updated_at"] = datetime.utcnow()
+		updated = test.model_copy(update=updates)
+		self._tests[(tenant_id, test_id)] = updated
+		self._audit(tenant_id, "test_updated", test_id)
+		return updated
+
+	async def delete_test(
+		self, tenant_id: str, test_id: str, actor_id: str
+	) -> LabTestResponse | None:
+		"""Soft-delete a test catalogue entry."""
+		test = self._tests.get((tenant_id, test_id))
+		if test is None:
+			return None
+		updated = test.model_copy(update={"is_deleted": True, "updated_at": datetime.utcnow()})
+		self._tests[(tenant_id, test_id)] = updated
+		self._audit(tenant_id, "test_deleted", test_id)
+		return updated
+
+	# ── order extensions ──────────────────────────────────────────────────────
+
+	async def update_order(
+		self, tenant_id: str, order_id: str, payload: LabOrderUpdate
+	) -> LabOrderResponse | None:
+		"""Apply a partial update to a lab order."""
+		order = self._orders.get((tenant_id, order_id))
+		if order is None:
+			return None
+		updates = {k: v for k, v in payload.model_dump().items() if v is not None}
+		updates["updated_at"] = datetime.utcnow()
+		updated = order.model_copy(update=updates)
+		self._orders[(tenant_id, order_id)] = updated
+		self._audit(tenant_id, "order_updated", order_id)
+		return updated
+
+	async def hold_order(
+		self, tenant_id: str, order_id: str, reason: str
+	) -> LabOrderResponse | None:
+		"""Place a lab order on hold with a documented reason."""
+		order = self._orders.get((tenant_id, order_id))
+		if order is None:
+			return None
+		updated = order.model_copy(update={
+			"status": OrderStatus.ON_HOLD, "on_hold_reason": reason, "updated_at": datetime.utcnow(),
+		})
+		self._orders[(tenant_id, order_id)] = updated
+		self._audit(tenant_id, "order_held", order_id)
+		return updated
+
+	async def unhold_order(
+		self, tenant_id: str, order_id: str
+	) -> LabOrderResponse | None:
+		"""Release a lab order from hold, restoring it to 'pending'."""
+		order = self._orders.get((tenant_id, order_id))
+		if order is None:
+			return None
+		updated = order.model_copy(update={
+			"status": OrderStatus.PENDING, "on_hold_reason": None, "updated_at": datetime.utcnow(),
+		})
+		self._orders[(tenant_id, order_id)] = updated
+		self._audit(tenant_id, "order_unheld", order_id)
+		return updated
+
+	async def list_orders(
+		self,
+		tenant_id: str,
+		patient_id: str | None = None,
+		status: str | None = None,
+		priority: str | None = None,
+	) -> list[LabOrderResponse]:
+		"""List lab orders with optional patient, status, and priority filters."""
+		results = [o for (tid, _), o in self._orders.items() if tid == tenant_id]
+		if patient_id:
+			results = [o for o in results if o.patient_id == patient_id]
+		if status:
+			results = [o for o in results if o.status == status]
+		if priority:
+			results = [o for o in results if o.collection_priority == priority]
+		return sorted(results, key=lambda o: o.ordered_at, reverse=True)
+
+	# ── specimen extensions ───────────────────────────────────────────────────
+
+	async def update_specimen(
+		self, tenant_id: str, specimen_id: str, payload: SpecimenUpdate
+	) -> SpecimenResponse | None:
+		"""Apply a partial update to a specimen record."""
+		spec = self._specimens.get((tenant_id, specimen_id))
+		if spec is None:
+			return None
+		updates = {k: v for k, v in payload.model_dump().items() if v is not None}
+		updates["updated_at"] = datetime.utcnow()
+		updated = spec.model_copy(update=updates)
+		self._specimens[(tenant_id, specimen_id)] = updated
+		self._audit(tenant_id, "specimen_updated", specimen_id)
+		return updated
+
+	async def track_specimen(
+		self, tenant_id: str, specimen_id: str, payload: SpecimenTrackRequest
+	) -> dict[str, Any]:
+		"""Append a custody event to a specimen's chain-of-custody log."""
+		spec = self._specimens.get((tenant_id, specimen_id))
+		if spec is None:
+			raise KeyError(f"specimen {specimen_id} not found")
+		event: dict[str, Any] = {
+			"event_type": payload.event_type,
+			"actor_id": payload.actor_id,
+			"location": payload.location,
+			"notes": payload.notes,
+			"timestamp": datetime.utcnow().isoformat(),
+		}
+		chain = self._custody_chain.get((tenant_id, specimen_id), [])
+		chain.append(event)
+		self._custody_chain[(tenant_id, specimen_id)] = chain
+		self._audit(tenant_id, "specimen_custody_event", specimen_id)
+		return {"specimen_id": specimen_id, "event": event, "custody_chain_length": len(chain)}
+
+	async def get_custody_chain(
+		self, tenant_id: str, specimen_id: str
+	) -> list[dict[str, Any]]:
+		"""Return the full chain-of-custody log for a specimen."""
+		return self._custody_chain.get((tenant_id, specimen_id), [])
+
+	# ── reference range management ────────────────────────────────────────────
+
+	async def create_reference_range(
+		self, payload: ReferenceRangeCreate
+	) -> ReferenceRangeResponse:
+		"""Create a new reference range for a test analyte."""
+		self._enforce({
+			"tenant_context_present": bool(payload.tenant_id),
+			"operation_type": "write", "policy_attached": True,
+		})
+		rr = ReferenceRangeResponse(
+			id=uuid7str(), tenant_id=payload.tenant_id,
+			test_code=payload.test_code, analyte=payload.analyte,
+			unit=payload.unit, low=payload.low, high=payload.high,
+			critical_low=payload.critical_low, critical_high=payload.critical_high,
+			age_min_years=payload.age_min_years, age_max_years=payload.age_max_years,
+			sex=payload.sex, condition=payload.condition,
+			effective_date=payload.effective_date, expiry_date=payload.expiry_date,
+			source=payload.source, created_by=payload.created_by,
+		)
+		self._reference_ranges[(payload.tenant_id, rr.id)] = rr
+		self._audit(payload.tenant_id, "reference_range_created", rr.id)
+		_log_op("create_reference_range", payload.tenant_id, rr.id)
+		return rr
+
+	async def get_reference_range(
+		self, tenant_id: str, rr_id: str
+	) -> ReferenceRangeResponse | None:
+		"""Retrieve a reference range by ID."""
+		return self._reference_ranges.get((tenant_id, rr_id))
+
+	async def list_reference_ranges(
+		self, tenant_id: str, test_code: str | None = None
+	) -> list[ReferenceRangeResponse]:
+		"""List reference ranges for a tenant, optionally filtered by test code."""
+		results = [
+			rr for (tid, _), rr in self._reference_ranges.items()
+			if tid == tenant_id and not rr.is_deleted and rr.active
+		]
+		if test_code:
+			results = [rr for rr in results if rr.test_code == test_code]
+		return sorted(results, key=lambda r: r.test_code)
+
+	async def update_reference_range(
+		self, tenant_id: str, rr_id: str, payload: ReferenceRangeUpdate
+	) -> ReferenceRangeResponse | None:
+		"""Update a reference range's bounds."""
+		rr = self._reference_ranges.get((tenant_id, rr_id))
+		if rr is None:
+			return None
+		updates = {k: v for k, v in payload.model_dump().items() if v is not None}
+		updates["updated_at"] = datetime.utcnow()
+		updated = rr.model_copy(update=updates)
+		self._reference_ranges[(tenant_id, rr_id)] = updated
+		self._audit(tenant_id, "reference_range_updated", rr_id)
+		return updated
+
+	async def delete_reference_range(
+		self, tenant_id: str, rr_id: str, actor_id: str
+	) -> ReferenceRangeResponse | None:
+		"""Soft-delete a reference range."""
+		rr = self._reference_ranges.get((tenant_id, rr_id))
+		if rr is None:
+			return None
+		updated = rr.model_copy(update={"is_deleted": True, "active": False, "updated_at": datetime.utcnow()})
+		self._reference_ranges[(tenant_id, rr_id)] = updated
+		self._audit(tenant_id, "reference_range_deleted", rr_id)
+		return updated
+
+	async def validate_reference_range(
+		self, tenant_id: str, test_code: str, analyte: str, value: float,
+		patient_age_years: float | None = None, patient_sex: str | None = None,
+	) -> dict[str, Any]:
+		"""Evaluate a result value against the best-matching reference range.
+
+		Applies demographic stratification: selects the most specific range
+		that matches age and sex. Returns abnormal flag and critical status.
+		"""
+		from .domain.calculations import classify_numeric_result, select_reference_range
+
+		ranges = [
+			rr.model_dump() for (tid, _), rr in self._reference_ranges.items()
+			if tid == tenant_id and rr.test_code == test_code
+			and rr.analyte == analyte and rr.active and not rr.is_deleted
+		]
+		matched = select_reference_range(ranges, patient_age_years, patient_sex)
+		if matched is None:
+			return {
+				"test_code": test_code, "analyte": analyte, "value": value,
+				"matched_range": None, "flag": None, "is_critical": False,
+				"note": "no_matching_reference_range",
+			}
+		flag, is_critical = classify_numeric_result(
+			value,
+			matched.get("low"), matched.get("high"),
+			matched.get("critical_low"), matched.get("critical_high"),
+		)
+		return {
+			"test_code": test_code, "analyte": analyte, "value": value,
+			"matched_range": matched,
+			"flag": flag.value if flag else None,
+			"is_critical": is_critical,
+		}
+
+	# ── result extensions ─────────────────────────────────────────────────────
+
+	async def update_result(
+		self, tenant_id: str, result_id: str, payload: LabResultUpdate
+	) -> LabResultResponse | None:
+		"""Apply a partial update to a result (permitted before verification)."""
+		result = self._results.get((tenant_id, result_id))
+		if result is None:
+			return None
+		if result.result_status in {"final", "validated"}:
+			raise PolicyViolationError("cannot update a verified/final result; use amend instead")
+		updates = {k: v for k, v in payload.model_dump().items() if v is not None}
+		updates["updated_at"] = datetime.utcnow()
+		updated = result.model_copy(update=updates)
+		self._results[(tenant_id, result_id)] = updated
+		self._audit(tenant_id, "result_updated", result_id)
+		return updated
+
+	# ── critical value extensions ─────────────────────────────────────────────
+
+	async def create_critical_value(
+		self, payload: CriticalValueCreate
+	) -> CriticalValueNotification:
+		"""Create a critical value notification record."""
+		notif = CriticalValueNotification(
+			id=uuid7str(), tenant_id=payload.tenant_id,
+			result_id=payload.result_id, patient_id=payload.patient_id,
+			analyte=payload.analyte, value=payload.value, unit=payload.unit,
+			severity=payload.severity, notified_to=payload.notified_to,
+			notified_by=payload.notified_by,
+			notification_method=payload.notification_method,
+			read_back_confirmed=payload.read_back_confirmed,
+			created_by=payload.created_by,
+		)
+		self._critical_values[(payload.tenant_id, notif.id)] = notif
+		self._audit(payload.tenant_id, "critical_value_created", notif.id)
+		_log_critical(payload.analyte, payload.value, payload.tenant_id)
+		return notif
+
+	async def get_critical_value(
+		self, tenant_id: str, notif_id: str
+	) -> CriticalValueNotification | None:
+		"""Retrieve a critical value notification by ID."""
+		return self._critical_values.get((tenant_id, notif_id))
+
+	async def alert_critical_value(
+		self,
+		tenant_id: str,
+		result_id: str,
+		analyte: str,
+		value: Any,
+		unit: str,
+		severity: str,
+		notified_to: str,
+		notified_by: str,
+		notification_method: str = "phone",
+		read_back_confirmed: bool = False,
+	) -> CriticalValueNotification:
+		"""High-level helper: create + audit a critical value alert in one call.
+
+		Enforces the 60-minute SLA window from result verification.
+		Read-back confirmation is recorded but not blocking at this stage
+		(must be completed within the SLA window).
+		"""
+		assert bool(notified_to), "notified_to required"
+		assert bool(notified_by), "notified_by required"
+
+		result = self._results.get((tenant_id, result_id))
+		# LabResultResponse has no patient_id; resolve via specimen
+		patient_id = ""
+		if result:
+			spec = self._specimens.get((tenant_id, result.specimen_id))
+			if spec:
+				patient_id = spec.patient_id
+
+		notif = CriticalValueNotification(
+			id=uuid7str(), tenant_id=tenant_id,
+			result_id=result_id, patient_id=patient_id,
+			analyte=analyte, value=value, unit=unit,
+			severity=severity, notified_to=notified_to, notified_by=notified_by,
+			notification_method=notification_method,
+			read_back_confirmed=read_back_confirmed,
+			created_by=notified_by,
+		)
+		self._critical_values[(tenant_id, notif.id)] = notif
+		self._audit(tenant_id, "critical_value_alerted", notif.id)
+		_log_critical(analyte, value, tenant_id)
+		return notif
+
+	# ── QC extensions ─────────────────────────────────────────────────────────
+
+	async def get_qc_run(
+		self, tenant_id: str, qc_id: str
+	) -> QCRunResponse | None:
+		"""Retrieve a single QC run record."""
+		return self._qc_runs.get((tenant_id, qc_id))
+
+	async def update_qc_run(
+		self, tenant_id: str, qc_id: str, payload: QCRunUpdate
+	) -> QCRunResponse | None:
+		"""Update QC run review status and notes."""
+		qc = self._qc_runs.get((tenant_id, qc_id))
+		if qc is None:
+			return None
+		updates = {k: v for k, v in payload.model_dump().items() if v is not None}
+		updates["updated_at"] = datetime.utcnow()
+		updated = qc.model_copy(update=updates)
+		self._qc_runs[(tenant_id, qc_id)] = updated
+		self._audit(tenant_id, "qc_run_updated", qc_id)
+		return updated
+
+	async def generate_qc_summary(self, tenant_id: str) -> dict[str, Any]:
+		"""Generate a QC pass/fail summary aggregated per instrument and test.
+
+		Returns per-instrument pass rates, current status, and a list of
+		Westgard violation counts broken down by rule name.
+		"""
+		from .domain.calculations import calculate_pass_rate
+
+		qc_runs = [q for (tid, _), q in self._qc_runs.items() if tid == tenant_id]
+		instruments = {i.id: i for (tid, _), i in self._instruments.items() if tid == tenant_id}
+
+		# Aggregate per instrument
+		by_instrument: dict[str, dict[str, Any]] = {}
+		for run in qc_runs:
+			key = run.instrument_id
+			if key not in by_instrument:
+				by_instrument[key] = {
+					"instrument_id": key,
+					"instrument_name": instruments[key].name if key in instruments else key,
+					"total": 0, "passed": 0, "failed": 0,
+					"violations": {}, "tests": {},
+				}
+			by_instrument[key]["total"] += 1
+			if run.status == "passed":
+				by_instrument[key]["passed"] += 1
+			elif run.status == "failed":
+				by_instrument[key]["failed"] += 1
+			for v in run.westgard_violations:
+				by_instrument[key]["violations"][v] = by_instrument[key]["violations"].get(v, 0) + 1
+			by_instrument[key]["tests"][run.test_code] = by_instrument[key]["tests"].get(run.test_code, 0) + 1
+
+		for inst_data in by_instrument.values():
+			inst_data["pass_rate_pct"] = calculate_pass_rate(inst_data["total"], inst_data["passed"])
+			iid = inst_data["instrument_id"]
+			inst_data["current_status"] = instruments[iid].status if iid in instruments else "unknown"
+
+		return {
+			"tenant_id": tenant_id,
+			"generated_at": datetime.utcnow().isoformat(),
+			"total_qc_runs": len(qc_runs),
+			"by_instrument": list(by_instrument.values()),
+		}
+
+	# ── instrument extensions ─────────────────────────────────────────────────
+
+	async def get_instrument(
+		self, tenant_id: str, instrument_id: str
+	) -> InstrumentResponse | None:
+		"""Retrieve a single analyser interface record."""
+		return self._instruments.get((tenant_id, instrument_id))
+
+	async def update_instrument(
+		self, tenant_id: str, instrument_id: str, payload: AnalyserInterfaceUpdate
+	) -> InstrumentResponse | None:
+		"""Update analyser interface properties."""
+		inst = self._instruments.get((tenant_id, instrument_id))
+		if inst is None:
+			return None
+		updates = {k: v for k, v in payload.model_dump().items() if v is not None}
+		updates["updated_at"] = datetime.utcnow()
+		updated = inst.model_copy(update=updates)
+		self._instruments[(tenant_id, instrument_id)] = updated
+		self._audit(tenant_id, "instrument_updated", instrument_id)
+		return updated
+
+	async def record_calibration(
+		self,
+		tenant_id: str,
+		instrument_id: str,
+		calibrated_by: str,
+		notes: str | None = None,
+		pass_fail: bool = True,
+	) -> dict[str, Any]:
+		"""Record an instrument calibration event and update calibration due date.
+
+		Updates instrument's last_calibrated_at and calibration_due_at.
+		If pass_fail is False, instrument remains offline pending corrective action.
+		"""
+		assert bool(calibrated_by), "calibrated_by required"
+		inst = self._instruments.get((tenant_id, instrument_id))
+		if inst is None:
+			raise KeyError(f"instrument {instrument_id} not found")
+
+		now = datetime.utcnow()
+		interval_days = inst.calibration_interval_days or 90
+		next_due = now + timedelta(days=interval_days)
+
+		cal_id = uuid7str()
+		record: dict[str, Any] = {
+			"id": cal_id,
+			"tenant_id": tenant_id,
+			"instrument_id": instrument_id,
+			"calibrated_by": calibrated_by,
+			"calibration_date": now.isoformat(),
+			"next_due_date": next_due.isoformat(),
+			"notes": notes,
+			"pass_fail": pass_fail,
+		}
+		self._calibrations[(tenant_id, cal_id)] = record
+
+		new_status = "online" if pass_fail else "offline"
+		updated_inst = inst.model_copy(update={
+			"last_calibrated_at": now,
+			"calibration_due_at": next_due,
+			"status": new_status,
+			"updated_at": now,
+		})
+		self._instruments[(tenant_id, instrument_id)] = updated_inst
+		self._audit(tenant_id, "instrument_calibrated", cal_id)
+		_log_op("record_calibration", tenant_id, cal_id)
+		return record
+
+	async def interface_analyser(
+		self,
+		tenant_id: str,
+		instrument_id: str,
+		protocol: str,
+		message_type: str,
+		raw_payload: str,
+	) -> dict[str, Any]:
+		"""Ingest a raw message from an analyser interface (HL7 v2 / ASTM / REST).
+
+		Parses the message header, extracts result segments, maps to LIS order IDs,
+		and queues results for technician review.  Instrument's last_message_at
+		and message_count are updated.  Returns a message receipt record.
+		"""
+		assert bool(raw_payload), "raw_payload required"
+		assert bool(message_type), "message_type required"
+
+		inst = self._instruments.get((tenant_id, instrument_id))
+		if inst is None:
+			raise KeyError(f"instrument {instrument_id} not found")
+
+		self._enforce({
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write", "policy_attached": True,
+		})
+
+		msg_id = uuid7str()
+		now = datetime.utcnow()
+
+		# Minimal parse: extract result segments from HL7 OBX or ASTM R records
+		parsed_results: list[dict[str, Any]] = []
+		if protocol in {"hl7_v2", "astm_e1381"}:
+			# Walk lines looking for OBX (HL7) or R| (ASTM) segments
+			for line in raw_payload.splitlines():
+				line = line.strip()
+				if line.startswith("OBX|") or line.startswith("R|"):
+					fields = line.split("|")
+					try:
+						if line.startswith("OBX|"):
+							parsed_results.append({
+								"segment": "OBX",
+								"set_id": fields[1] if len(fields) > 1 else "",
+								"value_type": fields[2] if len(fields) > 2 else "",
+								"identifier": fields[3] if len(fields) > 3 else "",
+								"value": fields[5] if len(fields) > 5 else "",
+								"unit": fields[6] if len(fields) > 6 else "",
+								"reference_range": fields[7] if len(fields) > 7 else "",
+								"abnormal_flag": fields[8] if len(fields) > 8 else "",
+							})
+						else:  # ASTM R|
+							parsed_results.append({
+								"segment": "R",
+								"test_id": fields[2] if len(fields) > 2 else "",
+								"value": fields[3] if len(fields) > 3 else "",
+								"unit": fields[4] if len(fields) > 4 else "",
+								"reference_range": fields[5] if len(fields) > 5 else "",
+								"abnormal_flag": fields[6] if len(fields) > 6 else "",
+							})
+					except IndexError:
+						pass
+
+		error: str | None = None
+		processed = len(parsed_results) > 0
+
+		record: dict[str, Any] = {
+			"id": msg_id,
+			"tenant_id": tenant_id,
+			"instrument_id": instrument_id,
+			"protocol": protocol,
+			"message_type": message_type,
+			"raw_payload": raw_payload,
+			"parsed_results": parsed_results,
+			"received_at": now.isoformat(),
+			"processed": processed,
+			"error": error,
+			"result_count": len(parsed_results),
+		}
+		self._instrument_messages[(tenant_id, msg_id)] = record
+
+		# Update instrument stats
+		new_count = (inst.message_count or 0) + 1
+		updated_inst = inst.model_copy(update={
+			"last_message_at": now,
+			"message_count": new_count,
+			"updated_at": now,
+		})
+		self._instruments[(tenant_id, instrument_id)] = updated_inst
+
+		self._audit(tenant_id, "analyser_message_ingested", msg_id)
+		_log_op("interface_analyser", tenant_id, msg_id)
+		return record
+
+	# ── external referral management ──────────────────────────────────────────
+
+	async def create_referral(
+		self, payload: ExternalReferralCreate
+	) -> ExternalReferralResponse:
+		"""Create an external referral for a specimen/test."""
+		self._enforce({
+			"tenant_context_present": bool(payload.tenant_id),
+			"operation_type": "write", "policy_attached": True,
+		})
+		referral = ExternalReferralResponse(
+			id=uuid7str(), tenant_id=payload.tenant_id,
+			order_id=payload.order_id, specimen_id=payload.specimen_id,
+			patient_id=payload.patient_id,
+			reference_lab_name=payload.reference_lab_name,
+			reference_lab_code=payload.reference_lab_code,
+			test_code=payload.test_code, test_name=payload.test_name,
+			clinical_notes=payload.clinical_notes,
+			expected_tat_hours=payload.expected_tat_hours,
+			dispatched_by=payload.dispatched_by,
+			created_by=payload.created_by,
+		)
+		self._referrals[(payload.tenant_id, referral.id)] = referral
+		self._audit(payload.tenant_id, "referral_created", referral.id)
+		_log_op("create_referral", payload.tenant_id, referral.id)
+		return referral
+
+	async def get_referral(
+		self, tenant_id: str, referral_id: str
+	) -> ExternalReferralResponse | None:
+		"""Retrieve an external referral by ID."""
+		return self._referrals.get((tenant_id, referral_id))
+
+	async def list_referrals(
+		self, tenant_id: str, status: str | None = None
+	) -> list[ExternalReferralResponse]:
+		"""List external referrals for a tenant with optional status filter."""
+		results = [
+			r for (tid, _), r in self._referrals.items()
+			if tid == tenant_id and not r.is_deleted
+		]
+		if status:
+			results = [r for r in results if r.status == status]
+		return sorted(results, key=lambda r: r.created_at, reverse=True)
+
+	async def update_referral(
+		self, tenant_id: str, referral_id: str, payload: ExternalReferralUpdate
+	) -> ExternalReferralResponse | None:
+		"""Update an external referral's tracking details."""
+		referral = self._referrals.get((tenant_id, referral_id))
+		if referral is None:
+			return None
+		updates = {k: v for k, v in payload.model_dump().items() if v is not None}
+		updates["updated_at"] = datetime.utcnow()
+		updated = referral.model_copy(update=updates)
+		self._referrals[(tenant_id, referral_id)] = updated
+		self._audit(tenant_id, "referral_updated", referral_id)
+		return updated
+
+	# ── report generation ─────────────────────────────────────────────────────
+
+	async def generate_lab_report(
+		self, tenant_id: str, order_id: str, fmt: str = "json"
+	) -> dict[str, Any]:
+		"""Generate a full patient lab report for an order.
+
+		Collects order, patient demographics, all specimens, all results
+		(with reference ranges and abnormal flags), and assembles a
+		structured report suitable for PDF rendering or HL7 ORU^R01 dispatch.
+
+		fmt: 'json' | 'html' | 'pdf' — PDF/HTML rendering is caller's responsibility.
+		"""
+		order = self._orders.get((tenant_id, order_id))
+		if order is None:
+			raise KeyError(f"order {order_id} not found")
+
+		specimens = [
+			s for (tid, _), s in self._specimens.items()
+			if tid == tenant_id and s.order_id == order_id
+		]
+		results = [
+			r for (tid, _), r in self._results.items()
+			if tid == tenant_id and r.order_id == order_id
+		]
+		critical_values = [
+			cv for (tid, _), cv in self._critical_values.items()
+			if tid == tenant_id and any(r.id == cv.result_id for r in results)
+		]
+
+		report_id = uuid7str()
+		now = datetime.utcnow()
+
+		report: dict[str, Any] = {
+			"id": report_id,
+			"tenant_id": tenant_id,
+			"generated_at": now.isoformat(),
+			"format": fmt,
+			"order": order.model_dump(mode="json"),
+			"patient": {
+				"patient_id": order.patient_id,
+				"age_years": order.patient_age_years,
+				"sex": order.patient_sex,
+			},
+			"specimens": [s.model_dump(mode="json") for s in specimens],
+			"results": [r.model_dump(mode="json") for r in results],
+			"critical_values": [cv.model_dump(mode="json") for cv in critical_values],
+			"summary": {
+				"total_results": len(results),
+				"critical_results": sum(1 for r in results if r.critical_value),
+				"abnormal_results": sum(1 for r in results if r.abnormal_flag is not None),
+				"all_verified": all(r.result_status in {"final", "corrected"} for r in results),
+			},
+		}
+		self._audit(tenant_id, "lab_report_generated", report_id)
+		_log_op("generate_lab_report", tenant_id, report_id)
+		return report
+
+	async def generate_critical_value_report(
+		self,
+		tenant_id: str,
+		date_from: str | None = None,
+		date_to: str | None = None,
+	) -> dict[str, Any]:
+		"""Generate a critical value notification compliance report.
+
+		Computes: total critical values, acknowledged count, SLA compliance rate
+		(notifications within 60 min), escalation rate, and per-analyte breakdown.
+		"""
+		from .domain.calculations import calculate_critical_value_response_time
+
+		all_cv = [n for (tid, _), n in self._critical_values.items() if tid == tenant_id]
+
+		total = len(all_cv)
+		acknowledged = sum(1 for n in all_cv if n.acknowledged_by is not None)
+		escalated = sum(1 for n in all_cv if n.escalated)
+		read_back = sum(1 for n in all_cv if n.read_back_confirmed)
+
+		response_times: list[float] = []
+		for n in all_cv:
+			rt = calculate_critical_value_response_time(n.created_at, n.acknowledged_at)
+			if rt is not None:
+				response_times.append(rt)
+
+		sla_met = sum(1 for rt in response_times if rt <= 60.0)
+		sla_compliance = round(sla_met / max(len(response_times), 1) * 100, 1)
+
+		by_analyte: dict[str, int] = {}
+		for n in all_cv:
+			by_analyte[n.analyte] = by_analyte.get(n.analyte, 0) + 1
+
+		return {
+			"tenant_id": tenant_id,
+			"generated_at": datetime.utcnow().isoformat(),
+			"date_from": date_from,
+			"date_to": date_to,
+			"total_critical_values": total,
+			"acknowledged": acknowledged,
+			"unacknowledged": total - acknowledged,
+			"acknowledgement_rate_pct": round(acknowledged / max(total, 1) * 100, 1),
+			"read_back_confirmed": read_back,
+			"read_back_rate_pct": round(read_back / max(total, 1) * 100, 1),
+			"escalated": escalated,
+			"escalation_rate_pct": round(escalated / max(total, 1) * 100, 1),
+			"sla_compliance_pct": sla_compliance,
+			"median_response_time_minutes": (
+				sorted(response_times)[len(response_times) // 2]
+				if response_times else None
+			),
+			"by_analyte": by_analyte,
+		}
+
+	async def generate_rejection_report(self, tenant_id: str) -> dict[str, Any]:
+		"""Generate a specimen rejection rate report broken down by reason.
+
+		Returns overall rejection rate and per-reason counts, enabling labs to
+		identify pre-analytical quality improvement opportunities.
+		"""
+		from .domain.calculations import calculate_rejection_rate
+
+		specimens = [s for (tid, _), s in self._specimens.items() if tid == tenant_id]
+		total = len(specimens)
+		rejected = [s for s in specimens if s.status == "rejected"]
+
+		by_reason: dict[str, int] = {}
+		for s in rejected:
+			reason = str(s.rejection_reason) if s.rejection_reason else "unspecified"
+			by_reason[reason] = by_reason.get(reason, 0) + 1
+
+		return {
+			"tenant_id": tenant_id,
+			"generated_at": datetime.utcnow().isoformat(),
+			"total_specimens": total,
+			"rejected_count": len(rejected),
+			"rejection_rate_pct": calculate_rejection_rate(total, len(rejected)),
+			"by_reason": by_reason,
+		}
+
+	# ── __init__ store registration ────────────────────────────────────────────
+	# (called at end of __init__ to register new stores)
+
+	def _init_extended_stores(self) -> None:
+		"""Initialise stores added in the expanded service beyond the base set."""
+		self._tests: dict[tuple[str, str], LabTestResponse] = {}
+		self._reference_ranges: dict[tuple[str, str], ReferenceRangeResponse] = {}
+		self._referrals: dict[tuple[str, str], ExternalReferralResponse] = {}
+		self._calibrations: dict[tuple[str, str], dict[str, Any]] = {}
+		self._instrument_messages: dict[tuple[str, str], dict[str, Any]] = {}
 
 	# ── internal ──────────────────────────────────────────────────────────────
 

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page_title }} — APG Fleet</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/fle.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="fle-app">
+<main class="fle-main fle-form-page">
+  <header class="fle-page-header">
+    <a href="{{ url_for('fle_views.list_trips') }}" class="fle-breadcrumb"><i class="fa-solid fa-chevron-left"></i> Trips</a>
+    <h1><i class="fa-solid fa-plus"></i> {{ page_title }}</h1>
+  </header>
+  {% if error %}<div class="fle-alert fle-alert-danger">{{ error }}</div>{% endif %}
+  <section class="fle-card">
+    <form method="POST" class="fle-form">
+      <div class="fle-form-grid">
+        <div class="fle-form-group">
+          <label for="vehicle_id">Vehicle *</label>
+          <select id="vehicle_id" name="vehicle_id" required class="fle-select">
+            <option value="">— Select vehicle —</option>
+            {% for v in vehicles %}<option value="{{ v.id }}">{{ v.registration }} — {{ v.make }} {{ v.model }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="fle-form-group">
+          <label for="driver_id">Driver *</label>
+          <select id="driver_id" name="driver_id" required class="fle-select">
+            <option value="">— Select driver —</option>
+            {% for d in drivers %}<option value="{{ d.id }}">{{ d.name }} ({{ d.licence_class.value if d.licence_class is not string else d.licence_class|upper }})</option>{% endfor %}
+          </select>
+        </div>
+        <div class="fle-form-group"><label for="origin">Origin *</label><input type="text" id="origin" name="origin" required class="fle-input" placeholder="Nairobi CBD"></div>
+        <div class="fle-form-group"><label for="destination">Destination *</label><input type="text" id="destination" name="destination" required class="fle-input" placeholder="Mombasa Port"></div>
+        <div class="fle-form-group"><label for="planned_departure">Planned Departure *</label><input type="datetime-local" id="planned_departure" name="planned_departure" required class="fle-input"></div>
+        <div class="fle-form-group"><label for="planned_arrival">Planned Arrival</label><input type="datetime-local" id="planned_arrival" name="planned_arrival" class="fle-input"></div>
+        <div class="fle-form-group"><label for="load_kg">Load (kg)</label><input type="number" id="load_kg" name="load_kg" min="0" step="0.01" placeholder="0" class="fle-input"></div>
+        <div class="fle-form-group"><label for="load_description">Load Description</label><input type="text" id="load_description" name="load_description" class="fle-input" placeholder="General cargo"></div>
+      </div>
+      <div class="fle-form-actions">
+        <a href="{{ url_for('fle_views.list_trips') }}" class="fle-btn fle-btn-outline">Cancel</a>
+        <button type="submit" class="fle-btn fle-btn-primary"><i class="fa-solid fa-route"></i> Plan Trip</button>
+      </div>
+    </form>
+  </section>
+</main>
+</body>
+</html>

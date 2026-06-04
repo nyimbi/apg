@@ -28,11 +28,17 @@ from .models import (
 	LeaseCreate, LeaseResponse, LeaseUpdate,
 	LeaseAbstractionCreate, LeaseAbstractionResponse,
 	RentEscalationCreate, RentEscalationResponse,
-	LeaseOptionCreate, LeaseOptionResponse,
+	LeaseOptionCreate, LeaseOptionResponse, LeaseOptionUpdate,
 	RentReviewCreate, RentReviewResponse,
 	Ifrs16ScheduleCreate, Ifrs16ScheduleResponse,
 	LeaseAssignmentCreate, LeaseAssignmentResponse,
+	LeaseModificationCreate, LeaseModificationResponse, LeaseModificationUpdate,
+	SubleaseCreate, SubleaseResponse, SubleaseUpdate,
+	LeaseExpiryCreate, LeaseExpiryResponse,
 	LeaseStatus, AbstractionStatus, Ifrs16Category,
+	ModificationStatus, ModificationTrigger,
+	LeaseModificationRequest, CpiRemeasurementResult, ExtensionOptionAssessment,
+	PortfolioLeaseAnalytics,
 )
 from .capability_contract import evaluate_capability_rules
 
@@ -116,24 +122,36 @@ class LeaseManagementService:
 	Store adapter pattern: inject a dict-based store or replace with a DB adapter.
 	"""
 
-	def __init__(self, store: dict[str, Any] | None = None) -> None:
-		self._store: dict[str, list[dict[str, Any]]] = store or {
-			"leases": [],
-			"abstractions": [],
-			"escalations": [],
-			"options": [],
-			"rent_reviews": [],
-			"ifrs16_schedules": [],
-			"assignments": [],
-			# New collections
-			"amendments": [],
-			"rent_demands": [],
-			"rent_receipts": [],
-			"service_charge_reconciliations": [],
-			"rent_free_periods": [],
-			"lease_incentives": [],
-			"journal_entries": [],
-		}
+	def __init__(
+		self,
+		store: dict[str, Any] | None = None,
+		db_session: Any = None,
+		tenant_id: str | None = None,
+		actor_id: str | None = None,
+	) -> None:
+		"""Initialise the service.
+
+		Args:
+			store: In-memory dict store (testing / dev). If None, a fresh store is created.
+			db_session: SQLAlchemy async session (production). Currently reserved for future DB adapter.
+			tenant_id: Default tenant context. Can be overridden per-call.
+			actor_id: Default actor/user. Can be overridden per-call.
+		"""
+		self._db_session = db_session
+		self._tenant_id = tenant_id
+		self._actor_id = actor_id
+
+		self._store: dict[str, list[dict[str, Any]]] = store or {}
+		# Ensure all collections exist
+		for _col in (
+			"leases", "abstractions", "escalations", "options", "rent_reviews",
+			"ifrs16_schedules", "assignments", "amendments", "rent_demands",
+			"rent_receipts", "service_charge_reconciliations", "rent_free_periods",
+			"lease_incentives", "journal_entries", "modifications", "subleases",
+			"expiry_flags",
+		):
+			if _col not in self._store:
+				self._store[_col] = []
 
 	# =========================================================================
 	# Logging helpers
@@ -2109,34 +2127,49 @@ class LeaseManagementService:
 	# Original methods (preserved)
 	# =========================================================================
 
+	_STORE_ONLY_FIELDS = frozenset({
+		"lease_term_months", "amendments", "options",
+		"start_date", "end_date", "abstraction_status",
+	})
+
+	def _to_lease_response(self, record: dict[str, Any]) -> LeaseResponse:
+		"""Convert a raw store record to LeaseResponse, stripping internal-only keys."""
+		clean = {k: v for k, v in record.items() if k not in self._STORE_ONLY_FIELDS}
+		# Map legacy store keys to LeaseResponse field names
+		if "start_date" in record and "commencement_date" not in clean:
+			clean["commencement_date"] = record["start_date"]
+		if "end_date" in record and "expiry_date" not in clean:
+			clean["expiry_date"] = record["end_date"]
+		return LeaseResponse(**clean)
+
 	async def get_lease(self, lease_id: str, tenant_id: str) -> LeaseResponse | None:
 		for l in self._store["leases"]:
-			if l["id"] == lease_id and l["tenant_id"] == tenant_id:
-				return LeaseResponse(**l)
+			if l["id"] == lease_id and l["tenant_id"] == tenant_id and not l.get("is_deleted"):
+				return self._to_lease_response(l)
 		return None
 
 	async def list_leases(self, tenant_id: str, property_id: str | None = None, status: str | None = None) -> list[LeaseResponse]:
-		results = [l for l in self._store["leases"] if l["tenant_id"] == tenant_id]
+		results = [l for l in self._store["leases"] if l["tenant_id"] == tenant_id and not l.get("is_deleted")]
 		if property_id:
 			results = [l for l in results if l.get("property_id") == property_id]
 		if status:
 			results = [l for l in results if l.get("status") == status]
-		return [LeaseResponse(**l) for l in results]
+		return [self._to_lease_response(l) for l in results]
 
 	async def activate_lease(self, lease_id: str, tenant_id: str) -> LeaseResponse | None:
 		for i, l in enumerate(self._store["leases"]):
 			if l["id"] == lease_id and l["tenant_id"] == tenant_id:
 				self._check_rules({
 					"operation": "activate_lease",
-					"commencement_date_present": bool(l.get("start_date")),
-					"expiry_date_present": bool(l.get("end_date")),
+					"commencement_date_present": bool(l.get("start_date") or l.get("commencement_date")),
+					"expiry_date_present": bool(l.get("end_date") or l.get("expiry_date")),
 					"abstraction_verified": l.get("abstraction_verified", False),
 				})
 				l["status"] = LeaseStatus.active.value
 				l["updated_at"] = _now_iso()
 				self._store["leases"][i] = l
 				self._log_operation("activate_lease", lease_id, tenant_id)
-				return LeaseResponse(**l)
+				return self._to_lease_response(l)
 		return None
 
 	async def update_lease(self, lease_id: str, tenant_id: str, updates: LeaseUpdate) -> LeaseResponse | None:
@@ -2145,7 +2178,7 @@ class LeaseManagementService:
 				l.update({k: v for k, v in updates.model_dump().items() if v is not None})
 				l["updated_at"] = _now_iso()
 				self._store["leases"][i] = l
-				return LeaseResponse(**l)
+				return self._to_lease_response(l)
 		return None
 
 	async def create_abstraction(self, payload: LeaseAbstractionCreate) -> LeaseAbstractionResponse:
@@ -2350,6 +2383,712 @@ class LeaseManagementService:
 						results.append({"lease_id": l["id"], "expiry_date": l["end_date"], "days_remaining": days_remaining, "property_id": l.get("property_id"), "current_rent": l.get("current_rent")})
 		results.sort(key=lambda x: x["days_remaining"])
 		return results
+
+
+	# =========================================================================
+	# Missing CRUD list helpers
+	# =========================================================================
+
+	async def list_options(self, tenant_id: str, lease_id: str | None = None) -> list[LeaseOptionResponse]:
+		"""List all lease options for a tenant, optionally filtered by lease."""
+		results = [o for o in self._store["options"] if o["tenant_id"] == tenant_id]
+		if lease_id:
+			results = [o for o in results if o["lease_id"] == lease_id]
+		return [LeaseOptionResponse(**o) for o in results]
+
+	async def list_modifications(self, tenant_id: str, lease_id: str | None = None) -> list[LeaseModificationResponse]:
+		"""List lease modifications for a tenant."""
+		results = [m for m in self._store.get("modifications", []) if m["tenant_id"] == tenant_id]
+		if lease_id:
+			results = [m for m in results if m["lease_id"] == lease_id]
+		return [LeaseModificationResponse(**m) for m in results]
+
+	async def list_rent_reviews(self, tenant_id: str, lease_id: str | None = None) -> list[RentReviewResponse]:
+		"""List rent reviews for a tenant."""
+		results = [r for r in self._store["rent_reviews"] if r["tenant_id"] == tenant_id]
+		if lease_id:
+			results = [r for r in results if r["lease_id"] == lease_id]
+		return [RentReviewResponse(**r) for r in results]
+
+	async def list_subleases(self, tenant_id: str, head_lease_id: str | None = None) -> list[SubleaseResponse]:
+		"""List subleases for a tenant."""
+		results = [s for s in self._store.get("subleases", []) if s["tenant_id"] == tenant_id]
+		if head_lease_id:
+			results = [s for s in results if s["head_lease_id"] == head_lease_id]
+		return [SubleaseResponse(**s) for s in results]
+
+	async def list_assignments(self, tenant_id: str, lease_id: str | None = None) -> list[LeaseAssignmentResponse]:
+		"""List lease assignments for a tenant."""
+		results = [a for a in self._store["assignments"] if a["tenant_id"] == tenant_id]
+		if lease_id:
+			results = [a for a in results if a["lease_id"] == lease_id]
+		return [LeaseAssignmentResponse(**a) for a in results]
+
+	async def list_abstractions(self, tenant_id: str, lease_id: str | None = None) -> list[LeaseAbstractionResponse]:
+		"""List lease abstractions for a tenant."""
+		results = [a for a in self._store["abstractions"] if a["tenant_id"] == tenant_id]
+		if lease_id:
+			results = [a for a in results if a["lease_id"] == lease_id]
+		return [LeaseAbstractionResponse(**a) for a in results]
+
+	# =========================================================================
+	# Pydantic-based lease creation (v2 API)
+	# =========================================================================
+
+	async def create_lease_v2(self, payload: LeaseCreate) -> LeaseResponse:
+		"""Create a lease from a validated LeaseCreate payload.
+
+		Preferred entrypoint over the legacy positional-argument create_lease().
+		Enforces all domain rules via assert_lease_create_valid, then stores the
+		record and returns a LeaseResponse.
+		"""
+		from .domain.rules import assert_lease_create_valid
+		term_months = _months_between(payload.commencement_date, payload.expiry_date)
+		assert_lease_create_valid(
+			tenant_id=payload.tenant_id,
+			commencement=payload.commencement_date,
+			expiry=payload.expiry_date,
+			rent=payload.initial_rent,
+			security_deposit=payload.security_deposit,
+			lease_term_months=term_months,
+		)
+		self._check_rules({
+			"tenant_context_present": True,
+			"operation": "create_lease",
+			"lease_type_supported": True,
+			"property_present": bool(payload.property_id),
+			"tenant_present": bool(payload.tenant_entity_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"cross_tenant": False,
+		})
+		data = payload.model_dump()
+		# Coerce dates to strings for dict store compatibility
+		for k in ("commencement_date", "expiry_date"):
+			if data.get(k) and not isinstance(data[k], str):
+				data[k] = str(data[k])
+
+		# Fields stored in dict but NOT in LeaseResponse schema
+		store_record = dict(data)
+		store_record["id"] = _uid()
+		store_record["status"] = LeaseStatus.heads_of_terms.value
+		store_record["current_rent"] = str(payload.initial_rent)
+		store_record["lease_term_months"] = term_months
+		store_record["abstraction_verified"] = False
+		store_record["abstraction_status"] = AbstractionStatus.pending.value
+		store_record["rou_asset"] = None
+		store_record["lease_liability"] = None
+		store_record["ifrs16_category"] = None
+		store_record["total_payments_made"] = "0"
+		store_record["amendments"] = []
+		store_record["options"] = {}
+		store_record["created_at"] = _now_iso()
+		store_record["updated_at"] = _now_iso()
+		# Legacy aliases for internal store lookups
+		store_record["start_date"] = data.get("commencement_date")
+		store_record["end_date"] = data.get("expiry_date")
+		self._store["leases"].append(store_record)
+		self._log_operation("create_lease_v2", store_record["id"], payload.tenant_id)
+
+		# Build response from only the fields LeaseResponse accepts
+		_EXTRA_STORE_FIELDS = {"lease_term_months", "amendments", "options", "start_date", "end_date"}
+		response_data = {k: v for k, v in store_record.items() if k not in _EXTRA_STORE_FIELDS}
+		return LeaseResponse(**response_data)
+
+	# =========================================================================
+	# Soft delete
+	# =========================================================================
+
+	async def soft_delete_lease(self, lease_id: str, tenant_id: str, actor_id: str) -> bool:
+		"""Soft-delete a lease by setting is_deleted=True."""
+		for i, l in enumerate(self._store["leases"]):
+			if l["id"] == lease_id and l["tenant_id"] == tenant_id:
+				l["is_deleted"] = True
+				l["updated_at"] = _now_iso()
+				self._store["leases"][i] = l
+				self._log_operation("soft_delete_lease", lease_id, tenant_id)
+				return True
+		return False
+
+	# =========================================================================
+	# Modification workflow
+	# =========================================================================
+
+	async def create_modification(self, payload: LeaseModificationCreate) -> LeaseModificationResponse:
+		"""Create a lease modification record (pending approval)."""
+		self._check_rules({
+			"tenant_context_present": True,
+			"operation_type": "write",
+			"policy_attached": True,
+		})
+		record = LeaseModificationResponse(**payload.model_dump())
+		d = record.model_dump()
+		# Coerce dates
+		for k in ("modification_date", "new_commencement_date"):
+			if d.get(k) and not isinstance(d[k], str):
+				d[k] = str(d[k])
+		if "modifications" not in self._store:
+			self._store["modifications"] = []
+		self._store["modifications"].append(d)
+		self._log_operation("create_modification", record.id, payload.tenant_id)
+		return record
+
+	async def approve_modification(self, mod_id: str, tenant_id: str, approved_by: str) -> LeaseModificationResponse | None:
+		"""Approve a pending modification."""
+		mods = self._store.get("modifications", [])
+		for i, m in enumerate(mods):
+			if m["id"] == mod_id and m["tenant_id"] == tenant_id and m["status"] == ModificationStatus.pending.value:
+				m["status"] = ModificationStatus.approved.value
+				m["approved_by"] = approved_by
+				m["updated_at"] = _now_iso()
+				mods[i] = m
+				self._log_operation("approve_modification", mod_id, tenant_id)
+				return LeaseModificationResponse(**m)
+		return None
+
+	async def apply_modification(self, mod_id: str, tenant_id: str, actor_id: str) -> dict[str, Any] | None:
+		"""Apply an approved modification: remeasure liability/ROU and update lease."""
+		from .domain.rules import assert_modification_approved, assert_modification_not_already_applied
+		mods = self._store.get("modifications", [])
+		for i, m in enumerate(mods):
+			if m["id"] == mod_id and m["tenant_id"] == tenant_id:
+				assert_modification_approved(m["status"])
+				assert_modification_not_already_applied(m["applied"])
+
+				lease_id = m["lease_id"]
+				new_terms: dict[str, Any] = {}
+				if m.get("new_base_payment"):
+					new_terms["current_rent"] = str(m["new_base_payment"])
+				if m.get("new_rate"):
+					new_terms["incremental_borrowing_rate"] = str(m["new_rate"])
+				if m.get("new_lease_term_months"):
+					# Compute new end date
+					lease = next((l for l in self._store["leases"] if l["id"] == lease_id), None)
+					if lease:
+						start = _parse_date(lease.get("start_date") or lease.get("commencement_date"))
+						if start:
+							from datetime import timedelta
+							new_end = start + timedelta(days=m["new_lease_term_months"] * 30)
+							new_terms["end_date"] = str(new_end)
+
+				# Remeasure
+				remeasure_result = await self.lease_modification_remeasurement(
+					lease_id=lease_id,
+					event_type="scope_change" if m["trigger"] in ("scope_increase", "scope_decrease") else "revised_payment",
+					new_terms=new_terms,
+				)
+				m["status"] = ModificationStatus.applied.value
+				m["applied"] = True
+				m["applied_at"] = _now_iso()
+				m["remeasured_liability"] = remeasure_result["new_lease_liability"]
+				m["remeasured_rou"] = remeasure_result["new_rou_asset"]
+				m["gain_loss_on_modification"] = remeasure_result["pl_adjustment"]
+				m["updated_at"] = _now_iso()
+				mods[i] = m
+				self._log_operation("apply_modification", mod_id, tenant_id)
+				return {**m, "remeasurement": remeasure_result}
+		return None
+
+	async def handle_lease_modification(
+		self,
+		lease_id: str,
+		req: LeaseModificationRequest,
+	) -> dict[str, Any]:
+		"""End-to-end modification handler: create → approve → apply in one call.
+
+		Used when the caller has authority to both approve and apply immediately.
+		Returns the full remeasurement result with modification record.
+		"""
+		lease = next((l for l in self._store["leases"] if l["id"] == lease_id), None)
+		assert lease is not None, f"lease '{lease_id}' not found"
+
+		tenant_id = lease["tenant_id"]
+
+		# Build creation payload
+		mod_data = {
+			"tenant_id": tenant_id,
+			"lease_id": lease_id,
+			"modification_date": str(req.modification_date),
+			"trigger": req.trigger.value if hasattr(req.trigger, "value") else req.trigger,
+			"reason": req.reason,
+			"new_lease_term_months": req.new_lease_term_months,
+			"new_base_payment": str(req.new_base_payment) if req.new_base_payment else None,
+			"new_rate": str(req.new_rate) if req.new_rate else None,
+			"surrendered_proportion": str(req.surrendered_proportion) if req.surrendered_proportion else None,
+			"creates_new_lease": req.creates_new_lease,
+			"approved_by": req.approved_by,
+			"created_by": req.approved_by or "system",
+		}
+		mod_payload = LeaseModificationCreate(**{k: v for k, v in mod_data.items() if v is not None})
+		mod = await self.create_modification(mod_payload)
+
+		# Approve
+		approved = await self.approve_modification(mod.id, tenant_id, req.approved_by or "system")
+		if not approved:
+			raise ValueError("modification approval failed")
+
+		# Apply
+		result = await self.apply_modification(mod.id, tenant_id, "system")
+		return result or {}
+
+	# =========================================================================
+	# Sublease management
+	# =========================================================================
+
+	async def create_sublease_record(self, payload: SubleaseCreate) -> SubleaseResponse:
+		"""Create a sublease record.
+
+		Validates that the sublease term does not extend beyond the head lease
+		and that the sublease rent does not exceed the head lease rent without
+		landlord consent.
+		"""
+		from .domain.rules import assert_sublease_within_head_lease
+		head_lease = next(
+			(l for l in self._store["leases"] if l["id"] == payload.head_lease_id),
+			None,
+		)
+		assert head_lease is not None, f"head lease '{payload.head_lease_id}' not found"
+
+		head_end = _parse_date(head_lease.get("end_date") or head_lease.get("expiry_date"))
+		if head_end:
+			assert_sublease_within_head_lease(payload.end_date, head_end)
+
+		if "subleases" not in self._store:
+			self._store["subleases"] = []
+
+		record = SubleaseResponse(**payload.model_dump())
+		d = record.model_dump()
+		for k in ("commencement_date", "end_date"):
+			if d.get(k) and not isinstance(d[k], str):
+				d[k] = str(d[k])
+		self._store["subleases"].append(d)
+		self._log_operation("create_sublease_record", record.id, payload.tenant_id)
+		return record
+
+	async def update_sublease(self, sublease_id: str, tenant_id: str, updates: SubleaseUpdate) -> SubleaseResponse | None:
+		"""Update a sublease record (status, payment amount, end date)."""
+		subleases = self._store.get("subleases", [])
+		for i, s in enumerate(subleases):
+			if s["id"] == sublease_id and s["tenant_id"] == tenant_id:
+				update_data = {k: v for k, v in updates.model_dump().items() if v is not None}
+				s.update(update_data)
+				s["updated_at"] = _now_iso()
+				subleases[i] = s
+				return SubleaseResponse(**s)
+		return None
+
+	async def sublease_management(self, tenant_id: str) -> dict[str, Any]:
+		"""Portfolio-level sublease management summary.
+
+		Returns active subleases, income analytics, and classification breakdown.
+		"""
+		subleases = [s for s in self._store.get("subleases", [])
+					 if s["tenant_id"] == tenant_id and not s.get("is_deleted")]
+
+		active = [s for s in subleases if s.get("status") == "active"]
+		total_income_annual = sum(_d(s.get("payment_amount", 0)) * 12 for s in active)
+
+		by_classification: dict[str, int] = {}
+		for s in active:
+			c = s.get("sublease_classification", "operating")
+			by_classification[c] = by_classification.get(c, 0) + 1
+
+		return {
+			"tenant_id": tenant_id,
+			"total_subleases": len(subleases),
+			"active_subleases": len(active),
+			"annual_sublease_income": float(total_income_annual),
+			"by_classification": by_classification,
+			"subleases": active,
+			"generated_at": _now_iso(),
+		}
+
+	# =========================================================================
+	# Expiry pipeline (v2 — named days_ahead parameter)
+	# =========================================================================
+
+	async def lease_expiry_pipeline(self, days_ahead: int = 180) -> list[dict[str, Any]]:
+		"""Return all active/holding-over leases expiring within days_ahead days.
+
+		Richer than get_lease_expiry_pipeline: includes renewal/break option flags,
+		urgency classification, and linked expiry records.
+		"""
+		assert days_ahead > 0, "days_ahead must be positive"
+		cutoff = date.today() + timedelta(days=days_ahead)
+		results: list[dict[str, Any]] = []
+
+		for l in self._store["leases"]:
+			if l.get("is_deleted"):
+				continue
+			if l.get("status") not in ("active", "holding_over"):
+				continue
+			end_str = l.get("end_date") or l.get("expiry_date")
+			if not end_str:
+				continue
+			expiry = _parse_date(end_str)
+			if expiry is None or expiry > cutoff:
+				continue
+
+			days_remaining = (expiry - date.today()).days
+			opts = l.get("options", {})
+			has_renewal_option = bool(opts.get("renewal_option"))
+			has_break_option = bool(opts.get("break_option"))
+
+			# Count open options
+			open_options = sum(
+				1 for o in self._store.get("options", [])
+				if o["lease_id"] == l["id"] and o.get("status") == "open"
+			)
+
+			results.append({
+				"lease_id": l["id"],
+				"lease_ref": l.get("lease_ref"),
+				"tenant_entity_id": l.get("tenant_entity_id"),
+				"property_id": l.get("property_id"),
+				"unit_id": l.get("unit_id"),
+				"end_date": str(expiry),
+				"days_remaining": days_remaining,
+				"current_rent": l.get("current_rent"),
+				"currency": l.get("currency", "KES"),
+				"status": l.get("status"),
+				"has_renewal_option": has_renewal_option,
+				"has_break_option": has_break_option,
+				"open_options_count": open_options,
+				"urgency": (
+					"critical" if days_remaining <= 30
+					else "high" if days_remaining <= 90
+					else "medium" if days_remaining <= 180
+					else "low"
+				),
+			})
+
+		results.sort(key=lambda r: r["days_remaining"])
+		return results
+
+	async def flag_lease_expiry(self, payload: LeaseExpiryCreate) -> LeaseExpiryResponse:
+		"""Create an expiry pipeline flag for a lease."""
+		if "expiry_flags" not in self._store:
+			self._store["expiry_flags"] = []
+		record = LeaseExpiryResponse(**payload.model_dump())
+		d = record.model_dump()
+		if d.get("expiry_date") and not isinstance(d["expiry_date"], str):
+			d["expiry_date"] = str(d["expiry_date"])
+		expiry_d = _parse_date(d.get("expiry_date"))
+		d["days_to_expiry"] = (expiry_d - date.today()).days if expiry_d else 0
+		self._store["expiry_flags"].append(d)
+		self._log_operation("flag_lease_expiry", record.id, payload.tenant_id)
+		return record
+
+	# =========================================================================
+	# IFRS 16 extension option assessment
+	# =========================================================================
+
+	async def assess_lease_extension_option(
+		self,
+		lease_id: str,
+		option_id: str | None,
+		assessment_data: dict[str, Any],
+	) -> ExtensionOptionAssessment:
+		"""Assess whether a lease extension/renewal option is reasonably certain.
+
+		Under IFRS 16.19, the lease term includes optional renewal periods only
+		when the lessee is reasonably certain to exercise the option.
+
+		Factors assessed:
+		  - Significant leasehold improvements (sunk cost)
+		  - Importance of underlying asset to operations
+		  - Relocation cost vs option cost
+		  - Prior assessment changed (re-assessment trigger)
+		  - Economic incentives (rent below market)
+		"""
+		lease = next((l for l in self._store["leases"] if l["id"] == lease_id), None)
+		assert lease is not None, f"lease '{lease_id}' not found"
+
+		# Resolve the option record if option_id given
+		option_rec: dict[str, Any] | None = None
+		if option_id:
+			option_rec = next(
+				(o for o in self._store.get("options", []) if o["id"] == option_id),
+				None,
+			)
+
+		# Score factors
+		significant_improvements = bool(assessment_data.get("significant_leasehold_improvements"))
+		importance_to_ops = bool(assessment_data.get("importance_to_operations"))
+		relocation_cost = bool(assessment_data.get("cost_of_relocation"))
+		prior_changed = bool(assessment_data.get("prior_assessment_changed"))
+		economic_incentive = bool(assessment_data.get("economic_incentive"))
+
+		# If any strong indicator is present, reasonably certain
+		strong_indicators = [significant_improvements, importance_to_ops, relocation_cost]
+		reasonably_certain = (
+			sum(strong_indicators) >= 2
+			or (economic_incentive and sum(strong_indicators) >= 1)
+		)
+
+		remeasurement_triggered = prior_changed and option_rec is not None and (
+			option_rec.get("reasonably_certain") != reasonably_certain
+		)
+
+		# Update option record
+		if option_rec:
+			idx = next(i for i, o in enumerate(self._store.get("options", [])) if o["id"] == option_id)
+			old_certain = option_rec.get("reasonably_certain", False)
+			option_rec["reasonably_certain"] = reasonably_certain
+			option_rec["economic_incentive"] = economic_incentive
+			option_rec["last_assessed_date"] = str(date.today())
+			option_rec["assessment_changed"] = old_certain != reasonably_certain
+			option_rec["updated_at"] = _now_iso()
+			self._store["options"][idx] = option_rec
+
+		result = ExtensionOptionAssessment(
+			lease_id=lease_id,
+			option_id=option_id or "n/a",
+			option_type=option_rec.get("option_type", "extension_option") if option_rec else "extension_option",
+			reasonably_certain=reasonably_certain,
+			economic_incentive=economic_incentive,
+			significant_leasehold_improvements=significant_improvements,
+			importance_to_operations=importance_to_ops,
+			cost_of_relocation=relocation_cost,
+			prior_assessment_changed=prior_changed,
+			remeasurement_triggered=remeasurement_triggered,
+			assessed_by=assessment_data.get("assessed_by", "system"),
+			notes=assessment_data.get("notes"),
+		)
+		self._log_operation("assess_extension_option", lease_id, lease.get("tenant_id", ""))
+		return result
+
+	async def assess_option(
+		self,
+		option_id: str,
+		tenant_id: str,
+		assessment_data: dict[str, Any],
+		actor_id: str,
+	) -> dict[str, Any]:
+		"""Generic option assessment dispatching to renewal or termination assessor."""
+		opt = next(
+			(o for o in self._store.get("options", [])
+			 if o["id"] == option_id and o["tenant_id"] == tenant_id),
+			None,
+		)
+		assert opt is not None, f"option '{option_id}' not found"
+
+		lease_id = opt["lease_id"]
+		opt_type = opt.get("option_type", "")
+
+		if "renewal" in opt_type or "extension" in opt_type:
+			renewal_date = str(opt.get("exercise_from", date.today()))
+			return await self.assess_renewal_option(lease_id, renewal_date)
+		elif "break" in opt_type or "termination" in opt_type:
+			break_date = str(opt.get("exercise_from", date.today()))
+			return await self.assess_termination_option(lease_id, break_date)
+		else:
+			return await self.assess_lease_extension_option(
+				lease_id, option_id, {**assessment_data, "assessed_by": actor_id}
+			)
+
+	# =========================================================================
+	# CPI remeasurement
+	# =========================================================================
+
+	async def apply_cpi_remeasurement(
+		self,
+		lease_id: str,
+		current_cpi: Decimal,
+		actor_id: str,
+	) -> CpiRemeasurementResult:
+		"""Remeasure a variable-payment lease when CPI changes.
+
+		IFRS 16.42: Remeasure lease liability using revised lease payments
+		(indexed to current CPI) at the original discount rate.
+
+		Updates lease liability and ROU asset in place.
+		"""
+		from .domain.calculations import apply_cpi_escalation, calculate_lease_liability
+		lease = next((l for l in self._store["leases"] if l["id"] == lease_id), None)
+		assert lease is not None, f"lease '{lease_id}' not found"
+		assert lease.get("variable_payment_indexed_to_cpi"), \
+			"lease is not indexed to CPI; use standard remeasurement"
+
+		idx = next(i for i, l in enumerate(self._store["leases"]) if l["id"] == lease_id)
+
+		base_cpi = _d(lease.get("cpi_base_index") or 100)
+		old_rent = _d(lease.get("current_rent", 0))
+		old_liability = _d(lease.get("lease_liability") or 0)
+		old_rou = _d(lease.get("rou_asset") or 0)
+
+		# Revised payment
+		new_rent = apply_cpi_escalation(old_rent, base_cpi, current_cpi)
+
+		# Remaining periods
+		start = _parse_date(lease.get("start_date") or lease.get("commencement_date"))
+		end = _parse_date(lease.get("end_date") or lease.get("expiry_date"))
+		remaining_months = _remaining_months(start, end, date.today())  # type: ignore[arg-type]
+
+		# Discount rate
+		opts = lease.get("options", {})
+		rate_annual = _d(
+			opts.get("implicit_rate", opts.get("ibr", opts.get("discount_rate", "0.05")))
+		)
+		rate_pct = rate_annual * 100  # calculations module expects % form
+		from .domain.calculations import calculate_lease_liability as _calc_ll
+		new_liability = _calc_ll(new_rent, remaining_months, rate_pct, 12)
+
+		adjustment = new_liability - old_liability
+		new_rou = max(old_rou + adjustment, Decimal("0")).quantize(CENTS, rounding=ROUND_HALF_UP)
+
+		# Persist
+		lease["current_rent"] = str(new_rent)
+		lease["lease_liability"] = str(new_liability)
+		lease["rou_asset"] = str(new_rou)
+		self._save_lease(idx, lease)
+
+		# Journal
+		entries = [
+			_debit("ROU Asset" if adjustment > 0 else "Lease Liability", abs(adjustment), "CPI remeasurement"),
+			_credit("Lease Liability" if adjustment > 0 else "ROU Asset", abs(adjustment), "CPI remeasurement counterpart"),
+		]
+		self._record_journal(lease_id, lease["tenant_id"], _now_iso()[:7], entries, f"CPI remeasurement: base={base_cpi}, current={current_cpi}")
+		self._log_operation("apply_cpi_remeasurement", lease_id, lease["tenant_id"])
+
+		return CpiRemeasurementResult(
+			lease_id=lease_id,
+			old_liability=old_liability,
+			new_liability=new_liability,
+			old_rou=old_rou,
+			new_rou=new_rou,
+			adjustment=adjustment.quantize(CENTS, rounding=ROUND_HALF_UP),
+			new_payment=new_rent,
+			current_cpi=current_cpi,
+			base_cpi=base_cpi,
+		)
+
+	# =========================================================================
+	# Portfolio analytics (comprehensive)
+	# =========================================================================
+
+	async def portfolio_lease_analytics(self, tenant_id: str) -> PortfolioLeaseAnalytics:
+		"""Generate comprehensive portfolio analytics for IFRS 16 reporting.
+
+		Combines lease_portfolio_summary, WALT, maturity analysis, and sublease
+		income into a single structured PortfolioLeaseAnalytics response.
+		"""
+		all_leases = [l for l in self._store["leases"]
+					  if l.get("tenant_id") == tenant_id and not l.get("is_deleted")]
+		active = [l for l in all_leases if l.get("status") == "active"]
+		today = date.today()
+
+		expiring_90 = sum(
+			1 for l in active
+			if l.get("end_date") and (_parse_date(l["end_date"]) - today).days <= 90
+		)
+		expiring_180 = sum(
+			1 for l in active
+			if l.get("end_date") and (_parse_date(l["end_date"]) - today).days <= 180
+		)
+
+		total_rou = sum(_d(l.get("rou_asset") or 0) for l in active)
+		total_ll = sum(_d(l.get("lease_liability") or 0) for l in active)
+		annual_cost = sum(_d(l.get("current_rent", 0)) * 12 for l in active)
+		total_deposits = sum(_d(l.get("security_deposit", 0)) for l in all_leases)
+
+		# WALT
+		walt = await self.weighted_average_lease_term({"tenant_id": tenant_id})
+		walt_d = _d(str(walt)) * 12  # convert to months
+
+		# Breakdowns
+		by_type: dict[str, int] = {}
+		by_status: dict[str, int] = {}
+		for l in all_leases:
+			t = l.get("lease_type", "unknown")
+			s = l.get("status", "unknown")
+			by_type[t] = by_type.get(t, 0) + 1
+			by_status[s] = by_status.get(s, 0) + 1
+
+		# Top leases by liability
+		sorted_by_ll = sorted(active, key=lambda l: float(_d(l.get("lease_liability") or 0)), reverse=True)
+		top_leases = [
+			{
+				"lease_id": l["id"],
+				"lease_ref": l.get("lease_ref"),
+				"property_id": l.get("property_id"),
+				"lease_liability": float(_d(l.get("lease_liability") or 0)),
+				"currency": l.get("currency", "KES"),
+			}
+			for l in sorted_by_ll[:10]
+		]
+
+		# Sublease income
+		active_subleases = [s for s in self._store.get("subleases", [])
+							if s.get("tenant_id") == tenant_id and s.get("status") == "active"]
+		sublease_income = sum(_d(s.get("payment_amount", 0)) * 12 for s in active_subleases)
+
+		# Exemptions
+		short_term = sum(
+			1 for l in all_leases
+			if l.get("ifrs16_category") == "short_term_exemption"
+		)
+		low_value = sum(
+			1 for l in all_leases
+			if l.get("ifrs16_category") == "low_value_exemption"
+		)
+
+		# Modifications YTD
+		this_year = str(today.year)
+		mods_ytd = sum(
+			1 for m in self._store.get("modifications", [])
+			if m.get("tenant_id") == tenant_id and str(m.get("modification_date", ""))[:4] == this_year
+		)
+
+		return PortfolioLeaseAnalytics(
+			tenant_id=tenant_id,
+			as_at=today,
+			total_leases=len(all_leases),
+			active_leases=len(active),
+			expiring_within_90_days=expiring_90,
+			expiring_within_180_days=expiring_180,
+			total_rou_assets=total_rou.quantize(CENTS, rounding=ROUND_HALF_UP),
+			total_lease_liabilities=total_ll.quantize(CENTS, rounding=ROUND_HALF_UP),
+			annual_lease_cost=annual_cost.quantize(CENTS, rounding=ROUND_HALF_UP),
+			weighted_average_remaining_term_months=walt_d.quantize(CENTS, rounding=ROUND_HALF_UP),
+			leases_by_type=by_type,
+			leases_by_status=by_status,
+			top_leases_by_liability=top_leases,
+			subleases_active=len(active_subleases),
+			sublease_income_annual=sublease_income.quantize(CENTS, rounding=ROUND_HALF_UP),
+			exemptions_short_term=short_term,
+			exemptions_low_value=low_value,
+			modifications_ytd=mods_ytd,
+			total_security_deposits=total_deposits.quantize(CENTS, rounding=ROUND_HALF_UP),
+		)
+
+	# =========================================================================
+	# Store initialisation — ensure all collections exist
+	# =========================================================================
+
+	def _ensure_collections(self) -> None:
+		"""Ensure all store collections exist (idempotent)."""
+		for col in (
+			"leases", "abstractions", "escalations", "options", "rent_reviews",
+			"ifrs16_schedules", "assignments", "amendments", "rent_demands",
+			"rent_receipts", "service_charge_reconciliations", "rent_free_periods",
+			"lease_incentives", "journal_entries", "modifications", "subleases",
+			"expiry_flags",
+		):
+			if col not in self._store:
+				self._store[col] = []
+
+	def _log_cpi_remeasure(self, lease_id: str, base_cpi: Decimal, current_cpi: Decimal, new_rent: Decimal) -> None:
+		log.info(
+			"lea.cpi_remeasure lease=%s base_cpi=%s current_cpi=%s new_rent=%s",
+			lease_id, base_cpi, current_cpi, new_rent,
+		)
+
+	def _log_modification(self, lease_id: str, trigger: str, status: str) -> None:
+		log.info("lea.modification lease=%s trigger=%s status=%s", lease_id, trigger, status)
+
+	def _log_sublease(self, sublease_id: str, head_lease_id: str, tenant_id: str) -> None:
+		log.info("lea.sublease sublease=%s head_lease=%s tenant=%s", sublease_id, head_lease_id, tenant_id)
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page_title }} — APG Fleet</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/fle.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="fle-app">
+
+<main class="fle-main">
+  <header class="fle-page-header">
+    <div>
+      <a href="{{ url_for('fle_views.list_vehicles') }}" class="fle-breadcrumb"><i class="fa-solid fa-chevron-left"></i> Vehicles</a>
+      <h1><i class="fa-solid fa-truck"></i> {{ vehicle.registration }}</h1>
+    </div>
+    <a href="{{ url_for('fle_views.edit_vehicle', vehicle_id=vehicle.id) }}" class="fle-btn fle-btn-warning"><i class="fa-solid fa-pen"></i> Edit</a>
+  </header>
+
+  <div class="fle-two-col">
+    <!-- Vehicle identity card -->
+    <section class="fle-card">
+      <h2>Vehicle Details</h2>
+      <dl class="fle-dl">
+        <dt>Registration</dt><dd><strong>{{ vehicle.registration }}</strong></dd>
+        <dt>VIN</dt><dd>{{ vehicle.vin }}</dd>
+        <dt>Make / Model</dt><dd>{{ vehicle.make }} {{ vehicle.model }} ({{ vehicle.year }})</dd>
+        <dt>Type</dt><dd>{{ vehicle.vehicle_type|replace('_',' ')|title }}</dd>
+        <dt>Fuel Type</dt><dd>{{ vehicle.fuel_type|upper }}</dd>
+        <dt>Ownership</dt><dd>{{ vehicle.ownership_type|replace('_',' ')|title }}</dd>
+        <dt>Status</dt><dd><span class="fle-status fle-status-{{ vehicle.status }}">{{ vehicle.status|replace('_',' ')|title }}</span></dd>
+        <dt>GVW</dt><dd>{{ "{:,.0f}".format(vehicle.gross_vehicle_weight_kg|float) }} kg</dd>
+        <dt>Payload</dt><dd>{{ "{:,.0f}".format(vehicle.payload_capacity_kg|float) }} kg</dd>
+        <dt>Odometer</dt><dd>{{ "{:,.0f}".format(vehicle.odometer_km|float) }} km</dd>
+        {% if vehicle.depot_id %}<dt>Depot</dt><dd>{{ vehicle.depot_id }}</dd>{% endif %}
+        {% if vehicle.colour %}<dt>Colour</dt><dd>{{ vehicle.colour }}</dd>{% endif %}
+      </dl>
+    </section>
+
+    <!-- TCO Summary -->
+    <section class="fle-card">
+      <h2><i class="fa-solid fa-coins"></i> Total Cost of Ownership</h2>
+      <dl class="fle-dl">
+        <dt>Fuel Cost</dt><dd>{{ "{:,.2f}".format(tco.fuel_cost|float) }} {{ tco.currency }}</dd>
+        <dt>Maintenance Cost</dt><dd>{{ "{:,.2f}".format(tco.maintenance_cost|float) }} {{ tco.currency }}</dd>
+        <dt>Insurance Cost</dt><dd>{{ "{:,.2f}".format(tco.insurance_cost|float) }} {{ tco.currency }}</dd>
+        <dt>Fines</dt><dd>{{ "{:,.2f}".format(tco.fine_cost|float) }} {{ tco.currency }}</dd>
+        <dt>Total Distance</dt><dd>{{ "{:,.0f}".format(tco.distance_km|float) }} km</dd>
+        <dt><strong>Total Cost</strong></dt><dd><strong>{{ "{:,.2f}".format(tco.total_cost|float) }} {{ tco.currency }}</strong></dd>
+        <dt>Cost per km</dt><dd>{{ "{:,.4f}".format(tco.cost_per_km|float) }} {{ tco.currency }}/km</dd>
+      </dl>
+    </section>
+  </div>
+
+  <!-- Last Position -->
+  {% if position %}
+  <section class="fle-card">
+    <h2><i class="fa-solid fa-location-dot"></i> Last Known Position</h2>
+    <dl class="fle-dl fle-dl-inline">
+      <dt>Coordinates</dt><dd>{{ "%.6f"|format(position.lat) }}, {{ "%.6f"|format(position.lon) }}</dd>
+      <dt>Speed</dt><dd>{{ position.speed_kmh }} km/h</dd>
+      <dt>Event</dt><dd>{{ position.event_type }}</dd>
+      <dt>Time</dt><dd>{{ position.occurred_at[:19].replace('T',' ') }} UTC</dd>
+    </dl>
+  </section>
+  {% endif %}
+
+  <!-- Recent trips -->
+  {% if trips %}
+  <section class="fle-card">
+    <h2><i class="fa-solid fa-route"></i> Recent Trips</h2>
+    <table class="fle-table">
+      <thead><tr><th>Origin</th><th>Destination</th><th>Planned Departure</th><th>Status</th><th>Distance</th></tr></thead>
+      <tbody>
+      {% for t in trips %}
+        <tr>
+          <td>{{ t.origin }}</td>
+          <td>{{ t.destination }}</td>
+          <td>{{ t.planned_departure[:16].replace('T',' ') }}</td>
+          <td><span class="fle-status fle-status-{{ t.status.value if t.status is not string else t.status }}">{{ (t.status.value if t.status is not string else t.status)|replace('_',' ')|title }}</span></td>
+          <td>{% if t.distance_km %}{{ "{:,.0f}".format(t.distance_km|float) }} km{% else %}—{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
+  <!-- Maintenance history -->
+  {% if maintenance %}
+  <section class="fle-card">
+    <h2><i class="fa-solid fa-wrench"></i> Maintenance History</h2>
+    <table class="fle-table">
+      <thead><tr><th>Type</th><th>Description</th><th>Scheduled</th><th>Status</th><th>Cost</th></tr></thead>
+      <tbody>
+      {% for m in maintenance %}
+        <tr>
+          <td>{{ m.maintenance_type.value if m.maintenance_type is not string else m.maintenance_type }}</td>
+          <td>{{ m.description }}</td>
+          <td>{{ m.scheduled_date[:10] }}</td>
+          <td><span class="fle-status fle-status-{{ m.status.value if m.status is not string else m.status }}">{{ (m.status.value if m.status is not string else m.status)|replace('_',' ')|title }}</span></td>
+          <td>{% if m.actual_cost %}{{ "{:,.2f}".format(m.actual_cost|float) }}{% else %}{{ "{:,.2f}".format(m.estimated_cost|float) }} est.{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+</main>
+</body>
+</html>

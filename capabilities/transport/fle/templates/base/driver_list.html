@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page_title }} — APG Fleet</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/fle.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="fle-app">
+<main class="fle-main">
+  <header class="fle-page-header">
+    <h1><i class="fa-solid fa-id-card"></i> {{ page_title }}</h1>
+    <a href="{{ url_for('fle_views.create_driver') }}" class="fle-btn fle-btn-primary"><i class="fa-solid fa-plus"></i> Register Driver</a>
+  </header>
+  <div class="fle-filter-bar">
+    <a href="{{ url_for('fle_views.list_drivers') }}" class="fle-filter-btn {% if not status_filter %}active{% endif %}">All</a>
+    {% for s in ['active','on_leave','suspended','training','inactive'] %}
+    <a href="{{ url_for('fle_views.list_drivers', status=s) }}" class="fle-filter-btn {% if status_filter == s %}active{% endif %}">{{ s|replace('_',' ')|title }}</a>
+    {% endfor %}
+  </div>
+  <section class="fle-card">
+    {% if drivers %}
+    <table class="fle-table fle-table-hover">
+      <thead><tr><th>Name</th><th>Licence</th><th>Class</th><th>Licence Expiry</th><th>CPC Expiry</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for d in drivers %}
+        <tr>
+          <td><strong>{{ d.name }}</strong></td>
+          <td>{{ d.licence_number }}</td>
+          <td>{{ d.licence_class.value if d.licence_class is not string else d.licence_class|upper }}</td>
+          <td>{{ d.licence_expiry[:10] }}</td>
+          <td>{{ d.cpc_expiry[:10] if d.cpc_expiry else '—' }}</td>
+          <td><span class="fle-status fle-status-{{ d.status.value if d.status is not string else d.status }}">{{ (d.status.value if d.status is not string else d.status)|replace('_',' ')|title }}</span></td>
+          <td class="fle-actions">
+            <a href="{{ url_for('fle_views.detail_driver', driver_id=d.id) }}" class="fle-btn-sm fle-btn-info"><i class="fa-solid fa-eye"></i></a>
+            <a href="{{ url_for('fle_views.edit_driver', driver_id=d.id) }}" class="fle-btn-sm fle-btn-warning"><i class="fa-solid fa-pen"></i></a>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="fle-empty-state">
+      <i class="fa-solid fa-id-card fa-3x"></i>
+      <p>No drivers found. <a href="{{ url_for('fle_views.create_driver') }}">Register your first driver.</a></p>
+    </div>
+    {% endif %}
+  </section>
+</main>
+</body>
+</html>

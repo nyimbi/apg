@@ -81,9 +81,9 @@ from .domain.rules import (
 	assert_no_cross_tenant,
 	assert_probability_sum_valid,
 	assert_scenarios_non_empty,
-	assert_sufficient_history,
+	assert_sufficient_history,  # noqa: F401 — exported for external callers
 	assert_tenant_context,
-	assert_zero_based_balanced,
+	assert_zero_based_balanced,  # noqa: F401 — exported for external callers
 )
 from .domain.calculations import (
 	apply_seasonal_adjustment,
@@ -129,24 +129,68 @@ class BFCService:
 		budget = await svc.create_budget_cycle(BFBudgetCreate(...))
 	"""
 
-	def __init__(self, tenant_id: str, actor_id: str) -> None:
+	def __init__(
+		self,
+		tenant_id: str,
+		actor_id: str,
+		*,
+		_shared_store: dict[str, Any] | None = None,
+	) -> None:
 		assert_tenant_context(tenant_id)
 		assert_actor_present(actor_id)
 		self.tenant_id = tenant_id
 		self.actor_id = actor_id
 
-		# In-memory stores (keyed by entity id)
-		self._budgets: dict[str, BFBudget] = {}
-		self._budget_lines: dict[str, BFBudgetLine] = {}
-		self._budget_versions: dict[str, BFBudgetVersion] = {}
-		self._budget_templates: dict[str, BFBudgetTemplate] = {}
-		self._budget_approvals: dict[str, BFBudgetApproval] = {}
-		self._forecasts: dict[str, BFForecast] = {}
-		self._forecast_lines: dict[str, BFForecastLine] = {}
-		self._variance_reports: dict[str, BFVarianceReport] = {}
-		self._scenarios: dict[str, BFScenarioModel] = {}
-		self._driver_assumptions: dict[str, BFDriverBasedAssumption] = {}
-		self._events: list[dict[str, Any]] = []
+		# Allow injecting a shared store for multi-actor tests / real DB backends.
+		if _shared_store is not None:
+			self._budgets = _shared_store.setdefault("_budgets", {})
+			self._budget_lines = _shared_store.setdefault("_budget_lines", {})
+			self._budget_versions = _shared_store.setdefault("_budget_versions", {})
+			self._budget_templates = _shared_store.setdefault("_budget_templates", {})
+			self._budget_approvals = _shared_store.setdefault("_budget_approvals", {})
+			self._forecasts = _shared_store.setdefault("_forecasts", {})
+			self._forecast_lines = _shared_store.setdefault("_forecast_lines", {})
+			self._variance_reports = _shared_store.setdefault("_variance_reports", {})
+			self._scenarios = _shared_store.setdefault("_scenarios", {})
+			self._driver_assumptions = _shared_store.setdefault("_driver_assumptions", {})
+			self._events = _shared_store.setdefault("_events", [])
+		else:
+			self._budgets: dict[str, BFBudget] = {}
+			self._budget_lines: dict[str, BFBudgetLine] = {}
+			self._budget_versions: dict[str, BFBudgetVersion] = {}
+			self._budget_templates: dict[str, BFBudgetTemplate] = {}
+			self._budget_approvals: dict[str, BFBudgetApproval] = {}
+			self._forecasts: dict[str, BFForecast] = {}
+			self._forecast_lines: dict[str, BFForecastLine] = {}
+			self._variance_reports: dict[str, BFVarianceReport] = {}
+			self._scenarios: dict[str, BFScenarioModel] = {}
+			self._driver_assumptions: dict[str, BFDriverBasedAssumption] = {}
+			self._events: list[dict[str, Any]] = []
+
+	def as_actor(self, actor_id: str) -> "BFCService":
+		"""
+		Return a new BFCService scoped to *actor_id* sharing this instance's
+		in-memory store.  Useful for multi-actor approval tests.
+
+		Usage::
+			alice = BFCService(tenant_id="acme", actor_id="alice")
+			bob   = alice.as_actor("bob")
+		"""
+		assert_actor_present(actor_id)
+		store: dict[str, Any] = {
+			"_budgets": self._budgets,
+			"_budget_lines": self._budget_lines,
+			"_budget_versions": self._budget_versions,
+			"_budget_templates": self._budget_templates,
+			"_budget_approvals": self._budget_approvals,
+			"_forecasts": self._forecasts,
+			"_forecast_lines": self._forecast_lines,
+			"_variance_reports": self._variance_reports,
+			"_scenarios": self._scenarios,
+			"_driver_assumptions": self._driver_assumptions,
+			"_events": self._events,
+		}
+		return BFCService(tenant_id=self.tenant_id, actor_id=actor_id, _shared_store=store)
 
 	# =========================================================================
 	# Budget lifecycle
@@ -166,6 +210,7 @@ class BFCService:
 			id=uuid7str(),
 			tenant_id=self.tenant_id,
 			created_by=self.actor_id,
+			updated_by=self.actor_id,
 			created_at=datetime.now(timezone.utc),
 			updated_at=datetime.now(timezone.utc),
 			**payload.model_dump(),
@@ -199,20 +244,33 @@ class BFCService:
 		budget = self._get_budget(payload.budget_id)
 		assert_budget_in_draft(budget.status)
 
+		# Auto-assign line_number
+		existing = self._lines_for(payload.budget_id)
+		line_number = len(existing) + 1
+
+		dump = payload.model_dump()
+		dump.setdefault("line_number", line_number)
+
+		# Auto-distribute month_amounts if not supplied
+		if dump.get("month_amounts") is None:
+			from .domain.calculations import distribute_equal
+			dump["month_amounts"] = distribute_equal(dump["budgeted_amount"], 12)
+
 		line = BFBudgetLine(
 			id=uuid7str(),
 			tenant_id=self.tenant_id,
 			created_by=self.actor_id,
+			updated_by=self.actor_id,
 			created_at=datetime.now(timezone.utc),
 			updated_at=datetime.now(timezone.utc),
-			**payload.model_dump(),
+			**dump,
 		)
 		self._budget_lines[line.id] = line
 		await self._recalc_budget_totals(budget)
 		self._emit("budget_line_added", line.id, {
 			"budget_id": payload.budget_id,
 			"line_type": line.line_type.value,
-			"amount": str(line.amount),
+			"amount": str(line.budgeted_amount),
 		})
 		return line
 
@@ -280,12 +338,19 @@ class BFCService:
 		return budget
 
 	async def close_budget(self, budget_id: str) -> BFBudget:
-		"""Close a budget at end of period."""
+		"""Close a budget at end of period. Allowed from APPROVED, ACTIVE, or LOCKED states."""
 		budget = self._get_budget(budget_id)
-		assert_budget_not_locked(budget.status)
+		closeable = {BFBudgetStatus.APPROVED, BFBudgetStatus.ACTIVE, BFBudgetStatus.LOCKED}
+		if budget.status not in closeable:
+			raise RuleViolation(
+				"budget_not_closeable",
+				f"Budget in status '{budget.status.value}' cannot be closed; must be APPROVED, ACTIVE, or LOCKED",
+				"approve_or_activate_first",
+			)
+		prior_status = budget.status.value
 		budget.status = BFBudgetStatus.CLOSED
 		budget.updated_at = datetime.now(timezone.utc)
-		self._emit("budget_closed", budget_id, {})
+		self._emit("budget_closed", budget_id, {"prior_status": prior_status})
 		return budget
 
 	async def cancel_budget(self, budget_id: str, reason: str) -> BFBudget:
@@ -385,8 +450,8 @@ class BFCService:
 			lines = self._lines_for(budget_id)
 			by_period: dict[str, Decimal] = {}
 			for line in lines:
-				key = str(line.period_date)
-				by_period[key] = by_period.get(key, Decimal("0")) + line.amount
+				key = str(line.period_start)
+				by_period[key] = by_period.get(key, Decimal("0")) + line.budgeted_amount
 			result = {"method": "bottom_up", "by_period": {k: str(v) for k, v in by_period.items()}}
 
 		else:  # EQUAL (default)
@@ -408,6 +473,7 @@ class BFCService:
 			id=uuid7str(),
 			tenant_id=self.tenant_id,
 			created_by=self.actor_id,
+			updated_by=self.actor_id,
 			created_at=datetime.now(timezone.utc),
 			updated_at=datetime.now(timezone.utc),
 			**payload.model_dump(),
@@ -421,34 +487,34 @@ class BFCService:
 		return list(self._budget_templates.values())
 
 	async def instantiate_template(self, template_id: str, fiscal_year: int, period_start: date, period_end: date) -> BFBudget:
-		"""Instantiate a budget from a template."""
+		"""Instantiate a budget from a template, copying all line definitions."""
 		tmpl = self._budget_templates.get(template_id)
 		if not tmpl or tmpl.tenant_id != self.tenant_id:
 			raise KeyError(f"Template {template_id} not found")
 		payload = BFBudgetCreate(
 			name=f"{tmpl.name} {fiscal_year}",
-			description=f"Instantiated from template {tmpl.name}",
+			description=f"Instantiated from template '{tmpl.name}'",
 			fiscal_year=fiscal_year,
 			period_start=period_start,
 			period_end=period_end,
-			budget_type=tmpl.default_budget_type,
-			currency_code=tmpl.currency_code,
-			department=tmpl.department,
-			cost_center=tmpl.cost_center,
+			budget_type=tmpl.budget_type,
+			owner_id=self.actor_id,
+			template_id=template_id,
 		)
 		budget = await self.create_budget_cycle(payload)
-		# Copy template lines
+		# Copy template line definitions
 		for line_def in tmpl.line_definitions:
 			lc = BFBudgetLineCreate(
 				budget_id=budget.id,
-				period_date=period_start,
+				period_start=period_start,
+				period_end=period_end,
 				account_code=line_def.get("account_code", "UNASSIGNED"),
 				line_type=BFLineType(line_def.get("line_type", "expense")),
-				description=line_def.get("description", ""),
-				amount=Decimal(str(line_def.get("default_amount", "0"))),
-				cost_center=tmpl.cost_center,
+				description=line_def.get("description", "Template line"),
+				budgeted_amount=Decimal(str(line_def.get("default_amount", "0"))),
 			)
 			await self.add_budget_line(lc)
+		tmpl.usage_count += 1
 		self._emit("template_instantiated", budget.id, {"template_id": template_id})
 		return budget
 
@@ -463,6 +529,7 @@ class BFCService:
 			id=uuid7str(),
 			tenant_id=self.tenant_id,
 			created_by=self.actor_id,
+			updated_by=self.actor_id,
 			created_at=datetime.now(timezone.utc),
 			updated_at=datetime.now(timezone.utc),
 			**payload.model_dump(),
@@ -494,19 +561,18 @@ class BFCService:
 
 	async def create_forecast(self, payload: BFForecastCreate) -> BFForecast:
 		"""Create a new forecast definition."""
-		assert_forecast_horizon_valid(payload.horizon_months)
 		forecast = BFForecast(
 			id=uuid7str(),
 			tenant_id=self.tenant_id,
 			created_by=self.actor_id,
+			updated_by=self.actor_id,
 			created_at=datetime.now(timezone.utc),
 			updated_at=datetime.now(timezone.utc),
 			**payload.model_dump(),
 		)
 		self._forecasts[forecast.id] = forecast
 		self._emit("forecast_created", forecast.id, {
-			"method": forecast.method.value,
-			"horizon_months": forecast.horizon_months,
+			"forecast_type": forecast.forecast_type.value,
 		})
 		return forecast
 
@@ -533,12 +599,10 @@ class BFCService:
 
 		# Build period labels beyond last known
 		last_date = max(l.period_date for l in lines)
-		from calendar import monthrange
-		from datetime import timedelta
 
 		projected = []
 		current = last_date
-		for i, val in enumerate(projections_decimal):
+		for val in projections_decimal:
 			# advance one month
 			month = current.month % 12 + 1
 			year = current.year + (current.month // 12)
@@ -548,7 +612,7 @@ class BFCService:
 		result = BFRollingForecastResult(
 			forecast_id=base_forecast_id,
 			periods=periods,
-			method=forecast.method.value,
+			method="rolling_exponential_smoothing",
 			projected_values=projected,
 			mape=None,
 		)
@@ -648,22 +712,23 @@ class BFCService:
 		job_id = uuid7str()
 		params = model_params or {}
 		params.setdefault("algorithm", "double_exponential")
-		params.setdefault("horizon", forecast.horizon_months)
+		horizon = int(params.get("horizon", 12))
 		params.setdefault("confidence", 0.95)
 
 		# Perform local double-exponential as fallback when ai_orchestration unavailable
+		history_decimal = [Decimal(str(v)) for v in history]
 		smoothed = double_exponential_smoothing(
-			[Decimal(str(v)) for v in history],
+			history_decimal,
 			alpha=float(params.get("alpha", 0.3)),
 			beta=float(params.get("beta", 0.1)),
 		)
-		projected = project_rolling([Decimal(str(v)) for v in history], forecast.horizon_months)
+		projected = project_rolling(history_decimal, horizon)
 
 		result = {
 			"job_id": job_id,
 			"forecast_id": forecast_id,
 			"algorithm": params["algorithm"],
-			"horizon": forecast.horizon_months,
+			"horizon": horizon,
 			"smoothed": [str(v) for v in smoothed],
 			"projected": [str(v) for v in projected],
 			"status": "completed",
@@ -678,6 +743,7 @@ class BFCService:
 			id=uuid7str(),
 			tenant_id=self.tenant_id,
 			created_by=self.actor_id,
+			updated_by=self.actor_id,
 			created_at=datetime.now(timezone.utc),
 			updated_at=datetime.now(timezone.utc),
 			**payload.model_dump(),
@@ -710,6 +776,7 @@ class BFCService:
 			id=uuid7str(),
 			tenant_id=self.tenant_id,
 			created_by=self.actor_id,
+			updated_by=self.actor_id,
 			created_at=datetime.now(timezone.utc),
 			updated_at=datetime.now(timezone.utc),
 			**payload.model_dump(),
@@ -796,7 +863,7 @@ class BFCService:
 		for line in lines:
 			adj = adjustments.get(line.line_type.value, 0.0)
 			if adj != 0.0:
-				delta = round_currency(line.amount * Decimal(str(adj)))
+				delta = round_currency(line.budgeted_amount * Decimal(str(adj)))
 				if line.line_type == BFLineType.REVENUE:
 					new_revenue += delta
 				else:
@@ -834,6 +901,7 @@ class BFCService:
 			id=uuid7str(),
 			tenant_id=self.tenant_id,
 			created_by=self.actor_id,
+			updated_by=self.actor_id,
 			created_at=datetime.now(timezone.utc),
 			updated_at=datetime.now(timezone.utc),
 			**payload.model_dump(),
@@ -873,25 +941,26 @@ class BFCService:
 		total_actual = Decimal("0")
 
 		for line in lines:
-			if not (period_start <= line.period_date <= period_end):
+			# Include line if its period overlaps the report window
+			if not (line.period_start <= period_end and line.period_end >= period_start):
 				continue
 			actual = actuals_by_account.get(line.account_code, Decimal("0"))
-			var_amt, var_pct = calculate_variance(line.amount, actual)
-			vtype = variance_type(line.amount, actual, line.line_type.value)
+			var_amt, var_pct = calculate_variance(line.budgeted_amount, actual)
+			vtype = variance_type(line.budgeted_amount, actual, line.line_type.value)
 			sig = significance_level(var_pct)
 
 			line_variances.append({
 				"line_id": line.id,
 				"account_code": line.account_code,
 				"line_type": line.line_type.value,
-				"budget": str(line.amount),
+				"budget": str(line.budgeted_amount),
 				"actual": str(actual),
 				"variance_amount": str(var_amt),
 				"variance_pct": str(var_pct),
 				"variance_type": vtype,
 				"significance": sig,
 			})
-			total_budget += line.amount
+			total_budget += line.budgeted_amount
 			total_actual += actual
 
 		total_var, total_var_pct = calculate_variance(total_budget, total_actual)
@@ -905,6 +974,7 @@ class BFCService:
 			id=uuid7str(),
 			tenant_id=self.tenant_id,
 			created_by=self.actor_id,
+			updated_by=self.actor_id,
 			created_at=datetime.now(timezone.utc),
 			updated_at=datetime.now(timezone.utc),
 			budget_id=budget_id,
@@ -959,10 +1029,10 @@ class BFCService:
 		by_dept: dict[str, Decimal] = {}
 		by_cc: dict[str, Decimal] = {}
 		for b in budgets:
-			if b.department:
-				by_dept[b.department] = by_dept.get(b.department, Decimal("0")) + b.total_expense + b.total_revenue
-			if b.cost_center:
-				by_cc[b.cost_center] = by_cc.get(b.cost_center, Decimal("0")) + b.total_expense + b.total_revenue
+			if b.department_id:
+				by_dept[b.department_id] = by_dept.get(b.department_id, Decimal("0")) + b.total_expense + b.total_revenue
+			if b.cost_center_id:
+				by_cc[b.cost_center_id] = by_cc.get(b.cost_center_id, Decimal("0")) + b.total_expense + b.total_revenue
 
 		result = BFConsolidationResult(
 			tenant_id=self.tenant_id,
@@ -1027,8 +1097,8 @@ class BFCService:
 		pending_approvals = await self.get_pending_approvals()
 		variance_reports = list(self._variance_reports.values())
 
-		total_budget = sum(b.total_revenue + b.total_expense for b in budgets)
-		total_actual = sum(r.total_actual for r in variance_reports)
+		total_budget = sum((b.total_revenue + b.total_expense for b in budgets), Decimal("0"))
+		total_actual = sum((r.total_actual for r in variance_reports), Decimal("0"))
 		material_variances = sum(
 			1 for r in variance_reports
 			if abs(r.variance_pct) >= Decimal("10")
@@ -1058,8 +1128,8 @@ class BFCService:
 	) -> BFBudgetSummary:
 		"""Aggregate budget summary for a period."""
 		budgets = list(self._budgets.values())
-		total_rev = sum(b.total_revenue for b in budgets)
-		total_exp = sum(b.total_expense for b in budgets)
+		total_rev = sum((b.total_revenue for b in budgets), Decimal("0"))
+		total_exp = sum((b.total_expense for b in budgets), Decimal("0"))
 
 		return BFBudgetSummary(
 			tenant_id=self.tenant_id,
@@ -1113,8 +1183,15 @@ class BFCService:
 
 	async def _recalc_budget_totals(self, budget: BFBudget) -> None:
 		lines = self._lines_for(budget.id)
-		budget.total_revenue = round_currency(sum(l.amount for l in lines if l.line_type == BFLineType.REVENUE))
-		budget.total_expense = round_currency(sum(l.amount for l in lines if l.line_type != BFLineType.REVENUE))
+		budget.total_revenue = round_currency(sum(
+			(l.budgeted_amount for l in lines if l.line_type == BFLineType.REVENUE),
+			Decimal("0"),
+		))
+		budget.total_expense = round_currency(sum(
+			(l.budgeted_amount for l in lines if l.line_type != BFLineType.REVENUE),
+			Decimal("0"),
+		))
+		budget.net_amount = round_currency(budget.total_revenue - budget.total_expense)
 		budget.updated_at = datetime.now(timezone.utc)
 
 	def _emit(self, event_name: str, entity_id: str, payload: dict[str, Any]) -> None:

@@ -35,8 +35,8 @@ def semantic_model() -> dict[str, Any]:
 		},
 		"capabilities": {
 			"cbm_cash_management": {
-				"name": contract["name"],
-				"version": contract["version"],
+				"name": contract.get("display_name", contract.get("capability", "cbm_cash_management")),
+				"version": contract.get("version", "2.1.0"),
 				"provides": contract["provides"],
 				"requires": contract["requires"],
 				"configuration": contract["configuration"],

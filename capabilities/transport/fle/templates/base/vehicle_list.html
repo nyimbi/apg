@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page_title }} — APG Fleet</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/fle.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="fle-app">
+{% include 'base/_nav.html' ignore missing %}
+
+<main class="fle-main">
+  <header class="fle-page-header">
+    <h1><i class="fa-solid fa-truck"></i> {{ page_title }}</h1>
+    <a href="{{ url_for('fle_views.create_vehicle') }}" class="fle-btn fle-btn-primary"><i class="fa-solid fa-plus"></i> Register Vehicle</a>
+  </header>
+
+  <!-- Status filter -->
+  <div class="fle-filter-bar">
+    <a href="{{ url_for('fle_views.list_vehicles') }}" class="fle-filter-btn {% if not status_filter %}active{% endif %}">All</a>
+    {% for s in ['active','in_maintenance','out_of_service','breakdown','awaiting_inspection','inactive'] %}
+    <a href="{{ url_for('fle_views.list_vehicles', status=s) }}" class="fle-filter-btn {% if status_filter == s %}active{% endif %}">{{ s|replace('_',' ')|title }}</a>
+    {% endfor %}
+  </div>
+
+  <section class="fle-card">
+    {% if vehicles %}
+    <table class="fle-table fle-table-hover">
+      <thead>
+        <tr>
+          <th>Registration</th><th>Make / Model</th><th>Type</th>
+          <th>Fuel</th><th>Status</th><th>Odometer</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for v in vehicles %}
+        <tr>
+          <td><strong>{{ v.registration }}</strong></td>
+          <td>{{ v.make }} {{ v.model }} ({{ v.year }})</td>
+          <td>{{ v.vehicle_type|replace('_',' ')|title }}</td>
+          <td>{{ v.fuel_type|upper }}</td>
+          <td><span class="fle-status fle-status-{{ v.status.value if v.status is not string else v.status }}">{{ (v.status.value if v.status is not string else v.status)|replace('_',' ')|title }}</span></td>
+          <td>{{ "{:,.0f}".format(v.odometer_km|float) }} km</td>
+          <td class="fle-actions">
+            <a href="{{ url_for('fle_views.detail_vehicle', vehicle_id=v.id) }}" class="fle-btn-sm fle-btn-info" title="View"><i class="fa-solid fa-eye"></i></a>
+            <a href="{{ url_for('fle_views.edit_vehicle', vehicle_id=v.id) }}" class="fle-btn-sm fle-btn-warning" title="Edit"><i class="fa-solid fa-pen"></i></a>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="fle-empty-state">
+      <i class="fa-solid fa-truck fa-3x"></i>
+      <p>No vehicles found. <a href="{{ url_for('fle_views.create_vehicle') }}">Register your first vehicle.</a></p>
+    </div>
+    {% endif %}
+  </section>
+</main>
+</body>
+</html>

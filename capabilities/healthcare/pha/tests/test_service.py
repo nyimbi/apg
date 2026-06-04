@@ -5,6 +5,8 @@ import asyncio, sys, os
 from datetime import datetime, timedelta
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
+from pydantic import ValidationError
+
 from pha.models import (
 	ControlledSubstanceLogCreate, DispenseOrderCreate, DrugCreate,
 	DrugInteractionCreate, InventoryItemCreate, PriorAuthCreate,
@@ -36,6 +38,9 @@ def test_add_drug_to_formulary():
 
 
 def test_add_drug_invalid_type_denied():
+	"""Pydantic rejects unknown enum values before the service layer sees them —
+	either ValidationError (model construction) or PolicyViolationError (service gate)
+	is an acceptable failure mode here."""
 	s = svc()
 	try:
 		run(s.add_drug_to_formulary(DrugCreate(
@@ -43,8 +48,8 @@ def test_add_drug_invalid_type_denied():
 			drug_type="unknown_type", drug_schedule="non_controlled", dosage_form="tablet",
 			strength="10", unit="mg", manufacturer="M", created_by="u",
 		)))
-		assert False
-	except PolicyViolationError:
+		assert False, "expected rejection of unknown drug_type"
+	except (PolicyViolationError, ValidationError):
 		pass
 
 

@@ -22,7 +22,14 @@ import spacy
 from transformers import pipeline, AutoTokenizer, AutoModelForSequenceClassification
 import openai
 from pydantic import BaseModel, Field, ConfigDict
-from uuid_extensions import uuid7str
+try:
+	from uuid6 import uuid7 as _uuid7
+	def uuid7str() -> str:
+		return str(_uuid7())
+except ImportError:
+	import uuid as _uuid
+	def uuid7str() -> str:  # type: ignore[misc]
+		return str(_uuid.uuid4())
 import pandas as pd
 import numpy as np
 

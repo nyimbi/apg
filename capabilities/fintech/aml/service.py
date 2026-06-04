@@ -19,13 +19,18 @@ from typing import Any
 
 try:
 	from .domain.calculations import (
+		calculate_correspondent_nesting_risk,
 		calculate_false_positive_rate,
 		calculate_network_risk_score,
 		calculate_risk_score,
 		calculate_sar_priority,
+		detect_crypto_mixer_routing,
 		detect_layering,
+		detect_nft_wash_trading,
 		detect_round_trip,
 		detect_structuring,
+		detect_terrorist_financing_indicators,
+		detect_trade_based_ml,
 		detect_velocity_anomaly,
 		requires_ctr,
 		risk_segment_from_score,
@@ -39,12 +44,15 @@ try:
 		assert_alert_type_supported,
 		assert_case_is_open_for_investigation,
 		assert_case_type_supported,
+		assert_correspondent_nesting_depth_acceptable,
+		assert_crypto_mixer_not_detected,
 		assert_ctr_amount_triggers_reporting,
 		assert_currency_present,
 		assert_investigator_assigned,
 		assert_kyc_link_present,
 		assert_match_score_valid,
 		assert_no_cross_tenant_access,
+		assert_nft_wash_trade_not_detected,
 		assert_positive_amount,
 		assert_sar_human_approval,
 		assert_sar_jurisdiction_present,
@@ -56,13 +64,18 @@ try:
 	)
 except ImportError:  # pragma: no cover — direct file load in tests
 	from domain.calculations import (  # type: ignore
+		calculate_correspondent_nesting_risk,
 		calculate_false_positive_rate,
 		calculate_network_risk_score,
 		calculate_risk_score,
 		calculate_sar_priority,
+		detect_crypto_mixer_routing,
 		detect_layering,
+		detect_nft_wash_trading,
 		detect_round_trip,
 		detect_structuring,
+		detect_terrorist_financing_indicators,
+		detect_trade_based_ml,
 		detect_velocity_anomaly,
 		requires_ctr,
 		risk_segment_from_score,
@@ -76,12 +89,15 @@ except ImportError:  # pragma: no cover — direct file load in tests
 		assert_alert_type_supported,
 		assert_case_is_open_for_investigation,
 		assert_case_type_supported,
+		assert_correspondent_nesting_depth_acceptable,
+		assert_crypto_mixer_not_detected,
 		assert_ctr_amount_triggers_reporting,
 		assert_currency_present,
 		assert_investigator_assigned,
 		assert_kyc_link_present,
 		assert_match_score_valid,
 		assert_no_cross_tenant_access,
+		assert_nft_wash_trade_not_detected,
 		assert_positive_amount,
 		assert_sar_human_approval,
 		assert_sar_jurisdiction_present,
@@ -1247,6 +1263,197 @@ class AMLService:
 		if jurisdiction:
 			filings = [f for f in filings if f.jurisdiction.upper() == jurisdiction.upper()]
 		return sorted(filings, key=lambda f: f.created_at, reverse=True)
+
+	# ------------------------------------------------------------------
+	# Trade-based money laundering (TBML)
+	# ------------------------------------------------------------------
+
+	async def detect_trade_based_ml(
+		self,
+		invoices: list[dict[str, Any]],
+		market_value_lookup: dict[str, float] | None = None,
+		over_under_threshold: float = 0.15,
+		phantom_shipment_indicators: list[str] | None = None,
+	) -> dict[str, Any]:
+		"""Detect TBML patterns: over/under-invoicing, phantom shipments, multiple invoicing.
+
+		Args:
+			invoices: list of invoice dicts with commodity_code, unit_price, amount, etc.
+			market_value_lookup: commodity_code -> fair-market unit price
+			over_under_threshold: fractional price deviation to flag (default 15%)
+			phantom_shipment_indicators: list of known phantom shipment reference IDs
+
+		Returns:
+			dict with detected flag, typologies, flagged_invoices, risk_score
+		"""
+		assert_tenant_context({"tenant_id": self.tenant_id})
+		result = detect_trade_based_ml(
+			invoices,
+			market_value_lookup=market_value_lookup,
+			over_under_threshold=over_under_threshold,
+			phantom_shipment_indicators=phantom_shipment_indicators,
+		)
+		if result["detected"]:
+			await self._emit_event("tbml_detected", {
+				"typologies": result["typologies"],
+				"risk_score": result["risk_score"],
+				"flagged_invoice_count": len(result["flagged_invoices"]),
+			})
+			self._log_warn("TBML detected", typologies=result["typologies"], score=result["risk_score"])
+		return result
+
+	# ------------------------------------------------------------------
+	# NFT wash-trade detection
+	# ------------------------------------------------------------------
+
+	async def detect_nft_wash_trading(
+		self,
+		nft_transfers: list[dict[str, Any]],
+		lookback_days: int = 30,
+		min_round_trips: int = 2,
+		price_inflation_threshold: float = 3.0,
+	) -> dict[str, Any]:
+		"""Detect NFT wash trading: circular transfers at artificially inflated prices.
+
+		Args:
+			nft_transfers: list of transfer dicts with token_id, from_wallet, to_wallet,
+			               price, currency, created_at
+			lookback_days: analysis window in days
+			min_round_trips: minimum back-and-forth transfers to flag
+			price_inflation_threshold: price multiplier indicating artificial inflation
+
+		Returns:
+			dict with detected flag, wash_trade_score (0-1), flagged_tokens, patterns
+		"""
+		assert_tenant_context({"tenant_id": self.tenant_id})
+		result = detect_nft_wash_trading(
+			nft_transfers,
+			lookback_days=lookback_days,
+			min_round_trips=min_round_trips,
+			price_inflation_threshold=price_inflation_threshold,
+		)
+		if result["detected"]:
+			assert_nft_wash_trade_not_detected(result["wash_trade_score"])
+		if result["detected"]:
+			await self._emit_event("nft_wash_trade_detected", {
+				"wash_trade_score": result["wash_trade_score"],
+				"flagged_token_count": len(result["flagged_tokens"]),
+				"patterns": result["patterns"],
+			})
+		return result
+
+	# ------------------------------------------------------------------
+	# Crypto mixer / tumbler detection
+	# ------------------------------------------------------------------
+
+	async def detect_crypto_mixer_routing(
+		self,
+		crypto_transactions: list[dict[str, Any]],
+		known_mixer_addresses: set[str] | None = None,
+	) -> dict[str, Any]:
+		"""Detect routing through crypto mixing/tumbling services.
+
+		Covers: known mixer addresses, service-label matching (Tornado Cash,
+		ChipMixer, etc.), and CoinJoin equal-output patterns.
+
+		Args:
+			crypto_transactions: list of transaction dicts with tx_hash,
+			                     from_address, to_address, service_label,
+			                     input_count, output_count, equal_output_amounts
+			known_mixer_addresses: tenant-supplied set of known mixer addresses
+
+		Returns:
+			dict with detected flag, mixer_indicators, flagged_transactions
+		"""
+		assert_tenant_context({"tenant_id": self.tenant_id})
+		result = detect_crypto_mixer_routing(crypto_transactions, known_mixer_addresses=known_mixer_addresses)
+		if result["detected"]:
+			assert_crypto_mixer_not_detected(result["mixer_indicators"])
+		# assert_crypto_mixer_not_detected raises if detected — we only reach here if clean
+		return result
+
+	# ------------------------------------------------------------------
+	# Correspondent banking nested account risk
+	# ------------------------------------------------------------------
+
+	async def correspondent_banking_analysis(
+		self,
+		correspondent_chain: list[dict[str, Any]],
+		high_risk_jurisdictions: set[str] | None = None,
+		max_nesting_depth: int = 3,
+	) -> dict[str, Any]:
+		"""Assess risk in nested correspondent banking relationships.
+
+		Covers: nesting depth, high-risk jurisdictions, poor AML ratings,
+		unverified KYB status, and excessive nested-account counts per FATF
+		Recommendation 13 guidance.
+
+		Args:
+			correspondent_chain: ordered list of correspondent institution dicts
+			high_risk_jurisdictions: set of jurisdiction codes (overrides defaults)
+			max_nesting_depth: maximum acceptable chain depth before rule violation
+
+		Returns:
+			dict with nesting_depth, risk_score, risk_factors, recommended_action
+		"""
+		assert_tenant_context({"tenant_id": self.tenant_id})
+		result = calculate_correspondent_nesting_risk(
+			correspondent_chain,
+			high_risk_jurisdictions=high_risk_jurisdictions,
+		)
+		assert_correspondent_nesting_depth_acceptable(result["nesting_depth"], max_depth=max_nesting_depth)
+		await self._emit_event("correspondent_banking_assessed", {
+			"nesting_depth": result["nesting_depth"],
+			"risk_score": result["risk_score"],
+			"recommended_action": result["recommended_action"],
+		})
+		return result
+
+	# ------------------------------------------------------------------
+	# Terrorist financing indicator detection
+	# ------------------------------------------------------------------
+
+	async def detect_terrorist_financing(
+		self,
+		customer_id: str,
+		lookback_days: int = 90,
+		customer_profile: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Detect terrorist financing indicators for a customer.
+
+		Covers FATF typologies: small amounts to high-risk jurisdictions,
+		hawala patterns, charity misuse, prepaid card loading, adverse
+		media, and known TF associate links.
+
+		Args:
+			customer_id: subject reference / customer identifier
+			lookback_days: how far back to look in transaction history
+			customer_profile: optional dict with adverse_media_terrorism,
+			                  known_tf_associate, charity_sector flags
+
+		Returns:
+			dict with detected flag, tf_indicators, risk_score, typologies
+		"""
+		assert_tenant_context({"tenant_id": self.tenant_id})
+		txns = [
+			t for t in self._transactions.values()
+			if t.get("tenant_id") == self.tenant_id
+			and t.get("subject_reference") == customer_id
+		]
+		result = detect_terrorist_financing_indicators(txns, customer_profile=customer_profile)
+		if result["detected"]:
+			await self._emit_event("terrorist_financing_indicators_detected", {
+				"customer_id": customer_id,
+				"tf_indicators": result["tf_indicators"],
+				"risk_score": result["risk_score"],
+			})
+			self._log_warn(
+				"TF indicators detected",
+				customer_id=customer_id,
+				indicators=result["tf_indicators"],
+				score=result["risk_score"],
+			)
+		return result
 
 	# ------------------------------------------------------------------
 	# Dashboard summary

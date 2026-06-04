@@ -801,12 +801,3 @@ ProcessingRequest = NLPProcessingRequest
 ProcessingResult = NLPProcessingResult
 ProcessingRecord = NLPDocument  # backward-compat alias
 
-from dataclasses import dataclass as _mc_dc, field as _mc_f
-@_mc_dc
-class ModelConfiguration:
-    model_name: str = "default"
-    max_tokens: int = 512
-    temperature: float = 0.7
-    language: str = "en"
-    task_type: str = "general"
-    options: dict = _mc_f(default_factory=dict)

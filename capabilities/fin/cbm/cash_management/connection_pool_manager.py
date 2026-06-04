@@ -19,11 +19,24 @@ import logging
 from contextlib import asynccontextmanager
 import weakref
 
-import asyncpg
-import redis.asyncio as redis
+try:
+	import asyncpg  # type: ignore[import]
+except ImportError:
+	asyncpg = None  # type: ignore[assignment]
+try:
+	import redis.asyncio as redis  # type: ignore[import]
+except ImportError:
+	redis = None  # type: ignore[assignment]
 import aiohttp
 from pydantic import BaseModel, Field, ConfigDict
-from uuid_extensions import uuid7str
+try:
+	from uuid6 import uuid7 as _uuid7
+	def uuid7str() -> str:
+		return str(_uuid7())
+except ImportError:
+	import uuid as _uuid
+	def uuid7str() -> str:  # type: ignore[misc]
+		return str(_uuid.uuid4())
 import psutil
 
 # Configure logging

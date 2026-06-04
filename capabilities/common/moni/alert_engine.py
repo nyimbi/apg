@@ -18,7 +18,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from pydantic import BaseModel, Field, ConfigDict
-from uuid_extensions import uuid7str
+from uuid6 import uuid7
+def uuid7str() -> str: return str(uuid7())
 
 from .models import (
 	MonitoringAlert, MonitoringRule, MonitoringMetric, AlertSeverity, 

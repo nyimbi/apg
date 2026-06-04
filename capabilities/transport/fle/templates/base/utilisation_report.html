@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page_title }} — APG Fleet</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/fle.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="fle-app">
+<main class="fle-main">
+  <header class="fle-page-header">
+    <h1><i class="fa-solid fa-chart-bar"></i> {{ page_title }}</h1>
+    <span class="fle-period">{{ report.period_start[:10] }} — {{ report.period_end[:10] }}</span>
+  </header>
+  <div class="fle-kpi-grid">
+    <div class="fle-kpi-card fle-kpi-primary"><div class="fle-kpi-icon"><i class="fa-solid fa-truck"></i></div><div class="fle-kpi-body"><div class="fle-kpi-value">{{ report.total_vehicles }}</div><div class="fle-kpi-label">Total Vehicles</div></div></div>
+    <div class="fle-kpi-card fle-kpi-success"><div class="fle-kpi-icon"><i class="fa-solid fa-gauge"></i></div><div class="fle-kpi-body"><div class="fle-kpi-value">{{ "%.1f"|format(report.avg_utilisation_pct) }}%</div><div class="fle-kpi-label">Avg Utilisation</div></div></div>
+    <div class="fle-kpi-card fle-kpi-info"><div class="fle-kpi-icon"><i class="fa-solid fa-road"></i></div><div class="fle-kpi-body"><div class="fle-kpi-value">{{ "{:,.0f}".format(report.total_distance_km|float) }}</div><div class="fle-kpi-label">Total km</div></div></div>
+    <div class="fle-kpi-card fle-kpi-info"><div class="fle-kpi-icon"><i class="fa-solid fa-route"></i></div><div class="fle-kpi-body"><div class="fle-kpi-value">{{ report.total_trips }}</div><div class="fle-kpi-label">Total Trips</div></div></div>
+    <div class="fle-kpi-card fle-kpi-primary"><div class="fle-kpi-icon"><i class="fa-solid fa-gas-pump"></i></div><div class="fle-kpi-body"><div class="fle-kpi-value">{{ "{:,.0f}".format(report.total_fuel_l|float) }}</div><div class="fle-kpi-label">Total Fuel (L)</div></div></div>
+    <div class="fle-kpi-card {% if report.overdue_maintenance_count > 0 %}fle-kpi-warning{% else %}fle-kpi-success{% endif %}"><div class="fle-kpi-icon"><i class="fa-solid fa-wrench"></i></div><div class="fle-kpi-body"><div class="fle-kpi-value">{{ report.overdue_maintenance_count }}</div><div class="fle-kpi-label">Overdue Maintenance</div></div></div>
+  </div>
+  <section class="fle-card">
+    <h2>Key Metrics</h2>
+    <dl class="fle-dl">
+      <dt>Active Vehicles</dt><dd>{{ report.active_vehicles }} / {{ report.total_vehicles }}</dd>
+      <dt>Vehicles In Maintenance</dt><dd>{{ report.vehicles_in_maintenance }}</dd>
+      <dt>Vehicles Awaiting Inspection</dt><dd>{{ report.vehicles_awaiting_inspection }}</dd>
+      <dt>Average Fuel Efficiency</dt><dd>{{ "%.2f"|format(report.avg_fuel_efficiency_l100km) }} L/100km</dd>
+      <dt>Compliance Alerts</dt><dd>{{ report.compliance_alert_count }}</dd>
+    </dl>
+  </section>
+</main>
+</body>
+</html>

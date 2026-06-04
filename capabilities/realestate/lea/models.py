@@ -1,11 +1,15 @@
 """Pydantic v2 models for Lease Management (lea) — IFRS 16 / ASC 842.
 
-Entities:
-	Lease · LeaseAsset · LeasePaymentSchedule · LeaseModification
-	RightOfUseAsset · LeaseLiability · EscalationClause · LeaseOption
-	LeaseAmendment · SubLease · LeaseExpiry
-	Plus: LeaseAbstraction · RentReview · LeaseAssignment · Ifrs16Schedule
-	Report models: IFRS16DisclosureNotes · PortfolioLeaseAnalytics · PeriodJournalEntry
+Entities
+--------
+Lease · LeaseAsset · LeasePaymentSchedule · LeaseModification
+RightOfUseAsset · LeaseLiability · EscalationClause · LeaseOption
+LeaseAmendment · SubLease · LeaseExpiry · LeaseAbstraction
+RentReview · LeaseAssignment · Ifrs16Schedule
+
+Report models: IFRS16DisclosureNotes · PortfolioLeaseAnalytics
+               PeriodJournalEntry · LeaseExpiryPipelineItem
+               CpiRemeasurementResult · ExtensionOptionAssessment
 """
 
 from __future__ import annotations
@@ -37,9 +41,11 @@ class LeaseType(str, Enum):
 	peppercorn = "peppercorn"
 	assured_shorthold = "assured_shorthold"
 	regulated = "regulated"
+	office = "office"
 
 
 class LeaseStatus(str, Enum):
+	draft = "draft"
 	heads_of_terms = "heads_of_terms"
 	negotiating = "negotiating"
 	signed = "signed"
@@ -51,6 +57,7 @@ class LeaseStatus(str, Enum):
 	forfeited = "forfeited"
 	assigned = "assigned"
 	terminated = "terminated"
+	renewed = "renewed"
 
 
 class EscalationType(str, Enum):
@@ -101,6 +108,9 @@ class Ifrs16Category(str, Enum):
 	operating_lease = "operating_lease"
 	short_term_exemption = "short_term_exemption"
 	low_value_exemption = "low_value_exemption"
+	# Alias used internally
+	finance = "finance"
+	operating = "operating"
 
 
 class AbstractionStatus(str, Enum):
@@ -201,6 +211,7 @@ class LeaBase(BaseModel):
 # ── Lease (master entity) ─────────────────────────────────────────────────────
 
 class LeaseCreate(BaseModel):
+	"""Input model for creating a new lease."""
 	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
 
 	tenant_id: str
@@ -243,6 +254,13 @@ class LeaseCreate(BaseModel):
 	def _positive_rent(cls, v: Decimal) -> Decimal:
 		if v < 0:
 			raise ValueError("initial_rent must be non-negative")
+		return v
+
+	@field_validator("security_deposit")
+	@classmethod
+	def _non_negative_deposit(cls, v: Decimal) -> Decimal:
+		if v < 0:
+			raise ValueError("security_deposit must be non-negative")
 		return v
 
 
@@ -978,3 +996,32 @@ class ExtensionOptionAssessment(BaseModel):
 	assessed_at: datetime = Field(default_factory=datetime.utcnow)
 	assessed_by: str
 	notes: str | None = None
+
+
+class LeaseModificationRequest(BaseModel):
+	"""Input for handling a lease modification with full remeasurement."""
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+
+	reason: str
+	trigger: ModificationTrigger
+	modification_date: date
+	new_lease_term_months: int | None = None
+	new_base_payment: Decimal | None = None
+	new_rate: Decimal | None = None
+	surrendered_proportion: Decimal | None = None
+	creates_new_lease: bool = False
+	approved_by: str | None = None
+
+
+class SubleaseCreate2(BaseModel):
+	"""Sublease management input (simplified for service-level use)."""
+	model_config = ConfigDict(extra="forbid", validate_by_name=True, validate_by_alias=True)
+
+	head_lease_id: str
+	sublessee_entity_id: str
+	commencement_date: date
+	end_date: date
+	monthly_payment: Decimal
+	sublease_classification: SubleaseClassification = SubleaseClassification.operating
+	implicit_rate: Decimal | None = None
+	currency: str = "KES"

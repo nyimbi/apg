@@ -113,6 +113,7 @@ def get_tenant_id(payload: dict | None = None) -> str:
 def get_user_id(payload: dict | None = None) -> str:
 	"""Resolve user id: JWT identity > request JSON body > request context > env fallback."""
 	try:
+		from flask_jwt_extended import get_jwt_identity  # optional dep
 		identity = get_jwt_identity()
 		if identity:
 			return str(identity)

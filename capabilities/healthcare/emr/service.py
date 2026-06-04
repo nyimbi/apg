@@ -15,10 +15,21 @@ from .capability_contract import (
 )
 from .models import (
 	AllergyCreate, AllergyResponse,
-	ClinicalNoteCreate, ClinicalNoteResponse,
-	EncounterCreate, EncounterResponse,
+	CarePlanCreate, CarePlanResponse, CarePlanUpdate,
+	ClinicalAlert,
+	ClinicalNoteCreate, ClinicalNoteResponse, ClinicalNoteUpdate,
+	EncounterCreate, EncounterResponse, EncounterUpdate,
+	FamilyHistoryCreate, FamilyHistoryResponse,
+	ImagingOrderCreate, ImagingOrderResponse,
+	ImmunisationCreate, ImmunisationResponse,
+	LabOrderCreate, LabOrderResponse,
+	LabResultCreate, LabResultResponse,
 	MedicationCreate, MedicationResponse,
+	PatientCreate, PatientResponse, PatientUpdate,
+	PatientMatchCandidate,
 	ProblemCreate, ProblemResponse,
+	PrescriptionCreate, PrescriptionResponse,
+	ReferralCreate, ReferralUpdate,
 	VitalSignCreate, VitalSignResponse,
 	uuid7str,
 )
@@ -410,14 +421,14 @@ class EMRService:
 		self._notify = notify or get_notify_adapter()
 		self._store = store or get_store(db_url)
 
-		# in-memory caches (the null store is memory-backed anyway; kept for
-		# backward compat with tests that inspect these dicts directly)
+		# in-memory caches (null store is memory-backed; kept for backward compat)
 		self._notes: dict[tuple[str, str], ClinicalNoteResponse] = {}
 		self._problems: dict[tuple[str, str], ProblemResponse] = {}
 		self._medications: dict[tuple[str, str], MedicationResponse] = {}
 		self._allergies: dict[tuple[str, str], AllergyResponse] = {}
 		self._vitals: dict[tuple[str, str], VitalSignResponse] = {}
 		self._encounters: dict[tuple[str, str], EncounterResponse] = {}
+		self._patients: dict[tuple[str, str], PatientResponse] = {}
 		self._audit_events: list[dict[str, Any]] = []
 		# extended tables
 		self._prescriptions: dict[tuple[str, str], dict[str, Any]] = {}
@@ -426,6 +437,12 @@ class EMRService:
 		self._discharge_summaries: dict[tuple[str, str], dict[str, Any]] = {}
 		self._diagnoses: dict[tuple[str, str], dict[str, Any]] = {}
 		self._cpt_procedures: dict[tuple[str, str], dict[str, Any]] = {}
+		self._lab_orders: dict[tuple[str, str], LabOrderResponse] = {}
+		self._lab_results: dict[tuple[str, str], LabResultResponse] = {}
+		self._imaging_orders: dict[tuple[str, str], ImagingOrderResponse] = {}
+		self._care_plans: dict[tuple[str, str], CarePlanResponse] = {}
+		self._immunisations: dict[tuple[str, str], ImmunisationResponse] = {}
+		self._family_history: dict[tuple[str, str], FamilyHistoryResponse] = {}
 
 
 	async def describe(self, tenant_id: str | None = None) -> dict[str, Any]:
@@ -667,8 +684,10 @@ class EMRService:
 		vital = VitalSignResponse(
 			id=uuid7str(), tenant_id=payload.tenant_id, patient_id=payload.patient_id,
 			encounter_id=payload.encounter_id, vital_type=payload.vital_type,
-			value=payload.value, unit=payload.unit, recorded_by=payload.recorded_by,
-			recorded_at=payload.recorded_at, created_by=payload.recorded_by,
+			value=payload.value, value2=payload.value2, unit=payload.unit,
+			recorded_by=payload.recorded_by, recorded_at=payload.recorded_at,
+			method=payload.method, position=payload.position,
+			created_by=payload.recorded_by,
 		)
 		self._vitals[(payload.tenant_id, vital.id)] = vital
 		self._record_audit(payload.tenant_id, "vital_recorded", vital.id)
@@ -956,16 +975,18 @@ class EMRService:
 				"recommendation": "No renal dosing data available. Consult Renal Drug Handbook.",
 			}
 
-		# pick most restrictive stage that applies
+		# Find the most restrictive (lowest-threshold) rule that still applies.
+		# A rule applies when egfr <= threshold (patient's function is at or below
+		# the threshold that triggers that adjustment).
+		# Sort ascending; the first match IS the most restrictive applicable rule.
 		recommendation = "No dose adjustment required for this eGFR."
 		adjustment_required = False
 		contraindicated = False
-		for threshold, text, is_contra in sorted(stages, key=lambda x: x[0], reverse=True):
-			if egfr_ml_per_min <= threshold:
-				recommendation = text
-				adjustment_required = True
-				contraindicated = is_contra
-				break
+		applicable = [(t, txt, ic) for t, txt, ic in stages if egfr_ml_per_min <= t]
+		if applicable:
+			# pick the entry with the smallest threshold (most restrictive)
+			threshold, recommendation, contraindicated = min(applicable, key=lambda x: x[0])
+			adjustment_required = True
 
 		return {
 			"drug_name": drug_name,
@@ -2414,6 +2435,902 @@ class EMRService:
 			"added_by": added_by,
 			"added_at": addendum_note.finalized_at.isoformat() if addendum_note.finalized_at else datetime.utcnow().isoformat(),
 			"content_preview": addendum_text[:120],
+		}
+
+	# ═══════════════════════════════════════════════════════════════════════════
+	# PATIENT CRUD (full lifecycle)
+	# ═══════════════════════════════════════════════════════════════════════════
+
+	async def register_patient(self, payload: "PatientCreate") -> "PatientResponse":
+		"""Register a new patient after running probabilistic dedup check.
+
+		Raises PolicyViolationError if a near-certain duplicate is found.
+		Returns the created PatientResponse.
+		"""
+		from .models import PatientResponse
+		self._enforce({"tenant_context_present": bool(payload.tenant_id), "operation_type": "write", "policy_attached": True})
+		# dedup check
+		candidates = await self.patient_deduplication_check({
+			"family": payload.name.family,
+			"given_0": payload.name.given[0] if payload.name.given else "",
+			"birth_date": payload.birth_date.isoformat(),
+			"gender": payload.gender,
+			"biometric_hash": payload.biometric_hash,
+		})
+		certain = [c for c in candidates if c.is_certain_duplicate]
+		if certain:
+			raise PolicyViolationError(
+				f"Certain duplicate patient found: {certain[0].candidate_patient_id} "
+				f"(score {certain[0].match_score:.2f}). Review before registering."
+			)
+
+		patient = PatientResponse(
+			id=uuid7str(),
+			tenant_id=payload.tenant_id,
+			name=payload.name,
+			birth_date=payload.birth_date,
+			gender=payload.gender,
+			marital_status=payload.marital_status,
+			deceased_date=payload.deceased_date,
+			is_deceased=payload.is_deceased,
+			address=payload.address,
+			telecom=payload.telecom,
+			language=payload.language,
+			nationality=payload.nationality,
+			religion=payload.religion,
+			race=payload.race,
+			ethnicity=payload.ethnicity,
+			blood_type=payload.blood_type,
+			next_of_kin=payload.next_of_kin,
+			emergency_contact=payload.emergency_contact,
+			mental_health_record=payload.mental_health_record,
+			biometric_hash=payload.biometric_hash,
+			identifiers=payload.identifiers,
+			created_by=payload.created_by,
+		)
+		self._patients[(payload.tenant_id, patient.id)] = patient
+		self._record_audit(payload.tenant_id, "patient_registered", patient.id)
+		_log_op("register_patient", payload.tenant_id, patient.id)
+		return patient
+
+	async def get_patient(self, tenant_id: str, patient_id: str) -> "PatientResponse | None":
+		"""Retrieve a patient by ID, enforcing tenant isolation."""
+		p = self._patients.get((tenant_id, patient_id))
+		if p is None or p.is_deleted:
+			return None
+		return p
+
+	async def list_patients(
+		self,
+		tenant_id: str,
+		status: str | None = None,
+		search: str | None = None,
+	) -> list["PatientResponse"]:
+		"""List patients for a tenant with optional status and name search filters."""
+		results = [
+			p for (tid, _), p in self._patients.items()
+			if tid == tenant_id and not p.is_deleted
+		]
+		if status:
+			results = [p for p in results if p.status == status]
+		if search:
+			search_lower = search.lower()
+			results = [
+				p for p in results
+				if search_lower in p.name.family.lower()
+				or any(search_lower in g.lower() for g in p.name.given)
+			]
+		return sorted(results, key=lambda p: p.created_at, reverse=True)
+
+	async def update_patient(
+		self,
+		tenant_id: str,
+		patient_id: str,
+		payload: "PatientUpdate",
+	) -> "PatientResponse | None":
+		"""Apply a partial update to a patient record."""
+		patient = self._patients.get((tenant_id, patient_id))
+		if patient is None or patient.is_deleted:
+			return None
+		if patient.is_deceased:
+			raise PolicyViolationError("deceased_record_locked: cannot update a deceased patient")
+		update_data = payload.model_dump(exclude_none=True)
+		update_data["updated_at"] = datetime.utcnow()
+		updated = patient.model_copy(update=update_data)
+		self._patients[(tenant_id, patient_id)] = updated
+		self._record_audit(tenant_id, "patient_updated", patient_id)
+		return updated
+
+	async def delete_patient(self, tenant_id: str, patient_id: str) -> bool:
+		"""Soft-delete a patient record (sets is_deleted=True)."""
+		patient = self._patients.get((tenant_id, patient_id))
+		if patient is None:
+			return False
+		updated = patient.model_copy(update={"is_deleted": True, "updated_at": datetime.utcnow()})
+		self._patients[(tenant_id, patient_id)] = updated
+		self._record_audit(tenant_id, "patient_deleted", patient_id)
+		return True
+
+	async def merge_patients(
+		self,
+		tenant_id: str,
+		duplicate_id: str,
+		surviving_id: str,
+	) -> dict[str, Any]:
+		"""Merge a duplicate patient record into the surviving record.
+
+		The duplicate is marked status=merged and merged_into=surviving_id.
+		All encounters / notes / problems for the duplicate are re-keyed to the
+		surviving patient in the in-memory store.
+		"""
+		duplicate = self._patients.get((tenant_id, duplicate_id))
+		surviving = self._patients.get((tenant_id, surviving_id))
+		if duplicate is None:
+			raise ValueError(f"Duplicate patient {duplicate_id} not found")
+		if surviving is None:
+			raise ValueError(f"Surviving patient {surviving_id} not found")
+
+		# mark duplicate
+		merged_dup = duplicate.model_copy(update={
+			"status": "merged",
+			"merged_into": surviving_id,
+			"updated_at": datetime.utcnow(),
+		})
+		self._patients[(tenant_id, duplicate_id)] = merged_dup
+
+		# re-key encounters
+		for key, enc in list(self._encounters.items()):
+			if enc.patient_id == duplicate_id:
+				rekey = enc.model_copy(update={"patient_id": surviving_id})
+				self._encounters[key] = rekey
+
+		# re-key notes
+		for key, note in list(self._notes.items()):
+			if note.patient_id == duplicate_id:
+				self._notes[key] = note.model_copy(update={"patient_id": surviving_id})
+
+		# re-key problems
+		for key, prob in list(self._problems.items()):
+			if prob.patient_id == duplicate_id:
+				self._problems[key] = prob.model_copy(update={"patient_id": surviving_id})
+
+		# re-key medications
+		for key, med in list(self._medications.items()):
+			if med.patient_id == duplicate_id:
+				self._medications[key] = med.model_copy(update={"patient_id": surviving_id})
+
+		# re-key allergies
+		for key, allergy in list(self._allergies.items()):
+			if allergy.patient_id == duplicate_id:
+				self._allergies[key] = allergy.model_copy(update={"patient_id": surviving_id})
+
+		self._record_audit(tenant_id, "patient_merged", duplicate_id)
+		logger.info("emr.merge_patients duplicate=%s surviving=%s", duplicate_id, surviving_id)
+		return {
+			"duplicate_id": duplicate_id,
+			"surviving_id": surviving_id,
+			"status": "merged",
+			"merged_at": datetime.utcnow().isoformat(),
+		}
+
+	async def patient_deduplication_check(
+		self,
+		incoming: dict[str, Any],
+	) -> list["PatientMatchCandidate"]:
+		"""Run probabilistic matching against all existing patients in the tenant.
+
+		Returns a list of PatientMatchCandidate sorted by score descending.
+		Candidates with score >= 0.85 are flagged as certain duplicates.
+		"""
+		from .models import PatientMatchCandidate
+		from .domain.calculations import patient_match_score
+
+		candidates: list[PatientMatchCandidate] = []
+		for (tid, _), patient in self._patients.items():
+			if tid != self.tenant_id or patient.is_deleted:
+				continue
+			existing = {
+				"family": patient.name.family,
+				"given_0": patient.name.given[0] if patient.name.given else "",
+				"birth_date": patient.birth_date.isoformat(),
+				"gender": str(patient.gender),
+				"biometric_hash": patient.biometric_hash,
+			}
+			score, matched_fields = patient_match_score(incoming, existing)
+			if score >= 0.40:
+				candidates.append(PatientMatchCandidate(
+					candidate_patient_id=patient.id,
+					match_score=score,
+					matching_fields=matched_fields,
+					is_certain_duplicate=score >= 0.85,
+				))
+		candidates.sort(key=lambda c: c.match_score, reverse=True)
+		return candidates
+
+	# ═══════════════════════════════════════════════════════════════════════════
+	# ENCOUNTER LIFECYCLE
+	# ═══════════════════════════════════════════════════════════════════════════
+
+	async def update_encounter(
+		self,
+		tenant_id: str,
+		encounter_id: str,
+		payload: "EncounterUpdate",
+	) -> "EncounterResponse | None":
+		"""Apply a partial update to an encounter."""
+		enc = self._encounters.get((tenant_id, encounter_id))
+		if enc is None:
+			return None
+		update_data = payload.model_dump(exclude_none=True)
+		update_data["updated_at"] = datetime.utcnow()
+		updated = enc.model_copy(update=update_data)
+		self._encounters[(tenant_id, encounter_id)] = updated
+		self._record_audit(tenant_id, "encounter_updated", encounter_id)
+		return updated
+
+	async def admit_patient(
+		self,
+		tenant_id: str,
+		encounter_id: str,
+		admit_data: dict[str, Any],
+	) -> "EncounterResponse | None":
+		"""Record formal patient admission (status → in_progress, set admit_time)."""
+		enc = self._encounters.get((tenant_id, encounter_id))
+		if enc is None:
+			return None
+		updated = enc.model_copy(update={
+			"status": "in_progress",
+			"admit_time": datetime.utcnow(),
+			"updated_at": datetime.utcnow(),
+		})
+		self._encounters[(tenant_id, encounter_id)] = updated
+		self._record_audit(tenant_id, "patient_admitted", encounter_id)
+		logger.info("emr.admit_patient enc=%s tenant=%s", encounter_id, tenant_id)
+		return updated
+
+	async def discharge_patient(
+		self,
+		encounter_id: str,
+		discharge_diagnosis: str,
+		treatment_summary: str,
+		follow_up: str,
+		discharge_medications: list[dict[str, Any]],
+	) -> dict[str, Any]:
+		"""Discharge a patient: close the encounter and generate the discharge summary."""
+		enc = self._encounters.get((self.tenant_id, encounter_id))
+		if enc is None:
+			raise ValueError(f"Encounter {encounter_id} not found")
+
+		# generate discharge summary note
+		summary = await self.create_discharge_summary(
+			encounter_id=encounter_id,
+			discharge_diagnosis=discharge_diagnosis,
+			treatment_summary=treatment_summary,
+			follow_up=follow_up,
+			discharge_medications=discharge_medications,
+		)
+
+		# close the encounter
+		closed = await self.close_encounter(self.tenant_id, encounter_id)
+
+		self._record_audit(self.tenant_id, "patient_discharged", encounter_id)
+		logger.info("emr.discharge_patient enc=%s", encounter_id)
+		return {
+			"encounter": closed.model_dump(mode="json") if closed else None,
+			"discharge_summary": summary,
+		}
+
+	async def transfer_patient(
+		self,
+		encounter_id: str,
+		to_location_id: str,
+		to_provider_id: str | None,
+		reason: str,
+	) -> dict[str, Any]:
+		"""Transfer patient to a different location/provider within the same encounter."""
+		assert to_location_id.strip(), "to_location_id required"
+		assert reason.strip(), "reason required"
+
+		enc = self._encounters.get((self.tenant_id, encounter_id))
+		if enc is None:
+			raise ValueError(f"Encounter {encounter_id} not found")
+
+		update: dict[str, Any] = {"location_id": to_location_id, "updated_at": datetime.utcnow()}
+		if to_provider_id:
+			update["provider_id"] = to_provider_id
+		updated = enc.model_copy(update=update)
+		self._encounters[(self.tenant_id, encounter_id)] = updated
+
+		transfer_id = uuid7str()
+		transfer_record: dict[str, Any] = {
+			"id": transfer_id,
+			"encounter_id": encounter_id,
+			"patient_id": enc.patient_id,
+			"from_location_id": enc.location_id,
+			"to_location_id": to_location_id,
+			"from_provider_id": enc.provider_id,
+			"to_provider_id": to_provider_id,
+			"reason": reason,
+			"transferred_at": datetime.utcnow().isoformat(),
+			"transferred_by": self.actor_id,
+		}
+		self._record_audit(self.tenant_id, "patient_transferred", encounter_id)
+		logger.info("emr.transfer enc=%s from=%s to=%s", encounter_id, enc.location_id, to_location_id)
+		return transfer_record
+
+	# ═══════════════════════════════════════════════════════════════════════════
+	# NOTE UPDATE
+	# ═══════════════════════════════════════════════════════════════════════════
+
+	async def update_note(
+		self,
+		tenant_id: str,
+		note_id: str,
+		payload: "ClinicalNoteUpdate",
+	) -> "ClinicalNoteResponse | None":
+		"""Update a draft note. Final notes must use addendum workflow."""
+		note = self._notes.get((tenant_id, note_id))
+		if note is None:
+			return None
+		if note.status == "final":
+			raise PolicyViolationError("final_note_immutable: use addendum for corrections")
+		update_data = payload.model_dump(exclude_none=True)
+		update_data["updated_at"] = datetime.utcnow()
+		updated = note.model_copy(update=update_data)
+		self._notes[(tenant_id, note_id)] = updated
+		self._record_audit(tenant_id, "note_updated", note_id)
+		return updated
+
+	# ═══════════════════════════════════════════════════════════════════════════
+	# LAB ORDERS & RESULTS
+	# ═══════════════════════════════════════════════════════════════════════════
+
+	async def order_lab_test(self, payload: "LabOrderCreate") -> "LabOrderResponse":
+		"""Create a new lab test order."""
+		from .models import LabOrderResponse
+		self._enforce({"tenant_context_present": bool(payload.tenant_id), "operation_type": "write", "policy_attached": True})
+		order = LabOrderResponse(
+			id=uuid7str(),
+			tenant_id=payload.tenant_id,
+			patient_id=payload.patient_id,
+			encounter_id=payload.encounter_id,
+			ordering_provider_id=payload.ordering_provider_id,
+			test_code=payload.test_code,
+			test_name=payload.test_name,
+			specimen_type=payload.specimen_type,
+			priority=payload.priority,
+			clinical_indication=payload.clinical_indication,
+			created_by=payload.created_by,
+		)
+		self._lab_orders[(payload.tenant_id, order.id)] = order
+		self._record_audit(payload.tenant_id, "lab_order_created", order.id)
+		_log_op("order_lab_test", payload.tenant_id, order.id)
+		return order
+
+	async def get_lab_order(self, tenant_id: str, order_id: str) -> "LabOrderResponse | None":
+		return self._lab_orders.get((tenant_id, order_id))
+
+	async def cancel_lab_order(self, tenant_id: str, order_id: str) -> "LabOrderResponse | None":
+		order = self._lab_orders.get((tenant_id, order_id))
+		if order is None:
+			return None
+		from .models import LabOrderStatus
+		updated = order.model_copy(update={"status": LabOrderStatus.cancelled, "updated_at": datetime.utcnow()})
+		self._lab_orders[(tenant_id, order_id)] = updated
+		self._record_audit(tenant_id, "lab_order_cancelled", order_id)
+		return updated
+
+	async def list_lab_orders(self, tenant_id: str, patient_id: str) -> list["LabOrderResponse"]:
+		return sorted(
+			[o for (tid, _), o in self._lab_orders.items() if tid == tenant_id and o.patient_id == patient_id],
+			key=lambda o: o.created_at, reverse=True,
+		)
+
+	async def receive_lab_result(self, payload: "LabResultCreate") -> "LabResultResponse":
+		"""Record a lab result and auto-flag critical values."""
+		from .models import LabResultResponse, LabResultFlag
+		self._enforce({"tenant_context_present": bool(payload.tenant_id), "operation_type": "write", "policy_attached": True})
+		result = LabResultResponse(
+			id=uuid7str(),
+			tenant_id=payload.tenant_id,
+			order_id=payload.order_id,
+			patient_id=payload.patient_id,
+			test_code=payload.test_code,
+			test_name=payload.test_name,
+			value=payload.value,
+			value_numeric=payload.value_numeric,
+			unit=payload.unit,
+			reference_range=payload.reference_range,
+			flag=payload.flag,
+			result_status=payload.result_status,
+			performing_lab=payload.performing_lab,
+			result_time=payload.result_time,
+			verified_by=payload.verified_by,
+			created_by=payload.created_by,
+		)
+		self._lab_results[(payload.tenant_id, result.id)] = result
+
+		# auto-notify critical values
+		if payload.flag in (LabResultFlag.critical_low, LabResultFlag.critical_high):
+			logger.warning(
+				"emr.critical_lab result=%s patient=%s test=%s flag=%s",
+				result.id, payload.patient_id, payload.test_name, payload.flag,
+			)
+
+		# update order status
+		order = self._lab_orders.get((payload.tenant_id, payload.order_id))
+		if order:
+			from .models import LabOrderStatus
+			updated_order = order.model_copy(update={"status": LabOrderStatus.completed, "updated_at": datetime.utcnow()})
+			self._lab_orders[(payload.tenant_id, payload.order_id)] = updated_order
+
+		self._record_audit(payload.tenant_id, "lab_result_received", result.id)
+		_log_op("receive_lab_result", payload.tenant_id, result.id)
+		return result
+
+	async def list_lab_results(self, tenant_id: str, patient_id: str) -> list["LabResultResponse"]:
+		return sorted(
+			[r for (tid, _), r in self._lab_results.items() if tid == tenant_id and r.patient_id == patient_id],
+			key=lambda r: r.result_time, reverse=True,
+		)
+
+	async def flag_critical_lab_result(
+		self,
+		result_id: str,
+		notified_to: str,
+	) -> "LabResultResponse":
+		"""Mark a critical lab result as notified."""
+		assert notified_to, "notified_to required"
+		result = self._lab_results.get((self.tenant_id, result_id))
+		if result is None:
+			raise ValueError(f"Lab result {result_id} not found")
+		updated = result.model_copy(update={
+			"critical_notified": True,
+			"critical_notified_at": datetime.utcnow(),
+			"critical_notified_to": notified_to,
+			"updated_at": datetime.utcnow(),
+		})
+		self._lab_results[(self.tenant_id, result_id)] = updated
+		self._record_audit(self.tenant_id, "critical_lab_notified", result_id)
+		logger.info("emr.critical_lab_notified result=%s to=%s", result_id, notified_to)
+		return updated
+
+	async def list_unnotified_critical_labs(self, tenant_id: str) -> list["LabResultResponse"]:
+		"""Return critical lab results that have not yet been notified."""
+		from .models import LabResultFlag
+		return [
+			r for (tid, _), r in self._lab_results.items()
+			if tid == tenant_id
+			and r.flag in (LabResultFlag.critical_low, LabResultFlag.critical_high)
+			and not r.critical_notified
+		]
+
+	# ═══════════════════════════════════════════════════════════════════════════
+	# IMAGING ORDERS
+	# ═══════════════════════════════════════════════════════════════════════════
+
+	async def order_imaging(self, payload: "ImagingOrderCreate") -> "ImagingOrderResponse":
+		"""Create a new imaging order."""
+		from .models import ImagingOrderResponse
+		self._enforce({"tenant_context_present": bool(payload.tenant_id), "operation_type": "write", "policy_attached": True})
+		import random, string
+		accession = "IMG-" + "".join(random.choices(string.digits, k=8))
+		order = ImagingOrderResponse(
+			id=uuid7str(),
+			tenant_id=payload.tenant_id,
+			patient_id=payload.patient_id,
+			encounter_id=payload.encounter_id,
+			ordering_provider_id=payload.ordering_provider_id,
+			modality=payload.modality,
+			body_part=payload.body_part,
+			laterality=payload.laterality,
+			cpt_code=payload.cpt_code,
+			clinical_indication=payload.clinical_indication,
+			priority=payload.priority,
+			contrast_required=payload.contrast_required,
+			patient_instructions=payload.patient_instructions,
+			accession_number=accession,
+			created_by=payload.created_by,
+		)
+		self._imaging_orders[(payload.tenant_id, order.id)] = order
+		self._record_audit(payload.tenant_id, "imaging_order_created", order.id)
+		_log_op("order_imaging", payload.tenant_id, order.id)
+		return order
+
+	async def get_imaging_order(self, tenant_id: str, order_id: str) -> "ImagingOrderResponse | None":
+		return self._imaging_orders.get((tenant_id, order_id))
+
+	async def list_imaging_orders(self, tenant_id: str, patient_id: str) -> list["ImagingOrderResponse"]:
+		return sorted(
+			[o for (tid, _), o in self._imaging_orders.items() if tid == tenant_id and o.patient_id == patient_id],
+			key=lambda o: o.created_at, reverse=True,
+		)
+
+	async def add_imaging_report(
+		self,
+		order_id: str,
+		radiologist_id: str,
+		impression: str,
+	) -> "ImagingOrderResponse | None":
+		"""Attach a radiology report to an imaging order."""
+		assert radiologist_id, "radiologist_id required"
+		assert impression.strip(), "impression required"
+		order = self._imaging_orders.get((self.tenant_id, order_id))
+		if order is None:
+			return None
+		from .models import ImagingStatus
+		report_id = uuid7str()
+		updated = order.model_copy(update={
+			"status": ImagingStatus.completed,
+			"report_id": report_id,
+			"radiologist_id": radiologist_id,
+			"impression": impression,
+			"reported_at": datetime.utcnow(),
+			"updated_at": datetime.utcnow(),
+		})
+		self._imaging_orders[(self.tenant_id, order_id)] = updated
+		self._record_audit(self.tenant_id, "imaging_report_added", order_id)
+		logger.info("emr.imaging_report order=%s radiologist=%s", order_id, radiologist_id)
+		return updated
+
+	# ═══════════════════════════════════════════════════════════════════════════
+	# CARE PLANS
+	# ═══════════════════════════════════════════════════════════════════════════
+
+	async def create_care_plan(self, payload: "CarePlanCreate") -> "CarePlanResponse":
+		"""Create a new care plan for a patient."""
+		from .models import CarePlanResponse
+		self._enforce({"tenant_context_present": bool(payload.tenant_id), "operation_type": "write", "policy_attached": True})
+		plan = CarePlanResponse(
+			id=uuid7str(),
+			tenant_id=payload.tenant_id,
+			patient_id=payload.patient_id,
+			encounter_id=payload.encounter_id,
+			title=payload.title,
+			description=payload.description,
+			goal=payload.goal,
+			icd10_codes=payload.icd10_codes,
+			activities=payload.activities,
+			start_date=payload.start_date,
+			end_date=payload.end_date,
+			care_team=payload.care_team,
+			created_by=payload.created_by,
+		)
+		self._care_plans[(payload.tenant_id, plan.id)] = plan
+		self._record_audit(payload.tenant_id, "care_plan_created", plan.id)
+		_log_op("create_care_plan", payload.tenant_id, plan.id)
+		return plan
+
+	async def get_care_plan(self, tenant_id: str, plan_id: str) -> "CarePlanResponse | None":
+		return self._care_plans.get((tenant_id, plan_id))
+
+	async def list_care_plans(self, tenant_id: str, patient_id: str) -> list["CarePlanResponse"]:
+		return sorted(
+			[p for (tid, _), p in self._care_plans.items() if tid == tenant_id and p.patient_id == patient_id],
+			key=lambda p: p.created_at, reverse=True,
+		)
+
+	async def update_care_plan(
+		self,
+		tenant_id: str,
+		plan_id: str,
+		payload: "CarePlanUpdate",
+	) -> "CarePlanResponse | None":
+		plan = self._care_plans.get((tenant_id, plan_id))
+		if plan is None:
+			return None
+		update_data = payload.model_dump(exclude_none=True)
+		update_data["updated_at"] = datetime.utcnow()
+		updated = plan.model_copy(update=update_data)
+		self._care_plans[(tenant_id, plan_id)] = updated
+		self._record_audit(tenant_id, "care_plan_updated", plan_id)
+		return updated
+
+	async def activate_care_plan(self, tenant_id: str, plan_id: str) -> "CarePlanResponse | None":
+		from .models import CarePlanStatus
+		plan = self._care_plans.get((tenant_id, plan_id))
+		if plan is None:
+			return None
+		updated = plan.model_copy(update={"status": CarePlanStatus.active, "updated_at": datetime.utcnow()})
+		self._care_plans[(tenant_id, plan_id)] = updated
+		self._record_audit(tenant_id, "care_plan_activated", plan_id)
+		return updated
+
+	async def complete_care_plan(self, tenant_id: str, plan_id: str) -> "CarePlanResponse | None":
+		from .models import CarePlanStatus
+		plan = self._care_plans.get((tenant_id, plan_id))
+		if plan is None:
+			return None
+		updated = plan.model_copy(update={"status": CarePlanStatus.completed, "updated_at": datetime.utcnow()})
+		self._care_plans[(tenant_id, plan_id)] = updated
+		self._record_audit(tenant_id, "care_plan_completed", plan_id)
+		return updated
+
+	# ═══════════════════════════════════════════════════════════════════════════
+	# REFERRAL MANAGEMENT
+	# ═══════════════════════════════════════════════════════════════════════════
+
+	async def list_referrals(self, tenant_id: str, patient_id: str) -> list[dict[str, Any]]:
+		return sorted(
+			[r for (tid, _), r in self._referrals.items() if tid == tenant_id and r["patient_id"] == patient_id],
+			key=lambda r: r["created_at"], reverse=True,
+		)
+
+	async def cancel_referral(self, referral_id: str, reason: str) -> dict[str, Any]:
+		assert reason.strip(), "reason required"
+		ref = self._referrals.get((self.tenant_id, referral_id))
+		if ref is None:
+			raise ValueError(f"Referral {referral_id} not found")
+		ref["status"] = "cancelled"
+		ref["cancel_reason"] = reason
+		ref["cancelled_at"] = datetime.utcnow().isoformat()
+		self._referrals[(self.tenant_id, referral_id)] = ref
+		self._record_audit(self.tenant_id, "referral_cancelled", referral_id)
+		return ref
+
+	# ═══════════════════════════════════════════════════════════════════════════
+	# CONSENTS
+	# ═══════════════════════════════════════════════════════════════════════════
+
+	async def list_consents(
+		self,
+		tenant_id: str,
+		patient_id: str,
+		scope: str | None = None,
+	) -> list[dict[str, Any]]:
+		results = [
+			c for (tid, _), c in self._consents.items()
+			if tid == tenant_id and c["patient_id"] == patient_id
+		]
+		if scope:
+			results = [c for c in results if c.get("consent_type") == scope or c.get("scope") == scope]
+		return sorted(results, key=lambda c: c["created_at"], reverse=True)
+
+	# ═══════════════════════════════════════════════════════════════════════════
+	# IMMUNISATIONS
+	# ═══════════════════════════════════════════════════════════════════════════
+
+	async def record_immunisation(self, payload: "ImmunisationCreate") -> "ImmunisationResponse":
+		"""Record a vaccine administration."""
+		from .models import ImmunisationResponse
+		self._enforce({"tenant_context_present": bool(payload.tenant_id), "operation_type": "write", "policy_attached": True})
+		imm = ImmunisationResponse(
+			id=uuid7str(),
+			tenant_id=payload.tenant_id,
+			patient_id=payload.patient_id,
+			encounter_id=payload.encounter_id,
+			vaccine_code=payload.vaccine_code,
+			vaccine_name=payload.vaccine_name,
+			dose_quantity=payload.dose_quantity,
+			dose_unit=payload.dose_unit,
+			route=payload.route,
+			site=payload.site,
+			lot_number=payload.lot_number,
+			manufacturer=payload.manufacturer,
+			expiration_date=payload.expiration_date,
+			administered_date=payload.administered_date,
+			administered_by=payload.administered_by,
+			notes=payload.notes,
+			created_by=payload.created_by,
+		)
+		self._immunisations[(payload.tenant_id, imm.id)] = imm
+		self._record_audit(payload.tenant_id, "immunisation_recorded", imm.id)
+		_log_op("record_immunisation", payload.tenant_id, imm.id)
+		return imm
+
+	async def list_immunisations(self, tenant_id: str, patient_id: str) -> list["ImmunisationResponse"]:
+		return sorted(
+			[i for (tid, _), i in self._immunisations.items() if tid == tenant_id and i.patient_id == patient_id],
+			key=lambda i: i.administered_date, reverse=True,
+		)
+
+	# ═══════════════════════════════════════════════════════════════════════════
+	# FAMILY HISTORY
+	# ═══════════════════════════════════════════════════════════════════════════
+
+	async def add_family_history(self, payload: "FamilyHistoryCreate") -> "FamilyHistoryResponse":
+		"""Add a family history entry for a patient."""
+		from .models import FamilyHistoryResponse
+		self._enforce({"tenant_context_present": bool(payload.tenant_id), "operation_type": "write", "policy_attached": True})
+		fhx = FamilyHistoryResponse(
+			id=uuid7str(),
+			tenant_id=payload.tenant_id,
+			patient_id=payload.patient_id,
+			relationship=payload.relationship,
+			deceased=payload.deceased,
+			age_at_death=payload.age_at_death,
+			conditions=payload.conditions,
+			notes=payload.notes,
+			created_by=payload.created_by,
+		)
+		self._family_history[(payload.tenant_id, fhx.id)] = fhx
+		self._record_audit(payload.tenant_id, "family_history_added", fhx.id)
+		return fhx
+
+	async def list_family_history(self, tenant_id: str, patient_id: str) -> list["FamilyHistoryResponse"]:
+		return [
+			fhx for (tid, _), fhx in self._family_history.items()
+			if tid == tenant_id and fhx.patient_id == patient_id
+		]
+
+	# ═══════════════════════════════════════════════════════════════════════════
+	# CLINICAL DECISION SUPPORT (consolidated)
+	# ═══════════════════════════════════════════════════════════════════════════
+
+	async def clinical_decision_support(self, patient_id: str) -> list["ClinicalAlert"]:
+		"""Run all CDS checks for a patient and return consolidated alerts.
+
+		Checks:
+		  - Drug-allergy conflicts for all active medications
+		  - Drug-drug interactions across active medication list
+		  - Duplicate therapy detection
+		  - Critical unnotified lab results
+		  - Pregnancy-contraindicated medications (if pregnancy on problem list)
+		  - Overdue preventive care reminders
+		  - Guideline-based alerts per active diagnoses
+		"""
+		from .models import ClinicalAlert, AlertType
+
+		alerts: list[ClinicalAlert] = []
+		active_meds = await self.list_medications(self.tenant_id, patient_id, status="active")
+		active_allergies = await self.list_allergies(self.tenant_id, patient_id)
+		active_problems = await self.list_problems(self.tenant_id, patient_id, status="active")
+
+		# 1. Drug-allergy alerts
+		for med in active_meds:
+			drug_class = _DRUG_CLASS_MAP.get(med.drug_name.lower(), "unknown")
+			allergy_result = await self.check_drug_allergy_alert(patient_id, med.drug_name, drug_class)
+			for conflict in allergy_result.get("conflicts", []):
+				severity_str = "critical" if conflict["severity"] in ("severe", "life_threatening") else "warning"
+				alerts.append(ClinicalAlert(
+					alert_type=AlertType.drug_allergy,
+					severity=severity_str,
+					title=f"Drug-Allergy Conflict: {med.drug_name}",
+					message=f"Patient has recorded {conflict['severity']} allergy to '{conflict['allergen']}'. Reaction: {conflict['reaction']}",
+					affected_entity_id=med.id,
+					suggested_action="Discontinue or substitute medication",
+					overridable=severity_str != "critical",
+					override_reason_required=severity_str == "critical",
+				))
+
+		# 2. Drug-drug interactions
+		if len(active_meds) >= 2:
+			drug_names = [m.drug_name for m in active_meds]
+			ddis = await self.check_drug_drug_interactions(drug_names)
+			for ddi in ddis:
+				severity_str = "critical" if ddi["severity"] == "contraindicated" else "warning"
+				alerts.append(ClinicalAlert(
+					alert_type=AlertType.drug_interaction,
+					severity=severity_str,
+					title=f"Drug Interaction: {ddi['drug_a']} + {ddi['drug_b']}",
+					message=f"Severity: {ddi['severity']}. {ddi['clinical_effect']}. Management: {ddi['management']}",
+					suggested_action=ddi["management"],
+					overridable=ddi["severity"] != "contraindicated",
+					override_reason_required=ddi["severity"] == "contraindicated",
+				))
+
+		# 3. Critical unnotified labs
+		critical_labs = await self.list_unnotified_critical_labs(self.tenant_id)
+		patient_critical = [r for r in critical_labs if r.patient_id == patient_id]
+		for lab in patient_critical:
+			alerts.append(ClinicalAlert(
+				alert_type=AlertType.critical_lab,
+				severity="critical",
+				title=f"Critical Lab Result: {lab.test_name}",
+				message=f"{lab.test_name} = {lab.value} {lab.unit} (Flag: {lab.flag}). Notification required.",
+				affected_entity_id=lab.id,
+				suggested_action="Notify responsible clinician immediately",
+				overridable=False,
+				override_reason_required=False,
+			))
+
+		# 4. Clinical reminders
+		reminders = await self.clinical_reminder_check(patient_id)
+		for reminder in reminders:
+			alerts.append(ClinicalAlert(
+				alert_type=AlertType.care_gap,
+				severity="info",
+				title=reminder["description"],
+				message=f"Recommended interval: {reminder['recommended_interval_months']} months",
+				suggested_action="Schedule appropriate screening/test",
+			))
+
+		# 5. Guideline alerts per active diagnosis
+		seen_prefixes: set[str] = set()
+		for prob in active_problems:
+			prefix = prob.icd10_code[:3]
+			if prefix not in seen_prefixes:
+				seen_prefixes.add(prefix)
+				guideline_alerts = await self.clinical_guideline_alert(patient_id, prob.icd10_code)
+				for ga in guideline_alerts:
+					alerts.append(ClinicalAlert(
+						alert_type=AlertType.care_gap,
+						severity="info",
+						title=ga["title"],
+						message=ga["body"],
+						references=[ga.get("source", "")],
+						suggested_action="Review guideline recommendations",
+					))
+
+		_log_cds("cds_alerts_total", patient_id, len(alerts))
+		return alerts
+
+	# ═══════════════════════════════════════════════════════════════════════════
+	# HL7 v2 MESSAGE PROCESSING
+	# ═══════════════════════════════════════════════════════════════════════════
+
+	async def hl7_message_processing(self, message: str) -> dict[str, Any]:
+		"""Parse and process an HL7 v2 message.
+
+		Supports: ADT^A01 (admit), ADT^A03 (discharge), ADT^A08 (update),
+		ORM^O01 (order), ORU^R01 (observation result).
+		Returns a structured acknowledgement dict.
+		"""
+		if not message.strip():
+			raise ValueError("HL7 message must not be empty")
+
+		lines = message.strip().replace("\r\n", "\n").replace("\r", "\n").split("\n")
+		segments: dict[str, list[str]] = {}
+		for line in lines:
+			if line:
+				seg_name = line[:3]
+				segments.setdefault(seg_name, []).append(line)
+
+		msh = segments.get("MSH", [""])[0]
+		msh_parts = msh.split("|")
+		message_type = msh_parts[8] if len(msh_parts) > 8 else "UNKNOWN"
+		message_id = msh_parts[9] if len(msh_parts) > 9 else uuid7str()
+
+		result: dict[str, Any] = {
+			"message_id": message_id,
+			"message_type": message_type,
+			"segments_received": list(segments.keys()),
+			"processed_at": datetime.utcnow().isoformat(),
+			"ack_code": "AA",
+			"ack_text": "Message accepted",
+			"actions_taken": [],
+		}
+
+		# ADT^A01 — patient admit
+		if "A01" in message_type and "PID" in segments:
+			result["actions_taken"].append("patient_admit_notification_received")
+
+		# ORU^R01 — observation result (lab result)
+		if "R01" in message_type and "OBX" in segments:
+			result["actions_taken"].append("observation_result_received")
+			result["obx_count"] = len(segments.get("OBX", []))
+
+		# ORM^O01 — order
+		if "O01" in message_type and "ORC" in segments:
+			result["actions_taken"].append("order_received")
+
+		self._record_audit(self.tenant_id, "hl7_message_processed", message_id)
+		logger.info("emr.hl7 type=%s id=%s actions=%s", message_type, message_id, result["actions_taken"])
+		return result
+
+	# ═══════════════════════════════════════════════════════════════════════════
+	# REPORTS
+	# ═══════════════════════════════════════════════════════════════════════════
+
+	async def controlled_substance_report(self, tenant_id: str) -> dict[str, Any]:
+		"""Report on controlled substance prescriptions issued today."""
+		today = date.today().isoformat()
+		controlled_rxs = [
+			rx for (tid, _), rx in self._prescriptions.items()
+			if tid == tenant_id
+			and rx.get("is_controlled") is True
+			and rx.get("created_at", "")[:10] == today
+		]
+		cs_by_schedule: dict[str, int] = {}
+		for rx in controlled_rxs:
+			sched = rx.get("dea_schedule", "unknown")
+			cs_by_schedule[sched] = cs_by_schedule.get(sched, 0) + 1
+		return {
+			"tenant_id": tenant_id,
+			"date": today,
+			"total_controlled_prescriptions": len(controlled_rxs),
+			"by_schedule": cs_by_schedule,
+			"prescriptions": controlled_rxs,
 		}
 
 	# ═══════════════════════════════════════════════════════════════════════════

@@ -31,9 +31,63 @@ from typing import Any
 from flask import Blueprint, jsonify, request
 
 try:
+	from .capability_contract import get_capability_contract
 	from .service import IntelligenceFusionService
 except ImportError:
+	from capability_contract import get_capability_contract  # type: ignore
 	from service import IntelligenceFusionService  # type: ignore
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Process-local view model helpers — used by test_package_contract.py
+# ─────────────────────────────────────────────────────────────────────────────
+
+def dashboard_model(svc: IntelligenceFusionService, tenant_id: str = "default") -> dict:
+	"""Return a dashboard view model dict for the given tenant."""
+	contract = get_capability_contract(tenant_id)
+	return {
+		"title": "Intelligence Fusion",
+		"tenant_id": tenant_id,
+		"summary": svc.dashboard_summary(tenant_id),
+		"theme": contract["theme"],
+		"routes": contract["ui"]["routes"],
+	}
+
+
+def fusion_console_model(svc: IntelligenceFusionService, tenant_id: str = "default") -> dict:
+	"""Return the full fusion console view model for the given tenant."""
+	return {
+		"tenant_id": tenant_id,
+		"authorities": _tenant_items(svc._sync_authorities, tenant_id),
+		"workspaces": _tenant_items(svc._sync_workspaces, tenant_id),
+		"sources": _tenant_items(svc._sync_sources, tenant_id),
+		"artifacts": _tenant_items(svc._sync_artifacts, tenant_id),
+		"correlations": _tenant_items(svc._sync_correlations, tenant_id),
+		"hypotheses": _tenant_items(svc._sync_hypotheses, tenant_id),
+		"assessments": _tenant_items(svc._sync_assessments, tenant_id),
+		"referrals": _tenant_items(svc._sync_referrals, tenant_id),
+		"disseminations": _tenant_items(svc._sync_disseminations, tenant_id),
+		"reviews": _tenant_items(svc._sync_reviews, tenant_id),
+	}
+
+
+def agent_workbench_model(svc: IntelligenceFusionService, tenant_id: str = "default") -> dict:
+	"""Return agent workbench view model for the given tenant."""
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"supported_runtimes": contract["configuration"]["agents"]["supported_runtimes"],
+		"supported_roles": contract["configuration"]["agents"]["supported_roles"],
+		"agents": [item.to_dict() for item in svc._sync_agents.values() if item.tenant_id == tenant_id],
+	}
+
+
+def _tenant_items(store: dict, tenant_id: str) -> list:
+	return [
+		item.to_dict()
+		for item in sorted(store.values(), key=lambda v: v.id)
+		if item.tenant_id == tenant_id
+	]
 
 ui = Blueprint("intel_fusion_ui", __name__, url_prefix="/intel-fusion")
 

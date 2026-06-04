@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page_title }} — APG Fleet</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/fle.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="fle-app">
+<main class="fle-main">
+  <header class="fle-page-header">
+    <h1><i class="fa-solid fa-bell"></i> {{ page_title }}</h1>
+    <span class="fle-badge">{{ total }} alerts</span>
+  </header>
+  {% for urgency, alerts in [('critical', critical), ('high', high), ('medium', medium)] %}
+  {% if alerts %}
+  <section class="fle-card {% if urgency == 'critical' %}fle-card-danger{% elif urgency == 'high' %}fle-card-warning{% endif %}">
+    <h2>
+      {% if urgency == 'critical' %}<i class="fa-solid fa-circle-xmark"></i>{% elif urgency == 'high' %}<i class="fa-solid fa-triangle-exclamation"></i>{% else %}<i class="fa-solid fa-circle-info"></i>{% endif %}
+      {{ urgency|title }} ({{ alerts|length }})
+    </h2>
+    <table class="fle-table">
+      <thead><tr><th>Vehicle</th><th>Component</th><th>Action</th><th>Confidence</th><th>Signals</th></tr></thead>
+      <tbody>
+      {% for a in alerts %}
+        <tr>
+          <td>{{ a.vehicle_id[:8] }}…</td>
+          <td><strong>{{ a.component }}</strong></td>
+          <td>{{ a.recommended_action }}</td>
+          <td>{{ "%.0f"|format(a.confidence_pct) }}%</td>
+          <td>{{ a.supporting_signals|join(', ') }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+  {% endfor %}
+  {% if not critical and not high and not medium %}
+  <div class="fle-empty-state">
+    <i class="fa-solid fa-check-circle fa-3x fle-text-success"></i>
+    <p>No predictive maintenance alerts at this time.</p>
+  </div>
+  {% endif %}
+</main>
+</body>
+</html>

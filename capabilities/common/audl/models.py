@@ -316,18 +316,20 @@ class AuditEventResponse(AuditBase):
 		return bool(self.checksum) and self.checksum == self._derive_checksum()
 
 	def _derive_checksum(self) -> str:
+		# Must match calculate_event_checksum in domain/rules.py exactly:
+		# compact separators, None fields replaced with "", str() on enum values.
 		payload = json.dumps({
-			"id":           self.id,
-			"tenant_id":    self.tenant_id,
-			"timestamp":    self.created_at.isoformat(),
-			"event_type":   self.event_type,
-			"actor_id":     self.actor_id,
-			"action":       self.action,
-			"resource_type":self.resource_type,
-			"resource_id":  self.resource_id,
-			"success":      self.success,
-		}, sort_keys=True)
-		return hashlib.sha256(payload.encode()).hexdigest()
+			"id":            self.id,
+			"tenant_id":     self.tenant_id,
+			"timestamp":     self.created_at.isoformat(),
+			"event_type":    str(self.event_type),
+			"actor_id":      self.actor_id or "",
+			"action":        self.action,
+			"resource_type": self.resource_type or "",
+			"resource_id":   self.resource_id or "",
+			"success":       self.success,
+		}, sort_keys=True, separators=(",", ":"))
+		return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 # ---------------------------------------------------------------------------

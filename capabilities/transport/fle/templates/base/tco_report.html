@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page_title }} — APG Fleet</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/fle.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="fle-app">
+<main class="fle-main">
+  <header class="fle-page-header">
+    <div>
+      <a href="{{ url_for('fle_views.detail_vehicle', vehicle_id=vehicle.id) }}" class="fle-breadcrumb"><i class="fa-solid fa-chevron-left"></i> {{ vehicle.registration }}</a>
+      <h1><i class="fa-solid fa-coins"></i> {{ page_title }}</h1>
+    </div>
+    <span class="fle-period">{{ tco.period_start[:10] }} — {{ tco.period_end[:10] }}</span>
+  </header>
+
+  <div class="fle-two-col">
+    <section class="fle-card">
+      <h2>Cost Breakdown</h2>
+      <dl class="fle-dl">
+        <dt>Fuel</dt><dd>{{ "{:,.2f}".format(tco.fuel_cost|float) }} {{ tco.currency }}</dd>
+        <dt>Maintenance</dt><dd>{{ "{:,.2f}".format(tco.maintenance_cost|float) }} {{ tco.currency }}</dd>
+        <dt>Insurance</dt><dd>{{ "{:,.2f}".format(tco.insurance_cost|float) }} {{ tco.currency }}</dd>
+        <dt>Registration</dt><dd>{{ "{:,.2f}".format(tco.registration_cost|float) }} {{ tco.currency }}</dd>
+        <dt>Depreciation</dt><dd>{{ "{:,.2f}".format(tco.depreciation|float) }} {{ tco.currency }}</dd>
+        <dt>Driver Cost</dt><dd>{{ "{:,.2f}".format(tco.driver_cost|float) }} {{ tco.currency }}</dd>
+        <dt>Toll Cost</dt><dd>{{ "{:,.2f}".format(tco.toll_cost|float) }} {{ tco.currency }}</dd>
+        <dt>Fines</dt><dd>{{ "{:,.2f}".format(tco.fine_cost|float) }} {{ tco.currency }}</dd>
+        <dt class="fle-total-row"><strong>Total Cost</strong></dt>
+        <dd class="fle-total-row"><strong>{{ "{:,.2f}".format(tco.total_cost|float) }} {{ tco.currency }}</strong></dd>
+      </dl>
+    </section>
+    <section class="fle-card">
+      <h2>Efficiency Metrics</h2>
+      <dl class="fle-dl">
+        <dt>Total Distance</dt><dd>{{ "{:,.0f}".format(tco.distance_km|float) }} km</dd>
+        <dt>Cost per km</dt><dd>{{ "{:,.4f}".format(tco.cost_per_km|float) }} {{ tco.currency }}/km</dd>
+        <dt>Utilisation</dt><dd>{{ "%.1f"|format(tco.utilisation_pct) }}%</dd>
+      </dl>
+      <div class="fle-tco-bar">
+        {% set total = tco.total_cost|float %}
+        {% if total > 0 %}
+          {% set fuel_pct = (tco.fuel_cost|float / total * 100)|round(1) %}
+          {% set maint_pct = (tco.maintenance_cost|float / total * 100)|round(1) %}
+          {% set ins_pct = (tco.insurance_cost|float / total * 100)|round(1) %}
+          <div class="fle-tco-segment fle-tco-fuel" style="width:{{ fuel_pct }}%" title="Fuel {{ fuel_pct }}%"></div>
+          <div class="fle-tco-segment fle-tco-maint" style="width:{{ maint_pct }}%" title="Maintenance {{ maint_pct }}%"></div>
+          <div class="fle-tco-segment fle-tco-ins" style="width:{{ ins_pct }}%" title="Insurance {{ ins_pct }}%"></div>
+        {% endif %}
+      </div>
+      <div class="fle-tco-legend">
+        <span class="fle-legend-item fle-tco-fuel-l">Fuel</span>
+        <span class="fle-legend-item fle-tco-maint-l">Maintenance</span>
+        <span class="fle-legend-item fle-tco-ins-l">Insurance</span>
+      </div>
+    </section>
+  </div>
+</main>
+</body>
+</html>

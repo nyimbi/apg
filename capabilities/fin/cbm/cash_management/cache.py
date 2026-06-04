@@ -17,19 +17,26 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 
-import aioredis
+try:
+	import aioredis as _aioredis
+	_Redis = _aioredis.Redis
+except ImportError:
+	_aioredis = None  # type: ignore[assignment]
+	_Redis = object  # type: ignore[assignment,misc]
+
 from pydantic import BaseModel
 
 
 class CashCacheManager:
 	"""
 	APG-compatible caching layer for cash management operations.
-	
+
 	Provides high-performance caching with automatic invalidation,
 	cache warming, and APG multi-tenant isolation.
+	Falls back to in-process dict when Redis is unavailable.
 	"""
-	
-	def __init__(self, redis_client: aioredis.Redis, tenant_id: str):
+
+	def __init__(self, redis_client: object | None, tenant_id: str):
 		"""Initialize cache manager with APG multi-tenant support."""
 		self.redis = redis_client
 		self.tenant_id = tenant_id

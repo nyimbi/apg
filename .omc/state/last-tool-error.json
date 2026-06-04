@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"python3 -c \\\"\\nimport ast, sys\\nfiles = [\\n    '/Users/nyimbiodero/src/pjs/apg/capabilities/common/apig/service.py',\\n    '/Users/nyimbiodero/src/pjs/apg/capabilities/ckm/rtc/service.py',\\...",
-  "error": "Exit code 1\nFAIL: common/apig : inconsistent use of tabs and spaces in indentation (<unknown>, line 815)",
-  "timestamp": "2026-06-04T14:04:50.441Z",
+  "tool_input_preview": "{\"command\":\"python -c \\\"\\nimport asyncio, time\\nfrom capabilities.common.nlpc.service import NLPCoreService\\n\\nasync def main():\\n    svc = NLPCoreService(tenant_id='t1', actor_id='test')\\n    t0 = ti...",
+  "error": "Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 14, in <module>\n  File \"/opt/homebrew/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/runners.py\", line 190, in run\n    return runner.run(main)\n           ^^^^^^^^^^^^^^^^\n  File \"/opt/homebrew/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/runners.py\", line 118, in run\n    return self._loop.run_until_complete(task)\n           ^^^^^^^...",
+  "timestamp": "2026-06-04T19:56:28.867Z",
   "retry_count": 1
 }

@@ -442,8 +442,9 @@ class PayrollManagementService:
 
 	def _assert_rules(self, context: dict[str, Any]) -> None:
 		result = evaluate_capability_rules(context)
-		# Only hard-block on explicit deny; require_review creates an audit flag
-		if result.get("decision") == "deny":
+		decision = result.get("decision", "allow")
+		# Block on explicit deny OR require_review (actor must supply reviewer before proceeding)
+		if decision in ("deny", "require_review"):
 			effects = result.get("effects") or result.get("actions") or []
 			reasons = [e.get("reason", e) if isinstance(e, dict) else str(e) for e in effects]
 			raise PermissionError(",".join(reasons) or "operation_denied")
@@ -576,10 +577,10 @@ class PayrollManagementService:
 		tax_id: str,
 		currency: str,
 		base_pay: float,
+		reviewed_by: str | None = None,
 		basic_pay: float | None = None,
 		hire_date: str | None = None,
 		bank_account: str | None = None,
-		reviewed_by: str | None = None,
 	) -> dict[str, Any]:
 		tenant = self._tenant(tenant_id)
 		pay_group = self.pay_groups.get(pay_group_id)

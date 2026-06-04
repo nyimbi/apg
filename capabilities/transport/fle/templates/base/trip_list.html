@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page_title }} — APG Fleet</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/fle.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="fle-app">
+<main class="fle-main">
+  <header class="fle-page-header">
+    <h1><i class="fa-solid fa-route"></i> {{ page_title }}</h1>
+    <a href="{{ url_for('fle_views.create_trip') }}" class="fle-btn fle-btn-primary"><i class="fa-solid fa-plus"></i> Plan Trip</a>
+  </header>
+  <div class="fle-filter-bar">
+    <a href="{{ url_for('fle_views.list_trips') }}" class="fle-filter-btn {% if not status_filter %}active{% endif %}">All</a>
+    {% for s in ['planned','dispatched','in_progress','completed','cancelled','breakdown','delayed'] %}
+    <a href="{{ url_for('fle_views.list_trips', status=s) }}" class="fle-filter-btn {% if status_filter == s %}active{% endif %}">{{ s|replace('_',' ')|title }}</a>
+    {% endfor %}
+  </div>
+  <section class="fle-card">
+    {% if trips %}
+    <table class="fle-table fle-table-hover">
+      <thead><tr><th>Origin</th><th>Destination</th><th>Departure</th><th>Driver</th><th>Load</th><th>Status</th><th>Distance</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for t in trips %}
+        <tr>
+          <td>{{ t.origin }}</td>
+          <td>{{ t.destination }}</td>
+          <td>{{ t.planned_departure[:16].replace('T',' ') }}</td>
+          <td>{{ t.driver_id[:8] }}…</td>
+          <td>{{ "{:,.0f}".format(t.load_kg|float) }} kg</td>
+          <td><span class="fle-status fle-status-{{ t.status.value if t.status is not string else t.status }}">{{ (t.status.value if t.status is not string else t.status)|replace('_',' ')|title }}</span></td>
+          <td>{% if t.distance_km %}{{ "{:,.0f}".format(t.distance_km|float) }} km{% else %}—{% endif %}</td>
+          <td class="fle-actions">
+            <a href="{{ url_for('fle_views.detail_trip', trip_id=t.id) }}" class="fle-btn-sm fle-btn-info"><i class="fa-solid fa-eye"></i></a>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="fle-empty-state">
+      <i class="fa-solid fa-route fa-3x"></i>
+      <p>No trips found. <a href="{{ url_for('fle_views.create_trip') }}">Plan your first trip.</a></p>
+    </div>
+    {% endif %}
+  </section>
+</main>
+</body>
+</html>

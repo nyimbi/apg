@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page_title }} — APG Fleet</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/fle.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="fle-app">
+
+<nav class="fle-nav">
+  <div class="fle-nav-brand"><i class="fa-solid fa-truck-moving"></i> Fleet Control</div>
+  <div class="fle-nav-links">
+    <a href="{{ url_for('fle_views.dashboard') }}" class="active"><i class="fa-solid fa-gauge-high"></i> Dashboard</a>
+    <a href="{{ url_for('fle_views.list_vehicles') }}"><i class="fa-solid fa-truck"></i> Vehicles</a>
+    <a href="{{ url_for('fle_views.list_drivers') }}"><i class="fa-solid fa-id-card"></i> Drivers</a>
+    <a href="{{ url_for('fle_views.list_trips') }}"><i class="fa-solid fa-route"></i> Trips</a>
+    <a href="{{ url_for('fle_views.list_maintenance') }}"><i class="fa-solid fa-wrench"></i> Maintenance</a>
+    <a href="{{ url_for('fle_views.compliance_calendar') }}"><i class="fa-solid fa-calendar-check"></i> Compliance</a>
+    <a href="{{ url_for('fle_views.fleet_utilisation_report') }}"><i class="fa-solid fa-chart-bar"></i> Analytics</a>
+  </div>
+</nav>
+
+<main class="fle-main">
+  <header class="fle-page-header">
+    <h1><i class="fa-solid fa-gauge-high"></i> Fleet Dashboard</h1>
+    <span class="fle-timestamp">as of {{ kpis.as_of[:19].replace('T',' ') }} UTC</span>
+  </header>
+
+  <!-- KPI Cards -->
+  <section class="fle-kpi-grid">
+    <div class="fle-kpi-card fle-kpi-primary">
+      <div class="fle-kpi-icon"><i class="fa-solid fa-truck"></i></div>
+      <div class="fle-kpi-body">
+        <div class="fle-kpi-value">{{ kpis.total_vehicles }}</div>
+        <div class="fle-kpi-label">Total Vehicles</div>
+        <div class="fle-kpi-sub">{{ kpis.active_vehicles }} active</div>
+      </div>
+    </div>
+    <div class="fle-kpi-card fle-kpi-success">
+      <div class="fle-kpi-icon"><i class="fa-solid fa-route"></i></div>
+      <div class="fle-kpi-body">
+        <div class="fle-kpi-value">{{ kpis.trips_in_progress }}</div>
+        <div class="fle-kpi-label">Trips In Progress</div>
+        <div class="fle-kpi-sub">{{ kpis.trips_today }} today</div>
+      </div>
+    </div>
+    <div class="fle-kpi-card fle-kpi-info">
+      <div class="fle-kpi-icon"><i class="fa-solid fa-id-card"></i></div>
+      <div class="fle-kpi-body">
+        <div class="fle-kpi-value">{{ kpis.drivers_on_duty }}</div>
+        <div class="fle-kpi-label">Drivers On Duty</div>
+        <div class="fle-kpi-sub">{{ kpis.active_drivers }} available</div>
+      </div>
+    </div>
+    <div class="fle-kpi-card {% if kpis.compliance_alerts > 0 %}fle-kpi-warning{% else %}fle-kpi-success{% endif %}">
+      <div class="fle-kpi-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+      <div class="fle-kpi-body">
+        <div class="fle-kpi-value">{{ kpis.compliance_alerts }}</div>
+        <div class="fle-kpi-label">Compliance Alerts</div>
+        <div class="fle-kpi-sub">{{ kpis.overdue_maintenance }} overdue maint.</div>
+      </div>
+    </div>
+    <div class="fle-kpi-card fle-kpi-primary">
+      <div class="fle-kpi-icon"><i class="fa-solid fa-gauge"></i></div>
+      <div class="fle-kpi-body">
+        <div class="fle-kpi-value">{{ "%.1f"|format(kpis.fleet_utilisation_pct) }}%</div>
+        <div class="fle-kpi-label">Fleet Utilisation</div>
+        <div class="fle-kpi-sub">{{ kpis.vehicles_in_maintenance }} in maintenance</div>
+      </div>
+    </div>
+    <div class="fle-kpi-card fle-kpi-info">
+      <div class="fle-kpi-icon"><i class="fa-solid fa-gas-pump"></i></div>
+      <div class="fle-kpi-body">
+        <div class="fle-kpi-value">{{ "{:,.0f}".format(kpis.fuel_spend_mtd|float) }}</div>
+        <div class="fle-kpi-label">Fuel Spend MTD</div>
+        <div class="fle-kpi-sub">{{ "{:,.0f}".format(kpis.maintenance_spend_mtd|float) }} maintenance</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="fle-two-col">
+    <!-- Predictive Maintenance Alerts -->
+    <section class="fle-card">
+      <div class="fle-card-header">
+        <h2><i class="fa-solid fa-bell"></i> Predictive Maintenance Alerts</h2>
+        <a href="{{ url_for('fle_views.predictive_maintenance_report') }}" class="fle-link-sm">View all</a>
+      </div>
+      {% if predictive_alerts %}
+        <ul class="fle-alert-list">
+        {% for alert in predictive_alerts %}
+          <li class="fle-alert fle-alert-{{ alert.urgency }}">
+            <span class="fle-alert-badge fle-urgency-{{ alert.urgency }}">{{ alert.urgency|upper }}</span>
+            <div class="fle-alert-body">
+              <strong>{{ alert.component }}</strong>
+              <span>{{ alert.recommended_action }}</span>
+            </div>
+            <span class="fle-alert-conf">{{ "%.0f"|format(alert.confidence_pct) }}%</span>
+          </li>
+        {% endfor %}
+        </ul>
+      {% else %}
+        <p class="fle-empty"><i class="fa-solid fa-check-circle"></i> No predictive alerts</p>
+      {% endif %}
+    </section>
+
+    <!-- Critical Compliance Events -->
+    <section class="fle-card">
+      <div class="fle-card-header">
+        <h2><i class="fa-solid fa-calendar-xmark"></i> Critical Compliance Events</h2>
+        <a href="{{ url_for('fle_views.compliance_calendar') }}" class="fle-link-sm">Full calendar</a>
+      </div>
+      {% if critical_compliance %}
+        <table class="fle-table">
+          <thead><tr><th>Entity</th><th>Event</th><th>Due</th><th>Days</th></tr></thead>
+          <tbody>
+          {% for entry in critical_compliance %}
+            <tr class="fle-row-{{ entry.severity }}">
+              <td>{{ entry.entity_type }}</td>
+              <td>{{ entry.event_type|replace('_',' ')|title }}</td>
+              <td>{{ entry.due_date[:10] }}</td>
+              <td class="{% if entry.is_overdue %}fle-overdue{% else %}fle-critical{% endif %}">
+                {% if entry.is_overdue %}OVERDUE {{ entry.days_until_due|abs }}d{% else %}{{ entry.days_until_due }}d{% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="fle-empty"><i class="fa-solid fa-check-circle"></i> All compliance items current</p>
+      {% endif %}
+    </section>
+  </div>
+
+  <!-- Quick Actions -->
+  <section class="fle-card fle-quick-actions">
+    <h2><i class="fa-solid fa-bolt"></i> Quick Actions</h2>
+    <div class="fle-action-row">
+      <a href="{{ url_for('fle_views.create_vehicle') }}" class="fle-btn fle-btn-primary"><i class="fa-solid fa-plus"></i> Register Vehicle</a>
+      <a href="{{ url_for('fle_views.create_driver') }}" class="fle-btn fle-btn-primary"><i class="fa-solid fa-plus"></i> Register Driver</a>
+      <a href="{{ url_for('fle_views.create_trip') }}" class="fle-btn fle-btn-success"><i class="fa-solid fa-route"></i> Plan Trip</a>
+      <a href="{{ url_for('fle_views.create_maintenance') }}" class="fle-btn fle-btn-warning"><i class="fa-solid fa-wrench"></i> Schedule Maintenance</a>
+    </div>
+  </section>
+</main>
+
+<script src="{{ url_for('static', filename='js/fle.js') }}"></script>
+</body>
+</html>

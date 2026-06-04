@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page_title }} — APG Fleet</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/fle.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="fle-app">
+
+<main class="fle-main fle-form-page">
+  <header class="fle-page-header">
+    <a href="{{ url_for('fle_views.list_vehicles') }}" class="fle-breadcrumb"><i class="fa-solid fa-chevron-left"></i> Vehicles</a>
+    <h1><i class="fa-solid fa-plus"></i> {{ page_title }}</h1>
+  </header>
+
+  {% if error %}
+  <div class="fle-alert fle-alert-danger"><i class="fa-solid fa-circle-xmark"></i> {{ error }}</div>
+  {% endif %}
+
+  <section class="fle-card">
+    <form method="POST" class="fle-form">
+      <div class="fle-form-grid">
+        <div class="fle-form-group">
+          <label for="registration">Registration Plate *</label>
+          <input type="text" id="registration" name="registration" required placeholder="e.g. KCA 001T" class="fle-input">
+        </div>
+        <div class="fle-form-group">
+          <label for="vin">VIN *</label>
+          <input type="text" id="vin" name="vin" required placeholder="17-character VIN" class="fle-input">
+        </div>
+        <div class="fle-form-group">
+          <label for="make">Make *</label>
+          <input type="text" id="make" name="make" required placeholder="e.g. Mercedes-Benz" class="fle-input">
+        </div>
+        <div class="fle-form-group">
+          <label for="model">Model *</label>
+          <input type="text" id="model" name="model" required placeholder="e.g. Actros" class="fle-input">
+        </div>
+        <div class="fle-form-group">
+          <label for="year">Year *</label>
+          <input type="number" id="year" name="year" required min="1980" max="2100" placeholder="2024" class="fle-input">
+        </div>
+        <div class="fle-form-group">
+          <label for="vehicle_type">Vehicle Type *</label>
+          <select id="vehicle_type" name="vehicle_type" required class="fle-select">
+            <option value="">— Select type —</option>
+            {% for t in vehicle_types %}<option value="{{ t }}">{{ t|replace('_',' ')|title }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="fle-form-group">
+          <label for="fuel_type">Fuel Type *</label>
+          <select id="fuel_type" name="fuel_type" required class="fle-select">
+            <option value="">— Select fuel —</option>
+            {% for f in fuel_types %}<option value="{{ f }}">{{ f|upper }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="fle-form-group">
+          <label for="ownership_type">Ownership *</label>
+          <select id="ownership_type" name="ownership_type" required class="fle-select">
+            <option value="">— Select ownership —</option>
+            {% for o in ownership_types %}<option value="{{ o }}">{{ o|replace('_',' ')|title }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="fle-form-group">
+          <label for="gross_vehicle_weight_kg">GVW (kg)</label>
+          <input type="number" id="gross_vehicle_weight_kg" name="gross_vehicle_weight_kg" min="0" step="0.01" placeholder="26000" class="fle-input">
+        </div>
+        <div class="fle-form-group">
+          <label for="payload_capacity_kg">Payload Capacity (kg)</label>
+          <input type="number" id="payload_capacity_kg" name="payload_capacity_kg" min="0" step="0.01" placeholder="16000" class="fle-input">
+        </div>
+        <div class="fle-form-group">
+          <label for="colour">Colour</label>
+          <input type="text" id="colour" name="colour" placeholder="White" class="fle-input">
+        </div>
+        <div class="fle-form-group">
+          <label for="odometer_km">Current Odometer (km)</label>
+          <input type="number" id="odometer_km" name="odometer_km" min="0" step="0.01" placeholder="0" class="fle-input">
+        </div>
+      </div>
+      <div class="fle-form-group fle-form-full">
+        <label for="notes">Notes</label>
+        <textarea id="notes" name="notes" rows="3" class="fle-textarea" placeholder="Optional notes…"></textarea>
+      </div>
+      <div class="fle-form-actions">
+        <a href="{{ url_for('fle_views.list_vehicles') }}" class="fle-btn fle-btn-outline">Cancel</a>
+        <button type="submit" class="fle-btn fle-btn-primary"><i class="fa-solid fa-save"></i> Register Vehicle</button>
+      </div>
+    </form>
+  </section>
+</main>
+</body>
+</html>

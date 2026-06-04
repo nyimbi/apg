@@ -673,7 +673,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		},
 		"ui": ui_manifest(),
 		"agents": agent_manifest(),
-		"streaming": STREAMING,
+		"streaming": streaming_manifest(),
 		"review_evidence": {
 			"durable_statuses": [
 				"pending",

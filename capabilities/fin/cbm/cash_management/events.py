@@ -18,7 +18,14 @@ from typing import Any, Dict, List, Optional, Callable, Union
 from uuid import UUID
 
 from pydantic import BaseModel, Field
-from uuid_extensions import uuid7str
+try:
+	from uuid6 import uuid7 as _uuid7
+	def uuid7str() -> str:
+		return str(_uuid7())
+except ImportError:
+	import uuid as _uuid
+	def uuid7str() -> str:  # type: ignore[misc]
+		return str(_uuid.uuid4())
 
 from .models import (
 	CashAccount, CashPosition, CashFlow, CashForecast, Investment, CashAlert,

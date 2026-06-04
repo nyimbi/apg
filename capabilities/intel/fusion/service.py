@@ -113,6 +113,50 @@ except ImportError:
 		WorkspaceStatus, uuid7str,
 	)
 
+try:
+	from .capability_contract import (
+		SUPPORTED_AGENT_RUNTIMES,
+		SUPPORTED_AGENT_ROLES,
+		SUPPORTED_AUTHORITY_TYPES,
+		SUPPORTED_CLASSIFICATIONS,
+		SUPPORTED_WORKSPACE_TYPES as _CONTRACT_WS_TYPES,
+		SUPPORTED_SOURCE_TYPES,
+		SUPPORTED_ARTIFACT_TYPES,
+		SUPPORTED_CORRELATION_TYPES as _CONTRACT_CORR_TYPES,
+		SUPPORTED_HYPOTHESIS_TYPES,
+		SUPPORTED_ASSESSMENT_TYPES as _CONTRACT_ASSESS_TYPES,
+		SUPPORTED_RISK_LEVELS as _CONTRACT_RISK_LEVELS,
+		SUPPORTED_REFERRAL_TYPES,
+		SUPPORTED_REVIEW_STATUSES,
+		FUSION_EVENT_STREAM,
+		evaluate_capability_rules,
+		get_capability_contract,
+	)
+	from .fusion_runtime import bounded_score, normalize_code, positive_int, present
+except ImportError:
+	from capability_contract import (  # type: ignore
+		SUPPORTED_AGENT_RUNTIMES,
+		SUPPORTED_AGENT_ROLES,
+		SUPPORTED_AUTHORITY_TYPES,
+		SUPPORTED_CLASSIFICATIONS,
+		SUPPORTED_WORKSPACE_TYPES as _CONTRACT_WS_TYPES,
+		SUPPORTED_SOURCE_TYPES,
+		SUPPORTED_ARTIFACT_TYPES,
+		SUPPORTED_CORRELATION_TYPES as _CONTRACT_CORR_TYPES,
+		SUPPORTED_HYPOTHESIS_TYPES,
+		SUPPORTED_ASSESSMENT_TYPES as _CONTRACT_ASSESS_TYPES,
+		SUPPORTED_RISK_LEVELS as _CONTRACT_RISK_LEVELS,
+		SUPPORTED_REFERRAL_TYPES,
+		SUPPORTED_REVIEW_STATUSES,
+		FUSION_EVENT_STREAM,
+		evaluate_capability_rules,
+		get_capability_contract,
+	)
+	from fusion_runtime import bounded_score, normalize_code, positive_int, present  # type: ignore
+
+
+from dataclasses import asdict, dataclass
+
 logger = logging.getLogger(__name__)
 
 _COL = {
@@ -1250,3 +1294,693 @@ def _ts(val: Any) -> float:
 		return datetime.fromisoformat(str(val)).timestamp()
 	except Exception:
 		return 0.0
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Sync contract-layer — in-memory dataclasses mirroring the capability contract
+# ─────────────────────────────────────────────────────────────────────────────
+
+@dataclass
+class FusionAuthority:
+	id: str
+	tenant_id: str
+	authority_type: str
+	scope_reference: str
+	classification: str
+	approver_id: str
+	expires_at: str
+	evidence_reference: str
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass
+class FusionWorkspaceRecord:
+	id: str
+	tenant_id: str
+	workspace_type: str
+	name: str
+	classification: str
+	authority_id: str
+	evidence_reference: str
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass
+class FusionSource:
+	id: str
+	tenant_id: str
+	source_type: str
+	source_reference: str
+	custodian_id: str
+	authority_id: str
+	lineage_reference: str
+	evidence_reference: str
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass
+class FusionArtifact:
+	id: str
+	tenant_id: str
+	workspace_id: str
+	source_id: str
+	artifact_type: str
+	artifact_reference: str
+	content_fingerprint: str
+	confidence_score: float
+	evidence_reference: str
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass
+class FusionCorrelationRecord:
+	id: str
+	tenant_id: str
+	artifact_id: str
+	correlation_type: str
+	confidence_score: float
+	analyst_id: str
+	evidence_reference: str
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass
+class FusionHypothesisRecord:
+	id: str
+	tenant_id: str
+	correlation_id: str
+	hypothesis_type: str
+	claim_reference: str
+	confidence_score: float
+	analyst_id: str
+	evidence_reference: str
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass
+class FusionAssessmentRecord:
+	id: str
+	tenant_id: str
+	hypothesis_id: str
+	assessment_type: str
+	risk_level: str
+	confidence_score: float
+	analyst_id: str
+	evidence_reference: str
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass
+class FusionReferral:
+	id: str
+	tenant_id: str
+	assessment_id: str
+	referral_type: str
+	recipient: str
+	approval_reference: str
+	evidence_reference: str
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass
+class FusionDissemination:
+	id: str
+	tenant_id: str
+	assessment_id: str
+	audience: str
+	release_marking: str
+	approval_reference: str
+	evidence_reference: str
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass
+class FusionReview:
+	id: str
+	tenant_id: str
+	reference_id: str
+	reviewer_id: str
+	status: str
+	evidence_reference: str
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass
+class FusionAgent:
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Sync contract methods — mixed into IntelligenceFusionService
+# These are non-async, in-memory dict-backed methods that satisfy the
+# capability contract tests (test_package_contract.py).
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _add_sync_contract_layer(cls: type) -> type:
+	"""Attach sync record_* methods to IntelligenceFusionService at class creation time."""
+
+	def _init_sync(self: Any) -> None:
+		"""Initialise sync contract collections if not already present."""
+		if not hasattr(self, "_sync_authorities"):
+			self._sync_authorities: dict[tuple[str, str], FusionAuthority] = {}
+			self._sync_workspaces: dict[tuple[str, str], FusionWorkspaceRecord] = {}
+			self._sync_sources: dict[tuple[str, str], FusionSource] = {}
+			self._sync_artifacts: dict[tuple[str, str], FusionArtifact] = {}
+			self._sync_correlations: dict[tuple[str, str], FusionCorrelationRecord] = {}
+			self._sync_hypotheses: dict[tuple[str, str], FusionHypothesisRecord] = {}
+			self._sync_assessments: dict[tuple[str, str], FusionAssessmentRecord] = {}
+			self._sync_referrals: dict[tuple[str, str], FusionReferral] = {}
+			self._sync_disseminations: dict[tuple[str, str], FusionDissemination] = {}
+			self._sync_reviews: dict[tuple[str, str], FusionReview] = {}
+			self._sync_agents: dict[tuple[str, str], FusionAgent] = {}
+			self._sync_audit_events: list[dict[str, Any]] = []
+
+	# Patch __init__ to call _init_sync
+	_orig_init = cls.__init__
+
+	def _patched_init(self: Any, *args: Any, **kwargs: Any) -> None:
+		_orig_init(self, *args, **kwargs)
+		_init_sync(self)
+
+	cls.__init__ = _patched_init
+
+	def _tk(self: Any, tenant_id: str, item_id: str) -> tuple[str, str]:
+		return (tenant_id, item_id)
+
+	def _sync_audit(self: Any, tenant_id: str, event_type: str, reference_id: str) -> None:
+		self._sync_audit_events.append({
+			"tenant_id": tenant_id,
+			"event_type": event_type,
+			"reference_id": reference_id,
+			"processor": "bytewax",
+		})
+
+	def _sync_count(self: Any, store: dict[tuple[str, str], Any], tenant_id: str) -> int:
+		return sum(1 for item in store.values() if item.tenant_id == tenant_id)
+
+	def _sync_enforce(self: Any, context: dict[str, Any]) -> None:
+		result = evaluate_capability_rules(context)
+		if result["decision"] == "allow":
+			return
+		reasons = ", ".join(
+			action.get("reason", action.get("rule", "fusion_policy_denied"))
+			for action in result["actions"]
+		)
+		raise PermissionError(reasons or "fusion_policy_denied")
+
+	def describe(self: Any, tenant_id: str = "default") -> dict[str, Any]:
+		return get_capability_contract(tenant_id)
+
+	def evaluate(self: Any, context: dict[str, Any]) -> dict[str, Any]:
+		return evaluate_capability_rules(context)
+
+	def record_authority(
+		self: Any,
+		authority_id: str,
+		tenant_id: str,
+		authority_type: str,
+		scope_reference: str,
+		classification: str,
+		approver_id: str,
+		expires_at: str,
+		evidence_reference: str,
+		policy_attached: bool = True,
+	) -> dict[str, Any]:
+		_init_sync(self)
+		authority_type = normalize_code(authority_type)
+		classification = normalize_code(classification)
+		_sync_enforce(self, {
+			"tenant_id": tenant_id,
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": policy_attached,
+			"operation": "record_authority",
+			"authority_type_supported": authority_type in SUPPORTED_AUTHORITY_TYPES,
+			"scope_present": present(scope_reference),
+			"classification_supported": classification in SUPPORTED_CLASSIFICATIONS,
+			"approver_present": present(approver_id),
+			"expiry_present": present(expires_at),
+			"evidence_present": present(evidence_reference),
+		})
+		item = FusionAuthority(authority_id, tenant_id, authority_type, scope_reference,
+		                       classification, approver_id, expires_at, evidence_reference)
+		self._sync_authorities[_tk(self, tenant_id, authority_id)] = item
+		_sync_audit(self, tenant_id, "fusion_authority_recorded", authority_id)
+		return item.to_dict()
+
+	def record_workspace(
+		self: Any,
+		workspace_id: str,
+		tenant_id: str,
+		workspace_type: str,
+		name: str,
+		classification: str,
+		authority_id: str,
+		evidence_reference: str,
+	) -> dict[str, Any]:
+		_init_sync(self)
+		authority = _tenant_authority_or_none(self, authority_id, tenant_id)
+		workspace_type = normalize_code(workspace_type)
+		classification = normalize_code(classification)
+		_sync_enforce(self, {
+			"tenant_id": tenant_id,
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "record_workspace",
+			"workspace_type_supported": workspace_type in _CONTRACT_WS_TYPES,
+			"workspace_name_present": present(name),
+			"classification_supported": classification in SUPPORTED_CLASSIFICATIONS,
+			"authority_present": authority is not None,
+			"evidence_present": present(evidence_reference),
+		})
+		item = FusionWorkspaceRecord(workspace_id, tenant_id, workspace_type, name,
+		                             classification, authority_id, evidence_reference)
+		self._sync_workspaces[_tk(self, tenant_id, workspace_id)] = item
+		_sync_audit(self, tenant_id, "fusion_workspace_recorded", workspace_id)
+		return item.to_dict()
+
+	def register_source(
+		self: Any,
+		source_id: str,
+		tenant_id: str,
+		source_type: str,
+		source_reference: str,
+		custodian_id: str,
+		authority_id: str,
+		lineage_reference: str,
+		evidence_reference: str,
+	) -> dict[str, Any]:
+		_init_sync(self)
+		source_type = normalize_code(source_type)
+		authority = _tenant_authority_or_none(self, authority_id, tenant_id)
+		_sync_enforce(self, {
+			"tenant_id": tenant_id,
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "register_source",
+			"source_type_supported": source_type in SUPPORTED_SOURCE_TYPES,
+			"source_reference_present": present(source_reference),
+			"custodian_present": present(custodian_id),
+			"authority_present": authority is not None,
+			"lineage_present": present(lineage_reference),
+			"evidence_present": present(evidence_reference),
+		})
+		item = FusionSource(source_id, tenant_id, source_type, source_reference,
+		                    custodian_id, authority_id, lineage_reference, evidence_reference)
+		self._sync_sources[_tk(self, tenant_id, source_id)] = item
+		_sync_audit(self, tenant_id, "fusion_source_registered", source_id)
+		return item.to_dict()
+
+	def record_artifact(
+		self: Any,
+		artifact_id: str,
+		tenant_id: str,
+		workspace_id: str,
+		source_id: str,
+		artifact_type: str,
+		artifact_reference: str,
+		content_fingerprint: str,
+		confidence_score: float,
+		evidence_reference: str,
+	) -> dict[str, Any]:
+		_init_sync(self)
+		artifact_type = normalize_code(artifact_type)
+		workspace = _tenant_workspace_or_none(self, workspace_id, tenant_id)
+		source = self._sync_sources.get(_tk(self, tenant_id, source_id))
+		# authority_mismatch: workspace and source must share the same authority
+		authority_match = (
+			workspace is not None
+			and source is not None
+			and workspace.authority_id == source.authority_id
+		)
+		_sync_enforce(self, {
+			"tenant_id": tenant_id,
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "record_artifact",
+			"workspace_present": workspace is not None,
+			"source_present": source is not None,
+			"workspace_source_authority_match": authority_match,
+			"artifact_type_supported": artifact_type in SUPPORTED_ARTIFACT_TYPES,
+			"artifact_reference_present": present(artifact_reference),
+			"fingerprint_present": present(content_fingerprint),
+			"confidence_valid": bounded_score(confidence_score),
+			"evidence_present": present(evidence_reference),
+		})
+		item = FusionArtifact(artifact_id, tenant_id, workspace_id, source_id,
+		                      artifact_type, artifact_reference, content_fingerprint,
+		                      float(confidence_score), evidence_reference)
+		self._sync_artifacts[_tk(self, tenant_id, artifact_id)] = item
+		_sync_audit(self, tenant_id, "fusion_artifact_recorded", artifact_id)
+		return item.to_dict()
+
+	def record_correlation(
+		self: Any,
+		correlation_id: str,
+		tenant_id: str,
+		artifact_id: str,
+		correlation_type: str,
+		confidence_score: float,
+		analyst_id: str,
+		evidence_reference: str,
+	) -> dict[str, Any]:
+		_init_sync(self)
+		correlation_type = normalize_code(correlation_type)
+		artifact = self._sync_artifacts.get(_tk(self, tenant_id, artifact_id))
+		_sync_enforce(self, {
+			"tenant_id": tenant_id,
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "record_correlation",
+			"artifact_present": artifact is not None,
+			"correlation_type_supported": correlation_type in _CONTRACT_CORR_TYPES,
+			"confidence_valid": bounded_score(confidence_score),
+			"analyst_present": present(analyst_id),
+			"evidence_present": present(evidence_reference),
+		})
+		item = FusionCorrelationRecord(correlation_id, tenant_id, artifact_id,
+		                               correlation_type, float(confidence_score),
+		                               analyst_id, evidence_reference)
+		self._sync_correlations[_tk(self, tenant_id, correlation_id)] = item
+		_sync_audit(self, tenant_id, "fusion_correlation_recorded", correlation_id)
+		return item.to_dict()
+
+	def record_hypothesis(
+		self: Any,
+		hypothesis_id: str,
+		tenant_id: str,
+		correlation_id: str,
+		hypothesis_type: str,
+		claim_reference: str,
+		confidence_score: float,
+		analyst_id: str,
+		evidence_reference: str,
+	) -> dict[str, Any]:
+		_init_sync(self)
+		hypothesis_type = normalize_code(hypothesis_type)
+		correlation = self._sync_correlations.get(_tk(self, tenant_id, correlation_id))
+		_sync_enforce(self, {
+			"tenant_id": tenant_id,
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "record_hypothesis",
+			"correlation_present": correlation is not None,
+			"hypothesis_type_supported": hypothesis_type in SUPPORTED_HYPOTHESIS_TYPES,
+			"claim_present": present(claim_reference),
+			"confidence_valid": bounded_score(confidence_score),
+			"analyst_present": present(analyst_id),
+			"evidence_present": present(evidence_reference),
+		})
+		item = FusionHypothesisRecord(hypothesis_id, tenant_id, correlation_id,
+		                              hypothesis_type, claim_reference,
+		                              float(confidence_score), analyst_id, evidence_reference)
+		self._sync_hypotheses[_tk(self, tenant_id, hypothesis_id)] = item
+		_sync_audit(self, tenant_id, "fusion_hypothesis_recorded", hypothesis_id)
+		return item.to_dict()
+
+	def record_assessment(
+		self: Any,
+		assessment_id: str,
+		tenant_id: str,
+		hypothesis_id: str,
+		assessment_type: str,
+		risk_level: str,
+		confidence_score: float,
+		analyst_id: str,
+		evidence_reference: str,
+	) -> dict[str, Any]:
+		_init_sync(self)
+		assessment_type = normalize_code(assessment_type)
+		risk_level = normalize_code(risk_level)
+		hypothesis = self._sync_hypotheses.get(_tk(self, tenant_id, hypothesis_id))
+		_sync_enforce(self, {
+			"tenant_id": tenant_id,
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "record_assessment",
+			"hypothesis_present": hypothesis is not None,
+			"assessment_type_supported": assessment_type in _CONTRACT_ASSESS_TYPES,
+			"risk_level_supported": risk_level in _CONTRACT_RISK_LEVELS,
+			"confidence_valid": bounded_score(confidence_score),
+			"analyst_present": present(analyst_id),
+			"evidence_present": present(evidence_reference),
+		})
+		item = FusionAssessmentRecord(assessment_id, tenant_id, hypothesis_id,
+		                              assessment_type, risk_level, float(confidence_score),
+		                              analyst_id, evidence_reference)
+		self._sync_assessments[_tk(self, tenant_id, assessment_id)] = item
+		_sync_audit(self, tenant_id, "fusion_assessment_recorded", assessment_id)
+		return item.to_dict()
+
+	def record_referral(
+		self: Any,
+		referral_id: str,
+		tenant_id: str,
+		assessment_id: str,
+		referral_type: str,
+		recipient: str,
+		approval_reference: str,
+		evidence_reference: str,
+	) -> dict[str, Any]:
+		_init_sync(self)
+		referral_type = normalize_code(referral_type)
+		assessment = self._sync_assessments.get(_tk(self, tenant_id, assessment_id))
+		_sync_enforce(self, {
+			"tenant_id": tenant_id,
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "record_referral",
+			"assessment_present": assessment is not None,
+			"referral_type_supported": referral_type in SUPPORTED_REFERRAL_TYPES,
+			"recipient_present": present(recipient),
+			"approval_present": present(approval_reference),
+			"evidence_present": present(evidence_reference),
+		})
+		item = FusionReferral(referral_id, tenant_id, assessment_id, referral_type,
+		                      recipient, approval_reference, evidence_reference)
+		self._sync_referrals[_tk(self, tenant_id, referral_id)] = item
+		_sync_audit(self, tenant_id, "fusion_referral_recorded", referral_id)
+		return item.to_dict()
+
+	def record_dissemination(
+		self: Any,
+		dissemination_id: str,
+		tenant_id: str,
+		assessment_id: str,
+		audience: str,
+		release_marking: str,
+		approval_reference: str,
+		evidence_reference: str,
+	) -> dict[str, Any]:
+		_init_sync(self)
+		assessment = self._sync_assessments.get(_tk(self, tenant_id, assessment_id))
+		_sync_enforce(self, {
+			"tenant_id": tenant_id,
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "record_dissemination",
+			"assessment_present": assessment is not None,
+			"audience_present": present(audience),
+			"release_marking_present": present(release_marking),
+			"approval_present": present(approval_reference),
+			"evidence_present": present(evidence_reference),
+		})
+		item = FusionDissemination(dissemination_id, tenant_id, assessment_id,
+		                           audience, release_marking, approval_reference, evidence_reference)
+		self._sync_disseminations[_tk(self, tenant_id, dissemination_id)] = item
+		_sync_audit(self, tenant_id, "fusion_dissemination_recorded", dissemination_id)
+		return item.to_dict()
+
+	def record_review(
+		self: Any,
+		review_id: str,
+		tenant_id: str,
+		reference_id: str,
+		reviewer_id: str,
+		status: str,
+		evidence_reference: str,
+	) -> dict[str, Any]:
+		_init_sync(self)
+		status = normalize_code(status)
+		_sync_enforce(self, {
+			"tenant_id": tenant_id,
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "record_review",
+			"status_supported": status in SUPPORTED_REVIEW_STATUSES,
+			"reviewer_present": present(reviewer_id),
+			"evidence_present": present(evidence_reference),
+		})
+		item = FusionReview(review_id, tenant_id, reference_id, reviewer_id,
+		                    status, evidence_reference)
+		self._sync_reviews[_tk(self, tenant_id, review_id)] = item
+		_sync_audit(self, tenant_id, "fusion_review_recorded", reference_id)
+		return item.to_dict()
+
+	def register_fusion_agent(
+		self: Any,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str = "fusion operations",
+	) -> dict[str, Any]:
+		_init_sync(self)
+		runtime = normalize_code(runtime)
+		role = normalize_code(role)
+		_sync_enforce(self, {
+			"tenant_id": tenant_id,
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "register_fusion_agent",
+			"agent_runtime_supported": runtime in SUPPORTED_AGENT_RUNTIMES,
+			"agent_role_supported": role in SUPPORTED_AGENT_ROLES,
+		})
+		item = FusionAgent(agent_id, tenant_id, name, runtime, role, scope)
+		self._sync_agents[_tk(self, tenant_id, agent_id)] = item
+		_sync_audit(self, tenant_id, "fusion_agent_registered", agent_id)
+		return item.to_dict()
+
+	def validate_agent_action(
+		self: Any,
+		tenant_id: str,
+		privileged_scope: bool = False,
+		human_approval_recorded: bool = False,
+		evidence_fabrication_scope: bool = False,
+		source_tampering_scope: bool = False,
+		privacy_bypass_scope: bool = False,
+		unsupported_identity_resolution_scope: bool = False,
+		autonomous_dissemination_scope: bool = False,
+		unapproved_attribution_scope: bool = False,
+	) -> dict[str, Any]:
+		_init_sync(self)
+		_sync_enforce(self, {
+			"tenant_id": tenant_id,
+			"tenant_context_present": bool(tenant_id),
+			"operation": "fusion_agent_action",
+			"privileged_scope": privileged_scope,
+			"human_approval_recorded": human_approval_recorded,
+			"evidence_fabrication_scope": evidence_fabrication_scope,
+			"source_tampering_scope": source_tampering_scope,
+			"privacy_bypass_scope": privacy_bypass_scope,
+			"unsupported_identity_resolution_scope": unsupported_identity_resolution_scope,
+			"autonomous_dissemination_scope": autonomous_dissemination_scope,
+			"unapproved_attribution_scope": unapproved_attribution_scope,
+		})
+		return {"tenant_id": tenant_id, "accepted": True, "privileged_scope": privileged_scope}
+
+	def validate_batch(
+		self: Any,
+		tenant_id: str,
+		item_count: int,
+		event_stream: str = "bytewax",
+	) -> dict[str, Any]:
+		_init_sync(self)
+		_sync_enforce(self, {
+			"tenant_id": tenant_id,
+			"tenant_context_present": bool(tenant_id),
+			"operation": "fusion_batch",
+			"event_stream": event_stream,
+		})
+		if not positive_int(item_count):
+			raise ValueError("item_count must be positive")
+		return {
+			"tenant_id": tenant_id,
+			"item_count": item_count,
+			"processor": "bytewax",
+			"stream": FUSION_EVENT_STREAM,
+			"accepted": True,
+		}
+
+	def dashboard_summary(self: Any, tenant_id: str) -> dict[str, Any]:
+		_init_sync(self)
+		return {
+			"tenant_id": tenant_id,
+			"authority_count": _sync_count(self, self._sync_authorities, tenant_id),
+			"workspace_count": _sync_count(self, self._sync_workspaces, tenant_id),
+			"source_count": _sync_count(self, self._sync_sources, tenant_id),
+			"artifact_count": _sync_count(self, self._sync_artifacts, tenant_id),
+			"correlation_count": _sync_count(self, self._sync_correlations, tenant_id),
+			"hypothesis_count": _sync_count(self, self._sync_hypotheses, tenant_id),
+			"assessment_count": _sync_count(self, self._sync_assessments, tenant_id),
+			"referral_count": _sync_count(self, self._sync_referrals, tenant_id),
+			"dissemination_count": _sync_count(self, self._sync_disseminations, tenant_id),
+			"review_count": _sync_count(self, self._sync_reviews, tenant_id),
+			"agent_count": _sync_count(self, self._sync_agents, tenant_id),
+			"audit_event_count": sum(
+				1 for e in self._sync_audit_events if e["tenant_id"] == tenant_id
+			),
+			"streaming": get_capability_contract(tenant_id)["streaming"],
+		}
+
+	def _tenant_authority_or_none(self: Any, item_id: str, tenant_id: str) -> FusionAuthority | None:
+		_init_sync(self)
+		return self._sync_authorities.get(_tk(self, tenant_id, item_id))
+
+	def _tenant_workspace_or_none(self: Any, item_id: str, tenant_id: str) -> FusionWorkspaceRecord | None:
+		_init_sync(self)
+		return self._sync_workspaces.get(_tk(self, tenant_id, item_id))
+
+	# Attach all methods to the class
+	cls.describe = describe
+	cls.evaluate = evaluate
+	cls.record_authority = record_authority
+	cls.record_workspace = record_workspace
+	cls.register_source = register_source
+	cls.record_artifact = record_artifact
+	cls.record_correlation = record_correlation
+	cls.record_hypothesis = record_hypothesis
+	cls.record_assessment = record_assessment
+	cls.record_referral = record_referral
+	cls.record_dissemination = record_dissemination
+	cls.record_review = record_review
+	cls.register_fusion_agent = register_fusion_agent
+	cls.validate_agent_action = validate_agent_action
+	cls.validate_batch = validate_batch
+	cls.dashboard_summary = dashboard_summary
+	cls._tenant_authority_or_none = _tenant_authority_or_none
+	cls._tenant_workspace_or_none = _tenant_workspace_or_none
+	return cls
+
+
+# Apply the sync contract layer to IntelligenceFusionService
+IntelligenceFusionService = _add_sync_contract_layer(IntelligenceFusionService)

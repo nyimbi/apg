@@ -13,7 +13,7 @@ try:
 except ImportError:  # pragma: no cover
 	from capability_contract import SUPPORTED_AGENT_ROLES, SUPPORTED_AGENT_RUNTIMES, SUPPORTED_APPLICATION_PURPOSES, SUPPORTED_COLLECTION_REASONS, SUPPORTED_COUNTRIES, SUPPORTED_CURRENCIES, SUPPORTED_DISBURSEMENT_RAILS, SUPPORTED_OFFER_STATUSES, SUPPORTED_PRODUCT_TYPES, SUPPORTED_REPAYMENT_FREQUENCIES, SUPPORTED_UNDERWRITING_DECISIONS, evaluate_capability_rules, get_capability_contract  # type: ignore
 	from lending_runtime import decision_category, estimate_installment, normalize_amount, normalize_code, normalize_country, normalize_currency, normalize_rate, normalize_score  # type: ignore
-	from models import BorrowerProfile, CollectionCase, Disbursement, LendingEvidence, LoanApplication, LoanOffer, LoanProduct, RepaymentSchedule, UnderwritingDecision  # type: ignore
+	from _domain_models import BorrowerProfile, CollectionCase, Disbursement, LendingEvidence, LoanApplication, LoanOffer, LoanProduct, RepaymentSchedule, UnderwritingDecision  # type: ignore
 
 
 # ---------------------------------------------------------------------------

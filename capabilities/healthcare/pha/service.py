@@ -62,7 +62,7 @@ class PharmacyManagementService:
 		self._inventory: dict[tuple[str, str], InventoryItemResponse] = {}
 		self._prior_auths: dict[tuple[str, str], PriorAuthResponse] = {}
 		self._audit_events: list[dict[str, Any]] = []
-		# Extended stores
+		# Unstructured operation stores (raw dict results)
 		self._prescription_verifications: dict[tuple[str, str], dict[str, Any]] = {}
 		self._cold_chain_records: dict[tuple[str, str], dict[str, Any]] = {}
 		self._narcotics_register: dict[tuple[str, str], dict[str, Any]] = {}
@@ -76,6 +76,13 @@ class PharmacyManagementService:
 		self._formulary_reviews: dict[tuple[str, str], dict[str, Any]] = {}
 		self._dispense_interaction_checks: dict[tuple[str, str], dict[str, Any]] = {}
 		self._controlled_dispenses: dict[tuple[str, str], dict[str, Any]] = {}
+		# Typed model stores (Pydantic response objects)
+		self._prescriptions: dict[tuple[str, str], Any] = {}
+		self._typed_cold_chain: dict[tuple[str, str], Any] = {}
+		self._typed_returns: dict[tuple[str, str], Any] = {}
+		self._typed_reorders: dict[tuple[str, str], Any] = {}
+		self._typed_narcotics: dict[tuple[str, str], Any] = {}
+		self._typed_counselling: dict[tuple[str, str], Any] = {}
 
 	async def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -112,18 +119,7 @@ class PharmacyManagementService:
 	async def get_drug(self, tenant_id: str, drug_id: str) -> DrugResponse | None:
 		return self._drugs.get((tenant_id, drug_id))
 
-	async def list_drugs(
-		self,
-		tenant_id: str,
-		formulary_status: str | None = None,
-		drug_schedule: str | None = None,
-	) -> list[DrugResponse]:
-		results = [d for (tid, _), d in self._drugs.items() if tid == tenant_id]
-		if formulary_status:
-			results = [d for d in results if d.formulary_status == formulary_status]
-		if drug_schedule:
-			results = [d for d in results if d.drug_schedule == drug_schedule]
-		return sorted(results, key=lambda d: d.drug_name)
+	# list_drugs with drug_type filter is defined in the extensions block below
 
 	async def mark_drug_lasa(
 		self,
@@ -1380,6 +1376,859 @@ class PharmacyManagementService:
 			"clinical_interventions": {"total": len(interventions)},
 			"reorder_alerts_active": len(reorder_alerts),
 		}
+
+	# ── prescriptions ────────────────────────────────────────────────────────
+
+	async def create_prescription(self, payload: Any) -> Any:
+		"""Receive and record a new prescription."""
+		from .models import PrescriptionCreate, PrescriptionResponse, PrescriptionStatus
+		if not isinstance(payload, PrescriptionCreate):
+			from .models import PrescriptionCreate as PC
+			payload = PC(**payload) if isinstance(payload, dict) else payload
+		self._enforce({
+			"tenant_context_present": bool(payload.tenant_id),
+			"operation_type": "write", "policy_attached": True,
+		})
+		from .domain.calculations import prescription_expiry_date
+		now = datetime.utcnow()
+		expires = prescription_expiry_date(now, controlled=payload.is_controlled)
+		rx = PrescriptionResponse(
+			id=uuid7str(), tenant_id=payload.tenant_id,
+			patient_id=payload.patient_id, prescriber_id=payload.prescriber_id,
+			prescriber_npi=payload.prescriber_npi, drug_id=payload.drug_id,
+			drug_name=payload.drug_name, dosage_form=payload.dosage_form,
+			strength=payload.strength, quantity=payload.quantity, unit=payload.unit,
+			days_supply=payload.days_supply, sig=payload.sig,
+			refills_authorized=payload.refills_authorized,
+			refills_remaining=payload.refills_remaining,
+			diagnosis_icd10=payload.diagnosis_icd10,
+			dea_number=payload.dea_number, is_controlled=payload.is_controlled,
+			status=PrescriptionStatus.RECEIVED,
+			formulary_override_reason=payload.formulary_override_reason,
+			electronic=payload.electronic,
+			prescriber_signature_ref=payload.prescriber_signature_ref,
+			expires_at=expires, created_by=payload.created_by,
+		)
+		self._prescriptions[(payload.tenant_id, rx.id)] = rx
+		self._audit(payload.tenant_id, "prescription_created", rx.id)
+		_log_op("create_prescription", payload.tenant_id, rx.id)
+		return rx
+
+	async def get_prescription(self, tenant_id: str, rx_id: str) -> Any | None:
+		"""Return a single prescription by ID."""
+		return self._prescriptions.get((tenant_id, rx_id))
+
+	async def list_prescriptions(
+		self,
+		tenant_id: str,
+		patient_id: str | None = None,
+		status: str | None = None,
+		drug_id: str | None = None,
+	) -> list[Any]:
+		"""List prescriptions with optional filters."""
+		results = [r for (tid, _), r in self._prescriptions.items() if tid == tenant_id and not r.is_deleted]
+		if patient_id:
+			results = [r for r in results if r.patient_id == patient_id]
+		if status:
+			results = [r for r in results if r.status == status]
+		if drug_id:
+			results = [r for r in results if r.drug_id == drug_id]
+		return sorted(results, key=lambda r: r.created_at, reverse=True)
+
+	async def update_prescription(self, tenant_id: str, rx_id: str, payload: Any) -> Any | None:
+		"""Partial update of a prescription."""
+		rx = self._prescriptions.get((tenant_id, rx_id))
+		if rx is None:
+			return None
+		updates: dict[str, Any] = {"updated_at": datetime.utcnow()}
+		if payload.status is not None:
+			updates["status"] = payload.status
+		if payload.refills_remaining is not None:
+			updates["refills_remaining"] = payload.refills_remaining
+		if payload.formulary_override_reason is not None:
+			updates["formulary_override_reason"] = payload.formulary_override_reason
+		updated = rx.model_copy(update=updates)
+		self._prescriptions[(tenant_id, rx_id)] = updated
+		self._audit(tenant_id, "prescription_updated", rx_id)
+		return updated
+
+	async def cancel_prescription(self, tenant_id: str, rx_id: str, actor_id: str) -> bool:
+		"""Cancel a prescription (soft delete / status change)."""
+		from .models import PrescriptionStatus
+		rx = self._prescriptions.get((tenant_id, rx_id))
+		if rx is None:
+			return False
+		updated = rx.model_copy(update={"status": PrescriptionStatus.CANCELLED, "is_deleted": True, "updated_at": datetime.utcnow()})
+		self._prescriptions[(tenant_id, rx_id)] = updated
+		self._audit(tenant_id, "prescription_cancelled", rx_id)
+		return True
+
+	# ── dispense order extensions ─────────────────────────────────────────────
+
+	async def update_dispense_order(self, tenant_id: str, order_id: str, payload: Any) -> Any | None:
+		"""Partial update of a dispense order (status, flags)."""
+		order = self._dispense_orders.get((tenant_id, order_id))
+		if order is None:
+			return None
+		updates: dict[str, Any] = {"updated_at": datetime.utcnow()}
+		for field in ("status", "counselling_completed", "label_printed", "barcode_scanned", "override_reason"):
+			val = getattr(payload, field, None)
+			if val is not None:
+				updates[field] = val
+		updated = order.model_copy(update=updates)
+		self._dispense_orders[(tenant_id, order_id)] = updated
+		self._audit(tenant_id, "dispense_order_updated", order_id)
+		return updated
+
+	async def cancel_dispense_order(self, tenant_id: str, order_id: str, actor_id: str) -> bool:
+		"""Cancel a dispense order."""
+		from .models import DispenseStatus
+		order = self._dispense_orders.get((tenant_id, order_id))
+		if order is None:
+			return False
+		if order.status in (DispenseStatus.DISPENSED, DispenseStatus.PICKED_UP):
+			raise PolicyViolationError("cannot_cancel_completed_dispense_order")
+		updated = order.model_copy(update={"status": DispenseStatus.CANCELLED, "updated_at": datetime.utcnow()})
+		self._dispense_orders[(tenant_id, order_id)] = updated
+		self._audit(tenant_id, "dispense_order_cancelled", order_id)
+		return True
+
+	async def mark_picked_up(self, tenant_id: str, order_id: str) -> Any | None:
+		"""Record patient pickup of a dispensed order."""
+		from .models import DispenseStatus
+		order = self._dispense_orders.get((tenant_id, order_id))
+		if order is None:
+			return None
+		if order.status != DispenseStatus.DISPENSED:
+			raise PolicyViolationError("order_must_be_dispensed_before_pickup")
+		updated = order.model_copy(update={
+			"status": DispenseStatus.PICKED_UP,
+			"picked_up_at": datetime.utcnow(),
+			"updated_at": datetime.utcnow(),
+		})
+		self._dispense_orders[(tenant_id, order_id)] = updated
+		self._audit(tenant_id, "medication_picked_up", order_id)
+		return updated
+
+	# ── formulary soft-delete ─────────────────────────────────────────────────
+
+	async def soft_delete_drug(self, tenant_id: str, drug_id: str, actor_id: str) -> bool:
+		"""Soft-delete a drug from the formulary."""
+		drug = self._drugs.get((tenant_id, drug_id))
+		if drug is None:
+			return False
+		updated = drug.model_copy(update={"is_deleted": True, "updated_at": datetime.utcnow()})
+		self._drugs[(tenant_id, drug_id)] = updated
+		self._audit(tenant_id, "drug_deleted", drug_id)
+		return True
+
+	async def list_drugs(
+		self,
+		tenant_id: str,
+		formulary_status: str | None = None,
+		drug_schedule: str | None = None,
+		drug_type: str | None = None,
+	) -> list[Any]:
+		"""List non-deleted drugs with optional filters."""
+		results = [d for (tid, _), d in self._drugs.items() if tid == tenant_id and not d.is_deleted]
+		if formulary_status:
+			results = [d for d in results if d.formulary_status == formulary_status]
+		if drug_schedule:
+			results = [d for d in results if d.drug_schedule == drug_schedule]
+		if drug_type:
+			results = [d for d in results if d.drug_type == drug_type]
+		return sorted(results, key=lambda d: d.drug_name)
+
+	# ── interactions extensions ───────────────────────────────────────────────
+
+	async def get_interaction(self, tenant_id: str, interaction_id: str) -> Any | None:
+		"""Return a single interaction record."""
+		return self._interactions.get((tenant_id, interaction_id))
+
+	async def soft_delete_interaction(self, tenant_id: str, interaction_id: str, actor_id: str) -> bool:
+		"""Soft-delete an interaction record."""
+		i = self._interactions.get((tenant_id, interaction_id))
+		if i is None:
+			return False
+		updated = i.model_copy(update={"is_deleted": True, "updated_at": datetime.utcnow()})
+		self._interactions[(tenant_id, interaction_id)] = updated
+		self._audit(tenant_id, "interaction_deleted", interaction_id)
+		return True
+
+	async def check_drug_interactions(
+		self,
+		tenant_id: str,
+		drug_id: str,
+		patient_drug_ids: list[str],
+	) -> dict[str, Any]:
+		"""Check a single drug against a patient's current medication list."""
+		assert bool(drug_id), "drug_id required"
+		drug_set = set(patient_drug_ids) | {drug_id}
+		found: list[dict[str, Any]] = []
+		for (tid, _), interaction in self._interactions.items():
+			if tid != tenant_id:
+				continue
+			if (interaction.drug_a_id in drug_set and interaction.drug_b_id in drug_set
+					and interaction.drug_a_id != interaction.drug_b_id):
+				found.append({
+					"drug_a": interaction.drug_a_id,
+					"drug_b": interaction.drug_b_id,
+					"severity": interaction.severity,
+					"clinical_effect": interaction.clinical_effect,
+					"management": interaction.management,
+				})
+		return {
+			"drug_id": drug_id,
+			"interactions_found": len(found),
+			"interactions": found,
+			"dispense_safe": not any(i["severity"] == "contraindicated" for i in found),
+		}
+
+	# ── pharmacist verification (named method for API) ────────────────────────
+
+	async def pharmacist_verification(
+		self,
+		tenant_id: str,
+		prescription_id: str,
+		pharmacist_id: str,
+		clinical_notes: str = "",
+		override_reason: str | None = None,
+	) -> dict[str, Any]:
+		"""Full pharmacist verification workflow — wraps verify_prescription with override support."""
+		record = await self.verify_prescription(tenant_id, prescription_id, pharmacist_id, clinical_notes)
+		if override_reason:
+			record["override_reason"] = override_reason
+			record["override_applied"] = True
+			record["ready_to_dispense"] = True
+			record["overall_status"] = "approved_with_override"
+		return record
+
+	async def get_verification(self, tenant_id: str, verification_id: str) -> dict[str, Any] | None:
+		"""Retrieve a pharmacist verification record."""
+		return self._prescription_verifications.get((tenant_id, verification_id))
+
+	# ── drug substitution (substitute_drug alias) ─────────────────────────────
+
+	async def substitute_drug(
+		self,
+		tenant_id: str,
+		drug_id: str,
+		generic: bool = True,
+	) -> Any:
+		"""Find a generic substitute for a brand drug from the formulary."""
+		from .models import DrugSubstituteResult
+		assert bool(drug_id), "drug_id required"
+		original = self._drugs.get((tenant_id, drug_id))
+		if original is None:
+			return DrugSubstituteResult(
+				original_drug_id=drug_id, substitute_found=False,
+				reason="original_drug_not_found",
+			)
+		if not generic:
+			return DrugSubstituteResult(
+				original_drug_id=drug_id, substitute_found=False,
+				reason="generic_substitution_not_requested",
+			)
+		# search for a preferred generic with matching generic_name
+		candidates = [
+			d for (tid, _), d in self._drugs.items()
+			if tid == tenant_id
+			and not d.is_deleted
+			and d.id != drug_id
+			and d.drug_type == "generic"
+			and d.generic_name.lower() == original.generic_name.lower()
+			and d.formulary_status == "preferred"
+		]
+		if candidates:
+			sub = candidates[0]
+			# Rough savings estimate (10% of original price if we had cost data)
+			return DrugSubstituteResult(
+				original_drug_id=drug_id, substitute_found=True,
+				substitute=sub, reason="generic_equivalent_found",
+			)
+		return DrugSubstituteResult(
+			original_drug_id=drug_id, substitute_found=False,
+			reason="no_preferred_generic_equivalent_in_formulary",
+		)
+
+	# ── cold chain typed CRUD ─────────────────────────────────────────────────
+
+	async def create_cold_chain_record(self, payload: Any) -> Any:
+		"""Create a structured cold chain record from ColdChainRecordCreate."""
+		from .models import ColdChainRecordCreate, ColdChainRecordResponse, ColdChainStatus
+		from .domain.calculations import cold_chain_status, temperature_deviation
+		if not isinstance(payload, ColdChainRecordCreate):
+			payload = ColdChainRecordCreate(**payload)
+		self._enforce({
+			"tenant_context_present": bool(payload.tenant_id),
+			"operation_type": "write", "policy_attached": True,
+		})
+		dev = temperature_deviation(
+			payload.recorded_temperature_c, payload.min_acceptable_c, payload.max_acceptable_c,
+		)
+		excursion_mins = payload.excursion_duration_minutes
+		status = cold_chain_status(
+			payload.recorded_temperature_c, payload.min_acceptable_c,
+			payload.max_acceptable_c, excursion_mins,
+		)
+		record = ColdChainRecordResponse(
+			id=uuid7str(), tenant_id=payload.tenant_id,
+			inventory_item_id=payload.inventory_item_id, drug_id=payload.drug_id,
+			recorded_temperature_c=payload.recorded_temperature_c,
+			min_acceptable_c=payload.min_acceptable_c, max_acceptable_c=payload.max_acceptable_c,
+			location=payload.location, sensor_id=payload.sensor_id,
+			status=status, excursion_duration_minutes=excursion_mins,
+			corrective_action=payload.corrective_action, deviation_c=dev,
+			created_by=payload.created_by,
+		)
+		self._typed_cold_chain[(payload.tenant_id, record.id)] = record
+		if status in ("excursion", "critical"):
+			self._audit(payload.tenant_id, "cold_chain_excursion_detected", record.id)
+		self._audit(payload.tenant_id, "cold_chain_record_created", record.id)
+		return record
+
+	async def get_cold_chain_record(self, tenant_id: str, record_id: str) -> Any | None:
+		"""Get a cold chain record by ID."""
+		return self._typed_cold_chain.get((tenant_id, record_id))
+
+	async def list_cold_chain_records(
+		self,
+		tenant_id: str,
+		drug_id: str | None = None,
+		status: str | None = None,
+	) -> list[Any]:
+		"""List typed cold chain records."""
+		results = [r for (tid, _), r in self._typed_cold_chain.items() if tid == tenant_id and not r.is_deleted]
+		if drug_id:
+			results = [r for r in results if r.drug_id == drug_id]
+		if status:
+			results = [r for r in results if r.status == status]
+		return sorted(results, key=lambda r: r.created_at, reverse=True)
+
+	async def cold_chain_monitoring(
+		self,
+		tenant_id: str,
+		drug_id: str,
+		temperature_readings: list[dict[str, Any]],
+		recorded_by: str,
+		storage_requirement: str = "2-8C",
+	) -> dict[str, Any]:
+		"""Alias for cold_chain_record with the temperature_readings key."""
+		return await self.cold_chain_record(
+			tenant_id, drug_id, temperature_readings, recorded_by, storage_requirement,
+		)
+
+	# ── inventory item CRUD ───────────────────────────────────────────────────
+
+	async def get_inventory_item(self, tenant_id: str, item_id: str) -> Any | None:
+		"""Return an inventory item by ID."""
+		return self._inventory.get((tenant_id, item_id))
+
+	async def update_inventory_item(self, tenant_id: str, item_id: str, payload: Any) -> Any | None:
+		"""Partial update of an inventory item."""
+		item = self._inventory.get((tenant_id, item_id))
+		if item is None:
+			return None
+		updates: dict[str, Any] = {"updated_at": datetime.utcnow()}
+		for field in ("quantity_on_hand", "status", "location", "reorder_point", "reorder_quantity"):
+			val = getattr(payload, field, None)
+			if val is not None:
+				updates[field] = val
+		updated = item.model_copy(update=updates)
+		self._inventory[(tenant_id, item_id)] = updated
+		self._audit(tenant_id, "inventory_updated", item_id)
+		return updated
+
+	async def soft_delete_inventory(self, tenant_id: str, item_id: str, actor_id: str) -> bool:
+		"""Soft-delete an inventory lot."""
+		item = self._inventory.get((tenant_id, item_id))
+		if item is None:
+			return False
+		updated = item.model_copy(update={"is_deleted": True, "updated_at": datetime.utcnow()})
+		self._inventory[(tenant_id, item_id)] = updated
+		self._audit(tenant_id, "inventory_deleted", item_id)
+		return True
+
+	async def check_expiry_dates(self, tenant_id: str, threshold_days: int = 30) -> list[dict[str, Any]]:
+		"""Alias for track_lot_expiry — used by API expiry endpoints."""
+		return await self.track_lot_expiry(tenant_id, threshold_days=threshold_days)
+
+	# ── returned medications CRUD ─────────────────────────────────────────────
+
+	async def create_returned_medication(self, payload: Any) -> Any:
+		"""Create a returned medication record."""
+		from .models import ReturnedMedicationCreate, ReturnedMedicationResponse
+		if not isinstance(payload, ReturnedMedicationCreate):
+			payload = ReturnedMedicationCreate(**payload)
+		self._enforce({
+			"tenant_context_present": bool(payload.tenant_id),
+			"operation_type": "write", "policy_attached": True,
+		})
+		ret = ReturnedMedicationResponse(
+			id=uuid7str(), tenant_id=payload.tenant_id,
+			patient_id=payload.patient_id, drug_id=payload.drug_id,
+			dispense_order_id=payload.dispense_order_id,
+			prescription_id=payload.prescription_id,
+			quantity_returned=payload.quantity_returned, unit=payload.unit,
+			return_reason=payload.return_reason, condition=payload.condition,
+			return_disposition=payload.return_disposition,
+			returned_by=payload.returned_by, received_by=payload.received_by,
+			notes=payload.notes, created_by=payload.created_by,
+		)
+		self._typed_returns[(payload.tenant_id, ret.id)] = ret
+		self._audit(payload.tenant_id, "medication_return_created", ret.id)
+		return ret
+
+	async def get_returned_medication(self, tenant_id: str, return_id: str) -> Any | None:
+		"""Get a returned medication record by ID."""
+		return self._typed_returns.get((tenant_id, return_id))
+
+	async def list_returned_medications(
+		self,
+		tenant_id: str,
+		patient_id: str | None = None,
+		processed: str | None = None,
+	) -> list[Any]:
+		"""List returned medication records."""
+		results = [r for (tid, _), r in self._typed_returns.items() if tid == tenant_id and not r.is_deleted]
+		if patient_id:
+			results = [r for r in results if r.patient_id == patient_id]
+		if processed is not None:
+			processed_bool = processed.lower() in ("true", "1", "yes")
+			results = [r for r in results if r.processed == processed_bool]
+		return sorted(results, key=lambda r: r.created_at, reverse=True)
+
+	async def update_returned_medication(self, tenant_id: str, return_id: str, payload: Any) -> Any | None:
+		"""Update a returned medication record."""
+		ret = self._typed_returns.get((tenant_id, return_id))
+		if ret is None:
+			return None
+		updates: dict[str, Any] = {"updated_at": datetime.utcnow()}
+		for field in ("processed", "processed_by", "return_disposition", "notes"):
+			val = getattr(payload, field, None)
+			if val is not None:
+				updates[field] = val
+		updated = ret.model_copy(update=updates)
+		self._typed_returns[(tenant_id, return_id)] = updated
+		self._audit(tenant_id, "medication_return_updated", return_id)
+		return updated
+
+	async def process_returned_medication(
+		self,
+		tenant_id: str,
+		return_id: str,
+		processed_by: str,
+		disposition: str = "destroy",
+	) -> Any | None:
+		"""Mark a returned medication as processed with a disposition."""
+		ret = self._typed_returns.get((tenant_id, return_id))
+		if ret is None:
+			return None
+		updated = ret.model_copy(update={
+			"processed": True, "processed_by": processed_by,
+			"processed_at": datetime.utcnow(),
+			"return_disposition": disposition,
+			"updated_at": datetime.utcnow(),
+		})
+		self._typed_returns[(tenant_id, return_id)] = updated
+		self._audit(tenant_id, "medication_return_processed", return_id)
+		return updated
+
+	# ── reorder requests CRUD ─────────────────────────────────────────────────
+
+	async def create_reorder_request(self, payload: Any) -> Any:
+		"""Create a reorder request for an inventory item."""
+		from .models import ReorderRequestCreate, ReorderRequestResponse, ReorderStatus
+		if not isinstance(payload, ReorderRequestCreate):
+			payload = ReorderRequestCreate(**payload)
+		self._enforce({
+			"tenant_context_present": bool(payload.tenant_id),
+			"operation_type": "write", "policy_attached": True,
+		})
+		req = ReorderRequestResponse(
+			id=uuid7str(), tenant_id=payload.tenant_id,
+			drug_id=payload.drug_id, inventory_item_id=payload.inventory_item_id,
+			quantity_requested=payload.quantity_requested, unit=payload.unit,
+			supplier_id=payload.supplier_id, urgency=payload.urgency,
+			triggered_by=payload.triggered_by,
+			status=ReorderStatus.PENDING, created_by=payload.created_by,
+		)
+		self._typed_reorders[(payload.tenant_id, req.id)] = req
+		self._audit(payload.tenant_id, "reorder_request_created", req.id)
+		_log_op("create_reorder_request", payload.tenant_id, req.id)
+		return req
+
+	async def get_reorder_request(self, tenant_id: str, reorder_id: str) -> Any | None:
+		"""Get a reorder request by ID."""
+		return self._typed_reorders.get((tenant_id, reorder_id))
+
+	async def list_reorder_requests(
+		self,
+		tenant_id: str,
+		drug_id: str | None = None,
+		status: str | None = None,
+	) -> list[Any]:
+		"""List reorder requests with optional filters."""
+		results = [r for (tid, _), r in self._typed_reorders.items() if tid == tenant_id and not r.is_deleted]
+		if drug_id:
+			results = [r for r in results if r.drug_id == drug_id]
+		if status:
+			results = [r for r in results if r.status == status]
+		return sorted(results, key=lambda r: r.created_at, reverse=True)
+
+	async def update_reorder_request(self, tenant_id: str, reorder_id: str, payload: Any) -> Any | None:
+		"""Update a reorder request status or quantity received."""
+		req = self._typed_reorders.get((tenant_id, reorder_id))
+		if req is None:
+			return None
+		updates: dict[str, Any] = {"updated_at": datetime.utcnow()}
+		if payload.status is not None:
+			updates["status"] = payload.status
+		if payload.quantity_received is not None:
+			updates["quantity_received"] = payload.quantity_received
+		updated = req.model_copy(update=updates)
+		self._typed_reorders[(tenant_id, reorder_id)] = updated
+		self._audit(tenant_id, "reorder_request_updated", reorder_id)
+		return updated
+
+	async def submit_reorder(self, tenant_id: str, reorder_id: str, submitted_by: str) -> Any | None:
+		"""Submit a pending reorder to the supplier."""
+		from .models import ReorderStatus
+		req = self._typed_reorders.get((tenant_id, reorder_id))
+		if req is None:
+			return None
+		if req.status != ReorderStatus.PENDING:
+			raise PolicyViolationError("only_pending_reorders_can_be_submitted")
+		updated = req.model_copy(update={
+			"status": ReorderStatus.SUBMITTED,
+			"submitted_at": datetime.utcnow(),
+			"updated_at": datetime.utcnow(),
+		})
+		self._typed_reorders[(tenant_id, reorder_id)] = updated
+		self._audit(tenant_id, "reorder_submitted", reorder_id)
+		return updated
+
+	async def receive_reorder(
+		self,
+		tenant_id: str,
+		reorder_id: str,
+		quantity_received: float,
+		received_by: str,
+	) -> Any | None:
+		"""Record receipt of an ordered stock delivery."""
+		from .models import ReorderStatus
+		assert quantity_received > 0, "quantity_received must be positive"
+		req = self._typed_reorders.get((tenant_id, reorder_id))
+		if req is None:
+			return None
+		updated = req.model_copy(update={
+			"status": ReorderStatus.RECEIVED,
+			"quantity_received": quantity_received,
+			"received_at": datetime.utcnow(),
+			"updated_at": datetime.utcnow(),
+		})
+		self._typed_reorders[(tenant_id, reorder_id)] = updated
+		self._audit(tenant_id, "reorder_received", reorder_id)
+		return updated
+
+	async def automated_reorder(
+		self,
+		tenant_id: str,
+		threshold_multiplier: float = 1.0,
+	) -> dict[str, Any]:
+		"""Scan all drugs and auto-create reorder requests for those at/below reorder point."""
+		self._enforce({
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write", "policy_attached": True,
+		})
+		from .models import ReorderRequestCreate, ReorderTrigger, Urgency
+		triggered: list[dict[str, Any]] = []
+		# Group inventory by drug
+		drug_totals: dict[str, tuple[float, float, str, str]] = {}  # drug_id -> (qty, reorder_pt, unit, item_id)
+		for (tid, item_id), item in self._inventory.items():
+			if tid != tenant_id or item.is_deleted or item.status in ("recalled", "expired"):
+				continue
+			existing_qty, existing_rp, unit, _ = drug_totals.get(item.drug_id, (0.0, item.reorder_point, item.unit, item_id))
+			drug_totals[item.drug_id] = (
+				existing_qty + item.quantity_on_hand,
+				max(existing_rp, item.reorder_point * threshold_multiplier),
+				unit, item_id,
+			)
+		for drug_id, (total_qty, reorder_pt, unit, item_id) in drug_totals.items():
+			if total_qty <= reorder_pt and reorder_pt > 0:
+				payload = ReorderRequestCreate(
+					tenant_id=tenant_id, drug_id=drug_id, inventory_item_id=item_id,
+					quantity_requested=max(reorder_pt * 3, 10.0), unit=unit,
+					urgency=Urgency.URGENT if total_qty == 0 else Urgency.ROUTINE,
+					triggered_by=ReorderTrigger.AUTO_REORDER, created_by="system",
+				)
+				req = await self.create_reorder_request(payload)
+				triggered.append({"drug_id": drug_id, "reorder_id": req.id, "quantity_on_hand": total_qty, "reorder_point": reorder_pt})
+		return {"tenant_id": tenant_id, "reorders_triggered": len(triggered), "reorders": triggered}
+
+	# ── prior auth extensions ─────────────────────────────────────────────────
+
+	async def get_prior_auth(self, tenant_id: str, pa_id: str) -> Any | None:
+		"""Get a prior authorization by ID."""
+		return self._prior_auths.get((tenant_id, pa_id))
+
+	async def withdraw_prior_auth(self, tenant_id: str, pa_id: str, actor_id: str) -> bool:
+		"""Withdraw a pending prior authorization."""
+		from .models import PriorAuthStatus
+		pa = self._prior_auths.get((tenant_id, pa_id))
+		if pa is None:
+			return False
+		if pa.status != PriorAuthStatus.PENDING:
+			raise PolicyViolationError("only_pending_prior_auths_can_be_withdrawn")
+		updated = pa.model_copy(update={
+			"status": PriorAuthStatus.WITHDRAWN,
+			"is_deleted": True, "updated_at": datetime.utcnow(),
+		})
+		self._prior_auths[(tenant_id, pa_id)] = updated
+		self._audit(tenant_id, "prior_auth_withdrawn", pa_id)
+		return True
+
+	# ── narcotics register typed CRUD ─────────────────────────────────────────
+
+	async def narcotics_register_entry(self, payload: Any) -> Any:
+		"""Create a typed narcotics register entry."""
+		from .models import NarcoticsRegisterEntryCreate, NarcoticsRegisterEntryResponse
+		if not isinstance(payload, NarcoticsRegisterEntryCreate):
+			payload = NarcoticsRegisterEntryCreate(**payload)
+		self._enforce({
+			"tenant_context_present": bool(payload.tenant_id),
+			"operation_type": "write", "policy_attached": True,
+			"dual_witness_present": bool(payload.witness_id) if payload.action == "waste" else True,
+		})
+		entry = NarcoticsRegisterEntryResponse(
+			id=uuid7str(), tenant_id=payload.tenant_id,
+			drug_id=payload.drug_id, drug_name=payload.drug_name,
+			drug_schedule=payload.drug_schedule, action=payload.action,
+			quantity=payload.quantity, unit=payload.unit,
+			balance_before=payload.balance_before, balance_after=payload.balance_after,
+			patient_id=payload.patient_id, prescription_id=payload.prescription_id,
+			dispense_order_id=payload.dispense_order_id,
+			performed_by=payload.performed_by, witness_id=payload.witness_id,
+			witness_signature_ref=payload.witness_signature_ref,
+			notes=payload.notes, discrepancy_amount=payload.discrepancy_amount,
+			discrepancy_reason=payload.discrepancy_reason, created_by=payload.created_by,
+		)
+		self._typed_narcotics[(payload.tenant_id, entry.id)] = entry
+		self._audit(payload.tenant_id, "narcotics_register_entry_created", entry.id)
+		return entry
+
+	async def get_narcotics_entry(self, tenant_id: str, entry_id: str) -> Any | None:
+		"""Get a narcotics register entry by ID."""
+		return self._typed_narcotics.get((tenant_id, entry_id))
+
+	async def list_narcotics_register(
+		self,
+		tenant_id: str,
+		drug_id: str | None = None,
+		action: str | None = None,
+	) -> list[Any]:
+		"""List narcotics register entries."""
+		results = [e for (tid, _), e in self._typed_narcotics.items() if tid == tenant_id and not e.is_deleted]
+		if drug_id:
+			results = [e for e in results if e.drug_id == drug_id]
+		if action:
+			results = [e for e in results if e.action == action]
+		return sorted(results, key=lambda e: e.created_at, reverse=True)
+
+	# ── counselling checklist CRUD ────────────────────────────────────────────
+
+	async def create_counselling_checklist(self, payload: Any) -> Any:
+		"""Create a counselling checklist record."""
+		from .models import CounsellingChecklistCreate, CounsellingChecklistResponse
+		from .domain.calculations import counselling_completion_score
+		if not isinstance(payload, CounsellingChecklistCreate):
+			payload = CounsellingChecklistCreate(**payload)
+		self._enforce({
+			"tenant_context_present": bool(payload.tenant_id),
+			"operation_type": "write", "policy_attached": True,
+		})
+		fields_dict = {
+			"indication_explained": payload.indication_explained,
+			"dosage_explained": payload.dosage_explained,
+			"administration_explained": payload.administration_explained,
+			"side_effects_explained": payload.side_effects_explained,
+			"interactions_explained": payload.interactions_explained,
+			"storage_explained": payload.storage_explained,
+			"missed_dose_explained": payload.missed_dose_explained,
+			"patient_questions_addressed": payload.patient_questions_addressed,
+			"patient_understood": payload.patient_understood,
+		}
+		score = counselling_completion_score(fields_dict)
+		checklist = CounsellingChecklistResponse(
+			id=uuid7str(), tenant_id=payload.tenant_id,
+			patient_id=payload.patient_id, dispense_order_id=payload.dispense_order_id,
+			drug_id=payload.drug_id, **fields_dict,
+			interpreter_used=payload.interpreter_used, language=payload.language,
+			pharmacist_id=payload.pharmacist_id, completion_score=score,
+			created_by=payload.created_by,
+		)
+		self._typed_counselling[(payload.tenant_id, checklist.id)] = checklist
+		self._audit(payload.tenant_id, "counselling_checklist_created", checklist.id)
+		return checklist
+
+	async def get_counselling_checklist(self, tenant_id: str, checklist_id: str) -> Any | None:
+		"""Get a counselling checklist by ID."""
+		return self._typed_counselling.get((tenant_id, checklist_id))
+
+	async def list_counselling_checklists(
+		self,
+		tenant_id: str,
+		patient_id: str | None = None,
+		dispense_order_id: str | None = None,
+	) -> list[Any]:
+		"""List counselling checklists."""
+		results = [c for (tid, _), c in self._typed_counselling.items() if tid == tenant_id and not c.is_deleted]
+		if patient_id:
+			results = [c for c in results if c.patient_id == patient_id]
+		if dispense_order_id:
+			results = [c for c in results if c.dispense_order_id == dispense_order_id]
+		return sorted(results, key=lambda c: c.created_at, reverse=True)
+
+	async def update_counselling_checklist(self, tenant_id: str, checklist_id: str, payload: Any) -> Any | None:
+		"""Update counselling checklist items and recalculate score."""
+		from .domain.calculations import counselling_completion_score
+		checklist = self._typed_counselling.get((tenant_id, checklist_id))
+		if checklist is None:
+			return None
+		updates: dict[str, Any] = {"updated_at": datetime.utcnow()}
+		for field in (
+			"indication_explained", "dosage_explained", "administration_explained",
+			"side_effects_explained", "interactions_explained", "storage_explained",
+			"missed_dose_explained", "patient_questions_addressed", "patient_understood",
+			"interpreter_used",
+		):
+			val = getattr(payload, field, None)
+			if val is not None:
+				updates[field] = val
+		updated = checklist.model_copy(update=updates)
+		# recalculate score
+		score = counselling_completion_score({
+			f: getattr(updated, f, False) for f in (
+				"indication_explained", "dosage_explained", "administration_explained",
+				"side_effects_explained", "interactions_explained", "storage_explained",
+				"missed_dose_explained", "patient_questions_addressed", "patient_understood",
+			)
+		})
+		updated = updated.model_copy(update={"completion_score": score})
+		self._typed_counselling[(tenant_id, checklist_id)] = updated
+		self._audit(tenant_id, "counselling_checklist_updated", checklist_id)
+		return updated
+
+	# ── reports ───────────────────────────────────────────────────────────────
+
+	async def dispensing_summary_report(self, tenant_id: str, period_start: datetime, period_end: datetime) -> Any:
+		"""Generate a dispensing summary report for a period."""
+		from .models import DispensingSummaryReport
+		orders = [
+			o for (tid, _), o in self._dispense_orders.items()
+			if tid == tenant_id and period_start <= o.created_at <= period_end
+		]
+		status_counts: dict[str, int] = {}
+		for o in orders:
+			status_counts[o.status] = status_counts.get(o.status, 0) + 1
+
+		# Drug frequency
+		drug_freq: dict[str, int] = {}
+		for o in orders:
+			drug_freq[o.drug_id] = drug_freq.get(o.drug_id, 0) + 1
+		top_drugs = sorted(
+			[{"drug_id": k, "count": v} for k, v in drug_freq.items()],
+			key=lambda x: x["count"], reverse=True,
+		)[:10]
+
+		# Counselling rate
+		counselled = sum(1 for o in orders if o.counselling_completed)
+		counselling_rate = round(counselled / len(orders), 4) if orders else 0.0
+
+		return DispensingSummaryReport(
+			tenant_id=tenant_id, period_start=period_start, period_end=period_end,
+			total_dispenses=len(orders),
+			pending=status_counts.get("pending", 0),
+			verified=status_counts.get("verified", 0),
+			dispensed=status_counts.get("dispensed", 0),
+			picked_up=status_counts.get("picked_up", 0),
+			returned=status_counts.get("returned", 0),
+			cancelled=status_counts.get("cancelled", 0),
+			top_drugs=top_drugs,
+			counselling_completion_rate=counselling_rate,
+		)
+
+	async def inventory_valuation_report(self, tenant_id: str) -> Any:
+		"""Generate an inventory valuation report."""
+		from .models import InventoryValuationReport
+		from .domain.calculations import total_inventory_value
+		items = [i for (tid, _), i in self._inventory.items() if tid == tenant_id and not i.is_deleted]
+		total_val = total_inventory_value([i.model_dump() for i in items])
+		in_stock = [i for i in items if i.status == "in_stock"]
+		in_stock_val = total_inventory_value([i.model_dump() for i in in_stock])
+		expiring_30 = sum(1 for i in items if 0 < i.days_remaining <= 30)
+		below_reorder = sum(1 for i in items if i.is_below_reorder_point)
+		return InventoryValuationReport(
+			tenant_id=tenant_id, as_of=datetime.utcnow(),
+			total_items=len(items), total_value=total_val,
+			in_stock_value=in_stock_val,
+			low_stock_count=sum(1 for i in items if i.status == "low_stock"),
+			expired_count=sum(1 for i in items if i.status == "expired"),
+			recalled_count=sum(1 for i in items if i.status == "recalled"),
+			quarantined_count=sum(1 for i in items if i.status == "quarantined"),
+			expiring_within_30_days=expiring_30,
+			below_reorder_point=below_reorder,
+		)
+
+	async def narcotics_audit_report(self, tenant_id: str, period_start: datetime, period_end: datetime) -> Any:
+		"""Generate a narcotics register audit report."""
+		from .models import NarcoticsAuditReport
+		entries = [
+			e for (tid, _), e in self._typed_narcotics.items()
+			if tid == tenant_id and period_start <= e.created_at <= period_end
+		]
+		action_counts: dict[str, int] = {}
+		discrepancies = 0
+		drugs_audited: set[str] = set()
+		witnessed = 0
+		waste_entries = 0
+		for e in entries:
+			action_counts[e.action] = action_counts.get(e.action, 0) + 1
+			drugs_audited.add(e.drug_id)
+			if e.discrepancy_amount is not None:
+				discrepancies += 1
+			if e.action == "waste":
+				waste_entries += 1
+				if e.witness_id:
+					witnessed += 1
+		witness_rate = round(witnessed / waste_entries, 4) if waste_entries else 1.0
+		return NarcoticsAuditReport(
+			tenant_id=tenant_id, period_start=period_start, period_end=period_end,
+			total_entries=len(entries), discrepancies_found=discrepancies,
+			drugs_audited=list(drugs_audited), entries_by_action=action_counts,
+			witness_compliance_rate=witness_rate,
+		)
+
+	async def cold_chain_report(self, tenant_id: str, period_start: datetime, period_end: datetime) -> Any:
+		"""Generate a cold chain compliance report."""
+		from .models import ColdChainReport
+		records = [
+			r for (tid, _), r in self._typed_cold_chain.items()
+			if tid == tenant_id and period_start <= r.created_at <= period_end
+		]
+		compliant = sum(1 for r in records if r.status == "compliant")
+		excursions = sum(1 for r in records if r.status == "excursion")
+		critical = sum(1 for r in records if r.status == "critical")
+		quarantined = sum(1 for r in records if r.status == "quarantined")
+		total = len(records)
+		rate = round(compliant / total, 4) if total else 1.0
+		affected = list({r.drug_id for r in records if r.status != "compliant"})
+		return ColdChainReport(
+			tenant_id=tenant_id, period_start=period_start, period_end=period_end,
+			total_readings=total, compliant=compliant, excursions=excursions,
+			critical=critical, quarantined=quarantined, compliance_rate=rate,
+			affected_drugs=affected,
+		)
 
 	# ── internal ──────────────────────────────────────────────────────────────
 

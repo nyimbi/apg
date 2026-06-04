@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page_title }} — APG Fleet</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/fle.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="fle-app">
+<main class="fle-main fle-form-page">
+  <header class="fle-page-header">
+    <a href="{{ url_for('fle_views.list_drivers') }}" class="fle-breadcrumb"><i class="fa-solid fa-chevron-left"></i> Drivers</a>
+    <h1><i class="fa-solid fa-plus"></i> {{ page_title }}</h1>
+  </header>
+  {% if error %}<div class="fle-alert fle-alert-danger">{{ error }}</div>{% endif %}
+  <section class="fle-card">
+    <form method="POST" class="fle-form">
+      <div class="fle-form-grid">
+        <div class="fle-form-group"><label for="name">Full Name *</label><input type="text" id="name" name="name" required class="fle-input" placeholder="John Kamau"></div>
+        <div class="fle-form-group"><label for="employee_number">Employee #</label><input type="text" id="employee_number" name="employee_number" class="fle-input" placeholder="EMP-001"></div>
+        <div class="fle-form-group"><label for="licence_number">Licence Number *</label><input type="text" id="licence_number" name="licence_number" required class="fle-input" placeholder="DLN-001"></div>
+        <div class="fle-form-group">
+          <label for="licence_class">Licence Class *</label>
+          <select id="licence_class" name="licence_class" required class="fle-select">
+            <option value="">— Select class —</option>
+            {% for c in licence_classes %}<option value="{{ c }}">{{ c|upper }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="fle-form-group"><label for="licence_expiry">Licence Expiry *</label><input type="datetime-local" id="licence_expiry" name="licence_expiry" required class="fle-input"></div>
+        <div class="fle-form-group"><label for="cpc_expiry">CPC Expiry</label><input type="datetime-local" id="cpc_expiry" name="cpc_expiry" class="fle-input"></div>
+        <div class="fle-form-group"><label for="medical_expiry">Medical Certificate Expiry</label><input type="datetime-local" id="medical_expiry" name="medical_expiry" class="fle-input"></div>
+        <div class="fle-form-group"><label for="tacho_card_number">Tachograph Card #</label><input type="text" id="tacho_card_number" name="tacho_card_number" class="fle-input" placeholder="TC-001"></div>
+        <div class="fle-form-group"><label for="phone">Phone</label><input type="tel" id="phone" name="phone" class="fle-input" placeholder="+254700000001"></div>
+        <div class="fle-form-group"><label for="email">Email</label><input type="email" id="email" name="email" class="fle-input"></div>
+      </div>
+      <div class="fle-form-group fle-form-full"><label for="notes">Notes</label><textarea id="notes" name="notes" rows="3" class="fle-textarea"></textarea></div>
+      <div class="fle-form-actions">
+        <a href="{{ url_for('fle_views.list_drivers') }}" class="fle-btn fle-btn-outline">Cancel</a>
+        <button type="submit" class="fle-btn fle-btn-primary"><i class="fa-solid fa-save"></i> Register Driver</button>
+      </div>
+    </form>
+  </section>
+</main>
+</body>
+</html>

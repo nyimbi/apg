@@ -860,3 +860,88 @@ class SwiftGpiStatus(BaseModel):
 	charges_deducted: Decimal = Decimal("0")
 	fx_rate_applied: Decimal | None = None
 	tracker_events: list[dict[str, Any]] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Alert / Optimization / Investment lightweight models
+# (used by analytics/event modules that import from .models)
+# ---------------------------------------------------------------------------
+
+class AlertSeverity(str, Enum):
+	INFO = "info"
+	WARNING = "warning"
+	CRITICAL = "critical"
+	EMERGENCY = "emergency"
+
+
+class AlertType(str, Enum):
+	LOW_BALANCE = "low_balance"
+	OVERDRAFT_RISK = "overdraft_risk"
+	LARGE_TRANSACTION = "large_transaction"
+	RECONCILIATION_VARIANCE = "reconciliation_variance"
+	FORECAST_DEVIATION = "forecast_deviation"
+	FX_EXPOSURE_BREACH = "fx_exposure_breach"
+	COVENANT_BREACH = "covenant_breach"
+	LIQUIDITY_DEFICIT = "liquidity_deficit"
+	TRAPPED_CASH = "trapped_cash"
+	PAYMENT_FAILURE = "payment_failure"
+
+
+class InvestmentStatus(str, Enum):
+	PENDING = "pending"
+	ACTIVE = "active"
+	MATURED = "matured"
+	CANCELLED = "cancelled"
+	REDEEMED = "redeemed"
+
+
+class CashAlert(CbmBase):
+	"""Operational alert on a cash account or position."""
+	alert_type: AlertType
+	severity: AlertSeverity
+	account_id: str | None = None
+	message: str
+	threshold: Decimal | None = None
+	actual_value: Decimal | None = None
+	acknowledged: bool = False
+	acknowledged_by: str | None = None
+	acknowledged_at: datetime | None = None
+
+
+class Investment(CbmBase):
+	"""Short-term investment instrument."""
+	account_id: str
+	investment_type: str  # from SUPPORTED_INVESTMENT_TYPES
+	counterparty: str
+	principal: Decimal
+	currency: CurrencyCode
+	annual_rate: Decimal
+	start_date: date
+	maturity_date: date
+	interest_accrued: Decimal = Decimal("0")
+	status: InvestmentStatus = InvestmentStatus.PENDING
+	reference: str | None = None
+	notes: str | None = None
+
+
+class OptimizationRule(CbmBase):
+	"""Rule governing automated cash concentration / sweep logic."""
+	rule_name: str
+	account_id: str
+	target_balance: Decimal
+	min_balance: Decimal
+	max_balance: Decimal
+	sweep_to_pool_id: str | None = None
+	trigger: str = "end_of_day"  # end_of_day | intraday | threshold
+	is_active: bool = True
+	priority: int = 100
+
+
+# ---------------------------------------------------------------------------
+# Backward-compatible aliases
+# ---------------------------------------------------------------------------
+
+# Some peripheral modules import "Bank" — map to BankAccount
+Bank = BankAccount
+# Some modules import "CashAccount" — map to BankAccount (same entity)
+CashAccount = BankAccount

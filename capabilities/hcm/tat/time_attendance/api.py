@@ -20,7 +20,10 @@ from typing import Any
 
 from flask import Blueprint, Response, Request, jsonify, request
 
-from .context import resolve_current_user_context
+try:
+	from .context import resolve_current_user_context
+except ImportError:  # pragma: no cover – direct-load via importlib in tests
+	from context import resolve_current_user_context  # type: ignore[no-redef]
 
 logger = logging.getLogger(__name__)
 

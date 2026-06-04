@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page_title }} — APG Fleet</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/fle.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="fle-app">
+<main class="fle-main">
+  <header class="fle-page-header">
+    <h1><i class="fa-solid fa-calendar-check"></i> {{ page_title }}</h1>
+    <span class="fle-badge">{{ total }} events</span>
+  </header>
+
+  {% if critical %}
+  <section class="fle-card fle-card-danger">
+    <h2><i class="fa-solid fa-circle-xmark"></i> Critical ({{ critical|length }})</h2>
+    <table class="fle-table">
+      <thead><tr><th>Entity</th><th>Event</th><th>Due Date</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for e in critical %}
+        <tr class="fle-row-danger">
+          <td>{{ e.entity_type|title }}: {{ e.entity_id[:8] }}…</td>
+          <td>{{ e.event_type|replace('_',' ')|title }}</td>
+          <td>{{ e.due_date[:10] }}</td>
+          <td class="fle-text-danger">
+            {% if e.is_overdue %}OVERDUE {{ e.days_until_due|abs }} day(s){% else %}Due in {{ e.days_until_due }} day(s){% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
+  {% if warning %}
+  <section class="fle-card fle-card-warning">
+    <h2><i class="fa-solid fa-triangle-exclamation"></i> Warnings ({{ warning|length }})</h2>
+    <table class="fle-table">
+      <thead><tr><th>Entity</th><th>Event</th><th>Due Date</th><th>Days Remaining</th></tr></thead>
+      <tbody>
+      {% for e in warning %}
+        <tr class="fle-row-warning">
+          <td>{{ e.entity_type|title }}: {{ e.entity_id[:8] }}…</td>
+          <td>{{ e.event_type|replace('_',' ')|title }}</td>
+          <td>{{ e.due_date[:10] }}</td>
+          <td class="fle-text-warning">{{ e.days_until_due }} day(s)</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
+  {% if info %}
+  <section class="fle-card">
+    <h2><i class="fa-solid fa-circle-info"></i> Upcoming ({{ info|length }})</h2>
+    <table class="fle-table">
+      <thead><tr><th>Entity</th><th>Event</th><th>Due Date</th><th>Days Remaining</th></tr></thead>
+      <tbody>
+      {% for e in info %}
+        <tr>
+          <td>{{ e.entity_type|title }}: {{ e.entity_id[:8] }}…</td>
+          <td>{{ e.event_type|replace('_',' ')|title }}</td>
+          <td>{{ e.due_date[:10] }}</td>
+          <td>{{ e.days_until_due }} day(s)</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
+  {% if not critical and not warning and not info %}
+  <div class="fle-empty-state">
+    <i class="fa-solid fa-check-circle fa-3x fle-text-success"></i>
+    <p>All compliance items are current. No upcoming events within 30 days.</p>
+  </div>
+  {% endif %}
+</main>
+</body>
+</html>

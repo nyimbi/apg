@@ -19,8 +19,18 @@ import logging
 from contextlib import asynccontextmanager
 
 from pydantic import BaseModel, Field, ConfigDict
-from uuid_extensions import uuid7str
-import asyncpg
+try:
+	from uuid6 import uuid7 as _uuid7
+	def uuid7str() -> str:
+		return str(_uuid7())
+except ImportError:
+	import uuid as _uuid
+	def uuid7str() -> str:  # type: ignore[misc]
+		return str(_uuid.uuid4())
+try:
+	import asyncpg  # type: ignore[import]
+except ImportError:
+	asyncpg = None  # type: ignore[assignment]
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

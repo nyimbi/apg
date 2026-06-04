@@ -628,6 +628,82 @@ def submit_filing(filing_id: str) -> Any:
 
 
 # ---------------------------------------------------------------------------
+# TBML / NFT / Crypto / Correspondent / TF endpoints
+# ---------------------------------------------------------------------------
+
+@aml_bp.post("/tbml/detect")
+def detect_tbml() -> Any:
+	"""POST body: {invoices, market_value_lookup?, over_under_threshold?, phantom_shipment_indicators?}"""
+	try:
+		b = _body()
+		return _ok(_run(_svc().detect_trade_based_ml(
+			invoices=b.get("invoices", []),
+			market_value_lookup=b.get("market_value_lookup"),
+			over_under_threshold=float(b.get("over_under_threshold", 0.15)),
+			phantom_shipment_indicators=b.get("phantom_shipment_indicators"),
+		)))
+	except (AssertionError, ValueError) as exc:
+		return _err(exc)
+
+
+@aml_bp.post("/nft/wash-trade")
+def detect_nft_wash_trade() -> Any:
+	"""POST body: {nft_transfers, lookback_days?, min_round_trips?, price_inflation_threshold?}"""
+	try:
+		b = _body()
+		return _ok(_run(_svc().detect_nft_wash_trading(
+			nft_transfers=b.get("nft_transfers", []),
+			lookback_days=int(b.get("lookback_days", 30)),
+			min_round_trips=int(b.get("min_round_trips", 2)),
+			price_inflation_threshold=float(b.get("price_inflation_threshold", 3.0)),
+		)))
+	except (AssertionError, ValueError) as exc:
+		return _err(exc)
+
+
+@aml_bp.post("/crypto/mixer-detection")
+def detect_mixer() -> Any:
+	"""POST body: {crypto_transactions, known_mixer_addresses?}"""
+	try:
+		b = _body()
+		addrs = set(b.get("known_mixer_addresses") or [])
+		return _ok(_run(_svc().detect_crypto_mixer_routing(
+			crypto_transactions=b.get("crypto_transactions", []),
+			known_mixer_addresses=addrs if addrs else None,
+		)))
+	except (AssertionError, ValueError) as exc:
+		return _err(exc)
+
+
+@aml_bp.post("/correspondent/analyse")
+def correspondent_analysis() -> Any:
+	"""POST body: {correspondent_chain, high_risk_jurisdictions?, max_nesting_depth?}"""
+	try:
+		b = _body()
+		hr = set(b.get("high_risk_jurisdictions") or [])
+		return _ok(_run(_svc().correspondent_banking_analysis(
+			correspondent_chain=b.get("correspondent_chain", []),
+			high_risk_jurisdictions=hr if hr else None,
+			max_nesting_depth=int(b.get("max_nesting_depth", 3)),
+		)))
+	except (AssertionError, ValueError) as exc:
+		return _err(exc)
+
+
+@aml_bp.get("/tf/<customer_id>")
+def detect_tf(customer_id: str) -> Any:
+	"""GET /tf/<customer_id>?lookback_days=90"""
+	try:
+		lookback = int(request.args.get("lookback_days", 90))
+		return _ok(_run(_svc().detect_terrorist_financing(
+			customer_id=customer_id,
+			lookback_days=lookback,
+		)))
+	except (AssertionError, ValueError) as exc:
+		return _err(exc)
+
+
+# ---------------------------------------------------------------------------
 # Backward-compat process-local helpers (used by existing app.py / tests)
 # ---------------------------------------------------------------------------
 

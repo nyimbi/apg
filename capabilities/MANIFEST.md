@@ -2936,9 +2936,6 @@ apg-common-mlcm --port 8080
 - `/moni/traces` — traces (moni:view_traces)
 - _10 more..._
 
-**Streaming events** via `bytewax`:
-`metric_recorded`, `metric_threshold_breached`, `alert_triggered`, `alert_resolved`, `health_check_failed`, ...
-
 **Standalone usage:**
 ```bash
 pip install apg-common-moni
@@ -3100,8 +3097,8 @@ apg-common-ncod --port 8080
 - `mlcm`
 - `conf`
 
-**Service methods** (193 total):
-`ensure_module`, `from_pretrained`, `polarity_scores`, `initialize_models`, `_initialize_spacy_models`, `_initialize_nltk`, `_initialize_gensim`, `process_document`, `_process_single_task`, `_tokenize_text`, `_segment_sentences`, `_detect_language`, ...
+**Service methods** (40 total):
+`uuid7str`, `create_document`, `get_document`, `list_documents`, `delete_document`, `detect_language`, `extract_entities`, `sentiment_analysis`, `intent_classification`, `text_summarisation`, `_ollama_summarise`, `translate`, ...
 
 **Governance rules** (38 total):
 `tenant_context_required`, `document_requires_content`, `document_size_within_limit`, `document_requires_language_or_detection`, `language_required_or_detected`, `language_must_be_supported`, `language_detection_low_confidence_requires_review`, `task_must_be_enabled`, ...
@@ -5503,8 +5500,8 @@ apg-fin-accounts_receivable --port 8080
 - `cbm_cash_management`
 - `bia_anl`
 
-**Service methods** (42 total):
-`create_budget_cycle`, `update_budget`, `add_budget_line`, `submit_budget`, `approve_budget`, `reject_budget`, `lock_budget`, `close_budget`, `cancel_budget`, `get_budget`, `list_budgets`, `get_budget_lines`, ...
+**Service methods** (43 total):
+`as_actor`, `create_budget_cycle`, `update_budget`, `add_budget_line`, `submit_budget`, `approve_budget`, `reject_budget`, `lock_budget`, `close_budget`, `cancel_budget`, `get_budget`, `list_budgets`, ...
 
 **Governance rules** (35 total):
 `tenant_context_required`, `bfc_write_requires_policy`, `budget_requires_owner`, `budget_requires_fiscal_year`, `budget_requires_currency`, `budget_requires_period_dates`, `budget_period_end_after_start`, `budget_line_requires_budget`, ...
@@ -5559,7 +5556,7 @@ apg-fin-budgeting_forecasting --port 8080
 - `wflo`
 - `glr_general_ledger`
 
-**Service methods** (40 total):
+**Service methods** (49 total):
 `bank_account_balance`, `import_bank_statement`, `auto_reconcile_statement`, `manual_match`, `reconciliation_report`, `cash_position_report`, `liquidity_forecast`, `fx_position`, `cash_pooling_sweep`, `intercompany_settlement`, `bank_covenant_compliance`, `mobile_money_reconciliation`, ...
 
 **Governance rules** (36 total):
@@ -5673,7 +5670,7 @@ apg-fin-rpt --port 8080
 - `wflo`
 - `srch`
 
-**Service methods** (55 total):
+**Service methods** (57 total):
 `create_account`, `record_dimension`, `open_period`, `create_journal_batch`, `create_journal_entry`, `approve_journal`, `post_journal`, `reverse_journal`, `record_currency_rate`, `create_allocation`, `generate_trial_balance`, `register_glr_agent`, ...
 
 **Governance rules** (36 total):
@@ -5791,7 +5788,7 @@ apg-fintech-agency --port 8080
 - `fintech_wallets`
 - `fintech_kyc`
 
-**Service methods** (66 total):
+**Service methods** (71 total):
 `_emit_event`, `create_rule`, `get_rule`, `update_rule`, `delete_rule`, `list_rules`, `monitor_transaction`, `evaluate_rules`, `_evaluate_single_rule`, `generate_alert`, `create_alert`, `get_alert`, ...
 
 **Governance rules** (42 total):
@@ -6805,7 +6802,7 @@ apg-fintech-neobanking --port 8080
 - `cbm_cash_management`
 - `arc_accounts_receivable`
 
-**Service methods** (78 total):
+**Service methods** (89 total):
 `_save`, `_get`, `_query`, `_emit`, `initiate_payment`, `mpesa_stk_push`, `mpesa_b2c`, `mpesa_b2b`, `mtn_momo_request_to_pay`, `airtel_money_push`, `tigo_pesa_collect`, `bank_eft_transfer`, ...
 
 **Governance rules** (40 total):
@@ -8748,7 +8745,7 @@ apg-healthcare-dev --port 8080
 - `wflo`
 - `mqeb`
 
-**Service methods** (72 total):
+**Service methods** (112 total):
 `check_permission`, `record`, `send`, `get`, `put`, `list`, `delete`, `get_auth_adapter`, `get_audit_adapter`, `get_notify_adapter`, `get_store`, `describe`, ...
 
 **Governance rules** (20 total):
@@ -8803,7 +8800,7 @@ apg-healthcare-emr --port 8080
 - `moni`
 - `mqeb`
 
-**Service methods** (41 total):
+**Service methods** (77 total):
 `describe`, `evaluate`, `create_order`, `receive_lab_order`, `cancel_order`, `get_order`, `list_orders`, `collect_specimen`, `label_specimen`, `track_specimen_chain_of_custody`, `reject_specimen`, `receive_specimen`, ...
 
 **Governance rules** (20 total):
@@ -8859,8 +8856,8 @@ apg-healthcare-lab --port 8080
 - `moni`
 - `mqeb`
 
-**Service methods** (40 total):
-`describe`, `evaluate`, `add_drug_to_formulary`, `get_drug`, `list_drugs`, `mark_drug_lasa`, `update_formulary_status`, `formulary_review`, `verify_prescription`, `check_drug_interactions_at_dispense`, `dispense_medication`, `create_dispense_order`, ...
+**Service methods** (88 total):
+`describe`, `evaluate`, `add_drug_to_formulary`, `get_drug`, `mark_drug_lasa`, `update_formulary_status`, `formulary_review`, `verify_prescription`, `check_drug_interactions_at_dispense`, `dispense_medication`, `create_dispense_order`, `verify_dispense`, ...
 
 **Governance rules** (21 total):
 `tenant_context_required`, `write_requires_policy`, `cross_tenant_dispense_denied`, `contraindicated_dispense_denied`, `pharmacist_verification_required`, `recalled_drug_dispense_denied`, `expired_drug_dispense_denied`, `out_of_stock_dispense_denied`, ...
@@ -8914,7 +8911,7 @@ apg-healthcare-pha --port 8080
 - `schd`
 - `mqeb`
 
-**Service methods** (40 total):
+**Service methods** (54 total):
 `describe`, `register_patient`, `get_patient`, `search_patient`, `search_patients`, `update_patient_status`, `merge_patients`, `admit_patient`, `transfer_patient`, `discharge_patient`, `list_admissions`, `register_bed`, ...
 
 **Governance rules** (22 total):
@@ -9588,7 +9585,7 @@ apg-intel-finint --port 8080
 - `ragn`
 - `geos`
 
-**Service methods** (69 total):
+**Service methods** (96 total):
 `create_intel_item`, `get_intel_item`, `list_intel_items`, `update_intel_item`, `delete_intel_item`, `validate_intel_item`, `reject_intel_item`, `_set_item_status`, `create_workspace`, `get_workspace`, `list_workspaces`, `update_workspace`, ...
 
 **Governance rules** (67 total):
@@ -9814,7 +9811,7 @@ apg-intel-monitoring --port 8080
 - `ragn`
 - `geoi`
 
-**Service methods** (61 total):
+**Service methods** (73 total):
 `describe`, `evaluate_rules`, `register_source`, `update_source`, `get_source`, `list_sources`, `delete_source`, `create_task`, `start_task`, `complete_task`, `fail_task`, `cancel_task`, ...
 
 **Governance rules** (49 total):
@@ -12043,7 +12040,7 @@ apg-realestate-ins --port 8080
 - `mqeb`
 - `schd`
 
-**Service methods** (51 total):
+**Service methods** (72 total):
 `create_lease`, `review_lease_terms`, `execute_lease`, `amend_lease`, `renew_lease`, `surrender_lease`, `terminate_lease`, `get_lease_expiry_pipeline`, `classify_lease_ifrs16`, `calculate_rou_asset`, `calculate_lease_liability`, `amortise_rou_asset`, ...
 
 **Governance rules** (22 total):
@@ -12560,7 +12557,7 @@ apg-retail-omc --port 8080
 - `moni`
 - `comp`
 
-**Service methods** (81 total):
+**Service methods** (87 total):
 `model_dump`, `model_dump`, `model_dump`, `model_dump`, `model_dump`, `put`, `get_item`, `tenant_values`, `all_values`, `set_stock`, `get_stock`, `adjust_stock`, ...
 
 **Governance rules** (24 total):

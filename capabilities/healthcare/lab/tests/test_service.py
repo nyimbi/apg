@@ -32,6 +32,9 @@ def test_create_order():
 
 
 def test_create_order_unsupported_category_denied():
+	"""Pydantic rejects invalid enums at validation time; both Pydantic ValidationError
+	and PolicyViolationError represent a correctly rejected request."""
+	from pydantic import ValidationError
 	s = svc()
 	try:
 		run(s.create_order(LabOrderCreate(
@@ -39,8 +42,8 @@ def test_create_order_unsupported_category_denied():
 			test_code="X", test_name="X", test_category="unknown_cat",
 			ordered_by="dr1", clinical_indication="x", specimen_type="blood_venous", created_by="dr1",
 		)))
-		assert False
-	except PolicyViolationError:
+		assert False, "expected a rejection"
+	except (PolicyViolationError, ValidationError):
 		pass
 
 

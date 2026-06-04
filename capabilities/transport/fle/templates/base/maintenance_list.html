@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page_title }} — APG Fleet</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/fle.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="fle-app">
+<main class="fle-main">
+  <header class="fle-page-header">
+    <h1><i class="fa-solid fa-wrench"></i> {{ page_title }}</h1>
+    <a href="{{ url_for('fle_views.create_maintenance') }}" class="fle-btn fle-btn-primary"><i class="fa-solid fa-plus"></i> Schedule Maintenance</a>
+  </header>
+  <div class="fle-filter-bar">
+    <a href="{{ url_for('fle_views.list_maintenance') }}" class="fle-filter-btn {% if not status_filter %}active{% endif %}">All</a>
+    {% for s in ['scheduled','in_progress','completed','overdue','deferred','cancelled'] %}
+    <a href="{{ url_for('fle_views.list_maintenance', status=s) }}" class="fle-filter-btn {% if status_filter == s %}active{% endif %}">{{ s|replace('_',' ')|title }}</a>
+    {% endfor %}
+  </div>
+  <section class="fle-card">
+    {% if maintenance %}
+    <table class="fle-table fle-table-hover">
+      <thead><tr><th>Vehicle</th><th>Type</th><th>Description</th><th>Scheduled</th><th>Status</th><th>Est. Cost</th><th>Actual Cost</th></tr></thead>
+      <tbody>
+      {% for m in maintenance %}
+        <tr class="{% if (m.status.value if m.status is not string else m.status) == 'overdue' %}fle-row-danger{% endif %}">
+          <td>{{ m.vehicle_id[:8] }}…</td>
+          <td>{{ (m.maintenance_type.value if m.maintenance_type is not string else m.maintenance_type)|replace('_',' ')|title }}</td>
+          <td>{{ m.description[:60] }}</td>
+          <td>{{ m.scheduled_date[:10] }}</td>
+          <td><span class="fle-status fle-status-{{ m.status.value if m.status is not string else m.status }}">{{ (m.status.value if m.status is not string else m.status)|replace('_',' ')|title }}</span></td>
+          <td>{{ "{:,.0f}".format(m.estimated_cost|float) }}</td>
+          <td>{% if m.actual_cost %}{{ "{:,.0f}".format(m.actual_cost|float) }}{% else %}—{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="fle-empty-state">
+      <i class="fa-solid fa-wrench fa-3x"></i>
+      <p>No maintenance records. <a href="{{ url_for('fle_views.create_maintenance') }}">Schedule first maintenance.</a></p>
+    </div>
+    {% endif %}
+  </section>
+</main>
+</body>
+</html>

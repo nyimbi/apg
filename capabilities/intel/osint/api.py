@@ -835,3 +835,82 @@ def audit_log():
 @_handle
 def get_contract():
 	return _ok(_run(_svc().describe()))
+
+
+# ---------------------------------------------------------------------------
+# Module-level legacy interface (used by test_package_contract.py)
+# These are plain synchronous functions that the test harness calls directly
+# on the imported api module — they are NOT Flask route handlers.
+# ---------------------------------------------------------------------------
+
+_LEGACY_SERVICE: "OSINTService | None" = None
+
+
+def service() -> "OSINTService":
+	"""Return a shared in-memory OSINTService instance for the legacy API interface."""
+	global _LEGACY_SERVICE
+	if _LEGACY_SERVICE is None:
+		_LEGACY_SERVICE = OSINTService(db_session=None, tenant_id="default", actor_id="system")
+	return _LEGACY_SERVICE
+
+
+def register_requirement(data: dict) -> dict:
+	"""Register an intelligence requirement (module-level legacy function)."""
+	svc = service()
+	# Temporarily adopt the caller's tenant context
+	svc._tenant_id = data.get("tenant_id", "default")
+	return svc.register_requirement(
+		requirement_id=data.get("requirement_id", str(id(data))),
+		tenant_id=data.get("tenant_id", "default"),
+		topic=data.get("topic", ""),
+		priority=data.get("priority", "medium"),
+		requester_id=data.get("requester_id", ""),
+		classification=data.get("classification", "unclassified"),
+		evidence_reference=data.get("evidence_reference", ""),
+	)
+
+
+def register_source(data: dict) -> dict:
+	"""Register an intelligence source (module-level legacy function)."""
+	svc = service()
+	svc._tenant_id = data.get("tenant_id", "default")
+	return svc._sync_register_source(
+		source_id=data.get("source_id", str(id(data))),
+		tenant_id=data.get("tenant_id", "default"),
+		source_type=data.get("source_type", "web"),
+		source_reference=data.get("source_reference", ""),
+		owner_id=data.get("owner_id", ""),
+		terms_review_reference=data.get("terms_review_reference", ""),
+		risk_tier=data.get("risk_tier", "low"),
+		evidence_reference=data.get("evidence_reference", ""),
+	)
+
+
+def record_collection_plan(data: dict) -> dict:
+	"""Record a collection plan (module-level legacy function)."""
+	svc = service()
+	svc._tenant_id = data.get("tenant_id", "default")
+	return svc.record_collection_plan(
+		plan_id=data.get("plan_id", str(id(data))),
+		tenant_id=data.get("tenant_id", "default"),
+		requirement_id=data.get("requirement_id", ""),
+		source_id=data.get("source_id", ""),
+		method=data.get("method", "manual_review"),
+		cadence=data.get("cadence", "daily"),
+		approval_reference=data.get("approval_reference", ""),
+		evidence_reference=data.get("evidence_reference", ""),
+	)
+
+
+def register_osint_agent(data: dict) -> dict:
+	"""Register an OSINT agent (module-level legacy function)."""
+	svc = service()
+	svc._tenant_id = data.get("tenant_id", "default")
+	return svc.register_osint_agent(
+		agent_id=data.get("agent_id", str(id(data))),
+		tenant_id=data.get("tenant_id", "default"),
+		name=data.get("name", ""),
+		runtime=data.get("runtime", "codex"),
+		role=data.get("role", "source_scout"),
+		scope=data.get("scope", ""),
+	)

@@ -24,9 +24,24 @@ from plotly.subplots import make_subplots
 import pandas as pd
 import numpy as np
 from pydantic import BaseModel, Field, ConfigDict
-from uuid_extensions import uuid7str
-import asyncpg
-import redis.asyncio as redis
+try:
+	from uuid6 import uuid7 as _uuid7
+	def uuid7str() -> str:
+		return str(_uuid7())
+except ImportError:
+	import uuid as _uuid
+	def uuid7str() -> str:  # type: ignore[misc]
+		return str(_uuid.uuid4())
+
+try:
+	import asyncpg as _asyncpg  # noqa: F401
+except ImportError:
+	_asyncpg = None  # type: ignore[assignment]
+
+try:
+	import redis.asyncio as redis  # noqa: F401
+except ImportError:
+	redis = None  # type: ignore[assignment]
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

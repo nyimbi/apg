@@ -302,3 +302,68 @@ async def threat_landscape_model(
 		"tenant_id": tenant_id,
 		"report": report.model_dump(),
 	}
+
+
+# ---------------------------------------------------------------------------
+# Legacy synchronous view models (used by test_package_contract.py)
+# ---------------------------------------------------------------------------
+
+def dashboard_model(svc: OSINTService, tenant_id: str = "default") -> dict[str, Any]:  # type: ignore[override]
+	"""Dashboard KPI view model — synchronous legacy interface.
+
+	Args:
+		svc: An OSINTService instance.
+		tenant_id: Tenant context.
+
+	Returns:
+		Dict with 'summary' containing KPI counts.
+	"""
+	summary = svc._sync_dashboard_summary(tenant_id)
+	contract = get_capability_contract(tenant_id)
+	return {
+		"title": "Open Source Intelligence",
+		"tenant_id": tenant_id,
+		"summary": summary,
+		"theme": contract["theme"],
+		"routes": contract["ui"]["routes"],
+		"streaming": contract["streaming"],
+	}
+
+
+def osint_console_model(svc: OSINTService, tenant_id: str = "default") -> dict[str, Any]:
+	"""OSINT operations console view model — synchronous legacy interface.
+
+	Returns collection plans, requirements, agents, and source lists for the
+	given tenant.
+
+	Args:
+		svc: An OSINTService instance.
+		tenant_id: Tenant context.
+
+	Returns:
+		Dict with 'collection_plans', 'requirements', 'agents', 'sources'.
+	"""
+	collection_plans = [
+		v for (t, _), v in getattr(svc, "_collection_plans", {}).items()
+		if t == tenant_id
+	]
+	requirements = [
+		v for (t, _), v in getattr(svc, "_requirements", {}).items()
+		if t == tenant_id
+	]
+	legacy_agents = [
+		v for (t, _), v in getattr(svc, "_legacy_agents", {}).items()
+		if t == tenant_id
+	]
+	legacy_sources = [
+		v for (t, _), v in getattr(svc, "_legacy_sources", {}).items()
+		if t == tenant_id
+	]
+	return {
+		"title": "OSINT Operations Console",
+		"tenant_id": tenant_id,
+		"collection_plans": collection_plans,
+		"requirements": requirements,
+		"agents": legacy_agents,
+		"sources": legacy_sources,
+	}

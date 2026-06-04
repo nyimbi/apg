@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page_title }} — APG Fleet</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/fle.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="fle-app">
+<main class="fle-main">
+  <header class="fle-page-header">
+    <div>
+      <a href="{{ url_for('fle_views.list_trips') }}" class="fle-breadcrumb"><i class="fa-solid fa-chevron-left"></i> Trips</a>
+      <h1><i class="fa-solid fa-route"></i> {{ trip.origin }} → {{ trip.destination }}</h1>
+    </div>
+    <span class="fle-status fle-status-{{ trip.status.value if trip.status is not string else trip.status }} fle-status-lg">
+      {{ (trip.status.value if trip.status is not string else trip.status)|replace('_',' ')|title }}
+    </span>
+  </header>
+  <div class="fle-two-col">
+    <section class="fle-card">
+      <h2>Trip Details</h2>
+      <dl class="fle-dl">
+        <dt>Origin</dt><dd>{{ trip.origin }}</dd>
+        <dt>Destination</dt><dd>{{ trip.destination }}</dd>
+        <dt>Vehicle</dt><dd>{{ trip.vehicle_id }}</dd>
+        <dt>Driver</dt><dd>{{ trip.driver_id }}</dd>
+        <dt>Load</dt><dd>{{ "{:,.0f}".format(trip.load_kg|float) }} kg</dd>
+        {% if trip.load_description %}<dt>Load Desc.</dt><dd>{{ trip.load_description }}</dd>{% endif %}
+        <dt>Planned Departure</dt><dd>{{ trip.planned_departure[:16].replace('T',' ') }}</dd>
+        {% if trip.planned_arrival %}<dt>Planned Arrival</dt><dd>{{ trip.planned_arrival[:16].replace('T',' ') }}</dd>{% endif %}
+        {% if trip.actual_departure %}<dt>Actual Departure</dt><dd>{{ trip.actual_departure[:16].replace('T',' ') }}</dd>{% endif %}
+        {% if trip.actual_arrival %}<dt>Actual Arrival</dt><dd>{{ trip.actual_arrival[:16].replace('T',' ') }}</dd>{% endif %}
+        {% if trip.distance_km %}<dt>Distance</dt><dd>{{ "{:,.0f}".format(trip.distance_km|float) }} km</dd>{% endif %}
+        {% if trip.fuel_consumed_l %}<dt>Fuel Consumed</dt><dd>{{ "{:,.1f}".format(trip.fuel_consumed_l|float) }} L</dd>{% endif %}
+        {% if trip.customs_required %}<dt>Cross-Border</dt><dd>{{ trip.cross_border_countries|join(', ') }}</dd>{% endif %}
+        {% if trip.delay_reason %}<dt>Delay / Reason</dt><dd class="fle-text-warning">{{ trip.delay_reason }}</dd>{% endif %}
+        {% if trip.breakdown_at %}<dt>Breakdown At</dt><dd class="fle-text-danger">{{ trip.breakdown_at[:16].replace('T',' ') }}</dd>{% endif %}
+      </dl>
+    </section>
+    <section class="fle-card">
+      <h2>Trip Actions</h2>
+      <div class="fle-action-stack">
+        {% set status = trip.status.value if trip.status is not string else trip.status %}
+        {% if status == 'planned' %}
+          <form action="/api/fle/v1/trips/{{ trip.id }}/dispatch" method="POST">
+            <button type="submit" class="fle-btn fle-btn-success fle-btn-block">Dispatch Trip</button>
+          </form>
+        {% endif %}
+        {% if status in ('planned','dispatched') %}
+          <form action="/api/fle/v1/trips/{{ trip.id }}/cancel" method="POST">
+            <button type="submit" class="fle-btn fle-btn-danger fle-btn-block">Cancel Trip</button>
+          </form>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+</main>
+</body>
+</html>
