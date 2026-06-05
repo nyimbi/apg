@@ -2936,6 +2936,9 @@ apg-common-mlcm --port 8080
 - `/moni/traces` — traces (moni:view_traces)
 - _10 more..._
 
+**Streaming events** via `bytewax`:
+`metric_recorded`, `metric_threshold_breached`, `alert_triggered`, `alert_resolved`, `health_check_failed`, ...
+
 **Standalone usage:**
 ```bash
 pip install apg-common-moni

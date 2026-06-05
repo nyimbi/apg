@@ -101,6 +101,22 @@ class CapabilityConfiguration:
 			"require_human_approval_for_privileged_roles": True
 		},
 		"streaming": {
+			"processor": "bytewax",
+			"stream": "apg.common.moni.lifecycle",
+			"key": "tenant_id",
+			"events": [
+				"metric_recorded",
+				"alert_fired",
+				"alert_resolved",
+				"incident_created",
+				"incident_closed",
+				"slo_breach_detected",
+				"health_check_failed",
+				"anomaly_detected"
+			],
+			"guardrails": [
+				"monitoring_batch_requires_bytewax"
+			],
 			"engine": "bytewax",
 			"lifecycle_stream": "moni.lifecycle",
 			"watermark": "event_time",
@@ -673,7 +689,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		},
 		"ui": ui_manifest(),
 		"agents": agent_manifest(),
-		"streaming": streaming_manifest(),
+		"streaming": STREAMING,
 		"review_evidence": {
 			"durable_statuses": [
 				"pending",

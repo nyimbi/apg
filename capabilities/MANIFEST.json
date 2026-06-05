@@ -14992,10 +14992,26 @@
         }
       ],
       "route_count": 16,
-      "streaming_processor": "",
-      "streaming_stream": "",
-      "streaming_events": [],
-      "streaming_guardrails": [],
+      "streaming_processor": "bytewax",
+      "streaming_stream": "apg.moni.lifecycle",
+      "streaming_events": [
+        "metric_recorded",
+        "metric_threshold_breached",
+        "alert_triggered",
+        "alert_resolved",
+        "health_check_failed",
+        "dashboard_created",
+        "dashboard_updated",
+        "trace_captured",
+        "slo_breached",
+        "incident_raised",
+        "incident_resolved",
+        "agent_registered"
+      ],
+      "streaming_guardrails": [
+        "moni_batch_requires_bytewax",
+        "moni_privileged_action_requires_human_approval"
+      ],
       "theme_name": "moni_signal_console",
       "theme_tokens": [
         "color.primary",
