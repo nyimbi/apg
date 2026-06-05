@@ -524,6 +524,9 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 			if kind in {"db", "database"}:
 				module.entities.append(self._parse_source_database(name, body, source_file))
 				continue
+			if kind == "agent" and self._is_agent_config_body(body):
+				module.entities.append(self._parse_source_agent(name, body, source_file))
+				continue
 			properties, methods = self._parse_source_members(body, source_file)
 			entity_type = self._entity_type_for_source_kind(kind)
 			module.entities.append(EntityDeclaration(
@@ -895,6 +898,45 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 					source_file=source_file,
 				))
 		return indexes
+
+	_TYPED_PROP_RE = re.compile(r":\s*(str|int|float|bool|bytes|list|dict|Any)\b|\s*->\s*\w+\s*=\s*\{")
+
+	def _is_agent_config_body(self, body: str) -> bool:
+		"""Return True when body uses agent config syntax (role:/model:) not typed entity properties."""
+		if self._TYPED_PROP_RE.search(body):
+			return False
+		return bool(re.search(r"\b(role|model|system|capabilities|tools|memory)\s*:", body))
+
+	def _parse_source_agent(self, name: str, body: str, source_file: Optional[str]) -> AIAgentDeclaration:
+		"""Parse agent { role:...; model:...; ... } into AIAgentDeclaration."""
+		from .ai_agent_composition import _parse_properties, _string_list, _rule_list
+
+		props = _parse_properties(body)
+
+		def _strval(key: str) -> str:
+			v = props.get(key, "")
+			return str(v).strip('"\'') if v else ""
+
+		mem_raw = props.get("memory", "")
+		memory: Optional[AgentMemory] = None
+		if mem_raw:
+			parts = str(mem_raw).split()
+			if len(parts) >= 2:
+				memory = AgentMemory(kind=parts[0], name=parts[-1])
+
+		return AIAgentDeclaration(
+			entity_type=EntityType.AGENT,
+			name=name,
+			source_file=source_file,
+			role=_strval("role"),
+			model=_strval("model"),
+			system_prompt=_strval("system"),
+			capabilities=_string_list(props.get("capabilities", [])),
+			tools=_string_list(props.get("tools", [])),
+			memory=memory,
+			configuration=props.get("configuration", {}),
+			rules=_rule_list(props.get("rules", [])),
+		)
 
 	def _parse_source_members(self, body: str, source_file: Optional[str]):
 		properties: List[PropertyDeclaration] = []

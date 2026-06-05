@@ -465,7 +465,7 @@ workflow LearningAndAssessmentFlow {
     guards: {
         assessment_submitted: "enrolment_status == active and attempts_remaining > 0",
         graded:               "submission_complete and marking_scheme_loaded",
-        certificate_issued:   "final_score >= passing_score and all_assessments_graded"
+        certificate_issued:   "final_score >= passing_score and all_assessments_graded",
     };
 }
 

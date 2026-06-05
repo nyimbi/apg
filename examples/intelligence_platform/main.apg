@@ -162,7 +162,7 @@ agent ThreatAnalyst {
 }
 
 agent_team FusionCell {
-    agents: [ThreatAnalyst, ThreatAnalyst];
+    agents: [ThreatAnalyst];
     capabilities: [intelligence_fusion, analytical_products];
     flow: ThreatAnalyst -> ThreatAnalyst;
 }
@@ -191,7 +191,7 @@ workflow ProductDissemination {
 app IntelligencePlatform {
     description: "Threat intelligence platform composed from APG capabilities";
     capabilities: [IntelPlatformCore];
-    agents: [ThreatAnalyst, ThreatAnalyst];
+    agents: [ThreatAnalyst];
     agent_teams: [FusionCell];
     routes: ["/intel", "/intel/alerts", "/intel/indicators", "/intel/osint"];
     theme: {name: intel_platform_theme, tokens: {"accent": "#B71C1C", "border.radius": "4px"}};

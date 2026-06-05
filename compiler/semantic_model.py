@@ -190,6 +190,16 @@ def _model_from_module(module: ModuleDeclaration, path: Path) -> dict[str, Any]:
 				symbols[_symbol_id("llm", entity.model)] = _symbol("llm", entity.model, entity, path)
 			continue
 
+		# EntityDeclarations with agent entity_type (platform examples use generic parsing)
+		if entity.entity_type in {EntityType.AGENT, EntityType.AI_AGENT, EntityType.SWARM}:
+			agents[entity.name] = {
+				"name": entity.name, "role": "", "model": "", "runtime": "",
+				"capabilities": [], "tools": [], "memory": None,
+				"inputs": [], "outputs": [], "handoffs": [],
+				"configuration": {}, "rules": [], "ui": {}, "theme": {}, "system": "",
+			}
+			continue
+
 		if isinstance(entity, AgentTeamDeclaration):
 			composition["agent_teams"][entity.name] = {
 				"agents": list(entity.agents),

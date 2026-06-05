@@ -34,7 +34,17 @@ class AIAgentParseError(Exception):
 
 
 def looks_like_ai_agent_composition(source: str) -> bool:
-	"""Return true when the source uses the first-class agentic surface."""
+	"""Return true only when the source is PRIMARILY agent/team composition.
+
+	Returns False if the source contains other entity types (table, capability,
+	app, workflow, etc.) — those require the full APG parser.
+	"""
+	# Presence of table/capability/app/workflow indicates a full platform program
+	_FULL_PLATFORM_KEYWORDS = re.compile(
+		r"\b(table|capability|app|application|workflow|flow|screen|form|rule)\s+[A-Za-z_][\w]*\s*\{",
+	)
+	if _FULL_PLATFORM_KEYWORDS.search(source):
+		return False
 	return bool(
 		re.search(r"\b(agent_team|team|swarm)\s+[A-Za-z_][\w]*\s*\{", source)
 		or re.search(
@@ -308,6 +318,9 @@ def _parse_value(value: str) -> Any:
 		inner = value[1:-1].strip()
 		result: Dict[str, Any] = {}
 		for part in _split_commas(inner):
+			part = part.strip()
+			if not part:
+				continue
 			key, item_value = _split_key_value(part)
 			result[key] = _parse_value(item_value)
 		return result

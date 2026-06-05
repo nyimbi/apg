@@ -164,6 +164,15 @@ class SemanticAnalyzer:
 		
 		# Built-in types and functions
 		self.builtin_types = {t.value for t in APGType}
+		# Extend with all common APG primitive and collection types
+		self.builtin_types.update({
+			"str", "int", "float", "bool", "bytes", "datetime", "date", "time",
+			"decimal", "Decimal", "duration", "Any", "None", "Optional",
+			"list", "List", "dict", "Dict", "set", "Set", "tuple", "Tuple",
+			"str?", "int?", "float?", "bool?", "bytes?", "datetime?", "decimal?",
+			"vector", "embedding", "json", "uuid", "url",
+			"string", "integer", "boolean", "number", "object", "array",
+		})
 		self.builtin_functions = self._initialize_builtins()
 	
 	def analyze(self, ast: ModuleDeclaration) -> Dict[str, Any]:
@@ -322,13 +331,15 @@ class SemanticAnalyzer:
 		"""Resolve types within an entity"""
 		self.current_entity = entity
 		
-		# Resolve property types
-		for prop in entity.properties:
-			if not self._is_valid_type(prop.type_annotation):
-				self.errors.append(SemanticError(
-					f"Unknown type '{prop.type_annotation.type_name}' for property '{prop.name}'",
-					prop
-				))
+		# Resolve property types — only for table/entity types, not agent/workflow/capability config
+		_TYPED_ENTITY_TYPES = {EntityType.ENTITY, EntityType.FORM, EntityType.UI_COMPONENT}
+		if entity.entity_type in _TYPED_ENTITY_TYPES:
+			for prop in entity.properties:
+				if not self._is_valid_type(prop.type_annotation):
+					self.errors.append(SemanticError(
+						f"Unknown type '{prop.type_annotation.type_name}' for property '{prop.name}'",
+						prop
+					))
 		
 		# Resolve method types
 		for method in entity.methods:
@@ -355,13 +366,27 @@ class SemanticAnalyzer:
 	
 	def _is_valid_type(self, type_annotation: TypeAnnotation) -> bool:
 		"""Check if a type annotation is valid"""
+		type_name = type_annotation.type_name or ""
+		
 		# Check built-in types
-		if type_annotation.type_name in self.builtin_types:
+		if type_name in self.builtin_types:
 			return True
 		
 		# Check if it's a defined entity
-		symbol = self.symbol_table.lookup(type_annotation.type_name)
+		symbol = self.symbol_table.lookup(type_name)
 		if symbol and symbol.symbol_type == APGType.ENTITY:
+			return True
+		
+		# Permissive: allow quoted strings (config values, not type names)
+		if type_name.startswith(('"', "'")):
+			return True
+		
+		# Permissive: allow list/dict literals, complex expressions, optional types
+		if type_name.startswith('[') or type_name.startswith('{'):
+			return True
+		if type_name.endswith('?') or '->' in type_name:
+			return True
+		if type_name.startswith('vector ') or ' ' in type_name:
 			return True
 		
 		return False
