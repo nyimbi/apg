@@ -8,7 +8,16 @@ from difflib import unified_diff
 from pathlib import Path
 from typing import Any
 
-from compiler.semantic_model import build_semantic_model
+from compiler.semantic_model import (
+	build_semantic_model,
+	build_semantic_model_from_source,
+	invalidate_semantic_model_cache,
+)
+
+# ── snapshot cache ──────────────────────────────────────────────────────────
+# Keyed by (resolved_path, mtime_ns) — avoids rebuilding snapshot on repeated
+# calls to build_studio_snapshot for the same unchanged file.
+_SNAPSHOT_CACHE: dict[tuple[str, int], dict[str, Any]] = {}
 
 
 STUDIO_SNAPSHOT_FORMAT = "apg.studio-snapshot.v1"
@@ -18,9 +27,39 @@ SCALAR_TYPES = {"str", "int", "float", "bool", "date", "datetime", "json", "any"
 
 
 def build_studio_snapshot(path: Path) -> dict[str, Any]:
-	"""Build a Studio-ready designer snapshot from one APG source file."""
+	"""Build a Studio-ready designer snapshot from one APG source file.
+
+	Cached by (resolved_path, mtime_ns); invalidated automatically when the
+	file changes.  Call ``invalidate_studio_snapshot_cache(path)`` to evict
+	explicitly (e.g. after a write).
+	"""
+	resolved = str(path.resolve())
+	try:
+		mtime_ns = path.stat().st_mtime_ns
+	except OSError:
+		mtime_ns = 0
+	cache_key = (resolved, mtime_ns)
+	if cache_key in _SNAPSHOT_CACHE:
+		return _SNAPSHOT_CACHE[cache_key]
+
 	source = path.read_text(encoding="utf-8")
 	model = build_semantic_model(path)
+	snapshot = _build_snapshot_from_model(model, path, source)
+	_SNAPSHOT_CACHE[cache_key] = snapshot
+	return snapshot
+
+
+def invalidate_studio_snapshot_cache(path: Path | None = None) -> None:
+	"""Evict one path (or all entries) from the snapshot cache."""
+	if path is None:
+		_SNAPSHOT_CACHE.clear()
+	else:
+		resolved = str(path.resolve())
+		for key in [k for k in _SNAPSHOT_CACHE if k[0] == resolved]:
+			del _SNAPSHOT_CACHE[key]
+
+
+def _build_snapshot_from_model(model: dict[str, Any], path: Path, source: str) -> dict[str, Any]:
 	return {
 		"format": STUDIO_SNAPSHOT_FORMAT,
 		"ok": bool(model.get("ok")),
@@ -78,6 +117,9 @@ def build_studio_edit_plan(
 	if ok and write and new_source != source:
 		path.write_text(new_source, encoding="utf-8")
 		written = True
+		# Invalidate both caches so next read sees the updated source.
+		invalidate_studio_snapshot_cache(path)
+		invalidate_semantic_model_cache(path)
 
 	return {
 		"format": STUDIO_EDIT_PLAN_FORMAT,
@@ -320,13 +362,9 @@ def _append_block(source: str, block: str) -> str:
 
 
 def _snapshot_from_source(path: Path, source: str) -> dict[str, Any]:
-	temporary = path.with_suffix(path.suffix + ".studio.tmp")
-	try:
-		temporary.write_text(source, encoding="utf-8")
-		return build_studio_snapshot(temporary)
-	finally:
-		if temporary.exists():
-			temporary.unlink()
+	"""Build a snapshot from in-memory source — no temp file written."""
+	model = build_semantic_model_from_source(source, display_path=path)
+	return _build_snapshot_from_model(model, path, source)
 
 
 def _snapshot_summary(snapshot: dict[str, Any] | None) -> dict[str, Any]:

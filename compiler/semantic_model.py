@@ -11,6 +11,10 @@ import json
 from pathlib import Path
 from typing import Any
 
+# ── file-level mtime cache ──────────────────────────────────────────────────
+# Keyed by (resolved_path_str, mtime_ns) — avoids re-parsing unchanged files.
+_MODEL_CACHE: dict[tuple[str, int], dict[str, Any]] = {}
+
 from .ast_builder import (
 	AIAgentDeclaration,
 	AgentTeamDeclaration,
@@ -42,33 +46,87 @@ DEFAULT_SEMANTIC_MODEL_CATALOG = Path(__file__).resolve().parent.parent / "tests
 
 
 def build_semantic_model(path: Path) -> dict[str, Any]:
-	"""Build an ``apg.semantic-model.v1`` report for one APG source file."""
-	parser = APGParser()
-	parse_result = parser.parse_file(str(path))
+	"""Build an ``apg.semantic-model.v1`` report for one APG source file.
+
+	Results are cached by (resolved_path, mtime_ns); callers can invalidate by
+	calling ``invalidate_semantic_model_cache(path)``.
+	"""
+	resolved = str(path.resolve())
+	try:
+		mtime_ns = path.stat().st_mtime_ns
+	except OSError:
+		mtime_ns = 0
+	cache_key = (resolved, mtime_ns)
+	if cache_key in _MODEL_CACHE:
+		return _MODEL_CACHE[cache_key]
+	source = path.read_text(encoding="utf-8")
+	model = build_semantic_model_from_source(source, display_path=path)
+	_MODEL_CACHE[cache_key] = model
+	return model
+
+
+def invalidate_semantic_model_cache(path: Path | None = None) -> None:
+	"""Evict one path (or all entries) from the mtime cache."""
+	if path is None:
+		_MODEL_CACHE.clear()
+	else:
+		resolved = str(path.resolve())
+		for key in [k for k in _MODEL_CACHE if k[0] == resolved]:
+			del _MODEL_CACHE[key]
+
+
+def build_semantic_model_from_source(
+	source: str,
+	display_path: Path | None = None,
+) -> dict[str, Any]:
+	"""Build a semantic model directly from source text without touching disk."""
+	label = str(display_path) if display_path else "<string>"
+	path_for_model = display_path or Path(label)
+
+	parser = _shared_parser()
+	parse_result = parser.parse_string(source, label)
 	diagnostics = [
-		_diagnostic_from_error(error, path, "error")
+		_diagnostic_from_error(error, path_for_model, "error")
 		for error in parse_result.get("errors", [])
 	]
 
 	module = parse_result.get("ast")
 	if module is None and parse_result.get("success"):
-		module = ASTBuilder().build_ast(parse_result["parse_tree"], str(path))
+		module = _shared_builder().build_ast(parse_result["parse_tree"], label)
 
 	if module is None:
-		return _empty_model(path, diagnostics)
+		return _empty_model(path_for_model, diagnostics)
 
-	analyzer = SemanticAnalyzer()
-	analysis = analyzer.analyze(module)
+	analysis = SemanticAnalyzer().analyze(module)
 	for error in analysis.get("errors", []):
-		diagnostics.append(_diagnostic_from_error(error, path, "error"))
+		diagnostics.append(_diagnostic_from_error(error, path_for_model, "error"))
 	for warning in analysis.get("warnings", []):
-		diagnostics.append(_diagnostic_from_error(warning, path, "warning"))
+		diagnostics.append(_diagnostic_from_error(warning, path_for_model, "warning"))
 
-	model = _model_from_module(module, path)
+	model = _model_from_module(module, path_for_model)
 	model["diagnostics"] = diagnostics
-	model["diagnostics"].extend(_database_backed_view_diagnostics(model, path))
-	model["ok"] = not any(diagnostic["severity"] == "error" for diagnostic in model["diagnostics"])
+	model["diagnostics"].extend(_database_backed_view_diagnostics(model, path_for_model))
+	model["ok"] = not any(d["severity"] == "error" for d in model["diagnostics"])
 	return model
+
+
+# ── module-level singleton parser and builder (construction is ~5ms each) ──
+_SHARED_PARSER: APGParser | None = None
+_SHARED_BUILDER: ASTBuilder | None = None
+
+
+def _shared_parser() -> APGParser:
+	global _SHARED_PARSER
+	if _SHARED_PARSER is None:
+		_SHARED_PARSER = APGParser()
+	return _SHARED_PARSER
+
+
+def _shared_builder() -> ASTBuilder:
+	global _SHARED_BUILDER
+	if _SHARED_BUILDER is None:
+		_SHARED_BUILDER = ASTBuilder()
+	return _SHARED_BUILDER
 
 
 def audit_semantic_model_fixtures(catalog_path: Path | None = None) -> dict[str, Any]:

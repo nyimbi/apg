@@ -11,7 +11,6 @@ from __future__ import annotations
 import difflib
 import json
 import re
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -22,6 +21,29 @@ from .semantic_analyzer import SemanticAnalyzer, SemanticError
 
 
 NL_PLAN_FORMAT = "apg.nl-plan.v1"
+
+# ── pre-compiled classify patterns ─────────────────────────────────────────
+_RE_AGENT = re.compile(r"\b(agent|assistant|copilot)\b")
+_RE_CAPABILITY = re.compile(r"\b(capability|module|component)\b")
+_RE_TABLE = re.compile(r"\b(table|entity|record|records)\b")
+
+# ── module-level parser/builder singletons (construction ~5ms each) ────────
+_NLP_PARSER: APGParser | None = None
+_NLP_BUILDER: ASTBuilder | None = None
+
+
+def _nlp_parser() -> APGParser:
+	global _NLP_PARSER
+	if _NLP_PARSER is None:
+		_NLP_PARSER = APGParser()
+	return _NLP_PARSER
+
+
+def _nlp_builder() -> ASTBuilder:
+	global _NLP_BUILDER
+	if _NLP_BUILDER is None:
+		_NLP_BUILDER = ASTBuilder()
+	return _NLP_BUILDER
 MIGRATION_PREVIEW_FORMAT = "apg.migration-preview.v1"
 NL_PLAN_FIXTURE_AUDIT_FORMAT = "apg.nl-plan-fixture-audit.v1"
 DEFAULT_NL_PLAN_FIXTURE_CATALOG = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "nl_plan" / "catalog.json"
@@ -263,13 +285,13 @@ def _classify_prompt(prompt: str) -> PlannedEdit | None:
 
 	if "credit memo" in normalized or "credit memos" in normalized:
 		return _domain_feature_edit("credit_memo", "Credit Memo Management")
-	if re.search(r"\b(agent|assistant|copilot)\b", normalized):
+	if _RE_AGENT.search(normalized):
 		base_name = _base_name_from_prompt(normalized, fallback="assistant_agent")
 		return _agent_edit(base_name)
-	if re.search(r"\b(capability|module|component)\b", normalized):
+	if _RE_CAPABILITY.search(normalized):
 		base_name = _base_name_from_prompt(normalized, fallback="business_capability")
 		return _capability_edit(base_name)
-	if re.search(r"\b(table|entity|record|records)\b", normalized):
+	if _RE_TABLE.search(normalized):
 		base_name = _base_name_from_prompt(normalized, fallback="business_record")
 		return _table_edit(base_name)
 	return None
@@ -410,21 +432,20 @@ def _unified_patch(source_file: Path, original: str, candidate: str) -> str:
 
 
 def _lint_candidate(source_file: Path, candidate_text: str) -> dict[str, Any]:
-	with tempfile.TemporaryDirectory(prefix="apg-nl-plan-") as temp_dir:
-		candidate_path = Path(temp_dir) / source_file.name
-		candidate_path.write_text(candidate_text, encoding="utf-8")
-		return _lint_file(candidate_path, display_file=source_file)
+	"""Lint candidate source in-memory — no temp file I/O."""
+	return _lint_source(candidate_text, display_file=source_file)
 
 
-def _lint_file(file_path: Path, display_file: Path) -> dict[str, Any]:
-	parser = APGParser()
-	ast_builder = ASTBuilder()
+def _lint_source(source_text: str, display_file: Path) -> dict[str, Any]:
+	"""Parse and semantically validate source text without touching disk."""
+	parser = _nlp_parser()
+	ast_builder = _nlp_builder()
 	analyzer = SemanticAnalyzer()
 	diagnostics: list[dict[str, Any]] = []
 	semantic_model_available = False
 
 	try:
-		parse_result = parser.parse_file(str(file_path))
+		parse_result = parser.parse_string(source_text, str(display_file))
 	except Exception as error:
 		diagnostics.append(_diagnostic_from_error(error, display_file, "error"))
 		return _lint_report(display_file, diagnostics, semantic_model_available)
@@ -447,6 +468,11 @@ def _lint_file(file_path: Path, display_file: Path) -> dict[str, Any]:
 			diagnostics.append(_diagnostic_from_error(error, display_file, "error"))
 
 	return _lint_report(display_file, diagnostics, semantic_model_available)
+
+
+def _lint_file(file_path: Path, display_file: Path) -> dict[str, Any]:
+	"""Lint from a file path — delegates to _lint_source after reading."""
+	return _lint_source(file_path.read_text(encoding="utf-8"), display_file=display_file)
 
 
 def _lint_report(file_path: Path, diagnostics: list[dict[str, Any]], semantic_model_available: bool) -> dict[str, Any]:
