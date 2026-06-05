@@ -28,10 +28,16 @@ def _loop() -> asyncio.AbstractEventLoop:
 		return loop
 
 
-def _run(coro: Any) -> Any:
-	return _loop().run_until_complete(coro)
-
-
+def _run(coro):
+    """Run a coroutine from Flask sync context. Python 3.12+ compatible."""
+    import asyncio
+    try:
+        asyncio.get_running_loop()
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(asyncio.run, coro).result(timeout=30)
+    except RuntimeError:
+        return asyncio.run(coro)
 def _ok(data: Any, status: int = 200):
 	return jsonify({"status": "ok", "data": data}), status
 

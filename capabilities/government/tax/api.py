@@ -76,15 +76,15 @@ def _err(message: str, code: int = 400) -> Any:
 
 
 def _run(coro):
-	"""Run a coroutine from a sync Flask route."""
-	try:
-		loop = asyncio.get_event_loop()
-	except RuntimeError:
-		loop = asyncio.new_event_loop()
-		asyncio.set_event_loop(loop)
-	return loop.run_until_complete(coro)
-
-
+    """Run a coroutine from Flask sync context. Python 3.12+ compatible."""
+    import asyncio
+    try:
+        asyncio.get_running_loop()
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(asyncio.run, coro).result(timeout=30)
+    except RuntimeError:
+        return asyncio.run(coro)
 def handle_errors(fn):
 	"""Decorator: map common exceptions to HTTP responses."""
 	@wraps(fn)
