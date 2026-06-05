@@ -510,7 +510,7 @@ class NLPSummaryResponse(NLPSummary):
 class NLPTranslation(NLPCBase):
 	"""Translation of document text to a target language."""
 
-	document_id:     str
+	document_id:     str | None = None
 	source_language: LanguageCode
 	target_language: LanguageCode
 	translated_text: Annotated[str, AfterValidator(_validate_non_empty)]
@@ -532,7 +532,7 @@ class NLPTranslationCreate(BaseModel):
 
 	tenant_id:       str
 	created_by:      str         = "system"
-	document_id:     str
+	document_id:     str | None = None
 	source_language: LanguageCode
 	target_language: LanguageCode
 	translated_text: str
@@ -726,7 +726,7 @@ class NLPBatchJob(NLPCBase):
 class NLPProcessingRequest(NLPCBase):
 	"""Request to run one or more NLP tasks against a document."""
 
-	document_id:     str
+	document_id:     str | None = None
 	tasks:           list[NLPTask]   = Field(min_length=1)
 	priority:        PriorityLevel   = PriorityLevel.NORMAL
 	parameters:      dict[str, Any]  = Field(default_factory=dict)

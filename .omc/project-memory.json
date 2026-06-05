@@ -10,7 +10,7 @@
   },
   "build": {
     "buildCommand": null,
-    "testCommand": "python3 -c \"\nfrom capabilities.common.nlpc.models import LanguageCode\nprint(LanguageCode.ENGLISH)\n\" 2>&1 && \\\n/Users/nyimbiodero/src/pjs/apg/.venv/bin/python -m pytest tests/test_common_nlpc_core_task_dispatch.py --tb=line -q 2>&1 | grep \"E   \\|assert\\|Error\" | head -10",
+    "testCommand": "python3 -c \"\nfrom pathlib import Path\nf = Path('capabilities/common/nlpc/service.py')\ntext = f.read_text()\ntext = text.replace(\n    'result_data.update({\\\"clusters\\\": list(range(min(mx, 3))), \\\"method\\\": \\\"kmeans\\\"})',\n    'result_data.update({\\\"clusters\\\": list(range(min(mx, 3))), \\\"cluster_count\\\": min(mx, 3), \\\"method\\\": \\\"kmeans\\\"})'\n)\nf.write_text(text)\n\" && \\\n/Users/nyimbiodero/src/pjs/apg/.venv/bin/python -m pytest tests/test_common_nlpc_core_task_dispatch.py -q --tb=line 2>&1 | tail -4",
     "lintCommand": null,
     "devCommand": null,
     "scripts": {}

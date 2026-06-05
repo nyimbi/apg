@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"/Users/nyimbiodero/src/pjs/apg/.venv/bin/python -m cli.main capabilities scaffold my_domain test_cap \\\"Test Capability\\\" --output /tmp/test_scaffold/ 2>&1 | grep -v \\\"Pydantic\\\\|Deprecated...",
-  "error": "Exit code 1\nUsage: python -m cli.main capabilities scaffold [OPTIONS] DOMAIN CODE\nTry 'python -m cli.main capabilities scaffold --help' for help.\n\nError: No such option '--output'. Did you mean '--out'?\n---Generated files:",
-  "timestamp": "2026-06-05T10:50:19.158Z",
+  "tool_input_preview": "{\"command\":\"python3 -c \\\"\\nfrom pathlib import Path\\nf = Path('capabilities/common/nlpc/service.py')\\ntext = f.read_text()\\n# The bad replacement inserted 'async def process_document' without the rest...",
+  "error": "Exit code 1\n  File \"capabilities/common/nlpc/service.py\", line 1472\n    \tasync def process_document\n    \t                          ^\nSyntaxError: expected '('",
+  "timestamp": "2026-06-05T12:42:03.137Z",
   "retry_count": 1
 }
