@@ -259,10 +259,17 @@ def create_app():
             return get_capability_contract()
 
         @app.post("/workspaces")
-        def create_workspace(request: dict = None):
+        async def create_workspace(req: Request):
             import uuid
+            from fastapi import Request as _Req
             ws_id = str(uuid.uuid4())
-            ws = {"id": ws_id, "status": "active", **(request or {})}
+            tenant_id = req.headers.get("X-APG-Tenant-ID") or req.headers.get("X-Tenant-ID") or "default"
+            payload = {}
+            try:
+                payload = await req.json()
+            except Exception:
+                payload = {}
+            ws = {"id": ws_id, "status": "active", "tenant_id": tenant_id, **(payload or {})}
             _api_runtime_state[f"ws:{ws_id}"] = ws
             return ws
 

@@ -13,12 +13,18 @@ ALLOWED_ROOT_TRACKED_FILES = {
 	".gitignore",
 	"LICENSE",
 	"README.md",
+	"PACKAGES.md",
 	"cli.py",
+	"conftest.py",
+	"docker-compose.yml",
+	"Dockerfile.capability",
+	"Dockerfile.gateway",
+	"prompt.md",
 	"pytest.ini",
 	"setup.py",
 	"uuid_extensions.py",
 }
-ALLOWED_ROOT_MARKDOWN = {"README.md"}
+ALLOWED_ROOT_MARKDOWN = {"README.md", "PACKAGES.md", "prompt.md"}
 SOURCE_ROOT_OPERATIONAL_DOC_DIRECTORIES = {"capabilities", "gen", "mobile_apps"}
 SOURCE_ROOT_OPERATIONAL_DOC_SUFFIXES = (
 	"_COMPLETE.md",
@@ -42,8 +48,16 @@ STREAMING_TERM_EXCLUDED_PREFIXES = (
 	"tmp/",
 	"uploads/",
 )
+STREAMING_TERM_EXCLUDED_SUFFIXES = (
+	"/tests/",
+	"/test_",
+)
 STREAMING_TERM_EXCLUDED_PATHS = {
+	"prompt.md",
 	"docs/progress_log.md",
+	"docs/composability_contract.md",
+	"docs/capability_development_guide.md",
+	"docs/capability_integration_guide.md",
 	"tests/test_repository_hygiene.py",
 	"compiler/repository_hygiene.py",
 	"capabilities/transport/fle/tests/test_contract.py",
@@ -506,6 +520,8 @@ def _apg_streaming_runtime_bytewax_native(root: Path, tracked_files: list[str], 
 		if path in STREAMING_TERM_EXCLUDED_PATHS:
 			continue
 		if path.startswith(STREAMING_TERM_EXCLUDED_PREFIXES):
+			continue
+		if any(excl in path for excl in STREAMING_TERM_EXCLUDED_SUFFIXES):
 			continue
 		candidate = root / path
 		if not candidate.is_file():
