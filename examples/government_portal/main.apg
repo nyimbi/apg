@@ -1,0 +1,148 @@
+// ============================================================================
+// Government Digital Portal — APG Capability Composition Example
+//
+// Composability pattern: Hub-and-Spoke + Pipeline
+//   CitizenServices is the citizen-facing hub
+//   Tax, Permits, CaseManagement, Electoral feed into the hub
+//   Notifications and Audit underpin all operations
+//
+// Copyright (c) 2025 Datacraft — Nyimbi Odero
+// ============================================================================
+
+module government_portal version 1.0.0 {
+    description: "Digital government portal — citizen services, tax, permits, case management";
+    author: "Datacraft";
+}
+
+table Citizen {
+    national_id: str;
+    full_name: str;
+    date_of_birth: datetime;
+    phone: str;
+    email: str;
+    county: str;
+    registration_status: str;  // pending | verified | active
+}
+
+table ServiceApplication {
+    application_number: str;
+    citizen_id: str;
+    service_type: str;   // tax_registration | business_permit | id_renewal | birth_certificate
+    status: str;         // submitted | under_review | approved | rejected | completed
+    fee_amount: decimal;
+    paid: bool;
+    submitted_at: datetime;
+}
+
+capability CitizenServicesHub {
+    contract: {
+        id: government_portal_core,
+        provides: [
+            citizen_registration,
+            service_application_lifecycle,
+            payment_processing,
+            status_tracking,
+            digital_notification,
+            multi_channel_access
+        ],
+        requires: [auth, audl, ntfy, wflo, schd],
+        configuration: {
+            tenant_id: "default",
+            supported_channels: ["web", "mobile", "ussd", "sms"],
+            require_id_verification: true,
+            self_service_enabled: true,
+            payment_providers: ["mpesa", "airtel_money", "bank_transfer"],
+            sla_days_service_delivery: 5
+        },
+        rule_engine: {
+            type: deterministic,
+            default_decision: allow,
+            rules: [
+                {name: "id_verification_required",
+                 when: "service_requires_verification == true and id_verified != true",
+                 action: deny},
+                {name: "fee_payment_required",
+                 when: "fee_amount > 0 and payment_confirmed != true",
+                 action: deny},
+                {name: "duplicate_application_blocked",
+                 when: "duplicate_application_exists == true and grace_period_expired == true",
+                 action: deny},
+                {name: "cross_county_service_escalation",
+                 when: "applicant_county != service_county",
+                 action: require_review}
+            ]
+        },
+        ui: {shell: python, routes: [
+            {name: "Citizen Portal",    path: "/gov",              component: "CitizenHome",    permission: "gov:public"},
+            {name: "My Applications",   path: "/gov/applications", component: "ApplicationList",permission: "gov:citizen"},
+            {name: "Apply for Service", path: "/gov/apply",        component: "ServiceApply",   permission: "gov:citizen"},
+            {name: "Pay Fees",          path: "/gov/pay",          component: "FeePayment",     permission: "gov:citizen"},
+            {name: "Track Status",      path: "/gov/track",        component: "StatusTracker",  permission: "gov:citizen"},
+            {name: "Tax Portal",        path: "/gov/tax",          component: "TaxPortal",      permission: "gov:citizen"},
+            {name: "Permits",           path: "/gov/permits",      component: "PermitPortal",   permission: "gov:citizen"},
+            {name: "Officer Dashboard", path: "/gov/officer",      component: "OfficerDesk",    permission: "gov:officer"}
+        ]},
+        theme: {name: government_theme, tokens: {
+            "color.primary":   "#006600",
+            "color.accent":    "#CC0000",
+            "color.success":   "#004D00",
+            "color.warning":   "#FF6600",
+            "color.danger":    "#990000",
+            "surface.canvas":  "#F0F5F0",
+            "surface.panel":   "#FFFFFF",
+            "text.primary":    "#1A2B1A",
+            "border.radius":   "4px",
+            "density":         "comfortable"
+        }, components: {
+            applications: {icon: "file-text",      status_indicator: "application-status-chip"},
+            payments:     {icon: "credit-card",    status_indicator: "payment-status-chip"},
+            services:     {icon: "building-2",     status_indicator: "service-type-chip"}
+        }}
+    };
+    streaming: {processor: bytewax, state: citizen_services_event_state};
+}
+
+agent CitizenAssistant {
+    role: "digital government assistant";
+    model: "openai:gpt-4.1-mini";
+    system: "You assist citizens with government services in Kenya. Speak in simple, clear language. Support Swahili and English. Guide citizens through service applications, explain requirements, and provide status updates.";
+    capabilities: [citizen_registration, service_application_lifecycle];
+    tools: [service_catalogue_search, application_status_query, fee_calculator, document_checklist];
+    memory: vector citizen_help_memory;
+    configuration: {temperature: 0.3, max_turns: 8};
+    rules: [
+        {name: "no_personal_data_collection", when: "requests_personal_data", action: deny}
+    ];
+}
+
+workflow CitizenServiceApplication {
+    steps: str = "submitted -> id_verified -> fee_calculated -> fee_paid -> under_review -> decision_made -> completed";
+    human_tasks: [id_verified, under_review, decision_made];
+    assignments: {id_verified: verification_officer, under_review: service_officer, decision_made: service_manager};
+    guards: {
+        fee_paid: "fee_amount == 0 or payment_confirmed",
+        decision_made: "supporting_documents_complete and review_notes_provided"
+    };
+    waits: {completed: service_delivery_confirmation};
+    retry_policy: {under_review: {attempts: 3, interval: 24hour}};
+}
+
+workflow TaxRegistrationPipeline {
+    steps: str = "application -> kra_pin_check -> biometric_capture -> registration -> pin_issued";
+    human_tasks: [kra_pin_check, biometric_capture];
+    assignments: {kra_pin_check: tax_officer, biometric_capture: biometrics_officer};
+    guards: {
+        kra_pin_check: "national_id_valid and not_blacklisted",
+        pin_issued: "biometric_captured and tax_type_selected"
+    };
+}
+
+app GovernmentPortal {
+    description: "Digital government services portal composed from APG capabilities";
+    capabilities: [CitizenServicesHub];
+    agents: [CitizenAssistant];
+    routes: ["/gov", "/gov/applications", "/gov/tax", "/gov/permits"];
+    theme: {name: gov_portal_theme, tokens: {"accent": "#CC0000", "border.radius": "4px"}};
+    runtime: {target: python, deployment: container, streaming: {processor: bytewax}};
+    deployments: {default: local, container: docker};
+}

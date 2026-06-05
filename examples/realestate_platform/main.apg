@@ -1,0 +1,177 @@
+// ============================================================================
+// Real Estate Platform — APG Capability Composition Example
+//
+// Composability pattern: Layered
+//   LeaseManagement is the core; PropertyManagement and Accounting depend on it
+//   Tenant portal feeds back into lease lifecycle
+//
+// Copyright (c) 2025 Datacraft — Nyimbi Odero
+// ============================================================================
+
+module realestate_platform version 1.0.0 {
+    description: "Property management platform — leasing, maintenance, accounting, IFRS 16";
+    author: "Datacraft";
+}
+
+table Property {
+    property_code: str;
+    property_name: str;
+    property_type: str;   // residential | commercial | industrial | mixed_use
+    address: str;
+    total_area_sqm: decimal;
+    lettable_area_sqm: decimal;
+    owner_id: str;
+    manager_id: str;
+    status: str;          // available | partially_let | fully_let | under_maintenance
+}
+
+table Unit {
+    unit_code: str;
+    property_id: str;
+    unit_type: str;       // office | retail | residential | storage | parking
+    floor: int;
+    area_sqm: decimal;
+    monthly_rent: decimal;
+    currency: str;
+    status: str;          // vacant | let | under_maintenance | reserved
+}
+
+table Lease {
+    lease_number: str;
+    unit_id: str;
+    tenant_id: str;
+    lease_type: str;      // commercial | residential | ground_lease
+    start_date: datetime;
+    end_date: datetime;
+    monthly_rent: decimal;
+    currency: str;
+    deposit: decimal;
+    status: str;          // draft | active | expired | terminated | renewed
+    ifrs16_applicable: bool;
+}
+
+capability RealEstatePlatformCore {
+    contract: {
+        id: realestate_platform_core,
+        provides: [
+            property_portfolio_management,
+            lease_lifecycle_management,
+            tenant_relationship_management,
+            maintenance_management,
+            service_charge_management,
+            ifrs16_accounting,
+            property_analytics
+        ],
+        requires: [auth, audl, ntfy, wflo, comp],
+        configuration: {
+            tenant_id: "default",
+            functional_currency: "KES",
+            ifrs16_applicable: true,
+            incremental_borrowing_rate: 0.12,
+            lease_term_months_threshold: 12,
+            low_value_asset_threshold: 500000,
+            vacancy_alert_days: 90,
+            rent_escalation_default_pct: 5.0
+        },
+        rule_engine: {
+            type: deterministic,
+            default_decision: allow,
+            rules: [
+                {name: "lease_requires_signed_contract",
+                 when: "operation == activate_lease and contract_signed != true",
+                 action: deny},
+                {name: "deposit_required_before_occupation",
+                 when: "operation == allow_occupation and deposit_paid != true",
+                 action: deny},
+                {name: "ifrs16_threshold_check",
+                 when: "lease_term_months_lt == 12 or monthly_rent_lt == 41667",
+                 action: require_review},
+                {name: "arrears_block_renewal",
+                 when: "operation == renew_lease and arrears_amount_gt == 0",
+                 action: require_review},
+                {name: "cfo_approval_large_lease",
+                 when: "annual_rent_gt == 5000000 and cfo_approved != true",
+                 action: require_review}
+            ]
+        },
+        ui: {shell: python, routes: [
+            {name: "Portfolio",          path: "/prop",              component: "PortfolioDashboard",  permission: "prop:view"},
+            {name: "Properties",         path: "/prop/properties",   component: "PropertyList",        permission: "prop:manage"},
+            {name: "Leases",             path: "/prop/leases",       component: "LeaseWorkbench",      permission: "prop:leases"},
+            {name: "Tenant Portal",      path: "/prop/tenants",      component: "TenantPortal",        permission: "prop:tenants"},
+            {name: "Maintenance",        path: "/prop/maintenance",  component: "MaintenanceDesk",     permission: "prop:maintenance"},
+            {name: "Accounting",         path: "/prop/accounting",   component: "PropertyAccounting",  permission: "prop:finance"},
+            {name: "IFRS 16",            path: "/prop/ifrs16",       component: "IFRS16Workbench",     permission: "prop:finance"},
+            {name: "Analytics",          path: "/prop/analytics",    component: "PropertyAnalytics",   permission: "prop:reports"}
+        ]},
+        theme: {name: realestate_theme, tokens: {
+            "color.primary":   "#6B21A8",
+            "color.accent":    "#7C3AED",
+            "color.success":   "#166534",
+            "color.warning":   "#92400E",
+            "color.danger":    "#991B1B",
+            "surface.canvas":  "#F9F7FF",
+            "surface.panel":   "#FFFFFF",
+            "text.primary":    "#1E1B4B",
+            "border.radius":   "6px",
+            "density":         "comfortable"
+        }, components: {
+            properties: {icon: "building-2",   status_indicator: "occupancy-chip"},
+            leases:     {icon: "file-contract", status_indicator: "lease-status-chip"},
+            tenants:    {icon: "users",         status_indicator: "tenant-tier-chip"}
+        }}
+    };
+    erp_modules: [fixed_assets, project_accounting, budgeting];
+    streaming: {processor: bytewax, state: realestate_event_state};
+    i18n: {supported_languages: [en, sw], default_language: en, fallback_language: en};
+}
+
+workflow LeaseLifecycle {
+    steps: str = "prospect -> offer_sent -> offer_accepted -> lease_drafted -> signed -> deposit_paid -> active -> notice_given -> expired";
+    human_tasks: [offer_sent, signed, deposit_paid];
+    assignments: {offer_sent: leasing_manager, signed: leasing_manager, deposit_paid: finance_officer};
+    guards: {
+        active: "contract_signed and deposit_paid and premises_inspected",
+        expired: "notice_period_served and final_inspection_done"
+    };
+}
+
+workflow IFRS16Accounting {
+    steps: str = "lease_created -> classification -> rou_calculated -> liability_calculated -> journal_posted -> period_amortised";
+    human_tasks: [classification, journal_posted];
+    assignments: {classification: property_accountant, journal_posted: controller};
+    guards: {
+        classification: "lease_term_months_gt == 12 and not_short_term and not_low_value",
+        journal_posted: "rou_asset_calculated and lease_liability_calculated"
+    };
+}
+
+workflow MaintenanceWorkflow {
+    steps: str = "reported -> triaged -> quoted -> approved -> work_in_progress -> completed -> invoiced";
+    human_tasks: [triaged, approved];
+    assignments: {triaged: facilities_manager, approved: property_manager};
+    guards: {
+        approved: "quote_within_budget or cfo_approved",
+        completed: "sign_off_by_tenant and photos_uploaded"
+    };
+}
+
+agent PropertyAdvisor {
+    role: "property management advisor";
+    model: "openai:gpt-4.1-mini";
+    system: "You assist property managers with lease analysis, IFRS 16 calculations, and market insights for Kenya/East Africa real estate market.";
+    capabilities: [lease_lifecycle_management, ifrs16_accounting];
+    tools: [lease_history, market_rental_query, ifrs16_calculator, vacancy_report];
+    memory: vector property_memory;
+    configuration: {temperature: 0.2, max_turns: 6};
+}
+
+app RealEstatePlatform {
+    description: "Property management platform composed from APG capabilities";
+    capabilities: [RealEstatePlatformCore];
+    agents: [PropertyAdvisor];
+    routes: ["/prop", "/prop/leases", "/prop/tenants", "/prop/ifrs16"];
+    theme: {name: realestate_platform_theme, tokens: {"accent": "#7C3AED", "border.radius": "6px"}};
+    runtime: {target: python, deployment: container, streaming: {processor: bytewax}};
+    deployments: {default: local, container: docker};
+}
