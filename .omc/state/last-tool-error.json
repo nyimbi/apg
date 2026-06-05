@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"python -c \\\"\\nfrom capabilities.manifest import all_capabilities, get_capability\\ncaps = all_capabilities()\\nc = caps[0]\\nprint('ui_routes sample:', c.get('ui_routes',[])[0] if c.get('ui_r...",
-  "error": "Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 6, in <module>\nAttributeError: 'list' object has no attribute 'keys'\nui_routes sample: {'name': 'dashboard', 'path': '/accs/dashboard', 'permission': 'accs:view', 'nav_group': 'Overview'}",
-  "timestamp": "2026-06-05T10:19:05.480Z",
-  "retry_count": 3
+  "tool_input_preview": "{\"command\":\"/Users/nyimbiodero/src/pjs/apg/.venv/bin/python -m cli.main capabilities scaffold my_domain test_cap \\\"Test Capability\\\" --output /tmp/test_scaffold/ 2>&1 | grep -v \\\"Pydantic\\\\|Deprecated...",
+  "error": "Exit code 1\nUsage: python -m cli.main capabilities scaffold [OPTIONS] DOMAIN CODE\nTry 'python -m cli.main capabilities scaffold --help' for help.\n\nError: No such option '--output'. Did you mean '--out'?\n---Generated files:",
+  "timestamp": "2026-06-05T10:50:19.158Z",
+  "retry_count": 1
 }

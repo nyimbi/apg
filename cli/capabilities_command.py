@@ -291,6 +291,23 @@ def _scaffold_files(domain: str, code: str, display_name: str) -> dict[str, str]
 		"release_report.json": _json_file(_release_report_data(capability_id, display_name)),
 		"tests/__init__.py": "",
 		"tests/test_capability_contract.py": _contract_test_py(domain, code, capability_id, display_name),
+		"pyproject.toml": _pyproject_toml(domain, code, display_name, capability_id),
+		"CHANGELOG.md": _changelog_md(display_name, capability_id),
+		"README.md": _scaffold_readme_md(display_name, capability_id, domain),
+		"py.typed": "",
+		"__main__.py": _main_py(domain, code, capability_id),
+		"domain/__init__.py": _domain_init_py(display_name),
+		"domain/adapters.py": _domain_adapters_py(display_name, class_prefix),
+		"domain/rules.py": _domain_rules_py(display_name, capability_id, class_prefix),
+		"domain/events.py": _domain_events_py(display_name, capability_id),
+		"database/__init__.py": _db_init_py(display_name),
+		"database/store.py": _db_store_py(display_name),
+		"database/schema.sql": _db_schema_sql(capability_id, code),
+		"alembic.ini": _alembic_ini_content(),
+		"alembic/env.py": _alembic_env_py(),
+		"alembic/script.py.mako": _alembic_mako(),
+		"alembic/README": "Alembic migration environment.",
+		"alembic/versions/0001_initial.py": _alembic_initial_migration(capability_id),
 	}
 
 
@@ -1360,3 +1377,473 @@ def capabilities_manifest(capability: str | None, domain: str | None, stats: boo
     click.echo("     apg capabilities manifest --capability <id>")
     click.echo("     apg capabilities manifest --domain <domain>")
     click.echo("     apg capabilities manifest --stats")
+
+
+# ── New scaffold generator functions ──────────────────────────────────────────
+
+def _pyproject_toml(domain: str, code: str, display_name: str, capability_id: str) -> str:
+	pkg_name = f"apg-{domain}-{code}"
+	mod_name = pkg_name.replace("-", "_")
+	return f'''[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "{pkg_name}"
+version = "1.0.0"
+description = "APG {display_name} capability"
+readme = "README.md"
+license = {{text = "Proprietary"}}
+requires-python = ">=3.11"
+keywords = ["apg", "datacraft", "capability", "{domain}", "{code}"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "pydantic>=2.0",
+    "uuid6>=0.4",
+    "sqlalchemy>=2.0",
+    "flask>=3.0",
+]
+
+[project.optional-dependencies]
+streaming = ["bytewax>=0.18"]
+full = ["{pkg_name}[streaming]"]
+
+[project.urls]
+Homepage = "https://www.datacraft.co.ke"
+
+[project.entry-points."apg.capabilities"]
+{capability_id} = "{mod_name}:get_capability_contract"
+
+[project.scripts]
+{pkg_name} = "{mod_name}.app:main"
+
+[tool.setuptools]
+package-dir = {{"{mod_name}" = "."}}
+packages    = ["{mod_name}"]
+
+[tool.setuptools.package-data]
+"{mod_name}" = ["py.typed", "README.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+'''
+
+
+def _changelog_md(display_name: str, capability_id: str) -> str:
+	return f'''# Changelog — {capability_id}
+
+## [1.0.0] — {__import__("datetime").date.today()}
+
+### Added
+- Initial production release of **{display_name}** capability.
+'''
+
+
+def _scaffold_readme_md(display_name: str, capability_id: str, domain: str) -> str:
+	pkg = f"apg-{domain}-{capability_id.split('_', 1)[-1] if '_' in capability_id else capability_id}"
+	mod = pkg.replace("-", "_")
+	return f'''# {display_name}
+
+## Overview
+
+{display_name} capability for the APG platform.
+
+## Capability ID
+
+`{capability_id}`
+
+## Standalone Usage
+
+```bash
+pip install {pkg}
+{pkg} --port 8080
+```
+
+```python
+from {mod} import get_capability_contract, evaluate_capability_rules
+from {mod}.service import {capability_id.replace("_", " ").title().replace(" ", "")}Service
+
+svc = {capability_id.replace("_", " ").title().replace(" ", "")}Service(tenant_id="my_org")
+contract = get_capability_contract("my_org")
+```
+
+## Development
+
+```bash
+pytest tests/ -q
+python -m build --wheel .
+```
+'''
+
+
+def _main_py(domain: str, code: str, capability_id: str) -> str:
+	return f'"""Enable: python -m apg_{domain}_{code}"""\nfrom .app import main\nmain()\n'
+
+
+def _domain_init_py(display_name: str) -> str:
+	return f'"""Domain logic for {display_name}."""\nfrom .adapters import get_auth_adapter, get_audit_adapter, get_notify_adapter\n'
+
+
+def _domain_adapters_py(display_name: str, class_prefix: str) -> str:
+	return f'''"""Adapter protocols for {display_name}."""
+from __future__ import annotations
+import os
+from typing import Any, Protocol, runtime_checkable
+
+
+@runtime_checkable
+class AuthAdapter(Protocol):
+    async def verify_token(self, token: str) -> dict[str, Any]: ...
+    async def check_permission(self, user_id: str, permission: str) -> bool: ...
+
+
+class NullAuthAdapter:
+    async def verify_token(self, token: str) -> dict[str, Any]:
+        return {{"user_id": token or "anonymous", "tenant_id": "default", "roles": ["user"]}}
+    async def check_permission(self, user_id: str, permission: str) -> bool:
+        return True
+
+
+@runtime_checkable
+class AuditAdapter(Protocol):
+    async def log_event(self, event_type: str, actor_id: str, tenant_id: str, resource_id: str, details: dict) -> None: ...
+
+
+class NullAuditAdapter:
+    async def log_event(self, event_type: str, actor_id: str, tenant_id: str, resource_id: str, details: dict) -> None:
+        pass
+
+
+@runtime_checkable
+class NotifyAdapter(Protocol):
+    async def send(self, recipient: str, channel: str, subject: str, body: str) -> None: ...
+
+
+class NullNotifyAdapter:
+    async def send(self, recipient: str, channel: str, subject: str, body: str) -> None:
+        pass
+
+
+def get_auth_adapter(auth_service=None) -> AuthAdapter:
+    if auth_service is not None: return auth_service
+    try:
+        from apg_common_auth import AuthService
+        return AuthService.from_env()
+    except ImportError:
+        return NullAuthAdapter()
+
+def get_audit_adapter(audit_service=None) -> AuditAdapter:
+    if audit_service is not None: return audit_service
+    try:
+        from apg_common_audl import AuditService
+        return AuditService.from_env()
+    except ImportError:
+        return NullAuditAdapter()
+
+def get_notify_adapter(notify_service=None) -> NotifyAdapter:
+    if notify_service is not None: return notify_service
+    try:
+        from apg_common_ntfy import NotifyService
+        return NotifyService.from_env()
+    except ImportError:
+        return NullNotifyAdapter()
+'''
+
+
+def _domain_rules_py(display_name: str, capability_id: str, class_prefix: str) -> str:
+	return f'''"""Deterministic domain rules for {display_name}."""
+from __future__ import annotations
+from typing import Any
+
+
+class RuleViolation(Exception):
+    def __init__(self, rule_name: str, reason: str, required_action: str = "") -> None:
+        self.rule_name = rule_name
+        self.reason = reason
+        self.required_action = required_action
+        super().__init__(f"Rule '{{rule_name}}' violated: {{reason}}")
+
+
+def assert_tenant_context(context: dict[str, Any]) -> None:
+    if not context.get("tenant_id"):
+        raise RuleViolation("tenant_context_required", "tenant_id is required", "attach_tenant_context")
+
+
+def assert_write_policy(context: dict[str, Any]) -> None:
+    if context.get("operation_type") == "write" and not context.get("policy_attached"):
+        raise RuleViolation("write_requires_policy", "write operations require a policy", "attach_policy")
+
+
+def assert_no_cross_tenant_access(actor_tenant: str, resource_tenant: str) -> None:
+    if actor_tenant != resource_tenant:
+        raise RuleViolation("cross_tenant_access_denied", "cross-tenant access is denied", "use_own_tenant_resources")
+'''
+
+
+def _domain_events_py(display_name: str, capability_id: str) -> str:
+	return f'''"""Domain events for {display_name}."""
+from __future__ import annotations
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
+
+
+@dataclass(frozen=True)
+class DomainEvent:
+    event_type: str
+    tenant_id: str
+    actor_id: str
+    timestamp: datetime = field(default_factory=datetime.utcnow)
+    payload: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {{
+            "event_type": self.event_type,
+            "tenant_id": self.tenant_id,
+            "actor_id": self.actor_id,
+            "timestamp": self.timestamp.isoformat(),
+            "payload": self.payload,
+            "capability_id": "{capability_id}",
+        }}
+'''
+
+
+def _db_init_py(display_name: str) -> str:
+	return f'"""Database store for {display_name}."""\nfrom .store import get_store, InMemoryStore, Store\n__all__ = ["get_store", "InMemoryStore", "Store"]\n'
+
+
+def _db_store_py(display_name: str) -> str:
+	return '''"""Database store for this capability."""
+from __future__ import annotations
+import json, os
+from typing import Any, Protocol, runtime_checkable
+
+
+@runtime_checkable
+class Store(Protocol):
+    async def get(self, collection: str, id: str) -> dict[str, Any] | None: ...
+    async def put(self, collection: str, record: dict[str, Any]) -> dict[str, Any]: ...
+    async def query(self, collection: str, filters: dict[str, Any], limit: int = 100) -> list[dict[str, Any]]: ...
+    async def delete(self, collection: str, id: str) -> bool: ...
+    async def count(self, collection: str, filters: dict[str, Any]) -> int: ...
+
+
+class InMemoryStore:
+    def __init__(self) -> None:
+        self._data: dict[str, dict[str, dict[str, Any]]] = {}
+
+    async def get(self, collection: str, id: str) -> dict[str, Any] | None:
+        return self._data.get(collection, {}).get(id)
+
+    async def put(self, collection: str, record: dict[str, Any]) -> dict[str, Any]:
+        self._data.setdefault(collection, {})[record["id"]] = dict(record)
+        return record
+
+    async def query(self, collection: str, filters: dict[str, Any], limit: int = 100) -> list[dict[str, Any]]:
+        rows = list(self._data.get(collection, {}).values())
+        for k, v in filters.items():
+            rows = [r for r in rows if r.get(k) == v]
+        return rows[:limit]
+
+    async def delete(self, collection: str, id: str) -> bool:
+        col = self._data.get(collection, {})
+        return col.pop(id, None) is not None
+
+    async def count(self, collection: str, filters: dict[str, Any]) -> int:
+        return len(await self.query(collection, filters, limit=100_000))
+
+
+def get_store(db_url: str | None = None) -> Store:
+    resolved = db_url or os.environ.get("APG_DATABASE_URL")
+    if resolved:
+        try:
+            return _PostgreSQLStore(resolved)
+        except Exception:
+            pass
+    return InMemoryStore()
+
+
+class _PostgreSQLStore:
+    def __init__(self, db_url: str) -> None:
+        from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+        engine = create_async_engine(db_url, echo=False)
+        self._session = async_sessionmaker(engine, class_=AsyncSession)
+
+    async def get(self, collection: str, id: str) -> dict[str, Any] | None:
+        async with self._session() as s:
+            row = (await s.execute("SELECT data FROM apg_records WHERE collection=:c AND id=:id", {"c": collection, "id": id})).fetchone()
+            return json.loads(row[0]) if row else None
+
+    async def put(self, collection: str, record: dict[str, Any]) -> dict[str, Any]:
+        async with self._session() as s:
+            await s.execute("INSERT INTO apg_records(id,collection,tenant_id,data) VALUES(:id,:c,:t,:d) ON CONFLICT(collection,id) DO UPDATE SET data=EXCLUDED.data",
+                {"id": record["id"], "c": collection, "t": record.get("tenant_id","default"), "d": json.dumps(record, default=str)})
+            await s.commit()
+        return record
+
+    async def query(self, collection: str, filters: dict[str, Any], limit: int = 100) -> list[dict[str, Any]]:
+        conds = " AND ".join(f"data->>\\'{k}\\' = :{k}" for k in filters)
+        where = f"WHERE collection=:_c{' AND ' + conds if conds else ''}"
+        async with self._session() as s:
+            rows = (await s.execute(f"SELECT data FROM apg_records {where} LIMIT :lim", {"_c": collection, "lim": limit, **filters})).fetchall()
+            return [json.loads(r[0]) for r in rows]
+
+    async def delete(self, collection: str, id: str) -> bool:
+        async with self._session() as s:
+            r = await s.execute("DELETE FROM apg_records WHERE collection=:c AND id=:id", {"c": collection, "id": id})
+            await s.commit()
+            return r.rowcount > 0
+
+    async def count(self, collection: str, filters: dict[str, Any]) -> int:
+        return len(await self.query(collection, filters, limit=100_000))
+'''
+
+
+def _db_schema_sql(capability_id: str, code: str) -> str:
+	return f'''-- APG {capability_id} database schema
+CREATE TABLE IF NOT EXISTS apg_records (
+    id TEXT NOT NULL,
+    collection TEXT NOT NULL,
+    tenant_id TEXT NOT NULL DEFAULT \'default\',
+    data JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (collection, id)
+);
+CREATE INDEX IF NOT EXISTS idx_apg_{code}_tenant ON apg_records (collection, tenant_id);
+CREATE INDEX IF NOT EXISTS idx_apg_{code}_data ON apg_records USING gin (data);
+'''
+
+
+def _alembic_ini_content() -> str:
+	return '''[alembic]
+script_location = alembic
+prepend_sys_path = .
+sqlalchemy.url = %(APG_DATABASE_URL)s
+
+[loggers]
+keys = root,sqlalchemy,alembic
+
+[handlers]
+keys = console
+
+[formatters]
+keys = generic
+
+[logger_root]
+level = WARN
+handlers = console
+qualname =
+
+[logger_sqlalchemy]
+level = WARN
+handlers =
+qualname = sqlalchemy.engine
+
+[logger_alembic]
+level = INFO
+handlers =
+qualname = alembic
+
+[handler_console]
+class = StreamHandler
+args = (sys.stderr,)
+level = NOTSET
+formatter = generic
+
+[formatter_generic]
+format = %(levelname)-5.5s [%(name)s] %(message)s
+datefmt = %H:%M:%S
+'''
+
+
+def _alembic_env_py() -> str:
+	return '''"""Alembic environment."""
+import os
+from logging.config import fileConfig
+from sqlalchemy import engine_from_config, pool
+from alembic import context
+
+config = context.config
+if config.config_file_name:
+    fileConfig(config.config_file_name)
+
+db_url = os.environ.get("APG_DATABASE_URL", "sqlite:///./capability.db")
+config.set_main_option("sqlalchemy.url", db_url)
+target_metadata = None
+
+def run_migrations_offline():
+    url = config.get_main_option("sqlalchemy.url")
+    context.configure(url=url, target_metadata=target_metadata, literal_binds=True)
+    with context.begin_transaction():
+        context.run_migrations()
+
+def run_migrations_online():
+    connectable = engine_from_config(config.get_section(config.config_ini_section, {}), prefix="sqlalchemy.", poolclass=pool.NullPool)
+    with connectable.connect() as connection:
+        context.configure(connection=connection, target_metadata=target_metadata)
+        with context.begin_transaction():
+            context.run_migrations()
+
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    run_migrations_online()
+'''
+
+
+def _alembic_mako() -> str:
+	return '''"""${message}
+Revision ID: ${up_revision}
+Revises: ${down_revision | comma,n}
+Create Date: ${create_date}
+"""
+from alembic import op
+import sqlalchemy as sa
+
+revision = ${repr(up_revision)}
+down_revision = ${repr(down_revision)}
+branch_labels = ${repr(branch_labels)}
+depends_on = ${repr(depends_on)}
+
+def upgrade():
+    ${upgrades if upgrades else "pass"}
+
+def downgrade():
+    ${downgrades if downgrades else "pass"}
+'''
+
+
+def _alembic_initial_migration(capability_id: str) -> str:
+	return f'''"""Initial migration: apg_records JSONB store.
+Revision ID: 0001
+"""
+from alembic import op
+import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
+
+revision = \'0001\'
+down_revision = None
+branch_labels = None
+depends_on = None
+
+def upgrade():
+    op.create_table(\'apg_records\',
+        sa.Column(\'id\', sa.Text(), nullable=False),
+        sa.Column(\'collection\', sa.Text(), nullable=False),
+        sa.Column(\'tenant_id\', sa.Text(), server_default=\'default\'),
+        sa.Column(\'data\', postgresql.JSONB(), nullable=False),
+        sa.Column(\'created_at\', sa.TIMESTAMP(timezone=True), server_default=sa.text(\'now()\')),
+        sa.Column(\'updated_at\', sa.TIMESTAMP(timezone=True), server_default=sa.text(\'now()\')),
+        sa.PrimaryKeyConstraint(\'collection\', \'id\'),
+    )
+    op.create_index(\'idx_{capability_id}_tenant\', \'apg_records\', [\'collection\', \'tenant_id\'])
+    op.create_index(\'idx_{capability_id}_data\', \'apg_records\', [\'data\'], postgresql_using=\'gin\')
+
+def downgrade():
+    op.drop_table(\'apg_records\')
+'''
