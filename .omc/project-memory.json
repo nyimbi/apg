@@ -10,7 +10,7 @@
   },
   "build": {
     "buildCommand": null,
-    "testCommand": ".venv/bin/python -m pytest tests/test_integration_transport.py tests/test_integration_healthcare.py tests/test_integration_government.py tests/test_integration_lending.py -q --tb=short 2>&1 | tail -30",
+    "testCommand": ".venv/bin/python -m pytest tests/test_integration_pharma.py tests/test_integration_retail.py tests/test_integration_telecom.py -v 2>&1 | tail -28",
     "lintCommand": null,
     "devCommand": null,
     "scripts": {}

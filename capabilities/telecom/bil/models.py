@@ -985,3 +985,190 @@ class RevenueAssuranceResult(BaseModel):
 	anomalies: list[dict[str, Any]]
 	currency: str
 	generated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# Legacy lightweight dataclass stubs used by service.py internal collections.
+# These are NOT Pydantic models — they are simple value objects with a to_dict()
+# helper so the service layer can serialise them without framework coupling.
+# ---------------------------------------------------------------------------
+
+class _LegacyBase:
+	"""Minimal base for legacy Bil* value objects."""
+	def to_dict(self) -> dict[str, Any]:
+		return {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
+
+
+class BilCdr(_LegacyBase):
+	__slots__ = ("cdr_id", "tenant_id", "source", "mediation_status", "msisdn",
+	             "duration_seconds", "data_volume_bytes", "recorded_at")
+
+	def __init__(self, cdr_id: str, tenant_id: str, source: str,
+	             mediation_status: str, msisdn: str, duration_seconds: int,
+	             data_volume_bytes: int, recorded_at: str) -> None:
+		self.cdr_id = cdr_id
+		self.tenant_id = tenant_id
+		self.source = source
+		self.mediation_status = mediation_status
+		self.msisdn = msisdn
+		self.duration_seconds = duration_seconds
+		self.data_volume_bytes = data_volume_bytes
+		self.recorded_at = recorded_at
+
+	def to_dict(self) -> dict[str, Any]:
+		return {s: getattr(self, s) for s in self.__slots__}
+
+
+class BilCharge(_LegacyBase):
+	__slots__ = ("charge_id", "tenant_id", "customer_id", "charge_type",
+	             "rating_type", "amount", "currency", "tax_amount", "cdr_id")
+
+	def __init__(self, charge_id: str, tenant_id: str, customer_id: str,
+	             charge_type: str, rating_type: str, amount: float,
+	             currency: str, tax_amount: float,
+	             cdr_id: str | None = None) -> None:
+		self.charge_id = charge_id
+		self.tenant_id = tenant_id
+		self.customer_id = customer_id
+		self.charge_type = charge_type
+		self.rating_type = rating_type
+		self.amount = amount
+		self.currency = currency
+		self.tax_amount = tax_amount
+		self.cdr_id = cdr_id
+
+	def to_dict(self) -> dict[str, Any]:
+		return {s: getattr(self, s) for s in self.__slots__}
+
+
+class BilCycle(_LegacyBase):
+	__slots__ = ("cycle_id", "tenant_id", "cycle_type", "cutoff_date",
+	             "start_date", "end_date", "status")
+
+	def __init__(self, cycle_id: str, tenant_id: str, cycle_type: str,
+	             cutoff_date: str, start_date: str, end_date: str,
+	             status: str = "active") -> None:
+		self.cycle_id = cycle_id
+		self.tenant_id = tenant_id
+		self.cycle_type = cycle_type
+		self.cutoff_date = cutoff_date
+		self.start_date = start_date
+		self.end_date = end_date
+		self.status = status
+
+	def to_dict(self) -> dict[str, Any]:
+		return {s: getattr(self, s) for s in self.__slots__}
+
+
+class BilInvoice(_LegacyBase):
+	__slots__ = ("invoice_id", "tenant_id", "customer_id", "cycle_id",
+	             "total_amount", "currency", "status", "approval_reference",
+	             "due_date")
+
+	def __init__(self, invoice_id: str, tenant_id: str, customer_id: str,
+	             cycle_id: str, total_amount: float, currency: str,
+	             status: str, approval_reference: str, due_date: str) -> None:
+		self.invoice_id = invoice_id
+		self.tenant_id = tenant_id
+		self.customer_id = customer_id
+		self.cycle_id = cycle_id
+		self.total_amount = total_amount
+		self.currency = currency
+		self.status = status
+		self.approval_reference = approval_reference
+		self.due_date = due_date
+
+	def to_dict(self) -> dict[str, Any]:
+		return {s: getattr(self, s) for s in self.__slots__}
+
+
+class BilDunningStep(_LegacyBase):
+	__slots__ = ("dunning_id", "tenant_id", "invoice_id", "step",
+	             "triggered_at", "next_step_date")
+
+	def __init__(self, dunning_id: str, tenant_id: str, invoice_id: str,
+	             step: str, triggered_at: str,
+	             next_step_date: str | None = None) -> None:
+		self.dunning_id = dunning_id
+		self.tenant_id = tenant_id
+		self.invoice_id = invoice_id
+		self.step = step
+		self.triggered_at = triggered_at
+		self.next_step_date = next_step_date
+
+	def to_dict(self) -> dict[str, Any]:
+		return {s: getattr(self, s) for s in self.__slots__}
+
+
+class BilPayment(_LegacyBase):
+	__slots__ = ("payment_id", "tenant_id", "invoice_id", "payment_method",
+	             "amount", "currency", "reference", "paid_at")
+
+	def __init__(self, payment_id: str, tenant_id: str, invoice_id: str,
+	             payment_method: str, amount: float, currency: str,
+	             reference: str, paid_at: str) -> None:
+		self.payment_id = payment_id
+		self.tenant_id = tenant_id
+		self.invoice_id = invoice_id
+		self.payment_method = payment_method
+		self.amount = amount
+		self.currency = currency
+		self.reference = reference
+		self.paid_at = paid_at
+
+	def to_dict(self) -> dict[str, Any]:
+		return {s: getattr(self, s) for s in self.__slots__}
+
+
+class BilDiscount(_LegacyBase):
+	__slots__ = ("discount_id", "tenant_id", "customer_id", "discount_type",
+	             "discount_pct", "approval_reference", "valid_from", "valid_to")
+
+	def __init__(self, discount_id: str, tenant_id: str, customer_id: str,
+	             discount_type: str, discount_pct: float,
+	             approval_reference: str, valid_from: str, valid_to: str) -> None:
+		self.discount_id = discount_id
+		self.tenant_id = tenant_id
+		self.customer_id = customer_id
+		self.discount_type = discount_type
+		self.discount_pct = discount_pct
+		self.approval_reference = approval_reference
+		self.valid_from = valid_from
+		self.valid_to = valid_to
+
+	def to_dict(self) -> dict[str, Any]:
+		return {s: getattr(self, s) for s in self.__slots__}
+
+
+class BilConvergentAccount(_LegacyBase):
+	__slots__ = ("account_id", "tenant_id", "convergent_mode",
+	             "master_account_id", "member_account_ids", "currency")
+
+	def __init__(self, account_id: str, tenant_id: str, convergent_mode: str,
+	             master_account_id: str, member_account_ids: str,
+	             currency: str) -> None:
+		self.account_id = account_id
+		self.tenant_id = tenant_id
+		self.convergent_mode = convergent_mode
+		self.master_account_id = master_account_id
+		self.member_account_ids = member_account_ids
+		self.currency = currency
+
+	def to_dict(self) -> dict[str, Any]:
+		return {s: getattr(self, s) for s in self.__slots__}
+
+
+class BilAgent(_LegacyBase):
+	__slots__ = ("agent_id", "tenant_id", "name", "runtime", "role", "scope")
+
+	def __init__(self, agent_id: str, tenant_id: str, name: str,
+	             runtime: str, role: str, scope: str) -> None:
+		self.agent_id = agent_id
+		self.tenant_id = tenant_id
+		self.name = name
+		self.runtime = runtime
+		self.role = role
+		self.scope = scope
+
+	def to_dict(self) -> dict[str, Any]:
+		return {s: getattr(self, s) for s in self.__slots__}

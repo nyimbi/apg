@@ -1,0 +1,300 @@
+// Pharmaceutical Operations Platform — APG composition example.
+// Demonstrates: Clinical Trials, QMS, Pharmacovigilance, Distribution,
+// Regulatory Affairs composability.
+// Pipeline: drug development lifecycle (trial → approval → distribution),
+// GMP compliance rules, adverse event pipeline, cold chain management.
+
+module pharma_platform version 1.0.0 {
+    description: "Full pharmaceutical operations platform covering the drug development lifecycle from clinical trial to patient distribution";
+}
+
+// ── Foundation ────────────────────────────────────────────────────────────────
+
+capability PharmaAuditLog {
+    contract: {
+        id: pharma_audit_log,
+        provides: [audit_events, compliance_trail, 21cfr_audit_trail],
+        configuration: {
+            retention_days: 3650,
+            immutable: true,
+            electronic_signature_required: true
+        }
+    };
+    streaming: {processor: bytewax, state: pharma_audit_state};
+}
+
+capability PharmaTenantContext {
+    contract: {
+        id: pharma_tenant_context,
+        provides: [tenant_context, rbac_policies, gxp_user_roles],
+        requires: [audit_events],
+        configuration: {multi_tenant: true, isolation: "strict", gxp_validated: true}
+    };
+    master_data: {entities: [tenant, organisation, user, role, training_record]};
+}
+
+// ── Clinical Trials Management ────────────────────────────────────────────────
+
+capability ClinicalTrials {
+    contract: {
+        id: pharma_ctr,
+        name: "Clinical Trials Management",
+        version: "1.0.0",
+        provides: [trial_registry, protocol_management, site_management, patient_enrollment, randomisation, crf_data, ae_reporting, regulatory_submissions],
+        requires: [audit_events, tenant_context],
+        configuration: {
+            gcp_compliant: true,
+            supported_phases: ["phase_1", "phase_2", "phase_3", "phase_4"],
+            ae_24h_reporting_enforced: true,
+            susar_15d_reporting_enforced: true,
+            tmf_reference_model: "ICH_E6R3",
+            edcsystem: "medidata_rave"
+        },
+        rules: [
+            {name: "irb_approval_required_before_activation", when: "operation = activate_trial AND irb_approved = false", action: "deny"},
+            {name: "informed_consent_before_enrollment", when: "operation = enrol_patient AND informed_consent_obtained = false", action: "deny"},
+            {name: "gcp_compliance_required", when: "gcp_compliant = false", action: "deny"},
+            {name: "ae_24h_expedited_reporting", when: "ae_type = serious_adverse_event AND within_24h = false", action: "deny"},
+            {name: "susar_15d_reporting", when: "ae_type = susar AND within_15d = false", action: "deny"},
+            {name: "site_must_be_initiated", when: "operation = enrol_patient AND site_initiated = false", action: "deny"},
+            {name: "protocol_version_required", when: "operation = approve_protocol AND version_present = false", action: "deny"},
+            {name: "cross_tenant_data_denied", when: "cross_tenant = true", action: "deny"}
+        ],
+        ui: {
+            shell: python,
+            routes: [
+                {name: "Trials", path: "/pharma/ctr/trials", component: "TrialListScreen"},
+                {name: "Sites", path: "/pharma/ctr/sites", component: "SiteManagementScreen"},
+                {name: "Patients", path: "/pharma/ctr/patients", component: "PatientEnrollmentScreen"},
+                {name: "Adverse Events", path: "/pharma/ctr/ae", component: "AdverseEventScreen"},
+                {name: "TMF", path: "/pharma/ctr/tmf", component: "TrialMasterFileScreen"},
+                {name: "Safety Dashboard", path: "/pharma/ctr/safety", component: "SafetyDashboardScreen"}
+            ]
+        },
+        theme: {name: pharma_theme, tokens: {accent: "#553C9A"}}
+    };
+
+    erp_modules: [clinical_operations, regulatory, safety, data_management];
+    master_data: {entities: [clinical_trial, protocol, site, patient, adverse_event, randomisation_record, crf, tmf_document, regulatory_submission]};
+    approvals: {levels: 3, approvers: [principal_investigator, medical_monitor, sponsor_cmo]};
+    i18n: {supported_languages: [en, fr, de, es, sw], default_language: en, fallback_language: en};
+    streaming: {processor: bytewax, state: ctr_lifecycle_state};
+
+    screens: {
+        SafetyMonitoringBoard: {
+            route: "/pharma/ctr/safety/board",
+            layout: dashboard,
+            contains: [AETimeline, SUSARAlertPanel, DunningActions, SMCReportSummary],
+            binds: [ae_reporting.active, regulatory_submissions.pending],
+            actions: [escalate_susar, file_sar, notify_irb]
+        }
+    };
+}
+
+workflow DrialDevelopmentLifecycle {
+    steps: str = "protocol_drafting -> irb_submission -> irb_approval -> trial_registration -> site_selection -> site_initiation -> patient_enrollment -> randomisation -> crf_data_collection -> interim_analysis -> database_lock -> csr_generation -> regulatory_submission";
+    stages: str = "design, regulatory_approval, execution, analysis, submission";
+    process: () -> bool = {
+        return true;
+    };
+}
+
+// ── Quality Management System ──────────────────────────────────────────────────
+
+capability QualityManagementSystem {
+    contract: {
+        id: pharma_qms,
+        name: "Quality Management System",
+        version: "1.0.0",
+        provides: [deviations, capa_management, change_control, batch_records, gmp_audits, sop_management],
+        requires: [audit_events, tenant_context],
+        configuration: {
+            gmp_standard: "ICH_Q10",
+            capa_sla_days: 30,
+            deviation_investigation_days: 15,
+            electronic_batch_record: true
+        },
+        rules: [
+            {name: "critical_deviation_capa_required", when: "deviation_severity = critical AND capa_raised = false", action: "deny"},
+            {name: "change_control_required_for_critical", when: "change_type = critical AND change_control_id missing", action: "deny"},
+            {name: "batch_release_requires_qp_sign", when: "operation = release_batch AND qp_signed = false", action: "deny"},
+            {name: "overdue_capa_escalation", when: "capa_days_open > capa_sla_days", action: "warn"},
+            {name: "sop_version_current", when: "sop_version != current_approved_version", action: "warn"}
+        ],
+        ui: {
+            shell: python,
+            routes: [
+                {name: "Deviations", path: "/pharma/qms/deviations", component: "DeviationScreen"},
+                {name: "CAPA", path: "/pharma/qms/capa", component: "CAPAScreen"},
+                {name: "Change Control", path: "/pharma/qms/changes", component: "ChangeControlScreen"},
+                {name: "Batch Records", path: "/pharma/qms/batches", component: "BatchRecordScreen"},
+                {name: "Audits", path: "/pharma/qms/audits", component: "AuditScreen"}
+            ]
+        },
+        theme: {name: pharma_theme, tokens: {accent: "#2C7A7B"}}
+    };
+
+    erp_modules: [quality, manufacturing, regulatory, training];
+    master_data: {entities: [deviation, capa, change_request, batch_record, audit_finding, sop]};
+    approvals: {levels: 3, approvers: [qa_officer, qa_manager, qualified_person]};
+    streaming: {processor: bytewax, state: qms_workflow_state};
+}
+
+// ── Pharmacovigilance ─────────────────────────────────────────────────────────
+
+capability Pharmacovigilance {
+    contract: {
+        id: pharma_pvi,
+        name: "Pharmacovigilance",
+        version: "1.0.0",
+        provides: [case_management, signal_detection, aggregate_reporting, risk_management],
+        requires: [ae_reporting, audit_events, tenant_context],
+        configuration: {
+            meddra_version: "26.0",
+            susar_7day_fatal_reporting: true,
+            susar_15day_reporting: true,
+            psur_frequency_months: 12,
+            rmp_required: true
+        },
+        rules: [
+            {name: "meddra_coding_required", when: "meddra_pt missing", action: "deny"},
+            {name: "fatal_7day_sar_required", when: "severity = fatal AND sar_filed = false AND days_since_onset > 7", action: "deny"},
+            {name: "serious_15day_sar_required", when: "seriousness = serious AND sar_filed = false AND days_since_onset > 15", action: "deny"},
+            {name: "causality_required_for_susar", when: "is_susar_candidate AND causality_assessed = false", action: "warn"},
+            {name: "duplicate_case_detection", when: "duplicate_detected", action: "require_review"}
+        ],
+        ui: {
+            shell: python,
+            routes: [
+                {name: "Cases", path: "/pharma/pvi/cases", component: "CaseManagementScreen"},
+                {name: "Signal Detection", path: "/pharma/pvi/signals", component: "SignalDetectionScreen"},
+                {name: "PSUR", path: "/pharma/pvi/psur", component: "PSURScreen"},
+                {name: "Risk Management", path: "/pharma/pvi/rmp", component: "RiskManagementScreen"}
+            ]
+        },
+        theme: {name: pharma_theme, tokens: {accent: "#C53030"}}
+    };
+
+    erp_modules: [safety, regulatory, medical_affairs];
+    master_data: {entities: [icsr_case, signal, psur, rmp, safety_communication]};
+    approvals: {levels: 2, approvers: [safety_physician, global_safety_officer]};
+    streaming: {processor: bytewax, state: pharmacovigilance_signal_state};
+
+    screens: {
+        SafetyCaseWorkbench: {
+            route: "/pharma/pvi/workbench",
+            layout: split,
+            contains: [PendingCaseList, CausalityAssessmentPanel, SARFilingQueue],
+            binds: [case_management.pending_triage, risk_management.active_signals],
+            actions: [triage_case, assess_causality, file_sar, close_case]
+        }
+    };
+}
+
+workflow AdverseEventPipeline {
+    steps: str = "ae_reported -> meddra_coding -> causality_assessment -> seriousness_determination -> susar_check -> sar_filing -> agency_acknowledgement -> case_closure";
+    stages: str = "intake, assessment, reporting, closure";
+    process: () -> bool = {
+        return true;
+    };
+}
+
+// ── Distribution ──────────────────────────────────────────────────────────────
+
+capability Distribution {
+    contract: {
+        id: pharma_dis,
+        name: "Pharmaceutical Distribution",
+        version: "1.0.0",
+        provides: [batch_traceability, cold_chain_management, serialisation, distribution_records, recall_management],
+        requires: [batch_records, audit_events, tenant_context],
+        configuration: {
+            gsdp_compliant: true,
+            cold_chain_temp_min_c: 2,
+            cold_chain_temp_max_c: 8,
+            serialisation_standard: "GS1_EPCIS",
+            recall_notification_hours: 24
+        },
+        rules: [
+            {name: "batch_release_required_before_dispatch", when: "batch_status != released", action: "deny"},
+            {name: "cold_chain_temp_excursion_hold", when: "temp_celsius > cold_chain_temp_max_c OR temp_celsius < cold_chain_temp_min_c", action: "deny"},
+            {name: "serialisation_required", when: "product_serialised = false", action: "deny"},
+            {name: "expiry_check_before_dispatch", when: "days_to_expiry < 90", action: "warn"},
+            {name: "recall_triggers_distribution_hold", when: "recall_active AND product_id = recalled_product_id", action: "deny"}
+        ],
+        ui: {
+            shell: python,
+            routes: [
+                {name: "Dispatch", path: "/pharma/dis/dispatch", component: "DispatchScreen"},
+                {name: "Cold Chain", path: "/pharma/dis/coldchain", component: "ColdChainMonitorScreen"},
+                {name: "Serialisation", path: "/pharma/dis/serial", component: "SerialisationScreen"},
+                {name: "Recalls", path: "/pharma/dis/recalls", component: "RecallManagementScreen"}
+            ]
+        },
+        theme: {name: pharma_theme, tokens: {accent: "#276749"}}
+    };
+
+    erp_modules: [distribution, warehouse, quality, logistics];
+    master_data: {entities: [batch, serial_number, dispatch_record, cold_chain_log, recall_notice]};
+    i18n: {supported_languages: [en, fr, sw], default_language: en, fallback_language: en};
+    streaming: {processor: bytewax, state: distribution_cold_chain_state};
+
+    screens: {
+        ColdChainDashboard: {
+            route: "/pharma/dis/coldchain/live",
+            layout: dashboard,
+            contains: [TemperatureMap, ExcursionAlertList, BatchStatusPanel],
+            binds: [cold_chain_management.live_sensors, distribution_records.in_transit],
+            actions: [quarantine_batch, notify_logistics, initiate_investigation]
+        }
+    };
+}
+
+// ── Regulatory Affairs ────────────────────────────────────────────────────────
+
+capability RegulatoryAffairs {
+    contract: {
+        id: pharma_reg,
+        name: "Regulatory Affairs",
+        version: "1.0.0",
+        provides: [dossier_management, submission_tracking, agency_correspondence, registration_status, variation_management],
+        requires: [ae_reporting, batch_records, capa_management, audit_events, tenant_context],
+        configuration: {
+            ectd_version: "4.0",
+            supported_agencies: ["FDA", "EMA", "NMRA", "WHO"],
+            submission_types: ["IND", "NDA", "BLA", "MAA", "CTA", "variation"],
+            response_tracking_days: 90
+        },
+        rules: [
+            {name: "ectd_format_required_for_fda_ema", when: "agency in [FDA, EMA] AND ectd_compliant = false", action: "deny"},
+            {name: "csr_required_before_nda", when: "submission_type = NDA AND csr_status != final", action: "deny"},
+            {name: "safety_update_required_with_variation", when: "variation_type = type_2 AND safety_profile_reviewed = false", action: "require_review"},
+            {name: "agency_response_tracking", when: "days_since_submission > response_tracking_days AND agency_response missing", action: "warn"}
+        ],
+        ui: {
+            shell: python,
+            routes: [
+                {name: "Submissions", path: "/pharma/reg/submissions", component: "SubmissionTrackerScreen"},
+                {name: "Dossiers", path: "/pharma/reg/dossiers", component: "DossierManagementScreen"},
+                {name: "Agency Correspondence", path: "/pharma/reg/correspondence", component: "CorrespondenceScreen"},
+                {name: "Registration Status", path: "/pharma/reg/status", component: "RegistrationStatusScreen"}
+            ]
+        },
+        theme: {name: pharma_theme, tokens: {accent: "#2B4C7E"}}
+    };
+
+    erp_modules: [regulatory, legal, quality, clinical_operations];
+    master_data: {entities: [dossier, submission, agency_correspondence, registration, variation]};
+    approvals: {levels: 3, approvers: [regulatory_affairs_manager, medical_director, cro]};
+    streaming: {processor: bytewax, state: regulatory_submission_state};
+}
+
+// ── Full Drug Development Lifecycle Pipeline ──────────────────────────────────
+
+workflow DrugApprovalToDistribution {
+    steps: str = "trial_complete -> csr_finalised -> nda_dossier_prepared -> regulatory_submission -> agency_review -> approval_granted -> gmp_batch_manufacturing -> batch_qp_release -> serialisation -> distribution_dispatch -> cold_chain_monitoring -> delivery_confirmed";
+    stages: str = "submission, review, manufacturing, distribution";
+    process: () -> bool = {
+        return true;
+    };
+}

@@ -1,0 +1,296 @@
+// Supply Chain Platform — APG composition example.
+// Demonstrates: Vendor Management, Procurement, Inventory,
+// Transport (Fleet + Routing + Tracking) composability.
+// Pipeline: procurement-to-delivery with vendor qualification rules,
+// transport optimisation, and real-time tracking.
+
+module supply_chain_platform version 1.0.0 {
+    description: "End-to-end supply chain platform composing vendor management, procurement, inventory, and transport capabilities";
+}
+
+// ── Foundation ───────────────────────────────────────────────────────────────
+
+capability AuditLog {
+    contract: {
+        id: audit_log,
+        provides: [audit_events, compliance_trail],
+        configuration: {retention_days: 2555, immutable: true}
+    };
+    streaming: {processor: bytewax, state: audit_log_state};
+}
+
+capability TenantContext {
+    contract: {
+        id: tenant_context,
+        provides: [tenant_context, rbac_policies],
+        requires: [audit_events],
+        configuration: {multi_tenant: true, isolation: "strict"}
+    };
+    master_data: {entities: [tenant, organisation, user, role]};
+}
+
+// ── Vendor Management ─────────────────────────────────────────────────────────
+
+capability VendorManagement {
+    contract: {
+        id: vendor_management,
+        name: "Vendor Management",
+        version: "1.0.0",
+        provides: [vendor_master, vendor_qualifications, vendor_scorecards],
+        requires: [audit_events, tenant_context],
+        configuration: {
+            qualification_validity_days: 365,
+            min_score_to_approve: 70,
+            currency: "KES"
+        },
+        rules: [
+            {name: "vendor_tax_pin_required", when: "tax_pin missing", action: "deny"},
+            {name: "vendor_bank_details_required", when: "bank_account missing", action: "deny"},
+            {name: "expired_qualification_blocked", when: "qualification_expired", action: "deny"},
+            {name: "low_score_vendor_review", when: "vendor_score < min_score_to_approve", action: "require_review"}
+        ],
+        ui: {
+            shell: python,
+            routes: [
+                {name: "Vendors", path: "/scm/vendors", component: "VendorListScreen"},
+                {name: "Qualifications", path: "/scm/vendors/qualify", component: "QualificationScreen"},
+                {name: "Scorecards", path: "/scm/vendors/scorecards", component: "VendorScorecardScreen"}
+            ]
+        },
+        theme: {name: supply_chain_theme, tokens: {accent: "#2B6CB0"}}
+    };
+
+    erp_modules: [procurement, finance, compliance];
+    master_data: {entities: [vendor, qualification_certificate, bank_account, tax_record]};
+    approvals: {levels: 2, approvers: [procurement_officer, compliance_manager]};
+    streaming: {processor: bytewax, state: vendor_qualification_state};
+}
+
+// ── Procurement ───────────────────────────────────────────────────────────────
+
+capability Procurement {
+    contract: {
+        id: procurement,
+        name: "Procurement",
+        version: "1.0.0",
+        provides: [purchase_requests, purchase_orders, rfq_management, goods_receipt],
+        requires: [vendor_master, vendor_qualifications, audit_events, tenant_context],
+        configuration: {
+            currency: "KES",
+            approval_threshold_low: 50000,
+            approval_threshold_high: 500000,
+            three_quote_minimum_above: 100000
+        },
+        rules: [
+            {name: "budget_code_required", when: "budget_code missing", action: "deny"},
+            {name: "unqualified_vendor_blocked", when: "vendor_qualified = false", action: "deny"},
+            {name: "three_quote_rule", when: "amount > three_quote_minimum_above AND quote_count < 3", action: "require_review"},
+            {name: "high_value_cfo_approval", when: "amount > approval_threshold_high", action: "require_review"},
+            {name: "po_requires_pr", when: "purchase_request_id missing", action: "deny"},
+            {name: "grn_quantity_mismatch", when: "received_qty != ordered_qty AND variance_pct > 5", action: "warn"}
+        ],
+        ui: {
+            shell: python,
+            routes: [
+                {name: "Purchase Requests", path: "/scm/procurement/pr", component: "PurchaseRequestScreen"},
+                {name: "Purchase Orders", path: "/scm/procurement/po", component: "PurchaseOrderScreen"},
+                {name: "RFQ", path: "/scm/procurement/rfq", component: "RFQScreen"},
+                {name: "Goods Receipt", path: "/scm/procurement/grn", component: "GoodsReceiptScreen"}
+            ]
+        },
+        theme: {name: supply_chain_theme, tokens: {accent: "#2B6CB0"}}
+    };
+
+    erp_modules: [procurement, finance, inventory];
+    components: {
+        requisition: {capability: purchase_requests, permissions: [create, approve, cancel]},
+        ordering: {capability: purchase_orders, permissions: [create, approve, dispatch, close]},
+        receiving: {capability: goods_receipt, permissions: [receive, inspect, reject]}
+    };
+    approvals: {levels: 3, approvers: [department_head, procurement_lead, cfo]};
+    master_data: {entities: [purchase_request, purchase_order, rfq, goods_receipt_note, supplier_quote]};
+    streaming: {processor: bytewax, state: procurement_workflow_state};
+
+    screens: {
+        ApprovalWorkbench: {
+            route: "/scm/procurement/approvals",
+            layout: split,
+            contains: [PendingPRList, POApprovalPanel],
+            binds: [purchase_requests.pending, purchase_orders.pending_approval],
+            actions: [approve, reject, request_revision]
+        }
+    };
+}
+
+workflow ProcurementToPO {
+    steps: str = "draft -> budget_check -> vendor_selection -> rfq -> po_raised -> approved -> dispatched";
+    stages: str = "draft, review, approval, execution";
+    process: () -> bool = {
+        return true;
+    };
+}
+
+// ── Inventory ─────────────────────────────────────────────────────────────────
+
+capability Inventory {
+    contract: {
+        id: inventory,
+        name: "Inventory Management",
+        version: "1.0.0",
+        provides: [stock_balances, stock_movements, reorder_alerts, warehouse_locations],
+        requires: [goods_receipt, audit_events, tenant_context],
+        configuration: {
+            default_warehouse: "NBO-WH-01",
+            reorder_lead_time_days: 14,
+            cycle_count_frequency_days: 30,
+            negative_stock_allowed: false
+        },
+        rules: [
+            {name: "no_negative_stock", when: "on_hand - reserved < 0 AND negative_stock_allowed = false", action: "deny"},
+            {name: "reorder_point_alert", when: "on_hand <= reorder_level", action: "warn"},
+            {name: "bin_location_required", when: "operation = putaway AND bin_location missing", action: "deny"},
+            {name: "expired_stock_quarantine", when: "expiry_date < today", action: "deny"}
+        ],
+        ui: {
+            shell: python,
+            routes: [
+                {name: "Stock Levels", path: "/scm/inventory/stock", component: "StockLevelScreen"},
+                {name: "Movements", path: "/scm/inventory/movements", component: "MovementScreen"},
+                {name: "Reorder Alerts", path: "/scm/inventory/reorder", component: "ReorderAlertScreen"},
+                {name: "Cycle Count", path: "/scm/inventory/cyclecount", component: "CycleCountScreen"}
+            ]
+        },
+        theme: {name: supply_chain_theme, tokens: {accent: "#276749"}}
+    };
+
+    erp_modules: [inventory, warehouse, procurement];
+    master_data: {entities: [stock_item, warehouse, bin_location, stock_movement, reorder_rule]};
+    streaming: {processor: bytewax, state: inventory_movement_state};
+}
+
+// ── Fleet Management ──────────────────────────────────────────────────────────
+
+capability FleetManagement {
+    contract: {
+        id: fleet_management,
+        name: "Fleet Management",
+        version: "1.0.0",
+        provides: [vehicle_registry, driver_registry, maintenance_schedules, fuel_records],
+        requires: [audit_events, tenant_context],
+        configuration: {
+            fuel_type: "diesel",
+            service_interval_km: 10000,
+            driver_licence_expiry_alert_days: 30
+        },
+        rules: [
+            {name: "expired_licence_blocked", when: "driver_licence_expired", action: "deny"},
+            {name: "overdue_service_blocked", when: "km_since_service > service_interval_km", action: "warn"},
+            {name: "vehicle_insurance_required", when: "insurance_expired", action: "deny"}
+        ],
+        ui: {
+            shell: python,
+            routes: [
+                {name: "Vehicles", path: "/scm/fleet/vehicles", component: "VehicleRegistryScreen"},
+                {name: "Drivers", path: "/scm/fleet/drivers", component: "DriverRegistryScreen"},
+                {name: "Maintenance", path: "/scm/fleet/maintenance", component: "MaintenanceScreen"}
+            ]
+        },
+        theme: {name: supply_chain_theme, tokens: {accent: "#744210"}}
+    };
+
+    erp_modules: [transport, maintenance, hr];
+    master_data: {entities: [vehicle, driver, maintenance_record, fuel_log, insurance_policy]};
+    streaming: {processor: bytewax, state: fleet_telemetry_state};
+}
+
+// ── Route Optimisation ────────────────────────────────────────────────────────
+
+capability RouteOptimisation {
+    contract: {
+        id: route_optimisation,
+        name: "Route Optimisation",
+        version: "1.0.0",
+        provides: [optimised_routes, delivery_plans, load_plans],
+        requires: [vehicle_registry, driver_registry, stock_balances, audit_events],
+        configuration: {
+            algorithm: "vrp_nearest_neighbour",
+            max_stops_per_route: 20,
+            max_load_kg: 5000,
+            time_window_enforcement: true
+        },
+        rules: [
+            {name: "overloaded_vehicle_denied", when: "load_kg > max_load_kg", action: "deny"},
+            {name: "driver_hours_limit", when: "planned_hours > 10", action: "deny"},
+            {name: "time_window_violation", when: "eta > delivery_window_end", action: "warn"}
+        ],
+        ui: {
+            shell: python,
+            routes: [
+                {name: "Route Planner", path: "/scm/transport/routes", component: "RoutePlannerScreen"},
+                {name: "Load Plans", path: "/scm/transport/loads", component: "LoadPlanScreen"}
+            ]
+        },
+        theme: {name: supply_chain_theme, tokens: {accent: "#744210"}}
+    };
+
+    erp_modules: [transport, logistics, warehouse];
+    master_data: {entities: [route, stop, delivery_plan, load_plan, time_window]};
+    streaming: {processor: bytewax, state: route_optimisation_state};
+}
+
+// ── Real-Time Tracking ────────────────────────────────────────────────────────
+
+capability ShipmentTracking {
+    contract: {
+        id: shipment_tracking,
+        name: "Shipment Tracking",
+        version: "1.0.0",
+        provides: [shipment_positions, eta_updates, delivery_confirmations, exception_alerts],
+        requires: [optimised_routes, vehicle_registry, audit_events, tenant_context],
+        configuration: {
+            telemetry_interval_seconds: 30,
+            geofence_radius_metres: 500,
+            sms_eta_alerts: true,
+            pod_signature_required: true
+        },
+        rules: [
+            {name: "pod_required_on_delivery", when: "delivery_completed AND pod_captured = false", action: "deny"},
+            {name: "geofence_deviation_alert", when: "distance_from_route > geofence_radius_metres", action: "warn"},
+            {name: "temperature_excursion_alert", when: "temp_celsius > max_temp OR temp_celsius < min_temp", action: "warn"}
+        ],
+        ui: {
+            shell: python,
+            routes: [
+                {name: "Live Map", path: "/scm/tracking/live", component: "LiveTrackingMapScreen"},
+                {name: "Shipments", path: "/scm/tracking/shipments", component: "ShipmentListScreen"},
+                {name: "Exceptions", path: "/scm/tracking/exceptions", component: "ExceptionAlertScreen"}
+            ]
+        },
+        theme: {name: supply_chain_theme, tokens: {accent: "#744210"}}
+    };
+
+    erp_modules: [logistics, transport, customer_service];
+    master_data: {entities: [shipment, telemetry_event, geofence, proof_of_delivery]};
+    i18n: {supported_languages: [en, sw], default_language: en, fallback_language: en};
+    streaming: {processor: bytewax, state: shipment_tracking_state};
+
+    screens: {
+        LiveDispatchBoard: {
+            route: "/scm/tracking/dispatch",
+            layout: map_split,
+            contains: [LiveVehicleMap, ActiveShipmentList, ExceptionPanel],
+            binds: [shipment_positions.live, exception_alerts.active],
+            actions: [reassign_driver, contact_driver, escalate_exception]
+        }
+    };
+}
+
+// ── Procurement-to-Delivery Pipeline ─────────────────────────────────────────
+
+workflow ProcurementToDelivery {
+    steps: str = "purchase_request -> vendor_qualification_check -> rfq -> po_approved -> goods_received -> warehouse_putaway -> pick_and_pack -> load_plan -> route_optimised -> dispatched -> in_transit -> delivered -> pod_captured";
+    stages: str = "planning, procurement, warehousing, dispatch, delivery, closure";
+    process: () -> bool = {
+        return true;
+    };
+}
