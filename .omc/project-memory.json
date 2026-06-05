@@ -10,7 +10,7 @@
   },
   "build": {
     "buildCommand": null,
-    "testCommand": "python -m pytest capabilities/common/wflo/tests/ -x --tb=short -q 2>&1 | head -80",
+    "testCommand": "/Users/nyimbiodero/src/pjs/apg/.venv/bin/python -m pytest \\\n  tests/test_composability_comprehensive.py \\\n  tests/test_integration_finance.py \\\n  tests/test_integration_fintech.py \\\n  tests/test_integration_intelligence.py \\\n  tests/test_integration_platform.py \\\n  -q --tb=no 2>&1 | tail -3",
     "lintCommand": null,
     "devCommand": null,
     "scripts": {}
@@ -382,8 +382,8 @@
     },
     {
       "path": "capabilities/intel/alerts/service.py",
-      "accessCount": 25,
-      "lastAccessed": 1780599654426,
+      "accessCount": 26,
+      "lastAccessed": 1780654678440,
       "type": "file"
     },
     {
@@ -400,8 +400,8 @@
     },
     {
       "path": "capabilities/capability_contract_registry.py",
-      "accessCount": 9,
-      "lastAccessed": 1780585009419,
+      "accessCount": 10,
+      "lastAccessed": 1780654676041,
       "type": "file"
     },
     {

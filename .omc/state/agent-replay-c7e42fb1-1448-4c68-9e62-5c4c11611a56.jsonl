@@ -493,3 +493,7 @@
 {"t":0,"agent":"aed0180","agent_type":"workflow-subagent","event":"agent_start","parent_mode":"none"}
 {"t":0,"agent":"aed0180","agent_type":"workflow-subagent","event":"agent_stop","success":true}
 {"t":0,"agent":"aa91336","agent_type":"workflow-subagent","event":"agent_stop","success":true}
+{"t":0,"agent":"a41d699","agent_type":"unknown","event":"agent_stop","success":true}
+{"t":0,"agent":"afff22a","agent_type":"unknown","event":"agent_stop","success":true}
+{"t":0,"agent":"ab4f975","agent_type":"general-purpose","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"ab4f975","agent_type":"general-purpose","event":"agent_stop","success":true}

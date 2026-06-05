@@ -178,7 +178,7 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"graph": "grph",
 		"rag": "ragn",
 		"event_stream": "bytewax",
-		"geo": "geoi",
+		"geo": "geos",
 	},
 	"ui": {
 		"enable_dashboard": True,
@@ -219,7 +219,7 @@ PROVIDES = [
 	"osint_review_workflow",
 	"osint_agent_workflow",
 ]
-REQUIRES = ["auth", "audl", "ntfy", "nlpc", "intel_crawler", "srch", "grph", "ragn", "geoi"]
+REQUIRES = ["auth", "audl", "ntfy", "nlpc", "intel_crawler", "srch", "grph", "ragn", "geos"]
 
 UI_ROUTES = [
 	{"name": "dashboard", "path": "/intel-osint/dashboard", "component": "OSINTDashboard", "permission": "intel_osint:view", "nav_group": "Overview"},

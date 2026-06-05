@@ -116,7 +116,7 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"notification": "adapter",
 		"gateway": "adapter",
 		"developer_portal": "adapter",
-		"service_discovery": "adapter",
+		"regy": "adapter",
 		"policy_management": "adapter",
 		"analytics_sink": "adapter",
 		"event_stream": "bytewax",
@@ -163,7 +163,7 @@ REQUIRES = [
 	"composition_events",
 	"composition_config",
 	"grc_pol",
-	"service_discovery",
+	"regy",
 ]
 
 
