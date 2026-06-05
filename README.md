@@ -1,527 +1,242 @@
-# APG v11 - Ultra-Terse Application Programming Generation Language
+# APG — Application Programming Generation
 
-**The most productive language for rapid development across web, mobile, industrial automation, digital twins, AI systems, and intelligence platforms.**
+**259 production-grade, independently-deployable capability packages across 28 business domains.**
+
+> Copyright (c) 2025 Datacraft · Author: Nyimbi Odero · [www.datacraft.co.ke](https://www.datacraft.co.ke)
 
 ---
 
-**Copyright (c) 2025 Datacraft**  
-**Author: Nyimbi Odero**
+## What is APG?
 
-## Overview
+APG is two things:
 
-APG (Application Programming Generation) is a revolutionary ultra-terse domain-specific language that enables developers to create complete, production-ready systems in 10-30 lines of code versus thousands in traditional approaches. Using a unified universal entity pattern, APG compiles to high-quality Python code and supports development across an unprecedented range of domains.
+1. **A capability library** — 259 world-class business capability packages (Finance, Fintech, Intelligence, Healthcare, Government, Transport, Telecom, and more) that can be installed independently or composed together.
 
-### Universal Entity Pattern
-```apg
-type name {
-    config: value;
-    behavior: action;
-}
-```
+2. **A DSL** — An ultra-terse language for declaring composed business systems that compiles to production Python.
 
-This single pattern scales from simple database tables to complex digital twins, from chatbots to industrial control systems, from OSINT platforms to predictive maintenance solutions.
+---
 
-## Quick Start
+## Quick Start — Use a Capability
 
-### Installation
 ```bash
-pip install apg-lang
+# Install any capability independently
+pip install apg-intel-alerts
+pip install apg-fin-arc          # Accounts Receivable
+pip install apg-hcm-payroll      # Payroll (7-country PAYE)
+pip install apg-fintech-payments # M-Pesa/MTN MoMo/SWIFT
+
+# Run as standalone server (InMemory store, zero config)
+apg-intel-alerts --port 8080
+
+# Run with PostgreSQL
+apg-fin-arc --db-url postgresql+asyncpg://... --port 8080
+
+# Use the Python API
+from apg_intel_alerts import get_capability_contract, evaluate_capability_rules
+from apg_intel_alerts.service import AlertManagementService
+
+svc = AlertManagementService("my_org")        # zero external deps
+contract = get_capability_contract("my_org")  # composability interface
 ```
 
-### Your First APG Program
+---
+
+## 259 Capabilities Across 28 Domains
+
+| Domain | Capabilities | Highlights |
+|---|---|---|
+| **common** | 81 | auth, audl, nlpc (7,844L), moni, wflo, rag, search, ML lifecycle |
+| **fintech** | 30 | payments (M-Pesa/SWIFT), KYC (3,063L), AML, lending, crypto, DeFi |
+| **intel** | 22 | OSINT, SIGINT, threats, fusion, alerts, correlation, prediction |
+| **fin** | 7 | AR (2,251L), GL (2,987L), AP (1,963L), payroll (3,021L) |
+| **healthcare** | 9 | EMR, pharmacy, lab, patient mgmt, telemedicine |
+| **government** | 10 | tax, electoral, emergency, law enforcement, citizen services |
+| **transport** | 9 | fleet, routing, dispatch, cargo, tracking |
+| **telecom** | 10 | billing (2,143L), provisioning, network, QoS |
+| **pharma** | 9 | clinical trials, pharmacovigilance, QMS |
+| **realestate** | 10 | lease (IFRS 16), property mgmt, valuation |
+| **retail** | 5 | POS (2,147L), omnichannel, loyalty |
+| **bia** | 8 | analytics, dashboards, data warehouse, ML |
+| **ppm** | 6 | project accounting, planning, resource mgmt |
+| **hcm** | 3 | payroll, time & attendance, employee data |
+| **grc** | 6 | policy, risk assessment, audit, incident mgmt |
+| _+ 13 more_ | 39 | energy, mining, education, pharma, loc, mob, eam, ecd, crm, scm, int, composition |
+
+**Quality**: All 259 capabilities have 40–184 async service methods, 10–100 governance rules, streaming events via Bytewax, and standalone PyPI packaging.
+
+---
+
+## Composability Contract
+
+Every capability exposes a machine-readable contract:
+
+```python
+from capabilities.capability_contract_registry import evaluate_rules, load_contract_registry
+
+# Discover all capabilities
+registry = load_contract_registry()
+
+# Evaluate governance rules
+result = evaluate_rules("intel_alerts", {
+    "tenant_context_present": True,
+    "operation": "record_alert",
+    "policy_attached": True,
+})
+# → {"decision": "allow", "matched_rules": [], "actions": []}
+
+# Navigate the manifest
+from capabilities.manifest import get_capability, find_capabilities, get_domain
+
+cap = get_capability("intel_alerts")        # by capability ID
+cap = get_by_path("capabilities/intel/alerts")  # by path
+cap = get_by_package("apg-intel-alerts")        # by package name
+results = find_capabilities("payroll")           # keyword search
+intel_caps = get_domain("intel")                 # domain listing
+```
+
+---
+
+## APG DSL — Compose Business Systems
+
+Declare composed applications in the APG language:
+
 ```apg
-// Complete application manifest in 8 lines
-db UserDB {
-    users: table {
-        name: str;
-        email: str [unique];
+// CRM platform in 40 lines
+module crm_platform version 1.0.0 { description: "Enterprise CRM"; }
+
+table Contact { name: str; email: str; status: str; }
+
+capability CRMCore {
+    contract: {
+        id: crm_platform_core,
+        provides: [contact_lifecycle, opportunity_pipeline, sales_analytics],
+        requires: [auth, audl, ntfy, wflo],
+        rules: [
+            {name: "large_deal_approval", when: "amount > 50000", action: require_review},
+            {name: "cross_tenant_denied", when: "contact_tenant != actor_tenant", action: deny}
+        ],
+        ui: {shell: python, routes: [
+            {name: "Pipeline", path: "/crm/pipeline", component: "Pipeline", permission: "crm:pipeline"}
+        ]},
+        theme: {name: crm_theme, tokens: {"color.primary": "#1565C0", "border.radius": "6px"}, components: {}}
     };
 }
 
-form UserForm {
-    fields: name, email;
-    actions: save -> UserDB.users;
-}
-```
-
-### Digital Twin Example
-```apg
-twin ProductionLine {
-    sync: real_time_sync("opc.tcp://192.168.1.100:4840");
-    models: gpt4->claude3->llama2;
-    @anomaly: isolation_forest + autoencoder;
-    when: temperature > 80°C -> alert("Overheating detected");
-}
-```
-
-## Core Capabilities
-
-### 🚀 **Ultra-Terse Productivity**
-- **10-30 lines** instead of thousands
-- **Unified syntax** across all domains
-- **Consistent patterns** reduce learning curve
-- **Cascade syntax**: `gpt4->claude3->llama2` for fallback chains
-- **Minion protocol**: `@all(robots).do(action)` for coordination
-
-### 🏭 **Digital Twin & Industrial IoT**
-- Complete digital twin modeling with physics engines
-- Real-time synchronization (microsecond accuracy)
-- Multi-protocol support: OPC-UA, Modbus, Ethernet/IP, MQTT
-- Predictive maintenance with ML integration
-- Production line monitoring and optimization
-
-### 👁️ **Computer Vision & Quality Control**
-- Advanced visual inspection and anomaly detection
-- Statistical process control and Six Sigma
-- Real-time production line monitoring
-- Industry-specific solutions (automotive, pharma, semiconductor, food)
-
-### 🤖 **AI & Robotics Integration**
-- Native LLM orchestration and agent deployment
-- Advanced robotics control with kinematics
-- Real-time sensor fusion and processing
-- Swarm intelligence and collective behavior
-- Multi-layer cognitive architectures
-
-### 🧩 **Executable Capability Contracts**
-- 100+ capability contracts discoverable through a platform registry
-- Per-capability configuration schemas, deterministic rules, UI manifests, and theme tokens
-- CLI validation with `python cli.py capabilities validate-contracts`
-- JSON contract listing with `python cli.py capabilities contracts --json`
-
-### 🕵️ **Intelligence & Analytics**
-- OSINT and intelligence gathering systems
-- Complex business calculations and reporting
-- Real-time analytics and stream processing
-- Regulatory compliance (FDA, GMP, HACCP, SOX)
-
-### 📊 **Business Applications**
-- ERP systems and complex workflows
-- Advanced reporting and dashboards
-- Financial calculations and compliance
-- Multi-modal user interfaces
-- Automated business processes
-
-## Language Features
-
-### Modern Python Integration
-- **Python 3.12+ syntax**: `str | None`, `list[str]`, `dict[str, Any]`
-- **Async/await**: Native asynchronous programming
-- **Pattern matching**: Advanced control flow
-- **Type annotations**: Full type system with generics
-- **Pydantic v2**: Automatic model generation
-
-### Advanced Control Structures
-```apg
-// Pattern matching
-match sensor_reading {
-    case value if value > threshold -> alert();
-    case normal_range -> continue();
-    case _ -> investigate();
+agent SalesAssistant {
+    model: "openai:gpt-4.1-mini" ?? "ollama:llama3.2";
+    capabilities: [opportunity_pipeline];
+    memory: vector sales_memory;
 }
 
-// Async processing
-async def process_stream() {
-    data = await sensor.read();
-    result = await ml_model.predict(data);
-    return result;
+app CRMPlatform {
+    capabilities: [CRMCore];
+    agents: [SalesAssistant];
+    runtime: {target: python, streaming: {processor: bytewax}};
 }
 ```
 
-### Comprehensive Expression System
-```apg
-// Complex expressions
-calculation: (revenue - costs) * tax_rate + adjustments;
-pipeline: data | filter(valid=true) | transform(normalize) | analyze();
-cascade: primary_server->backup_server->emergency_fallback;
+Compile and run:
+
+```bash
+apg compile examples/crm_platform/main.apg --output ./generated --verify
+python ./generated/app.py --host 0.0.0.0 --port 8080
 ```
 
-## Domain Examples
+---
 
-### Digital Twin Manufacturing
-```apg
-twin CNCMachine {
-    physical_model: "Haas_VF2_Vertical_Mill";
-    sync: opc_ua("192.168.1.50:4840", 1000Hz);
-    
-    @geometry: {
-        workspace: [x=508, y=406, z=508]; // mm
-        spindle: {max_rpm: 8100, max_torque: 109}; // Nm
-    };
-    
-    @physics: finite_element {
-        materials: [steel_4140, aluminum_6061];
-        cutting_forces: dynamic_simulation;
-        thermal_expansion: temperature_dependent;
-    };
-    
-    @predictive: {
-        spindle_bearing: weibull(β=2.1, η=8760); // hours
-        tool_wear: exponential(λ=0.003);
-        maintenance: condition_based + vibration_analysis;
-    };
-}
+## Platform Deployment
+
+```bash
+# Run the full platform with Docker Compose
+docker compose up
+
+# Run just the intelligence capabilities
+docker compose up apg-db intel-alerts intel-threats intel-osint
+
+# Run just finance
+docker compose up apg-db fin-arc fin-glr fin-apy
 ```
 
-### Vision Quality Control
-```apg
-vision QualityInspector {
-    cameras: [
-        overhead: "Basler_acA4112-30uc",
-        side: "FLIR_BFS-PGE-50S5C"
-    ];
-    
-    @pipeline: {
-        preprocess: gaussian_blur(σ=1.0) + histogram_equalization;
-        detect: canny_edges + template_matching;
-        classify: cnn_model("defect_classifier_v2.1");
-        
-        defects: [
-            scratches: template_matching(>0.8),
-            dents: depth_analysis(>0.5mm),
-            discoloration: color_deviation(ΔE>3.0)
-        ];
-    };
-    
-    quality: dimensional_accuracy(±0.01mm) + surface_roughness(Ra<1.6μm);
-}
+Services expose: `GET /health`, `GET /contract`, `POST /evaluate`, `GET /api/v1/...`
+
+---
+
+## CLI
+
+```bash
+# Capability discovery
+apg capabilities search alerts
+apg capabilities manifest --stats
+apg capabilities manifest --domain intel
+apg capabilities manifest --capability intel_alerts
+
+# Contract validation
+apg capabilities validate-contracts
+
+# Build all packages
+./scripts/build_all_packages.sh
 ```
 
-### AI Agent System
-```apg
-agent IntelligentAssistant {
-    models: gpt4->claude3->llama2;
-    memory: episodic + semantic + working;
-    
-    @cognitive: {
-        attention: selective_focus + context_switching;
-        reasoning: chain_of_thought + tree_of_thoughts;
-        learning: few_shot + transfer + continual;
-    };
-    
-    @capabilities: [
-        natural_language: multilingual + context_aware,
-        vision: object_detection + scene_understanding,
-        planning: hierarchical + temporal + resource_aware,
-        execution: tool_use + code_generation + verification
-    ];
-    
-    @social: {
-        theory_of_mind: belief_tracking + intention_recognition;
-        communication: pragmatic + empathetic + adaptive;
-        coordination: negotiation + cooperation + competition;
-    };
-}
-```
+---
 
-### OSINT Intelligence Platform
-```apg
-intel ThreatIntelligencePlatform {
-    sources: [
-        osint: social_media + news + forums + darkweb,
-        technical: malware_samples + network_traffic + dns,
-        commercial: threat_feeds + vulnerability_databases,
-        government: advisories + sanctions + watch_lists
-    ];
-    
-    @collection: {
-        web_scraping: scrapy + selenium + tor_proxy;
-        api_integration: twitter + reddit + telegram + discord;
-        data_mining: nlp + entity_extraction + sentiment_analysis;
-        monitoring: real_time_alerts + trend_detection;
-    };
-    
-    @analysis: {
-        correlation: temporal + spatial + behavioral + network;
-        attribution: stylometry + infrastructure + tactics;
-        prediction: threat_modeling + risk_assessment + forecasting;
-        visualization: network_graphs + geospatial + timeline;
-    };
-    
-    @sharing: {
-        formats: stix + taxii + misp + json;
-        classification: tlp_white + tlp_green + tlp_amber + tlp_red;
-        distribution: automated_feeds + manual_reports + briefings;
-    };
-}
-```
+## Documentation
 
-### Business ERP System
-```apg
-erp ManufacturingERP {
-    modules: [
-        inventory: real_time_tracking + abc_analysis + demand_forecasting,
-        production: mrp + scheduling + capacity_planning + quality_control,
-        finance: accounting + cost_analysis + budgeting + compliance,
-        hr: payroll + performance + training + safety_management
-    ];
-    
-    @integration: {
-        mes: production_data + quality_metrics + downtime_tracking;
-        scada: process_control + alarm_management + historian;
-        plm: product_lifecycle + change_management + documentation;
-        crm: customer_orders + service_requests + satisfaction;
-    };
-    
-    @analytics: {
-        kpis: oee + yield + cycle_time + cost_per_unit;
-        dashboards: executive + operational + tactical;
-        reporting: financial + regulatory + operational + custom;
-        forecasting: demand + capacity + financial + resource;
-    };
-}
-```
+| Document | Description |
+|---|---|
+| `docs/composability_contract.md` | Complete contract schema reference (1,384 lines) |
+| `docs/capability_development_guide.md` | How to build a new capability (2,108 lines) |
+| `docs/capability_integration_guide.md` | Integration patterns and testing guide |
+| `capabilities/MANIFEST.md` | Full index of all 259 capabilities (13,857 lines) |
+| `capabilities/COMPOSABILITY.md` | Dependency graph (1,900 edges, 0 broken) |
+
+---
+
+## Example Platform Programs
+
+Fully compilable APG programs demonstrating capability composition:
+
+| Example | Pattern | Demonstrates |
+|---|---|---|
+| `examples/crm_platform/` | Hub-and-Spoke | CRM + AI agent + workflows |
+| `examples/accounting_platform/` | Layered | GL + AR + AP + IFRS rules |
+| `examples/erp_platform/` | Full ERP | Procure-to-pay, order-to-cash, hire-to-retire |
+| `examples/intelligence_platform/` | Pipeline | OSINT → Fusion → Alerts |
+| `examples/fintech_platform/` | Africa-first | M-Pesa, KYC tiers, AML, CBK rules |
+| `examples/healthcare_platform/` | Clinical | EMR → Pharmacy → Lab |
+
+---
 
 ## Project Structure
 
 ```
 apg/
-├── spec/
-│   ├── apg_v11_complete.g4    # Complete ANTLR grammar
-│   ├── apg_v10.g4             # Ultra-terse version
-│   ├── apg_v9.g4              # Agent-oriented extensions
-│   └── apg_v8.g4              # Original grammar
-├── examples/
-│   ├── digital_twin_examples.apg
-│   ├── production_line_monitoring.apg
-│   ├── sync_and_maintenance.apg
-│   ├── basic_applications.apg
-│   ├── ai_agent_systems.apg
-│   ├── osint_intelligence.apg
-│   └── business_erp.apg
-├── docs/
-│   ├── language_reference.md
-│   ├── api_documentation.md
-│   ├── tutorials/
-│   └── industry_guides/
-├── compiler/
-│   ├── lexer.py
-│   ├── parser.py
-│   ├── ast_builder.py
-│   ├── semantic_analyzer.py
-│   ├── code_generator.py
-│   └── optimizer.py
-├── runtime/
-│   ├── base_classes.py
-│   ├── database_adapters.py
-│   ├── industrial_protocols.py
-│   ├── ml_frameworks.py
-│   └── deployment_tools.py
-└── tests/
-    ├── unit/
-    ├── integration/
-    └── examples/
+├── capabilities/               # 259 capability packages
+│   ├── MANIFEST.json           # Machine-readable index
+│   ├── MANIFEST.md             # Human-readable index (13,857 lines)
+│   ├── manifest.py             # Bidirectional navigation API
+│   ├── COMPOSABILITY.md        # Dependency graph
+│   ├── <domain>/<code>/        # Each capability directory
+│   │   ├── capability_contract.py
+│   │   ├── models.py
+│   │   ├── service.py          # 40-184 async methods
+│   │   ├── api.py
+│   │   ├── app.py              # Standalone server
+│   │   ├── pyproject.toml      # PyPI package
+│   │   ├── domain/adapters.py  # Protocol interfaces
+│   │   ├── database/store.py   # InMemory + PostgreSQL
+│   │   └── alembic/            # DB migrations
+├── compiler/                   # APG language compiler
+├── examples/                   # 6 platform APG programs
+├── docs/                       # Reference documentation
+├── tests/                      # 200+ tests (0 collection errors)
+├── spec/apg.g4                 # ANTLR4 grammar
+├── docker-compose.yml          # Platform deployment
+├── Dockerfile.capability       # Standalone capability container
+└── .github/workflows/ci.yml    # CI pipeline
 ```
-
-## Compilation Process
-
-APG compiles to high-quality Python code through a sophisticated multi-stage process:
-
-1. **Lexical Analysis**: Tokenization with domain-specific keywords
-2. **Parsing**: AST generation using ANTLR grammar
-3. **Semantic Analysis**: Type checking and validation
-4. **Code Generation**: Dependency-light Python artifacts with type hints
-5. **Optimization**: Performance and resource optimization
-6. **Runtime Integration**: Capability contracts and optional library binding
-
-### Generated Python Features
-- **Modern Python 3.12+** with full type annotations
-- **Async/await** for concurrent operations
-- **Pydantic models** for data validation
-- **JSON manifests** for generated application metadata
-- **Executable capability contracts** for configuration, rules, UI manifests, and theme tokens
-- **Industrial libraries** for automation protocols
-- **ML frameworks** for AI integration
-
-## Getting Started - Detailed Examples
-
-### 1. Simple Web Application
-```apg
-// File: simple_blog.apg
-db BlogDB {
-    posts: table {
-        title: str;
-        content: str;
-        created: datetime [default=now()];
-        author: str;
-    };
-}
-
-form PostForm {
-    fields: title, content, author;
-    validation: title [required, min_length=5];
-    action: save -> BlogDB.posts;
-}
-
-report PostList {
-    source: BlogDB.posts;
-    fields: title, author, created;
-    sort: created [desc];
-    pagination: 10;
-}
-```
-
-Generates a Python application artifact with typed data structures, executable health metadata, and manifest output that can be composed into larger APG systems.
-
-### 2. IoT Sensor Network
-```apg
-// File: sensor_network.apg
-sensor TemperatureSensor {
-    protocol: mqtt("mqtt://iot-hub.local:1883");
-    topic: "factory/zone1/temperature";
-    sampling_rate: 1Hz;
-    range: [-40, 125]; // Celsius
-    accuracy: ±0.5;
-}
-
-anomaly TempAnomalyDetector {
-    input: TemperatureSensor;
-    algorithm: isolation_forest(contamination=0.1);
-    window: sliding(60s);
-    threshold: 95th_percentile;
-    
-    when: anomaly_detected -> {
-        alert.send("Temperature anomaly in Zone 1");
-        hvac.adjust_setpoint(temperature - 2);
-    };
-}
-```
-
-### 3. Business Calculation Engine
-```apg
-// File: financial_calc.apg
-calc RevenueAnalysis {
-    variables: {
-        gross_revenue: decimal;
-        cost_of_goods: decimal;
-        operating_expenses: decimal;
-        tax_rate: decimal [range=0.0..1.0];
-    };
-    
-    formulas: {
-        gross_profit: gross_revenue - cost_of_goods;
-        operating_income: gross_profit - operating_expenses;
-        net_income: operating_income * (1 - tax_rate);
-        profit_margin: net_income / gross_revenue;
-    };
-    
-    @compliance: {
-        gaap: us_generally_accepted_accounting_principles;
-        sox: sarbanes_oxley_requirements;
-        audit_trail: all_calculations + source_data + timestamps;
-    };
-}
-```
-
-## Advanced Features
-
-### Cascade Syntax for Resilience
-```apg
-chat CustomerSupport {
-    models: gpt4->claude3->llama2->local_model;
-    // Automatically falls back if primary model fails
-    
-    backup_data: primary_db->replica_db->cache->static_responses;
-    // Cascading data sources for high availability
-}
-```
-
-### Minion Protocol for Coordination
-```apg
-swarm RobotFleet {
-    @all(robots).do(formation_flying);
-    @nearby(drones).get(battery_status);
-    @type(sensors).watch(environmental_changes);
-    @group(maintenance_crew).report(system_health);
-}
-```
-
-### Real-time Processing
-```apg
-stream DataProcessor {
-    input: sensor_data(1MHz);
-    processing: {
-        filter: butterworth(cutoff=1kHz, order=4);
-        fft: 2048_point_transform;
-        features: spectral_peaks + rms + kurtosis;
-        ml: cnn_classifier(real_time_inference);
-    };
-    latency: <10ms_p99;
-    throughput: 1M_samples_per_second;
-}
-```
-
-## Installation and Usage
-
-### Prerequisites
-- Python 3.12+
-- ANTLR 4.13+
-- Modern development environment
-
-### Installation
-```bash
-# Install APG compiler
-pip install apg-lang
-
-# Verify installation
-apg --version
-```
-
-### Basic Usage
-```bash
-# Compile APG to executable Python artifacts
-apg compile myapp.apg --output ./generated --verify
-
-# Verify generated contracts and runtime surface
-python generated/app.py --self-test
-python generated/smoke_test.py
-
-# Run the generated standard-library HTTP application
-python generated/app.py --host 127.0.0.1 --port 8080
-```
-
-### Development Workflow
-```bash
-# Create new APG project
-mkdir my-project && cd my-project
-apg init
-
-# Edit main.apg, then compile
-apg compile main.apg --output generated --verify
-
-# Inspect generated app metadata and OpenAPI
-python generated/app.py --describe
-python generated/app.py --self-test
-
-# Optional: run in Docker
-docker build -t apg-generated-app generated
-docker run --rm -p 8080:8080 apg-generated-app
-```
-
-## Contributing
-
-We welcome contributions from the community. Start with the [Contributors Guide](docs/contributors_guide.md) for the current APG workflow, evidence standards, and commit protocol.
-
-### Development Setup
-```bash
-git clone https://github.com/datacraft/apg.git
-cd apg
-uv venv create
-uv pip install -e .[dev]
-uv run pytest tests/
-```
-
-## License
-
-APG is released under the MIT License. See [LICENSE](LICENSE) for details.
-
-## Support and Community
-
-- **Documentation**: [docs.datacraft.io/apg](https://docs.datacraft.io/apg)
-- **Community**: [Discord](https://discord.gg/apg-lang)
-- **Issues**: [GitHub Issues](https://github.com/datacraft/apg/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/datacraft/apg/discussions)
 
 ---
 
-**Datacraft - Empowering the next generation of software development**
+## License
+
+Proprietary — © 2025 Datacraft · [nyimbi@gmail.com](mailto:nyimbi@gmail.com)
