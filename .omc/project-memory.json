@@ -10,7 +10,7 @@
   },
   "build": {
     "buildCommand": null,
-    "testCommand": "python3 -c \"\nfrom pathlib import Path\nf = Path('tests/test_repository_hygiene.py')\ntext = f.read_text()\ntext = text.replace(\n    'STREAMING_TERM_EXCLUDED_PATHS = {\\n\\t\\\"docs/composability_contract.md\\\",',\n    'STREAMING_TERM_EXCLUDED_PATHS = {\\n\\t\\\"prompt.md\\\",\\n\\t\\\"docs/composability_contract.md\\\",'\n)\nf.write_text(text)\n\" && \\\n/Users/nyimbiodero/src/pjs/apg/.venv/bin/python -m pytest \\\n  tests/test_repository_hygiene.py::test_root_tests_and_docs_stay_in_expected_directories \\\n  tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native \\\n  tests/test_tooling_audit.py::test_tooling_audit_covers_fixture_cli_ide_and_studio_surfaces \\\n  tests/test_top_level_blueprint_tenant_context.py::test_request_context_resolves_tenant_from_payload_flask_and_environment \\\n  -q --tb=no 2>&1 | tail -3",
+    "testCommand": "python3 -c \"\nfrom capabilities.common.nlpc.models import LanguageCode\nprint(LanguageCode.ENGLISH)\n\" 2>&1 && \\\n/Users/nyimbiodero/src/pjs/apg/.venv/bin/python -m pytest tests/test_common_nlpc_core_task_dispatch.py --tb=line -q 2>&1 | grep \"E   \\|assert\\|Error\" | head -10",
     "lintCommand": null,
     "devCommand": null,
     "scripts": {}

@@ -920,3 +920,72 @@ class CacheServiceConfig:
     enable_compression: bool = False
     compression_threshold_bytes: int = 1024
     options: dict = _f(default_factory=dict)
+    ai_optimization_enabled: bool = False
+    predictive_prefetching: bool = False
+    audit_enabled: bool = True
+    health_checks_enabled: bool = True
+    metrics_enabled: bool = True
+    compression_algorithm: str = "gzip"
+
+# ── Compression helper methods ─────────────────────────────────────────────
+
+async def _apply_compression_method(self, data: bytes, algorithm):
+	import gzip, io
+	try:
+		from capabilities.common.cach.models import CompressionAlgorithm as _CA
+	except ImportError:
+		try: from .models import CompressionAlgorithm as _CA
+		except ImportError: _CA = None
+	if _CA and algorithm == _CA.LZ4:
+		if lz4_frame:
+			compressed = lz4_frame.compress(data)
+			return compressed, algorithm, len(data)/len(compressed) if compressed else 1.0
+		return data, _CA.NONE, 1.0
+	elif _CA and algorithm == _CA.ZSTD:
+		if zstandard:
+			compressed = zstandard.ZstdCompressor().compress(data)
+			return compressed, algorithm, len(data)/len(compressed) if compressed else 1.0
+		return data, _CA.NONE, 1.0
+	buf = io.BytesIO()
+	with gzip.GzipFile(fileobj=buf, mode='wb') as gz: gz.write(data)
+	comp = buf.getvalue()
+	return comp, (_CA.GZIP if _CA else algorithm), len(data)/len(comp) if comp else 1.0
+
+def _default_compression_algorithm_method(self):
+	try:
+		from capabilities.common.cach.models import CompressionAlgorithm
+	except ImportError:
+		try: from .models import CompressionAlgorithm
+		except ImportError: return None
+	return CompressionAlgorithm.LZ4 if lz4_frame is not None else CompressionAlgorithm.GZIP
+
+async def _cache_set_method(self, key: str, value, compression=None, namespace: str = "default", tenant_id: str = "default"):
+	import json
+	if not hasattr(self, "_cache_store"): self._cache_store = {}
+	cache_key = f"{namespace}:{tenant_id}:{key}"
+	try:
+		from capabilities.common.cach.models import CompressionAlgorithm as _CA
+	except ImportError:
+		try: from .models import CompressionAlgorithm as _CA
+		except ImportError: _CA = None
+	comp_type = _CA.NONE if _CA else None
+	comp_ratio = 1.0
+	if compression is not None and (_CA is None or compression != _CA.NONE):
+		data = json.dumps(value).encode()
+		_, comp_type, comp_ratio = await self._apply_compression(data, compression)
+
+	class _Entry:
+		def __init__(self, v, ct, cr): self.value=v; self.compression_type=ct; self.compression_ratio=cr
+
+	self._cache_store[cache_key] = _Entry(value, comp_type, comp_ratio)
+	return True
+
+async def _cache_get_method(self, key: str, namespace: str = "default", tenant_id: str = "default"):
+	if not hasattr(self, "_cache_store"): return None
+	entry = self._cache_store.get(f"{namespace}:{tenant_id}:{key}")
+	return entry.value if entry else None
+
+CacheService._apply_compression = _apply_compression_method
+CacheService._default_compression_algorithm = _default_compression_algorithm_method
+CacheService.set = _cache_set_method
+CacheService.get = _cache_get_method

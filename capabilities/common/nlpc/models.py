@@ -120,6 +120,7 @@ class SentimentLabel(str, Enum):
 class LanguageCode(str, Enum):
 	AUTO  = "auto"
 	EN    = "en"
+	ENGLISH = "en"  # alias
 	ES    = "es"
 	FR    = "fr"
 	DE    = "de"
