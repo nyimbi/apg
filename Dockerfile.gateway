@@ -1,0 +1,48 @@
+# APG API Gateway Dockerfile
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir flask pydantic requests
+
+COPY capabilities/MANIFEST.json ./capabilities/MANIFEST.json
+COPY capabilities/manifest.py ./capabilities/manifest.py
+COPY capabilities/__init__.py ./capabilities/__init__.py
+COPY capabilities/capability_contract_registry.py ./capabilities/capability_contract_registry.py
+
+# Simple gateway app
+RUN cat > gateway.py << 'PYEOF'
+"""APG Platform API Gateway — capability discovery and health aggregation."""
+from flask import Flask, jsonify
+import json, os, requests
+
+app = Flask(__name__)
+
+with open("capabilities/MANIFEST.json") as f:
+    MANIFEST = json.load(f)
+
+@app.get("/health")
+def health():
+    return jsonify({"status": "ok", "gateway": "apg-platform", "capabilities": MANIFEST["capability_count"]})
+
+@app.get("/capabilities")
+def list_caps():
+    return jsonify({"capabilities": list(MANIFEST["capabilities"].keys()), "count": MANIFEST["capability_count"]})
+
+@app.get("/capabilities/<cap_id>")
+def get_cap(cap_id):
+    cap = MANIFEST["capabilities"].get(cap_id)
+    if not cap:
+        return jsonify({"error": "not_found"}), 404
+    return jsonify(cap)
+
+@app.get("/domains")
+def domains():
+    return jsonify(MANIFEST["by_domain"])
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("GATEWAY_PORT", 8000)))
+PYEOF
+
+EXPOSE 8000
+CMD ["python", "gateway.py"]

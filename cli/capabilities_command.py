@@ -1263,3 +1263,100 @@ def publish_apply(package_dir: Path, catalog_path: Path, dry_run: bool, as_json:
 			click.echo(f"  warning: {warning}")
 	if not report["ok"]:
 		raise click.exceptions.Exit(1)
+
+
+@capabilities.command("search")
+@click.argument("keyword")
+@click.option("--domain", default=None, help="Filter by domain (intel, fintech, fin, etc.)")
+@click.option("--limit", default=10, help="Maximum results to show")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def capabilities_search(keyword: str, domain: str | None, limit: int, as_json: bool):
+    """Search capabilities by keyword, domain, service name, or method."""
+    import sys; sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from capabilities.manifest import find_capabilities, get_domain
+
+    if domain:
+        results = [c for c in get_domain(domain)
+                   if keyword.lower() in (c["id"] + " " + c["display_name"] + " " + " ".join(c.get("provides", []))).lower()]
+    else:
+        results = find_capabilities(keyword, limit=limit)
+
+    results = results[:limit]
+
+    if as_json:
+        click.echo(json.dumps([{
+            "id": r["id"], "display_name": r["display_name"],
+            "domain": r["domain"], "provides": r["provides"][:3],
+            "install": r["install"]
+        } for r in results], indent=2))
+        return
+
+    if not results:
+        click.echo(f"No capabilities found for '{keyword}'")
+        return
+
+    click.echo(f"\nFound {len(results)} capabilities matching '{keyword}':\n")
+    for cap in results:
+        provides_preview = ", ".join(cap.get("provides", [])[:3])
+        click.echo(f"  {cap['id']:40s}  {cap['display_name']}")
+        click.echo(f"    Domain: {cap['domain']}  |  {cap['service_method_count']} methods")
+        click.echo(f"    Provides: {provides_preview}")
+        click.echo(f"    Install:  {cap['install']}")
+        click.echo()
+
+
+@capabilities.command("manifest")
+@click.option("--capability", "-c", default=None, help="Show details for a specific capability ID")
+@click.option("--domain", "-d", default=None, help="List all capabilities in a domain")
+@click.option("--stats", is_flag=True, help="Show quality statistics")
+def capabilities_manifest(capability: str | None, domain: str | None, stats: bool):
+    """Inspect the APG Capability Manifest."""
+    import sys; sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from capabilities.manifest import (
+        get_capability, get_domain, all_capabilities, capability_count
+    )
+    import statistics
+
+    if capability:
+        cap = get_capability(capability)
+        if not cap:
+            click.echo(f"Capability '{capability}' not found", err=True)
+            return
+        click.echo(json.dumps(cap, indent=2))
+        return
+
+    if domain:
+        caps = get_domain(domain)
+        click.echo(f"\n{domain.upper()} domain — {len(caps)} capabilities:\n")
+        for c in caps:
+            click.echo(f"  {c['id']:45s}  {c['service_method_count']} methods  {c['rule_count']} rules")
+        return
+
+    if stats:
+        caps = all_capabilities()
+        methods = [c["service_method_count"] for c in caps]
+        rules = [c["rule_count"] for c in caps]
+        click.echo(f"\n=== APG Capability Quality Statistics ===\n")
+        click.echo(f"  Total capabilities:   {capability_count()}")
+        click.echo(f"  World-class (40+):    {sum(1 for m in methods if m >= 40)} ({sum(1 for m in methods if m >= 40)*100//len(caps)}%)")
+        click.echo(f"  Mean methods:         {statistics.mean(methods):.1f}")
+        click.echo(f"  Median methods:       {statistics.median(methods):.0f}")
+        click.echo(f"  Mean rules:           {statistics.mean(rules):.1f}")
+        click.echo(f"  Min methods:          {min(methods)}")
+        click.echo(f"  Max methods:          {max(methods)}")
+        click.echo(f"  No streaming events:  {sum(1 for c in caps if not c.get('streaming_events'))}")
+        click.echo()
+        return
+
+    # Default: show summary
+    click.echo(f"\nAPG Capability Manifest — {capability_count()} capabilities\n")
+    from capabilities.manifest import list_domains, get_domain as gd
+    for d in list_domains():
+        caps = gd(d)
+        avg_methods = sum(c["service_method_count"] for c in caps) / len(caps)
+        click.echo(f"  {d:20s}  {len(caps):3d} caps  avg {avg_methods:.0f} methods")
+    click.echo()
+    click.echo("Use: apg capabilities search <keyword>")
+    click.echo("     apg capabilities manifest --capability <id>")
+    click.echo("     apg capabilities manifest --domain <domain>")
+    click.echo("     apg capabilities manifest --stats")

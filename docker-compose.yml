@@ -1,0 +1,218 @@
+# APG Platform — Docker Compose
+# Runs key capabilities as standalone services behind a gateway.
+#
+# Usage:
+#   docker compose up                    # run all services
+#   docker compose up intel-alerts       # run single service
+#   docker compose up gateway fintech    # run gateway + fintech group
+#
+# Environment:
+#   APG_DATABASE_URL   PostgreSQL connection (default: shared apg-db)
+#   APG_DEFAULT_TENANT default tenant ID
+
+version: "3.9"
+
+# ── Shared infrastructure ────────────────────────────────────────────────────
+
+x-common-env: &common-env
+  APG_DATABASE_URL: postgresql+asyncpg://apg:apg_secret@apg-db:5432/apg
+  APG_DEFAULT_TENANT: platform
+
+x-capability-defaults: &capability-defaults
+  build:
+    context: .
+    dockerfile: Dockerfile.capability
+  environment:
+    <<: *common-env
+  depends_on:
+    apg-db:
+      condition: service_healthy
+  restart: unless-stopped
+  networks:
+    - apg-net
+
+services:
+
+  # ── Database ──────────────────────────────────────────────────────────────
+
+  apg-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: apg
+      POSTGRES_USER: apg
+      POSTGRES_PASSWORD: apg_secret
+    volumes:
+      - apg-db-data:/var/lib/postgresql/data
+      - ./capabilities/intel/alerts/database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apg -d apg"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports:
+      - "5432:5432"
+    networks:
+      - apg-net
+
+  # ── API Gateway (capability discovery + routing) ─────────────────────────
+
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway
+    environment:
+      <<: *common-env
+      GATEWAY_PORT: "8000"
+    ports:
+      - "8000:8000"
+    depends_on:
+      - apg-db
+    networks:
+      - apg-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Intelligence Capabilities ─────────────────────────────────────────────
+
+  intel-alerts:
+    <<: *capability-defaults
+    command: ["python", "-m", "apg_intel_alerts", "--host", "0.0.0.0", "--port", "8101"]
+    environment:
+      <<: *common-env
+      CAPABILITY_PORT: "8101"
+    ports:
+      - "8101:8101"
+    labels:
+      apg.capability: "intel_alerts"
+      apg.domain: "intel"
+
+  intel-threats:
+    <<: *capability-defaults
+    command: ["python", "-m", "apg_intel_threats", "--host", "0.0.0.0", "--port", "8102"]
+    ports:
+      - "8102:8102"
+    labels:
+      apg.capability: "intel_threats"
+      apg.domain: "intel"
+
+  intel-osint:
+    <<: *capability-defaults
+    command: ["python", "-m", "apg_intel_osint", "--host", "0.0.0.0", "--port", "8103"]
+    ports:
+      - "8103:8103"
+    labels:
+      apg.capability: "intel_osint"
+      apg.domain: "intel"
+
+  # ── Finance Capabilities ──────────────────────────────────────────────────
+
+  fin-arc:
+    <<: *capability-defaults
+    command: ["python", "-m", "apg_fin_arc", "--host", "0.0.0.0", "--port", "8201"]
+    ports:
+      - "8201:8201"
+    labels:
+      apg.capability: "arc_accounts_receivable"
+      apg.domain: "fin"
+
+  fin-glr:
+    <<: *capability-defaults
+    command: ["python", "-m", "apg_fin_glr", "--host", "0.0.0.0", "--port", "8202"]
+    ports:
+      - "8202:8202"
+    labels:
+      apg.capability: "glr_general_ledger"
+      apg.domain: "fin"
+
+  fin-apy:
+    <<: *capability-defaults
+    command: ["python", "-m", "apg_fin_apy", "--host", "0.0.0.0", "--port", "8203"]
+    ports:
+      - "8203:8203"
+    labels:
+      apg.capability: "apy_accounts_payable"
+      apg.domain: "fin"
+
+  # ── Fintech Capabilities ──────────────────────────────────────────────────
+
+  fintech-payments:
+    <<: *capability-defaults
+    command: ["python", "-m", "apg_fintech_payments", "--host", "0.0.0.0", "--port", "8301"]
+    ports:
+      - "8301:8301"
+    labels:
+      apg.capability: "fintech_payments"
+      apg.domain: "fintech"
+
+  fintech-kyc:
+    <<: *capability-defaults
+    command: ["python", "-m", "apg_fintech_kyc", "--host", "0.0.0.0", "--port", "8302"]
+    ports:
+      - "8302:8302"
+    labels:
+      apg.capability: "fintech_kyc"
+      apg.domain: "fintech"
+
+  fintech-aml:
+    <<: *capability-defaults
+    command: ["python", "-m", "apg_fintech_aml", "--host", "0.0.0.0", "--port", "8303"]
+    ports:
+      - "8303:8303"
+    labels:
+      apg.capability: "fintech_aml"
+      apg.domain: "fintech"
+
+  # ── HCM Capabilities ─────────────────────────────────────────────────────
+
+  hcm-payroll:
+    <<: *capability-defaults
+    command: ["python", "-m", "apg_hcm_payroll", "--host", "0.0.0.0", "--port", "8401"]
+    ports:
+      - "8401:8401"
+    labels:
+      apg.capability: "pay_payroll"
+      apg.domain: "hcm"
+
+  # ── Common Platform Capabilities ──────────────────────────────────────────
+
+  common-auth:
+    <<: *capability-defaults
+    command: ["python", "-m", "apg_common_auth", "--host", "0.0.0.0", "--port", "8501"]
+    ports:
+      - "8501:8501"
+    labels:
+      apg.capability: "auth"
+      apg.domain: "common"
+
+  common-audl:
+    <<: *capability-defaults
+    command: ["python", "-m", "apg_common_audl", "--host", "0.0.0.0", "--port", "8502"]
+    ports:
+      - "8502:8502"
+    labels:
+      apg.capability: "audl"
+      apg.domain: "common"
+
+  common-ntfy:
+    <<: *capability-defaults
+    command: ["python", "-m", "apg_common_ntfy", "--host", "0.0.0.0", "--port", "8503"]
+    ports:
+      - "8503:8503"
+    labels:
+      apg.capability: "ntfy"
+      apg.domain: "common"
+
+# ── Service profiles ─────────────────────────────────────────────────────────
+# docker compose --profile intelligence up
+# docker compose --profile finance up
+# docker compose --profile platform up
+
+volumes:
+  apg-db-data:
+
+networks:
+  apg-net:
+    driver: bridge
