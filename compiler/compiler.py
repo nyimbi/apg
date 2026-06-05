@@ -214,8 +214,8 @@ class APGCompiler:
 			
 			result.module = ast
 			
-			# Phase 3: Semantic Analysis
-			semantic_result = self.semantic_analyzer.analyze(ast)
+			# Phase 3: Semantic Analysis (fresh analyzer per file to avoid state leakage)
+			semantic_result = SemanticAnalyzer().analyze(ast)
 			result.errors.extend(semantic_result['errors'])
 			result.warnings.extend(semantic_result['warnings'])
 			
@@ -311,7 +311,7 @@ class APGCompiler:
 	def _analyze_semantics(self, ast: ModuleDeclaration) -> Dict[str, Any]:
 		"""Perform semantic analysis on AST"""
 		try:
-			return self.semantic_analyzer.analyze(ast)
+			return SemanticAnalyzer().analyze(ast)
 		except Exception as e:
 			self.logger.error(f"Semantic analysis failed: {e}")
 			return {
