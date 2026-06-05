@@ -1,0 +1,212 @@
+# APG Capability Library — Continuous Integration
+#
+# Runs on every push and pull request to main.
+# Gates: contract validation, integration tests, composability tests, build check.
+
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  # ── 1. Contract Validation ──────────────────────────────────────────────────
+  contracts:
+    name: Contract Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install "pydantic>=2.0" "uuid6>=0.4" "sqlalchemy>=2.0" flask
+
+      - name: Validate all 259 capability contracts
+        run: |
+          python -c "
+          import sys; sys.path.insert(0, '.')
+          from capabilities.capability_contract_registry import validate_contract_registry
+          r = validate_contract_registry()
+          print(f'Contracts: {r[\"contract_count\"]}  Errors: {r[\"error_count\"]}')
+          assert r['valid'], f'Contract errors: {r[\"errors\"][:5]}'
+          assert r['contract_count'] == 259, f'Expected 259 contracts, got {r[\"contract_count\"]}'
+          print('All 259 contracts valid')
+          "
+
+      - name: Verify all requires are satisfied
+        run: |
+          python -c "
+          import sys, json; sys.path.insert(0, '.')
+          from capabilities.capability_contract_registry import load_contract_registry
+          registry = load_contract_registry()
+          all_ids = set(registry.keys())
+          violations = [f'{cap} requires unknown: {req}'
+              for cap, rec in registry.items()
+              for req in rec.contract.get('requires', [])
+              if req not in all_ids]
+          assert not violations, violations
+          print(f'All requires satisfied across {len(registry)} capabilities')
+          "
+
+      - name: Check streaming events coverage
+        run: |
+          python -c "
+          import sys, json; sys.path.insert(0, '.')
+          manifest = json.loads(open('capabilities/MANIFEST.json').read())
+          caps = list(manifest['capabilities'].values())
+          no_events = [c['id'] for c in caps if not c.get('streaming_events')]
+          assert not no_events, f'Missing streaming events: {no_events}'
+          print(f'All {len(caps)} capabilities have streaming events')
+          "
+
+  # ── 2. Quality Gate ─────────────────────────────────────────────────────────
+  quality:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install "pydantic>=2.0" "uuid6>=0.4" flask
+
+      - name: Check all capabilities are world-class (40+ methods)
+        run: |
+          python -c "
+          import sys, json; sys.path.insert(0, '.')
+          manifest = json.loads(open('capabilities/MANIFEST.json').read())
+          caps = list(manifest['capabilities'].values())
+          below = [(c['id'], c['service_method_count']) for c in caps if c['service_method_count'] < 40]
+          assert not below, f'Below world-class threshold: {below[:5]}'
+          methods = [c['service_method_count'] for c in caps]
+          import statistics
+          print(f'All {len(caps)} capabilities world-class (40+ methods)')
+          print(f'Mean: {statistics.mean(methods):.1f}  Min: {min(methods)}  Max: {max(methods)}')
+          "
+
+  # ── 3. Tests ────────────────────────────────────────────────────────────────
+  tests:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install test dependencies
+        run: |
+          pip install pytest pytest-asyncio
+          pip install "pydantic>=2.0" "uuid6>=0.4" "sqlalchemy>=2.0" flask fastapi httpx
+
+      - name: Run composability tests
+        run: python -m pytest tests/test_composability_comprehensive.py -q --tb=short
+
+      - name: Run integration tests
+        run: |
+          python -m pytest \
+            tests/test_integration_finance.py \
+            tests/test_integration_fintech.py \
+            tests/test_integration_intelligence.py \
+            tests/test_integration_platform.py \
+            -q --tb=short
+
+      - name: Run core compiler tests
+        run: |
+          python -m pytest \
+            tests/test_parser.py \
+            tests/test_semantic_analyzer.py \
+            tests/test_capability_contract_public_api.py \
+            tests/test_system_integration_simple.py \
+            -q --tb=short
+
+  # ── 4. Build Verification (sample) ─────────────────────────────────────────
+  build:
+    name: Package Build Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install build tools
+        run: pip install build setuptools>=68 wheel
+
+      - name: Build sample of key capability packages
+        run: |
+          mkdir -p /tmp/apg-wheels
+          for cap in \
+            capabilities/intel/alerts \
+            capabilities/fin/arc/accounts_receivable \
+            capabilities/fintech/payments \
+            capabilities/hcm/pay/payroll \
+            capabilities/common/auth \
+            capabilities/government/tax \
+            capabilities/healthcare/emr; do
+            echo "Building $cap..."
+            python -m build --wheel --quiet --outdir /tmp/apg-wheels/ "$cap"
+          done
+          echo "Wheels built: $(ls /tmp/apg-wheels/*.whl | wc -l)"
+
+      - name: Verify wheels install and expose entry points
+        run: |
+          pip install /tmp/apg-wheels/apg_intel_alerts*.whl
+          python -c "
+          from apg_intel_alerts import get_capability_contract
+          c = get_capability_contract('ci_test')
+          assert c['capability'] == 'intel_alerts'
+          assert c['ui']['requires_theme'] == True
+          print('Wheel install and entry point: OK')
+          "
+
+  # ── 5. APG Compiler (example programs) ─────────────────────────────────────
+  compiler:
+    name: APG Compiler
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install antlr4 and compiler deps
+        run: pip install "antlr4-python3-runtime==4.13.2" "pydantic>=2.0" flask
+
+      - name: Compile all 6 platform example programs
+        run: |
+          python -c "
+          import sys; sys.path.insert(0, '.')
+          from compiler.compiler import APGCompiler
+          c = APGCompiler()
+          examples = [
+            'examples/crm_platform/main.apg',
+            'examples/accounting_platform/main.apg',
+            'examples/erp_platform/main.apg',
+            'examples/intelligence_platform/main.apg',
+            'examples/fintech_platform/main.apg',
+            'examples/healthcare_platform/main.apg',
+          ]
+          all_ok = True
+          for ex in examples:
+            r = c.compile_file(ex, output_dir=f'/tmp/apg_{ex.split(\"/\")[-2]}')
+            status = 'OK' if r.success else f'FAIL: {r.errors[0].message[:50] if r.errors else \"?\"}'
+            print(f'  {ex.split(\"/\")[-2]}: {status}')
+            if not r.success: all_ok = False
+          assert all_ok, 'Some examples failed to compile'
+          "
