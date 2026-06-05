@@ -1,0 +1,573 @@
+// ============================================================================
+// Education Platform — APG Capability Composition Example
+//
+// Composability pattern: Hub + Pipeline
+//   school_management is the institutional hub
+//   lms depends on school_management for student/staff roster
+//   timetabling depends on school_management for rooms/classes
+//   lms → assessment → certificate forms the learning pipeline
+//
+// Copyright (c) 2025 Datacraft — Nyimbi Odero
+// ============================================================================
+
+module education_platform version 1.0.0 {
+    description: "Integrated education platform — LMS, School Management, Timetabling";
+    author: "Datacraft";
+}
+
+// ── Domain tables ─────────────────────────────────────────────────────────────
+
+table Student {
+    student_id: str;
+    admission_number: str;
+    first_name: str;
+    last_name: str;
+    date_of_birth: datetime;
+    gender: str;
+    national_id: str?;
+    guardian_name: str;
+    guardian_phone: str;
+    guardian_email: str?;
+    class_id: str;
+    stream_id: str?;
+    enrolment_date: date;
+    status: str;         // active | suspended | graduated | transferred | withdrawn
+    special_needs: List[str];
+}
+
+table Staff {
+    staff_id: str;
+    employee_number: str;
+    first_name: str;
+    last_name: str;
+    role: str;           // teacher | hod | principal | admin | support
+    department_id: str?;
+    subjects: List[str];
+    qualifications: List[str];
+    hire_date: date;
+    status: str;         // active | on_leave | terminated
+}
+
+table AcademicClass {
+    class_id: str;
+    name: str;           // e.g. "Form 3 North"
+    level: str;          // e.g. "form_3"
+    stream: str?;
+    class_teacher_id: str;
+    room_id: str?;
+    capacity: int;
+    academic_year: str;
+}
+
+table Course {
+    course_id: str;
+    title: str;
+    code: str;
+    subject: str;
+    course_type: str;    // instructor_led | self_paced | blended | certification
+    owner_id: str;
+    description: str?;
+    duration_weeks: int?;
+    passing_score: float;
+    status: str;         // draft | published | archived
+    tags: List[str];
+}
+
+table Enrolment {
+    enrolment_id: str;
+    student_id: str;
+    course_id: str;
+    class_id: str?;
+    enrolment_type: str;  // mandatory | elective | remedial | enrichment
+    status: str;          // active | completed | withdrawn | failed
+    enrolled_at: datetime;
+    completed_at: datetime?;
+}
+
+table Assessment {
+    assessment_id: str;
+    course_id: str;
+    title: str;
+    assessment_type: str;  // quiz | assignment | exam | project | practical
+    max_score: float;
+    passing_score: float;
+    weight_percent: float;
+    due_at: datetime?;
+    attempts_allowed: int;
+}
+
+table Submission {
+    submission_id: str;
+    assessment_id: str;
+    student_id: str;
+    enrolment_id: str;
+    score: float?;
+    grade: str?;          // A | B | C | D | E | F
+    feedback: str?;
+    submitted_at: datetime;
+    graded_at: datetime?;
+    graded_by: str?;
+}
+
+table Certificate {
+    certificate_id: str;
+    student_id: str;
+    course_id: str;
+    enrolment_id: str;
+    certificate_type: str;  // completion | competency | merit | distinction | professional
+    issued_at: datetime;
+    expires_at: datetime?;
+    issuer_id: str;
+    status: str;            // issued | revoked | expired
+}
+
+table TimetableSlot {
+    slot_id: str;
+    class_id: str;
+    subject: str;
+    teacher_id: str;
+    room_id: str;
+    day_of_week: str;      // monday | tuesday | wednesday | thursday | friday
+    period_start: str;     // HH:MM
+    period_end: str;
+    week_type: str;        // all | odd | even
+    academic_year: str;
+    term: str;             // term_1 | term_2 | term_3
+}
+
+table AcademicCalendar {
+    calendar_id: str;
+    academic_year: str;
+    term: str;
+    term_start: date;
+    term_end: date;
+    events: List[str];     // opening_day | closing_day | exams | holiday | pta_meeting
+    active: bool;
+}
+
+table ParentCommunication {
+    message_id: str;
+    student_id: str;
+    guardian_email: str;
+    guardian_phone: str;
+    message_type: str;     // report | alert | newsletter | meeting_invite | fee_notice
+    subject: str;
+    body: str;
+    channel: str;          // email | sms | push | portal
+    sent_at: datetime?;
+    status: str;           // pending | sent | delivered | failed
+}
+
+// ── Capability declarations ───────────────────────────────────────────────────
+
+capability SchoolManagement {
+    contract: {
+        id: education_sch_mgmt,
+        provides: [
+            student_registration,
+            staff_management,
+            class_assignment,
+            academic_calendar_management,
+            fee_management,
+            parent_portal,
+            reporting
+        ],
+        requires: [auth, audl, mten, conf, ntfy, wflo, comp, mqeb, schd],
+        configuration: {
+            tenant_id: "default",
+            school_name: "APG Academy",
+            country: "KE",
+            curriculum: "CBC",
+            academic_year_start_month: 1,
+            fee_currency: "KES",
+            sms_enabled: true,
+            email_enabled: true,
+            parent_portal_enabled: true,
+            max_class_size: 45
+        },
+        rule_engine: {
+            type: deterministic,
+            default_decision: allow,
+            rules: [
+                {name: "guardian_consent_for_minor",
+                 when: "student_age_lt == 18 and guardian_consent missing",
+                 action: require_review},
+                {name: "class_capacity_check",
+                 when: "class_enrollment_count_gte == max_class_size",
+                 action: deny},
+                {name: "staff_clearance_required",
+                 when: "role == teacher and background_check_passed != true",
+                 action: deny},
+                {name: "fee_arrears_block",
+                 when: "fee_balance_gt == 0 and exam_registration == true",
+                 action: require_review},
+                {name: "parent_communication_consent",
+                 when: "channel == sms and sms_consent != true",
+                 action: deny}
+            ]
+        },
+        ui: {shell: python, routes: [
+            {name: "School Dashboard",   path: "/school",            component: "SchoolDashboard",   permission: "school:view",     nav_group: "Overview"},
+            {name: "Students",           path: "/school/students",   component: "StudentRegistry",   permission: "school:students", nav_group: "People"},
+            {name: "Staff",              path: "/school/staff",      component: "StaffDirectory",    permission: "school:staff",    nav_group: "People"},
+            {name: "Classes",            path: "/school/classes",    component: "ClassManager",      permission: "school:classes",  nav_group: "Academic"},
+            {name: "Calendar",           path: "/school/calendar",   component: "AcademicCalendar",  permission: "school:calendar", nav_group: "Academic"},
+            {name: "Fees",               path: "/school/fees",       component: "FeeManagement",     permission: "school:fees",     nav_group: "Finance"},
+            {name: "Parent Portal",      path: "/school/parents",    component: "ParentPortal",      permission: "school:parents",  nav_group: "Communication"},
+            {name: "Reports",            path: "/school/reports",    component: "SchoolReports",     permission: "school:reports",  nav_group: "Analytics"}
+        ]},
+        theme: {name: school_theme, tokens: {
+            "color.primary":   "#1565C0",
+            "color.accent":    "#0288D1",
+            "color.success":   "#2E7D32",
+            "color.warning":   "#F57F17",
+            "color.danger":    "#C62828",
+            "surface.canvas":  "#F3F8FF",
+            "surface.panel":   "#FFFFFF",
+            "text.primary":    "#0D1B2A",
+            "text.secondary":  "#546E7A",
+            "border.radius":   "8px",
+            "density":         "comfortable"
+        }, components: {
+            students:   {icon: "user-graduate", status_indicator: "student-status-chip"},
+            staff:      {icon: "chalkboard-teacher", status_indicator: "staff-role-chip"},
+            classes:    {icon: "building-columns", status_indicator: "class-level-chip"},
+            calendar:   {icon: "calendar-days",  status_indicator: "term-chip"}
+        }}
+    };
+    streaming: {
+        processor: bytewax,
+        stream: "apg.education.school.lifecycle",
+        key: "tenant_id",
+        events: [
+            "student_registered", "student_transferred", "student_graduated",
+            "staff_hired", "staff_terminated",
+            "class_created", "class_assigned",
+            "term_opened", "term_closed",
+            "fee_invoiced", "fee_paid", "fee_overdue",
+            "parent_message_sent", "guardian_consent_recorded"
+        ],
+        guardrails: [
+            "no_enrolment_without_guardian_consent_for_minors",
+            "class_capacity_enforced",
+            "background_check_required_for_teachers",
+            "fee_arrears_exam_block"
+        ]
+    };
+    i18n: {supported_languages: [en, sw], default_language: en, fallback_language: en};
+}
+
+capability LearningManagement {
+    contract: {
+        id: education_lms,
+        provides: [
+            course_management,
+            learner_enrolment,
+            content_delivery,
+            assessment_and_grading,
+            certificate_issuance,
+            learning_path_management,
+            adaptive_learning,
+            xapi_scorm_tracking
+        ],
+        requires: [auth, audl, mten, conf, ntfy, wflo, nlpc, moni, comp, mqeb, schd],
+        configuration: {
+            tenant_id: "default",
+            scorm_enabled: true,
+            xapi_endpoint: "https://lrs.apgacademy.ke/xapi",
+            adaptive_learning_enabled: true,
+            peer_assessment_enabled: true,
+            gamification_enabled: true,
+            certificate_digital_signing: true,
+            passing_score_default: 50.0,
+            max_attempts_default: 3,
+            plagiarism_detection: true
+        },
+        rule_engine: {
+            type: deterministic,
+            default_decision: allow,
+            rules: [
+                {name: "enrolment_requires_active_student",
+                 when: "student_status != active",
+                 action: deny},
+                {name: "paid_course_requires_payment",
+                 when: "enrolment_type == paid and payment_reference missing",
+                 action: deny},
+                {name: "grade_override_requires_approval",
+                 when: "operation == override_grade and approval_reference_present != true",
+                 action: deny},
+                {name: "certificate_requires_passing_score",
+                 when: "operation == issue_certificate and completion_criteria_met != true",
+                 action: deny},
+                {name: "scorm_version_check",
+                 when: "content_type == scorm and scorm_version_supported != true",
+                 action: deny},
+                {name: "learner_data_consent",
+                 when: "operation == export_learner_analytics and consent_recorded != true",
+                 action: deny}
+            ]
+        },
+        ui: {shell: python, routes: [
+            {name: "LMS Dashboard",      path: "/lms",                 component: "LmsDashboard",       permission: "lms:view",       nav_group: "Overview"},
+            {name: "Course Catalogue",   path: "/lms/courses",         component: "CourseCatalogue",    permission: "lms:courses",    nav_group: "Learning"},
+            {name: "My Learning",        path: "/lms/my-learning",     component: "LearnerDashboard",   permission: "lms:learner",    nav_group: "Learning"},
+            {name: "Assessments",        path: "/lms/assessments",     component: "AssessmentWorkbench",permission: "lms:assess",     nav_group: "Assessment"},
+            {name: "Certificates",       path: "/lms/certificates",    component: "CertificateVault",   permission: "lms:certs",      nav_group: "Credentials"},
+            {name: "Learning Paths",     path: "/lms/paths",           component: "LearningPaths",      permission: "lms:paths",      nav_group: "Learning"},
+            {name: "Analytics",          path: "/lms/analytics",       component: "LmsAnalytics",       permission: "lms:analytics",  nav_group: "Analytics"},
+            {name: "Agents",             path: "/lms/agents",          component: "LmsAgents",          permission: "lms:agents",     nav_group: "AI"}
+        ]},
+        theme: {name: lms_theme, tokens: {
+            "color.primary":   "#4527A0",
+            "color.accent":    "#7B1FA2",
+            "color.success":   "#1B5E20",
+            "color.warning":   "#E65100",
+            "color.danger":    "#B71C1C",
+            "surface.canvas":  "#F8F5FF",
+            "surface.panel":   "#FFFFFF",
+            "text.primary":    "#1A0050",
+            "text.secondary":  "#6A1B9A",
+            "border.radius":   "10px",
+            "density":         "spacious"
+        }, components: {
+            courses:      {icon: "book-open",      status_indicator: "course-status-chip"},
+            assessments:  {icon: "clipboard-check",status_indicator: "assessment-type-chip"},
+            certificates: {icon: "award",          status_indicator: "cert-type-chip"},
+            progress:     {icon: "chart-line",     status_indicator: "progress-bar"}
+        }}
+    };
+    streaming: {
+        processor: bytewax,
+        stream: "apg.education.lms.lifecycle",
+        key: "tenant_id",
+        events: [
+            "course_created", "course_published", "course_archived",
+            "learner_enrolled", "learner_unenrolled",
+            "content_item_added", "progress_recorded",
+            "assessment_submitted", "grade_recorded",
+            "certificate_issued", "certificate_revoked",
+            "learning_path_created", "adaptive_recommendation_generated",
+            "badge_awarded", "scorm_statement_received"
+        ],
+        guardrails: [
+            "no_enrolment_for_inactive_students",
+            "payment_required_for_paid_courses",
+            "grade_override_requires_approval",
+            "certificate_only_on_passing_score",
+            "consent_required_for_analytics_export"
+        ]
+    };
+    i18n: {supported_languages: [en, sw], default_language: en, fallback_language: en};
+}
+
+capability Timetabling {
+    contract: {
+        id: education_ttbl,
+        provides: [
+            timetable_generation,
+            room_allocation,
+            teacher_assignment,
+            clash_detection,
+            substitution_management,
+            exam_scheduling
+        ],
+        requires: [auth, audl, mten, conf, ntfy, wflo, moni, mqeb, schd, comp],
+        configuration: {
+            tenant_id: "default",
+            periods_per_day: 8,
+            working_days: "monday,tuesday,wednesday,thursday,friday",
+            period_duration_minutes: 40,
+            break_periods: [3, 6],
+            double_period_enabled: true,
+            auto_clash_detection: true,
+            teacher_max_periods_per_day: 6,
+            room_utilisation_target_pct: 80
+        },
+        rule_engine: {
+            type: deterministic,
+            default_decision: allow,
+            rules: [
+                {name: "no_teacher_double_booking",
+                 when: "teacher_already_assigned == true and period == same",
+                 action: deny},
+                {name: "no_room_double_booking",
+                 when: "room_already_occupied == true and period == same",
+                 action: deny},
+                {name: "teacher_daily_load_limit",
+                 when: "teacher_periods_today_gte == max_periods_per_day",
+                 action: deny},
+                {name: "exam_requires_invigilator",
+                 when: "slot_type == exam and invigilator_assigned != true",
+                 action: require_review}
+            ]
+        },
+        ui: {shell: python, routes: [
+            {name: "Timetable Grid",   path: "/timetable",           component: "TimetableGrid",      permission: "timetable:view",    nav_group: "Schedule"},
+            {name: "Room Allocation",  path: "/timetable/rooms",     component: "RoomAllocation",     permission: "timetable:rooms",   nav_group: "Resources"},
+            {name: "Teacher Loads",    path: "/timetable/teachers",  component: "TeacherLoad",        permission: "timetable:teachers",nav_group: "Resources"},
+            {name: "Exam Schedule",    path: "/timetable/exams",     component: "ExamScheduler",      permission: "timetable:exams",   nav_group: "Exams"},
+            {name: "Substitutions",    path: "/timetable/subs",      component: "SubstitutionBoard",  permission: "timetable:subs",    nav_group: "Operations"}
+        ]},
+        theme: {name: timetable_theme, tokens: {
+            "color.primary":   "#00695C",
+            "color.accent":    "#00897B",
+            "surface.canvas":  "#F0FBF9",
+            "border.radius":   "6px",
+            "density":         "compact"
+        }}
+    };
+    streaming: {
+        processor: bytewax,
+        stream: "apg.education.timetable.lifecycle",
+        key: "tenant_id",
+        events: [
+            "slot_created", "slot_modified", "slot_deleted",
+            "clash_detected", "clash_resolved",
+            "substitution_created", "substitution_confirmed",
+            "exam_slot_created", "invigilator_assigned"
+        ],
+        guardrails: [
+            "no_teacher_double_booking",
+            "no_room_double_booking",
+            "teacher_load_limit_enforced"
+        ]
+    };
+    i18n: {supported_languages: [en, sw], default_language: en, fallback_language: en};
+}
+
+// ── Workflows ─────────────────────────────────────────────────────────────────
+
+workflow StudentEnrolmentPipeline {
+    steps: str = "application_received -> documents_verified -> fees_invoiced -> fees_paid -> class_assigned -> lms_account_created -> orientation -> active_learner";
+    human_tasks: [documents_verified, fees_invoiced, class_assigned, orientation];
+    assignments: {
+        documents_verified: admissions_officer,
+        fees_invoiced:      finance_officer,
+        class_assigned:     head_of_year,
+        orientation:        class_teacher
+    };
+    guards: {
+        fees_paid:          "fee_amount_paid >= registration_fee",
+        class_assigned:     "class_capacity_available and documents_verified",
+        lms_account_created:"class_assigned and guardian_consent_recorded",
+        active_learner:     "orientation_completed and lms_enrolled"
+    };
+}
+
+workflow LearningAndAssessmentFlow {
+    steps: str = "enrolled -> content_access -> learning_in_progress -> assessment_scheduled -> assessment_submitted -> graded -> result_released -> certificate_issued";
+    human_tasks: [assessment_scheduled, graded, result_released];
+    assignments: {
+        assessment_scheduled: subject_teacher,
+        graded:               subject_teacher,
+        result_released:      head_of_department
+    };
+    guards: {
+        assessment_submitted: "enrolment_status == active and attempts_remaining > 0",
+        graded:               "submission_complete and marking_scheme_loaded",
+        certificate_issued:   "final_score >= passing_score and all_assessments_graded"
+    };
+}
+
+workflow AcademicCalendarManagement {
+    steps: str = "draft_calendar -> board_review -> approved -> term_open -> mid_term_break -> term_resume -> exams -> marking -> results_released -> term_close -> holiday";
+    human_tasks: [board_review, approved, exams, results_released];
+    assignments: {
+        board_review:     principal,
+        approved:         board_of_governors,
+        exams:            examination_officer,
+        results_released: principal
+    };
+    guards: {
+        approved:         "board_quorum_present and calendar_conflicts_resolved",
+        term_open:        "calendar_approved and staff_briefed",
+        results_released: "all_scripts_marked and moderation_complete"
+    };
+}
+
+workflow ParentCommunicationFlow {
+    steps: str = "trigger_event -> message_composed -> consent_checked -> channel_selected -> message_sent -> delivery_confirmed -> response_tracked";
+    human_tasks: [message_composed];
+    assignments: {message_composed: class_teacher};
+    guards: {
+        message_sent:        "sms_consent_valid or email_confirmed",
+        delivery_confirmed:  "channel_ack_received"
+    };
+}
+
+// ── AI Agents ─────────────────────────────────────────────────────────────────
+
+agent AdaptiveLearningAgent {
+    role: "personalised learning recommendation";
+    model: "ollama:llama3.2";
+    system: "You are an adaptive learning engine. Analyse learner progress data, identify knowledge gaps, and recommend the next most appropriate learning activities. Personalise difficulty and content type based on learner performance history. Always respect data privacy and parental consent requirements.";
+    capabilities: [education_lms];
+    tools: [learner_progress_api, course_catalogue_api, competency_map];
+    memory: vector learner_memory;
+    configuration: {temperature: 0.3, max_turns: 5};
+    rules: [
+        {name: "no_pii_in_recommendations", when: "response_contains_pii == true", action: deny},
+        {name: "consent_required",          when: "learner_age_lt == 18 and guardian_consent != true", action: deny}
+    ];
+}
+
+agent ParentCommunicationAgent {
+    role: "guardian communication and reporting";
+    model: "ollama:llama3.2";
+    system: "You are a school communication assistant. Compose clear, professional messages to parents and guardians about student progress, events, and important notices. Use appropriate language for the audience. Always include the school name and contact details.";
+    capabilities: [education_sch_mgmt];
+    tools: [student_profile_api, calendar_api, fee_api];
+    memory: episodic parent_interaction_memory;
+    configuration: {temperature: 0.4, max_turns: 3};
+    rules: [
+        {name: "no_disciplinary_details_via_sms", when: "channel == sms and message_type == disciplinary", action: deny},
+        {name: "guardian_only_access",            when: "recipient_is_guardian != true", action: deny}
+    ];
+}
+
+agent TimetableOptimiserAgent {
+    role: "automated timetable generation and conflict resolution";
+    model: "ollama:llama3.2";
+    system: "You are a timetabling optimisation agent. Generate conflict-free timetables that balance teacher workloads, maximise room utilisation, and respect curriculum requirements. Detect and resolve scheduling clashes automatically.";
+    capabilities: [education_ttbl, education_sch_mgmt];
+    tools: [timetable_api, room_availability_api, teacher_workload_api];
+    memory: working timetable_state;
+    configuration: {temperature: 0.1, max_turns: 10};
+    rules: [
+        {name: "no_double_booking",       when: "clash_detected == true", action: deny},
+        {name: "require_human_approval",  when: "bulk_timetable_change == true and affected_classes_gte == 5", action: require_review}
+    ];
+}
+
+// ── Application ───────────────────────────────────────────────────────────────
+
+app EducationPlatform {
+    description: "Integrated K-12 and higher education platform composed from APG capabilities";
+    capabilities: [SchoolManagement, LearningManagement, Timetabling];
+    agents: [AdaptiveLearningAgent, ParentCommunicationAgent, TimetableOptimiserAgent];
+    routes: [
+        "/school", "/school/students", "/school/staff", "/school/calendar", "/school/fees",
+        "/lms", "/lms/courses", "/lms/assessments", "/lms/certificates", "/lms/analytics",
+        "/timetable", "/timetable/rooms", "/timetable/exams"
+    ];
+    theme: {
+        name: education_platform_theme,
+        tokens: {
+            "color.primary":   "#1565C0",
+            "color.accent":    "#4527A0",
+            "surface.canvas":  "#F5F7FF",
+            "border.radius":   "8px",
+            "density":         "comfortable"
+        }
+    };
+    runtime: {
+        target: python,
+        deployment: container,
+        streaming: {processor: bytewax}
+    };
+    deployments: {
+        default:    local,
+        container:  docker,
+        production: kubernetes
+    };
+}

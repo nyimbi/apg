@@ -782,7 +782,7 @@ class LmsService:
 			"completion_rate_pct": round(completed / max(len(enrolments), 1) * 100, 1),
 			"certificates_issued": len(certs),
 			"total_submissions": len(subs),
-			"courses": len([c for (t, _) in self.courses if t == tenant_id]),
+			"courses": len([(t, c) for (t, c) in self.courses if t == tenant_id]),
 		}
 
 	# -----------------------------------------------------------------------

@@ -10,7 +10,7 @@
   },
   "build": {
     "buildCommand": null,
-    "testCommand": ".venv/bin/python -m pytest tests/test_integration_pharma.py tests/test_integration_retail.py tests/test_integration_telecom.py -v 2>&1 | tail -28",
+    "testCommand": ".venv/bin/python -m pytest tests/test_security_integration.py -q --tb=short 2>&1 | tail -8",
     "lintCommand": null,
     "devCommand": null,
     "scripts": {}
@@ -400,8 +400,8 @@
     },
     {
       "path": "capabilities/capability_contract_registry.py",
-      "accessCount": 10,
-      "lastAccessed": 1780654676041,
+      "accessCount": 11,
+      "lastAccessed": 1780666946475,
       "type": "file"
     },
     {
@@ -411,15 +411,15 @@
       "type": "file"
     },
     {
-      "path": "compiler/compiler.py",
-      "accessCount": 8,
-      "lastAccessed": 1780520626968,
+      "path": "capabilities/intel/alerts/capability_contract.py",
+      "accessCount": 9,
+      "lastAccessed": 1780666951944,
       "type": "file"
     },
     {
-      "path": "capabilities/intel/alerts/capability_contract.py",
+      "path": "compiler/compiler.py",
       "accessCount": 8,
-      "lastAccessed": 1780597181607,
+      "lastAccessed": 1780520626968,
       "type": "file"
     },
     {

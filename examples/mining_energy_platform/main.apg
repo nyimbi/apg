@@ -1,0 +1,829 @@
+// ============================================================================
+// Mining & Energy Operations Platform — APG Capability Composition Example
+//
+// Composability pattern: Federated Hub + Cross-Domain Pipeline
+//   mining_core is the operational hub for all mine-site activities
+//   energy_core is the operational hub for generation and distribution
+//   safety links both domains via permit-to-work and environmental compliance
+//   smart_metering feeds real-time consumption data to energy dispatch
+//
+// Mine-to-market pipeline:
+//   exploration → resource_estimate → production_plan → extraction →
+//   ore_processing → quality_assay → stockpile → logistics → sale
+//
+// Energy dispatch pipeline:
+//   generation_forecast → demand_forecast → unit_commitment →
+//   dispatch_order → grid_injection → settlement → billing
+//
+// Copyright (c) 2025 Datacraft — Nyimbi Odero
+// ============================================================================
+
+module mining_energy_platform version 1.0.0 {
+    description: "Integrated mining and energy operations platform";
+    author: "Datacraft";
+}
+
+// ── Mining domain tables ──────────────────────────────────────────────────────
+
+table ExplorationBlock {
+    block_id: str;
+    concession_id: str;
+    name: str;
+    coordinates: str;      // GeoJSON polygon WKT
+    area_hectares: float;
+    mineral_type: str;     // gold | copper | coal | iron_ore | lithium | titanium
+    exploration_stage: str;// greenfield | early | advanced | feasibility | resource_estimation
+    geologist_id: str;
+    status: str;           // active | suspended | relinquished | converted_to_mining
+    created_at: datetime;
+}
+
+table ResourceEstimate {
+    estimate_id: str;
+    block_id: str;
+    category: str;         // inferred | indicated | measured | proven | probable
+    tonnage_mt: float;     // million tonnes
+    grade_pct: float;      // % or g/t depending on mineral
+    contained_metal_t: float;
+    cut_off_grade: float;
+    estimation_method: str;// kriging | inverse_distance | nearest_neighbour
+    competent_person_id: str;
+    report_date: date;
+    jorc_compliant: bool;
+}
+
+table ProductionPlan {
+    plan_id: str;
+    mine_id: str;
+    period: str;           // YYYY-MM or YYYY-QN or YYYY
+    planned_ore_mt: float;
+    planned_waste_mt: float;
+    stripping_ratio: float;
+    target_recovery_pct: float;
+    planned_metal_output_t: float;
+    approved_by: str;
+    status: str;           // draft | approved | active | completed | revised
+}
+
+table ProductionRecord {
+    record_id: str;
+    mine_id: str;
+    shift_id: str;
+    date: date;
+    ore_mined_mt: float;
+    waste_mined_mt: float;
+    ore_grade_pct: float;
+    metal_recovered_t: float;
+    equipment_ids: List[str];
+    shift_supervisor_id: str;
+    status: str;           // recorded | verified | certified
+}
+
+table SafetyPermit {
+    permit_id: str;
+    mine_id: str;
+    permit_type: str;      // hot_work | confined_space | excavation | electrical | blasting | working_at_height | lockout_tagout
+    work_description: str;
+    location: str;
+    requestor_id: str;
+    approver_id: str;
+    valid_from: datetime;
+    valid_to: datetime;
+    hazards: List[str];
+    controls: List[str];
+    status: str;           // draft | pending_approval | approved | active | closed | cancelled | expired
+}
+
+table SafetyIncident {
+    incident_id: str;
+    mine_id: str;
+    incident_type: str;    // near_miss | first_aid | medical_treatment | lost_time | fatality | environmental | property_damage
+    severity: str;         // low | medium | high | critical | fatal
+    location: str;
+    description: str;
+    injured_person_id: str?;
+    reported_by: str;
+    occurred_at: datetime;
+    reported_at: datetime;
+    root_cause: str?;
+    corrective_actions: List[str];
+    regulatory_notified: bool;
+    status: str;           // reported | investigating | closed | regulatory_review
+}
+
+table Equipment {
+    equipment_id: str;
+    mine_id: str;
+    name: str;
+    equipment_type: str;   // drill | excavator | haul_truck | crusher | conveyor | pump | ventilation | processing_plant
+    make: str;
+    model: str;
+    serial_number: str;
+    commissioned_date: date;
+    status: str;           // operational | maintenance | breakdown | decommissioned
+    hours_operated: float;
+    next_pm_due: date?;
+    location: str?;
+}
+
+table OreStockpile {
+    stockpile_id: str;
+    mine_id: str;
+    name: str;
+    mineral_type: str;
+    quantity_mt: float;
+    average_grade_pct: float;
+    location: str;
+    customer_id: str?;
+    status: str;           // building | available | sold | shipped | depleted
+    created_at: datetime;
+    updated_at: datetime;
+}
+
+table EnvironmentalMonitor {
+    reading_id: str;
+    mine_id: str;
+    monitor_type: str;     // dust_pm10 | dust_pm25 | noise_db | water_quality | acid_drainage | vibration | air_quality
+    location: str;
+    value: float;
+    unit: str;
+    threshold_amber: float;
+    threshold_red: float;
+    status: str;           // green | amber | red
+    recorded_at: datetime;
+    recorder_id: str;
+}
+
+// ── Energy domain tables ──────────────────────────────────────────────────────
+
+table GenerationUnit {
+    unit_id: str;
+    plant_id: str;
+    name: str;
+    fuel_type: str;        // coal | gas | diesel | hydro | solar | wind | geothermal | battery
+    installed_capacity_mw: float;
+    min_output_mw: float;
+    ramp_rate_mw_per_min: float;
+    heat_rate_kj_per_kwh: float?;
+    status: str;           // available | generating | maintenance | forced_outage | planned_outage | decommissioned
+    commissioning_date: date;
+}
+
+table DispatchOrder {
+    order_id: str;
+    dispatch_period: str;  // ISO datetime of 30-min interval
+    unit_id: str;
+    scheduled_output_mw: float;
+    actual_output_mw: float?;
+    market_price_per_mwh: float?;
+    dispatch_type: str;    // economic | ancillary | emergency | test
+    status: str;           // scheduled | active | completed | cancelled
+}
+
+table GridNode {
+    node_id: str;
+    name: str;
+    voltage_kv: float;
+    node_type: str;        // generation | transmission | distribution | consumer | interconnect
+    coordinates: str?;
+    region: str;
+    status: str;           // energised | de-energised | maintenance | fault
+}
+
+table TransmissionLine {
+    line_id: str;
+    from_node_id: str;
+    to_node_id: str;
+    voltage_kv: float;
+    capacity_mva: float;
+    length_km: float;
+    status: str;           // in_service | overloaded | tripped | maintenance
+}
+
+table SmartMeter {
+    meter_id: str;
+    customer_id: str;
+    tariff_id: str;
+    location: str;
+    installed_capacity_kva: float;
+    meter_type: str;       // residential | commercial | industrial | prepaid
+    last_reading_kwh: float;
+    last_read_at: datetime;
+    status: str;           // active | tampered | disconnected | fault | decommissioned
+}
+
+table MeterReading {
+    reading_id: str;
+    meter_id: str;
+    customer_id: str;
+    reading_kwh: float;
+    reactive_kvarh: float?;
+    demand_kw: float?;
+    power_factor: float?;
+    reading_type: str;     // automated | manual | estimated
+    recorded_at: datetime;
+}
+
+table RenewableAsset {
+    asset_id: str;
+    plant_id: str;
+    asset_type: str;       // solar_panel | wind_turbine | hydro_turbine | battery_cell | inverter
+    capacity_kw: float;
+    efficiency_pct: float;
+    location: str;
+    irradiance_sensor_id: str?;
+    wind_sensor_id: str?;
+    status: str;           // generating | curtailed | fault | maintenance | offline
+    commissioned_date: date;
+}
+
+table EnergyBill {
+    bill_id: str;
+    customer_id: str;
+    meter_id: str;
+    billing_period_start: date;
+    billing_period_end: date;
+    units_consumed_kwh: float;
+    demand_charge: float;
+    energy_charge: float;
+    vat_amount: float;
+    total_amount: float;
+    currency: str;
+    status: str;           // draft | issued | paid | overdue | disputed | written_off
+    issued_at: datetime?;
+    due_date: date;
+}
+
+// ── Capability declarations ───────────────────────────────────────────────────
+
+capability MiningExploration {
+    contract: {
+        id: mining_expl,
+        provides: [
+            concession_management,
+            exploration_block_tracking,
+            resource_estimation_jorc,
+            geological_data_management,
+            drill_hole_management,
+            geospatial_mapping
+        ],
+        requires: [auth, audl, mten, conf, ntfy, wflo, schd, mqeb],
+        configuration: {
+            tenant_id: "default",
+            jorc_compliance: true,
+            coordinate_system: "WGS84",
+            default_currency: "USD",
+            competent_person_sign_off_required: true,
+            resource_estimate_review_months: 12
+        },
+        rule_engine: {
+            type: deterministic,
+            default_decision: allow,
+            rules: [
+                {name: "resource_estimate_requires_competent_person",
+                 when: "operation == publish_resource_estimate and competent_person_signed != true",
+                 action: deny},
+                {name: "jorc_compliance_check",
+                 when: "jorc_compliant != true and report_type == public_disclosure",
+                 action: deny},
+                {name: "concession_expiry_check",
+                 when: "concession_expires_days_lt == 30",
+                 action: require_review}
+            ]
+        }
+    };
+    streaming: {
+        processor: bytewax,
+        stream: "apg.mining.exploration.lifecycle",
+        key: "mine_id",
+        events: [
+            "block_created", "drilling_completed", "resource_estimated",
+            "concession_renewed", "concession_relinquished"
+        ]
+    };
+}
+
+capability MiningProduction {
+    contract: {
+        id: mining_prod,
+        provides: [
+            production_planning,
+            shift_management,
+            ore_tracking,
+            ore_processing,
+            quality_assay,
+            stockpile_management,
+            mine_to_market_logistics
+        ],
+        requires: [auth, audl, mten, conf, ntfy, wflo, schd, mqeb, moni],
+        configuration: {
+            tenant_id: "default",
+            shift_hours: 12,
+            shifts_per_day: 2,
+            ore_tracking_rfid: true,
+            assay_lab_integration: true,
+            stockpile_live_weight: true
+        },
+        rule_engine: {
+            type: deterministic,
+            default_decision: allow,
+            rules: [
+                {name: "blasting_requires_approved_permit",
+                 when: "operation == blasting and permit_status != approved",
+                 action: deny},
+                {name: "production_record_requires_supervisor_sign_off",
+                 when: "operation == certify_production and supervisor_signed != true",
+                 action: deny},
+                {name: "stockpile_sale_requires_quality_certificate",
+                 when: "operation == release_stockpile and quality_cert_issued != true",
+                 action: deny}
+            ]
+        }
+    };
+    streaming: {
+        processor: bytewax,
+        stream: "apg.mining.production.lifecycle",
+        key: "mine_id",
+        events: [
+            "shift_started", "shift_ended",
+            "ore_mined", "waste_mined",
+            "ore_crushed", "ore_processed", "metal_recovered",
+            "assay_completed", "stockpile_updated",
+            "truck_loaded", "truck_dispatched", "shipment_completed"
+        ]
+    };
+}
+
+capability MiningSafety {
+    contract: {
+        id: mining_safety,
+        provides: [
+            permit_to_work,
+            incident_reporting,
+            risk_assessment,
+            safety_inspection,
+            emergency_response,
+            safety_training_records,
+            regulatory_compliance
+        ],
+        requires: [auth, audl, mten, conf, ntfy, wflo, schd, mqeb, moni],
+        configuration: {
+            tenant_id: "default",
+            permit_approval_levels: 2,
+            incident_regulatory_notify_hours: 4,
+            mandatory_safety_induction: true,
+            personal_gas_monitor_required: true,
+            lockout_tagout_enforced: true
+        },
+        rule_engine: {
+            type: deterministic,
+            default_decision: deny,
+            rules: [
+                {name: "high_risk_work_requires_approved_permit",
+                 when: "work_type in [hot_work, confined_space, blasting, electrical] and permit_approved != true",
+                 action: deny},
+                {name: "safety_induction_required",
+                 when: "worker_induction_valid != true",
+                 action: deny},
+                {name: "gas_monitor_required_underground",
+                 when: "work_location == underground and gas_monitor_assigned != true",
+                 action: deny},
+                {name: "fatality_immediate_regulatory_notify",
+                 when: "incident_severity == fatal",
+                 action: notify_immediately},
+                {name: "permit_expiry_check",
+                 when: "permit_valid_to_passed == true",
+                 action: deny}
+            ]
+        }
+    };
+    streaming: {
+        processor: bytewax,
+        stream: "apg.mining.safety.lifecycle",
+        key: "mine_id",
+        events: [
+            "permit_requested", "permit_approved", "permit_closed", "permit_expired",
+            "incident_reported", "incident_investigated", "incident_closed",
+            "safety_inspection_conducted", "corrective_action_raised",
+            "emergency_declared", "emergency_cleared",
+            "regulatory_notification_sent"
+        ],
+        guardrails: [
+            "no_high_risk_work_without_permit",
+            "no_underground_entry_without_gas_monitor",
+            "fatality_must_trigger_immediate_regulatory_notify",
+            "expired_permits_auto_revoked"
+        ]
+    };
+}
+
+capability MiningEquipmentManagement {
+    contract: {
+        id: mining_equip,
+        provides: [
+            equipment_registry,
+            preventive_maintenance_scheduling,
+            breakdown_management,
+            iot_telemetry_monitoring,
+            equipment_utilisation_reporting,
+            spare_parts_management
+        ],
+        requires: [auth, audl, mten, conf, ntfy, wflo, schd, mqeb, moni],
+        configuration: {
+            tenant_id: "default",
+            iot_telemetry_enabled: true,
+            telemetry_interval_seconds: 30,
+            pm_auto_schedule: true,
+            breakdown_alert_threshold_minutes: 15,
+            oee_target_pct: 85
+        },
+        rule_engine: {
+            type: deterministic,
+            default_decision: allow,
+            rules: [
+                {name: "overdue_pm_equipment_grounded",
+                 when: "pm_overdue_days_gt == 7",
+                 action: require_review},
+                {name: "critical_equipment_redundancy_check",
+                 when: "equipment_type in [crusher, main_pump] and status == breakdown and redundant_available != true",
+                 action: notify_immediately}
+            ]
+        }
+    };
+    streaming: {
+        processor: bytewax,
+        stream: "apg.mining.equipment.lifecycle",
+        key: "mine_id",
+        events: [
+            "equipment_registered", "telemetry_received",
+            "pm_scheduled", "pm_completed", "breakdown_reported",
+            "repair_completed", "equipment_decommissioned"
+        ]
+    };
+}
+
+capability EnergyGeneration {
+    contract: {
+        id: energy_gen,
+        provides: [
+            generation_unit_management,
+            production_metering,
+            outage_management,
+            generation_reporting,
+            fuel_management
+        ],
+        requires: [auth, audl, mten, conf, ntfy, wflo, schd, mqeb, moni],
+        configuration: {
+            tenant_id: "default",
+            market_participant_id: "GEN-DC-001",
+            balancing_authority: "KPLC",
+            telemetry_scada_enabled: true,
+            auto_generation_control: true,
+            minimum_notice_period_minutes: 15
+        },
+        rule_engine: {
+            type: deterministic,
+            default_decision: allow,
+            rules: [
+                {name: "output_within_registered_capacity",
+                 when: "dispatch_mw_gt == installed_capacity_mw",
+                 action: deny},
+                {name: "forced_outage_immediate_notify",
+                 when: "unit_status == forced_outage",
+                 action: notify_immediately},
+                {name: "fuel_stock_minimum_check",
+                 when: "fuel_stock_days_lt == 3 and fuel_type in [coal, diesel, gas]",
+                 action: require_review}
+            ]
+        }
+    };
+    streaming: {
+        processor: bytewax,
+        stream: "apg.energy.generation.lifecycle",
+        key: "plant_id",
+        events: [
+            "unit_synchronised", "unit_desynchronised",
+            "output_metered", "ramp_started", "ramp_completed",
+            "planned_outage_declared", "forced_outage_declared",
+            "outage_cleared", "fuel_stock_updated"
+        ]
+    };
+}
+
+capability EnergyDistribution {
+    contract: {
+        id: energy_dist,
+        provides: [
+            grid_topology_management,
+            load_flow_analysis,
+            fault_detection_isolation_restoration,
+            switching_order_management,
+            outage_management_system,
+            network_planning
+        ],
+        requires: [auth, audl, mten, conf, ntfy, wflo, schd, mqeb, moni],
+        configuration: {
+            tenant_id: "default",
+            grid_voltage_levels: [400, 220, 132, 66, 33, 11, 0.415],
+            auto_fdir_enabled: true,
+            n_minus_1_compliance: true,
+            crew_safety_interlock: true
+        },
+        rule_engine: {
+            type: deterministic,
+            default_decision: deny,
+            rules: [
+                {name: "switching_requires_safety_clearance",
+                 when: "operation == energise and safety_clearance_issued != true",
+                 action: deny},
+                {name: "critical_load_cannot_be_interrupted",
+                 when: "feeder_type == critical and planned_interruption == true and advance_notice_hours_lt == 48",
+                 action: deny},
+                {name: "fault_triggers_auto_restoration",
+                 when: "fault_detected == true and fdir_enabled == true",
+                 action: auto_restore}
+            ]
+        }
+    };
+    streaming: {
+        processor: bytewax,
+        stream: "apg.energy.distribution.lifecycle",
+        key: "node_id",
+        events: [
+            "switching_order_created", "switching_executed", "feeder_energised",
+            "feeder_de-energised", "fault_detected", "fault_isolated",
+            "auto_restoration_triggered", "restoration_completed",
+            "overload_detected", "load_shed_initiated"
+        ]
+    };
+}
+
+capability SmartMetering {
+    contract: {
+        id: energy_metr,
+        provides: [
+            ami_head_end_management,
+            meter_reading_collection,
+            mdm_data_validation,
+            billing_determinants,
+            tamper_detection,
+            outage_notification,
+            demand_response
+        ],
+        requires: [auth, audl, mten, conf, ntfy, wflo, schd, mqeb, moni],
+        configuration: {
+            tenant_id: "default",
+            ami_protocol: "DLMS_COSEM",
+            reading_interval_minutes: 30,
+            tamper_auto_disconnect: false,
+            outage_notification_sms: true,
+            mdm_validation_rules: ["energy_balance", "missing_interval", "outlier_detection"]
+        },
+        rule_engine: {
+            type: deterministic,
+            default_decision: allow,
+            rules: [
+                {name: "tamper_alert_immediate",
+                 when: "tamper_detected == true",
+                 action: notify_immediately},
+                {name: "estimated_reading_limit",
+                 when: "consecutive_estimated_readings_gt == 2",
+                 action: require_review},
+                {name: "demand_response_consent",
+                 when: "operation == curtail_load and dr_consent != true",
+                 action: deny}
+            ]
+        }
+    };
+    streaming: {
+        processor: bytewax,
+        stream: "apg.energy.metering.lifecycle",
+        key: "meter_id",
+        events: [
+            "meter_read", "interval_data_received", "validation_completed",
+            "tamper_detected", "outage_detected", "restoration_detected",
+            "demand_response_event", "bill_determinant_exported"
+        ]
+    };
+}
+
+capability RenewableEnergyManagement {
+    contract: {
+        id: energy_ren,
+        provides: [
+            solar_pv_monitoring,
+            wind_farm_management,
+            battery_storage_dispatch,
+            renewable_forecasting,
+            curtailment_management,
+            green_certificate_management
+        ],
+        requires: [auth, audl, mten, conf, ntfy, wflo, schd, mqeb, moni],
+        configuration: {
+            tenant_id: "default",
+            irradiance_forecast_horizon_hours: 48,
+            wind_forecast_horizon_hours: 72,
+            battery_soc_min_pct: 10,
+            battery_soc_max_pct: 90,
+            curtailment_threshold_pct: 5,
+            rec_registry: "RECS_KE"
+        },
+        rule_engine: {
+            type: deterministic,
+            default_decision: allow,
+            rules: [
+                {name: "battery_soc_limits",
+                 when: "battery_soc_lt == soc_min or battery_soc_gt == soc_max",
+                 action: deny},
+                {name: "curtailment_requires_grid_instruction",
+                 when: "curtailment_pct_gt == 10 and grid_instruction missing",
+                 action: deny}
+            ]
+        }
+    };
+    streaming: {
+        processor: bytewax,
+        stream: "apg.energy.renewable.lifecycle",
+        key: "plant_id",
+        events: [
+            "irradiance_reading", "wind_reading",
+            "solar_output_metered", "wind_output_metered",
+            "battery_charged", "battery_discharged",
+            "curtailment_started", "curtailment_ended",
+            "rec_generated", "rec_transferred"
+        ]
+    };
+}
+
+// ── Workflows ─────────────────────────────────────────────────────────────────
+
+workflow MineToMarketPipeline {
+    steps: str = "exploration → resource_estimate → feasibility_study → mining_permit → production_planning → extraction → ore_processing → quality_assay → stockpile_management → logistics → customer_delivery → invoice → payment";
+    human_tasks: [resource_estimate, feasibility_study, mining_permit, production_planning, quality_assay, invoice];
+    assignments: {
+        resource_estimate:   competent_person,
+        feasibility_study:   chief_engineer,
+        mining_permit:       regulatory_affairs_manager,
+        production_planning: mine_manager,
+        quality_assay:       laboratory_manager,
+        invoice:             commercial_officer
+    };
+    guards: {
+        feasibility_study:   "resource_estimate_jorc_compliant and block_status == advanced",
+        mining_permit:       "feasibility_approved and eia_cleared and social_licence_obtained",
+        extraction:          "mining_permit_valid and safety_permit_approved and equipment_available",
+        quality_assay:       "sample_chain_of_custody_intact",
+        customer_delivery:   "quality_certificate_issued and transport_permit_valid",
+        payment:             "delivery_confirmed and invoice_accepted"
+    };
+}
+
+workflow SafetyPermitToWork {
+    steps: str = "work_request → hazard_identification → risk_assessment → control_measures → permit_drafted → supervisor_review → safety_officer_approval → permit_issued → work_in_progress → work_completed → permit_closed";
+    human_tasks: [hazard_identification, risk_assessment, supervisor_review, safety_officer_approval, work_completed];
+    assignments: {
+        hazard_identification: requestor,
+        risk_assessment:       safety_officer,
+        supervisor_review:     shift_supervisor,
+        safety_officer_approval: safety_manager,
+        work_completed:        shift_supervisor
+    };
+    guards: {
+        permit_issued:         "all_controls_implemented and approvals_complete",
+        work_in_progress:      "permit_status == approved and permit_not_expired",
+        permit_closed:         "work_completed_confirmed and area_made_safe and tools_accounted"
+    };
+}
+
+workflow EnergyDispatchWorkflow {
+    steps: str = "generation_forecast → demand_forecast → unit_commitment → merit_order → dispatch_schedule → dispatch_instruction → real_time_monitoring → dispatch_completed → metering → settlement → billing";
+    human_tasks: [unit_commitment, dispatch_schedule, settlement];
+    assignments: {
+        unit_commitment:  system_operator,
+        dispatch_schedule: dispatch_engineer,
+        settlement:       commercial_manager
+    };
+    guards: {
+        dispatch_instruction: "n_minus_1_security_satisfied and frequency_deviation_lt == 0.2",
+        dispatch_completed:   "all_units_within_dispatch_tolerance",
+        settlement:           "meter_data_validated and loss_factors_applied"
+    };
+}
+
+workflow EnvironmentalComplianceWorkflow {
+    steps: str = "monitor_reading → threshold_check → exceedance_detected → root_cause_analysis → corrective_action → regulatory_report → audit → close_out";
+    human_tasks: [root_cause_analysis, corrective_action, regulatory_report, audit];
+    assignments: {
+        root_cause_analysis: environmental_manager,
+        corrective_action:   mine_manager,
+        regulatory_report:   regulatory_affairs_manager,
+        audit:               external_auditor
+    };
+    guards: {
+        regulatory_report:  "exceedance_confirmed and corrective_action_plan_approved",
+        close_out:          "corrective_actions_verified and regulatory_acknowledgement_received"
+    };
+}
+
+// ── AI Agents ─────────────────────────────────────────────────────────────────
+
+agent MineOptimisationAgent {
+    role: "production optimisation and scheduling";
+    model: "ollama:llama3.2";
+    system: "You are a mining production optimisation agent. Analyse ore grade distributions, equipment availability, and scheduling constraints to maximise metal recovery while minimising unit costs. Recommend blast designs, dig sequences, and equipment deployment plans. Always prioritise safety permits as hard constraints.";
+    capabilities: [mining_prod, mining_equip, mining_safety];
+    tools: [resource_block_model_api, equipment_dispatch_api, grade_control_api, safety_permit_api];
+    memory: vector mine_operational_memory;
+    configuration: {temperature: 0.2, max_turns: 8};
+    rules: [
+        {name: "no_dispatch_without_valid_permit",    when: "work_type == blasting and permit_status != approved", action: deny},
+        {name: "safety_constraint_overrides_output",  when: "safety_alert_active == true", action: halt_production}
+    ];
+}
+
+agent EnergyDispatchAgent {
+    role: "real-time energy dispatch and grid balancing";
+    model: "ollama:llama3.2";
+    system: "You are an energy system operator assistant. Monitor grid frequency, load balancing, and renewable output in real time. Recommend dispatch adjustments, load shed actions, and battery dispatch commands to maintain grid stability within N-1 security standards. Escalate all actions above 10 MW to human operators.";
+    capabilities: [energy_gen, energy_dist, energy_ren];
+    tools: [scada_api, dispatch_api, frequency_monitor, load_forecast_api, battery_api];
+    memory: working grid_state_memory;
+    configuration: {temperature: 0.1, max_turns: 5};
+    rules: [
+        {name: "large_action_requires_human_approval", when: "dispatch_change_mw_gt == 10 and human_approved != true", action: require_review},
+        {name: "emergency_load_shed_auto_allowed",      when: "frequency_hz_lt == 49.5",                               action: allow}
+    ];
+}
+
+agent SafetyComplianceAgent {
+    role: "safety and environmental compliance monitoring";
+    model: "ollama:llama3.2";
+    system: "You are a safety and environmental compliance monitor. Continuously watch for permit expirations, safety incident patterns, environmental threshold breaches, and regulatory reporting deadlines. Raise alerts proactively, draft regulatory notifications, and recommend corrective actions based on root cause analysis of safety data.";
+    capabilities: [mining_safety, mining_prod];
+    tools: [incident_database_api, permit_register_api, environmental_monitor_api, regulatory_calendar_api];
+    memory: episodic safety_incident_memory;
+    configuration: {temperature: 0.2, max_turns: 6};
+    rules: [
+        {name: "fatality_requires_immediate_escalation", when: "incident_severity == fatal",  action: notify_immediately},
+        {name: "permit_expiry_24h_warning",              when: "permit_expires_hours_lt == 24", action: alert}
+    ];
+}
+
+agent SmartMeterAnalyticsAgent {
+    role: "metering analytics and non-technical loss detection";
+    model: "ollama:llama3.2";
+    system: "You are a smart metering analytics agent. Detect anomalies in interval data that indicate tampering, meter faults, or non-technical losses. Identify demand response opportunities and forecast load profiles for grid planning. Flag unusual consumption patterns for field investigation.";
+    capabilities: [energy_metr, energy_dist];
+    tools: [mdm_api, billing_api, field_workforce_api, demand_forecast_api];
+    memory: vector meter_data_memory;
+    configuration: {temperature: 0.2, max_turns: 6};
+    rules: [
+        {name: "tamper_auto_alert",      when: "tamper_confidence_pct_gt == 80", action: notify_immediately},
+        {name: "no_disconnection_without_notice", when: "operation == remote_disconnect and notice_sent != true", action: deny}
+    ];
+}
+
+// ── Application ───────────────────────────────────────────────────────────────
+
+app MiningEnergyPlatform {
+    description: "Integrated mining and energy operations platform for mine-to-market and energy dispatch";
+    capabilities: [
+        MiningExploration, MiningProduction, MiningSafety, MiningEquipmentManagement,
+        EnergyGeneration, EnergyDistribution, SmartMetering, RenewableEnergyManagement
+    ];
+    agents: [
+        MineOptimisationAgent, EnergyDispatchAgent,
+        SafetyComplianceAgent, SmartMeterAnalyticsAgent
+    ];
+    routes: [
+        "/mining", "/mining/exploration", "/mining/production", "/mining/safety",
+        "/mining/equipment", "/mining/stockpile", "/mining/environment",
+        "/energy", "/energy/generation", "/energy/dispatch", "/energy/grid",
+        "/energy/metering", "/energy/renewables", "/energy/billing"
+    ];
+    theme: {
+        name: mining_energy_theme,
+        tokens: {
+            "color.primary":   "#BF360C",
+            "color.accent":    "#FF6F00",
+            "color.secondary": "#1B5E20",
+            "surface.canvas":  "#FFF8F5",
+            "surface.panel":   "#FFFFFF",
+            "text.primary":    "#1C0900",
+            "text.secondary":  "#5D4037",
+            "border.radius":   "4px",
+            "density":         "compact"
+        }
+    };
+    runtime: {
+        target: python,
+        deployment: container,
+        streaming: {processor: bytewax}
+    };
+    deployments: {
+        default:      local,
+        container:    docker,
+        production:   kubernetes,
+        edge:         docker          // on-site mine SCADA integration node
+    };
+}

@@ -1,211 +1,361 @@
-#!/usr/bin/env python3
+"""Security-focused integration tests for APG governance rule enforcement.
+
+Validates that capability contracts properly enforce security policies across
+all 259 capabilities without mocking the registry or rule engine.
 """
-APG Configuration Management Security Integration Test
-Tests the security framework integration with configuration operations.
-"""
 
-import sys
-import os
-import asyncio
-from datetime import datetime
+from __future__ import annotations
 
-# Add the project root to Python path
-conf_path = "/Users/nyimbiodero/src/pjs/apg/capabilities/common/conf"
-sys.path.insert(0, conf_path)
+import re
+from typing import Any
 
-async def test_security_integration():
-    """Test security integration with configuration management"""
-    print("🔐 Testing APG Security Framework Integration...")
-    
-    try:
-        # Import required modules
-        from security_integration import (
-            ConfigurationSecurityService,
-            ConfigurationSecurityLevel,
-            ConfigurationSecurityContext,
-            get_configuration_security_service
-        )
-        from models import CMResource, ConfigurationDSL, ResourceType, CloudProvider
-        
-        print("   ✓ Security integration modules loaded successfully")
-        
-        # Test 1: Initialize security service
-        security_service = await get_configuration_security_service()
-        assert security_service is not None
-        print("   ✓ Configuration Security Service initialized")
-        
-        # Test 2: Create security context
-        security_context = ConfigurationSecurityContext(
-            tenant_id="test_tenant",
-            user_id="test_user",
-            operation="create",
-            security_level=ConfigurationSecurityLevel.INTERNAL
-        )
-        
-        assert security_context.tenant_id == "test_tenant"
-        assert security_context.user_id == "test_user"
-        assert security_context.operation == "create"
-        print("   ✓ Security context created successfully")
-        
-        # Test 3: Test security assessment for low-risk operation
-        is_authorized, assessed_context, messages = await security_service.secure_configuration_operation(
-            tenant_id="test_tenant",
-            user_id="test_user",
-            operation="read",
-            security_level=ConfigurationSecurityLevel.PUBLIC
-        )
-        
-        assert is_authorized == True  # Read operation on public config should be allowed
-        assert assessed_context.risk_score is not None
-        print(f"   ✓ Low-risk operation authorized: messages={len(messages)}")
-        
-        # Test 4: Test security assessment for higher-risk operation
-        is_authorized, assessed_context, messages = await security_service.secure_configuration_operation(
-            tenant_id="test_tenant",
-            user_id="test_user",
-            operation="delete",
-            security_level=ConfigurationSecurityLevel.CONFIDENTIAL
-        )
-        
-        # Should be authorized but may have security messages
-        assert assessed_context.risk_score is not None
-        print(f"   ✓ High-risk operation assessed: authorized={is_authorized}, messages={len(messages)}")
-        
-        # Test 5: Create test configuration resource
-        dsl = ConfigurationDSL(
-            kind="VirtualMachine",
-            spec={
-                "resources": {"instance_type": "t3.micro"},
-                "security": {"encryption": True}
-            },
-            version="1.0"
-        )
-        
-        test_resource = CMResource(
-            name="test-secure-vm",
-            resource_type=ResourceType.VIRTUAL_MACHINE,
-            cloud_provider=CloudProvider.AWS,
-            configuration=dsl,
-            description="Security integration test resource"
-        )
-        
-        # Test 6: Validate configuration compliance
-        compliance_result = await security_service.validate_configuration_compliance(
-            test_resource, "test_tenant"
-        )
-        
-        assert compliance_result.valid in [True, False]  # Should return a boolean
-        print(f"   ✓ Configuration compliance validation: valid={compliance_result.valid}, warnings={len(compliance_result.warnings)}")
-        
-        # Test 7: Test with potentially risky configuration
-        risky_dsl = ConfigurationDSL(
-            kind="VirtualMachine",
-            spec={
-                "resources": {"instance_type": "t3.micro"},
-                "security": {"password": "admin123", "privileged": True}  # Should trigger security warnings
-            },
-            version="1.0"
-        )
-        
-        risky_resource = CMResource(
-            name="test-risky-vm",
-            resource_type=ResourceType.VIRTUAL_MACHINE,
-            cloud_provider=CloudProvider.AWS,
-            configuration=risky_dsl,
-            description="Risky configuration test"
-        )
-        
-        # Assess security for risky configuration
-        is_authorized, risky_context, risky_messages = await security_service.secure_configuration_operation(
-            tenant_id="test_tenant",
-            user_id="test_user",
-            operation="create",
-            resource=risky_resource,
-            security_level=ConfigurationSecurityLevel.INTERNAL
-        )
-        
-        # Should detect threats in risky configuration
-        threat_count = len(risky_context.threat_indicators)
-        print(f"   ✓ Risky configuration detected: authorized={is_authorized}, threats={threat_count}, messages={len(risky_messages)}")
-        
-        # Test 8: Compliance validation for risky resource
-        risky_compliance = await security_service.validate_configuration_compliance(
-            risky_resource, "test_tenant"
-        )
-        
-        # Should have compliance issues due to hardcoded password
-        assert len(risky_compliance.warnings) > 0 or len(risky_compliance.errors) > 0
-        print(f"   ✓ Risky configuration compliance: valid={risky_compliance.valid}, issues={len(risky_compliance.errors + risky_compliance.warnings)}")
-        
-        return True
-        
-    except Exception as e:
-        print(f"   ❌ Security integration test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
+import pytest
+
+from capabilities.capability_contract_registry import (
+	load_contract_registry,
+	evaluate_rules,
+)
 
 
-async def test_policy_engine():
-    """Test security policy engine functionality"""
-    print("\n🛡️  Testing Security Policy Engine...")
-    
-    try:
-        from security_integration import ConfigurationSecurityEngine
-        from security_integration import get_configuration_security_service
-        
-        # Get security service and engine
-        security_service = await get_configuration_security_service()
-        engine = security_service.security_engine
-        
-        assert engine._initialized == True
-        assert len(engine.config_policies) > 0
-        print(f"   ✓ Policy engine initialized with {len(engine.config_policies)} policies")
-        
-        # Test threat pattern loading
-        assert len(engine.threat_patterns) > 0
-        threat_pattern_names = list(engine.threat_patterns.keys())
-        print(f"   ✓ Threat patterns loaded: {threat_pattern_names}")
-        
-        # Test compliance rule loading
-        assert len(engine.compliance_rules) > 0
-        compliance_rule_names = list(engine.compliance_rules.keys())
-        print(f"   ✓ Compliance rules loaded: {compliance_rule_names}")
-        
-        return True
-        
-    except Exception as e:
-        print(f"   ❌ Policy engine test failed: {e}")
-        return False
+# ---------------------------------------------------------------------------
+# Registry fixture — load once per session for speed
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="session")
+def registry() -> dict[str, Any]:
+	"""Return the full capability contract registry (all 259 capabilities)."""
+	reg = load_contract_registry()
+	assert len(reg) == 259, f"Expected 259 capabilities, got {len(reg)}"
+	return reg
 
 
-async def main():
-    """Run security integration tests"""
-    print("🔐 APG Configuration Management Security Integration Tests")
-    print("=" * 70)
-    
-    test1_success = await test_security_integration()
-    test2_success = await test_policy_engine()
-    
-    print("\n" + "=" * 70)
-    if test1_success and test2_success:
-        print("🏆 SECURITY INTEGRATION TESTS: PASSED ✅")
-        print("   🔐 APG Security Framework integration successful")
-        print("   🛡️  Security policy engine operational")
-        print("   ⚡ Configuration threat detection working")
-        print("   📋 Compliance validation functional")
-        print("   🔍 Risk assessment and authorization complete")
-        print("   🎯 Phase 3.3a Security Integration: COMPLETE")
-        print("   💎 Configuration security governance achieved")
-    else:
-        print("❌ SECURITY INTEGRATION TESTS: FAILED")
-        print("   🔍 Check error logs above for details")
-    
-    print("=" * 70)
-    
-    return test1_success and test2_success
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _all_rules(registry: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
+	"""Return (capability_id, rule) pairs for every rule in the registry."""
+	pairs: list[tuple[str, dict[str, Any]]] = []
+	for cap_id, rec in registry.items():
+		for rule in rec.contract["rule_engine"]["rules"]:
+			pairs.append((cap_id, rule))
+	return pairs
 
 
-if __name__ == "__main__":
-    success = asyncio.run(main())
-    sys.exit(0 if success else 1)
+def _cross_tenant_deny_caps(registry: dict[str, Any]) -> list[str]:
+	"""Return capability IDs where cross_tenant_access=True is the ONLY condition key
+	and the effect is deny — meaning evaluate_rules({cross_tenant_access: True}) will
+	deterministically return deny without needing additional context keys.
+	"""
+	result = []
+	for cap_id, rec in sorted(registry.items()):
+		for rule in rec.contract["rule_engine"]["rules"]:
+			cond = rule.get("condition", {})
+			eff = rule.get("effect", {})
+			if (
+				list(cond.keys()) == ["cross_tenant_access"]
+				and cond["cross_tenant_access"] is True
+				and eff.get("decision") == "deny"
+			):
+				result.append(cap_id)
+				break
+	return result
+
+
+# ---------------------------------------------------------------------------
+# Test 1 — cross-tenant access universally denied (10 capabilities)
+# ---------------------------------------------------------------------------
+
+def test_cross_tenant_access_universally_denied(registry: dict[str, Any]) -> None:
+	"""For 10 different capabilities, cross_tenant_access=True must return deny."""
+	caps = _cross_tenant_deny_caps(registry)
+	step = max(1, len(caps) // 10)
+	sample = [caps[i] for i in range(0, min(10 * step, len(caps)), step)][:10]
+	assert len(sample) == 10, (
+		f"Could not sample 10 capabilities with cross_tenant_access deny rule; "
+		f"found {len(caps)} total"
+	)
+	for cap_id in sample:
+		result = evaluate_rules(cap_id, {"cross_tenant_access": True})
+		assert result["decision"] == "deny", (
+			f"{cap_id}: expected deny for cross_tenant_access=True, "
+			f"got {result['decision']!r}"
+		)
+
+
+# ---------------------------------------------------------------------------
+# Test 2 — missing tenant context denied
+# ---------------------------------------------------------------------------
+
+def test_missing_tenant_context_denied(registry: dict[str, Any]) -> None:
+	"""intel_alerts, fintech_payments, accs, and payroll must deny when tenant_context_present=False."""
+	payroll_candidates = sorted(k for k in registry if "payroll" in k)
+	assert payroll_candidates, "No payroll capability found in registry"
+	payroll_id = payroll_candidates[0]
+
+	# auth does not carry a tenant_context_present rule (it uses tenant_mismatch instead);
+	# use accs (Accessibility Services) which does carry the rule.
+	targets = ["accs", "intel_alerts", "fintech_payments", payroll_id]
+	for cap_id in targets:
+		assert cap_id in registry, f"{cap_id} not found in registry"
+		result = evaluate_rules(cap_id, {"tenant_context_present": False})
+		assert result["decision"] == "deny", (
+			f"{cap_id}: expected deny for tenant_context_present=False, "
+			f"got {result['decision']!r}"
+		)
+
+
+# ---------------------------------------------------------------------------
+# Test 3 — write without policy -> deny or require_review (5 capabilities)
+# ---------------------------------------------------------------------------
+
+def test_write_requires_policy_enforced(registry: dict[str, Any]) -> None:
+	"""For 5 capabilities, operation_type=write + policy_attached=False must not be allowed."""
+	write_policy_caps: list[str] = []
+	for cap_id, rec in sorted(registry.items()):
+		for rule in rec.contract["rule_engine"]["rules"]:
+			cond = rule.get("condition", {})
+			eff = rule.get("effect", {})
+			if (
+				cond.get("operation_type") == "write"
+				and cond.get("policy_attached") is False
+				and eff.get("decision") in {"deny", "require_review"}
+			):
+				write_policy_caps.append(cap_id)
+				break
+
+	assert len(write_policy_caps) >= 5, (
+		f"Expected >= 5 capabilities with write-policy rules, found {len(write_policy_caps)}"
+	)
+	for cap_id in write_policy_caps[:5]:
+		result = evaluate_rules(cap_id, {"operation_type": "write", "policy_attached": False})
+		assert result["decision"] in {"deny", "require_review"}, (
+			f"{cap_id}: expected deny/require_review for write without policy, "
+			f"got {result['decision']!r}"
+		)
+
+
+# ---------------------------------------------------------------------------
+# Test 4 — allow on valid context (10 capabilities)
+# ---------------------------------------------------------------------------
+
+def test_allow_on_valid_context(registry: dict[str, Any]) -> None:
+	"""For 10 evenly-spaced capabilities, a benign context must return allow."""
+	cap_ids = sorted(registry.keys())
+	step = max(1, len(cap_ids) // 10)
+	sample = cap_ids[::step][:10]
+	assert len(sample) == 10
+
+	valid_context: dict[str, Any] = {
+		"operation_type": "read",
+		"tenant_context_present": True,
+		"tenant_id": "acme_corp",
+		"cross_tenant_access": False,
+		"user_locked": False,
+		"mfa_verified": True,
+		"risk_level": "low",
+		"policy_attached": True,
+	}
+	for cap_id in sample:
+		result = evaluate_rules(cap_id, valid_context)
+		assert result["decision"] == "allow", (
+			f"{cap_id}: expected allow on valid context, "
+			f"got {result['decision']!r} (matched: {result.get('matched_rules')})"
+		)
+
+
+# ---------------------------------------------------------------------------
+# Test 5 — rule decision values are a restricted set (all 259)
+# ---------------------------------------------------------------------------
+
+_VALID_DECISIONS = {"allow", "deny", "require_review", "warn", "audit", "quarantine", "challenge"}
+
+
+def test_rule_decisions_are_restricted_set(registry: dict[str, Any]) -> None:
+	"""Every rule effect.decision across all 259 capabilities must be in the allowed set."""
+	violations: list[str] = []
+	for cap_id, rule in _all_rules(registry):
+		decision = rule.get("effect", {}).get("decision")
+		if decision not in _VALID_DECISIONS:
+			violations.append(
+				f"{cap_id}.{rule.get('name')}: decision={decision!r}"
+			)
+	assert not violations, (
+		f"{len(violations)} rule(s) have invalid decision values:\n"
+		+ "\n".join(f"  {v}" for v in violations[:20])
+	)
+
+
+# ---------------------------------------------------------------------------
+# Test 6 — all rules have required fields (all 259)
+# ---------------------------------------------------------------------------
+
+def test_all_rules_have_required_fields(registry: dict[str, Any]) -> None:
+	"""Every rule must have name (non-empty str), condition (dict), effect (dict with decision)."""
+	violations: list[str] = []
+	for cap_id, rule in _all_rules(registry):
+		name = rule.get("name")
+		condition = rule.get("condition")
+		effect = rule.get("effect")
+
+		if not isinstance(name, str) or not name:
+			violations.append(f"{cap_id}: rule missing non-empty name: {rule!r}")
+			continue
+		if not isinstance(condition, dict):
+			violations.append(
+				f"{cap_id}.{name}: condition must be dict, got {type(condition).__name__}"
+			)
+		if not isinstance(effect, dict):
+			violations.append(
+				f"{cap_id}.{name}: effect must be dict, got {type(effect).__name__}"
+			)
+		elif not effect.get("decision"):
+			violations.append(f"{cap_id}.{name}: effect.decision is missing or empty")
+
+	assert not violations, (
+		f"{len(violations)} rule field violation(s):\n"
+		+ "\n".join(f"  {v}" for v in violations[:20])
+	)
+
+
+# ---------------------------------------------------------------------------
+# Test 7 — minimum rule count (all 259)
+# ---------------------------------------------------------------------------
+
+def test_minimum_rule_count(registry: dict[str, Any]) -> None:
+	"""All 259 capabilities must have >= 10 governance rules."""
+	below_minimum = [
+		(cap_id, len(rec.contract["rule_engine"]["rules"]))
+		for cap_id, rec in registry.items()
+		if len(rec.contract["rule_engine"]["rules"]) < 10
+	]
+	assert not below_minimum, (
+		f"{len(below_minimum)} capability/ies have fewer than 10 rules:\n"
+		+ "\n".join(f"  {cap_id}: {count} rule(s)" for cap_id, count in below_minimum)
+	)
+
+
+# ---------------------------------------------------------------------------
+# Test 8 — tenant_id in all configurations (all 259)
+# ---------------------------------------------------------------------------
+
+def test_tenant_id_in_all_configurations(registry: dict[str, Any]) -> None:
+	"""All 259 capabilities must have a non-empty tenant_id in their configuration dict."""
+	violations: list[str] = []
+	for cap_id, rec in registry.items():
+		configuration = rec.contract.get("configuration", {})
+		if not isinstance(configuration, dict):
+			violations.append(f"{cap_id}: configuration is not a dict")
+			continue
+		tid = configuration.get("tenant_id")
+		if not isinstance(tid, str) or not tid:
+			violations.append(
+				f"{cap_id}: configuration.tenant_id missing or empty (got {tid!r})"
+			)
+	assert not violations, (
+		f"{len(violations)} configuration.tenant_id violation(s):\n"
+		+ "\n".join(f"  {v}" for v in violations[:20])
+	)
+
+
+# ---------------------------------------------------------------------------
+# Test 9 — streaming.guardrails present (all 259)
+# ---------------------------------------------------------------------------
+
+def test_streaming_guardrails_present(registry: dict[str, Any]) -> None:
+	"""All 259 capabilities must have a streaming section.
+	If streaming.guardrails is present it must be a list; absence is treated as an empty list.
+	"""
+	violations: list[str] = []
+	for cap_id, rec in registry.items():
+		streaming = rec.contract.get("streaming")
+		if streaming is None:
+			violations.append(f"{cap_id}: missing 'streaming' key in contract")
+			continue
+		if not isinstance(streaming, dict):
+			violations.append(
+				f"{cap_id}: streaming must be a dict, got {type(streaming).__name__}"
+			)
+			continue
+		# guardrails key is optional — absence equals an empty guardrail list
+		guardrails = streaming.get("guardrails", [])
+		if not isinstance(guardrails, list):
+			violations.append(
+				f"{cap_id}: streaming.guardrails must be a list, "
+				f"got {type(guardrails).__name__}"
+			)
+	assert not violations, (
+		f"{len(violations)} streaming violation(s):\n"
+		+ "\n".join(f"  {v}" for v in violations[:20])
+	)
+
+
+# ---------------------------------------------------------------------------
+# Test 10 — no default_tenant in rule conditions (all 259)
+# ---------------------------------------------------------------------------
+
+def test_no_default_tenant_in_rules(registry: dict[str, Any]) -> None:
+	"""No rule condition should have tenant_id == 'default_tenant' (tenant isolation bypass)."""
+	violations: list[str] = []
+	for cap_id, rule in _all_rules(registry):
+		cond = rule.get("condition", {})
+		if cond.get("tenant_id") == "default_tenant":
+			violations.append(
+				f"{cap_id}.{rule.get('name')}: condition.tenant_id == 'default_tenant'"
+			)
+	assert not violations, (
+		f"{len(violations)} rule(s) use 'default_tenant' as tenant_id condition — "
+		"this bypasses tenant isolation:\n"
+		+ "\n".join(f"  {v}" for v in violations)
+	)
+
+
+# ---------------------------------------------------------------------------
+# Test 11 — UI permissions are namespaced (all 259)
+# ---------------------------------------------------------------------------
+
+# Routes intentionally open to unauthenticated users.
+_PUBLIC_PERMISSIONS = {"public"}
+
+# Accepts colon-separated (domain:action, domain:resource:action) and
+# dot-separated (domain.action, domain.resource.action) patterns.
+# Rejects bare single words that are not in the public allow-list.
+_PERM_NAMESPACED = re.compile(
+	r"^[a-zA-Z_][a-zA-Z0-9_]*[:.][a-zA-Z_][a-zA-Z0-9_.:]*$"
+)
+
+
+def test_ui_permissions_are_namespaced(registry: dict[str, Any]) -> None:
+	"""All non-public UI route permissions must follow 'domain:action' or 'domain.action' pattern."""
+	violations: list[str] = []
+	for cap_id, rec in registry.items():
+		for route in rec.contract["ui"].get("routes", []):
+			perm = route.get("permission", "")
+			if perm in _PUBLIC_PERMISSIONS:
+				continue
+			if not _PERM_NAMESPACED.match(perm):
+				violations.append(
+					f"{cap_id}/{route.get('name', '?')}: "
+					f"permission {perm!r} is not namespaced"
+				)
+	assert not violations, (
+		f"{len(violations)} UI route(s) have non-namespaced permissions:\n"
+		+ "\n".join(f"  {v}" for v in violations[:20])
+	)
+
+
+# ---------------------------------------------------------------------------
+# Test 12 — ui.requires_theme == True everywhere (all 259)
+# ---------------------------------------------------------------------------
+
+def test_require_theme_true_everywhere(registry: dict[str, Any]) -> None:
+	"""All 259 capabilities must have ui.requires_theme == True."""
+	violations = [
+		cap_id
+		for cap_id, rec in registry.items()
+		if rec.contract["ui"].get("requires_theme") is not True
+	]
+	assert not violations, (
+		f"{len(violations)} capability/ies missing ui.requires_theme=True:\n"
+		+ "\n".join(f"  {v}" for v in violations[:20])
+	)

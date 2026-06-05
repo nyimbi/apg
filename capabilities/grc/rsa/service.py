@@ -283,6 +283,7 @@ class RiskAssessmentService:
 
 		# Colour bands: score ≥20=red, ≥12=amber, ≥6=yellow, else green
 		heat_map: dict[str, Any] = {
+			"id": _uid(),
 			"entity_id": entity_id,
 			"as_of_date": as_of_date,
 			"total_risks": len(assessed),
