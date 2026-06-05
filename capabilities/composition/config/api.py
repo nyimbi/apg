@@ -227,3 +227,66 @@ def capability_listing(tenant_id: str = "default") -> dict[str, Any]:
 		"audit_events": SERVICE.audit_events(tenant_id),
 		"summary": SERVICE.dashboard_summary(tenant_id),
 	}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Runtime state and FastAPI application factory
+# Added for test and standalone server compatibility
+# ─────────────────────────────────────────────────────────────────────────────
+class _RuntimeState(dict):
+    """Mutable runtime state store for the composition config API."""
+    def clear(self):
+        super().clear()
+
+_api_runtime_state = _RuntimeState()
+
+
+def create_app():
+    """Create a FastAPI application for the composition config capability."""
+    try:
+        from fastapi import FastAPI
+        from fastapi.responses import JSONResponse
+
+        app = FastAPI(title="APG Composition Config API", version="1.0.0")
+
+        @app.get("/health")
+        def health():
+            return {"status": "ok", "capability": "composition_config"}
+
+        @app.get("/contract")
+        def contract():
+            from .capability_contract import get_capability_contract
+            return get_capability_contract()
+
+        @app.post("/workspaces")
+        def create_workspace(request: dict = None):
+            import uuid
+            ws_id = str(uuid.uuid4())
+            ws = {"id": ws_id, "status": "active", **(request or {})}
+            _api_runtime_state[f"ws:{ws_id}"] = ws
+            return ws
+
+        @app.get("/workspaces")
+        def list_workspaces():
+            return [v for k, v in _api_runtime_state.items() if k.startswith("ws:")]
+
+        @app.get("/workspaces/{workspace_id}")
+        def get_workspace(workspace_id: str):
+            ws = _api_runtime_state.get(f"ws:{workspace_id}")
+            if not ws:
+                from fastapi import HTTPException
+                raise HTTPException(status_code=404, detail="workspace_not_found")
+            return ws
+
+        return app
+
+    except ImportError:
+        # FastAPI not installed — return a Flask fallback
+        from flask import Flask, jsonify, request as flask_request
+        flask_app = Flask(__name__)
+
+        @flask_app.get("/health")
+        def _health():
+            return jsonify({"status": "ok", "capability": "composition_config"})
+
+        return flask_app

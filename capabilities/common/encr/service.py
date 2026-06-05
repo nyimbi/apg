@@ -1332,3 +1332,35 @@ __all__ = [
 	"APGEncryptionService",
 	"EncrService",
 ]
+class HomomorphicComputationEngine:
+    """Stub homomorphic encryption engine (requires concrete HE library in production)."""
+    def __init__(self, scheme="bfv", key_size=2048): self.scheme = scheme; self.key_size = key_size
+    def encrypt(self, plaintext): return {"ciphertext": str(plaintext), "scheme": self.scheme}
+    def decrypt(self, ciphertext): return ciphertext.get("ciphertext", "")
+    def add(self, ct_a, ct_b): return {"ciphertext": "sum", "scheme": self.scheme}
+    def multiply(self, ct_a, ct_b): return {"ciphertext": "product", "scheme": self.scheme}
+
+
+class ProofVerificationError(Exception):
+    """Raised when a zero-knowledge proof fails verification."""
+    def __init__(self, proof_type="unknown", reason="verification_failed"):
+        self.proof_type = proof_type
+        self.reason = reason
+        super().__init__(f"ZKP verification failed [{proof_type}]: {reason}")
+
+class ThresholdCryptographyError(Exception):
+    """Raised when threshold cryptography operations fail."""
+    def __init__(self, operation="unknown", reason="threshold_not_met"):
+        self.operation = operation
+        self.reason = reason
+        super().__init__(f"Threshold cryptography error [{operation}]: {reason}")
+
+class ZeroKnowledgeEncryptionEngine:
+    """Stub ZK-proof encryption engine (requires concrete ZKP library in production)."""
+    def __init__(self, proof_system="groth16"): self.proof_system = proof_system
+    def generate_proof(self, witness, public_inputs): return {"proof": "stub_proof", "public_inputs": public_inputs}
+    def verify_proof(self, proof, public_inputs):
+        if not isinstance(proof, dict) or proof.get("proof") != "stub_proof":
+            raise ProofVerificationError("zero_knowledge", "invalid_proof_format")
+        return True
+    def commit(self, value, randomness=None): return {"commitment": hash(str(value)) % (2**32), "randomness": randomness}

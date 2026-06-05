@@ -79,6 +79,13 @@ class NLPTask(str, Enum):
 	PII_DETECTION           = "pii_detection"
 	QUESTION_ANSWERING      = "question_answering"
 	TEXT_GENERATION         = "text_generation"
+	SEMANTIC_SIMILARITY     = "semantic_similarity"
+	TEXT_CLASSIFICATION     = "text_classification"
+	TEXT_TRANSLATION        = "text_translation"
+	TEXT_CLUSTERING         = "text_clustering"
+	TEMPORAL_EXTRACTION     = "temporal_extraction"
+	EVENT_EXTRACTION        = "event_extraction"
+	SEMANTIC_SEARCH         = "semantic_search"
 
 
 class EntityType(str, Enum):

@@ -10,7 +10,7 @@
   },
   "build": {
     "buildCommand": null,
-    "testCommand": "/Users/nyimbiodero/src/pjs/apg/.venv/bin/python -m pytest \\\n  tests/test_composability_comprehensive.py \\\n  tests/test_integration_finance.py \\\n  tests/test_integration_fintech.py \\\n  tests/test_integration_intelligence.py \\\n  tests/test_integration_platform.py \\\n  -q --tb=no 2>&1 | tail -3",
+    "testCommand": "/Users/nyimbiodero/src/pjs/apg/.venv/bin/python -m pytest tests/ -q --tb=no 2>&1 | tail -5",
     "lintCommand": null,
     "devCommand": null,
     "scripts": {}

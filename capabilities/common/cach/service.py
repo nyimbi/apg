@@ -27,6 +27,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+
+# Optional compression library stubs (installed in production)
+try:
+    import lz4.frame as lz4_frame
+except ImportError:
+    lz4_frame = None  # pip install lz4
+try:
+    import zstandard
+except ImportError:
+    zstandard = None  # pip install zstandard
+
 def uuid7str() -> str:
 	return str(uuid7())
 
@@ -899,3 +910,13 @@ class CacheService:
 		)
 		await self._audit("compliance_report_generated", "system", {"framework": framework})
 		return report
+
+from dataclasses import dataclass, field as _f
+@dataclass
+class CacheServiceConfig:
+    max_size: int = 10000
+    default_ttl: int = 300
+    eviction_policy: str = "lru"
+    enable_compression: bool = False
+    compression_threshold_bytes: int = 1024
+    options: dict = _f(default_factory=dict)
