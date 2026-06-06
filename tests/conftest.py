@@ -99,14 +99,32 @@ def _pop_flask_contexts() -> None:
 		pass
 
 
+def _evict_stale_modules() -> None:
+	"""Remove sys.modules entries whose source file no longer exists.
+
+	CLI tests that use isolated_filesystem() may import capability modules
+	from a temp directory.  When the temp dir is cleaned up, those cached
+	entries become stale and prevent re-importing from the real repo path.
+	"""
+	import importlib
+	stale = [
+		name for name, mod in list(sys.modules.items())
+		if name.startswith("capabilities.")
+		and hasattr(mod, "__spec__")
+		and mod.__spec__ is not None
+		and mod.__spec__.origin is not None
+		and not Path(mod.__spec__.origin).exists()
+	]
+	for name in stale:
+		del sys.modules[name]
+	if stale:
+		importlib.invalidate_caches()
+
+
 @pytest.fixture(autouse=True)
 def _flush_stale_flask_contexts():
-	"""Ensure no stale Flask contexts surround each test.
-
-	Run cleanup BEFORE the test (catches context left by the previous test's
-	teardown chain) AND AFTER the test (catches context created by this test
-	that wasn't popped, e.g. due to test failure).
-	"""
+	"""Ensure clean Flask context and module state around each test."""
 	_pop_flask_contexts()
 	yield
 	_pop_flask_contexts()
+	_evict_stale_modules()
