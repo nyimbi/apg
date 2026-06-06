@@ -22,13 +22,19 @@ ALLOWED_ROOT_TRACKED_FILES = {
 	".gitignore",
 	"LICENSE",
 	"README.md",
+	"PACKAGES.md",
+	"CONTRIBUTING.md",
 	"cli.py",
+	"conftest.py",
+	"docker-compose.yml",
+	"Dockerfile.capability",
+	"Dockerfile.gateway",
 	"pytest.ini",
 	"setup.py",
 	"uuid_extensions.py",
 	"prompt.md",
 }
-ALLOWED_ROOT_MARKDOWN = {"README.md", "PACKAGES.md", "prompt.md"}
+ALLOWED_ROOT_MARKDOWN = {"README.md", "PACKAGES.md", "CONTRIBUTING.md", "prompt.md"}
 SOURCE_ROOT_OPERATIONAL_DOC_DIRECTORIES = {"capabilities", "gen", "mobile_apps"}
 SOURCE_ROOT_OPERATIONAL_DOC_SUFFIXES = (
 	"_COMPLETE.md",
