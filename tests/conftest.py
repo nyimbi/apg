@@ -80,7 +80,12 @@ def context(engine: CompositionEngine):
 
 
 def _pop_flask_contexts() -> None:
-	"""Pop any active Flask request and app contexts using Flask 3.x ContextVars."""
+	"""Reset Flask ContextVars to None so has_request_context() returns False.
+
+	Uses two strategies:
+	1. Call ctx.pop() to trigger proper Flask teardown (teardown_request, etc.)
+	2. Force-reset the ContextVar to None regardless, using _cv_request.set(None)
+	"""
 	try:
 		from flask.globals import _cv_request, _cv_app
 		ctx = _cv_request.get(None)
@@ -89,12 +94,15 @@ def _pop_flask_contexts() -> None:
 				ctx.pop()
 			except Exception:
 				pass
+			# Force-reset even if pop() silently failed
+			_cv_request.set(None)  # type: ignore[arg-type]
 		app_ctx = _cv_app.get(None)
 		if app_ctx is not None:
 			try:
 				app_ctx.pop()
 			except Exception:
 				pass
+			_cv_app.set(None)  # type: ignore[arg-type]
 	except Exception:
 		pass
 
