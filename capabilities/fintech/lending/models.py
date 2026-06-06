@@ -866,3 +866,22 @@ class ErrorResponse(BaseModel):
 	error: str
 	detail: str | None = None
 	code: str | None = None
+
+
+# Re-export domain dataclasses so service.py's package-mode import works
+from ._domain_models import (  # noqa: E402
+    BorrowerProfile,
+    CollectionCase,
+    Disbursement,
+    LendingEvidence,
+    LoanApplication as LoanApplicationDC,
+    LoanOffer as LoanOfferDC,
+    LoanProduct as LoanProductDC,
+    RepaymentSchedule,
+    UnderwritingDecision as UnderwritingDecisionDC,
+)
+# Expose under the names service.py expects
+LoanApplication = LoanApplicationDC
+LoanOffer = LoanOfferDC
+LoanProduct = LoanProductDC
+UnderwritingDecision = UnderwritingDecisionDC
