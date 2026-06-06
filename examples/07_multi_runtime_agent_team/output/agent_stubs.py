@@ -59,36 +59,33 @@ class AgentBase:
 
 
 class Researcher(AgentBase):
-    """Agent stub for Researcher — researcher."""
     name = 'Researcher'
     role = 'researcher'
     model = 'openai:gpt-4.1-mini'
     runtime = 'codex'
     system = 'Gather structured evidence and cite source IDs.'
-    capabilities = []
-    tools = ['web.search', 'docs.read']
+    capabilities = ()
+    tools = ('web.search', 'docs.read')
 
 
 class Coder(AgentBase):
-    """Agent stub for Coder — implementation_engineer."""
     name = 'Coder'
     role = 'implementation_engineer'
     model = 'claude:sonnet'
     runtime = 'claude_code'
     system = 'Implement focused code changes from accepted plans.'
-    capabilities = []
-    tools = ['repo.edit', 'tests.run']
+    capabilities = ()
+    tools = ('repo.edit', 'tests.run')
 
 
 class LocalReviewer(AgentBase):
-    """Agent stub for LocalReviewer — local_review."""
     name = 'LocalReviewer'
     role = 'local_review'
     model = 'ollama:llama3.1'
     runtime = 'ollama'
     system = 'Review diffs locally without sending code to external services.'
-    capabilities = []
-    tools = []
+    capabilities = ()
+    tools = ()
 
 
 # Registry of all declared agents

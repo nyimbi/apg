@@ -59,14 +59,13 @@ class AgentBase:
 
 
 class TriageAgent(AgentBase):
-    """Agent stub for TriageAgent — support_triage."""
     name = 'TriageAgent'
     role = 'support_triage'
     model = 'openai:gpt-4.1-mini'
     runtime = 'codex'
     system = 'Classify incoming tickets and produce a concise next action.'
-    capabilities = []
-    tools = ['tickets.read', 'knowledge.search']
+    capabilities = ()
+    tools = ('tickets.read', 'knowledge.search')
 
 
 # Registry of all declared agents

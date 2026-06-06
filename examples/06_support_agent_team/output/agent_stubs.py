@@ -59,25 +59,23 @@ class AgentBase:
 
 
 class Planner(AgentBase):
-    """Agent stub for Planner — planner."""
     name = 'Planner'
     role = 'planner'
     model = 'openai:gpt-4.1-mini'
     runtime = 'codex'
     system = 'Break the ticket into concrete resolution steps.'
-    capabilities = []
-    tools = ['tickets.read', 'docs.search']
+    capabilities = ()
+    tools = ('tickets.read', 'docs.search')
 
 
 class Writer(AgentBase):
-    """Agent stub for Writer — writer."""
     name = 'Writer'
     role = 'writer'
     model = 'openai:gpt-4.1-mini'
     runtime = 'codex'
     system = 'Write concise customer-facing replies from a plan.'
-    capabilities = []
-    tools = ['tickets.update']
+    capabilities = ()
+    tools = ('tickets.update',)
 
 
 # Registry of all declared agents

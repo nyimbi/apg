@@ -192,26 +192,6 @@
       "docs_url": "docs/tooling.md#semantic-model-contract",
       "file": "procurement_approval_workbench.apg",
       "fixes": [],
-      "message": "Workflow 'ProcurementApproval' should define steps or stages",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
-      },
-      "related_locations": [],
-      "severity": "warning",
-      "title": "Semantic warning"
-    },
-    {
-      "code": "APG0100",
-      "docs_url": "docs/tooling.md#semantic-model-contract",
-      "file": "procurement_approval_workbench.apg",
-      "fixes": [],
       "message": "Capability 'ProcurementWorkbench' requires 'audit_events' which is not declared in this module",
       "range": {
         "end": {
