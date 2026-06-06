@@ -63,3 +63,29 @@ def context(engine: CompositionEngine):
 		project_description="Fixture-backed generated application",
 		author="APG Test Suite",
 	)
+
+
+@pytest.fixture(autouse=True)
+def _flush_stale_flask_contexts():
+	"""Pop any lingering Flask request/app contexts left by previous tests.
+
+	Flask 3.x uses ContextVar — request context leaks between tests when a
+	test_request_context() is pushed but not popped (e.g. on test failure).
+	"""
+	yield
+	try:
+		from flask.globals import _cv_request, _cv_app
+		ctx = _cv_request.get(None)
+		if ctx is not None:
+			try:
+				ctx.pop()
+			except Exception:
+				pass
+		app_ctx = _cv_app.get(None)
+		if app_ctx is not None:
+			try:
+				app_ctx.pop()
+			except Exception:
+				pass
+	except Exception:
+		pass
