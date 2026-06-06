@@ -14,6 +14,7 @@ ALLOWED_ROOT_TRACKED_FILES = {
 	"LICENSE",
 	"README.md",
 	"PACKAGES.md",
+	"CONTRIBUTING.md",
 	"cli.py",
 	"conftest.py",
 	"docker-compose.yml",
@@ -24,7 +25,7 @@ ALLOWED_ROOT_TRACKED_FILES = {
 	"setup.py",
 	"uuid_extensions.py",
 }
-ALLOWED_ROOT_MARKDOWN = {"README.md", "PACKAGES.md", "prompt.md"}
+ALLOWED_ROOT_MARKDOWN = {"README.md", "PACKAGES.md", "CONTRIBUTING.md", "prompt.md"}
 SOURCE_ROOT_OPERATIONAL_DOC_DIRECTORIES = {"capabilities", "gen", "mobile_apps"}
 SOURCE_ROOT_OPERATIONAL_DOC_SUFFIXES = (
 	"_COMPLETE.md",
