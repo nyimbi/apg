@@ -83,7 +83,7 @@ def test_capabilities_scaffold_creates_valid_spec_backed_package():
 	assert report["format"] == "apg.capability-scaffold-report.v1"
 	assert report["ok"] is True
 	assert report["capability"] == "common_demo"
-	assert len(report["written"]) == 13
+	assert len(report["written"]) == 30
 	assert contract_path.name == "capability_contract.py"
 	assert package_artifacts_exist is True
 	validate_contract_shape(contract, contract_path)
