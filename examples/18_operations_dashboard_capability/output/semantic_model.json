@@ -41,12 +41,24 @@
         {
           "action": "require_review",
           "name": "critical_exception_review",
-          "when": "severity == critical"
+          "when": "severity == critical",
+          "when_ast": {
+            "field": "severity",
+            "op": "==",
+            "type": "compare",
+            "value": "critical"
+          }
         },
         {
           "action": "warn",
           "name": "stale_metric_warning",
-          "when": "metric_age_minutes > 15"
+          "when": "metric_age_minutes > 15",
+          "when_ast": {
+            "field": "metric_age_minutes",
+            "op": ">",
+            "type": "compare",
+            "value": 15
+          }
         }
       ],
       "runtime": {},
@@ -131,12 +143,24 @@
         {
           "action": "require_review",
           "name": "critical_exception_review",
-          "when": "severity == critical"
+          "when": "severity == critical",
+          "when_ast": {
+            "field": "severity",
+            "op": "==",
+            "type": "compare",
+            "value": "critical"
+          }
         },
         {
           "action": "warn",
           "name": "stale_metric_warning",
-          "when": "metric_age_minutes > 15"
+          "when": "metric_age_minutes > 15",
+          "when_ast": {
+            "field": "metric_age_minutes",
+            "op": ">",
+            "type": "compare",
+            "value": 15
+          }
         }
       ],
       "theme": {
@@ -162,7 +186,88 @@
     "source": "operations_dashboard_capability.apg",
     "target": "python"
   },
-  "diagnostics": [],
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "operations_dashboard_capability.apg",
+      "fixes": [],
+      "message": "Capability 'OperationsDashboard' requires 'journal_entries' which is not declared in this module",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "operations_dashboard_capability.apg",
+      "fixes": [],
+      "message": "Capability 'OperationsDashboard' requires 'stock_balances' which is not declared in this module",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "operations_dashboard_capability.apg",
+      "fixes": [],
+      "message": "Capability 'OperationsDashboard' requires 'production_oee' which is not declared in this module",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "operations_dashboard_capability.apg",
+      "fixes": [],
+      "message": "Capability 'OperationsDashboard' requires 'forecast_metrics' which is not declared in this module",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
   "flows": {},
   "format": "apg.semantic-model.v1",
   "graphs": {
@@ -221,12 +326,24 @@
     "OperationsDashboard.critical_exception_review": {
       "action": "require_review",
       "name": "critical_exception_review",
-      "when": "severity == critical"
+      "when": "severity == critical",
+      "when_ast": {
+        "field": "severity",
+        "op": "==",
+        "type": "compare",
+        "value": "critical"
+      }
     },
     "OperationsDashboard.stale_metric_warning": {
       "action": "warn",
       "name": "stale_metric_warning",
-      "when": "metric_age_minutes > 15"
+      "when": "metric_age_minutes > 15",
+      "when_ast": {
+        "field": "metric_age_minutes",
+        "op": ">",
+        "type": "compare",
+        "value": 15
+      }
     }
   },
   "security": {},

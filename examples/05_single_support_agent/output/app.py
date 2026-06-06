@@ -472,13 +472,13 @@ def describe_workflow(workflow_name: str) -> Dict[str, Any]:
     defaults = _workflow_defaults(entity)
     steps = _split_workflow_sequence(defaults.get("steps") or flow.get("steps"))
     stages = _split_workflow_sequence(defaults.get("stages") or flow.get("stages"))
-    guards = _workflow_mapping(defaults.get("guards") or defaults.get("guard_rules") or defaults.get("conditions"))
-    assignments = _workflow_mapping(defaults.get("assignments") or defaults.get("assignees") or defaults.get("owners"))
-    timers = _workflow_mapping(defaults.get("timers") or defaults.get("sla") or defaults.get("deadlines"))
-    waits = _workflow_mapping(defaults.get("waits") or defaults.get("event_waits") or defaults.get("wait_for"))
-    retry_policy = _workflow_mapping(defaults.get("retry_policy") or defaults.get("retries"))
-    compensation = _workflow_mapping(defaults.get("compensation") or defaults.get("compensations"))
-    human_tasks = _split_workflow_sequence(defaults.get("human_tasks") or defaults.get("manual_steps"))
+    guards = _workflow_mapping(defaults.get("guards") or flow.get("guards") or defaults.get("guard_rules") or defaults.get("conditions"))
+    assignments = _workflow_mapping(defaults.get("assignments") or flow.get("assignments") or defaults.get("assignees") or defaults.get("owners"))
+    timers = _workflow_mapping(defaults.get("timers") or flow.get("timers") or defaults.get("sla") or defaults.get("deadlines"))
+    waits = _workflow_mapping(defaults.get("waits") or flow.get("waits") or defaults.get("event_waits") or defaults.get("wait_for"))
+    retry_policy = _workflow_mapping(defaults.get("retry_policy") or flow.get("retry_policy") or defaults.get("retries"))
+    compensation = _workflow_mapping(defaults.get("compensation") or flow.get("compensation") or defaults.get("compensations"))
+    human_tasks = _split_workflow_sequence(defaults.get("human_tasks") or flow.get("human_tasks") or defaults.get("manual_steps"))
     transitions = [
         {
             "from": steps[index],

@@ -586,7 +586,7 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 				module.entities.append(self._parse_source_agent(name, body, source_file))
 				continue
 			if kind in {"workflow", "flow"}:
-				module.entities.append(self._parse_source_workflow(name, body, source_file))
+				module.entities.append(self._parse_source_workflow(name, body, source_file, kind=kind))
 				continue
 			properties, methods = self._parse_source_members(body, source_file)
 			entity_type = self._entity_type_for_source_kind(kind)
@@ -999,7 +999,7 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 			rules=_rule_list(props.get("rules", [])),
 		)
 
-	def _parse_source_workflow(self, name: str, body: str, source_file: Optional[str]) -> WorkflowDeclaration:
+	def _parse_source_workflow(self, name: str, body: str, source_file: Optional[str], kind: str = "workflow") -> WorkflowDeclaration:
 		"""Parse workflow { steps: ...; human_tasks: ...; guards: ...; } into a typed state graph."""
 		from .ai_agent_composition import _parse_properties, _string_list
 
@@ -1062,7 +1062,7 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 			return {str(k): str(val) for k, val in v.items()} if isinstance(v, dict) else {}
 
 		return WorkflowDeclaration(
-			entity_type=EntityType.WORKFLOW,
+			entity_type=self._entity_type_for_source_kind(kind),
 			name=name,
 			source_file=source_file,
 			steps_raw=steps_raw,

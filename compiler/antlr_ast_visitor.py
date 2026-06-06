@@ -149,7 +149,7 @@ class APGASTVisitor(apgVisitor):  # type: ignore[misc]
 
 		if kind in {"workflow", "flow"}:
 			return self._builder._parse_source_workflow(
-				name, body_text, self._source_file
+				name, body_text, self._source_file, kind=kind
 			)
 
 		if kind == "agent" and self._builder._is_agent_config_body(body_text):

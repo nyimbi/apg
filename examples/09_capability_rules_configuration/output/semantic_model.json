@@ -41,12 +41,24 @@
         {
           "action": "deny",
           "name": "over_limit",
-          "when": "order_total > credit_limit"
+          "when": "order_total > credit_limit",
+          "when_ast": {
+            "field": "order_total",
+            "op": ">",
+            "type": "compare",
+            "value": "credit_limit"
+          }
         },
         {
           "action": "require_review",
           "name": "manual_review",
-          "when": "risk_score > 0.75"
+          "when": "risk_score > 0.75",
+          "when_ast": {
+            "field": "risk_score",
+            "op": ">",
+            "type": "compare",
+            "value": 0.75
+          }
         }
       ],
       "runtime": {},
@@ -84,12 +96,24 @@
         {
           "action": "deny",
           "name": "over_limit",
-          "when": "order_total > credit_limit"
+          "when": "order_total > credit_limit",
+          "when_ast": {
+            "field": "order_total",
+            "op": ">",
+            "type": "compare",
+            "value": "credit_limit"
+          }
         },
         {
           "action": "require_review",
           "name": "manual_review",
-          "when": "risk_score > 0.75"
+          "when": "risk_score > 0.75",
+          "when_ast": {
+            "field": "risk_score",
+            "op": ">",
+            "type": "compare",
+            "value": 0.75
+          }
         }
       ],
       "version": "1.0.0"
@@ -99,7 +123,28 @@
     "source": "credit_control.apg",
     "target": "python"
   },
-  "diagnostics": [],
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "credit_control.apg",
+      "fixes": [],
+      "message": "Capability 'CreditControl' requires 'audit_events' which is not declared in this module",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
   "flows": {},
   "format": "apg.semantic-model.v1",
   "graphs": {
@@ -158,12 +203,24 @@
     "CreditControl.manual_review": {
       "action": "require_review",
       "name": "manual_review",
-      "when": "risk_score > 0.75"
+      "when": "risk_score > 0.75",
+      "when_ast": {
+        "field": "risk_score",
+        "op": ">",
+        "type": "compare",
+        "value": 0.75
+      }
     },
     "CreditControl.over_limit": {
       "action": "deny",
       "name": "over_limit",
-      "when": "order_total > credit_limit"
+      "when": "order_total > credit_limit",
+      "when_ast": {
+        "field": "order_total",
+        "op": ">",
+        "type": "compare",
+        "value": "credit_limit"
+      }
     }
   },
   "security": {},

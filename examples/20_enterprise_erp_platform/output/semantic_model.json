@@ -60,12 +60,23 @@
         {
           "action": "deny",
           "name": "balanced_journal",
-          "when": "debits != credits"
+          "when": "debits != credits",
+          "when_ast": {
+            "field": "debits",
+            "op": "!=",
+            "type": "compare",
+            "value": "credits"
+          }
         },
         {
           "action": "deny",
           "name": "invoice_requires_order",
-          "when": "order_id missing"
+          "when": "order_id missing",
+          "when_ast": {
+            "field": "order_id",
+            "negated": false,
+            "type": "missing"
+          }
         }
       ],
       "runtime": {},
@@ -122,12 +133,24 @@
         {
           "action": "deny",
           "name": "no_negative_stock",
-          "when": "on_hand - reserved < 0"
+          "when": "on_hand - reserved < 0",
+          "when_ast": {
+            "field": "on_hand",
+            "op": "==",
+            "type": "compare",
+            "value": true
+          }
         },
         {
           "action": "require_review",
           "name": "critical_exception_review",
-          "when": "severity == critical"
+          "when": "severity == critical",
+          "when_ast": {
+            "field": "severity",
+            "op": "==",
+            "type": "compare",
+            "value": "critical"
+          }
         }
       ],
       "runtime": {},
@@ -309,12 +332,23 @@
         {
           "action": "deny",
           "name": "balanced_journal",
-          "when": "debits != credits"
+          "when": "debits != credits",
+          "when_ast": {
+            "field": "debits",
+            "op": "!=",
+            "type": "compare",
+            "value": "credits"
+          }
         },
         {
           "action": "deny",
           "name": "invoice_requires_order",
-          "when": "order_id missing"
+          "when": "order_id missing",
+          "when_ast": {
+            "field": "order_id",
+            "negated": false,
+            "type": "missing"
+          }
         }
       ],
       "theme": {
@@ -353,12 +387,24 @@
         {
           "action": "deny",
           "name": "no_negative_stock",
-          "when": "on_hand - reserved < 0"
+          "when": "on_hand - reserved < 0",
+          "when_ast": {
+            "field": "on_hand",
+            "op": "==",
+            "type": "compare",
+            "value": true
+          }
         },
         {
           "action": "require_review",
           "name": "critical_exception_review",
-          "when": "severity == critical"
+          "when": "severity == critical",
+          "when_ast": {
+            "field": "severity",
+            "op": "==",
+            "type": "compare",
+            "value": "critical"
+          }
         }
       ],
       "theme": {
@@ -452,22 +498,45 @@
     "EnterpriseFinance.balanced_journal": {
       "action": "deny",
       "name": "balanced_journal",
-      "when": "debits != credits"
+      "when": "debits != credits",
+      "when_ast": {
+        "field": "debits",
+        "op": "!=",
+        "type": "compare",
+        "value": "credits"
+      }
     },
     "EnterpriseFinance.invoice_requires_order": {
       "action": "deny",
       "name": "invoice_requires_order",
-      "when": "order_id missing"
+      "when": "order_id missing",
+      "when_ast": {
+        "field": "order_id",
+        "negated": false,
+        "type": "missing"
+      }
     },
     "EnterpriseOperations.critical_exception_review": {
       "action": "require_review",
       "name": "critical_exception_review",
-      "when": "severity == critical"
+      "when": "severity == critical",
+      "when_ast": {
+        "field": "severity",
+        "op": "==",
+        "type": "compare",
+        "value": "critical"
+      }
     },
     "EnterpriseOperations.no_negative_stock": {
       "action": "deny",
       "name": "no_negative_stock",
-      "when": "on_hand - reserved < 0"
+      "when": "on_hand - reserved < 0",
+      "when_ast": {
+        "field": "on_hand",
+        "op": "==",
+        "type": "compare",
+        "value": true
+      }
     }
   },
   "security": {},

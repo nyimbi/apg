@@ -20,7 +20,13 @@
           "action": "deny",
           "name": "period_open",
           "priority": 100,
-          "when": "period.closed"
+          "when": "period.closed",
+          "when_ast": {
+            "field": "period.closed",
+            "op": "==",
+            "type": "compare",
+            "value": true
+          }
         }
       ],
       "components": {
@@ -73,7 +79,13 @@
         {
           "action": "deny",
           "name": "balanced_journal",
-          "when": "debits != credits"
+          "when": "debits != credits",
+          "when_ast": {
+            "field": "debits",
+            "op": "!=",
+            "type": "compare",
+            "value": "credits"
+          }
         }
       ],
       "runtime": {},
@@ -129,7 +141,13 @@
         {
           "action": "deny",
           "name": "balanced_journal",
-          "when": "debits != credits"
+          "when": "debits != credits",
+          "when_ast": {
+            "field": "debits",
+            "op": "!=",
+            "type": "compare",
+            "value": "credits"
+          }
         }
       ],
       "theme": {
@@ -155,7 +173,28 @@
     "source": "finance_general_ledger.apg",
     "target": "python"
   },
-  "diagnostics": [],
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "finance_general_ledger.apg",
+      "fixes": [],
+      "message": "Capability 'GeneralLedger' requires 'audit_events' which is not declared in this module",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
   "flows": {},
   "format": "apg.semantic-model.v1",
   "graphs": {
@@ -214,13 +253,25 @@
     "GeneralLedger.balanced_journal": {
       "action": "deny",
       "name": "balanced_journal",
-      "when": "debits != credits"
+      "when": "debits != credits",
+      "when_ast": {
+        "field": "debits",
+        "op": "!=",
+        "type": "compare",
+        "value": "credits"
+      }
     },
     "GeneralLedger.period_open": {
       "action": "deny",
       "name": "period_open",
       "priority": 100,
-      "when": "period.closed"
+      "when": "period.closed",
+      "when_ast": {
+        "field": "period.closed",
+        "op": "==",
+        "type": "compare",
+        "value": true
+      }
     }
   },
   "security": {},

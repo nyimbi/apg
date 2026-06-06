@@ -61,7 +61,12 @@
         {
           "action": "deny",
           "name": "invoice_requires_order",
-          "when": "order_id missing"
+          "when": "order_id missing",
+          "when_ast": {
+            "field": "order_id",
+            "negated": false,
+            "type": "missing"
+          }
         }
       ],
       "runtime": {},
@@ -129,7 +134,12 @@
         {
           "action": "deny",
           "name": "customer_required",
-          "when": "customer_id missing"
+          "when": "customer_id missing",
+          "when_ast": {
+            "field": "customer_id",
+            "negated": false,
+            "type": "missing"
+          }
         }
       ],
       "runtime": {},
@@ -195,7 +205,12 @@
         {
           "action": "deny",
           "name": "invoice_requires_order",
-          "when": "order_id missing"
+          "when": "order_id missing",
+          "when_ast": {
+            "field": "order_id",
+            "negated": false,
+            "type": "missing"
+          }
         }
       ]
     },
@@ -228,7 +243,12 @@
         {
           "action": "deny",
           "name": "customer_required",
-          "when": "customer_id missing"
+          "when": "customer_id missing",
+          "when_ast": {
+            "field": "customer_id",
+            "negated": false,
+            "type": "missing"
+          }
         }
       ],
       "ui": {
@@ -306,12 +326,22 @@
     "Billing.invoice_requires_order": {
       "action": "deny",
       "name": "invoice_requires_order",
-      "when": "order_id missing"
+      "when": "order_id missing",
+      "when_ast": {
+        "field": "order_id",
+        "negated": false,
+        "type": "missing"
+      }
     },
     "OrderManagement.customer_required": {
       "action": "deny",
       "name": "customer_required",
-      "when": "customer_id missing"
+      "when": "customer_id missing",
+      "when_ast": {
+        "field": "customer_id",
+        "negated": false,
+        "type": "missing"
+      }
     }
   },
   "security": {},
