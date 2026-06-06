@@ -108,24 +108,52 @@ def _pop_flask_contexts() -> None:
 
 
 def _evict_stale_modules() -> None:
-	"""Remove sys.modules entries whose source file no longer exists.
+	"""Remove stale or stub module entries from sys.modules after each test.
 
-	CLI tests that use isolated_filesystem() may import capability modules
-	from a temp directory.  When the temp dir is cleaned up, those cached
-	entries become stale and prevent re-importing from the real repo path.
+	Some tests replace real packages with types.ModuleType stubs (e.g. flask,
+	capabilities.fintech.*) and don't restore them.  This causes subsequent
+	tests to fail with ModuleNotFoundError or ImportError.
+
+	Stubs created via types.ModuleType have __spec__ = None and __file__ = None;
+	real installed packages always have both.  We evict:
+	  1. Known real packages (flask, capabilities.*) that have no __spec__/__file__
+	  2. capabilities.* modules pointing to deleted temp files
 	"""
 	import importlib
-	stale = [
-		name for name, mod in list(sys.modules.items())
-		if name.startswith("capabilities.")
-		and hasattr(mod, "__spec__")
-		and mod.__spec__ is not None
-		and mod.__spec__.origin is not None
-		and not Path(mod.__spec__.origin).exists()
-	]
-	for name in stale:
-		del sys.modules[name]
-	if stale:
+	# Packages that should always have __spec__ and __file__ when genuine
+	_REAL_PREFIXES = ("flask", "werkzeug", "sqlalchemy", "pydantic", "fastapi", "capabilities")
+
+	stale: list[str] = []
+	for name, mod in list(sys.modules.items()):
+		is_real_prefix = any(name == p or name.startswith(p + ".") or name.startswith(p + "_") for p in _REAL_PREFIXES)
+		if not is_real_prefix:
+			continue
+
+		mod_file = getattr(mod, "__file__", None)
+		spec = getattr(mod, "__spec__", None)
+
+		# Stub: real package replaced with types.ModuleType (no __spec__, no __file__)
+		if mod_file is None and spec is None:
+			stale.append(name)
+			continue
+
+		# Deleted file: __spec__.origin points to a temp dir that was cleaned up
+		origin = getattr(spec, "origin", None) if spec else None
+		if origin is not None and not Path(origin).exists():
+			stale.append(name)
+
+	# Also evict any capabilities.fintech/kyc/lending stubs that have __path__=[]
+	for name, mod in list(sys.modules.items()):
+		if name.startswith("capabilities."):
+			path = getattr(mod, "__path__", None)
+			if path is not None and list(path) == []:
+				if name not in stale:
+					stale.append(name)
+
+	stale_set = set(stale)
+	for name in stale_set:
+		sys.modules.pop(name, None)
+	if stale_set:
 		importlib.invalidate_caches()
 
 
