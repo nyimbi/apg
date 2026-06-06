@@ -158,6 +158,25 @@ class AgentTeamDeclaration(EntityDeclaration):
 
 
 @dataclass
+class Transition(ASTNode):
+	"""A single state-machine transition within a workflow."""
+	source: str
+	target: str
+	guard: Optional[str] = None  # raw condition string from guards dict
+
+
+@dataclass
+class WorkflowDeclaration(EntityDeclaration):
+	"""First-class workflow declaration with a typed state graph."""
+	steps_raw: str = ""                              # original "a -> b -> c" string
+	states: List[str] = field(default_factory=list)  # ordered list of state names
+	transitions: List[Transition] = field(default_factory=list)
+	human_tasks: List[str] = field(default_factory=list)
+	guards: Dict[str, str] = field(default_factory=dict)
+	assignments: Dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
 class CapabilityDeclaration(EntityDeclaration):
 	"""First-class composable APG capability declaration"""
 	contract: Dict[str, Any] = field(default_factory=dict)
@@ -491,6 +510,17 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 				parse_tree.source_file = source_file
 				return parse_tree
 			if hasattr(parse_tree, "source_code"):
+				# Prefer the ANTLR visitor when the real parse tree is available
+				# Use ANTLR visitor only when the ANTLR parse was error-free
+				antlr_tree = getattr(parse_tree, "antlr_tree", None)
+				antlr_clean = getattr(parse_tree, "antlr_clean", False)
+				if antlr_tree is not None and antlr_clean:
+					from .antlr_ast_visitor import build_ast_from_antlr
+					antlr_src = getattr(parse_tree, "antlr_source", parse_tree.source_code)
+					result = build_ast_from_antlr(antlr_tree, antlr_src, source_file)
+					if result is not None:
+						return result
+				# Fall back to the regex-based source parser
 				return self._build_source_ast(parse_tree.source_code, source_file)
 			return self.visit(parse_tree)
 		except Exception as e:
@@ -526,6 +556,9 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 				continue
 			if kind == "agent" and self._is_agent_config_body(body):
 				module.entities.append(self._parse_source_agent(name, body, source_file))
+				continue
+			if kind in {"workflow", "flow"}:
+				module.entities.append(self._parse_source_workflow(name, body, source_file))
 				continue
 			properties, methods = self._parse_source_members(body, source_file)
 			entity_type = self._entity_type_for_source_kind(kind)
@@ -936,6 +969,60 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 			memory=memory,
 			configuration=props.get("configuration", {}),
 			rules=_rule_list(props.get("rules", [])),
+		)
+
+	def _parse_source_workflow(self, name: str, body: str, source_file: Optional[str]) -> WorkflowDeclaration:
+		"""Parse workflow { steps: ...; human_tasks: ...; guards: ...; } into a typed state graph."""
+		from .ai_agent_composition import _parse_properties, _string_list
+
+		props = _parse_properties(body)
+
+		# Parse steps string "a -> b -> c" into states + transitions
+		# Handle `steps: str = "..."` — strip any `str =` type annotation prefix
+		steps_val = str(props.get("steps", "")).strip()
+		import re as _re
+		steps_val = _re.sub(r'^[A-Za-z_][A-Za-z0-9_]*\s*=\s*', '', steps_val)
+		steps_raw = steps_val.strip().strip('"\'')
+		states: List[str] = []
+		transitions: List[Transition] = []
+		if steps_raw:
+			parts = [s.strip() for s in steps_raw.split("->") if s.strip()]
+			states = parts
+			for i in range(len(parts) - 1):
+				transitions.append(Transition(source=parts[i], target=parts[i + 1]))
+
+		# Parse guards: {state: "condition"} dict
+		guards_raw = props.get("guards", {})
+		guards: Dict[str, str] = {}
+		if isinstance(guards_raw, dict):
+			for k, v in guards_raw.items():
+				guards[str(k)] = str(v).strip('"\'')
+			# Attach guard conditions to transitions
+			for t in transitions:
+				if t.target in guards:
+					t.guard = guards[t.target]
+
+		# Parse human_tasks: [state, state, ...]
+		human_tasks_raw = props.get("human_tasks", [])
+		human_tasks = _string_list(human_tasks_raw)
+
+		# Parse assignments: {state: role}
+		assignments_raw = props.get("assignments", {})
+		assignments: Dict[str, str] = {}
+		if isinstance(assignments_raw, dict):
+			for k, v in assignments_raw.items():
+				assignments[str(k)] = str(v)
+
+		return WorkflowDeclaration(
+			entity_type=EntityType.WORKFLOW,
+			name=name,
+			source_file=source_file,
+			steps_raw=steps_raw,
+			states=states,
+			transitions=transitions,
+			human_tasks=human_tasks,
+			guards=guards,
+			assignments=assignments,
 		)
 
 	def _parse_source_members(self, body: str, source_file: Optional[str]):

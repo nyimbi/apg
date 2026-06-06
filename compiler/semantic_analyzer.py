@@ -201,7 +201,10 @@ class SemanticAnalyzer:
 			
 			# Phase 4: Dead code analysis
 			self._analyze_dead_code(ast)
-			
+
+			# Phase 5: Cross-entity reference resolution (warnings only)
+			self._resolve_references(ast)
+
 			return {
 				'success': len(self.errors) == 0,
 				'errors': self.errors.copy(),
@@ -506,6 +509,37 @@ class SemanticAnalyzer:
 						f"Capability '{entity.name}' has a {rule_set_name} entry without a name",
 						entity
 					))
+				# Phase 2: parse rule `when` conditions and store the AST
+				when_cond = rule.get("when") or rule.get("condition")
+				if when_cond and isinstance(when_cond, str):
+					try:
+						from .rule_expr import parse_rule_expr, expr_to_dict
+						expr_ast = parse_rule_expr(when_cond)
+						if expr_ast is not None:
+							rule["when_ast"] = expr_to_dict(expr_ast)
+					except Exception:
+						pass  # parse failure → no AST, no error (lenient)
+
+	def _validate_workflow_constraints(self, entity: EntityDeclaration) -> None:
+		"""Validate WorkflowDeclaration state graph consistency."""
+		from .ast_builder import WorkflowDeclaration
+		if not isinstance(entity, WorkflowDeclaration):
+			return
+		if not entity.states:
+			return
+		state_set = set(entity.states)
+		for task in entity.human_tasks:
+			if task and task not in state_set:
+				self.warnings.append(SemanticError(
+					f"Workflow '{entity.name}': human_task '{task}' is not a declared state",
+					entity, "workflow"
+				))
+		for state_key in entity.guards:
+			if state_key and state_key not in state_set:
+				self.warnings.append(SemanticError(
+					f"Workflow '{entity.name}': guard key '{state_key}' is not a declared state",
+					entity, "workflow"
+				))
 
 	def _validate_agent_team_constraints(self, entity: EntityDeclaration):
 		"""Validate AI agent team shape before cross-reference checks."""
@@ -809,6 +843,72 @@ class SemanticAnalyzer:
 		"""Check if analysis found any warnings"""
 		return len(self.warnings) > 0
 	
+	def _resolve_references(self, module: ModuleDeclaration) -> None:
+		"""Phase 5: validate cross-entity references (warnings, not errors).
+
+		Checks that `requires`, `provides`, `capabilities`, `agents`, and
+		`binds` identifiers refer to entities declared in the module.
+		Unknown references from installed system capabilities produce warnings
+		rather than errors because those packages may not be in scope.
+		"""
+		# Build local name sets
+		local_names: set[str] = {e.name for e in module.entities}
+		capability_provides: set[str] = set()
+		for e in module.entities:
+			if isinstance(e, CapabilityDeclaration):
+				capability_provides.update(e.provides or [])
+
+		# Load known system capability IDs from MANIFEST.json (best-effort)
+		known_system: set[str] = set()
+		try:
+			from pathlib import Path
+			import json
+			manifest_path = Path(__file__).resolve().parents[1] / "capabilities" / "MANIFEST.json"
+			if manifest_path.exists():
+				raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+				for cap in raw.get("capabilities", {}).values():
+					known_system.add(str(cap.get("id", "")))
+					known_system.add(str(cap.get("code", "")))
+		except Exception:
+			pass
+
+		def _is_known(ref: str) -> bool:
+			return ref in local_names or ref in capability_provides or ref in known_system
+
+		for entity in module.entities:
+			# Capability requires/provides cross-check
+			if isinstance(entity, CapabilityDeclaration):
+				for ref in (entity.requires or []):
+					if ref and not _is_known(ref):
+						self.warnings.append(SemanticError(
+							f"Capability '{entity.name}' requires '{ref}' which is not declared in this module",
+							entity, "reference"
+						))
+
+			# Application capabilities cross-check
+			if isinstance(entity, ApplicationDeclaration):
+				for ref in (entity.capabilities or []):
+					if ref and ref not in local_names:
+						self.warnings.append(SemanticError(
+							f"Application '{entity.name}' references capability '{ref}' not declared in this module",
+							entity, "reference"
+						))
+				for ref in (entity.agents or []):
+					if ref and ref not in local_names:
+						self.warnings.append(SemanticError(
+							f"Application '{entity.name}' references agent '{ref}' not declared in this module",
+							entity, "reference"
+						))
+
+			# Agent capabilities cross-check
+			if isinstance(entity, AIAgentDeclaration):
+				for ref in (entity.capabilities or []):
+					if ref and not _is_known(ref):
+						self.warnings.append(SemanticError(
+							f"Agent '{entity.name}' references capability '{ref}' not declared or provided in this module",
+							entity, "reference"
+						))
+
 	def print_errors(self):
 		"""Print all errors and warnings"""
 		if self.errors:

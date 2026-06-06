@@ -55,12 +55,72 @@ class APGErrorListener(ErrorListener):
 		self.errors.append(error)
 
 
-@dataclass
+def _strip_comments_preserve_positions(source: str) -> str:
+	"""Replace APG // comment content with spaces to preserve character positions.
+
+	The ANTLR grammar has a lexer bug: FLOORDIV ('//' operator) is defined
+	before COMMENT ('//' line comment), so ANTLR treats '//' as a FLOORDIV
+	token instead of a comment start. We pre-strip comments here so the ANTLR
+	parser never sees comment text. Positions are preserved so that
+	ctx.start.start / ctx.stop.stop still index into a same-length string.
+	"""
+	result = list(source)
+	i = 0
+	in_string: str | None = None
+	while i < len(source):
+		c = source[i]
+		if in_string:
+			if c == "\\" and in_string != "":
+				i += 2
+				continue
+			if c == in_string:
+				in_string = None
+		elif c in ('"', "'"):
+			in_string = c
+		elif c == "/" and i + 1 < len(source) and source[i + 1] == "/":
+			# replace // through end of line with spaces
+			while i < len(source) and source[i] != "\n":
+				result[i] = " "
+				i += 1
+			continue
+		elif c == "/" and i + 1 < len(source) and source[i + 1] == "*":
+			# replace /* ... */ with spaces
+			result[i] = " "
+			result[i + 1] = " "
+			i += 2
+			while i < len(source) - 1:
+				if source[i] == "*" and source[i + 1] == "/":
+					result[i] = " "
+					result[i + 1] = " "
+					i += 2
+					break
+				result[i] = " " if source[i] != "\n" else "\n"
+				i += 1
+			continue
+		elif c == "#":
+			# Python-style comment
+			while i < len(source) and source[i] != "\n":
+				result[i] = " "
+				i += 1
+			continue
+		i += 1
+	return "".join(result)
+
+
 class APGSourceParseTree:
 	"""Source-backed parse tree used by the compatibility parser path."""
 
 	source_code: str
 	source_name: str
+	antlr_tree: Any = None       # real ANTLR ProgramContext, set by parse_string
+	antlr_source: str = ""       # comment-stripped source aligned with ANTLR token positions
+
+	def __init__(self, source_code: str, source_name: str) -> None:
+		self.source_code = source_code
+		self.source_name = source_name
+		self.antlr_tree = None
+		self.antlr_source = source_code  # default: same as original
+		self.antlr_clean = False  # True only when ANTLR parsed with zero errors
 
 	def getText(self) -> str:
 		return self.source_code
@@ -143,9 +203,12 @@ class APGParser:
 
 		# Reset error listener
 		self.error_listener.errors.clear()
-		
+
+		# Strip // comments before ANTLR so FLOORDIV lexer rule doesn't shadow them
+		antlr_source = _strip_comments_preserve_positions(source_code)
+
 		# Create input stream and lexer
-		input_stream = InputStream(source_code)
+		input_stream = InputStream(antlr_source)
 		lexer = apgLexer(input_stream)
 		lexer.removeErrorListeners()
 		lexer.addErrorListener(self.error_listener)
@@ -163,6 +226,9 @@ class APGParser:
 			self._last_tokens = token_stream
 			
 			compat_tree = APGSourceParseTree(source_code, source_name)
+			compat_tree.antlr_tree = parse_tree
+			compat_tree.antlr_source = antlr_source
+			compat_tree.antlr_clean = len(self.error_listener.errors) == 0
 			compat_errors = self._source_compatibility_errors(source_code, source_name)
 			errors = compat_errors
 

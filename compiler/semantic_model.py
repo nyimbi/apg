@@ -612,7 +612,19 @@ def _view_model(entity: EntityDeclaration) -> dict[str, Any]:
 
 
 def _flow_model(entity: EntityDeclaration) -> dict[str, Any]:
-	return {**_generic_entity_model(entity), "states": [], "transitions": []}
+	from .ast_builder import WorkflowDeclaration
+	base = {**_generic_entity_model(entity), "states": [], "transitions": []}
+	if isinstance(entity, WorkflowDeclaration):
+		base["states"] = list(entity.states)
+		base["transitions"] = [
+			{"source": t.source, "target": t.target, "guard": t.guard}
+			for t in entity.transitions
+		]
+		base["human_tasks"] = list(entity.human_tasks)
+		base["guards"] = dict(entity.guards)
+		base["assignments"] = dict(entity.assignments)
+		base["steps_raw"] = entity.steps_raw
+	return base
 
 
 def _generic_entity_model(entity: EntityDeclaration) -> dict[str, Any]:
