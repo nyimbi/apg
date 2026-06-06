@@ -82,6 +82,7 @@ def test_default_python_generation_integrates_agents_and_capabilities():
     assert set(files) == {
         "README.md",
         "__init__.py",
+        "agent_stubs.py",
         "ai_agents.py",
         "apg_capabilities.py",
         "app.py",
