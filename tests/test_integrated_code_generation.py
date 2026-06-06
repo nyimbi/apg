@@ -80,6 +80,7 @@ def test_default_python_generation_integrates_agents_and_capabilities():
     files = generator.generate(_composition_module())
 
     assert set(files) == {
+        "README.md",
         "__init__.py",
         "ai_agents.py",
         "apg_capabilities.py",
