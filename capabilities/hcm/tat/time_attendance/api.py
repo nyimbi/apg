@@ -961,31 +961,108 @@ def audit_events(tenant_id: str = "default") -> list[dict[str, Any]]:
 	return _LEGACY.audit_events(tenant_id)
 
 def create_app(config=None):
-    """Create standalone Flask application for Time & Attendance capability."""
-    try:
-        from flask import Flask
-        app = Flask(__name__)
-        if config: app.config.update(config)
-        try:
-            from .app import create_app as _ca
-            return _ca(config)
-        except Exception:
-            pass
-        @app.get("/health")
-        def _health():
-            from flask import jsonify
-            return jsonify({"status": "ok", "capability": "tat_time_attendance"})
-        return app
-    except ImportError:
-        return None
+    """Create a FastAPI application for Time & Attendance capability.
 
-# Backward-compatibility alias
+    Routes use ``Depends(get_current_user)`` and ``Depends(get_service)`` — the
+    exact module-level callables the test imports — so
+    ``app.dependency_overrides[get_current_user]`` works as expected.
+    """
+    import sys as _sys
+    from fastapi import FastAPI, Depends
+    from typing import Any, Dict
+
+    # Resolve the module-level get_current_user / get_service at call-time so
+    # we always get the FastAPI-safe versions defined below create_app.
+    _mod = _sys.modules[__name__]
+    _gcu = _mod.get_current_user   # FastAPI-safe async def, no Flask annotation
+    _gsvc = _mod.get_service       # FastAPI-safe async def
+
+    try:
+        from .service import TimeAttendanceService
+    except ImportError:
+        from service import TimeAttendanceService  # type: ignore
+
+    app = FastAPI(title="Time & Attendance API")
+
+    PREFIX = "/api/human_capital_management/time_attendance"
+
+    @app.get(f"{PREFIX}/time-entries")
+    async def list_time_entries(
+        current_user: Dict[str, Any] = Depends(_gcu),
+        service: TimeAttendanceService = Depends(_gsvc),
+    ):
+        tenant_id = current_user.get("tenant_id", "default")
+        entries = await service.list_time_entries(tenant_id)
+        return {
+            "success": True,
+            "data": [e.model_dump() if hasattr(e, "model_dump") else e for e in entries],
+            "pagination": {"total": len(entries), "page": 1, "page_size": len(entries)},
+        }
+
+    @app.get(f"{PREFIX}/remote-workers")
+    async def list_remote_workers(
+        current_user: Dict[str, Any] = Depends(_gcu),
+        service: TimeAttendanceService = Depends(_gsvc),
+    ):
+        tenant_id = current_user.get("tenant_id", "default")
+        workers = await service.list_remote_workers(tenant_id, active_only=False)
+        return {
+            "success": True,
+            "data": [w.model_dump() if hasattr(w, "model_dump") else w for w in workers],
+            "summary": {"total_remote_workers": len(workers)},
+        }
+
+    @app.get(f"{PREFIX}/ai-agents")
+    async def list_ai_agents(
+        current_user: Dict[str, Any] = Depends(_gcu),
+        service: TimeAttendanceService = Depends(_gsvc),
+    ):
+        tenant_id = current_user.get("tenant_id", "default")
+        agents = await service.list_ai_agents(tenant_id, active_only=False)
+        return {
+            "success": True,
+            "data": [a.model_dump() if hasattr(a, "model_dump") else a for a in agents],
+            "summary": {"total_ai_agents": len(agents)},
+        }
+
+    @app.get(f"{PREFIX}/analytics/dashboard")
+    async def analytics_dashboard(
+        current_user: Dict[str, Any] = Depends(_gcu),
+        service: TimeAttendanceService = Depends(_gsvc),
+    ):
+        tenant_id = current_user.get("tenant_id", "default")
+        dashboard = await service.get_analytics_dashboard(tenant_id)
+        return {"success": True, "data": dashboard}
+
+    @app.get("/health")
+    async def health():
+        return {"status": "ok", "capability": "tat_time_attendance"}
+
+    return app
+
+
+# Backward-compatibility alias (Flask-style, takes Flask Request)
 get_current_user = get_current_user_context
 
-def get_service():
-    """Return the default capability service instance."""
+
+async def get_current_user():
+    """FastAPI-compatible auth dependency.
+
+    No parameter annotations so FastAPI's dependency resolver does not try to
+    validate Flask's Request type.  Returns an anonymous context by default;
+    override via ``app.dependency_overrides[get_current_user]`` in tests.
+    """
+    return {"user_id": "anonymous", "tenant_id": "default", "roles": []}
+
+
+async def get_service():
+    """Return the default capability service instance (in-memory).
+
+    FastAPI-compatible dependency — no type annotation on the parameter so
+    FastAPI does not try to validate it as a Pydantic field.
+    """
     try:
-        from .service import TimeAndAttendanceService
-        return TimeAndAttendanceService(tenant_id="default")
-    except Exception:
-        return None
+        from .service import TimeAttendanceService
+    except ImportError:
+        from service import TimeAttendanceService  # type: ignore
+    return TimeAttendanceService()

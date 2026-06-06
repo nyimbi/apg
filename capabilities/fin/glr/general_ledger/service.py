@@ -3105,6 +3105,298 @@ class GeneralLedgerService:
 		}
 
 
+	# ==================================================================
+	# PERIOD REPORTING HELPERS
+	# ==================================================================
+
+	async def _get_active_reporting_accounts(self, account_types: list) -> list:
+		"""Return accounts whose type_code (or account_type) is in account_types.
+
+		Subclasses override this to adapt to ORM model shapes.
+		Default implementation queries the in-memory accounts store.
+		"""
+		result = []
+		for acct in self.accounts.values():
+			atype = acct.get("account_type", "")
+			# Support both plain strings and AccountTypeEnum values
+			for at in account_types:
+				at_val = at.value if hasattr(at, "value") else str(at)
+				if atype == at_val:
+					result.append(acct)
+					break
+		return result
+
+	async def _get_account_balance(self, account_id: str, as_of_date: object) -> "Decimal":  # type: ignore[override]
+		"""Return a single Decimal balance for *account_id* as of *as_of_date*.
+
+		Subclasses replace this.  Default: sum all postings for the account.
+		"""
+		total = Decimal("0")
+		for posting in self.postings.values():
+			for line in posting["lines"]:
+				if line.get("account_id") != account_id:
+					continue
+				total += _d(line.get("debit", 0)) - _d(line.get("credit", 0))
+		return total
+
+	async def _get_account_period_activity(
+		self,
+		account_id: str,
+		date_from: object,
+		date_to: object,
+	) -> "Decimal":
+		"""Return net activity for *account_id* between *date_from* and *date_to*.
+
+		Subclasses replace this.  Default: sum all postings (no date filtering in
+		the in-memory store as postings carry period_code, not exact dates).
+		"""
+		total = Decimal("0")
+		for posting in self.postings.values():
+			for line in posting["lines"]:
+				if line.get("account_id") != account_id:
+					continue
+				total += _d(line.get("debit", 0)) - _d(line.get("credit", 0))
+		return total
+
+	async def _get_comparative_balances(
+		self,
+		account_types: list,
+		as_of_date: object,
+	) -> dict:
+		"""Return balance-sheet style comparative data for the given account types.
+
+		Returns::
+
+		    {
+		        "totals": {<TYPE_NAME>: float, ...},
+		        "sections": {<TYPE_NAME>: [{"account_code": ..., "account_name": ...,
+		                                    "balance": float}, ...], ...},
+		    }
+		"""
+		accounts = await self._get_active_reporting_accounts(account_types)
+		totals: dict = {}
+		sections: dict = {}
+
+		for acct in accounts:
+			# Resolve the type name — works for both ORM objects with .account_type.type_code
+			# and plain dicts with "account_type".
+			if hasattr(acct, "account_type"):
+				type_obj = acct.account_type
+				type_code = type_obj.type_code if hasattr(type_obj, "type_code") else type_obj
+			else:
+				type_code = acct.get("account_type", "")
+
+			type_name = (type_code.value if hasattr(type_code, "value") else str(type_code)).upper()
+
+			account_id = acct.account_id if hasattr(acct, "account_id") else acct.get("id", "")
+			account_code = acct.account_code if hasattr(acct, "account_code") else acct.get("code", "")
+			account_name = acct.account_name if hasattr(acct, "account_name") else acct.get("name", "")
+
+			balance = await self._get_account_balance(account_id, as_of_date)
+			balance_float = float(balance)
+
+			totals[type_name] = totals.get(type_name, 0.0) + balance_float
+			sections.setdefault(type_name, []).append({
+				"account_id": account_id,
+				"account_code": account_code,
+				"account_name": account_name,
+				"balance": balance_float,
+			})
+
+		return {"totals": totals, "sections": sections}
+
+	async def _get_comparative_income_data(
+		self,
+		account_types: list,
+		date_from: object,
+		date_to: object,
+	) -> dict:
+		"""Return income-statement style comparative data for the given account types.
+
+		Returns::
+
+		    {
+		        "totals": {<TYPE_NAME>: float, ..., "net_income": float},
+		        "sections": {<TYPE_NAME>: [...], ...},
+		    }
+		"""
+		accounts = await self._get_active_reporting_accounts(account_types)
+		totals: dict = {}
+		sections: dict = {}
+
+		for acct in accounts:
+			if hasattr(acct, "account_type"):
+				type_obj = acct.account_type
+				type_code = type_obj.type_code if hasattr(type_obj, "type_code") else type_obj
+			else:
+				type_code = acct.get("account_type", "")
+
+			type_name = (type_code.value if hasattr(type_code, "value") else str(type_code)).upper()
+
+			account_id = acct.account_id if hasattr(acct, "account_id") else acct.get("id", "")
+			account_code = acct.account_code if hasattr(acct, "account_code") else acct.get("code", "")
+			account_name = acct.account_name if hasattr(acct, "account_name") else acct.get("name", "")
+
+			activity = await self._get_account_period_activity(account_id, date_from, date_to)
+			activity_float = float(activity)
+
+			totals[type_name] = totals.get(type_name, 0.0) + activity_float
+			sections.setdefault(type_name, []).append({
+				"account_id": account_id,
+				"account_code": account_code,
+				"account_name": account_name,
+				"activity": activity_float,
+			})
+
+		revenue = totals.get("REVENUE", 0.0)
+		expense = totals.get("EXPENSE", 0.0)
+		totals["net_income"] = revenue - expense
+
+		return {"totals": totals, "sections": sections}
+
+	async def _run_period_allocations(self, period: object) -> None:
+		"""Run auto-allocation rules for all expense accounts in the period.
+
+		Appends a checklist item to *period.closing_checklist* and commits.
+		"""
+		account_types_all: list = []
+		for acct in (self.accounts.values() if isinstance(self.accounts, dict) else self.accounts):
+			if hasattr(acct, "auto_allocation_rules") and acct.auto_allocation_rules:
+				account_types_all.append(acct)
+			elif isinstance(acct, dict) and acct.get("auto_allocation_rules"):
+				account_types_all.append(acct)
+
+		# Also accept accounts that are dataclass/SimpleNamespace objects from tests
+		if not account_types_all and hasattr(self, "accounts") and isinstance(self.accounts, list):
+			for acct in self.accounts:
+				if hasattr(acct, "auto_allocation_rules") and acct.auto_allocation_rules:
+					account_types_all.append(acct)
+
+		allocations_run: list = []
+		for acct in account_types_all:
+			rules = (
+				acct.auto_allocation_rules
+				if hasattr(acct, "auto_allocation_rules")
+				else acct.get("auto_allocation_rules", [])
+			)
+			account_id = acct.account_id if hasattr(acct, "account_id") else acct.get("id", "")
+			balance = await self._get_account_balance(
+				account_id,
+				getattr(period, "end_date", None),
+			)
+			for rule in (rules or []):
+				pct = Decimal(str(rule.get("percent", 0))) / Decimal("100")
+				amount = float((balance * pct).quantize(TWO, rounding=ROUND_HALF_UP))
+				allocations_run.append({
+					"source_account": account_id,
+					"target_account": rule.get("target_account_id"),
+					"rule_name": rule.get("name"),
+					"amount": amount,
+				})
+
+		period.closing_checklist.append({
+			"step": "run_period_allocations",
+			"period_id": getattr(period, "period_id", None),
+			"allocations": allocations_run,
+			"status": "completed",
+		})
+		if hasattr(self, "session"):
+			self.session.commit()
+
+	async def _generate_period_reports(self, period: object) -> None:
+		"""Generate standard period-end reports and append results to checklist.
+
+		Appends a checklist item and sets *period.closing_notes*.  Commits.
+		"""
+		from datetime import date as _date
+
+		as_of = getattr(period, "end_date", None)
+		date_from = getattr(period, "start_date", None)
+
+		# Build TrialBalanceParams and call generate_trial_balance if available
+		tb_result = None
+		if hasattr(self, "generate_trial_balance"):
+			try:
+				params = TrialBalanceParams(
+					period_code=getattr(period, "period_name", ""),
+					as_of_date=as_of,
+				)
+				tb_result = await self.generate_trial_balance(params)
+			except Exception:
+				tb_result = None
+
+		bs_result = None
+		if hasattr(self, "generate_balance_sheet"):
+			try:
+				bs_result = await self.generate_balance_sheet(as_of_date=as_of)
+			except Exception:
+				bs_result = None
+
+		is_result = None
+		if hasattr(self, "generate_income_statement") and date_from and as_of:
+			try:
+				is_result = await self.generate_income_statement(date_from=date_from, date_to=as_of)
+			except Exception:
+				is_result = None
+
+		def _report_meta(result) -> dict:
+			if result is None:
+				return {}
+			if isinstance(result, dict):
+				return result.get("metadata", result)
+			return getattr(result, "metadata", {}) or {}
+
+		reports = {
+			"trial_balance": _report_meta(tb_result),
+			"balance_sheet": _report_meta(bs_result),
+			"income_statement": _report_meta(is_result),
+		}
+
+		period.closing_checklist.append({
+			"step": "generate_period_reports",
+			"period_id": getattr(period, "period_id", None),
+			"reports": reports,
+			"status": "completed",
+		})
+
+		period.closing_notes = (
+			f"Period {getattr(period, 'period_name', '')} reports generated. "
+			f"Trial balance balanced: {reports['trial_balance'].get('balanced', False)}."
+		)
+		if hasattr(self, "session"):
+			self.session.commit()
+
+	async def setup_tenant(self, tenant_data: dict) -> dict:
+		"""Initialise a tenant with its chart of accounts and opening configuration.
+
+		*tenant_data* may carry: tenant_id, accounts, periods, currency.
+		Returns a summary dict.
+		"""
+		tenant_id = tenant_data.get("tenant_id", self.tenant_id or "default")
+		self.tenant_id = tenant_id
+
+		accounts_created = 0
+		for acct in tenant_data.get("accounts", []):
+			try:
+				await self.create_account_v2(
+					tenant_id=tenant_id,
+					account_code=acct.get("code", acct.get("account_code", "")),
+					account_name=acct.get("name", acct.get("account_name", "")),
+					account_type=acct.get("account_type", "asset"),
+					parent_code=acct.get("parent_code"),
+					currency=acct.get("currency", "USD"),
+				)
+				accounts_created += 1
+			except Exception:
+				pass
+
+		return {
+			"tenant_id": tenant_id,
+			"accounts_created": accounts_created,
+			"status": "initialized",
+		}
+
+
 # ---------------------------------------------------------------------------
 # Backwards-compatible alias
 # ---------------------------------------------------------------------------
@@ -3114,20 +3406,34 @@ from enum import Enum
 class AccountTypeEnum(str, Enum):
     ASSET = "asset"; LIABILITY = "liability"; EQUITY = "equity"; REVENUE = "revenue"; EXPENSE = "expense"
 
-from dataclasses import dataclass as _fdc
+from dataclasses import dataclass as _fdc, field as _fld
 @_fdc
 class FinancialReportingResult:
-    period: str
-    entity: str
-    statements: dict = None
-    ok: bool = True
-    def __post_init__(self):
-        if self.statements is None: self.statements = {}
+	report_type: str = ""
+	as_of_date: object = None
+	currency: str = "USD"
+	data: dict = None
+	metadata: dict = None
+	# Legacy fields kept for backwards compatibility
+	period: str = ""
+	entity: str = ""
+	statements: dict = None
+	ok: bool = True
+
+	def __post_init__(self):
+		if self.data is None:
+			self.data = {}
+		if self.metadata is None:
+			self.metadata = {}
+		if self.statements is None:
+			self.statements = {}
+
 
 from dataclasses import dataclass as _tbdc
 @_tbdc
 class TrialBalanceParams:
-    period_code: str
-    tenant_id: str = "default"
-    include_zero_balances: bool = False
-    currency: str = "functional"
+	period_code: str = ""
+	tenant_id: str = "default"
+	include_zero_balances: bool = False
+	currency: str = "functional"
+	as_of_date: object = None

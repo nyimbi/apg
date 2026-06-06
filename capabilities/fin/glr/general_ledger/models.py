@@ -584,3 +584,28 @@ class GLListResponse(BaseModel):
 	total: int
 	page: int = 1
 	page_size: int = 50
+
+
+# ---------------------------------------------------------------------------
+# CF-prefixed canonical aliases (capability-framework naming convention)
+# ---------------------------------------------------------------------------
+
+class CFGLJournalLine(GLJournalLineCreate):
+	"""Canonical alias for a GL journal line used in the capability framework."""
+	pass
+
+
+class CFGLJournalEntry(GLJournalEntryCreate):
+	"""Canonical alias for a GL journal entry used in the capability framework."""
+	pass
+
+
+class CFGLPosting(GLJournalEntryResponse):
+	"""Canonical alias for a posted GL journal entry used in the capability framework."""
+	pass
+
+
+# Short aliases that tests and integration code reference by the unprefixed name.
+GLJournalEntry = CFGLJournalEntry
+GLJournalLine = CFGLJournalLine
+GLPosting = CFGLPosting

@@ -183,6 +183,7 @@ class PythonCodeGenerator:
 			"app.py": self._generate_python_app(ast),
 			"__init__.py": self._generate_package_init(ast),
 			"requirements.txt": self._generate_python_requirements(),
+			"README.md": self._generate_python_readme(ast),
 		}
 		files.update(self._generate_ai_agent_files(ast))
 		files.update(self._generate_application_files(ast))

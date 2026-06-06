@@ -741,25 +741,86 @@ class ConfigFormat(str, Enum):
     ENV = "env"
     TOML = "toml"
 
+import json as _json
 from typing import Any as _CAny
-from dataclasses import dataclass as _Cdc
+from dataclasses import dataclass as _Cdc, field as _Cff
+from datetime import datetime as _Cdt
+
 
 @_Cdc
 class ConfigValue:
-    key: str
-    value: _CAny
-    namespace: str = "default"
-    tenant_id: str = "default"
-    data_type: str = "string"
+	value: _CAny
+	raw_value: str = ""
+	format: "ConfigFormat" = None  # type: ignore[assignment]
+	encrypted: bool = False
+	version: int = 1
+	checksum: str = ""
+	expires_at: _Cdt | None = None
+	metadata: dict = _Cff(default_factory=dict)
+	# legacy / optional fields kept for backward compat
+	key: str = ""
+	namespace: str = "default"
+	tenant_id: str = "default"
+	data_type: str = "string"
+
 
 class RedisConfigStorage:
-    """In-memory Redis-style config storage stub."""
-    def __init__(self, *args, **kwargs): self._data = {}
-    def get(self, key, default=None): return self._data.get(key, default)
-    def set(self, key, value, ex=None): self._data[key] = value
-    def delete(self, key): self._data.pop(key, None)
-    def exists(self, key): return key in self._data
-    def keys(self, pattern="*"): return list(self._data.keys())
+	"""Async-compatible Redis config storage that delegates to any redis-like client."""
+
+	def __init__(self, client: _CAny) -> None:
+		self._client = client
+		self._version_counter: dict[str, int] = {}
+
+	async def get(self, key: str) -> "ConfigValue | None":
+		raw = await self._client.get(key)
+		if raw is None:
+			return None
+		try:
+			data = _json.loads(raw)
+		except (_json.JSONDecodeError, TypeError):
+			data = {}
+		fmt_val = data.get("format")
+		fmt = None
+		try:
+			fmt = ConfigFormat(fmt_val) if fmt_val else ConfigFormat.JSON
+		except Exception:
+			fmt = ConfigFormat.JSON
+		return ConfigValue(
+			value=data.get("value"),
+			raw_value=data.get("raw_value", ""),
+			format=fmt,
+			encrypted=data.get("encrypted", False),
+			version=data.get("version", 1),
+			checksum=data.get("checksum", ""),
+			expires_at=None,
+			metadata=data.get("metadata", {}),
+		)
+
+	async def set(self, key: str, value: "ConfigValue") -> int:
+		self._version_counter[key] = self._version_counter.get(key, 0) + 1
+		version = self._version_counter[key]
+		raw_value = value.raw_value
+		if not raw_value and value.value is not None:
+			raw_value = _json.dumps(value.value)
+		payload = _json.dumps({
+			"value": value.value,
+			"raw_value": raw_value,
+			"format": value.format.value if value.format else "json",
+			"encrypted": value.encrypted,
+			"version": version,
+			"checksum": value.checksum,
+			"metadata": value.metadata,
+		})
+		await self._client.set(key, payload)
+		return version
+
+	async def delete(self, key: str) -> bool:
+		result = await self._client.delete(key)
+		return bool(result)
+
+	async def exists(self, key: str) -> bool:
+		val = await self._client.get(key)
+		return val is not None
 
 
 # ── Auto-generated expansion methods ────────────────────────────────────────

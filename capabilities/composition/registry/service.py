@@ -690,6 +690,145 @@ class CompositionRegistryService:
 	def list_records(self, tenant_id: str = "default") -> list[dict[str, Any]]:
 		return self.list_capabilities(tenant_id)
 
+	# ------------------------------------------------------------------ metadata helpers
+
+	def _extract_string_value(self, line: str) -> str:
+		"""Extract the string literal value from a line like ``__key__ = "value"``."""
+		for quote in ('"', "'"):
+			start = line.find(quote)
+			if start != -1:
+				end = line.find(quote, start + 1)
+				if end != -1:
+					return line[start + 1:end]
+		return ""
+
+	def _extract_list_value(self, text: str, default: str) -> list[str]:
+		"""Extract a list of string literals from a possibly-multiline assignment block."""
+		import re
+		# grab everything between the first '[' and its matching ']'
+		start = text.find("[")
+		end = text.rfind("]")
+		if start == -1 or end == -1:
+			return [default] if default else []
+		inner = text[start + 1:end]
+		return [m.group(1) for m in re.finditer(r'''["'](.*?)["']''', inner)]
+
+	async def _extract_capability_metadata(self, init_file: "Path") -> dict[str, Any]:  # type: ignore[name-defined]
+		"""Parse an ``__init__.py`` file and return a capability metadata dict."""
+		from pathlib import Path
+
+		path = Path(init_file)
+		source = path.read_text(encoding="utf-8")
+
+		def _scalar(name: str) -> str:
+			import re
+			m = re.search(rf'^{name}\s*=\s*["\']([^"\']*)["\']', source, re.MULTILINE)
+			return m.group(1) if m else ""
+
+		def _list_field(name: str) -> list[str]:
+			import re
+			# match the assignment including a potential multiline list
+			m = re.search(rf'^{name}\s*=\s*(\[.*?\])', source, re.MULTILINE | re.DOTALL)
+			if not m:
+				return []
+			return self._extract_list_value(m.group(0), "")
+
+		# derive module path and category/subcategory from the file path
+		parts = path.parts
+		# find "capabilities" in the path and build dotted module path from there
+		try:
+			cap_idx = parts.index("capabilities")
+			module_parts = parts[cap_idx:-1]  # drop __init__.py filename
+			module_path = ".".join(module_parts)
+			category = module_parts[1] if len(module_parts) > 1 else ""
+			subcategory = module_parts[2] if len(module_parts) > 2 else ""
+		except ValueError:
+			module_path = str(path.parent).replace("/", ".")
+			category = ""
+			subcategory = ""
+
+		return {
+			"capability_code": _scalar("__capability_code__"),
+			"capability_name": _scalar("__capability_name__"),
+			"version": _scalar("__version__"),
+			"description": _scalar("__description__"),
+			"composition_keywords": _list_field("__composition_keywords__"),
+			"module_path": module_path,
+			"category": category,
+			"subcategory": subcategory,
+		}
+
+	async def _generate_capability_recommendations(
+		self,
+		query: str | None,
+		search_results: list[dict[str, Any]],
+	) -> list[dict[str, Any]]:
+		"""Rank search results into capability recommendations.
+
+		When a query is provided, intent-match score (keyword overlap) dominates.
+		Without a query, rank by quality then popularity.
+		"""
+		query_terms: list[str] = []
+		if query:
+			query_terms = [t.lower() for t in query.replace(",", " ").split() if len(t) > 2]
+
+		def _score(cap: dict[str, Any]) -> tuple[float, dict[str, Any], list[str]]:
+			quality = float(cap.get("quality_score", 0.5))
+			popularity = float(cap.get("popularity_score", 0.0))
+			complexity = float(cap.get("complexity_score", 5.0))
+			# normalise complexity penalty: lower is better, scale 1-10
+			complexity_penalty = max(0.0, (complexity - 1) / 9)
+
+			matched: list[str] = []
+			intent_match = 0.0
+			if query_terms:
+				searchable: list[str] = []
+				for field in ("capability_name", "description"):
+					val = cap.get(field, "")
+					if val:
+						searchable += val.lower().replace(",", " ").split()
+				for kw in cap.get("composition_keywords", []):
+					searchable += kw.lower().replace(",", " ").split()
+				for qt in query_terms:
+					if qt in searchable:
+						matched.append(qt)
+				intent_match = len(matched) / max(len(query_terms), 1)
+
+			breakdown = {
+				"intent_match": round(intent_match, 4),
+				"quality": round(quality, 4),
+				"popularity": round(popularity, 4),
+				"complexity_penalty": round(complexity_penalty, 4),
+			}
+
+			if query_terms:
+				# intent match is primary signal
+				score = (intent_match * 0.55) + (quality * 0.30) + (popularity * 0.10) - (complexity_penalty * 0.05)
+			else:
+				score = (quality * 0.60) + (popularity * 0.35) - (complexity_penalty * 0.05)
+
+			return score, breakdown, sorted(matched)
+
+		ranked: list[dict[str, Any]] = []
+		for cap in search_results:
+			score, breakdown, matched = _score(cap)
+			if query_terms and matched:
+				reason = f"Matches intent terms: {', '.join(matched)}"
+			elif not query_terms:
+				reason = "High quality capability for this search result set"
+			else:
+				reason = "Capability matches search criteria"
+			ranked.append({
+				**cap,
+				"confidence_score": round(score, 4),
+				"matched_terms": matched,
+				"recommendation_reason": reason,
+				"score_breakdown": breakdown,
+			})
+
+		ranked.sort(key=lambda r: r["confidence_score"], reverse=True)
+		return ranked
+
 	# ------------------------------------------------------------------ internals
 
 	def _require_capability(self, capability_id: str, tenant_id: str) -> dict[str, Any]:

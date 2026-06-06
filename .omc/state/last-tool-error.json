@@ -1,7 +1,7 @@
 {
-  "tool_name": "Read",
-  "tool_input_preview": "{\"file_path\":\"/Users/nyimbiodero/src/pjs/apg/examples/mining_energy_platform\"}",
-  "error": "EISDIR: illegal operation on a directory, read '/Users/nyimbiodero/src/pjs/apg/examples/mining_energy_platform'",
-  "timestamp": "2026-06-05T13:53:16.805Z",
-  "retry_count": 1
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"find /Users/nyimbiodero/src/pjs/apg/capabilities/crm/adv/database -name \\\"*.pyc\\\" -delete && .venv/bin/python -m pytest tests/test_crm_adv_core_records.py -q --tb=short 2>&1\",\"description\"...",
+  "error": "Exit code 1\n....F..                                                                  [100%]\n=================================== FAILURES ===================================\n_________ test_crm_contact_import_export_endpoints_execute_standalone __________\ncapabilities/crm/adv/import_export.py:481: in export_contacts\n    filtered_contacts = self._filter_export_fields(contacts, include_fields, exclude_fields)\n                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^...",
+  "timestamp": "2026-06-06T08:55:05.176Z",
+  "retry_count": 3
 }

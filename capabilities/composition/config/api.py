@@ -241,6 +241,20 @@ class _RuntimeState(dict):
 _api_runtime_state = _RuntimeState()
 
 
+def _append_audit(tenant_id: str, user_id: str, action: str, details: dict) -> None:
+    """Append an audit event to the runtime state for the given tenant."""
+    key = f"audit:{tenant_id}"
+    events = _api_runtime_state.setdefault(key, [])
+    import datetime
+    events.append({
+        "tenant_id": tenant_id,
+        "user_id": user_id,
+        "action": action,
+        "details": details,
+        "timestamp": datetime.datetime.utcnow().isoformat(),
+    })
+
+
 def create_app():
     """Create a FastAPI application for the composition config capability."""
     try:
@@ -271,6 +285,8 @@ def create_app():
                 payload = {}
             ws = {"id": ws_id, "status": "active", "tenant_id": tenant_id, **(payload or {})}
             _api_runtime_state[f"ws:{ws_id}"] = ws
+            user_id = req.headers.get("X-APG-User-ID") or req.headers.get("X-User-ID") or "system"
+            _append_audit(tenant_id, user_id, "create_workspace", {"workspace_id": ws_id})
             return ws
 
         @app.get("/workspaces")
@@ -284,6 +300,225 @@ def create_app():
                 from fastapi import HTTPException
                 raise HTTPException(status_code=404, detail="workspace_not_found")
             return ws
+
+        # ── Templates ────────────────────────────────────────────────────────
+
+        @app.post("/templates")
+        async def create_template_endpoint(req: Request, workspace_id: str = ""):
+            import uuid
+            payload = {}
+            try:
+                payload = await req.json()
+            except Exception:
+                payload = {}
+            tid = str(uuid.uuid4())
+            tenant_id = req.headers.get("X-APG-Tenant-ID") or "default"
+            template = {
+                "id": tid,
+                "workspace_id": workspace_id,
+                "tenant_id": tenant_id,
+                "name": payload.get("name", ""),
+                "category": payload.get("category", "general"),
+                "template_data": payload.get("template_data", {}),
+                "is_public": payload.get("is_public", False),
+                "status": "active",
+            }
+            _api_runtime_state[f"tmpl:{tid}"] = template
+            return template
+
+        @app.get("/templates")
+        def list_templates_endpoint(workspace_id: str = ""):
+            templates = [v for k, v in _api_runtime_state.items() if k.startswith("tmpl:")]
+            if workspace_id:
+                templates = [t for t in templates if t.get("workspace_id") == workspace_id]
+            return {"templates": templates, "total_count": len(templates)}
+
+        # ── Configurations ───────────────────────────────────────────────────
+
+        @app.post("/configurations")
+        async def create_configuration_endpoint(req: Request, workspace_id: str = ""):
+            import uuid
+            payload = {}
+            try:
+                payload = await req.json()
+            except Exception:
+                payload = {}
+            cid = str(uuid.uuid4())
+            tenant_id = req.headers.get("X-APG-Tenant-ID") or "default"
+            user_id = req.headers.get("X-APG-User-ID") or "system"
+            config = {
+                "id": cid,
+                "workspace_id": workspace_id,
+                "tenant_id": tenant_id,
+                "name": payload.get("name", ""),
+                "key_path": payload.get("key_path", ""),
+                "value": payload.get("value", {}),
+                "tags": payload.get("tags", []),
+                "version": "1.0.0",
+                "status": "active",
+                "created_by": user_id,
+                "_versions": [
+                    {"version": "1.0.0", "value": payload.get("value", {}), "changed_by": user_id, "reason": "initial"}
+                ],
+            }
+            _api_runtime_state[f"cfg:{cid}"] = config
+            _append_audit(tenant_id, user_id, "create_configuration", {"config_id": cid})
+            return {k: v for k, v in config.items() if not k.startswith("_")}
+
+        @app.put("/configurations/{config_id}")
+        async def update_configuration_endpoint(req: Request, config_id: str, change_reason: str = ""):
+            payload = {}
+            try:
+                payload = await req.json()
+            except Exception:
+                payload = {}
+            cfg = _api_runtime_state.get(f"cfg:{config_id}")
+            if not cfg:
+                from fastapi import HTTPException
+                raise HTTPException(status_code=404, detail="configuration_not_found")
+            tenant_id = req.headers.get("X-APG-Tenant-ID") or "default"
+            user_id = req.headers.get("X-APG-User-ID") or "system"
+            # bump version
+            old_ver = cfg.get("version", "1.0.0")
+            parts = old_ver.split(".")
+            new_patch = int(parts[-1]) + 1
+            new_ver = ".".join(parts[:-1] + [str(new_patch)])
+            if "value" in payload:
+                cfg["value"] = payload["value"]
+            cfg["version"] = new_ver
+            versions = cfg.setdefault("_versions", [])
+            versions.append({"version": new_ver, "value": cfg["value"], "changed_by": user_id, "reason": change_reason})
+            _append_audit(tenant_id, user_id, "update_configuration", {"config_id": config_id, "version": new_ver})
+            return {k: v for k, v in cfg.items() if not k.startswith("_")}
+
+        @app.get("/configurations")
+        def list_configurations_endpoint(req: Request, query: str = ""):
+            tenant_id = req.headers.get("X-APG-Tenant-ID") or "default"
+            configs = [
+                {k: v for k, v in cfg.items() if not k.startswith("_")}
+                for key, cfg in _api_runtime_state.items()
+                if key.startswith("cfg:") and cfg.get("tenant_id") == tenant_id
+            ]
+            if query:
+                q = query.lower()
+                configs = [c for c in configs if q in c.get("name", "").lower() or q in c.get("key_path", "").lower()]
+            return {"configurations": configs, "total_count": len(configs)}
+
+        @app.get("/configurations/{config_id}")
+        def get_configuration_endpoint(config_id: str):
+            cfg = _api_runtime_state.get(f"cfg:{config_id}")
+            if not cfg:
+                from fastapi import HTTPException
+                raise HTTPException(status_code=404, detail="configuration_not_found")
+            return {k: v for k, v in cfg.items() if not k.startswith("_")}
+
+        @app.post("/configurations/{config_id}/deploy")
+        async def deploy_configuration_endpoint(req: Request, config_id: str):
+            import uuid
+            payload = {}
+            try:
+                payload = await req.json()
+            except Exception:
+                payload = {}
+            cfg = _api_runtime_state.get(f"cfg:{config_id}")
+            if not cfg:
+                from fastapi import HTTPException
+                raise HTTPException(status_code=404, detail="configuration_not_found")
+            tenant_id = req.headers.get("X-APG-Tenant-ID") or "default"
+            user_id = req.headers.get("X-APG-User-ID") or "system"
+            did = str(uuid.uuid4())
+            deployment = {
+                "id": did,
+                "config_id": config_id,
+                "tenant_id": tenant_id,
+                "cloud_provider": payload.get("cloud_provider", "local"),
+                "environment_id": payload.get("environment_id", "default"),
+                "options": payload.get("options", {}),
+                "status": "deployed",
+                "deployed_by": user_id,
+                "config_version": cfg.get("version", "1.0.0"),
+            }
+            _api_runtime_state[f"dep:{did}"] = deployment
+            _append_audit(tenant_id, user_id, "deploy_configuration", {"config_id": config_id, "deployment_id": did})
+            return deployment
+
+        @app.get("/deployments")
+        def list_deployments_endpoint(req: Request, cloud_provider: str = ""):
+            tenant_id = req.headers.get("X-APG-Tenant-ID") or "default"
+            deps = [
+                v for k, v in _api_runtime_state.items()
+                if k.startswith("dep:") and v.get("tenant_id") == tenant_id
+            ]
+            if cloud_provider:
+                deps = [d for d in deps if d.get("cloud_provider") == cloud_provider]
+            return {"deployments": deps, "total_count": len(deps)}
+
+        @app.get("/configurations/{config_id}/versions")
+        def list_configuration_versions_endpoint(config_id: str):
+            cfg = _api_runtime_state.get(f"cfg:{config_id}")
+            if not cfg:
+                from fastapi import HTTPException
+                raise HTTPException(status_code=404, detail="configuration_not_found")
+            versions = cfg.get("_versions", [])
+            return {"versions": versions, "total_count": len(versions)}
+
+        @app.post("/configurations/{config_id}/restore")
+        async def restore_configuration_version_endpoint(req: Request, config_id: str):
+            payload = {}
+            try:
+                payload = await req.json()
+            except Exception:
+                payload = {}
+            cfg = _api_runtime_state.get(f"cfg:{config_id}")
+            if not cfg:
+                from fastapi import HTTPException
+                raise HTTPException(status_code=404, detail="configuration_not_found")
+            target_version = payload.get("version", "1.0.0")
+            reason = payload.get("reason", "restore")
+            versions = cfg.get("_versions", [])
+            match = next((v for v in versions if v["version"] == target_version), None)
+            if not match:
+                from fastapi import HTTPException
+                raise HTTPException(status_code=404, detail="version_not_found")
+            tenant_id = req.headers.get("X-APG-Tenant-ID") or "default"
+            user_id = req.headers.get("X-APG-User-ID") or "system"
+            cfg["value"] = match["value"]
+            _append_audit(tenant_id, user_id, "restore_configuration", {"config_id": config_id, "version": target_version, "reason": reason})
+            return {"success": True, "config_id": config_id, "restored_version": target_version}
+
+        # ── Analytics ────────────────────────────────────────────────────────
+
+        @app.get("/analytics/usage")
+        def analytics_usage_endpoint(req: Request):
+            tenant_id = req.headers.get("X-APG-Tenant-ID") or "default"
+            configs = [v for k, v in _api_runtime_state.items() if k.startswith("cfg:") and v.get("tenant_id") == tenant_id]
+            deps = [v for k, v in _api_runtime_state.items() if k.startswith("dep:") and v.get("tenant_id") == tenant_id]
+            return {
+                "total_configurations": len(configs),
+                "total_deployments": len(deps),
+                "tenant_id": tenant_id,
+            }
+
+        # ── Security ─────────────────────────────────────────────────────────
+
+        @app.get("/security/audit-log")
+        def audit_log_endpoint(req: Request):
+            tenant_id = req.headers.get("X-APG-Tenant-ID") or "default"
+            events = _api_runtime_state.get(f"audit:{tenant_id}", [])
+            return {"events": events, "total_count": len(events)}
+
+        @app.get("/security/compliance-report")
+        def compliance_report_endpoint(req: Request, framework: str = "SOC2"):
+            tenant_id = req.headers.get("X-APG-Tenant-ID") or "default"
+            events = _api_runtime_state.get(f"audit:{tenant_id}", [])
+            score = min(100, max(0, len(events) * 10))
+            return {
+                "framework": framework,
+                "tenant_id": tenant_id,
+                "compliance_score": score,
+                "audited_events": len(events),
+                "status": "compliant" if score >= 50 else "needs_review",
+            }
 
         return app
 

@@ -47,11 +47,26 @@ class CollaborationService:
 
 	All state is held in Python dicts (in-memory store pattern).
 	Every state change emits an audit event.
+
+	Can also be constructed with a SQLAlchemy-compatible async session as
+	the first argument for DB-backed operation::
+
+		service = CollaborationService(db_session)
+		messages = await service.get_chat_messages("/some/page", limit=20, tenant_id="t1")
 	"""
 
-	def __init__(self, actor_id: str = "system", tenant_id: str = "default") -> None:
-		self.actor_id = actor_id
-		self.tenant_id = tenant_id
+	def __init__(self, actor_id_or_db: Any = "system", tenant_id: str = "default") -> None:
+		# Support two construction modes:
+		#   CollaborationService("actor-id", "tenant-id")  — in-memory store
+		#   CollaborationService(db_session)                — DB-backed
+		if isinstance(actor_id_or_db, str):
+			self.actor_id = actor_id_or_db
+			self.tenant_id = tenant_id
+			self._db = None
+		else:
+			self._db = actor_id_or_db
+			self.actor_id = "system"
+			self.tenant_id = tenant_id
 
 		self._workspaces:   dict[str, _R] = {}
 		self._members:      dict[str, list[_R]] = {}       # workspace_id -> members
@@ -117,6 +132,112 @@ class CollaborationService:
 		if r is None:
 			raise KeyError(f"task not found: {task_id}")
 		return r
+
+	# ------------------------------------------------------------------
+	# get_chat_messages  (DB-backed)
+	# ------------------------------------------------------------------
+
+	async def get_chat_messages(
+		self,
+		session_id: str,
+		*,
+		tenant_id: str,
+		page: int = 1,
+		limit: int | None = None,
+	) -> list[dict[str, Any]]:
+		"""Return chat messages for a page/session, sorted by timestamp descending.
+
+		Merges two sources:
+		  1. ``RTCPageCollaboration.chat_messages`` — stored JSON blobs keyed by
+		     the page URL (``session_id`` parameter).
+		  2. ``RTCMessage`` rows linked to the same page/session.
+
+		The combined list is sorted newest-first; *limit* is applied after sorting.
+		"""
+		assert self._db is not None, "get_chat_messages requires a DB session"
+
+		# -- 1. page-level collaboration record ----------------------------------
+		from sqlalchemy import select
+		from .models import RTCPageCollaboration, RTCMessage
+
+		page_result = await self._db.execute(
+			select(RTCPageCollaboration).where(
+				RTCPageCollaboration.page_url == session_id,
+				RTCPageCollaboration.tenant_id == tenant_id,
+			)
+		)
+		page_collab = page_result.scalar_one_or_none()
+
+		# -- 2. session messages from RTCMessage ---------------------------------
+		msg_result = await self._db.execute(
+			select(RTCMessage).where(
+				RTCMessage.session_id == session_id,
+				RTCMessage.tenant_id == tenant_id,
+				RTCMessage.is_deleted == False,  # noqa: E712
+			)
+		)
+		session_messages: list[Any] = msg_result.scalars().all()
+
+		# -- normalise page chat_messages ----------------------------------------
+		def _normalise_page_msg(raw: dict[str, Any]) -> dict[str, Any]:
+			"""Coerce the various key schemas stored in RTCPageCollaboration.chat_messages."""
+			# Canonical keys present → use directly
+			if "message_id" in raw and "message" in raw:
+				return {
+					"message_id": raw["message_id"],
+					"user_id":    raw.get("user_id", raw.get("sender_id", "")),
+					"username":   raw.get("username", raw.get("display_name", "")),
+					"message":    raw["message"],
+					"message_type": raw.get("message_type", "text"),
+					"timestamp":  raw.get("timestamp", raw.get("sent_at", "")),
+				}
+			# Fallback schema: id / sender_id / content / sent_at
+			return {
+				"message_id": raw.get("message_id", raw.get("id", "")),
+				"user_id":    raw.get("user_id", raw.get("sender_id", "")),
+				"username":   raw.get("username", raw.get("display_name", "")),
+				"message":    raw.get("message", raw.get("content", "")),
+				"message_type": raw.get("message_type", "text"),
+				"timestamp":  raw.get("timestamp", raw.get("sent_at", "")),
+			}
+
+		page_msgs: list[dict[str, Any]] = []
+		if page_collab is not None:
+			for raw in (page_collab.chat_messages or []):
+				page_msgs.append(_normalise_page_msg(raw))
+
+		# -- normalise RTCMessage ORM objects ------------------------------------
+		def _normalise_session_msg(m: Any) -> dict[str, Any]:
+			ts = m.sent_at
+			if isinstance(ts, datetime):
+				ts = ts.isoformat(timespec="seconds")
+			participant = getattr(m, "participant", None)
+			user_id  = participant.user_id    if participant else ""
+			username = participant.display_name if participant else ""
+			return {
+				"message_id":   m.message_id,
+				"user_id":      user_id,
+				"username":     username,
+				"message":      m.content,
+				"message_type": m.message_type,
+				"timestamp":    ts,
+			}
+
+		orm_msgs = [_normalise_session_msg(m) for m in session_messages]
+
+		# -- merge, sort, limit --------------------------------------------------
+		all_msgs = page_msgs + orm_msgs
+
+		def _sort_key(msg: dict[str, Any]) -> str:
+			ts = msg.get("timestamp") or ""
+			return ts if isinstance(ts, str) else str(ts)
+
+		all_msgs.sort(key=_sort_key, reverse=True)
+
+		if limit is not None:
+			all_msgs = all_msgs[:limit]
+
+		return all_msgs
 
 	# ------------------------------------------------------------------
 	# 1. workspace_create

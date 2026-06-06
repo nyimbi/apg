@@ -538,7 +538,7 @@ class ContactImportExportManager:
 		filtered_contacts = []
 		
 		for contact in contacts:
-			contact_dict = contact.model_dump()
+			contact_dict = contact.model_dump() if hasattr(contact, "model_dump") else dict(contact)
 			
 			if include_fields:
 				# Only include specified fields

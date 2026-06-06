@@ -10,9 +10,31 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from flask import Flask
+
+try:
+	from .context import get_current_user_id, get_tenant_id_from_request
+	from .service import GeneralLedgerService
+except ImportError:
+	from context import get_current_user_id, get_tenant_id_from_request  # type: ignore
+	from service import GeneralLedgerService  # type: ignore
+
+
+def _run_async_initialization(factory):
+	"""Run an async initialisation coroutine/factory synchronously."""
+	try:
+		loop = asyncio.get_event_loop()
+		if loop.is_running():
+			import concurrent.futures
+			with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+				future = pool.submit(asyncio.run, factory())
+				return future.result()
+		return loop.run_until_complete(factory())
+	except RuntimeError:
+		return asyncio.run(factory())
 
 # ---------------------------------------------------------------------------
 # Capability metadata
@@ -54,7 +76,7 @@ SUBCAPABILITY_META: dict[str, Any] = {
 }
 
 
-def init_subcapability(appbuilder_or_app: Any) -> dict[str, Any]:
+def init_subcapability(appbuilder_or_app: Any, tenant_data: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Register the GLR blueprint with the Flask application.
 
 	Accepts either a Flask app or a Flask-AppBuilder instance.
@@ -75,6 +97,13 @@ def init_subcapability(appbuilder_or_app: Any) -> dict[str, Any]:
 	# Avoid duplicate registration
 	if "glr_general_ledger" not in app.blueprints:
 		app.register_blueprint(glr_bp)
+
+	# Initialise a tenant-scoped service instance when tenant_data is provided.
+	if tenant_data:
+		tenant_id = get_tenant_id_from_request(tenant_data)
+		user_id = get_current_user_id(tenant_data)
+		gl_service = GeneralLedgerService(tenant_id, user_id)
+		_run_async_initialization(lambda: gl_service.setup_tenant(tenant_data))
 
 	return {
 		"capability": "General Ledger",

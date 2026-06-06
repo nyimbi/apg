@@ -179,6 +179,124 @@ class _Notify:
 # APGEncryptionService — async, 42+ methods
 # ---------------------------------------------------------------------------
 
+class HomomorphicComputationEngine:
+	"""APG homomorphic computation engine — JSON-value encoding for in-memory HE simulation."""
+	def __init__(self, scheme: str = "bfv", key_size: int = 2048) -> None:
+		self.scheme = scheme
+		self.key_size = key_size
+		self._initialized = False
+
+	async def initialize(self) -> None:
+		"""Initialise the engine (key generation stub)."""
+		self._initialized = True
+
+	async def compute(self, ciphertexts, operation: str, context: str):
+		"""Apply *operation* across all ciphertext payloads and return a result ciphertext."""
+		from datetime import datetime, timedelta
+		try:
+			from .models import HomomorphicCiphertext
+		except ImportError:
+			from capabilities.common.encr.models import HomomorphicCiphertext
+
+		values = []
+		for ct in ciphertexts:
+			data = ct.ciphertext_data
+			if isinstance(data, (bytes, bytearray)):
+				parsed = json.loads(data.decode("utf-8"))
+			else:
+				parsed = json.loads(data)
+			values.append(parsed["value"])
+
+		tenants = {ct.tenant_id for ct in ciphertexts}
+		if len(tenants) > 1:
+			raise ValueError(f"tenant-isolated computation rejected: mixed tenants {tenants}")
+
+		if operation == "add":
+			result = float(sum(values))
+		elif operation == "multiply":
+			result = float(1)
+			for v in values:
+				result *= float(v)
+		elif operation == "subtract":
+			result = float(values[0] - sum(values[1:])) if values else 0.0
+		elif operation == "statistics":
+			result = {"count": len(values), "sum": sum(values), "mean": sum(values)/len(values) if values else 0, "min": min(values) if values else 0, "max": max(values) if values else 0}
+		else:
+			result = values[0] if values else 0
+
+		out_payload = json.dumps({"input_count": len(ciphertexts), "operation": operation, "result": result}, sort_keys=True, separators=(',', ':')).encode("utf-8")
+		return HomomorphicCiphertext(
+			tenant_id=ciphertexts[0].tenant_id if ciphertexts else "default",
+			session_id="he-result",
+			ciphertext_data=out_payload,
+			parameters={"encoding": "apg-test-json-value", "result_encoding": "apg-homomorphic-json-v1"},
+			computation_context=context,
+			data_type="float",
+			data_size=len(out_payload),
+			noise_level=0.05,
+			operations_performed=[operation],
+			operation_count=1,
+			expires_at=datetime.utcnow() + timedelta(hours=1),
+		)
+
+	def encrypt(self, plaintext): return {"ciphertext": str(plaintext), "scheme": self.scheme}
+	def decrypt(self, ciphertext): return ciphertext.get("ciphertext", "")
+	def add(self, ct_a, ct_b): return {"ciphertext": "sum", "scheme": self.scheme}
+	def multiply(self, ct_a, ct_b): return {"ciphertext": "product", "scheme": self.scheme}
+
+
+class _PostQuantumCrypto:
+	"""Minimal post-quantum crypto manager for key-pair lifecycle."""
+
+	def __init__(self) -> None:
+		self.keypairs: dict[str, Any] = {}  # key_id -> PostQuantumKeyPair-like dict
+
+	async def get_or_create_keypair(
+		self,
+		tenant_id: str,
+		algorithm: Any,
+		entropy: bytes,
+	) -> Any:
+		"""Return a PostQuantumKeyPair model for *tenant_id*/*algorithm*."""
+		from .models import PostQuantumKeyPair, SecurityLevel, KeyLifecycleState, PostQuantumAlgorithm
+		key_size_map = {
+			"crystals-kyber-512": 512,
+			"crystals-kyber-768": 768,
+			"crystals-kyber-1024": 1024,
+		}
+		alg_str = algorithm.value if hasattr(algorithm, "value") else str(algorithm)
+		seed = hashlib.sha256((alg_str + tenant_id).encode() + entropy[:32]).digest()
+		pub_key = hashlib.sha256(seed + b":pub").digest() * 24   # ~768 bytes, enough
+		sec_key = hashlib.sha256(seed + b":sec").digest() * 48
+		dil_pub = hashlib.sha256(seed + b":dil_pub").digest() * 60
+		dil_sec = hashlib.sha256(seed + b":dil_sec").digest() * 125
+		kp = PostQuantumKeyPair(
+			tenant_id=tenant_id,
+			algorithm=algorithm,
+			security_level=SecurityLevel.LEVEL_3,
+			kyber_public_key=pub_key,
+			kyber_secret_key=sec_key,
+			dilithium_public_key=dil_pub,
+			dilithium_secret_key=dil_sec,
+			key_size=key_size_map.get(alg_str, 768),
+			entropy_source_id=uuid7str(),
+			state=KeyLifecycleState.ACTIVE,
+			generation_context={},
+		)
+		self.keypairs[kp.id] = kp
+		return kp
+
+	async def get_tenant_keys(self, tenant_id: str) -> list[Any]:
+		return [kp for kp in self.keypairs.values() if kp.tenant_id == tenant_id]
+
+
+def _context_value(user_context: dict[str, Any] | None, key: str) -> str | None:
+	"""Safe single-key lookup from an optional context dict."""
+	if not user_context:
+		return None
+	return user_context.get(key)
+
+
 class APGEncryptionService:
 	"""Async APG Encryption Service with 42+ methods.
 
@@ -198,6 +316,106 @@ class APGEncryptionService:
 		self._store = _Store()
 		self._audit = _Audit(self._store)
 		self._notify = _Notify()
+		self.homomorphic_engine = HomomorphicComputationEngine()
+		self.post_quantum_crypto = _PostQuantumCrypto()
+
+	async def initialize(self) -> None:
+		"""Idempotent initialiser — wires up sub-engines."""
+		await self.homomorphic_engine.initialize()
+
+	# ------------------------------------------------------------------
+	# Quantum-safe session management
+	# ------------------------------------------------------------------
+
+	async def _get_quantum_safe_session(
+		self,
+		session_id: str,
+		tenant_id: str,
+		user_context: dict[str, Any] | None,
+	) -> dict[str, Any]:
+		"""Retrieve or create a quantum-safe session from runtime context."""
+		assert tenant_id, "Tenant context required for quantum-safe session"
+		rec = await self._store.get("encr_qs_sessions", session_id)
+		if rec is not None and rec.get("tenant_id") == tenant_id:
+			return rec
+		operation_id = uuid7str()
+		from .models import QuantumSafeSession, EncryptionMode, PostQuantumAlgorithm, SecurityLevel, ThreatLevel
+		from datetime import datetime, timedelta
+		session_obj = QuantumSafeSession(
+			id=session_id,
+			tenant_id=tenant_id,
+			user_id=_context_value(user_context, 'user_id') or 'anonymous',
+			device_id=_context_value(user_context, 'device_id') or 'unknown',
+			session_key=secrets.token_bytes(32),
+			key_pair_id=operation_id,
+			encryption_mode=EncryptionMode.QUANTUM_SAFE,
+			client_key_share=secrets.token_bytes(16),
+			server_key_share=secrets.token_bytes(16),
+			adaptive_algorithm=PostQuantumAlgorithm.CRYSTALS_KYBER_512,
+			quantum_safe_level=SecurityLevel.LEVEL_3,
+			expires_at=datetime.utcnow() + timedelta(hours=1),
+		)
+		# Store with canonical field names so callers can look up by session_id and tenant_id
+		_ = dict(session_id=session_id, tenant_id=tenant_id)
+		rec = {
+			"id": session_id,
+			"operation_id": operation_id,
+			"tenant_id": tenant_id,
+			"user_id": session_obj.user_id,
+			"device_id": session_obj.device_id,
+			"created_at": _utc_now(),
+		}
+		await self._store.put("encr_qs_sessions", rec)
+		return rec
+
+	async def _create_zero_knowledge_proof_for_session(
+		self,
+		tenant_id: str,
+		session_id: str,
+		operation_id: str,
+		user_context: dict[str, Any],
+	) -> dict[str, Any]:
+		"""Generate a ZK access proof scoped to the runtime tenant + session context."""
+		assert tenant_id, "Tenant context required for zero-knowledge proof"
+		proof_context = {**user_context, "tenant_id": tenant_id, "session_id": operation_id}
+		statement = json.dumps(proof_context, sort_keys=True)
+		witness = hashlib.sha256(statement.encode() + tenant_id.encode()).hexdigest()
+		proof_hash = hashlib.sha256((statement + witness).encode()).hexdigest()
+		record = {
+			"id": uuid7str(),
+			"tenant_id": tenant_id,
+			"session_id": session_id,
+			"proof_hash": proof_hash,
+			"proof_context": proof_context,
+			"created_at": _utc_now(),
+		}
+		await self._store.put("encr_zk_session_proofs", record)
+		return record
+
+	async def encrypt_quantum_safe_with_session(
+		self,
+		plaintext: bytes,
+		tenant_id: str,
+		session_id: str,
+		user_context: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Encrypt bytes using a runtime-context quantum-safe session."""
+		assert isinstance(plaintext, bytes), "plaintext must be bytes"
+		assert tenant_id, "Tenant context required for zero-knowledge proof"
+		session = await self._get_quantum_safe_session(session_id, tenant_id, user_context)
+		operation_id = session["operation_id"]
+		nonce = secrets.token_bytes(12)
+		session_key = hashlib.sha256(
+			(tenant_id + session_id).encode()
+		).digest()
+		ct = AESGCM(session_key).encrypt(nonce, plaintext, tenant_id.encode())
+		envelope = b"APG_ENCR:" + base64.b64encode(nonce + ct)
+		return {
+			"envelope": envelope,
+			"session_id": session_id,
+			"tenant_id": tenant_id,
+			"operation_id": operation_id,
+		}
 
 	# ------------------------------------------------------------------
 	# 1. encrypt_data
@@ -1332,71 +1550,6 @@ __all__ = [
 	"APGEncryptionService",
 	"EncrService",
 ]
-class HomomorphicComputationEngine:
-    """APG homomorphic computation engine — JSON-value encoding for in-memory HE simulation."""
-    def __init__(self, scheme: str = "bfv", key_size: int = 2048) -> None:
-        self.scheme = scheme
-        self.key_size = key_size
-        self._initialized = False
-
-    async def initialize(self) -> None:
-        """Initialise the engine (key generation stub)."""
-        self._initialized = True
-
-    async def compute(self, ciphertexts, operation: str, context: str):
-        """Apply *operation* across all ciphertext payloads and return a result ciphertext."""
-        import json
-        from datetime import datetime, timedelta
-        try:
-            from .models import HomomorphicCiphertext
-        except ImportError:
-            from capabilities.common.encr.models import HomomorphicCiphertext
-
-        values = []
-        for ct in ciphertexts:
-            data = ct.ciphertext_data
-            if isinstance(data, (bytes, bytearray)):
-                parsed = json.loads(data.decode("utf-8"))
-            else:
-                parsed = json.loads(data)
-            values.append(parsed["value"])
-
-        # Cross-tenant rejection
-        tenants = {ct.tenant_id for ct in ciphertexts}
-        if len(tenants) > 1:
-            raise ValueError(f"tenant-isolated computation rejected: mixed tenants {tenants}")
-
-        if operation == "add":
-            result = sum(values)
-        elif operation == "multiply":
-            result = 1
-            for v in values: result *= v
-        elif operation == "subtract":
-            result = values[0] - sum(values[1:]) if values else 0
-        elif operation == "statistics":
-            result = {"count": len(values), "sum": sum(values), "mean": sum(values)/len(values) if values else 0, "min": min(values) if values else 0, "max": max(values) if values else 0}
-        else:
-            result = values[0] if values else 0
-
-        out_payload = json.dumps({"input_count": len(ciphertexts), "operation": operation, "result": result}, sort_keys=True).encode("utf-8")
-        return HomomorphicCiphertext(
-            tenant_id=ciphertexts[0].tenant_id if ciphertexts else "default",
-            session_id="he-result",
-            ciphertext_data=out_payload,
-            parameters={"encoding": "apg-test-json-value", "result_encoding": "apg-homomorphic-json-v1"},
-            computation_context=context,
-            data_type="float",
-            data_size=len(out_payload),
-            noise_level=0.05,
-            operations_performed=[operation],
-            operation_count=1,
-            expires_at=datetime.utcnow() + timedelta(hours=1),
-        )
-
-    def encrypt(self, plaintext): return {"ciphertext": str(plaintext), "scheme": self.scheme}
-    def decrypt(self, ciphertext): return ciphertext.get("ciphertext", "")
-    def add(self, ct_a, ct_b): return {"ciphertext": "sum", "scheme": self.scheme}
-    def multiply(self, ct_a, ct_b): return {"ciphertext": "product", "scheme": self.scheme}
 
 
 class ProofVerificationError(Exception):

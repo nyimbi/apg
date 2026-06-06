@@ -897,4 +897,113 @@ class AdvancedCRMService:
 		self._audit_events.append({"event": event_name, "tenant_id": tenant_id, "record_id": record_id, "payload": deepcopy(payload), "processor": "bytewax", "stream": streaming_manifest()["stream"], "created_at": _now()})
 
 
-CRMService = AdvancedCRMService
+class CRMService:
+	"""
+	High-level CRM service with typed dict-based API, in-memory persistence via
+	DatabaseManager, and lazy-loaded optional integration managers.
+
+	This is the class imported by tests and API helpers.  AdvancedCRMService is
+	retained for backward-compatibility with older callers.
+	"""
+
+	def __init__(self) -> None:
+		from .database import DatabaseManager
+		self.db_manager = DatabaseManager()
+
+		# Lazy-load optional integrations so the service is usable without
+		# their heavyweight dependencies (sklearn, redis, asyncpg …).
+		from .ai_insights import CRMAIInsights
+		self.ai_insights = CRMAIInsights()
+
+		from .email_integration import EmailIntegrationManager
+		self.email_integration_manager = EmailIntegrationManager(self.db_manager)
+
+		from .realtime_sync import RealTimeSyncEngine
+		self.realtime_sync = RealTimeSyncEngine(db_pool=None, redis_client=None)
+
+		# Per-tenant configuration store (default values)
+		self._configs: dict[str, dict[str, Any]] = {}
+		# Time-entry store for clock-in/out
+		self._time_entries: dict[str, list[dict[str, Any]]] = {}
+
+	# ------------------------------------------------------------------ #
+	# Default config helper
+	# ------------------------------------------------------------------ #
+
+	def _get_config(self, tenant_id: str) -> dict[str, Any]:
+		if tenant_id not in self._configs:
+			self._configs[tenant_id] = {
+				"default_lead_score_threshold": 70.0,
+				"default_opportunity_probability": 50.0,
+				"customer_health_score_enabled": True,
+				"ai_recommendations_enabled": True,
+				"predictive_analytics_enabled": True,
+				"email_integration_enabled": True,
+				"calendar_integration_enabled": True,
+				"social_media_monitoring_enabled": True,
+				"document_management_enabled": True,
+				"max_records_per_page": 100,
+				"cache_ttl_seconds": 300,
+				"background_job_timeout": 3600,
+			}
+		return self._configs[tenant_id]
+
+	# ------------------------------------------------------------------ #
+	# Leads
+	# ------------------------------------------------------------------ #
+
+	async def create_lead(
+		self, data: dict[str, Any], tenant_id: str, user_id: str
+	):
+		from .models import CRMLead
+		lead = CRMLead(
+			tenant_id=tenant_id,
+			created_by=user_id,
+			**{k: v for k, v in data.items()},
+		)
+		return await self.db_manager.create_lead(lead)
+
+	async def update_lead(
+		self,
+		lead_id: str,
+		updates: dict[str, Any],
+		tenant_id: str,
+		user_id: str,
+	):
+		rec = await self.db_manager.get_lead(lead_id, tenant_id)
+		if rec is None:
+			raise KeyError(f"Lead not found: {lead_id}")
+		patch = dict(updates)
+		patch["updated_by"] = user_id
+		patch["version"] = rec.version + 1
+		return await self.db_manager.update_lead(lead_id, patch, tenant_id)
+
+	# ------------------------------------------------------------------ #
+	# Accounts
+	# ------------------------------------------------------------------ #
+
+	async def create_account(
+		self, data: dict[str, Any], tenant_id: str, user_id: str
+	):
+		from .models import CRMAccount
+		account = CRMAccount(
+			tenant_id=tenant_id,
+			created_by=user_id,
+			**{k: v for k, v in data.items()},
+		)
+		return await self.db_manager.create_account(account)
+
+	# ------------------------------------------------------------------ #
+	# Opportunities
+	# ------------------------------------------------------------------ #
+
+	async def create_opportunity(
+		self, data: dict[str, Any], tenant_id: str, user_id: str
+	):
+		from .models import CRMOpportunity
+		opp = CRMOpportunity(
+			tenant_id=tenant_id,
+			created_by=user_id,
+			**{k: v for k, v in data.items()},
+		)
+		return await self.db_manager.create_opportunity(opp)

@@ -20,11 +20,12 @@ Mount with:
 
 from __future__ import annotations
 
+import os
 import traceback
 from datetime import datetime
-from typing import Any
+from typing import Any, List, Optional
 
-from flask import Blueprint, jsonify, request, Response
+from flask import Blueprint, g, jsonify, request, Response, session
 from uuid6 import uuid7
 
 from .domain.rules import RuleViolation
@@ -45,6 +46,95 @@ def uuid7str() -> str:
 
 
 nlpc_bp = Blueprint("nlpc", __name__, url_prefix="/api/nlpc")
+
+
+# ---------------------------------------------------------------------------
+# Context resolution helpers
+# ---------------------------------------------------------------------------
+
+def _clean_text(value: Any) -> Optional[str]:
+	if value is None:
+		return None
+	text = str(value).strip()
+	return text or None
+
+
+def _get_tenant_id() -> str:
+	"""Resolve tenant ID: request.current_user > g.current_user > header > session > query > env."""
+	default = os.environ.get("APG_TENANT_ID", "default")
+
+	# request.current_user (set by auth middleware)
+	current_user = getattr(request, "current_user", None)
+	if current_user:
+		tid = _clean_text(
+			current_user.get("tenant_id") if isinstance(current_user, dict)
+			else getattr(current_user, "tenant_id", None)
+		)
+		if tid:
+			return tid
+
+	# g.current_user
+	g_user = getattr(g, "current_user", None)
+	if g_user:
+		tid = _clean_text(
+			g_user.get("tenant_id") if isinstance(g_user, dict)
+			else getattr(g_user, "tenant_id", None)
+		)
+		if tid:
+			return tid
+
+	candidates: List[Any] = [
+		request.headers.get("X-APG-Tenant-ID"),
+		request.headers.get("X-Tenant-ID"),
+		session.get("tenant_id"),
+		request.args.get("tenant_id"),
+		request.args.get("tenant"),
+	]
+	for c in candidates:
+		tid = _clean_text(c)
+		if tid:
+			return tid
+	return default
+
+
+def _get_user_id() -> str:
+	"""Resolve user ID: request.current_user > g.current_user > header > session > query > env."""
+	default = os.environ.get("APG_USER_ID", "system")
+
+	# request.current_user
+	current_user = getattr(request, "current_user", None)
+	if current_user:
+		uid = _clean_text(
+			current_user.get("user_id") if isinstance(current_user, dict)
+			else getattr(current_user, "user_id", None)
+		)
+		if uid:
+			return uid
+
+	# g.current_user
+	g_user = getattr(g, "current_user", None)
+	if g_user:
+		uid = _clean_text(
+			g_user.get("user_id") if isinstance(g_user, dict)
+			else getattr(g_user, "user_id", None)
+		)
+		if uid:
+			return uid
+
+	candidates: List[Any] = [
+		request.headers.get("X-APG-User-ID"),
+		request.headers.get("X-User-ID"),
+		session.get("user_id"),
+		request.args.get("user_id"),
+	]
+	for c in candidates:
+		uid = _clean_text(c)
+		if uid:
+			return uid
+	return default
+
+
+# ===== REST API Endpoints
 
 
 # ---------------------------------------------------------------------------
