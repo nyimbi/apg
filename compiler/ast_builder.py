@@ -174,6 +174,10 @@ class WorkflowDeclaration(EntityDeclaration):
 	human_tasks: List[str] = field(default_factory=list)
 	guards: Dict[str, str] = field(default_factory=dict)
 	assignments: Dict[str, str] = field(default_factory=dict)
+	timers: Dict[str, str] = field(default_factory=dict)
+	waits: Dict[str, str] = field(default_factory=dict)
+	retry_policy: Dict[str, str] = field(default_factory=dict)
+	compensation: Dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -1016,7 +1020,12 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 				transitions.append(Transition(source=parts[i], target=parts[i + 1]))
 
 		# Parse guards: {state: "condition"} dict
+		# Strip "dict =" prefix when written as "guards: dict = {...}"
 		guards_raw = props.get("guards", {})
+		if isinstance(guards_raw, str):
+			guards_raw = _re.sub(r'^[A-Za-z_][A-Za-z0-9_]*\s*=\s*', '', guards_raw.strip())
+			from .ai_agent_composition import _parse_value as _pv
+			guards_raw = _pv(guards_raw)
 		guards: Dict[str, str] = {}
 		if isinstance(guards_raw, dict):
 			for k, v in guards_raw.items():
@@ -1026,16 +1035,31 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 				if t.target in guards:
 					t.guard = guards[t.target]
 
-		# Parse human_tasks: [state, state, ...]
+		# Parse human_tasks: [state, state, ...] or "str = state, state"
 		human_tasks_raw = props.get("human_tasks", [])
+		if isinstance(human_tasks_raw, str):
+			human_tasks_raw = _re.sub(r'^[A-Za-z_][A-Za-z0-9_]*\s*=\s*["\']*', '', human_tasks_raw.strip()).strip('"\'')
+			human_tasks_raw = [t.strip() for t in human_tasks_raw.split(",") if t.strip()]
 		human_tasks = _string_list(human_tasks_raw)
 
-		# Parse assignments: {state: role}
+		# Parse assignments: {state: role} or "dict = {...}"
 		assignments_raw = props.get("assignments", {})
+		if isinstance(assignments_raw, str):
+			assignments_raw = _re.sub(r'^[A-Za-z_][A-Za-z0-9_]*\s*=\s*', '', assignments_raw.strip())
+			from .ai_agent_composition import _parse_value as _pv2
+			assignments_raw = _pv2(assignments_raw)
 		assignments: Dict[str, str] = {}
 		if isinstance(assignments_raw, dict):
 			for k, v in assignments_raw.items():
 				assignments[str(k)] = str(v)
+
+		def _dict_prop(key: str) -> Dict[str, str]:
+			v = props.get(key, {})
+			if isinstance(v, str):
+				v = _re.sub(r'^[A-Za-z_][A-Za-z0-9_]*\s*=\s*', '', v.strip())
+				from .ai_agent_composition import _parse_value as _pv3
+				v = _pv3(v)
+			return {str(k): str(val) for k, val in v.items()} if isinstance(v, dict) else {}
 
 		return WorkflowDeclaration(
 			entity_type=EntityType.WORKFLOW,
@@ -1047,6 +1071,10 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 			human_tasks=human_tasks,
 			guards=guards,
 			assignments=assignments,
+			timers=_dict_prop("timers"),
+			waits=_dict_prop("waits"),
+			retry_policy=_dict_prop("retry_policy"),
+			compensation=_dict_prop("compensation"),
 		)
 
 	def _parse_source_members(self, body: str, source_file: Optional[str]):
