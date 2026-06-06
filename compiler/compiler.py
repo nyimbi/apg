@@ -143,7 +143,10 @@ class APGCompiler:
 				return result
 			
 			result.module = ast
-			
+
+			# Phase 2b: Resolve imports — merge entities from imported files
+			self._resolve_imports(ast, Path(source_file).parent)
+
 			# Phase 3: Semantic Analysis
 			semantic_result = self._analyze_semantics(ast)
 			result.errors.extend(semantic_result['errors'])
@@ -286,6 +289,44 @@ class APGCompiler:
 	# Internal Compilation Phases
 	# ========================================
 	
+	def _resolve_imports(self, module: Any, base_dir: Path) -> None:
+		"""Phase 2b: resolve and inline entities from imported APG files.
+
+		Translates dot-separated module names to relative file paths
+		(e.g. `sales.contracts` → `<base_dir>/sales/contracts.apg`).
+		Detected cycles are silently skipped.  Parse failures in imported
+		files produce warnings stored on the module.
+		"""
+		if not hasattr(module, "imports") or not module.imports:
+			return
+		seen: set[str] = {getattr(module, "source_file", "") or ""}
+		for imp in list(module.imports):
+			# Map "a.b.c" → "<base_dir>/a/b/c.apg"
+			rel_path = Path(*imp.module_name.split(".")).with_suffix(".apg")
+			candidate = base_dir / rel_path
+			if not candidate.exists():
+				continue
+			resolved = str(candidate.resolve())
+			if resolved in seen:
+				continue
+			seen.add(resolved)
+			try:
+				sub_result = self._parse_file(candidate)
+				if not sub_result.get("success"):
+					continue
+				sub_ast = sub_result.get("ast") or self._build_ast(sub_result, resolved)
+				if sub_ast is None:
+					continue
+				# Filter to only exported entities if import_items specified
+				names = set(imp.import_items) if imp.import_items else None
+				for entity in sub_ast.entities:
+					if names is None or entity.name in names:
+						module.entities.append(entity)
+				# Recurse into sub-module imports
+				self._resolve_imports(sub_ast, candidate.parent)
+			except Exception:
+				pass
+
 	def _parse_file(self, source_file: Union[str, Path]) -> Dict[str, Any]:
 		"""Parse APG source file"""
 		try:

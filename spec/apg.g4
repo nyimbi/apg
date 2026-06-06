@@ -193,6 +193,8 @@ entity_type
     | 'marketplace' | 'ecommerce' | 'platform'
     // Reporting and analytics
     | 'pipeline' | 'etl' | 'dbt_model'
+    // User-defined / decorator-backed entity kinds — any identifier is valid
+    | IDENTIFIER
     ;
 
 inheritance

@@ -188,6 +188,10 @@ class PythonCodeGenerator:
 		files.update(self._generate_ai_agent_files(ast))
 		files.update(self._generate_application_files(ast))
 		files.update(self._generate_capability_files(ast))
+		# Phase 6: typed stub classes for agents
+		agent_stubs = self._generate_agent_stubs(ast)
+		if agent_stubs:
+			files["agent_stubs.py"] = agent_stubs
 		return files
 
 	def generate_deployment_bundle(self, ast: ModuleDeclaration) -> Dict[str, str]:
@@ -207,6 +211,113 @@ class PythonCodeGenerator:
 			"README.md": self._generate_python_readme(ast),
 			"smoke_test.py": self._generate_python_smoke_test(),
 		}
+
+	def _generate_agent_stubs(self, ast: ModuleDeclaration) -> str:
+		"""Generate typed Python stub classes for declared AI agents (Phase 6).
+
+		Each agent gets an AgentBase subclass with its declared metadata
+		and an async invoke() that routes to the configured runtime via the
+		APG agent adapter protocol.
+		"""
+		agents = [e for e in ast.entities if isinstance(e, AIAgentDeclaration)]
+		if not agents:
+			return ""
+
+		lines = [
+			'"""Typed agent stub classes generated from APG agent declarations.',
+			"",
+			"Each class wraps the agent metadata and provides an async invoke()",
+			"that delegates to the declared runtime via the APG adapter protocol.",
+			'"""',
+			"",
+			"from __future__ import annotations",
+			"",
+			"import asyncio",
+			"import json",
+			"import os",
+			"import shlex",
+			"import subprocess",
+			"from typing import Any, Optional",
+			"",
+			"",
+			"class AgentContext:",
+			'    """Runtime context for an agent invocation."""',
+			"    def __init__(self, tenant_id: str = 'default', user_id: str = 'anonymous',",
+			"                 session_id: str = '', **kwargs: Any) -> None:",
+			"        self.tenant_id = tenant_id",
+			"        self.user_id = user_id",
+			"        self.session_id = session_id",
+			"        self.metadata = kwargs",
+			"",
+			"",
+			"class AgentBase:",
+			'    """Base class for APG agent stubs."""',
+			"    name: str = ''",
+			"    role: str = ''",
+			"    model: str = ''",
+			"    runtime: str = 'codex'",
+			"",
+			"    async def invoke(self, prompt: str, context: Optional[AgentContext] = None) -> str:",
+			"        env_key = f'APG_AGENT_{self.runtime.upper()}_PROVIDER_COMMAND'",
+			"        cmd = os.environ.get(env_key) or os.environ.get('APG_AGENT_PROVIDER_COMMAND')",
+			"        if not cmd:",
+			"            raise RuntimeError(",
+			"                f'Agent {self.name!r}: no provider command configured. '",
+			"                f'Set {env_key} to wire up the {self.runtime} runtime.'",
+			"            )",
+			"        payload = {",
+			"            'agent': {'name': self.name, 'role': self.role, 'model': self.model},",
+			"            'input': prompt,",
+			"            'context': {",
+			"                'tenant_id': getattr(context, 'tenant_id', 'default'),",
+			"                'user_id': getattr(context, 'user_id', 'anonymous'),",
+			"            } if context else {},",
+			"        }",
+			"        result = await asyncio.to_thread(",
+			"            subprocess.run, shlex.split(cmd),",
+			"            input=json.dumps(payload), capture_output=True, text=True, timeout=120",
+			"        )",
+			"        out = result.stdout.strip()",
+			"        try:",
+			"            return json.loads(out).get('output', out)",
+			"        except Exception:",
+			"            return out",
+			"",
+			"",
+		]
+
+		for agent in agents:
+			cls_name = agent.name
+			role = (agent.role or "").replace("'", "\\'")
+			model = (agent.model or "").replace("'", "\\'")
+			system = (agent.system_prompt or "").replace("'", "\\'")
+			runtime = (agent.runtime or "codex").replace("'", "\\'")
+			caps = repr(list(agent.capabilities))
+			tools = repr(list(agent.tools))
+
+			lines += [
+				f"class {cls_name}(AgentBase):",
+				f'    """Agent stub for {cls_name} — {role}."""',
+				f"    name = '{cls_name}'",
+				f"    role = '{role}'",
+				f"    model = '{model}'",
+				f"    runtime = '{runtime}'",
+				f"    system = '{system[:100]}'",
+				f"    capabilities = {caps}",
+				f"    tools = {tools}",
+				"",
+				"",
+			]
+
+		lines += [
+			f"# Registry of all declared agents",
+			"AGENTS = {",
+		]
+		for agent in agents:
+			lines.append(f"    '{agent.name}': {agent.name},")
+		lines += ["}", ""]
+
+		return "\n".join(lines)
 
 	def _generate_semantic_model_files(self, ast: ModuleDeclaration) -> Dict[str, str]:
 		"""Generate the compiler semantic model artifact shipped with apps."""

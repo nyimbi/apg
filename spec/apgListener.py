@@ -1,4 +1,4 @@
-# Generated from /Users/nyimbiodero/src/pjs/apg/spec/apg.g4 by ANTLR 4.13.2
+# Generated from apg.g4 by ANTLR 4.13.2
 from antlr4 import *
 if "." in __name__:
     from .apgParser import apgParser
@@ -818,6 +818,168 @@ class apgListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by apgParser#screen_contract_block.
+    def enterScreen_contract_block(self, ctx:apgParser.Screen_contract_blockContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#screen_contract_block.
+    def exitScreen_contract_block(self, ctx:apgParser.Screen_contract_blockContext):
+        pass
+
+
+    # Enter a parse tree produced by apgParser#screen_set.
+    def enterScreen_set(self, ctx:apgParser.Screen_setContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#screen_set.
+    def exitScreen_set(self, ctx:apgParser.Screen_setContext):
+        pass
+
+
+    # Enter a parse tree produced by apgParser#screen_binding.
+    def enterScreen_binding(self, ctx:apgParser.Screen_bindingContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#screen_binding.
+    def exitScreen_binding(self, ctx:apgParser.Screen_bindingContext):
+        pass
+
+
+    # Enter a parse tree produced by apgParser#screen_key.
+    def enterScreen_key(self, ctx:apgParser.Screen_keyContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#screen_key.
+    def exitScreen_key(self, ctx:apgParser.Screen_keyContext):
+        pass
+
+
+    # Enter a parse tree produced by apgParser#screen_contract.
+    def enterScreen_contract(self, ctx:apgParser.Screen_contractContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#screen_contract.
+    def exitScreen_contract(self, ctx:apgParser.Screen_contractContext):
+        pass
+
+
+    # Enter a parse tree produced by apgParser#screen_contract_member.
+    def enterScreen_contract_member(self, ctx:apgParser.Screen_contract_memberContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#screen_contract_member.
+    def exitScreen_contract_member(self, ctx:apgParser.Screen_contract_memberContext):
+        pass
+
+
+    # Enter a parse tree produced by apgParser#screen_layout.
+    def enterScreen_layout(self, ctx:apgParser.Screen_layoutContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#screen_layout.
+    def exitScreen_layout(self, ctx:apgParser.Screen_layoutContext):
+        pass
+
+
+    # Enter a parse tree produced by apgParser#screen_element_list.
+    def enterScreen_element_list(self, ctx:apgParser.Screen_element_listContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#screen_element_list.
+    def exitScreen_element_list(self, ctx:apgParser.Screen_element_listContext):
+        pass
+
+
+    # Enter a parse tree produced by apgParser#screen_element_ref.
+    def enterScreen_element_ref(self, ctx:apgParser.Screen_element_refContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#screen_element_ref.
+    def exitScreen_element_ref(self, ctx:apgParser.Screen_element_refContext):
+        pass
+
+
+    # Enter a parse tree produced by apgParser#screen_element_member.
+    def enterScreen_element_member(self, ctx:apgParser.Screen_element_memberContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#screen_element_member.
+    def exitScreen_element_member(self, ctx:apgParser.Screen_element_memberContext):
+        pass
+
+
+    # Enter a parse tree produced by apgParser#screen_event_list.
+    def enterScreen_event_list(self, ctx:apgParser.Screen_event_listContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#screen_event_list.
+    def exitScreen_event_list(self, ctx:apgParser.Screen_event_listContext):
+        pass
+
+
+    # Enter a parse tree produced by apgParser#screen_event.
+    def enterScreen_event(self, ctx:apgParser.Screen_eventContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#screen_event.
+    def exitScreen_event(self, ctx:apgParser.Screen_eventContext):
+        pass
+
+
+    # Enter a parse tree produced by apgParser#screen_event_member.
+    def enterScreen_event_member(self, ctx:apgParser.Screen_event_memberContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#screen_event_member.
+    def exitScreen_event_member(self, ctx:apgParser.Screen_event_memberContext):
+        pass
+
+
+    # Enter a parse tree produced by apgParser#screen_relationship_list.
+    def enterScreen_relationship_list(self, ctx:apgParser.Screen_relationship_listContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#screen_relationship_list.
+    def exitScreen_relationship_list(self, ctx:apgParser.Screen_relationship_listContext):
+        pass
+
+
+    # Enter a parse tree produced by apgParser#screen_relationship.
+    def enterScreen_relationship(self, ctx:apgParser.Screen_relationshipContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#screen_relationship.
+    def exitScreen_relationship(self, ctx:apgParser.Screen_relationshipContext):
+        pass
+
+
+    # Enter a parse tree produced by apgParser#screen_relation_edge.
+    def enterScreen_relation_edge(self, ctx:apgParser.Screen_relation_edgeContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#screen_relation_edge.
+    def exitScreen_relation_edge(self, ctx:apgParser.Screen_relation_edgeContext):
+        pass
+
+
+    # Enter a parse tree produced by apgParser#screen_relation_modifier.
+    def enterScreen_relation_modifier(self, ctx:apgParser.Screen_relation_modifierContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#screen_relation_modifier.
+    def exitScreen_relation_modifier(self, ctx:apgParser.Screen_relation_modifierContext):
+        pass
+
+
+    # Enter a parse tree produced by apgParser#screen_relationship_member.
+    def enterScreen_relationship_member(self, ctx:apgParser.Screen_relationship_memberContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#screen_relationship_member.
+    def exitScreen_relationship_member(self, ctx:apgParser.Screen_relationship_memberContext):
+        pass
+
+
     # Enter a parse tree produced by apgParser#ui_shell.
     def enterUi_shell(self, ctx:apgParser.Ui_shellContext):
         pass
@@ -1220,6 +1382,24 @@ class apgListener(ParseTreeListener):
 
     # Exit a parse tree produced by apgParser#cascade_value.
     def exitCascade_value(self, ctx:apgParser.Cascade_valueContext):
+        pass
+
+
+    # Enter a parse tree produced by apgParser#fallback_chain.
+    def enterFallback_chain(self, ctx:apgParser.Fallback_chainContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#fallback_chain.
+    def exitFallback_chain(self, ctx:apgParser.Fallback_chainContext):
+        pass
+
+
+    # Enter a parse tree produced by apgParser#physical_literal.
+    def enterPhysical_literal(self, ctx:apgParser.Physical_literalContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#physical_literal.
+    def exitPhysical_literal(self, ctx:apgParser.Physical_literalContext):
         pass
 
 
@@ -1790,6 +1970,15 @@ class apgListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by apgParser#null_coalesce_expr.
+    def enterNull_coalesce_expr(self, ctx:apgParser.Null_coalesce_exprContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#null_coalesce_expr.
+    def exitNull_coalesce_expr(self, ctx:apgParser.Null_coalesce_exprContext):
+        pass
+
+
     # Enter a parse tree produced by apgParser#or_test.
     def enterOr_test(self, ctx:apgParser.Or_testContext):
         pass
@@ -1823,6 +2012,15 @@ class apgListener(ParseTreeListener):
 
     # Exit a parse tree produced by apgParser#comparison.
     def exitComparison(self, ctx:apgParser.ComparisonContext):
+        pass
+
+
+    # Enter a parse tree produced by apgParser#pipeline_expr.
+    def enterPipeline_expr(self, ctx:apgParser.Pipeline_exprContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#pipeline_expr.
+    def exitPipeline_expr(self, ctx:apgParser.Pipeline_exprContext):
         pass
 
 
@@ -6269,6 +6467,51 @@ class apgListener(ParseTreeListener):
 
     # Exit a parse tree produced by apgParser#database_schema.
     def exitDatabase_schema(self, ctx:apgParser.Database_schemaContext):
+        pass
+
+
+    # Enter a parse tree produced by apgParser#enum_variant_decl.
+    def enterEnum_variant_decl(self, ctx:apgParser.Enum_variant_declContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#enum_variant_decl.
+    def exitEnum_variant_decl(self, ctx:apgParser.Enum_variant_declContext):
+        pass
+
+
+    # Enter a parse tree produced by apgParser#enum_variant_doc.
+    def enterEnum_variant_doc(self, ctx:apgParser.Enum_variant_docContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#enum_variant_doc.
+    def exitEnum_variant_doc(self, ctx:apgParser.Enum_variant_docContext):
+        pass
+
+
+    # Enter a parse tree produced by apgParser#state_transition.
+    def enterState_transition(self, ctx:apgParser.State_transitionContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#state_transition.
+    def exitState_transition(self, ctx:apgParser.State_transitionContext):
+        pass
+
+
+    # Enter a parse tree produced by apgParser#state_transition_props.
+    def enterState_transition_props(self, ctx:apgParser.State_transition_propsContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#state_transition_props.
+    def exitState_transition_props(self, ctx:apgParser.State_transition_propsContext):
+        pass
+
+
+    # Enter a parse tree produced by apgParser#state_transition_prop.
+    def enterState_transition_prop(self, ctx:apgParser.State_transition_propContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#state_transition_prop.
+    def exitState_transition_prop(self, ctx:apgParser.State_transition_propContext):
         pass
 
 

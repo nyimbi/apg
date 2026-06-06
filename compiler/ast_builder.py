@@ -542,6 +542,30 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 			source_file=source_file,
 		)
 
+		# Parse import statements: "import foo.bar;" or "from foo.bar import Baz;"
+		for m in re.finditer(
+			r"\bfrom\s+([A-Za-z_][A-Za-z0-9_.]*)\s+import\s+([A-Za-z_*][A-Za-z0-9_,\s*]*);",
+			cleaned,
+		):
+			module_name = m.group(1).strip()
+			items_raw = m.group(2).strip()
+			items = [i.strip() for i in items_raw.split(",") if i.strip() and i.strip() != "*"]
+			module.imports.append(ImportDeclaration(
+				module_name=module_name,
+				import_items=items,
+			))
+		for m in re.finditer(
+			r"(?<!['\"])(?:^|\n)\s*import\s+([A-Za-z_][A-Za-z0-9_.]*)\s*(?:as\s+([A-Za-z_][A-Za-z0-9_]*))?\s*;",
+			cleaned,
+		):
+			module_name = m.group(1).strip()
+			alias = m.group(2).strip() if m.group(2) else None
+			module.imports.append(ImportDeclaration(
+				module_name=module_name,
+				import_items=[],
+				alias=alias,
+			))
+
 		for kind, name, body in self._iter_source_entities(cleaned):
 			if kind == "module":
 				continue

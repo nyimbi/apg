@@ -1,4 +1,4 @@
-# Generated from /Users/nyimbiodero/src/pjs/apg/spec/apg.g4 by ANTLR 4.13.2
+# Generated from apg.g4 by ANTLR 4.13.2
 from antlr4 import *
 if "." in __name__:
     from .apgParser import apgParser
@@ -459,6 +459,96 @@ class apgVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by apgParser#screen_contract_block.
+    def visitScreen_contract_block(self, ctx:apgParser.Screen_contract_blockContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by apgParser#screen_set.
+    def visitScreen_set(self, ctx:apgParser.Screen_setContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by apgParser#screen_binding.
+    def visitScreen_binding(self, ctx:apgParser.Screen_bindingContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by apgParser#screen_key.
+    def visitScreen_key(self, ctx:apgParser.Screen_keyContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by apgParser#screen_contract.
+    def visitScreen_contract(self, ctx:apgParser.Screen_contractContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by apgParser#screen_contract_member.
+    def visitScreen_contract_member(self, ctx:apgParser.Screen_contract_memberContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by apgParser#screen_layout.
+    def visitScreen_layout(self, ctx:apgParser.Screen_layoutContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by apgParser#screen_element_list.
+    def visitScreen_element_list(self, ctx:apgParser.Screen_element_listContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by apgParser#screen_element_ref.
+    def visitScreen_element_ref(self, ctx:apgParser.Screen_element_refContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by apgParser#screen_element_member.
+    def visitScreen_element_member(self, ctx:apgParser.Screen_element_memberContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by apgParser#screen_event_list.
+    def visitScreen_event_list(self, ctx:apgParser.Screen_event_listContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by apgParser#screen_event.
+    def visitScreen_event(self, ctx:apgParser.Screen_eventContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by apgParser#screen_event_member.
+    def visitScreen_event_member(self, ctx:apgParser.Screen_event_memberContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by apgParser#screen_relationship_list.
+    def visitScreen_relationship_list(self, ctx:apgParser.Screen_relationship_listContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by apgParser#screen_relationship.
+    def visitScreen_relationship(self, ctx:apgParser.Screen_relationshipContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by apgParser#screen_relation_edge.
+    def visitScreen_relation_edge(self, ctx:apgParser.Screen_relation_edgeContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by apgParser#screen_relation_modifier.
+    def visitScreen_relation_modifier(self, ctx:apgParser.Screen_relation_modifierContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by apgParser#screen_relationship_member.
+    def visitScreen_relationship_member(self, ctx:apgParser.Screen_relationship_memberContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by apgParser#ui_shell.
     def visitUi_shell(self, ctx:apgParser.Ui_shellContext):
         return self.visitChildren(ctx)
@@ -681,6 +771,16 @@ class apgVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by apgParser#cascade_value.
     def visitCascade_value(self, ctx:apgParser.Cascade_valueContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by apgParser#fallback_chain.
+    def visitFallback_chain(self, ctx:apgParser.Fallback_chainContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by apgParser#physical_literal.
+    def visitPhysical_literal(self, ctx:apgParser.Physical_literalContext):
         return self.visitChildren(ctx)
 
 
@@ -999,6 +1099,11 @@ class apgVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by apgParser#null_coalesce_expr.
+    def visitNull_coalesce_expr(self, ctx:apgParser.Null_coalesce_exprContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by apgParser#or_test.
     def visitOr_test(self, ctx:apgParser.Or_testContext):
         return self.visitChildren(ctx)
@@ -1016,6 +1121,11 @@ class apgVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by apgParser#comparison.
     def visitComparison(self, ctx:apgParser.ComparisonContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by apgParser#pipeline_expr.
+    def visitPipeline_expr(self, ctx:apgParser.Pipeline_exprContext):
         return self.visitChildren(ctx)
 
 
@@ -3486,6 +3596,31 @@ class apgVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by apgParser#database_schema.
     def visitDatabase_schema(self, ctx:apgParser.Database_schemaContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by apgParser#enum_variant_decl.
+    def visitEnum_variant_decl(self, ctx:apgParser.Enum_variant_declContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by apgParser#enum_variant_doc.
+    def visitEnum_variant_doc(self, ctx:apgParser.Enum_variant_docContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by apgParser#state_transition.
+    def visitState_transition(self, ctx:apgParser.State_transitionContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by apgParser#state_transition_props.
+    def visitState_transition_props(self, ctx:apgParser.State_transition_propsContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by apgParser#state_transition_prop.
+    def visitState_transition_prop(self, ctx:apgParser.State_transition_propContext):
         return self.visitChildren(ctx)
 
 
