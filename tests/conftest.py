@@ -79,14 +79,8 @@ def context(engine: CompositionEngine):
 	)
 
 
-@pytest.fixture(autouse=True)
-def _flush_stale_flask_contexts():
-	"""Pop any lingering Flask request/app contexts left by previous tests.
-
-	Flask 3.x uses ContextVar — request context leaks between tests when a
-	test_request_context() is pushed but not popped (e.g. on test failure).
-	"""
-	yield
+def _pop_flask_contexts() -> None:
+	"""Pop any active Flask request and app contexts using Flask 3.x ContextVars."""
 	try:
 		from flask.globals import _cv_request, _cv_app
 		ctx = _cv_request.get(None)
@@ -103,3 +97,16 @@ def _flush_stale_flask_contexts():
 				pass
 	except Exception:
 		pass
+
+
+@pytest.fixture(autouse=True)
+def _flush_stale_flask_contexts():
+	"""Ensure no stale Flask contexts surround each test.
+
+	Run cleanup BEFORE the test (catches context left by the previous test's
+	teardown chain) AND AFTER the test (catches context created by this test
+	that wasn't popped, e.g. due to test failure).
+	"""
+	_pop_flask_contexts()
+	yield
+	_pop_flask_contexts()
