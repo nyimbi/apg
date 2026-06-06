@@ -4,6 +4,10 @@
 *Date: 2026-06-06*
 *Scope: spec/apg.g4 v11, compiler/ast_builder.py, compiler/semantic_analyzer.py, examples/*
 
+> **Living document.** This analysis is updated as issues are resolved. The Resolution Status
+> section below tracks progress against commits 9c547d7c–6a661a29 (Phases 1–7). Open issues
+> remain on the roadmap; partial fixes are noted with caveats.
+
 ---
 
 ## Methodology
@@ -12,6 +16,27 @@ This analysis examines the grammar specification (`spec/apg.g4`, 4,375 lines), t
 implementation (`compiler/ast_builder.py`, 1,424 lines; `compiler/parser.py`, 354 lines;
 `compiler/semantic_analyzer.py`, 838 lines), and representative APG programs from the `examples/`
 directory. Issues are ordered by architectural severity.
+
+## Resolution Status
+
+Progress as of commits 9c547d7c–6a661a29 (Phases 1–7):
+
+| Issue | Severity | Status | Notes |
+|-------|----------|--------|-------|
+| §1 Dual-parser architecture | Critical | Partial | `compiler/antlr_ast_visitor.py`: ANTLR drives entity boundary detection; body parsing still uses regex. `antlr_clean` gate prevents broken trees from corrupting AST. Full migration (body parsers as ANTLR visitors) is Phase 8. |
+| §2 100+ entity_type keywords | High | Partial | `spec/apg.g4`: added an `IDENTIFIER` alternative — any identifier is now a valid entity kind. Historic keyword list retained for backward compatibility. Grammar regenerated. |
+| §3 Rule conditions as strings | High | Done | `compiler/rule_expr.py`: recursive descent parser for `when` conditions. `parse_rule_expr`, `extract_fields`, `validate_rule_fields`, `expr_to_dict`. Integrated into semantic_analyzer; conditions stored as `when_ast` dicts in semantic model. |
+| §4 Workflow as string | High | Done | `compiler/ast_builder.py`: `WorkflowDeclaration` with typed `states`, `transitions`, `human_tasks`, `guards`, `assignments`, `timers`, `waits`, `retry_policy`, `compensation`. Validated in semantic_analyzer. Exposed in semantic_model flows. |
+| §5 No cross-entity validation | High | Done | `compiler/semantic_analyzer.py`: `_resolve_references()` Phase 5 pass. Validates `requires`, `provides`, `capabilities`, `agents` against local symbols and MANIFEST.json. Emits warnings (not errors). |
+| §6 Inheritance declared not implemented | Medium | Open | `extends` keyword accepted by grammar but not semantically resolved. Planned for a later phase. |
+| §7 Import system grammar-only | Medium | Partial | `compiler/compiler.py`: `_resolve_imports()` resolves dot-separated module names to relative `.apg` file paths. Lenient (missing files silently skipped). No semver constraints or lock file. |
+| §8 contract_separator ambiguity | Medium | Open | Both `;` and `,` remain valid separators. Formatter normalization planned. |
+| §9 Agent memory parsing ambiguous | Medium | Open | `memory: {kind: vector, name: sales_memory}` structured form not yet enforced. |
+| §10 Generated code is config only | Medium | Partial | `compiler/code_generator.py`: `_generate_agent_stubs()` produces typed `AgentBase` subclasses in `agent_stubs.py`. Capability router stubs not yet generated. |
+| §11 Streaming declared not expressed | Medium | Open | `streaming: {processor: bytewax}` remains a declaration tag without topology. |
+| §12 Physical literals discarded | Low | Open | `NUMBER PHYS_UNIT` tokens parsed but type-erased in property values. |
+| §13 Form layout sub-language stranded | Low | Open | `form` entity bodies capture ANTLR context but form-field validation against table schema not implemented. |
+| §14 No versioning for generated artifacts | Low | Open | Module version strings stored but not cross-validated. No lock file generated. |
 
 ---
 

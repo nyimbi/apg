@@ -8,12 +8,16 @@ does not write generated application files.
 from __future__ import annotations
 
 import json
+from collections import OrderedDict
 from pathlib import Path
+from threading import RLock
 from typing import Any
 
 # ── file-level mtime cache ──────────────────────────────────────────────────
-# Keyed by (resolved_path_str, mtime_ns) — avoids re-parsing unchanged files.
-_MODEL_CACHE: dict[tuple[str, int], dict[str, Any]] = {}
+# Bounded LRU, keyed by (resolved_path_str, mtime_ns).  Thread-safe via RLock.
+_MODEL_CACHE_MAX = 256
+_MODEL_CACHE: OrderedDict[tuple[str, int], dict[str, Any]] = OrderedDict()
+_MODEL_CACHE_LOCK = RLock()
 
 from .ast_builder import (
 	AIAgentDeclaration,
@@ -46,10 +50,10 @@ DEFAULT_SEMANTIC_MODEL_CATALOG = Path(__file__).resolve().parent.parent / "tests
 
 
 def build_semantic_model(path: Path) -> dict[str, Any]:
-	"""Build an ``apg.semantic-model.v1`` report for one APG source file.
+	"""Build apg.semantic-model.v1 for one APG source file.
 
-	Results are cached by (resolved_path, mtime_ns); callers can invalidate by
-	calling ``invalidate_semantic_model_cache(path)``.
+	Cached by (resolved_path, mtime_ns); LRU-evicted at 256 entries.
+	Call invalidate_semantic_model_cache(path) after writing to path.
 	"""
 	resolved = str(path.resolve())
 	try:
@@ -57,22 +61,37 @@ def build_semantic_model(path: Path) -> dict[str, Any]:
 	except OSError:
 		mtime_ns = 0
 	cache_key = (resolved, mtime_ns)
-	if cache_key in _MODEL_CACHE:
-		return _MODEL_CACHE[cache_key]
+
+	with _MODEL_CACHE_LOCK:
+		cached = _MODEL_CACHE.get(cache_key)
+		if cached is not None:
+			_MODEL_CACHE.move_to_end(cache_key)
+			return cached
+
+	# Build outside lock so concurrent unrelated files don't serialize
 	source = path.read_text(encoding="utf-8")
 	model = build_semantic_model_from_source(source, display_path=path)
-	_MODEL_CACHE[cache_key] = model
+
+	with _MODEL_CACHE_LOCK:
+		# Evict any stale entries for this path (different mtime)
+		for k in [k for k in _MODEL_CACHE if k[0] == resolved and k != cache_key]:
+			_MODEL_CACHE.pop(k, None)
+		_MODEL_CACHE[cache_key] = model
+		_MODEL_CACHE.move_to_end(cache_key)
+		while len(_MODEL_CACHE) > _MODEL_CACHE_MAX:
+			_MODEL_CACHE.popitem(last=False)
 	return model
 
 
 def invalidate_semantic_model_cache(path: Path | None = None) -> None:
 	"""Evict one path (or all entries) from the mtime cache."""
-	if path is None:
-		_MODEL_CACHE.clear()
-	else:
+	with _MODEL_CACHE_LOCK:
+		if path is None:
+			_MODEL_CACHE.clear()
+			return
 		resolved = str(path.resolve())
 		for key in [k for k in _MODEL_CACHE if k[0] == resolved]:
-			del _MODEL_CACHE[key]
+			_MODEL_CACHE.pop(key, None)
 
 
 def build_semantic_model_from_source(
@@ -177,9 +196,15 @@ def audit_semantic_model_fixtures(catalog_path: Path | None = None) -> dict[str,
 	}
 
 
-def build_semantic_model_from_module(module: ModuleDeclaration, source: str | Path) -> dict[str, Any]:
-	"""Build an ``apg.semantic-model.v1`` report from an existing AST module."""
-	path = Path(source)
+def build_semantic_model_from_module(module: ModuleDeclaration, display_path: str | Path) -> dict[str, Any]:
+	"""Build an ``apg.semantic-model.v1`` report from an existing AST module.
+
+	``display_path`` is the file path used for diagnostic messages and the
+	``source_files`` field in the returned model.  It is a PATH, not source
+	text — contrast with ``build_semantic_model_from_source`` which takes
+	actual source code as its first argument.
+	"""
+	path = Path(display_path)
 	analyzer = SemanticAnalyzer()
 	analysis = analyzer.analyze(module)
 	diagnostics: list[dict[str, Any]] = []

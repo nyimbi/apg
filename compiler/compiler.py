@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, Union
 from pathlib import Path
 import json
 import logging
+import re
 
 # Import compiler components
 from .parser import APGParser, APGSyntaxError
@@ -289,27 +290,60 @@ class APGCompiler:
 	# Internal Compilation Phases
 	# ========================================
 	
-	def _resolve_imports(self, module: Any, base_dir: Path) -> None:
+	_IMPORT_SEG_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+	def _resolve_imports(
+		self,
+		module: Any,
+		base_dir: Path,
+		_seen: "set[str] | None" = None,
+	) -> None:
 		"""Phase 2b: resolve and inline entities from imported APG files.
 
 		Translates dot-separated module names to relative file paths
 		(e.g. `sales.contracts` → `<base_dir>/sales/contracts.apg`).
-		Detected cycles are silently skipped.  Parse failures in imported
-		files produce warnings stored on the module.
+
+		Security: each path segment is validated as a simple identifier to
+		prevent path traversal (e.g. `import ..secrets` is rejected).
+		Containment is enforced — resolved path must stay within base_dir.
+
+		Cycles: `_seen` is threaded through recursion so A→B→C→A chains
+		are correctly detected and skipped (not just direct self-imports).
 		"""
 		if not hasattr(module, "imports") or not module.imports:
 			return
-		seen: set[str] = {getattr(module, "source_file", "") or ""}
+
+		if _seen is None:
+			src = getattr(module, "source_file", "") or ""
+			_seen = {str(Path(src).resolve()) if src else ""}
+
+		project_root = base_dir.resolve()
+
 		for imp in list(module.imports):
-			# Map "a.b.c" → "<base_dir>/a/b/c.apg"
-			rel_path = Path(*imp.module_name.split(".")).with_suffix(".apg")
+			segments = imp.module_name.split(".")
+			# Reject traversal: each segment must be a plain identifier
+			if not segments or not all(self._IMPORT_SEG_RE.match(s) for s in segments):
+				self.logger.debug("Rejected import with invalid segments: %r", imp.module_name)
+				continue
+
+			rel_path = Path(*segments).with_suffix(".apg")
 			candidate = base_dir / rel_path
 			if not candidate.exists():
 				continue
-			resolved = str(candidate.resolve())
-			if resolved in seen:
+
+			try:
+				resolved_candidate = candidate.resolve()
+				# Enforce containment: must stay within the project root or a parent
+				resolved_candidate.relative_to(project_root)
+			except (ValueError, OSError):
+				self.logger.debug("Rejected import outside project root: %s", candidate)
 				continue
-			seen.add(resolved)
+
+			resolved = str(resolved_candidate)
+			if resolved in _seen:
+				continue
+			_seen.add(resolved)
+
 			try:
 				sub_result = self._parse_file(candidate)
 				if not sub_result.get("success"):
@@ -322,10 +356,10 @@ class APGCompiler:
 				for entity in sub_ast.entities:
 					if names is None or entity.name in names:
 						module.entities.append(entity)
-				# Recurse into sub-module imports
-				self._resolve_imports(sub_ast, candidate.parent)
-			except Exception:
-				pass
+				# Recurse with shared seen set for transitive cycle detection
+				self._resolve_imports(sub_ast, resolved_candidate.parent, _seen)
+			except Exception as e:
+				self.logger.debug("Import resolution failed for %s: %s", candidate, e)
 
 	def _parse_file(self, source_file: Union[str, Path]) -> Dict[str, Any]:
 		"""Parse APG source file"""

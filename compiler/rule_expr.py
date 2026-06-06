@@ -195,8 +195,9 @@ class _Parser:
 			self._consume()
 			inner = self._parse_or()
 			close = self._peek()
-			if close and close.kind == "rparen":
-				self._consume()
+			if not (close and close.kind == "rparen"):
+				raise RuleExprParseError("Expected ')' to close sub-expression")
+			self._consume()
 			return inner
 
 		# Must start with a field identifier
@@ -264,8 +265,9 @@ class _Parser:
 					continue
 				values.append(self._parse_value())
 			close = self._peek()
-			if close and close.kind == "rbracket":
-				self._consume()
+			if not (close and close.kind == "rbracket"):
+				raise RuleExprParseError("Expected ']' to close list")
+			self._consume()
 		else:
 			# Bare list: FDA, EMA, HC (until 'and'/'or'/end)
 			while True:
@@ -338,13 +340,25 @@ def expr_to_dict(node: RuleExprNode) -> dict[str, Any]:
 
 def validate_rule_fields(
 	condition: str,
-	known_fields: set[str],
+	known_fields: "set[str] | None",
 ) -> list[str]:
 	"""Parse condition and return warnings for unknown field references.
 
-	Returns empty list when all fields are known or when condition is empty.
-	Never raises — parse failures produce a single warning.
+	known_fields semantics:
+	    None    → skip field validation (syntax-only check; use in lint dry-run)
+	    set()   → strict: warn on every field reference (zero known fields)
+	    {name}  → warn on fields not in the set; also matches dotted paths by
+	              base name (account.status validates against {'status'})
+
+	Never raises — parse failures produce a single warning entry.
 	"""
+	if known_fields is None:
+		# Syntax-only pass: still report parse errors as warnings
+		try:
+			parse_rule_expr(condition)
+		except RuleExprParseError as e:
+			return [f"Rule condition parse warning: {e}"]
+		return []
 	try:
 		node = parse_rule_expr(condition)
 	except RuleExprParseError as e:

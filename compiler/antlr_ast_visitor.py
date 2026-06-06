@@ -59,6 +59,17 @@ class APGASTVisitor(apgVisitor):  # type: ignore[misc]
 	nested-brace bugs), delegate body content to existing _parse_source_*
 	methods so that no semantic behaviour changes.
 
+	WHY THE HYBRID EXISTS — FLOORDIV/COMMENT lexer ordering bug:
+	    In spec/apg.g4 the FLOORDIV token rule ('//') is declared before the
+	    COMMENT rule ('// ...' line comment).  ANTLR uses first-match lexer
+	    ordering, so it tokenizes every '//' as FLOORDIV and never recognises
+	    line comments.  Rather than reorder the grammar (which would change
+	    token indices and break generated code), we pre-strip all comment text
+	    in _strip_comments_preserve_positions() before handing source to ANTLR.
+	    The stripped source has the same length as the original, so all
+	    ctx.start.start / ctx.stop.stop character offsets remain valid and
+	    _span_text() still reconstructs the right body text.
+
 	To add a native ANTLR body handler for a specific entity kind, add a
 	`_visit_<kind>_body(body_ctx)` method and dispatch to it in visitEntity.
 	"""
@@ -178,8 +189,19 @@ def build_ast_from_antlr(
 ) -> Optional[ModuleDeclaration]:
 	"""Build a ModuleDeclaration from an ANTLR parse tree.
 
-	Returns None if the visitor fails, allowing callers to fall back to the
-	regex-based parser.
+	Precondition — callers MUST check ``parse_tree.antlr_clean is True`` before
+	calling this function.  When ANTLR reported errors, token offsets may be
+	unreliable and _span_text() will produce garbage body text; the regex-based
+	fallback (_build_source_ast) is safer in that case.
+
+	The ``source_code`` argument must be the comment-stripped source that was
+	fed to ANTLR (i.e. ``APGSourceParseTree.antlr_source``), NOT the raw
+	original.  This is necessary because _span_text() uses ANTLR character
+	offsets to slice into the string — those offsets index into the stripped
+	source, not the raw source.
+
+	Returns None if ANTLR is unavailable, the tree is None, or the visitor
+	raises, allowing callers to fall back to the regex-based parser.
 	"""
 	if not _ANTLR_AVAILABLE or antlr_tree is None:
 		return None

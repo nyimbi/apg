@@ -161,3 +161,61 @@ class TestRealConditions:
 		node = parse_rule_expr(cond)
 		assert node is not None
 		assert extract_fields(node)
+
+
+class TestEdgeCases:
+	"""Grammar features documented in rule_expr.py but not previously tested."""
+
+	def test_not_in_list(self):
+		node = parse_rule_expr("country not in [US, CA]")
+		assert isinstance(node, InNode)
+		assert node.negated is True
+		assert set(node.values) == {"US", "CA"}
+
+	def test_parenthesised_expression(self):
+		node = parse_rule_expr("(amount > 1 or amount > 2) and stage == q")
+		assert isinstance(node, AndNode)
+		assert isinstance(node.left, OrNode)
+
+	def test_and_binds_tighter_than_or(self):
+		node = parse_rule_expr("a == 1 or b == 2 and c == 3")
+		# Should be: a == 1 or (b == 2 and c == 3)
+		assert isinstance(node, OrNode)
+		assert isinstance(node.right, AndNode)
+
+	def test_float_value(self):
+		node = parse_rule_expr("risk_score > 0.75")
+		assert isinstance(node, CompareNode)
+		assert node.value == 0.75
+
+	def test_quoted_string_value(self):
+		node = parse_rule_expr("status == 'active'")
+		assert isinstance(node, CompareNode)
+		assert node.value == "active"
+
+	def test_three_way_and(self):
+		node = parse_rule_expr("amount > 1000 and stage == q and approved == false")
+		assert isinstance(node, AndNode)
+		# All three fields should be extracted
+		assert "amount" in extract_fields(node)
+		assert "stage" in extract_fields(node)
+		assert "approved" in extract_fields(node)
+
+	def test_bare_truthy_field(self):
+		node = parse_rule_expr("duplicate_detected")
+		assert isinstance(node, CompareNode)
+		assert node.field == "duplicate_detected"
+
+	def test_not_equal_normalises_to_ne(self):
+		node = parse_rule_expr("status <> inactive")
+		assert isinstance(node, CompareNode)
+		assert node.op == "!="
+
+	def test_or_expression_multiword(self):
+		node = parse_rule_expr("amount < 100 or amount > 1000")
+		assert isinstance(node, OrNode)
+
+	def test_validate_rule_fields_none_skips_validation(self):
+		# None means "skip field validation" — should not warn even for unknown fields
+		warnings = validate_rule_fields("totally_unknown_field > 999", None)
+		assert warnings == [], f"None known_fields should skip validation: {warnings}"

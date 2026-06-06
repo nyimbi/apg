@@ -26,11 +26,28 @@ class AgentBase:
 	They hold the agent's declared metadata and provide an `invoke` method
 	that routes to the configured runtime.
 
+	Provider command contract:
+	    The env var ``APG_AGENT_<RUNTIME>_PROVIDER_COMMAND`` (falling back to
+	    ``APG_AGENT_PROVIDER_COMMAND``) names an executable that receives on
+	    stdin a JSON object::
+
+	        {"agent": {"name": "...", "role": "...", "model": "..."},
+	         "input": "<prompt>",
+	         "context": {"tenant_id": "...", "user_id": "..."}}
+
+	    and must write to stdout a JSON object::
+
+	        {"output": "<response text>"}
+
 	Attributes:
 	    name:    Agent name as declared in the APG source.
 	    role:    Agent role description.
 	    model:   LLM model identifier (e.g. 'openai:gpt-4.1-mini').
 	    runtime: Runtime identifier (e.g. 'codex', 'claude_code').
+	    system:  System prompt for the agent.
+	    capabilities: Declared capability identifiers (immutable; subclasses replace).
+	    tools:         Declared tool identifiers (immutable; subclasses replace).
+	    configuration: Runtime configuration map (subclasses replace entirely; do NOT mutate base).
 	"""
 
 	name: str = ""
@@ -38,9 +55,10 @@ class AgentBase:
 	model: str = ""
 	runtime: str = "codex"
 	system: str = ""
-	capabilities: list[str] = []
-	tools: list[str] = []
-	configuration: dict[str, Any] = {}
+	capabilities: tuple[str, ...] = ()
+	tools: tuple[str, ...] = ()
+	# Note: do NOT use a mutable default here — subclasses replace this at the class level
+	configuration: "dict[str, Any]" = {}  # type: ignore[assignment]
 
 	async def invoke(self, prompt: str, context: AgentContext | None = None) -> str:
 		"""Invoke the agent with a prompt.
@@ -48,9 +66,19 @@ class AgentBase:
 		The default implementation raises NotImplementedError. Generated stubs
 		override this to route to the declared runtime via the agent adapter.
 		"""
+		env_key = f"APG_AGENT_{self.runtime.upper()}_PROVIDER_COMMAND"
+		cmd = (
+			__import__("os").environ.get(env_key)
+			or __import__("os").environ.get("APG_AGENT_PROVIDER_COMMAND")
+		)
+		if not cmd:
+			raise RuntimeError(
+				f"Agent '{self.name}': set {env_key} to configure the "
+				f"{self.runtime!r} runtime provider command."
+			)
 		raise NotImplementedError(
 			f"Agent '{self.name}' has no runtime wired up. "
-			f"Set APG_AGENT_{self.runtime.upper()}_PROVIDER_COMMAND to configure."
+			f"Set {env_key} to configure."
 		)
 
 	def __repr__(self) -> str:

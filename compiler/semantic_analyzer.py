@@ -24,6 +24,37 @@ from .ast_builder import (
 )
 
 
+# Module-level MANIFEST cache — keyed by mtime_ns to auto-invalidate on updates
+_MANIFEST_KNOWN_SYSTEM_CACHE: "tuple[frozenset[str], int] | None" = None
+
+
+def _load_known_system_capabilities() -> frozenset[str]:
+	"""Load capability IDs from MANIFEST.json, cached by file mtime."""
+	global _MANIFEST_KNOWN_SYSTEM_CACHE
+	from pathlib import Path
+	manifest_path = Path(__file__).resolve().parents[1] / "capabilities" / "MANIFEST.json"
+	try:
+		mtime = manifest_path.stat().st_mtime_ns
+	except OSError:
+		return frozenset()
+	if _MANIFEST_KNOWN_SYSTEM_CACHE is not None and _MANIFEST_KNOWN_SYSTEM_CACHE[1] == mtime:
+		return _MANIFEST_KNOWN_SYSTEM_CACHE[0]
+	known: set[str] = set()
+	try:
+		import json
+		raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+		for cap in raw.get("capabilities", {}).values():
+			for key in ("id", "code"):
+				v = str(cap.get(key, "") or "")
+				if v:
+					known.add(v)
+	except Exception:
+		pass
+	result = frozenset(known)
+	_MANIFEST_KNOWN_SYSTEM_CACHE = (result, mtime)
+	return result
+
+
 KNOWN_AI_AGENT_RUNTIMES = {
 	"local", "offline", "test",
 	"codex", "codex_cli", "openai_codex",
@@ -526,6 +557,12 @@ class SemanticAnalyzer:
 		if not isinstance(entity, WorkflowDeclaration):
 			return
 		if not entity.states:
+			# Warn when a workflow body exists but declares no step transitions
+			if not entity.steps_raw:
+				self.warnings.append(SemanticError(
+					f"Workflow '{entity.name}' defines no steps or states",
+					entity, "warning"
+				))
 			return
 		state_set = set(entity.states)
 		for task in entity.human_tasks:
@@ -621,21 +658,6 @@ class SemanticAnalyzer:
 		if not has_state:
 			self.warnings.append(SemanticError(
 				f"Digital twin '{entity.name}' should have state-related properties",
-				entity,
-				"warning"
-			))
-	
-	def _validate_workflow_constraints(self, entity: EntityDeclaration):
-		"""Validate workflow-specific constraints"""
-		# Check for steps or stages
-		has_steps = any(
-			'step' in prop.name.lower() or 'stage' in prop.name.lower() 
-			for prop in entity.properties
-		)
-		
-		if not has_steps:
-			self.warnings.append(SemanticError(
-				f"Workflow '{entity.name}' should define steps or stages",
 				entity,
 				"warning"
 			))
@@ -858,19 +880,8 @@ class SemanticAnalyzer:
 			if isinstance(e, CapabilityDeclaration):
 				capability_provides.update(e.provides or [])
 
-		# Load known system capability IDs from MANIFEST.json (best-effort)
-		known_system: set[str] = set()
-		try:
-			from pathlib import Path
-			import json
-			manifest_path = Path(__file__).resolve().parents[1] / "capabilities" / "MANIFEST.json"
-			if manifest_path.exists():
-				raw = json.loads(manifest_path.read_text(encoding="utf-8"))
-				for cap in raw.get("capabilities", {}).values():
-					known_system.add(str(cap.get("id", "")))
-					known_system.add(str(cap.get("code", "")))
-		except Exception:
-			pass
+		# Load known system capability IDs from MANIFEST.json (best-effort, mtime-cached)
+		known_system = _load_known_system_capabilities()
 
 		def _is_known(ref: str) -> bool:
 			return ref in local_names or ref in capability_provides or ref in known_system

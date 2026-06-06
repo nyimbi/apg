@@ -56,55 +56,88 @@ class APGErrorListener(ErrorListener):
 
 
 def _strip_comments_preserve_positions(source: str) -> str:
-	"""Replace APG // comment content with spaces to preserve character positions.
+	"""Replace APG comment content with spaces to preserve character positions.
 
-	The ANTLR grammar has a lexer bug: FLOORDIV ('//' operator) is defined
-	before COMMENT ('//' line comment), so ANTLR treats '//' as a FLOORDIV
-	token instead of a comment start. We pre-strip comments here so the ANTLR
-	parser never sees comment text. Positions are preserved so that
-	ctx.start.start / ctx.stop.stop still index into a same-length string.
+	Handles:
+	- // line comments (replaced with spaces up to newline)
+	- /* ... */ block comments (replaced with spaces, newlines preserved)
+	- # Python-style comments (replaced with spaces up to newline)
+	- String literals (single and double quoted) protected from stripping
+	- Escaped characters inside strings
+
+	The ANTLR grammar has a lexer-ordering bug: FLOORDIV ('//') is declared
+	before COMMENT ('//' line comment), so ANTLR tokenizes '//' as FLOORDIV.
+	This function pre-strips comments so ANTLR never sees them.
+	Character positions are preserved so ANTLR token offsets remain valid.
 	"""
-	result = list(source)
+	# Fast path: if no comment markers present at all
+	if "//" not in source and "/*" not in source and "#" not in source:
+		return source
+
+	parts: list[str] = []
 	i = 0
+	n = len(source)
 	in_string: str | None = None
-	while i < len(source):
+	span_start = 0
+
+	def flush(end: int) -> None:
+		if end > span_start:
+			parts.append(source[span_start:end])
+
+	while i < n:
 		c = source[i]
-		if in_string:
-			if c == "\\" and in_string != "":
+
+		if in_string is not None:
+			# Inside a string: handle escape sequences
+			if c == "\\" and i + 1 < n:
 				i += 2
 				continue
 			if c == in_string:
 				in_string = None
-		elif c in ('"', "'"):
+			i += 1
+			continue
+
+		# Not inside a string
+		if c in ('"', "'"):
 			in_string = c
-		elif c == "/" and i + 1 < len(source) and source[i + 1] == "/":
-			# replace // through end of line with spaces
-			while i < len(source) and source[i] != "\n":
-				result[i] = " "
-				i += 1
+			i += 1
 			continue
-		elif c == "/" and i + 1 < len(source) and source[i + 1] == "*":
-			# replace /* ... */ with spaces
-			result[i] = " "
-			result[i + 1] = " "
-			i += 2
-			while i < len(source) - 1:
-				if source[i] == "*" and source[i + 1] == "/":
-					result[i] = " "
-					result[i + 1] = " "
-					i += 2
-					break
-				result[i] = " " if source[i] != "\n" else "\n"
-				i += 1
+
+		if c == "/" and i + 1 < n and source[i + 1] == "/":
+			# Line comment: replace up to (but not including) newline
+			flush(i)
+			j = source.find("\n", i)
+			end = j if j != -1 else n
+			parts.append(" " * (end - i))
+			i = end
+			span_start = i
 			continue
-		elif c == "#":
-			# Python-style comment
-			while i < len(source) and source[i] != "\n":
-				result[i] = " "
-				i += 1
+
+		if c == "/" and i + 1 < n and source[i + 1] == "*":
+			# Block comment: replace, preserving newlines
+			flush(i)
+			j = source.find("*/", i + 2)
+			end = (j + 2) if j != -1 else n
+			chunk = source[i:end]
+			parts.append("".join("\n" if ch == "\n" else " " for ch in chunk))
+			i = end
+			span_start = i
 			continue
+
+		if c == "#":
+			# Python-style comment: replace up to newline
+			flush(i)
+			j = source.find("\n", i)
+			end = j if j != -1 else n
+			parts.append(" " * (end - i))
+			i = end
+			span_start = i
+			continue
+
 		i += 1
-	return "".join(result)
+
+	flush(n)
+	return "".join(parts)
 
 
 class APGSourceParseTree:

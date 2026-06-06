@@ -286,23 +286,39 @@ class PythonCodeGenerator:
 			"",
 		]
 
+		import re as _re
+
 		for agent in agents:
 			cls_name = agent.name
-			role = (agent.role or "").replace("'", "\\'")
-			model = (agent.model or "").replace("'", "\\'")
-			system = (agent.system_prompt or "").replace("'", "\\'")
-			runtime = (agent.runtime or "codex").replace("'", "\\'")
-			caps = repr(list(agent.capabilities))
-			tools = repr(list(agent.tools))
+			runtime = agent.runtime or "codex"
+
+			# Validate that cls_name and runtime are safe Python identifiers
+			# before interpolating them into generated source code.
+			if not _re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', cls_name):
+				raise ValueError(
+					f"Agent name {cls_name!r} is not a valid Python identifier"
+				)
+			if not _re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', runtime):
+				raise ValueError(
+					f"Agent runtime {runtime!r} is not a valid Python identifier"
+				)
+
+			# Use repr() for ALL user-controlled string fields to prevent
+			# code injection via newlines, backslashes, or triple-quote sequences.
+			role = repr(agent.role or "")
+			model = repr(agent.model or "")
+			system = repr((agent.system_prompt or "")[:100])
+			runtime_r = repr(runtime)
+			caps = repr(tuple(agent.capabilities))
+			tools = repr(tuple(agent.tools))
 
 			lines += [
 				f"class {cls_name}(AgentBase):",
-				f'    """Agent stub for {cls_name} — {role}."""',
-				f"    name = '{cls_name}'",
-				f"    role = '{role}'",
-				f"    model = '{model}'",
-				f"    runtime = '{runtime}'",
-				f"    system = '{system[:100]}'",
+				f"    name = {cls_name!r}",
+				f"    role = {role}",
+				f"    model = {model}",
+				f"    runtime = {runtime_r}",
+				f"    system = {system}",
 				f"    capabilities = {caps}",
 				f"    tools = {tools}",
 				"",
@@ -310,11 +326,11 @@ class PythonCodeGenerator:
 			]
 
 		lines += [
-			f"# Registry of all declared agents",
+			"# Registry of all declared agents",
 			"AGENTS = {",
 		]
 		for agent in agents:
-			lines.append(f"    '{agent.name}': {agent.name},")
+			lines.append(f"    {agent.name!r}: {agent.name},")
 		lines += ["}", ""]
 
 		return "\n".join(lines)
