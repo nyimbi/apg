@@ -24,6 +24,56 @@ except ImportError:
 	from service import CRMService  # type: ignore
 
 
+# ── context resolution helpers ───────────────────────────────────────────────
+
+Request = Any  # type alias so `request: Request` annotations are valid standalone
+
+
+def _clean_text(value: Any) -> str:
+	return str(value or "").strip()
+
+
+async def get_current_user(request: Request, credentials: Any = None) -> dict[str, Any]:
+	"""Resolve user context: state → headers → env → default, returns dict."""
+	state = getattr(request, "state", None)
+	if state:
+		user = getattr(state, "current_user", None)
+		if isinstance(user, dict) and user.get("user_id"):
+			headers_inner = getattr(request, "headers", {}) or {}
+			def _h(k: str) -> str:
+				return _clean_text((headers_inner.get(k) if isinstance(headers_inner, dict) else getattr(headers_inner, k, "")) or "")
+			return {
+				"user_id": _clean_text(user["user_id"]),
+				"tenant_id": _clean_text(user.get("tenant_id") or _h("X-APG-Tenant-ID") or os.environ.get("APG_DEFAULT_TENANT_ID", "default")),
+				"roles": user.get("roles", ["crm_user"]),
+			}
+	headers = getattr(request, "headers", {}) or {}
+	def _hdr(key: str) -> str:
+		if isinstance(headers, dict):
+			return _clean_text(headers.get(key, ""))
+		return _clean_text(getattr(headers, key, "") or "")
+	user_id = _hdr("X-APG-User-ID") or _hdr("X-User-ID") or os.environ.get("APG_DEFAULT_USER_ID", "anonymous")
+	tenant_id = _hdr("X-APG-Tenant-ID") or _hdr("X-Tenant-ID") or os.environ.get("APG_DEFAULT_TENANT_ID", "default")
+	roles_raw = _hdr("X-APG-Roles")
+	roles = [r.strip() for r in roles_raw.split(",") if r.strip()] if roles_raw else ["crm_user"]
+	return {"user_id": user_id, "tenant_id": tenant_id, "roles": roles}
+
+
+def get_tenant_id(request: Request, credentials: Any = None) -> str:
+	"""Resolve tenant_id: state → X-APG-Tenant-ID header → APG_DEFAULT_TENANT_ID env."""
+	state = getattr(request, "state", None)
+	if state:
+		user = getattr(state, "current_user", None)
+		if isinstance(user, dict) and user.get("tenant_id"):
+			return _clean_text(user["tenant_id"])
+	headers = getattr(request, "headers", {}) or {}
+	for key in ("X-APG-Tenant-ID", "X-Tenant-ID"):
+		val = (headers.get(key) if isinstance(headers, dict) else getattr(headers, key, None))
+		if val:
+			return _clean_text(val)
+	return os.environ.get("APG_DEFAULT_TENANT_ID", "default")
+
+
 # ---------------------------------------------------------------------------
 # Minimal Flask-like app shim so `from capabilities.crm.adv.api import app`
 # works in integration contexts that expect an WSGI/ASGI object.
