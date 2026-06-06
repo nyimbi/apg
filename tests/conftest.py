@@ -2,10 +2,24 @@
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
+
+# ── sys.path bootstrap ──────────────────────────────────────────────────────
+# Some capability packages contain bare-import fallbacks (e.g.
+# capabilities/fintech/lending/service.py has `from capability_contract import
+# ...`) that only work when the package directory is on sys.path.  Add these
+# directories unconditionally so test-ordering doesn't affect import success.
+_REPO = Path(__file__).resolve().parents[1]
+for _bare_import_dir in (
+    _REPO / "capabilities" / "fintech" / "lending",
+):
+    _s = str(_bare_import_dir)
+    if _s not in sys.path:
+        sys.path.insert(0, _s)
 
 from templates.composable.composition_engine import CompositionEngine
 
