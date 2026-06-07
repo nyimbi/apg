@@ -10,7 +10,7 @@
   },
   "build": {
     "buildCommand": null,
-    "testCommand": "\\\n.venv/bin/python -m pytest tests/ \\\n  --ignore=tests/test_tooling_audit.py \\\n  -q --tb=short 2>&1 | tail -10",
+    "testCommand": "\\\n.venv/bin/python -m pytest \\\n  tests/test_tooling_ergonomics.py \\\n  tests/test_compiled_program_tables.py \\\n  tests/test_antlr_visitor.py \\\n  tests/test_rule_expr.py \\\n  -q --tb=short 2>&1 | tail -8",
     "lintCommand": null,
     "devCommand": null,
     "scripts": {}
@@ -389,6 +389,18 @@
       "type": "file"
     },
     {
+      "path": "compiler/studio.py",
+      "accessCount": 25,
+      "lastAccessed": 1780855607220,
+      "type": "file"
+    },
+    {
+      "path": "compiler/nl_plan.py",
+      "accessCount": 25,
+      "lastAccessed": 1780855642560,
+      "type": "file"
+    },
+    {
       "path": "compiler/compiler.py",
       "accessCount": 23,
       "lastAccessed": 1780800935591,
@@ -401,21 +413,9 @@
       "type": "file"
     },
     {
-      "path": "compiler/studio.py",
-      "accessCount": 16,
-      "lastAccessed": 1780849582538,
-      "type": "file"
-    },
-    {
       "path": "capabilities/hcm/tat/time_attendance/api.py",
       "accessCount": 14,
       "lastAccessed": 1780735619582,
-      "type": "file"
-    },
-    {
-      "path": "compiler/nl_plan.py",
-      "accessCount": 12,
-      "lastAccessed": 1780849567484,
       "type": "file"
     },
     {

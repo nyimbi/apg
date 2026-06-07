@@ -113,7 +113,24 @@ def build_nl_plan(source_file: Path, prompt: str) -> dict[str, Any]:
 			ok=False,
 		)
 
-	candidate_text = _apply_edit_to_source(source_text, edit)
+	candidate_text, mutation_errors = _apply_edit_to_source(source_text, edit)
+	if mutation_errors:
+		lint_report = _empty_lint_report(source_file, _planner_diagnostic(source_file, prompt))
+		return _report(
+			source_file=source_file,
+			prompt=prompt,
+			intent=edit.intent,
+			confidence="low",
+			dsl_patch="",
+			append_text=edit.append_text,
+			affected_symbols=edit.affected_symbols,
+			lint=lint_report,
+			migration_preview=_migration_preview(edit.migration_changes),
+			test_plan=_test_plan(source_file),
+			errors=mutation_errors,
+			warnings=[],
+			ok=False,
+		)
 	dsl_patch = _unified_patch(source_file, source_text, candidate_text)
 	lint_report = _lint_candidate(source_file, candidate_text)
 	ok = bool(lint_report["ok"])
@@ -550,25 +567,52 @@ def _add_workflow_state_edit(workflow_name: str, state_name: str, *, before: str
 	)
 
 
+_DENY_RE = re.compile(
+	r'\bdeny\s+(?P<subject>\w+)\s+over\s+(?P<threshold>[\d,]+(?:\s*(?:thousand|million|billion))?)\b',
+	re.IGNORECASE,
+)
+_THRESHOLD_WORDS: dict[str, int] = {
+	"thousand": 1_000,
+	"million": 1_000_000,
+	"billion": 1_000_000_000,
+}
+
+
+def _parse_threshold(s: str) -> str:
+	"""Convert '1 million' -> '1000000', '50,000' -> '50000'."""
+	s = s.strip().lower()
+	for word, mult in _THRESHOLD_WORDS.items():
+		if word in s:
+			num = re.search(r'[\d,]+', s)
+			if num:
+				base = int(num.group().replace(',', ''))
+				return str(base * mult)
+	return s.replace(',', '')
+
+
 def _add_rule_edit(condition_text: str) -> PlannedEdit:
 	"""Generate a rule block from a natural-language condition description."""
-	# Parse common patterns: "deny orders over 1000000", "require phone not missing"
 	action = "deny"
 	condition_expr = "value > 0"
+	confidence = "medium"
+	matched = False
 
-	deny_match = re.search(r"\bdeny\b.*\bover\s+([\d,]+)", condition_text, re.IGNORECASE)
+	deny_match = _DENY_RE.search(condition_text)
 	require_match = re.search(r"\brequir(?:e|ing)\s+(\w+)\s+not\s+missing", condition_text, re.IGNORECASE)
 	if deny_match:
-		threshold = deny_match.group(1).replace(",", "")
-		# Extract the subject noun (word before "over")
-		subject_match = re.search(r"\bdeny\s+(\w+)\s+over", condition_text, re.IGNORECASE)
-		subject = subject_match.group(1) if subject_match else "amount"
+		threshold = _parse_threshold(deny_match.group("threshold"))
+		subject = deny_match.group("subject")
 		condition_expr = f"{subject} > {threshold}"
 		action = "deny"
+		matched = True
 	elif require_match:
 		field = require_match.group(1)
 		condition_expr = f"{field} == null"
 		action = "deny"
+		matched = True
+
+	if not matched:
+		confidence = "low"
 
 	# Generate a slug rule name from condition text
 	words = re.findall(r"[a-z0-9]+", condition_text.lower())
@@ -588,7 +632,7 @@ def _add_rule_edit(condition_text: str) -> PlannedEdit:
 			"symbol": f"rule.{rule_name}",
 			"destructive": False,
 		}],
-		confidence="medium",
+		confidence=confidence,
 	)
 
 
@@ -613,7 +657,7 @@ def _rename_entity_edit(old_name: str, new_name: str) -> PlannedEdit:
 def _add_workflow_edit(name_raw: str) -> PlannedEdit:
 	"""Generate a workflow block with a sensible default step list."""
 	wf_name = _pascal_case(name_raw)
-	steps_str = "draft, submitted, approved, completed"
+	steps_str = "draft -> submitted -> approved -> completed"
 	append_text = (
 		f"\n// Planned APG workflow: {wf_name}.\n"
 		f"workflow {wf_name} {{\n"
@@ -647,8 +691,12 @@ def _base_name_from_prompt(normalized_prompt: str, fallback: str) -> str:
 	return "_".join(words[:4])
 
 
-def _apply_edit_to_source(source_text: str, edit: PlannedEdit) -> str:
-	"""Dispatch to the correct source mutation strategy based on intent."""
+def _apply_edit_to_source(source_text: str, edit: PlannedEdit) -> tuple[str, list[str]]:
+	"""Dispatch to the correct source mutation strategy based on intent.
+
+	Returns (new_source, errors). Errors is non-empty when a referenced entity
+	(table, workflow) was not found in the source.
+	"""
 	intent = edit.intent
 
 	if intent == "add_field":
@@ -660,9 +708,10 @@ def _apply_edit_to_source(source_text: str, edit: PlannedEdit) -> str:
 			# Use same _insert_field logic from studio.py, inlined here to avoid circular import
 			result = _source_insert_field(source_text, table_name, field_line)
 			if result != source_text:
-				return result
+				return result, []
+			return source_text, [f"Table '{table_name}' not found in source"]
 		# Fallback: append sentinel comment so lint still has something to validate
-		return _append_source(source_text, edit.append_text)
+		return _append_source(source_text, edit.append_text), []
 
 	if intent == "remove_field":
 		m = re.search(r"APG_REMOVE_FIELD target=(\S+) field=(\S+)", edit.append_text)
@@ -670,15 +719,16 @@ def _apply_edit_to_source(source_text: str, edit: PlannedEdit) -> str:
 			table_name, field_name = m.group(1), m.group(2)
 			result = _source_remove_field(source_text, table_name, field_name)
 			if result != source_text:
-				return result
-		return _append_source(source_text, edit.append_text)
+				return result, []
+			return source_text, [f"Table '{table_name}' not found in source"]
+		return _append_source(source_text, edit.append_text), []
 
 	if intent == "rename_entity":
 		m = re.search(r"APG_RENAME_ENTITY old=(\S+) new=(\S+)", edit.append_text)
 		if m:
 			old_name, new_name = m.group(1), m.group(2)
-			return _source_rename_entity(source_text, old_name, new_name)
-		return source_text
+			return _source_rename_entity(source_text, old_name, new_name), []
+		return source_text, []
 
 	if intent == "add_workflow_state":
 		m = re.search(r"APG_ADD_WORKFLOW_STATE target=(\S+) state=(\S+)(?:\s+between=(\S+),(\S+))?", edit.append_text)
@@ -687,12 +737,13 @@ def _apply_edit_to_source(source_text: str, edit: PlannedEdit) -> str:
 			before_state, after_state = m.group(3), m.group(4)
 			result = _source_add_workflow_state(source_text, workflow_name, state_name, before=before_state, after=after_state)
 			if result != source_text:
-				return result
-		return _append_source(source_text, edit.append_text)
+				return result, []
+			return source_text, [f"Workflow '{workflow_name}' not found in source"]
+		return _append_source(source_text, edit.append_text), []
 
 	# For intents that produce pure appends (add_table, add_capability, add_agent,
 	# add_workflow, add_rule, domain_feature) just append the text.
-	return _append_source(source_text, edit.append_text)
+	return _append_source(source_text, edit.append_text), []
 
 
 def _source_insert_field(source: str, table_name: str, field_line: str) -> str:
@@ -746,7 +797,7 @@ def _source_add_workflow_state(
 	match = pattern.search(source)
 	if not match:
 		return source
-	existing_steps = [s.strip() for s in match.group(2).split(",")]
+	existing_steps = _parse_workflow_steps(match.group(2))
 	if state_name in existing_steps:
 		return source  # already present
 	if before and after and before in existing_steps and after in existing_steps:
@@ -754,8 +805,15 @@ def _source_add_workflow_state(
 		existing_steps.insert(idx + 1, state_name)
 	else:
 		existing_steps.append(state_name)
-	new_steps_str = ", ".join(existing_steps)
+	new_steps_str = " -> ".join(existing_steps)
 	return source[: match.start(2)] + new_steps_str + source[match.end(2) :]
+
+
+def _parse_workflow_steps(steps_str: str) -> list[str]:
+	"""Parse workflow steps string, handling both -> and , separators."""
+	if '->' in steps_str:
+		return [s.strip() for s in re.split(r'\s*->\s*', steps_str) if s.strip()]
+	return [s.strip() for s in steps_str.split(',') if s.strip()]
 
 
 def _append_source(source_text: str, append_text: str) -> str:

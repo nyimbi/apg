@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\".venv/bin/python -c \\\"\\nimport sys; sys.path.insert(0, '.')\\nfrom compiler.nl_plan import build_nl_plan\\nfrom pathlib import Path\\np = Path('examples/crm_platform/main.apg')\\nfor prompt in...",
-  "error": "Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 3, in <module>\n  File \"/Users/nyimbiodero/src/pjs/apg/compiler/__init__.py\", line 39, in <module>\n    from .tooling_audit import audit_tooling_fixtures, build_tooling_fixture_audit\n  File \"/Users/nyimbiodero/src/pjs/apg/compiler/tooling_audit.py\", line 25, in <module>\n    from compiler.studio import build_studio_edit_plan, build_studio_snapshot\n  File \"/Users/nyimbiodero/src/pjs/apg/compiler/studio.py\", line 481\n    rf'(workf...",
-  "timestamp": "2026-06-07T16:26:14.916Z",
+  "tool_input_preview": "{\"command\":\".venv/bin/python -c \\\"\\nfrom compiler.refactor import _mask_strings, _unmask_strings\\nsrc = 'table Contact { name: str; }\\\\n// label: \\\\\\\"Contact form\\\\\\\"\\\\n'\\nmasked, holes = _mask_string...",
+  "error": "Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 12, in <module>\n  File \"/Users/nyimbiodero/src/pjs/apg/compiler/refactor.py\", line 45, in _unmask_strings\n    result[start + j] = ch\n    ~~~~~~^^^^^^^^^^^\nIndexError: list assignment index out of range\nholes: [(39, 53, '\"Contact form\"')]\nmasked repr: 'table Contact { name: str; }\\n// label: \"\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\"\\n'\nnew_masked repr: 'table Lead { name: str; }\\n// label: \"\\x00\\x00\\x00\\x00\\x00\\x00\\x0...",
+  "timestamp": "2026-06-07T18:08:59.005Z",
   "retry_count": 1
 }

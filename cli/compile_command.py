@@ -407,9 +407,12 @@ def _watch_and_compile(source_path: Path, config: CodeGenConfig, catalog: Path |
 
 	click.echo(f"Watching {source_path}")
 
+	# Hoist compiler construction outside the recompile loop — avoids
+	# rebuilding grammar/config objects on every file-change event.
+	compiler = APGCompiler(config)
+
 	def _do_compile() -> tuple[bool, int, float]:
 		"""Run a single compile pass. Returns (success, file_count, elapsed_ms)."""
-		compiler = APGCompiler(config)
 		t0 = time.monotonic()
 		try:
 			with open(source_path, "r", encoding="utf-8") as fh:
@@ -444,16 +447,24 @@ def _watch_and_compile(source_path: Path, config: CodeGenConfig, catalog: Path |
 				click.echo(f"[{_ts()}] Change detected — recompiling...")
 				_do_compile()
 		else:
-			# Polling fallback: check mtime every 500 ms
+			# Polling fallback: check mtime every 500 ms.
+			# Also watches for source-file deletion: if the file is missing for
+			# ~5 seconds (10 consecutive polls) the watcher stops cleanly.
 			try:
 				last_mtime = source_path.stat().st_mtime
 			except OSError:
 				last_mtime = 0.0
+			missing_counter = 0
 			while True:
 				time.sleep(0.5)
 				try:
 					mtime = source_path.stat().st_mtime
+					missing_counter = 0
 				except OSError:
+					missing_counter += 1
+					if missing_counter > 10:  # ~5 seconds with no source file
+						click.echo(f"\n[{_ts()}] Source file not found — stopping watch.")
+						return
 					continue
 				if mtime != last_mtime:
 					last_mtime = mtime

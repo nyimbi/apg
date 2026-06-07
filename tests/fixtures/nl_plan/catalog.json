@@ -8,7 +8,12 @@
     "unrepresentable",
     "lint_integration",
     "migration_preview",
-    "source_immutability"
+    "source_immutability",
+    "add_field",
+    "add_rule",
+    "rename_entity",
+    "add_workflow_state",
+    "add_workflow"
   ],
   "fixtures": [
     {
@@ -69,6 +74,60 @@
       "expected_diagnostics": ["APG1201"],
       "expect_patch": false,
       "tags": ["unrepresentable", "source_immutability"]
+    },
+    {
+      "id": "add_field_to_customer",
+      "source": "base.apg",
+      "prompt": "add a phone field to Customer table",
+      "expected_ok": false,
+      "expected_intent": "add_field",
+      "expected_migration_change_kinds": ["add_column"],
+      "expect_patch": false,
+      "tags": ["add_field", "migration_preview", "source_immutability"]
+    },
+    {
+      "id": "add_rule_deny_large_deals",
+      "source": "base.apg",
+      "prompt": "add a rule to deny deals over 1000000",
+      "expected_ok": true,
+      "expected_intent": "add_rule",
+      "expected_migration_change_kinds": ["add_rule"],
+      "expect_patch": true,
+      "expect_test_plan": true,
+      "tags": ["add_rule", "lint_integration", "migration_preview", "source_immutability"]
+    },
+    {
+      "id": "rename_customer_to_lead",
+      "source": "base.apg",
+      "prompt": "rename Customer to Lead",
+      "expected_ok": true,
+      "expected_intent": "rename_entity",
+      "expected_confidence": "high",
+      "expected_migration_change_kinds": ["rename_table"],
+      "expect_patch": false,
+      "expect_test_plan": true,
+      "tags": ["rename_entity", "lint_integration", "migration_preview", "source_immutability"]
+    },
+    {
+      "id": "add_workflow_state_escalated",
+      "source": "base.apg",
+      "prompt": "add escalated state to ReviewWorkflow",
+      "expected_ok": false,
+      "expected_intent": "add_workflow_state",
+      "expected_migration_change_kinds": ["add_workflow_state"],
+      "expect_patch": false,
+      "tags": ["add_workflow_state", "migration_preview", "source_immutability"]
+    },
+    {
+      "id": "add_approval_workflow",
+      "source": "base.apg",
+      "prompt": "add an approval workflow with three steps",
+      "expected_ok": true,
+      "expected_intent": "add_workflow",
+      "expected_migration_change_kinds": ["add_workflow"],
+      "expect_patch": true,
+      "expect_test_plan": true,
+      "tags": ["add_workflow", "lint_integration", "migration_preview", "source_immutability"]
     }
   ]
 }

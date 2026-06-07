@@ -288,6 +288,14 @@ def _validate_edit(edit: dict[str, Any], snapshot: dict[str, Any]) -> list[str]:
 			errors.append("add_rule requires 'when'")
 		if not action:
 			errors.append("add_rule requires 'action'")
+		if action and not re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', action):
+			errors.append(f"Invalid action identifier: {action!r}")
+		caps = {
+			c["name"]
+			for c in snapshot["panels"]["capability_composition_designer"]["capabilities"]
+		}
+		if cap_name and cap_name not in caps:
+			errors.append(f"Cannot add rule to unknown capability: {cap_name!r}")
 	elif operation == "add_workflow_state":
 		workflow_name = str(edit.get("workflow", ""))
 		state = str(edit.get("state", ""))
@@ -297,6 +305,12 @@ def _validate_edit(edit: dict[str, Any], snapshot: dict[str, Any]) -> list[str]:
 			errors.append("add_workflow_state requires 'state'")
 		if not _valid_identifier(state):
 			errors.append(f"Invalid APG identifier for state: {state!r}")
+		flows = {
+			f["name"]
+			for f in snapshot["panels"]["workflow_designer"]["flows"]
+		}
+		if workflow_name and workflow_name not in flows:
+			errors.append(f"Cannot add state to unknown workflow: {workflow_name!r}")
 	return errors
 
 
@@ -411,13 +425,22 @@ def _snapshot_summary(snapshot: dict[str, Any] | None) -> dict[str, Any]:
 	}
 
 
+def _dsl_string(s: str) -> str:
+	"""Escape a value for embedding in an APG string literal."""
+	return '"' + s.replace('\\', '\\\\').replace('"', '\\"') + '"'
+
+
 def _add_rule_to_capability(source: str, edit: dict[str, Any]) -> str:
 	"""Append a rule entry to the rules list inside a named capability's contract block."""
 	cap_name = edit["capability"]
 	rule_name = edit["name"]
 	when = edit["when"]
 	action = edit["action"]
-	rule_text = f'{{name: "{rule_name}", when: "{when}", action: {action}}}'
+	rule_text = (
+		f'{{name: {_dsl_string(rule_name)}, '
+		f'when: {_dsl_string(when)}, '
+		f'action: {action}}}'
+	)
 
 	# Find 'rules: [' inside the capability block and append before closing ']'
 	# Strategy: locate the capability block, then find the rules list within it.
@@ -463,6 +486,13 @@ def _add_rule_to_capability(source: str, edit: dict[str, Any]) -> str:
 	)
 
 
+def _parse_workflow_steps(steps_str: str) -> list[str]:
+	"""Parse workflow steps string, handling both -> and , separators."""
+	if '->' in steps_str:
+		return [s.strip() for s in re.split(r'\s*->\s*', steps_str) if s.strip()]
+	return [s.strip() for s in steps_str.split(',') if s.strip()]
+
+
 def _add_state_to_workflow(source: str, edit: dict[str, Any]) -> str:
 	"""Insert a new state into a workflow's steps string, after the specified state."""
 	workflow_name = edit["workflow"]
@@ -495,7 +525,7 @@ def _add_state_to_workflow(source: str, edit: dict[str, Any]) -> str:
 		)
 
 	steps_str = match.group(2)
-	states = [s.strip() for s in re.split(r'\s*->\s*', steps_str)]
+	states = _parse_workflow_steps(steps_str)
 
 	if after_state and after_state in states:
 		idx = states.index(after_state)
