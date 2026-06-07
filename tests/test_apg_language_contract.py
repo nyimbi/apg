@@ -238,23 +238,9 @@ def test_grammar_supports_screen_composition_and_relationships():
 
 
 def test_grammar_includes_broad_african_language_codes():
+	# language_code now uses member_name | STRING, accepting any identifier (including
+	# all language codes like 'sw', 'af', 'en', etc.) rather than an explicit enumeration.
+	# This avoids creating ~100 implicit keyword tokens that shadow IDENTIFIER.
 	language_code = _rule_body("language_code")
-	codes = set(re.findall(r"'([a-z]{2,3})'", language_code))
-
-	assert len(codes) >= 40
-	assert {
-		"af",
-		"ak",
-		"am",
-		"ar",
-		"ha",
-		"ig",
-		"rw",
-		"so",
-		"sw",
-		"ti",
-		"wo",
-		"xh",
-		"yo",
-		"zu",
-	} <= codes
+	assert "member_name" in language_code
+	assert "STRING" in language_code
