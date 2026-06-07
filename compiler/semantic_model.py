@@ -643,13 +643,10 @@ def _flow_model(entity: EntityDeclaration) -> dict[str, Any]:
 		base["states"] = list(entity.states)
 		# "steps" alias expected by generated app.py describe_workflow()
 		base["steps"] = list(entity.states)
+		# Canonical transition schema: {source, target, guard}
+		# (The generated app.py builds its own {"from", "to"} list from steps+guards)
 		base["transitions"] = [
 			{"source": t.source, "target": t.target, "guard": t.guard}
-			for t in entity.transitions
-		]
-		# Remap transitions to {"from": src, "to": tgt} format expected by app.py
-		base["step_transitions"] = [
-			{"from": t.source, "to": t.target, "guard": t.guard}
 			for t in entity.transitions
 		]
 		base["human_tasks"] = list(entity.human_tasks)

@@ -874,17 +874,22 @@ class SemanticAnalyzer:
 		rather than errors because those packages may not be in scope.
 		"""
 		# Build local name sets
-		local_names: set[str] = {e.name for e in module.entities}
-		capability_provides: set[str] = set()
-		for e in module.entities:
-			if isinstance(e, CapabilityDeclaration):
-				capability_provides.update(e.provides or [])
+		local_names: frozenset[str] = frozenset(e.name for e in module.entities)
+		capability_provides: frozenset[str] = frozenset(
+			name
+			for e in module.entities
+			if isinstance(e, CapabilityDeclaration)
+			for name in (e.provides or [])
+		)
 
 		# Load known system capability IDs from MANIFEST.json (best-effort, mtime-cached)
 		known_system = _load_known_system_capabilities()
 
+		# Pre-compute union once; membership tests are O(1) on frozenset
+		all_known: frozenset[str] = local_names | capability_provides | known_system
+
 		def _is_known(ref: str) -> bool:
-			return ref in local_names or ref in capability_provides or ref in known_system
+			return ref in all_known
 
 		for entity in module.entities:
 			# Capability requires/provides cross-check

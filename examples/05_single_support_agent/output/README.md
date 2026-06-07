@@ -69,3 +69,11 @@ Generated deployment artifacts:
 ## AI agents
 
 - `TriageAgent` - runtime `codex`, invoke with `POST /agents/TriageAgent/invoke`
+
+Typed agent stub classes live in `agent_stubs.py`. Wire up a runtime adapter by setting the environment variable:
+
+```
+export APG_AGENT_CODEX_PROVIDER_COMMAND='python my_provider.py'
+```
+
+The provider receives JSON `{"agent": {...}, "input": "...", "context": {...}}` on stdin and writes `{"output": "..."}` to stdout.

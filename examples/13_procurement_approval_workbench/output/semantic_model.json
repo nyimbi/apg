@@ -245,28 +245,6 @@
         "finance_approval",
         "approved"
       ],
-      "step_transitions": [
-        {
-          "from": "draft",
-          "guard": null,
-          "to": "budget_review"
-        },
-        {
-          "from": "budget_review",
-          "guard": null,
-          "to": "procurement_review"
-        },
-        {
-          "from": "procurement_review",
-          "guard": null,
-          "to": "finance_approval"
-        },
-        {
-          "from": "finance_approval",
-          "guard": null,
-          "to": "approved"
-        }
-      ],
       "steps": [
         "draft",
         "budget_review",

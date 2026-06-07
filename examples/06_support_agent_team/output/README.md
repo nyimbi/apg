@@ -71,6 +71,14 @@ Generated deployment artifacts:
 - `Planner` - runtime `codex`, invoke with `POST /agents/Planner/invoke`
 - `Writer` - runtime `codex`, invoke with `POST /agents/Writer/invoke`
 
+Typed agent stub classes live in `agent_stubs.py`. Wire up a runtime adapter by setting the environment variable:
+
+```
+export APG_AGENT_CODEX_PROVIDER_COMMAND='python my_provider.py'
+```
+
+The provider receives JSON `{"agent": {...}, "input": "...", "context": {...}}` on stdin and writes `{"output": "..."}` to stdout.
+
 ## AI agent teams
 
 - `SupportCrew` - invoke with `POST /agent-teams/SupportCrew/invoke`

@@ -4976,6 +4976,18 @@ if __name__ == "__main__":
 			for agent in agents:
 				runtime = agent.runtime or "local"
 				lines.append(f"- `{agent.name}` - runtime `{runtime}`, invoke with `POST /agents/{agent.name}/invoke`")
+			lines.extend([
+				"",
+				"Typed agent stub classes live in `agent_stubs.py`. "
+				"Wire up a runtime adapter by setting the environment variable:",
+				"",
+				"```",
+				f"export APG_AGENT_{(agents[0].runtime or 'CODEX').upper()}_PROVIDER_COMMAND='python my_provider.py'",
+				"```",
+				"",
+				"The provider receives JSON `{\"agent\": {...}, \"input\": \"...\", \"context\": {...}}` "
+				"on stdin and writes `{\"output\": \"...\"}` to stdout.",
+			])
 
 		if teams:
 			lines.extend(["", "## AI agent teams", ""])

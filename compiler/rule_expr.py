@@ -172,6 +172,8 @@ class _Parser:
 		return node
 
 	def _parse_or(self) -> RuleExprNode:
+		# 'and' has higher precedence than 'or' (same as Python / SQL).
+		# This is enforced structurally: _parse_and() is called inside _parse_or().
 		left = self._parse_and()
 		while self._match_word("or"):
 			right = self._parse_and()
@@ -300,10 +302,18 @@ class _Parser:
 # ── Public API ───────────────────────────────────────────────────────────────
 
 def parse_rule_expr(condition: str) -> RuleExprNode | None:
-	"""Parse a rule condition string into an AST node.
+	"""Parse a rule condition string into a typed AST node.
 
-	Returns None if the string is empty or whitespace.
-	Raises RuleExprParseError on parse failure.
+	Returns:
+	    RuleExprNode  — a CompareNode, MissingNode, InNode, AndNode, or OrNode
+	    None          — the condition is empty or whitespace-only (not an error)
+
+	Raises:
+	    RuleExprParseError  — the condition has unexpected tokens or invalid syntax
+
+	Callers must handle three states: node (success), None (empty input),
+	and RuleExprParseError (bad syntax). Use ``validate_rule_fields`` for a
+	no-raise variant that turns parse failures into warning strings.
 	"""
 	condition = (condition or "").strip()
 	if not condition:
@@ -315,7 +325,14 @@ def parse_rule_expr(condition: str) -> RuleExprNode | None:
 
 
 def extract_fields(node: RuleExprNode) -> set[str]:
-	"""Return all field names referenced in a rule expression."""
+	"""Return all field names referenced in a rule expression.
+
+	Dotted paths are returned as-is (e.g. ``account.status`` is returned as
+	the single string ``"account.status"``, not split into ``"account"`` and
+	``"status"``).  The ``validate_rule_fields`` function handles base-name
+	matching so that ``{"status"}`` in ``known_fields`` also accepts
+	``"account.status"`` references.
+	"""
 	if isinstance(node, (CompareNode, MissingNode, InNode)):
 		return {node.field}
 	if isinstance(node, (AndNode, OrNode)):

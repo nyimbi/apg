@@ -13,6 +13,35 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 
+# ── module-level grammar keyword cache ──────────────────────────────────────
+# Reads spec/apg.g4 once per process; shared across all ASTBuilder instances.
+_GRAMMAR_ENTITY_KEYWORDS_CACHE: Optional[frozenset[str]] = None
+
+
+def _grammar_entity_keywords() -> frozenset[str]:
+	"""Return the set of APG entity-type keywords from spec/apg.g4.
+
+	Result is cached process-wide after the first call.
+	"""
+	global _GRAMMAR_ENTITY_KEYWORDS_CACHE
+	if _GRAMMAR_ENTITY_KEYWORDS_CACHE is not None:
+		return _GRAMMAR_ENTITY_KEYWORDS_CACHE
+	keywords: set[str] = {
+		"module", "agent", "capability", "digital_twin", "workflow",
+		"database", "db",
+	}
+	grammar_path = Path(__file__).resolve().parent.parent / "spec" / "apg.g4"
+	try:
+		grammar = grammar_path.read_text(encoding="utf-8")
+		m = re.search(r"^entity_type\s*\n\s*:(.*?)\n\s*;", grammar, flags=re.MULTILINE | re.DOTALL)
+		if m:
+			keywords.update(re.findall(r"'([^']+)'", m.group(1)))
+	except OSError:
+		keywords.update({"app", "flow", "screen", "twin", "agent_runtime"})
+	_GRAMMAR_ENTITY_KEYWORDS_CACHE = frozenset(keywords)
+	return _GRAMMAR_ENTITY_KEYWORDS_CACHE
+
+
 # Import generated ANTLR parsers
 sys.path.append(str(Path(__file__).parent.parent / "spec"))
 
@@ -675,30 +704,13 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 			position = index
 
 	def _source_entity_keywords(self) -> set[str]:
-		"""Return grammar-backed entity keywords for source-backed AST building."""
-		if self._source_entity_keyword_cache is not None:
-			return set(self._source_entity_keyword_cache)
+		"""Return grammar-backed entity keywords for source-backed AST building.
 
-		keywords = {
-			"module",
-			"agent",
-			"capability",
-			"digital_twin",
-			"workflow",
-			"database",
-			"db",
-		}
-		grammar_path = Path(__file__).resolve().parent.parent / "spec" / "apg.g4"
-		try:
-			grammar = grammar_path.read_text(encoding="utf-8")
-			match = re.search(r"^entity_type\s*\n\s*:(.*?)\n\s*;", grammar, flags=re.MULTILINE | re.DOTALL)
-			if match:
-				keywords.update(re.findall(r"'([^']+)'", match.group(1)))
-		except OSError:
-			keywords.update({"app", "flow", "screen", "twin", "agent_runtime"})
-
-		self._source_entity_keyword_cache = set(keywords)
-		return set(keywords)
+		Result is cached process-wide in _GRAMMAR_ENTITY_KEYWORDS so the
+		apg.g4 file is read at most once per process regardless of how many
+		ASTBuilder instances are created.
+		"""
+		return _grammar_entity_keywords()
 
 	def _entity_type_for_source_kind(self, kind: str) -> EntityType:
 		"""Map source keywords to AST entity categories while preserving key APG surfaces."""

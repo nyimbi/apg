@@ -72,6 +72,14 @@ Generated deployment artifacts:
 - `Coder` - runtime `claude_code`, invoke with `POST /agents/Coder/invoke`
 - `LocalReviewer` - runtime `ollama`, invoke with `POST /agents/LocalReviewer/invoke`
 
+Typed agent stub classes live in `agent_stubs.py`. Wire up a runtime adapter by setting the environment variable:
+
+```
+export APG_AGENT_CODEX_PROVIDER_COMMAND='python my_provider.py'
+```
+
+The provider receives JSON `{"agent": {...}, "input": "...", "context": {...}}` on stdin and writes `{"output": "..."}` to stdout.
+
 ## AI agent teams
 
 - `DeliverySwarm` - invoke with `POST /agent-teams/DeliverySwarm/invoke`
