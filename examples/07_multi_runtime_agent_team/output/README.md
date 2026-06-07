@@ -1,4 +1,4 @@
-# agent_runtime_portfolio
+# multi_runtime_team
 
 Dependency-free APG generated Python application.
 
@@ -66,11 +66,17 @@ Generated deployment artifacts:
 - `semantic_model.json` - normalized APG semantic model for IDEs, agents, and release checks
 - `smoke_test.py` - standalone generated app smoke test
 
+## Entities
+
+- `AnalyticsCrew`
+- `MultiRuntimeApp`
+
 ## AI agents
 
-- `Researcher` - runtime `codex`, invoke with `POST /agents/Researcher/invoke`
-- `Coder` - runtime `claude_code`, invoke with `POST /agents/Coder/invoke`
-- `LocalReviewer` - runtime `ollama`, invoke with `POST /agents/LocalReviewer/invoke`
+- `CloudAnalyst` - runtime `local`, invoke with `POST /agents/CloudAnalyst/invoke`
+- `LocalPrivacyAgent` - runtime `local`, invoke with `POST /agents/LocalPrivacyAgent/invoke`
+- `ConversationalAgent` - runtime `local`, invoke with `POST /agents/ConversationalAgent/invoke`
+- `OpenSourceCoder` - runtime `local`, invoke with `POST /agents/OpenSourceCoder/invoke`
 
 Typed agent stub classes live in `agent_stubs.py`. Wire up a runtime adapter by setting the environment variable:
 
@@ -79,7 +85,3 @@ export APG_AGENT_CODEX_PROVIDER_COMMAND='python my_provider.py'
 ```
 
 The provider receives JSON `{"agent": {...}, "input": "...", "context": {...}}` on stdin and writes `{"output": "..."}` to stdout.
-
-## AI agent teams
-
-- `DeliverySwarm` - invoke with `POST /agent-teams/DeliverySwarm/invoke`

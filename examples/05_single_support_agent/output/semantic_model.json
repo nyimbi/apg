@@ -1,49 +1,100 @@
 {
   "agents": {
     "TriageAgent": {
-      "capabilities": [],
-      "configuration": {},
-      "handoffs": [],
-      "inputs": [
-        "ticket"
+      "capabilities": [
+        "ticket_management",
+        "knowledge_base",
+        "customer_history"
       ],
+      "configuration": {
+        "max_turns": 8,
+        "presence_penalty": 0.0,
+        "temperature": 0.1,
+        "top_p": 0.9
+      },
+      "handoffs": [],
+      "inputs": [],
       "memory": {
         "kind": "vector",
         "name": "support_memory"
       },
       "model": "openai:gpt-4.1-mini",
       "name": "TriageAgent",
-      "outputs": [
-        "triage_plan"
-      ],
-      "role": "support_triage",
+      "outputs": [],
+      "role": "support triage specialist",
       "rules": [
         {
           "action": "reject",
           "name": "ticket_required",
-          "when": "ticket missing"
+          "when": "ticket_id missing"
+        },
+        {
+          "action": "deny",
+          "name": "valid_channel",
+          "when": "channel not in [email, chat, phone, portal]"
+        },
+        {
+          "action": "allow",
+          "name": "customer_identified",
+          "when": "customer_id not missing"
+        },
+        {
+          "action": "require_review",
+          "name": "critical_escalation",
+          "when": "severity == critical and sla_breach_imminent == true"
+        },
+        {
+          "action": "deny",
+          "name": "rate_limit",
+          "when": "requests_per_minute > 100"
         }
       ],
-      "runtime": "codex",
-      "system": "Classify incoming tickets and produce a concise next action.",
+      "runtime": null,
+      "system": "Classify incoming support tickets by severity and category. Produce a structured triage plan with suggested resolution steps and escalation path. Never reveal internal system details.",
       "theme": {},
       "tools": [
         "tickets.read",
-        "knowledge.search"
+        "tickets.update",
+        "knowledge.search",
+        "customer.lookup",
+        "escalation.trigger"
       ],
       "ui": {}
     }
   },
   "app": {
-    "description": "Single support triage agent",
-    "entity_count": 1,
+    "description": null,
+    "entity_count": 2,
     "name": "support_agent",
     "version": "1.0.0"
   },
   "capabilities": {},
   "composition": {
     "agent_teams": {},
-    "applications": {},
+    "applications": {
+      "SupportAgent": {
+        "agent_teams": [],
+        "agents": [
+          "TriageAgent"
+        ],
+        "capabilities": [],
+        "components": {},
+        "configuration": {},
+        "deployments": {},
+        "description": "AI-powered support triage",
+        "integrations": {},
+        "name": "SupportAgent",
+        "policies": {},
+        "routes": [
+          "/support",
+          "/agents/triage"
+        ],
+        "runtime": {},
+        "screens": {},
+        "theme": {},
+        "workflows": []
+      }
+    },
     "capability_dependencies": {}
   },
   "contracts": {},
@@ -51,7 +102,68 @@
     "source": "support_agent.apg",
     "target": "python"
   },
-  "diagnostics": [],
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "support_agent.apg",
+      "fixes": [],
+      "message": "Agent 'TriageAgent' references capability 'ticket_management' not declared or provided in this module",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "support_agent.apg",
+      "fixes": [],
+      "message": "Agent 'TriageAgent' references capability 'knowledge_base' not declared or provided in this module",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "support_agent.apg",
+      "fixes": [],
+      "message": "Agent 'TriageAgent' references capability 'customer_history' not declared or provided in this module",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
   "flows": {},
   "format": "apg.semantic-model.v1",
   "graphs": {
@@ -63,12 +175,12 @@
     "capability": {
       "edges": 0,
       "kind": "capability",
-      "nodes": 0
+      "nodes": 1
     },
     "deployment": {
-      "edges": 1,
+      "edges": 2,
       "kind": "deployment",
-      "nodes": 2
+      "nodes": 3
     },
     "er": {
       "edges": 0,
@@ -76,35 +188,35 @@
       "nodes": 0
     },
     "handler": {
-      "edges": 1,
+      "edges": 2,
       "kind": "handler",
-      "nodes": 2
+      "nodes": 3
     },
     "lookup": {
-      "edges": 1,
+      "edges": 2,
       "kind": "lookup",
-      "nodes": 2
+      "nodes": 3
     },
     "package": {
-      "edges": 1,
+      "edges": 2,
       "kind": "package",
-      "nodes": 2
+      "nodes": 3
     },
     "security": {
-      "edges": 1,
+      "edges": 2,
       "kind": "security",
-      "nodes": 2
+      "nodes": 3
     },
     "workflow": {
-      "edges": 1,
+      "edges": 2,
       "kind": "workflow",
-      "nodes": 2
+      "nodes": 3
     }
   },
   "llms": {
     "TriageAgent": {
       "model": "openai:gpt-4.1-mini",
-      "runtime": "codex"
+      "runtime": null
     }
   },
   "ok": true,
@@ -125,11 +237,28 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 8
+          "line": 0
         },
         "start": {
           "character": 0,
-          "line": 8
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "app.SupportAgent": {
+      "file": "support_agent.apg",
+      "id": "app.SupportAgent",
+      "kind": "app",
+      "name": "SupportAgent",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
         }
       },
       "references": []
@@ -142,11 +271,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 8
+          "line": 0
         },
         "start": {
           "character": 0,
-          "line": 8
+          "line": 0
         }
       },
       "references": []

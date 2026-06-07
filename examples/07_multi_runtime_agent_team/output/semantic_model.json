@@ -1,112 +1,143 @@
 {
   "agents": {
-    "Coder": {
+    "CloudAnalyst": {
       "capabilities": [],
-      "configuration": {},
+      "configuration": {
+        "max_turns": 10,
+        "temperature": 0.1
+      },
       "handoffs": [],
       "inputs": [],
       "memory": null,
-      "model": "claude:sonnet",
-      "name": "Coder",
+      "model": "openai:gpt-4.1",
+      "name": "CloudAnalyst",
       "outputs": [],
-      "role": "implementation_engineer",
+      "role": "cloud analyst",
       "rules": [],
-      "runtime": "claude_code",
-      "system": "Implement focused code changes from accepted plans.",
+      "runtime": null,
+      "system": "Perform deep technical analysis. Use the highest-capability model available.",
       "theme": {},
       "tools": [
-        "repo.edit",
-        "tests.run"
+        "data.query",
+        "reports.generate"
       ],
       "ui": {}
     },
-    "LocalReviewer": {
+    "ConversationalAgent": {
       "capabilities": [],
-      "configuration": {},
-      "handoffs": [],
-      "inputs": [],
-      "memory": null,
-      "model": "ollama:llama3.1",
-      "name": "LocalReviewer",
-      "outputs": [],
-      "role": "local_review",
-      "rules": [],
-      "runtime": "ollama",
-      "system": "Review diffs locally without sending code to external services.",
-      "theme": {},
-      "tools": [],
-      "ui": {}
-    },
-    "Researcher": {
-      "capabilities": [],
-      "configuration": {},
+      "configuration": {
+        "max_turns": 20,
+        "temperature": 0.7
+      },
       "handoffs": [],
       "inputs": [],
       "memory": null,
       "model": "openai:gpt-4.1-mini",
-      "name": "Researcher",
+      "name": "ConversationalAgent",
       "outputs": [],
-      "role": "researcher",
+      "role": "customer conversation handler",
       "rules": [],
-      "runtime": "codex",
-      "system": "Gather structured evidence and cite source IDs.",
+      "runtime": null,
+      "system": "Handle warm, empathetic customer conversations. Keep responses concise and human.",
       "theme": {},
       "tools": [
-        "web.search",
-        "docs.read"
+        "customer.profile",
+        "conversation.history"
+      ],
+      "ui": {}
+    },
+    "LocalPrivacyAgent": {
+      "capabilities": [],
+      "configuration": {
+        "max_turns": 6,
+        "temperature": 0.2
+      },
+      "handoffs": [],
+      "inputs": [],
+      "memory": {
+        "kind": "vector",
+        "name": "local_memory"
+      },
+      "model": "ollama:llama3.3",
+      "name": "LocalPrivacyAgent",
+      "outputs": [],
+      "role": "privacy-safe local analyst",
+      "rules": [],
+      "runtime": null,
+      "system": "Analyse data locally. No data leaves this environment. Use Llama for privacy-sensitive workloads.",
+      "theme": {},
+      "tools": [
+        "local_data.query",
+        "local_reports.generate"
+      ],
+      "ui": {}
+    },
+    "OpenSourceCoder": {
+      "capabilities": [],
+      "configuration": {
+        "max_turns": 8,
+        "temperature": 0.0
+      },
+      "handoffs": [],
+      "inputs": [],
+      "memory": null,
+      "model": "ollama:mistral",
+      "name": "OpenSourceCoder",
+      "outputs": [],
+      "role": "open source code generator",
+      "rules": [],
+      "runtime": null,
+      "system": "Generate code using open-weight models. Prefer Apache/MIT licensed outputs.",
+      "theme": {},
+      "tools": [
+        "code.search",
+        "docs.lookup"
       ],
       "ui": {}
     }
   },
   "app": {
-    "description": "Agent team that can route work across several AI runtimes",
-    "entity_count": 4,
-    "name": "agent_runtime_portfolio",
+    "description": null,
+    "entity_count": 6,
+    "name": "multi_runtime_team",
     "version": "1.0.0"
   },
   "capabilities": {},
   "composition": {
-    "agent_teams": {
-      "DeliverySwarm": {
+    "agent_teams": {},
+    "applications": {
+      "MultiRuntimeApp": {
+        "agent_teams": [
+          "AnalyticsCrew"
+        ],
         "agents": [
-          "Researcher",
-          "Coder",
-          "LocalReviewer"
+          "ConversationalAgent",
+          "OpenSourceCoder"
         ],
         "capabilities": [],
-        "configuration": {
-          "fallback_runtime": "opencode",
-          "handoff_mode": "sequential"
-        },
-        "flow": [
-          {
-            "condition": "done",
-            "from": "Researcher",
-            "to": "Coder"
-          },
-          {
-            "condition": "done",
-            "from": "Coder",
-            "to": "LocalReviewer"
-          }
+        "components": {},
+        "configuration": {},
+        "deployments": {},
+        "description": "Multi-runtime agent platform with model diversity",
+        "integrations": {},
+        "name": "MultiRuntimeApp",
+        "policies": {},
+        "routes": [
+          "/analytics",
+          "/conversations",
+          "/codegen"
         ],
-        "rules": [
-          {
-            "action": "require_review",
-            "name": "local_review_required",
-            "when": "code_changed"
-          }
-        ],
+        "runtime": {},
+        "screens": {},
         "theme": {},
-        "ui": {}
+        "workflows": []
       }
     },
-    "applications": {},
     "capability_dependencies": {}
   },
   "contracts": {},
   "deployment": {
-    "source": "agent_runtime_portfolio.apg",
+    "source": "multi_runtime_team.apg",
     "target": "python"
   },
   "diagnostics": [],
@@ -114,19 +145,19 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "agent": {
-      "edges": 3,
+      "edges": 0,
       "kind": "agent",
-      "nodes": 4
+      "nodes": 5
     },
     "capability": {
       "edges": 0,
       "kind": "capability",
-      "nodes": 0
+      "nodes": 1
     },
     "deployment": {
-      "edges": 4,
+      "edges": 6,
       "kind": "deployment",
-      "nodes": 5
+      "nodes": 7
     },
     "er": {
       "edges": 0,
@@ -134,43 +165,47 @@
       "nodes": 0
     },
     "handler": {
-      "edges": 4,
+      "edges": 6,
       "kind": "handler",
-      "nodes": 5
+      "nodes": 7
     },
     "lookup": {
-      "edges": 4,
+      "edges": 6,
       "kind": "lookup",
-      "nodes": 5
+      "nodes": 7
     },
     "package": {
-      "edges": 4,
+      "edges": 6,
       "kind": "package",
-      "nodes": 5
+      "nodes": 7
     },
     "security": {
-      "edges": 4,
+      "edges": 6,
       "kind": "security",
-      "nodes": 5
+      "nodes": 7
     },
     "workflow": {
-      "edges": 4,
+      "edges": 6,
       "kind": "workflow",
-      "nodes": 5
+      "nodes": 7
     }
   },
   "llms": {
-    "Coder": {
-      "model": "claude:sonnet",
-      "runtime": "claude_code"
+    "CloudAnalyst": {
+      "model": "openai:gpt-4.1",
+      "runtime": null
     },
-    "LocalReviewer": {
-      "model": "ollama:llama3.1",
-      "runtime": "ollama"
-    },
-    "Researcher": {
+    "ConversationalAgent": {
       "model": "openai:gpt-4.1-mini",
-      "runtime": "codex"
+      "runtime": null
+    },
+    "LocalPrivacyAgent": {
+      "model": "ollama:llama3.3",
+      "runtime": null
+    },
+    "OpenSourceCoder": {
+      "model": "ollama:mistral",
+      "runtime": null
     }
   },
   "ok": true,
@@ -180,133 +215,184 @@
   "rules": {},
   "security": {},
   "source_files": [
-    "agent_runtime_portfolio.apg"
+    "multi_runtime_team.apg"
   ],
   "symbols": {
-    "agent.Coder": {
-      "file": "agent_runtime_portfolio.apg",
-      "id": "agent.Coder",
+    "agent.CloudAnalyst": {
+      "file": "multi_runtime_team.apg",
+      "id": "agent.CloudAnalyst",
       "kind": "agent",
-      "name": "Coder",
+      "name": "CloudAnalyst",
       "range": {
         "end": {
           "character": 1,
-          "line": 16
+          "line": 0
         },
         "start": {
           "character": 0,
-          "line": 16
+          "line": 0
         }
       },
       "references": []
     },
-    "agent.LocalReviewer": {
-      "file": "agent_runtime_portfolio.apg",
-      "id": "agent.LocalReviewer",
+    "agent.ConversationalAgent": {
+      "file": "multi_runtime_team.apg",
+      "id": "agent.ConversationalAgent",
       "kind": "agent",
-      "name": "LocalReviewer",
+      "name": "ConversationalAgent",
       "range": {
         "end": {
           "character": 1,
-          "line": 24
+          "line": 0
         },
         "start": {
           "character": 0,
-          "line": 24
+          "line": 0
         }
       },
       "references": []
     },
-    "agent.Researcher": {
-      "file": "agent_runtime_portfolio.apg",
-      "id": "agent.Researcher",
+    "agent.LocalPrivacyAgent": {
+      "file": "multi_runtime_team.apg",
+      "id": "agent.LocalPrivacyAgent",
       "kind": "agent",
-      "name": "Researcher",
+      "name": "LocalPrivacyAgent",
       "range": {
         "end": {
           "character": 1,
-          "line": 8
+          "line": 0
         },
         "start": {
           "character": 0,
-          "line": 8
+          "line": 0
         }
       },
       "references": []
     },
-    "composition.DeliverySwarm": {
-      "file": "agent_runtime_portfolio.apg",
-      "id": "composition.DeliverySwarm",
-      "kind": "composition",
-      "name": "DeliverySwarm",
+    "agent.OpenSourceCoder": {
+      "file": "multi_runtime_team.apg",
+      "id": "agent.OpenSourceCoder",
+      "kind": "agent",
+      "name": "OpenSourceCoder",
       "range": {
         "end": {
           "character": 1,
-          "line": 31
+          "line": 0
         },
         "start": {
           "character": 0,
-          "line": 31
+          "line": 0
         }
       },
       "references": []
     },
-    "llm.claude:sonnet": {
-      "file": "agent_runtime_portfolio.apg",
-      "id": "llm.claude:sonnet",
+    "agent_team.AnalyticsCrew": {
+      "file": "multi_runtime_team.apg",
+      "id": "agent_team.AnalyticsCrew",
+      "kind": "agent_team",
+      "name": "AnalyticsCrew",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "app.MultiRuntimeApp": {
+      "file": "multi_runtime_team.apg",
+      "id": "app.MultiRuntimeApp",
+      "kind": "app",
+      "name": "MultiRuntimeApp",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "llm.ollama:llama3.3": {
+      "file": "multi_runtime_team.apg",
+      "id": "llm.ollama:llama3.3",
       "kind": "llm",
-      "name": "claude:sonnet",
+      "name": "ollama:llama3.3",
       "range": {
         "end": {
           "character": 1,
-          "line": 16
+          "line": 0
         },
         "start": {
           "character": 0,
-          "line": 16
+          "line": 0
         }
       },
       "references": []
     },
-    "llm.ollama:llama3.1": {
-      "file": "agent_runtime_portfolio.apg",
-      "id": "llm.ollama:llama3.1",
+    "llm.ollama:mistral": {
+      "file": "multi_runtime_team.apg",
+      "id": "llm.ollama:mistral",
       "kind": "llm",
-      "name": "ollama:llama3.1",
+      "name": "ollama:mistral",
       "range": {
         "end": {
           "character": 1,
-          "line": 24
+          "line": 0
         },
         "start": {
           "character": 0,
-          "line": 24
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "llm.openai:gpt-4.1": {
+      "file": "multi_runtime_team.apg",
+      "id": "llm.openai:gpt-4.1",
+      "kind": "llm",
+      "name": "openai:gpt-4.1",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
         }
       },
       "references": []
     },
     "llm.openai:gpt-4.1-mini": {
-      "file": "agent_runtime_portfolio.apg",
+      "file": "multi_runtime_team.apg",
       "id": "llm.openai:gpt-4.1-mini",
       "kind": "llm",
       "name": "openai:gpt-4.1-mini",
       "range": {
         "end": {
           "character": 1,
-          "line": 8
+          "line": 0
         },
         "start": {
           "character": 0,
-          "line": 8
+          "line": 0
         }
       },
       "references": []
     },
-    "module.agent_runtime_portfolio": {
-      "file": "agent_runtime_portfolio.apg",
-      "id": "module.agent_runtime_portfolio",
+    "module.multi_runtime_team": {
+      "file": "multi_runtime_team.apg",
+      "id": "module.multi_runtime_team",
       "kind": "module",
-      "name": "agent_runtime_portfolio",
+      "name": "multi_runtime_team",
       "range": {
         "end": {
           "character": 1,

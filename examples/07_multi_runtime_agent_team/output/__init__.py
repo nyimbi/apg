@@ -1,10 +1,8 @@
 """
-agent_runtime_portfolio - APG Generated Package
-================================================
+multi_runtime_team - APG Generated Package
+===========================================
 
 Version: 1.0.0
-
-Agent team that can route work across several AI runtimes
 
 This package was automatically generated from APG source code.
 """

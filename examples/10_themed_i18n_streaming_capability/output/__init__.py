@@ -1,6 +1,6 @@
 """
-localized_streaming_capability - APG Generated Package
-=======================================================
+localised_inventory - APG Generated Package
+============================================
 
 Version: 1.0.0
 

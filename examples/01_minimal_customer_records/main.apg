@@ -1,14 +1,42 @@
-// Example 01: minimal generated application.
-// Complexity focus: one module plus one typed record entity.
-// Compile this with: apg compile examples/01_minimal_customer_records/main.apg --output generated/customer_records
+// Example 01: typed customer record with optional and union fields.
+// Features: str, int, float, decimal, bool, datetime, date, str?, str | None,
+//           default values, List[str], Dict[str, Any]
 
 module customer_records version 1.0.0 {
-    // The module block names the generated application and provides runbook metadata.
-    description: "Smallest useful APG app: a customer record table";
+    description: "Customer data model with full type coverage";
 }
 
 table Customer {
-    // `str` fields compile into string schema properties and browser text inputs.
-    name: str;
+    // Required scalar fields
+    customer_number: str;
+    legal_name: str;
     email: str;
+    phone: str;
+    // Optional field — may be absent (null)
+    secondary_email: str?;
+    // Union type — explicit null alternative
+    company_name: str | None;
+    // Numeric types
+    credit_limit: decimal = 50000.0;
+    loyalty_points: int = 0;
+    discount_rate: float = 0.0;
+    // Boolean with default
+    is_active: bool = true;
+    is_verified: bool = false;
+    // Date/time types
+    registered_at: datetime;
+    date_of_birth: date?;
+    // Collection types
+    tags: List[str];
+    preferences: Dict[str, str];
+    // Status with a default
+    status: str = "prospect";
+    // Arbitrary metadata
+    metadata: Dict[str, Any];
+}
+
+app CustomerRecords {
+    description: "Customer records application";
+    capabilities: [];
+    routes: ["/customers"];
 }

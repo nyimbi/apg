@@ -1,6 +1,6 @@
 """
-operations_dashboard_capability - APG Generated Package
-========================================================
+operations_dashboard - APG Generated Package
+=============================================
 
 Version: 1.0.0
 

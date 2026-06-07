@@ -1,4 +1,4 @@
-# finance_general_ledger
+# finance_gl
 
 Dependency-free APG generated Python application.
 
@@ -66,9 +66,16 @@ Generated deployment artifacts:
 - `semantic_model.json` - normalized APG semantic model for IDEs, agents, and release checks
 - `smoke_test.py` - standalone generated app smoke test
 
+## Entities
+
+- `Account`
+- `JournalEntry`
+- `JournalLine`
+- `FinanceGL`
+
 ## Capabilities
 
-- `GeneralLedger` - provides journal_entries, chart_of_accounts, financial_periods
+- `GeneralLedger` - provides chart_of_accounts, journal_entries, period_close, trial_balance, financial_statements
 
 Capability operations:
 
@@ -82,4 +89,7 @@ Capability operations:
 
 Capability screens:
 
-- `GET /finance/gl/journals`
+- `GET /gl/accounts`
+- `GET /gl/journals`
+- `GET /gl/period-close`
+- `GET /gl/trial`

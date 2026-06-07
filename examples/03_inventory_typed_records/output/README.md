@@ -69,3 +69,5 @@ Generated deployment artifacts:
 ## Entities
 
 - `InventoryItem`
+- `StockMovement`
+- `InventoryRecords`

@@ -1,6 +1,6 @@
 """
-multi_capability_dependency_suite - APG Generated Package
-==========================================================
+platform_suite - APG Generated Package
+=======================================
 
 Version: 1.0.0
 

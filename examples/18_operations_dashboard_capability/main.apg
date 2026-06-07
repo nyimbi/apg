@@ -1,39 +1,103 @@
-// Example 18: cross-functional operations dashboard.
-// Complexity focus: composing metrics from finance, inventory, manufacturing, and sales.
+// Example 18: operations dashboard exercising all layout types and duration literals.
+// Features: dashboard/grid/tabs/split/stack/wizard/form layouts in one program,
+//           streaming window with duration literal
 
-module operations_dashboard_capability version 1.0.0 {
-    description: "Executive operations dashboard capability";
+module operations_dashboard version 1.0.0 {
+    description: "Operations dashboard with all layout types and streaming";
 }
 
 capability OperationsDashboard {
     contract: {
         id: operations_dashboard,
-        provides: [executive_kpis, exception_queue, operations_scorecards],
-        requires: [journal_entries, stock_balances, production_oee, forecast_metrics],
-        configuration: {refresh_seconds: 30, tenant_scoped: true},
-        rules: [
-            {name: "critical_exception_review", when: "severity == critical", action: "require_review"},
-            {name: "stale_metric_warning", when: "metric_age_minutes > 15", action: "warn"}
-        ],
-        ui: {shell: python, routes: [{name: "Operations", path: "/ops/dashboard", component: "OpsDashboard"}]},
-        theme: {name: executive_theme, tokens: {accent: "#1A365D", surface: "#F7FAFC"}}
+        provides: [operations_ui, kpi_views, approval_interfaces],
+        configuration: {tenant_id: "default"},
+        ui: {shell: python, routes: [
+            {name: "Home",      path: "/ops",           component: "OpsDashboard",  permission: "ops:view"},
+            {name: "Approvals", path: "/ops/approvals", component: "Approvals",     permission: "ops:approve"}
+        ]},
+        theme: {name: ops_theme, tokens: {accent: "#1565C0"}}
     };
 
-    erp_modules: [finance, inventory, manufacturing, sales, hr];
     screens: {
-        ExecutiveDashboard: {
-            route: "/ops/executive",
+        MainDashboard: {
+            route: "/ops",
+            title: "Operations Centre",
             layout: dashboard,
-            contains: [FinanceKpis, InventoryKpis, ProductionKpis, SalesKpis],
-            composes: [ExceptionQueue],
-            binds: [executive_kpis.current],
-            relationships: [
-                FinanceKpis -> ExceptionQueue,
-                InventoryKpis -> ExceptionQueue,
-                ProductionKpis -> ExceptionQueue,
-                SalesKpis -> ExceptionQueue
-            ]
+            contains: [RevenueKpi, CostKpi, MarginKpi, AlertBanner],
+            composes: [LedgerSummary],
+            binds: [kpis.daily, alerts.active, ledger.summary],
+            actions: [refresh, export, drill_down],
+            events: [{on: "click", do: "navigate", target: LedgerSummary}],
+            relationships: [RevenueKpi -> LedgerSummary, AlertBanner -> LedgerSummary]
+        },
+
+        KpiGrid: {
+            route: "/ops/kpis",
+            title: "KPI Grid",
+            layout: grid,
+            contains: [SalesKpi, InventoryKpi, PayrollKpi, ComplianceKpi],
+            binds: [kpis.all],
+            actions: [compare, export, date_range]
+        },
+
+        ReportsTabs: {
+            route: "/ops/reports",
+            title: "Reports",
+            layout: tabs,
+            contains: [FinancialReports, OperationalReports, ComplianceReports],
+            binds: [reports.all],
+            actions: [download, schedule, share]
+        },
+
+        ApprovalSplit: {
+            route: "/ops/approvals",
+            title: "Approvals",
+            layout: split,
+            contains: [ApprovalList, ApprovalDetail],
+            binds: [approvals.pending],
+            actions: [approve, reject, request_changes],
+            relationships: [ApprovalList -> ApprovalDetail]
+        },
+
+        ActivityStack: {
+            route: "/ops/activity",
+            title: "Activity Feed",
+            layout: stack,
+            contains: [ActivityItem],
+            binds: [activity.recent],
+            actions: [load_more, filter, mark_read]
+        },
+
+        PeriodCloseWizard: {
+            route: "/ops/period-close",
+            title: "Period Close",
+            layout: wizard,
+            contains: [ReconciliationStep, ReviewStep, ApprovalStep, CloseStep],
+            binds: [period.status],
+            actions: [next, previous, save_progress]
+        },
+
+        ConfigurationForm: {
+            route: "/ops/config",
+            title: "Configuration",
+            layout: form,
+            contains: [GeneralSettings, NotificationSettings, IntegrationSettings],
+            binds: [config.current],
+            actions: [save, reset, test_connection]
         }
     };
-    streaming: {processor: bytewax, state: operations_dashboard_state};
+
+    streaming: {
+        processor: bytewax,
+        input:  operations_event_bus,
+        output: operations_alerts,
+        state:  ops_state,
+        window: 10min
+    };
+}
+
+app OperationsDashboardApp {
+    description: "Operations centre with all layout types";
+    capabilities: [OperationsDashboard];
+    routes: ["/ops"];
 }

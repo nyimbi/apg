@@ -1,30 +1,94 @@
 {
-  "agents": {},
+  "agents": {
+    "ERPAnalyst": {
+      "capabilities": [
+        "erp_entities",
+        "executive_dashboard",
+        "board_reporting"
+      ],
+      "configuration": {
+        "max_turns": 10,
+        "temperature": 0.1
+      },
+      "handoffs": [],
+      "inputs": [],
+      "memory": {
+        "kind": "vector",
+        "name": "erp_analyst_memory"
+      },
+      "model": "openai:gpt-4.1",
+      "name": "ERPAnalyst",
+      "outputs": [],
+      "role": "ERP business analyst",
+      "rules": [],
+      "runtime": null,
+      "system": "Analyse ERP data across Finance, Procurement, HR, and CRM. Produce concise insights with KPI context. Cite data sources.",
+      "theme": {},
+      "tools": [
+        "gl.query",
+        "procurement.analysis",
+        "inventory.forecast",
+        "hr.analytics"
+      ],
+      "ui": {}
+    },
+    "PrivacyAgent": {
+      "capabilities": [
+        "erp_entities"
+      ],
+      "configuration": {
+        "max_turns": 5,
+        "temperature": 0.0
+      },
+      "handoffs": [],
+      "inputs": [],
+      "memory": null,
+      "model": "ollama:llama3.3",
+      "name": "PrivacyAgent",
+      "outputs": [],
+      "role": "privacy-safe HR advisor",
+      "rules": [],
+      "runtime": null,
+      "system": "Handle HR queries locally. No data transmitted externally. GDPR-compliant responses.",
+      "theme": {},
+      "tools": [
+        "hr.query_local",
+        "payroll.summarise_local"
+      ],
+      "ui": {}
+    }
+  },
   "app": {
     "description": null,
-    "entity_count": 7,
-    "name": "enterprise_erp_platform",
-    "version": "1.0.0"
+    "entity_count": 12,
+    "name": "enterprise_erp",
+    "version": "2.0.0"
   },
   "capabilities": {
-    "EnterpriseFinance": {
-      "approvals": {
-        "approvers": [
-          "controller",
-          "cfo"
-        ],
-        "levels": 2
-      },
+    "ERPCore": {
+      "approvals": {},
       "business_rules": [],
       "components": {},
       "configuration": {
-        "currency": "KES",
-        "fiscal_calendar": "monthly"
+        "api_key": "$ERP_API_KEY",
+        "base_currency": "KES",
+        "db_url": "env(\"ERP_DATABASE_URL\")",
+        "fiscal_year_start": "01-01",
+        "tenant_id": "env(\"ERP_TENANT_ID\")"
       },
       "erp_modules": [
         "finance",
         "general_ledger",
-        "accounts_payable"
+        "accounts_payable",
+        "accounts_receivable",
+        "procurement",
+        "inventory",
+        "hr",
+        "payroll",
+        "sales",
+        "crm",
+        "fixed_assets",
+        "project_accounting"
       ],
       "i18n": {
         "default_language": "en",
@@ -32,251 +96,225 @@
         "supported_languages": [
           "en",
           "sw",
+          "fr",
+          "ar",
           "ha",
           "yo",
           "zu",
-          "am",
-          "rw"
+          "am"
         ]
       },
       "master_data": {
         "entities": [
           "account",
-          "cost_center",
-          "financial_period"
-        ]
+          "cost_centre",
+          "department",
+          "currency",
+          "exchange_rate",
+          "financial_period",
+          "tax_code"
+        ],
+        "ownership": {
+          "account": "finance",
+          "cost_centre": "operations"
+        }
       },
-      "name": "EnterpriseFinance",
+      "name": "ERPCore",
       "provides": [
-        "journal_entries",
-        "invoice_generation",
-        "payment_allocation"
+        "erp_entities",
+        "erp_config",
+        "erp_audit"
       ],
-      "requires": [
-        "audit_events"
-      ],
-      "rule_engine": {},
-      "rules": [
-        {
-          "action": "deny",
-          "name": "balanced_journal",
-          "when": "debits != credits",
-          "when_ast": {
-            "field": "debits",
-            "op": "!=",
-            "type": "compare",
-            "value": "credits"
-          }
-        },
-        {
-          "action": "deny",
-          "name": "invoice_requires_order",
-          "when": "order_id missing",
-          "when_ast": {
-            "field": "order_id",
-            "negated": false,
-            "type": "missing"
-          }
-        }
-      ],
-      "runtime": {},
-      "screens": {},
-      "streaming": {
-        "processor": "bytewax",
-        "state": "finance_event_state"
-      },
-      "theme": {
-        "name": "finance_theme",
-        "tokens": {
-          "accent": "#126E82"
-        }
-      },
-      "ui": {
-        "routes": [
+      "requires": [],
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
           {
-            "component": "FinanceWorkbench",
-            "name": "Finance",
-            "path": "/erp/finance"
+            "action": "deny",
+            "name": "tenant_required",
+            "priority": 100,
+            "when": "tenant_id missing"
+          },
+          {
+            "action": "deny",
+            "name": "auth_required",
+            "priority": 90,
+            "when": "session_token missing"
           }
         ],
-        "shell": "python"
-      }
+        "type": "deterministic"
+      },
+      "rules": [],
+      "runtime": {},
+      "screens": {},
+      "streaming": {},
+      "theme": {},
+      "ui": {}
     },
-    "EnterpriseOperations": {
-      "approvals": {},
+    "ExecutiveERP": {
+      "approvals": {
+        "approvers": [
+          "ceo"
+        ],
+        "levels": 1,
+        "segregation_of_duties": false
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
-        "default_warehouse": "NBO-01",
-        "refresh_seconds": 30
+        "tenant_id": "env(\"ERP_TENANT_ID\")"
       },
-      "erp_modules": [
-        "inventory",
-        "warehouse",
-        "manufacturing",
-        "sales"
-      ],
+      "erp_modules": [],
       "i18n": {},
       "master_data": {},
-      "name": "EnterpriseOperations",
+      "name": "ExecutiveERP",
       "provides": [
-        "stock_balances",
-        "order_fulfillment",
-        "executive_kpis"
+        "executive_dashboard",
+        "board_reporting"
       ],
       "requires": [
-        "journal_entries",
-        "audit_events"
+        "erp_entities",
+        "erp_audit"
       ],
       "rule_engine": {},
       "rules": [
         {
           "action": "deny",
-          "name": "no_negative_stock",
-          "when": "on_hand - reserved < 0",
+          "name": "exec_only",
+          "when": "role missing",
           "when_ast": {
-            "field": "on_hand",
-            "op": "==",
-            "type": "compare",
-            "value": true
+            "field": "role",
+            "negated": false,
+            "type": "missing"
           }
         },
         {
           "action": "require_review",
-          "name": "critical_exception_review",
-          "when": "severity == critical",
+          "name": "large_exposure",
+          "when": "total_exposure > 10000000",
           "when_ast": {
-            "field": "severity",
-            "op": "==",
+            "field": "total_exposure",
+            "op": ">",
             "type": "compare",
-            "value": "critical"
+            "value": 10000000
           }
         }
       ],
       "runtime": {},
       "screens": {
-        "OperationsDashboard": {
+        "ExecutiveHome": {
           "actions": [
-            "approve",
-            "reject",
-            "escalate"
+            "export_board_pack",
+            "drill_down",
+            "schedule_report"
           ],
           "binds": [
-            "executive_kpis.current"
+            "financials.current_month",
+            "inventory.value",
+            "hr.headcount"
           ],
           "composes": [
-            "FulfillmentTable",
-            "FinanceKpis"
+            "ProcurementSummary",
+            "PayrollSummary"
           ],
           "contains": [
-            "InventoryKpis",
-            "OrderQueue",
-            "ExceptionQueue"
-          ],
-          "events": [
-            {
-              "do": "filter",
-              "on": "select",
-              "target": "FulfillmentTable"
-            }
+            "RevenueKpi",
+            "CashPosition",
+            "OpenOrders",
+            "HeadcountSummary"
           ],
           "layout": "dashboard",
           "relationships": [
-            "InventoryKpis -> ExceptionQueue",
-            "OrderQueue -> FulfillmentTable",
-            "FinanceKpis -> ExceptionQueue"
+            "RevenueKpi -> ProcurementSummary",
+            {
+              "from": "CashPosition",
+              "to": "OpenOrders",
+              "via": "liquidity_filter"
+            }
           ],
-          "route": "/erp/operations/dashboard",
-          "title": "Enterprise Operations"
+          "route": "/erp/exec",
+          "title": "Executive Dashboard"
         }
       },
       "streaming": {
+        "input": "erp_event_bus",
+        "output": "exec_alerts",
         "processor": "bytewax",
-        "state": "operations_event_state"
+        "state": "exec_state",
+        "window": "1hour"
       },
       "theme": {
-        "name": "operations_theme",
+        "name": "exec_theme",
         "tokens": {
-          "accent": "#2F855A",
-          "surface": "#F7FAFC"
+          "border.radius": "4px",
+          "color.accent": "#006064",
+          "color.primary": "#0D47A1",
+          "density": "spacious",
+          "font.family": "Roboto, sans-serif"
         }
       },
       "ui": {
+        "requires_theme": true,
         "routes": [
           {
-            "component": "OperationsWorkbench",
-            "name": "Operations",
-            "path": "/erp/operations"
+            "component": "ExecutiveDashboard",
+            "name": "Executive",
+            "path": "/erp/exec",
+            "permission": "erp:executive"
+          },
+          {
+            "component": "BoardPack",
+            "name": "Board Pack",
+            "path": "/erp/board",
+            "permission": "erp:board"
           }
         ],
         "shell": "python"
       }
-    },
-    "PlatformAudit": {
-      "approvals": {},
-      "business_rules": [],
-      "components": {},
-      "configuration": {
-        "retention_days": 730
-      },
-      "erp_modules": [],
-      "i18n": {},
-      "master_data": {},
-      "name": "PlatformAudit",
-      "provides": [
-        "audit_events"
-      ],
-      "requires": [],
-      "rule_engine": {},
-      "rules": [],
-      "runtime": {},
-      "screens": {},
-      "streaming": {
-        "processor": "bytewax",
-        "state": "platform_audit_state"
-      },
-      "theme": {},
-      "ui": {}
     }
   },
   "composition": {
     "agent_teams": {},
     "applications": {
-      "EnterpriseERPPlatform": {
-        "agent_teams": [],
+      "EnterpriseERP": {
+        "agent_teams": [
+          "ERPAdvisors"
+        ],
         "agents": [],
         "capabilities": [
-          "PlatformAudit",
-          "EnterpriseFinance",
-          "EnterpriseOperations"
+          "ERPCore",
+          "ExecutiveERP"
         ],
         "components": {
-          "audit_console": {
-            "capability": "audit_events",
-            "route": "/erp/audit"
-          },
           "finance_workbench": {
-            "capability": "journal_entries",
+            "capability": "erp_entities",
             "route": "/erp/finance"
           },
-          "operations_workbench": {
-            "capability": "executive_kpis",
-            "route": "/erp/operations"
+          "hr_portal": {
+            "capability": "erp_entities",
+            "route": "/erp/hr"
+          },
+          "procurement_desk": {
+            "capability": "erp_entities",
+            "route": "/erp/procurement"
           }
         },
         "configuration": {},
         "deployments": {
+          "cloud": "kubernetes",
           "container": "docker",
           "default": "local"
         },
-        "description": "Composable ERP application shell that assembles finance, operations, and audit capabilities",
+        "description": "Full-suite ERP composed from APG capabilities",
         "integrations": {},
-        "name": "EnterpriseERPPlatform",
+        "name": "EnterpriseERP",
         "policies": {},
         "routes": [
+          "/erp",
+          "/erp/exec",
           "/erp/finance",
-          "/erp/operations",
-          "/erp/operations/dashboard"
+          "/erp/procurement",
+          "/erp/hr"
         ],
         "runtime": {
           "deployment": "container",
@@ -286,269 +324,488 @@
           "target": "python"
         },
         "screens": {
-          "ExecutiveHome": {
-            "capability": "EnterpriseOperations",
-            "component": "ExecutiveHome",
-            "route": "/erp"
+          "ERPHome": {
+            "actions": [
+              "navigate",
+              "refresh"
+            ],
+            "binds": [
+              "erp.summary",
+              "activity.recent",
+              "alerts.active"
+            ],
+            "contains": [
+              "ModuleNav",
+              "RecentActivity",
+              "AlertPanel"
+            ],
+            "layout": "dashboard",
+            "route": "/erp",
+            "title": "ERP Platform"
           }
         },
         "theme": {
-          "name": "enterprise_theme",
+          "name": "erp_platform_theme",
           "tokens": {
-            "accent": "#174EA6",
-            "surface": "#F8FAFC"
+            "accent": "#006064",
+            "border.radius": "4px"
           }
         },
         "workflows": []
       }
     },
     "capability_dependencies": {
-      "EnterpriseFinance": [
-        "audit_events"
-      ],
-      "EnterpriseOperations": [
-        "journal_entries",
-        "audit_events"
-      ],
-      "PlatformAudit": []
+      "ERPCore": [],
+      "ExecutiveERP": [
+        "erp_entities",
+        "erp_audit"
+      ]
     }
   },
   "contracts": {
-    "EnterpriseFinance": {
+    "ERPCore": {
       "configuration": {
-        "currency": "KES",
-        "fiscal_calendar": "monthly"
+        "api_key": "$ERP_API_KEY",
+        "base_currency": "KES",
+        "db_url": "env(\"ERP_DATABASE_URL\")",
+        "fiscal_year_start": "01-01",
+        "tenant_id": "env(\"ERP_TENANT_ID\")"
       },
-      "id": "enterprise_finance",
+      "configuration_schema": {
+        "required": [
+          "tenant_id",
+          "db_url"
+        ]
+      },
+      "id": "enterprise_erp_core",
       "provides": [
-        "journal_entries",
-        "invoice_generation",
-        "payment_allocation"
+        "erp_entities",
+        "erp_config",
+        "erp_audit"
       ],
-      "requires": [
-        "audit_events"
-      ],
-      "rules": [
-        {
-          "action": "deny",
-          "name": "balanced_journal",
-          "when": "debits != credits",
-          "when_ast": {
-            "field": "debits",
-            "op": "!=",
-            "type": "compare",
-            "value": "credits"
-          }
-        },
-        {
-          "action": "deny",
-          "name": "invoice_requires_order",
-          "when": "order_id missing",
-          "when_ast": {
-            "field": "order_id",
-            "negated": false,
-            "type": "missing"
-          }
-        }
-      ],
-      "theme": {
-        "name": "finance_theme",
-        "tokens": {
-          "accent": "#126E82"
-        }
-      },
-      "ui": {
-        "routes": [
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
           {
-            "component": "FinanceWorkbench",
-            "name": "Finance",
-            "path": "/erp/finance"
+            "action": "deny",
+            "name": "tenant_required",
+            "priority": 100,
+            "when": "tenant_id missing"
+          },
+          {
+            "action": "deny",
+            "name": "auth_required",
+            "priority": 90,
+            "when": "session_token missing"
           }
         ],
-        "shell": "python"
+        "type": "deterministic"
       }
     },
-    "EnterpriseOperations": {
+    "ExecutiveERP": {
       "configuration": {
-        "default_warehouse": "NBO-01",
-        "refresh_seconds": 30
+        "tenant_id": "env(\"ERP_TENANT_ID\")"
       },
-      "id": "enterprise_operations",
+      "id": "executive_erp_view",
       "provides": [
-        "stock_balances",
-        "order_fulfillment",
-        "executive_kpis"
+        "executive_dashboard",
+        "board_reporting"
       ],
       "requires": [
-        "journal_entries",
-        "audit_events"
+        "erp_entities",
+        "erp_audit"
       ],
       "rules": [
         {
           "action": "deny",
-          "name": "no_negative_stock",
-          "when": "on_hand - reserved < 0",
+          "name": "exec_only",
+          "when": "role missing",
           "when_ast": {
-            "field": "on_hand",
-            "op": "==",
-            "type": "compare",
-            "value": true
+            "field": "role",
+            "negated": false,
+            "type": "missing"
           }
         },
         {
           "action": "require_review",
-          "name": "critical_exception_review",
-          "when": "severity == critical",
+          "name": "large_exposure",
+          "when": "total_exposure > 10000000",
           "when_ast": {
-            "field": "severity",
-            "op": "==",
+            "field": "total_exposure",
+            "op": ">",
             "type": "compare",
-            "value": "critical"
+            "value": 10000000
           }
         }
       ],
       "theme": {
-        "name": "operations_theme",
+        "name": "exec_theme",
         "tokens": {
-          "accent": "#2F855A",
-          "surface": "#F7FAFC"
+          "border.radius": "4px",
+          "color.accent": "#006064",
+          "color.primary": "#0D47A1",
+          "density": "spacious",
+          "font.family": "Roboto, sans-serif"
         }
       },
       "ui": {
+        "requires_theme": true,
         "routes": [
           {
-            "component": "OperationsWorkbench",
-            "name": "Operations",
-            "path": "/erp/operations"
+            "component": "ExecutiveDashboard",
+            "name": "Executive",
+            "path": "/erp/exec",
+            "permission": "erp:executive"
+          },
+          {
+            "component": "BoardPack",
+            "name": "Board Pack",
+            "path": "/erp/board",
+            "permission": "erp:board"
           }
         ],
         "shell": "python"
       }
-    },
-    "PlatformAudit": {
-      "configuration": {
-        "retention_days": 730
-      },
-      "id": "platform_audit",
-      "provides": [
-        "audit_events"
-      ]
     }
   },
   "deployment": {
-    "source": "enterprise_erp_platform.apg",
+    "source": "enterprise_erp.apg",
     "target": "python"
   },
   "diagnostics": [],
-  "flows": {},
+  "flows": {
+    "HireToRetire": {
+      "assignments": {
+        "job_offer": "hr_manager",
+        "onboarding": "hr_officer"
+      },
+      "compensation": {
+        "confirmed": "reinstate_probation_status"
+      },
+      "guards": {
+        "probation": "onboarding_complete == true\";\n        confirmed: \"probation_assessment_passed == true\";"
+      },
+      "human_tasks": [
+        "job_offer",
+        "onboarding",
+        "probation",
+        "offboarding"
+      ],
+      "methods": [],
+      "name": "HireToRetire",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "job_offer",
+        "onboarding",
+        "probation",
+        "confirmed",
+        "active",
+        "resignation",
+        "offboarding",
+        "terminated"
+      ],
+      "steps": [
+        "job_offer",
+        "onboarding",
+        "probation",
+        "confirmed",
+        "active",
+        "resignation",
+        "offboarding",
+        "terminated"
+      ],
+      "steps_raw": "job_offer -> onboarding -> probation -> confirmed -> active -> resignation -> offboarding -> terminated",
+      "timers": {
+        "offboarding": "P30D",
+        "probation": "P90D"
+      },
+      "transitions": [
+        {
+          "guard": null,
+          "source": "job_offer",
+          "target": "onboarding"
+        },
+        {
+          "guard": "onboarding_complete == true\";\n        confirmed: \"probation_assessment_passed == true\";",
+          "source": "onboarding",
+          "target": "probation"
+        },
+        {
+          "guard": null,
+          "source": "probation",
+          "target": "confirmed"
+        },
+        {
+          "guard": null,
+          "source": "confirmed",
+          "target": "active"
+        },
+        {
+          "guard": null,
+          "source": "active",
+          "target": "resignation"
+        },
+        {
+          "guard": null,
+          "source": "resignation",
+          "target": "offboarding"
+        },
+        {
+          "guard": null,
+          "source": "offboarding",
+          "target": "terminated"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    },
+    "MonthEndClose": {
+      "assignments": {
+        "approved": "cfo",
+        "review": "controller"
+      },
+      "compensation": {},
+      "guards": {
+        "review": "all_reconciliations_complete == true\";\n        approved: \"review_sign_off_complete == true\";\n        locked:   \"approved == true\";"
+      },
+      "human_tasks": [
+        "accruals",
+        "bank_recon",
+        "review",
+        "approved"
+      ],
+      "methods": [],
+      "name": "MonthEndClose",
+      "properties": {},
+      "retry_policy": {
+        "bank_recon": "3",
+        "sub_ledger_recon": "2"
+      },
+      "states": [
+        "open",
+        "accruals",
+        "bank_recon",
+        "sub_ledger_recon",
+        "review",
+        "approved",
+        "closed",
+        "locked"
+      ],
+      "steps": [
+        "open",
+        "accruals",
+        "bank_recon",
+        "sub_ledger_recon",
+        "review",
+        "approved",
+        "closed",
+        "locked"
+      ],
+      "steps_raw": "open -> accruals -> bank_recon -> sub_ledger_recon -> review -> approved -> closed -> locked",
+      "timers": {
+        "approved": "PT24H",
+        "review": "PT48H"
+      },
+      "transitions": [
+        {
+          "guard": null,
+          "source": "open",
+          "target": "accruals"
+        },
+        {
+          "guard": null,
+          "source": "accruals",
+          "target": "bank_recon"
+        },
+        {
+          "guard": null,
+          "source": "bank_recon",
+          "target": "sub_ledger_recon"
+        },
+        {
+          "guard": "all_reconciliations_complete == true\";\n        approved: \"review_sign_off_complete == true\";\n        locked:   \"approved == true\";",
+          "source": "sub_ledger_recon",
+          "target": "review"
+        },
+        {
+          "guard": null,
+          "source": "review",
+          "target": "approved"
+        },
+        {
+          "guard": null,
+          "source": "approved",
+          "target": "closed"
+        },
+        {
+          "guard": null,
+          "source": "closed",
+          "target": "locked"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    }
+  },
   "format": "apg.semantic-model.v1",
   "graphs": {
     "agent": {
       "edges": 0,
       "kind": "agent",
-      "nodes": 0
+      "nodes": 3
     },
     "capability": {
-      "edges": 6,
+      "edges": 4,
       "kind": "capability",
-      "nodes": 6
+      "nodes": 5
     },
     "deployment": {
-      "edges": 7,
+      "edges": 12,
       "kind": "deployment",
-      "nodes": 8
+      "nodes": 13
     },
     "er": {
-      "edges": 13,
+      "edges": 25,
       "kind": "er",
-      "nodes": 15
+      "nodes": 29
     },
     "handler": {
-      "edges": 7,
+      "edges": 12,
       "kind": "handler",
-      "nodes": 8
+      "nodes": 13
     },
     "lookup": {
-      "edges": 7,
+      "edges": 12,
       "kind": "lookup",
-      "nodes": 8
+      "nodes": 13
     },
     "package": {
-      "edges": 7,
+      "edges": 12,
       "kind": "package",
-      "nodes": 8
+      "nodes": 13
     },
     "security": {
-      "edges": 7,
+      "edges": 12,
       "kind": "security",
-      "nodes": 8
+      "nodes": 13
     },
     "workflow": {
-      "edges": 7,
+      "edges": 12,
       "kind": "workflow",
-      "nodes": 8
+      "nodes": 13
     }
   },
-  "llms": {},
+  "llms": {
+    "ERPAnalyst": {
+      "model": "openai:gpt-4.1",
+      "runtime": null
+    },
+    "PrivacyAgent": {
+      "model": "ollama:llama3.3",
+      "runtime": null
+    }
+  },
   "ok": true,
   "operations": {},
   "packages": {},
   "roles": {},
   "rules": {
-    "EnterpriseFinance.balanced_journal": {
+    "ERPCore.auth_required": {
       "action": "deny",
-      "name": "balanced_journal",
-      "when": "debits != credits",
-      "when_ast": {
-        "field": "debits",
-        "op": "!=",
-        "type": "compare",
-        "value": "credits"
-      }
+      "name": "auth_required",
+      "priority": 90,
+      "when": "session_token missing"
     },
-    "EnterpriseFinance.invoice_requires_order": {
+    "ERPCore.tenant_required": {
       "action": "deny",
-      "name": "invoice_requires_order",
-      "when": "order_id missing",
+      "name": "tenant_required",
+      "priority": 100,
+      "when": "tenant_id missing"
+    },
+    "ExecutiveERP.exec_only": {
+      "action": "deny",
+      "name": "exec_only",
+      "when": "role missing",
       "when_ast": {
-        "field": "order_id",
+        "field": "role",
         "negated": false,
         "type": "missing"
       }
     },
-    "EnterpriseOperations.critical_exception_review": {
+    "ExecutiveERP.large_exposure": {
       "action": "require_review",
-      "name": "critical_exception_review",
-      "when": "severity == critical",
+      "name": "large_exposure",
+      "when": "total_exposure > 10000000",
       "when_ast": {
-        "field": "severity",
-        "op": "==",
+        "field": "total_exposure",
+        "op": ">",
         "type": "compare",
-        "value": "critical"
-      }
-    },
-    "EnterpriseOperations.no_negative_stock": {
-      "action": "deny",
-      "name": "no_negative_stock",
-      "when": "on_hand - reserved < 0",
-      "when_ast": {
-        "field": "on_hand",
-        "op": "==",
-        "type": "compare",
-        "value": true
+        "value": 10000000
       }
     }
   },
   "security": {},
   "source_files": [
-    "enterprise_erp_platform.apg"
+    "enterprise_erp.apg"
   ],
   "symbols": {
-    "app.EnterpriseERPPlatform": {
-      "file": "enterprise_erp_platform.apg",
-      "id": "app.EnterpriseERPPlatform",
+    "agent.ERPAnalyst": {
+      "file": "enterprise_erp.apg",
+      "id": "agent.ERPAnalyst",
+      "kind": "agent",
+      "name": "ERPAnalyst",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "agent.PrivacyAgent": {
+      "file": "enterprise_erp.apg",
+      "id": "agent.PrivacyAgent",
+      "kind": "agent",
+      "name": "PrivacyAgent",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "agent_team.ERPAdvisors": {
+      "file": "enterprise_erp.apg",
+      "id": "agent_team.ERPAdvisors",
+      "kind": "agent_team",
+      "name": "ERPAdvisors",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "app.EnterpriseERP": {
+      "file": "enterprise_erp.apg",
+      "id": "app.EnterpriseERP",
       "kind": "app",
-      "name": "EnterpriseERPPlatform",
+      "name": "EnterpriseERP",
       "range": {
         "end": {
           "character": 1,
@@ -561,11 +818,11 @@
       },
       "references": []
     },
-    "capability.EnterpriseFinance": {
-      "file": "enterprise_erp_platform.apg",
-      "id": "capability.EnterpriseFinance",
+    "capability.ERPCore": {
+      "file": "enterprise_erp.apg",
+      "id": "capability.ERPCore",
       "kind": "capability",
-      "name": "EnterpriseFinance",
+      "name": "ERPCore",
       "range": {
         "end": {
           "character": 1,
@@ -578,11 +835,11 @@
       },
       "references": []
     },
-    "capability.EnterpriseOperations": {
-      "file": "enterprise_erp_platform.apg",
-      "id": "capability.EnterpriseOperations",
+    "capability.ExecutiveERP": {
+      "file": "enterprise_erp.apg",
+      "id": "capability.ExecutiveERP",
       "kind": "capability",
-      "name": "EnterpriseOperations",
+      "name": "ExecutiveERP",
       "range": {
         "end": {
           "character": 1,
@@ -595,11 +852,11 @@
       },
       "references": []
     },
-    "capability.PlatformAudit": {
-      "file": "enterprise_erp_platform.apg",
-      "id": "capability.PlatformAudit",
-      "kind": "capability",
-      "name": "PlatformAudit",
+    "database.ERPDB": {
+      "file": "enterprise_erp.apg",
+      "id": "database.ERPDB",
+      "kind": "database",
+      "name": "ERPDB",
       "range": {
         "end": {
           "character": 1,
@@ -612,11 +869,28 @@
       },
       "references": []
     },
-    "field.Customer.active": {
-      "file": "enterprise_erp_platform.apg",
-      "id": "field.Customer.active",
+    "field.Customer.credit_limit": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Customer.credit_limit",
       "kind": "field",
-      "name": "Customer.active",
+      "name": "Customer.credit_limit",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.currency": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Customer.currency",
+      "kind": "field",
+      "name": "Customer.currency",
       "range": {
         "end": {
           "character": 1,
@@ -630,7 +904,7 @@
       "references": []
     },
     "field.Customer.customer_number": {
-      "file": "enterprise_erp_platform.apg",
+      "file": "enterprise_erp.apg",
       "id": "field.Customer.customer_number",
       "kind": "field",
       "name": "Customer.customer_number",
@@ -646,25 +920,8 @@
       },
       "references": []
     },
-    "field.Customer.email": {
-      "file": "enterprise_erp_platform.apg",
-      "id": "field.Customer.email",
-      "kind": "field",
-      "name": "Customer.email",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
-      },
-      "references": []
-    },
     "field.Customer.legal_name": {
-      "file": "enterprise_erp_platform.apg",
+      "file": "enterprise_erp.apg",
       "id": "field.Customer.legal_name",
       "kind": "field",
       "name": "Customer.legal_name",
@@ -680,11 +937,11 @@
       },
       "references": []
     },
-    "field.Item.active": {
-      "file": "enterprise_erp_platform.apg",
-      "id": "field.Item.active",
+    "field.Customer.payment_terms": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Customer.payment_terms",
       "kind": "field",
-      "name": "Item.active",
+      "name": "Customer.payment_terms",
       "range": {
         "end": {
           "character": 1,
@@ -697,11 +954,11 @@
       },
       "references": []
     },
-    "field.Item.description": {
-      "file": "enterprise_erp_platform.apg",
-      "id": "field.Item.description",
+    "field.Customer.region": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Customer.region",
       "kind": "field",
-      "name": "Item.description",
+      "name": "Customer.region",
       "range": {
         "end": {
           "character": 1,
@@ -714,11 +971,11 @@
       },
       "references": []
     },
-    "field.Item.sku": {
-      "file": "enterprise_erp_platform.apg",
-      "id": "field.Item.sku",
+    "field.Customer.status": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Customer.status",
       "kind": "field",
-      "name": "Item.sku",
+      "name": "Customer.status",
       "range": {
         "end": {
           "character": 1,
@@ -731,11 +988,11 @@
       },
       "references": []
     },
-    "field.Item.unit_price": {
-      "file": "enterprise_erp_platform.apg",
-      "id": "field.Item.unit_price",
+    "field.Employee.department": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Employee.department",
       "kind": "field",
-      "name": "Item.unit_price",
+      "name": "Employee.department",
       "range": {
         "end": {
           "character": 1,
@@ -748,11 +1005,11 @@
       },
       "references": []
     },
-    "field.SalesOrder.customer_id": {
-      "file": "enterprise_erp_platform.apg",
-      "id": "field.SalesOrder.customer_id",
+    "field.Employee.employee_number": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Employee.employee_number",
       "kind": "field",
-      "name": "SalesOrder.customer_id",
+      "name": "Employee.employee_number",
       "range": {
         "end": {
           "character": 1,
@@ -765,11 +1022,11 @@
       },
       "references": []
     },
-    "field.SalesOrder.order_number": {
-      "file": "enterprise_erp_platform.apg",
-      "id": "field.SalesOrder.order_number",
+    "field.Employee.full_name": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Employee.full_name",
       "kind": "field",
-      "name": "SalesOrder.order_number",
+      "name": "Employee.full_name",
       "range": {
         "end": {
           "character": 1,
@@ -782,11 +1039,11 @@
       },
       "references": []
     },
-    "field.SalesOrder.status": {
-      "file": "enterprise_erp_platform.apg",
-      "id": "field.SalesOrder.status",
+    "field.Employee.hire_date": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Employee.hire_date",
       "kind": "field",
-      "name": "SalesOrder.status",
+      "name": "Employee.hire_date",
       "range": {
         "end": {
           "character": 1,
@@ -799,11 +1056,11 @@
       },
       "references": []
     },
-    "field.SalesOrder.total": {
-      "file": "enterprise_erp_platform.apg",
-      "id": "field.SalesOrder.total",
+    "field.Employee.is_active": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Employee.is_active",
       "kind": "field",
-      "name": "SalesOrder.total",
+      "name": "Employee.is_active",
       "range": {
         "end": {
           "character": 1,
@@ -816,11 +1073,215 @@
       },
       "references": []
     },
-    "module.enterprise_erp_platform": {
-      "file": "enterprise_erp_platform.apg",
-      "id": "module.enterprise_erp_platform",
+    "field.Employee.position": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Employee.position",
+      "kind": "field",
+      "name": "Employee.position",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Employee.salary": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Employee.salary",
+      "kind": "field",
+      "name": "Employee.salary",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Vendor.bank_account": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Vendor.bank_account",
+      "kind": "field",
+      "name": "Vendor.bank_account",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Vendor.country": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Vendor.country",
+      "kind": "field",
+      "name": "Vendor.country",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Vendor.currency": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Vendor.currency",
+      "kind": "field",
+      "name": "Vendor.currency",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Vendor.legal_name": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Vendor.legal_name",
+      "kind": "field",
+      "name": "Vendor.legal_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Vendor.payment_terms": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Vendor.payment_terms",
+      "kind": "field",
+      "name": "Vendor.payment_terms",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Vendor.status": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Vendor.status",
+      "kind": "field",
+      "name": "Vendor.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Vendor.tax_id": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Vendor.tax_id",
+      "kind": "field",
+      "name": "Vendor.tax_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Vendor.vendor_number": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Vendor.vendor_number",
+      "kind": "field",
+      "name": "Vendor.vendor_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "llm.ollama:llama3.3": {
+      "file": "enterprise_erp.apg",
+      "id": "llm.ollama:llama3.3",
+      "kind": "llm",
+      "name": "ollama:llama3.3",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "llm.openai:gpt-4.1": {
+      "file": "enterprise_erp.apg",
+      "id": "llm.openai:gpt-4.1",
+      "kind": "llm",
+      "name": "openai:gpt-4.1",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.enterprise_erp": {
+      "file": "enterprise_erp.apg",
+      "id": "module.enterprise_erp",
       "kind": "module",
-      "name": "enterprise_erp_platform",
+      "name": "enterprise_erp",
       "range": {
         "end": {
           "character": 1,
@@ -834,7 +1295,7 @@
       "references": []
     },
     "table.Customer": {
-      "file": "enterprise_erp_platform.apg",
+      "file": "enterprise_erp.apg",
       "id": "table.Customer",
       "kind": "table",
       "name": "Customer",
@@ -850,11 +1311,11 @@
       },
       "references": []
     },
-    "table.Item": {
-      "file": "enterprise_erp_platform.apg",
-      "id": "table.Item",
+    "table.Employee": {
+      "file": "enterprise_erp.apg",
+      "id": "table.Employee",
       "kind": "table",
-      "name": "Item",
+      "name": "Employee",
       "range": {
         "end": {
           "character": 1,
@@ -867,11 +1328,45 @@
       },
       "references": []
     },
-    "table.SalesOrder": {
-      "file": "enterprise_erp_platform.apg",
-      "id": "table.SalesOrder",
+    "table.Vendor": {
+      "file": "enterprise_erp.apg",
+      "id": "table.Vendor",
       "kind": "table",
-      "name": "SalesOrder",
+      "name": "Vendor",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.HireToRetire": {
+      "file": "enterprise_erp.apg",
+      "id": "workflow.HireToRetire",
+      "kind": "workflow",
+      "name": "HireToRetire",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.MonthEndClose": {
+      "file": "enterprise_erp.apg",
+      "id": "workflow.MonthEndClose",
+      "kind": "workflow",
+      "name": "MonthEndClose",
       "range": {
         "end": {
           "character": 1,
@@ -888,17 +1383,17 @@
   "tables": {
     "Customer": {
       "fields": {
-        "active": {
+        "credit_limit": {
           "relationship": null,
           "required": true,
-          "type": "bool"
+          "type": "float"
         },
-        "customer_number": {
+        "currency": {
           "relationship": null,
           "required": true,
           "type": "str"
         },
-        "email": {
+        "customer_number": {
           "relationship": null,
           "required": true,
           "type": "str"
@@ -907,50 +1402,94 @@
           "relationship": null,
           "required": true,
           "type": "str"
+        },
+        "payment_terms": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "region": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
         }
       },
       "lookup_paths": {},
       "name": "Customer"
     },
-    "Item": {
+    "Employee": {
       "fields": {
-        "active": {
+        "department": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "employee_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "full_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "hire_date": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "is_active": {
           "relationship": null,
           "required": true,
           "type": "bool"
         },
-        "description": {
+        "position": {
           "relationship": null,
           "required": true,
           "type": "str"
         },
-        "sku": {
-          "relationship": null,
-          "required": true,
-          "type": "str"
-        },
-        "unit_price": {
+        "salary": {
           "relationship": null,
           "required": true,
           "type": "float"
         }
       },
       "lookup_paths": {},
-      "name": "Item"
+      "name": "Employee"
     },
-    "SalesOrder": {
+    "Vendor": {
       "fields": {
-        "customer_id": {
+        "bank_account": {
           "relationship": {
-            "alias": "customer",
             "cardinality": "many-to-one",
             "target_field": "id",
-            "target_table": "Customer"
+            "target_table": "str?"
           },
           "required": true,
-          "type": "int"
+          "type": "str?"
         },
-        "order_number": {
+        "country": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "currency": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "legal_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "payment_terms": {
           "relationship": null,
           "required": true,
           "type": "str"
@@ -960,14 +1499,32 @@
           "required": true,
           "type": "str"
         },
-        "total": {
+        "tax_id": {
+          "relationship": {
+            "alias": "tax",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Tax"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "vendor_number": {
           "relationship": null,
           "required": true,
-          "type": "float"
+          "type": "str"
         }
       },
-      "lookup_paths": {},
-      "name": "SalesOrder"
+      "lookup_paths": {
+        "bank_account.id": {
+          "chain": [
+            "Vendor.bank_account",
+            "str?.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Vendor"
     }
   },
   "views": {}

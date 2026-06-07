@@ -1,4 +1,4 @@
-# procurement_approval_workbench
+# procurement_workbench
 
 Dependency-free APG generated Python application.
 
@@ -68,7 +68,22 @@ Generated deployment artifacts:
 
 ## Entities
 
+- `ProcurementDB`
+- `PurchaseRequest`
+- `SupplierQuote`
 - `ProcurementApproval`
+- `ProcurementApp`
+
+## Databases
+
+- `GET /databases` - database catalog with connection and schema metadata
+- `GET /databases/status` - database validation status and schema/reference counts
+- `GET /databases/{Database}/schemas` - schema, table, column, index, and relationship metadata for one database
+- `GET /relationships` - generated entity and database relationship graph
+
+Declared databases:
+
+- `ProcurementDB` - 0 schema(s), 0 table(s)
 
 ## Capabilities
 
@@ -88,3 +103,4 @@ Capability screens:
 
 - `GET /procurement`
 - `GET /procurement/approvals`
+- `GET /procurement/quotes`

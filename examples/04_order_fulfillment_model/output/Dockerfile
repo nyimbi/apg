@@ -10,6 +10,6 @@ COPY . /app
 
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD python app.py --self-test >/tmp/fulfillment_ops_self_test.json || exit 1
+  CMD python app.py --self-test >/tmp/order_fulfillment_self_test.json || exit 1
 
 CMD ["python", "app.py"]

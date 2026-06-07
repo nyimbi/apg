@@ -1,48 +1,140 @@
-// Example 19: multi-capability dependency suite.
-// Complexity focus: several capabilities with provides/requires dependency planning.
+// Example 19: multi-capability composition with dependency chain.
+// Features: requires chain across 4 capabilities, rule_engine block,
+//           app with agent_teams, full composability pattern
 
-module multi_capability_dependency_suite version 1.0.0 {
-    description: "Composable ERP capabilities with explicit dependencies";
+module platform_suite version 1.0.0 {
+    description: "Multi-capability platform demonstrating dependency chain composition";
 }
 
-capability AuditEvents {
+// Layer 1: Foundation
+capability Authentication {
     contract: {
-        id: audit_events,
-        provides: [audit_events],
-        configuration: {retention_days: 365}
+        id: auth,
+        provides: [identity_verification, session_management, role_assignment, jwt_tokens],
+        configuration: {tenant_id: "default", token_ttl_seconds: 3600, mfa_required: false},
+        rule_engine: {
+            type: deterministic,
+            default_decision: deny,
+            rules: [
+                {name: "valid_session",    when: "session_token not missing",  action: allow,  priority: 100},
+                {name: "mfa_required",     when: "mfa_token missing",          action: deny,   priority: 90},
+                {name: "locked_account",   when: "account_locked == true",     action: deny,   priority: 80},
+                {name: "rate_limited",     when: "login_attempts > 5",         action: deny,   priority: 70}
+            ]
+        }
     };
-    streaming: {processor: bytewax, state: audit_event_state};
 }
 
+// Layer 2: Observability (depends on auth)
+capability AuditTrail {
+    contract: {
+        id: audl,
+        provides: [audit_events, compliance_trail, change_history],
+        requires: [identity_verification],
+        configuration: {tenant_id: "default", retention_days: 2555, immutable: true},
+        rules: [
+            {name: "actor_required",    when: "actor_id missing",   action: deny},
+            {name: "event_type_valid",  when: "event_type missing", action: deny}
+        ]
+    };
+}
+
+// Layer 3: Core business (depends on auth + audit)
 capability CustomerMaster {
     contract: {
         id: customer_master,
-        provides: [customer_master],
-        requires: [audit_events],
-        configuration: {deduplicate: true}
+        provides: [customer_records, credit_profiles, kyc_status],
+        requires: [identity_verification, audit_events],
+        configuration: {
+            tenant_id: "default",
+            kyc_required: true,
+            credit_check_provider: "internal"
+        },
+        rules: [
+            {name: "kyc_required",     when: "kyc_status == pending",   action: deny},
+            {name: "duplicate_email",  when: "email_exists == true",    action: require_review},
+            {name: "credit_limit",     when: "credit_score < 300",      action: require_review}
+        ],
+        rule_engine: {type: policy, default_decision: allow},
+        ui: {shell: python, routes: [
+            {name: "Customers", path: "/customers", component: "CustomerList", permission: "customers:view"}
+        ]},
+        theme: {name: customer_theme, tokens: {accent: "#00695C"}}
     };
-    master_data: {entities: [customer, address, contact]};
+    master_data: {entities: [customer, credit_profile, kyc_document]};
 }
 
-capability OrderManagement {
+// Layer 4: Application (depends on all three)
+capability SalesPortal {
     contract: {
-        id: order_management,
-        provides: [sales_orders, order_fulfillment],
-        requires: [customer_master, audit_events],
-        configuration: {default_status: "pending"},
-        rules: [{name: "customer_required", when: "customer_id missing", action: "deny"}],
-        ui: {shell: python, routes: [{name: "Orders", path: "/orders", component: "OrderScreen"}]}
+        id: sales_portal,
+        provides: [sales_dashboard, order_management, customer_engagement],
+        requires: [identity_verification, audit_events, customer_records, credit_profiles],
+        configuration: {tenant_id: "default", max_order_value: 5000000},
+        rules: [
+            {name: "auth_required",       when: "session_token missing",  action: deny},
+            {name: "kyc_gate",            when: "kyc_status != verified", action: deny},
+            {name: "credit_gate",         when: "available_credit < 0",   action: deny},
+            {name: "large_order",         when: "order_total > 1000000",  action: require_review},
+            {name: "approved_region",     when: "customer_region == KE",  action: allow},
+            {name: "unsupported_region",  when: "customer_region missing", action: deny}
+        ],
+        ui: {shell: python, routes: [
+            {name: "Dashboard", path: "/sales",        component: "SalesDashboard", permission: "sales:view"},
+            {name: "Orders",    path: "/sales/orders", component: "OrderList",      permission: "sales:orders"}
+        ]},
+        theme: {name: sales_theme, tokens: {accent: "#1565C0"}}
     };
-    erp_modules: [sales, inventory, finance];
+
+    screens: {
+        SalesDashboard: {
+            route: "/sales",
+            layout: dashboard,
+            contains: [RevenueChart, TopCustomers, RecentOrders],
+            binds: [sales.summary, customers.top, orders.recent],
+            actions: [create_order, refresh, export]
+        }
+    };
+    streaming: {processor: bytewax, state: sales_event_state};
 }
 
-capability Billing {
-    contract: {
-        id: billing,
-        provides: [invoice_generation, payment_allocation],
-        requires: [sales_orders, customer_master, audit_events],
-        configuration: {currency: "KES"},
-        rules: [{name: "invoice_requires_order", when: "order_id missing", action: "deny"}]
+agent SalesAdvisor {
+    role: "sales advisor";
+    model: "openai:gpt-4.1-mini";
+    runtime: codex;
+    system: "Advise sales team on customer engagement, upsell opportunities, and deal risk.";
+    capabilities: [customer_records, sales_dashboard, order_management];
+    tools: [customer.lookup, order.history, credit.check];
+    memory: vector sales_memory;
+    configuration: {temperature: 0.2, max_turns: 8};
+}
+
+agent ComplianceAdvisor {
+    role: "compliance advisor";
+    model: "ollama:llama3.3";
+    runtime: ollama;
+    system: "Review transactions for AML and KYC compliance. Flag any concerns.";
+    capabilities: [audit_events, kyc_status];
+    tools: [kyc.verify, aml.screen, compliance.report];
+    configuration: {temperature: 0.0, max_turns: 4};
+}
+
+agent_team SalesComplianceCrew {
+    agents: [SalesAdvisor, ComplianceAdvisor];
+    flow: SalesAdvisor -> ComplianceAdvisor [condition: compliance_check_needed];
+    capabilities: [customer_records, audit_events];
+}
+
+app PlatformSuite {
+    description: "Multi-capability platform with full dependency chain";
+    capabilities: [Authentication, AuditTrail, CustomerMaster, SalesPortal];
+    agent_teams: [SalesComplianceCrew];
+    routes: ["/", "/customers", "/sales"];
+    components: {
+        auth_service:     {capability: identity_verification, route: "/auth"},
+        customer_portal:  {capability: customer_records,      route: "/customers"},
+        sales_portal:     {capability: sales_dashboard,       route: "/sales"}
     };
-    erp_modules: [finance, sales];
+    runtime: {target: python, deployment: container, streaming: {processor: bytewax}};
+    deployments: {default: local, container: docker, cloud: kubernetes};
 }

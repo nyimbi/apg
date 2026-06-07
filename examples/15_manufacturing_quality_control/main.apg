@@ -1,42 +1,96 @@
-// Example 15: manufacturing quality control.
-// Complexity focus: production records, quality rules, and shop-floor dashboard composition.
+// Example 15: manufacturing quality control with environment variable references.
+// Features: env() function, $VAR_NAME syntax for configuration secrets
 
-module manufacturing_quality_control version 1.0.0 {
-    description: "Manufacturing production and quality-control capability";
+module manufacturing_qc version 1.0.0 {
+    description: "Manufacturing quality control with env-var configuration";
 }
 
-table ProductionRun {
-    line_code: str;
-    product_sku: str;
-    planned_quantity: int;
-    completed_quantity: int;
-    defect_count: int;
-    active: bool;
+table WorkOrder {
+    work_order_id: str;
+    product_code: str;
+    quantity_planned: int;
+    quantity_produced: int = 0;
+    quantity_rejected: int = 0;
+    status: str = "planned";
+    started_at: datetime?;
+    completed_at: datetime?;
+    production_line: str;
 }
 
-capability QualityControl {
+table QualityInspection {
+    inspection_id: str;
+    work_order_id: str;
+    inspector_id: str;
+    inspection_type: str;     // in_process | final | audit
+    result: str?;             // pass | fail | conditional
+    defect_count: int = 0;
+    defect_rate: float = 0.0;
+    inspected_at: datetime;
+    notes: str?;
+}
+
+capability ManufacturingQC {
     contract: {
-        id: quality_control,
-        provides: [quality_inspections, defect_tracking, production_oee],
-        requires: [stock_movements, audit_events],
-        configuration: {defect_threshold: 3, inspection_frequency_minutes: 60},
+        id: manufacturing_qc,
+        provides: [quality_inspections, defect_tracking, production_yield],
+        requires: [audit_events, work_orders],
+        configuration: {
+            // Environment variable references — secrets stay out of source
+            tenant_id:           env("APG_TENANT_ID"),
+            db_url:              env("MANUFACTURING_DB_URL"),
+            erp_api_key:         $ERP_API_KEY,
+            erp_endpoint:        env("ERP_API_ENDPOINT"),
+            // Literal configuration
+            max_defect_rate:     0.02,
+            inspection_interval: 50,
+            auto_fail_threshold: 0.05,
+            alert_email:         env("QC_ALERT_EMAIL")
+        },
+        configuration_schema: {
+            required: ["tenant_id", "db_url", "erp_api_key"]
+        },
         rules: [
-            {name: "defect_threshold", when: "defect_count > defect_threshold", action: "require_review"},
-            {name: "run_completion", when: "completed_quantity >= planned_quantity", action: "audit"}
+            {name: "defect_rate_fail",   when: "defect_rate >= auto_fail_threshold",  action: deny},
+            {name: "defect_review",      when: "defect_rate > max_defect_rate",        action: require_review},
+            {name: "inspector_required", when: "inspector_id missing",                 action: deny},
+            {name: "valid_result",       when: "result in [pass, fail, conditional]",  action: allow}
         ],
-        ui: {shell: python, routes: [{name: "Quality", path: "/manufacturing/quality", component: "QualityScreen"}]},
-        theme: {name: shop_floor_theme, tokens: {accent: "#B83280"}}
+        ui: {
+            shell: python,
+            routes: [
+                {name: "Inspections", path: "/qc",         component: "InspectionQueue", permission: "qc:view"},
+                {name: "Defects",     path: "/qc/defects", component: "DefectTracker",   permission: "qc:defects"},
+                {name: "Yield",       path: "/qc/yield",   component: "YieldReport",     permission: "qc:reports"}
+            ]
+        },
+        theme: {name: manufacturing_theme, tokens: {accent: "#F57F17"}}
     };
 
-    erp_modules: [manufacturing, inventory];
-    screens: {
-        LineDashboard: {
-            route: "/manufacturing/line",
-            layout: dashboard,
-            contains: [RunSummary, DefectChart, InspectionQueue],
-            binds: [production_runs.active],
-            actions: [pause_line, approve_run, escalate_quality]
-        }
+    erp_modules: [manufacturing, quality, production_planning];
+    master_data: {entities: [product_spec, quality_standard, defect_category, production_line]};
+}
+
+workflow QualityInspectionFlow {
+    steps: str = "initiated -> in_process_check -> final_inspection -> disposition -> closed";
+    human_tasks: [in_process_check, final_inspection, disposition];
+    assignments: {
+        in_process_check: line_inspector,
+        final_inspection: quality_manager,
+        disposition:      production_manager
     };
-    streaming: {processor: bytewax, state: quality_event_state};
+    guards: {
+        final_inspection: "in_process_check_passed == true",
+        disposition:      "final_inspection_complete == true",
+        closed:           "disposition_recorded == true",
+    };
+    timers: {
+        in_process_check: "PT2H",
+        final_inspection: "PT4H"
+    };
+}
+
+app ManufacturingQCApp {
+    description: "Manufacturing quality control";
+    capabilities: [ManufacturingQC];
+    routes: ["/qc", "/production"];
 }

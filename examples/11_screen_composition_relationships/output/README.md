@@ -1,4 +1,4 @@
-# screen_composition
+# operations_workbench
 
 Dependency-free APG generated Python application.
 
@@ -66,9 +66,13 @@ Generated deployment artifacts:
 - `semantic_model.json` - normalized APG semantic model for IDEs, agents, and release checks
 - `smoke_test.py` - standalone generated app smoke test
 
+## Entities
+
+- `OperationsWorkbenchApp`
+
 ## Capabilities
 
-- `OperationsWorkbench` - provides operations_ui
+- `OperationsWorkbench` - provides operations_ui, approval_queue, kpi_dashboard
 
 Capability operations:
 
@@ -83,3 +87,9 @@ Capability operations:
 Capability screens:
 
 - `GET /ops`
+- `GET /ops/activity`
+- `GET /ops/approvals`
+- `GET /ops/config`
+- `GET /ops/kpis`
+- `GET /ops/onboard`
+- `GET /ops/reports`

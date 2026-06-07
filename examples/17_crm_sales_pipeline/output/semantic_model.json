@@ -2,93 +2,187 @@
   "agents": {},
   "app": {
     "description": null,
-    "entity_count": 3,
-    "name": "crm_sales_pipeline",
+    "entity_count": 5,
+    "name": "crm_sales",
     "version": "1.0.0"
   },
   "capabilities": {
-    "SalesPipeline": {
+    "LeadManagement": {
       "approvals": {},
       "business_rules": [],
       "components": {},
       "configuration": {
-        "default_probability": 25,
-        "forecast_currency": "KES"
+        "lead_timeout_days": 30,
+        "tenant_id": "default"
       },
-      "erp_modules": [
-        "crm",
-        "sales",
-        "project_accounting"
-      ],
+      "erp_modules": [],
       "i18n": {},
       "master_data": {},
-      "name": "SalesPipeline",
+      "name": "LeadManagement",
       "provides": [
-        "lead_management",
-        "opportunity_tracking",
-        "forecast_metrics"
+        "lead_capture",
+        "lead_scoring",
+        "lead_conversion"
       ],
-      "requires": [
-        "customer_master"
-      ],
+      "requires": [],
       "rule_engine": {},
       "rules": [
         {
-          "action": "warn",
-          "name": "qualified_lead_minimum",
-          "when": "score < 50",
+          "action": "require_review",
+          "name": "duplicate_check",
+          "when": "email_exists == true",
           "when_ast": {
-            "field": "score",
-            "op": "<",
+            "field": "email_exists",
+            "op": "==",
             "type": "compare",
-            "value": 50
+            "value": true
           }
         },
         {
-          "action": "require_review",
-          "name": "large_deal_review",
-          "when": "amount > 1000000",
+          "action": "warn",
+          "name": "score_threshold",
+          "when": "score >= 75",
           "when_ast": {
-            "field": "amount",
+            "field": "score",
+            "op": ">=",
+            "type": "compare",
+            "value": 75
+          }
+        },
+        {
+          "action": "warn",
+          "name": "stale_lead",
+          "when": "days_since_contact > 30",
+          "when_ast": {
+            "field": "days_since_contact",
             "op": ">",
             "type": "compare",
-            "value": 1000000
+            "value": 30
           }
         }
       ],
       "runtime": {},
-      "screens": {
-        "ForecastDashboard": {
-          "actions": [
-            "advance_stage",
-            "mark_won",
-            "mark_lost"
-          ],
-          "binds": [
-            "opportunities.active"
-          ],
-          "contains": [
-            "StageFunnel",
-            "OpportunityTable",
-            "ForecastKpis"
-          ],
-          "layout": "dashboard",
-          "route": "/crm/forecast"
-        }
-      },
+      "screens": {},
       "streaming": {},
       "theme": {
-        "name": "sales_theme",
+        "name": "lead_theme",
         "tokens": {
-          "accent": "#DD6B20"
+          "accent": "#00838F"
         }
       },
       "ui": {
         "routes": [
           {
-            "component": "PipelineScreen",
+            "component": "LeadList",
+            "name": "Leads",
+            "path": "/crm/leads",
+            "permission": "crm:leads"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "OpportunityPipeline": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "max_discount_pct": 30,
+        "tenant_id": "default"
+      },
+      "erp_modules": [],
+      "i18n": {},
+      "master_data": {},
+      "name": "OpportunityPipeline",
+      "provides": [
+        "deal_tracking",
+        "pipeline_analytics",
+        "forecast"
+      ],
+      "requires": [
+        "lead_capture"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "require_review",
+          "name": "large_deal_review",
+          "when": "amount > 500000",
+          "when_ast": {
+            "field": "amount",
+            "op": ">",
+            "type": "compare",
+            "value": 500000
+          }
+        },
+        {
+          "action": "deny",
+          "name": "discount_limit",
+          "when": "discount_pct > 30",
+          "when_ast": {
+            "field": "discount_pct",
+            "op": ">",
+            "type": "compare",
+            "value": 30
+          }
+        },
+        {
+          "action": "warn",
+          "name": "stage_progression",
+          "when": "next_stage missing",
+          "when_ast": {
+            "field": "next_stage",
+            "negated": false,
+            "type": "missing"
+          }
+        }
+      ],
+      "runtime": {},
+      "screens": {
+        "PipelineKanban": {
+          "actions": [
+            "move_stage",
+            "create_deal",
+            "filter"
+          ],
+          "binds": [
+            "opportunities.by_stage"
+          ],
+          "contains": [
+            "StageColumn",
+            "DealCard"
+          ],
+          "layout": "grid",
+          "route": "/crm/kanban",
+          "title": "Pipeline Board"
+        }
+      },
+      "streaming": {},
+      "theme": {
+        "name": "pipeline_theme",
+        "tokens": {
+          "accent": "#E65100"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "PipelineView",
             "name": "Pipeline",
-            "path": "/crm/pipeline"
+            "path": "/crm/pipeline",
+            "permission": "crm:pipeline"
+          },
+          {
+            "component": "ForecastView",
+            "name": "Forecast",
+            "path": "/crm/forecast",
+            "permission": "crm:forecast"
+          },
+          {
+            "component": "SalesAnalytics",
+            "name": "Analytics",
+            "path": "/crm/analytics",
+            "permission": "crm:analytics"
           }
         ],
         "shell": "python"
@@ -97,64 +191,229 @@
   },
   "composition": {
     "agent_teams": {},
-    "applications": {},
+    "applications": {
+      "CRMSalesPipeline": {
+        "agent_teams": [],
+        "agents": [],
+        "capabilities": [
+          "LeadManagement",
+          "OpportunityPipeline"
+        ],
+        "components": {
+          "analytics_hub": {
+            "capability": "pipeline_analytics",
+            "route": "/crm/analytics"
+          },
+          "deal_pipeline": {
+            "capability": "deal_tracking",
+            "route": "/crm/pipeline"
+          },
+          "forecast_console": {
+            "capability": "forecast",
+            "route": "/crm/forecast"
+          },
+          "lead_desk": {
+            "capability": "lead_capture",
+            "route": "/crm/leads"
+          }
+        },
+        "configuration": {},
+        "deployments": {},
+        "description": "CRM sales pipeline with lead and opportunity management",
+        "integrations": {},
+        "name": "CRMSalesPipeline",
+        "policies": {},
+        "routes": [
+          "/crm",
+          "/crm/leads",
+          "/crm/pipeline",
+          "/crm/forecast"
+        ],
+        "runtime": {
+          "deployment": "container",
+          "streaming": {
+            "processor": "bytewax"
+          },
+          "target": "python"
+        },
+        "screens": {
+          "SalesDashboard": {
+            "actions": [
+              "create_lead",
+              "refresh",
+              "export"
+            ],
+            "binds": [
+              "pipeline.summary",
+              "leads.recent",
+              "forecast.current"
+            ],
+            "contains": [
+              "PipelineSummary",
+              "LeadFunnel",
+              "ForecastWidget",
+              "RecentActivity"
+            ],
+            "layout": "dashboard",
+            "route": "/crm",
+            "title": "Sales Dashboard"
+          }
+        },
+        "theme": {
+          "name": "crm_theme",
+          "tokens": {
+            "accent": "#FF6D00",
+            "border.radius": "4px"
+          }
+        },
+        "workflows": []
+      }
+    },
     "capability_dependencies": {
-      "SalesPipeline": [
-        "customer_master"
+      "LeadManagement": [],
+      "OpportunityPipeline": [
+        "lead_capture"
       ]
     }
   },
   "contracts": {
-    "SalesPipeline": {
+    "LeadManagement": {
       "configuration": {
-        "default_probability": 25,
-        "forecast_currency": "KES"
+        "lead_timeout_days": 30,
+        "tenant_id": "default"
       },
-      "id": "sales_pipeline",
+      "id": "lead_management",
       "provides": [
-        "lead_management",
-        "opportunity_tracking",
-        "forecast_metrics"
-      ],
-      "requires": [
-        "customer_master"
+        "lead_capture",
+        "lead_scoring",
+        "lead_conversion"
       ],
       "rules": [
         {
-          "action": "warn",
-          "name": "qualified_lead_minimum",
-          "when": "score < 50",
+          "action": "require_review",
+          "name": "duplicate_check",
+          "when": "email_exists == true",
           "when_ast": {
-            "field": "score",
-            "op": "<",
+            "field": "email_exists",
+            "op": "==",
             "type": "compare",
-            "value": 50
+            "value": true
           }
         },
         {
-          "action": "require_review",
-          "name": "large_deal_review",
-          "when": "amount > 1000000",
+          "action": "warn",
+          "name": "score_threshold",
+          "when": "score >= 75",
           "when_ast": {
-            "field": "amount",
+            "field": "score",
+            "op": ">=",
+            "type": "compare",
+            "value": 75
+          }
+        },
+        {
+          "action": "warn",
+          "name": "stale_lead",
+          "when": "days_since_contact > 30",
+          "when_ast": {
+            "field": "days_since_contact",
             "op": ">",
             "type": "compare",
-            "value": 1000000
+            "value": 30
           }
         }
       ],
       "theme": {
-        "name": "sales_theme",
+        "name": "lead_theme",
         "tokens": {
-          "accent": "#DD6B20"
+          "accent": "#00838F"
         }
       },
       "ui": {
         "routes": [
           {
-            "component": "PipelineScreen",
+            "component": "LeadList",
+            "name": "Leads",
+            "path": "/crm/leads",
+            "permission": "crm:leads"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "OpportunityPipeline": {
+      "configuration": {
+        "max_discount_pct": 30,
+        "tenant_id": "default"
+      },
+      "id": "opportunity_pipeline",
+      "provides": [
+        "deal_tracking",
+        "pipeline_analytics",
+        "forecast"
+      ],
+      "requires": [
+        "lead_capture"
+      ],
+      "rules": [
+        {
+          "action": "require_review",
+          "name": "large_deal_review",
+          "when": "amount > 500000",
+          "when_ast": {
+            "field": "amount",
+            "op": ">",
+            "type": "compare",
+            "value": 500000
+          }
+        },
+        {
+          "action": "deny",
+          "name": "discount_limit",
+          "when": "discount_pct > 30",
+          "when_ast": {
+            "field": "discount_pct",
+            "op": ">",
+            "type": "compare",
+            "value": 30
+          }
+        },
+        {
+          "action": "warn",
+          "name": "stage_progression",
+          "when": "next_stage missing",
+          "when_ast": {
+            "field": "next_stage",
+            "negated": false,
+            "type": "missing"
+          }
+        }
+      ],
+      "theme": {
+        "name": "pipeline_theme",
+        "tokens": {
+          "accent": "#E65100"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "PipelineView",
             "name": "Pipeline",
-            "path": "/crm/pipeline"
+            "path": "/crm/pipeline",
+            "permission": "crm:pipeline"
+          },
+          {
+            "component": "ForecastView",
+            "name": "Forecast",
+            "path": "/crm/forecast",
+            "permission": "crm:forecast"
+          },
+          {
+            "component": "SalesAnalytics",
+            "name": "Analytics",
+            "path": "/crm/analytics",
+            "permission": "crm:analytics"
           }
         ],
         "shell": "python"
@@ -162,16 +421,141 @@
     }
   },
   "deployment": {
-    "source": "crm_sales_pipeline.apg",
+    "source": "crm_sales.apg",
     "target": "python"
   },
-  "diagnostics": [
-    {
-      "code": "APG0100",
-      "docs_url": "docs/tooling.md#semantic-model-contract",
-      "file": "crm_sales_pipeline.apg",
-      "fixes": [],
-      "message": "Capability 'SalesPipeline' requires 'customer_master' which is not declared in this module",
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 3,
+      "kind": "capability",
+      "nodes": 4
+    },
+    "deployment": {
+      "edges": 5,
+      "kind": "deployment",
+      "nodes": 6
+    },
+    "er": {
+      "edges": 26,
+      "kind": "er",
+      "nodes": 25
+    },
+    "handler": {
+      "edges": 5,
+      "kind": "handler",
+      "nodes": 6
+    },
+    "lookup": {
+      "edges": 5,
+      "kind": "lookup",
+      "nodes": 6
+    },
+    "package": {
+      "edges": 5,
+      "kind": "package",
+      "nodes": 6
+    },
+    "security": {
+      "edges": 5,
+      "kind": "security",
+      "nodes": 6
+    },
+    "workflow": {
+      "edges": 5,
+      "kind": "workflow",
+      "nodes": 6
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {
+    "LeadManagement.duplicate_check": {
+      "action": "require_review",
+      "name": "duplicate_check",
+      "when": "email_exists == true",
+      "when_ast": {
+        "field": "email_exists",
+        "op": "==",
+        "type": "compare",
+        "value": true
+      }
+    },
+    "LeadManagement.score_threshold": {
+      "action": "warn",
+      "name": "score_threshold",
+      "when": "score >= 75",
+      "when_ast": {
+        "field": "score",
+        "op": ">=",
+        "type": "compare",
+        "value": 75
+      }
+    },
+    "LeadManagement.stale_lead": {
+      "action": "warn",
+      "name": "stale_lead",
+      "when": "days_since_contact > 30",
+      "when_ast": {
+        "field": "days_since_contact",
+        "op": ">",
+        "type": "compare",
+        "value": 30
+      }
+    },
+    "OpportunityPipeline.discount_limit": {
+      "action": "deny",
+      "name": "discount_limit",
+      "when": "discount_pct > 30",
+      "when_ast": {
+        "field": "discount_pct",
+        "op": ">",
+        "type": "compare",
+        "value": 30
+      }
+    },
+    "OpportunityPipeline.large_deal_review": {
+      "action": "require_review",
+      "name": "large_deal_review",
+      "when": "amount > 500000",
+      "when_ast": {
+        "field": "amount",
+        "op": ">",
+        "type": "compare",
+        "value": 500000
+      }
+    },
+    "OpportunityPipeline.stage_progression": {
+      "action": "warn",
+      "name": "stage_progression",
+      "when": "next_stage missing",
+      "when_ast": {
+        "field": "next_stage",
+        "negated": false,
+        "type": "missing"
+      }
+    }
+  },
+  "security": {},
+  "source_files": [
+    "crm_sales.apg"
+  ],
+  "symbols": {
+    "app.CRMSalesPipeline": {
+      "file": "crm_sales.apg",
+      "id": "app.CRMSalesPipeline",
+      "kind": "app",
+      "name": "CRMSalesPipeline",
       "range": {
         "end": {
           "character": 1,
@@ -182,99 +566,30 @@
           "line": 0
         }
       },
-      "related_locations": [],
-      "severity": "warning",
-      "title": "Semantic warning"
-    }
-  ],
-  "flows": {},
-  "format": "apg.semantic-model.v1",
-  "graphs": {
-    "agent": {
-      "edges": 0,
-      "kind": "agent",
-      "nodes": 0
+      "references": []
     },
-    "capability": {
-      "edges": 1,
+    "capability.LeadManagement": {
+      "file": "crm_sales.apg",
+      "id": "capability.LeadManagement",
       "kind": "capability",
-      "nodes": 2
+      "name": "LeadManagement",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
     },
-    "deployment": {
-      "edges": 3,
-      "kind": "deployment",
-      "nodes": 4
-    },
-    "er": {
-      "edges": 11,
-      "kind": "er",
-      "nodes": 12
-    },
-    "handler": {
-      "edges": 3,
-      "kind": "handler",
-      "nodes": 4
-    },
-    "lookup": {
-      "edges": 3,
-      "kind": "lookup",
-      "nodes": 4
-    },
-    "package": {
-      "edges": 3,
-      "kind": "package",
-      "nodes": 4
-    },
-    "security": {
-      "edges": 3,
-      "kind": "security",
-      "nodes": 4
-    },
-    "workflow": {
-      "edges": 3,
-      "kind": "workflow",
-      "nodes": 4
-    }
-  },
-  "llms": {},
-  "ok": true,
-  "operations": {},
-  "packages": {},
-  "roles": {},
-  "rules": {
-    "SalesPipeline.large_deal_review": {
-      "action": "require_review",
-      "name": "large_deal_review",
-      "when": "amount > 1000000",
-      "when_ast": {
-        "field": "amount",
-        "op": ">",
-        "type": "compare",
-        "value": 1000000
-      }
-    },
-    "SalesPipeline.qualified_lead_minimum": {
-      "action": "warn",
-      "name": "qualified_lead_minimum",
-      "when": "score < 50",
-      "when_ast": {
-        "field": "score",
-        "op": "<",
-        "type": "compare",
-        "value": 50
-      }
-    }
-  },
-  "security": {},
-  "source_files": [
-    "crm_sales_pipeline.apg"
-  ],
-  "symbols": {
-    "capability.SalesPipeline": {
-      "file": "crm_sales_pipeline.apg",
-      "id": "capability.SalesPipeline",
+    "capability.OpportunityPipeline": {
+      "file": "crm_sales.apg",
+      "id": "capability.OpportunityPipeline",
       "kind": "capability",
-      "name": "SalesPipeline",
+      "name": "OpportunityPipeline",
       "range": {
         "end": {
           "character": 1,
@@ -288,7 +603,7 @@
       "references": []
     },
     "field.Lead.company": {
-      "file": "crm_sales_pipeline.apg",
+      "file": "crm_sales.apg",
       "id": "field.Lead.company",
       "kind": "field",
       "name": "Lead.company",
@@ -304,11 +619,11 @@
       },
       "references": []
     },
-    "field.Lead.contact_name": {
-      "file": "crm_sales_pipeline.apg",
-      "id": "field.Lead.contact_name",
+    "field.Lead.created_at": {
+      "file": "crm_sales.apg",
+      "id": "field.Lead.created_at",
       "kind": "field",
-      "name": "Lead.contact_name",
+      "name": "Lead.created_at",
       "range": {
         "end": {
           "character": 1,
@@ -322,7 +637,7 @@
       "references": []
     },
     "field.Lead.email": {
-      "file": "crm_sales_pipeline.apg",
+      "file": "crm_sales.apg",
       "id": "field.Lead.email",
       "kind": "field",
       "name": "Lead.email",
@@ -338,11 +653,96 @@
       },
       "references": []
     },
-    "field.Lead.qualified": {
-      "file": "crm_sales_pipeline.apg",
-      "id": "field.Lead.qualified",
+    "field.Lead.first_name": {
+      "file": "crm_sales.apg",
+      "id": "field.Lead.first_name",
       "kind": "field",
-      "name": "Lead.qualified",
+      "name": "Lead.first_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Lead.last_name": {
+      "file": "crm_sales.apg",
+      "id": "field.Lead.last_name",
+      "kind": "field",
+      "name": "Lead.last_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Lead.lead_id": {
+      "file": "crm_sales.apg",
+      "id": "field.Lead.lead_id",
+      "kind": "field",
+      "name": "Lead.lead_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Lead.notes": {
+      "file": "crm_sales.apg",
+      "id": "field.Lead.notes",
+      "kind": "field",
+      "name": "Lead.notes",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Lead.owner_id": {
+      "file": "crm_sales.apg",
+      "id": "field.Lead.owner_id",
+      "kind": "field",
+      "name": "Lead.owner_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Lead.phone": {
+      "file": "crm_sales.apg",
+      "id": "field.Lead.phone",
+      "kind": "field",
+      "name": "Lead.phone",
       "range": {
         "end": {
           "character": 1,
@@ -356,7 +756,7 @@
       "references": []
     },
     "field.Lead.score": {
-      "file": "crm_sales_pipeline.apg",
+      "file": "crm_sales.apg",
       "id": "field.Lead.score",
       "kind": "field",
       "name": "Lead.score",
@@ -372,8 +772,59 @@
       },
       "references": []
     },
+    "field.Lead.source": {
+      "file": "crm_sales.apg",
+      "id": "field.Lead.source",
+      "kind": "field",
+      "name": "Lead.source",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Lead.status": {
+      "file": "crm_sales.apg",
+      "id": "field.Lead.status",
+      "kind": "field",
+      "name": "Lead.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Opportunity.account_id": {
+      "file": "crm_sales.apg",
+      "id": "field.Opportunity.account_id",
+      "kind": "field",
+      "name": "Opportunity.account_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
     "field.Opportunity.amount": {
-      "file": "crm_sales_pipeline.apg",
+      "file": "crm_sales.apg",
       "id": "field.Opportunity.amount",
       "kind": "field",
       "name": "Opportunity.amount",
@@ -389,11 +840,28 @@
       },
       "references": []
     },
-    "field.Opportunity.expected_close_date": {
-      "file": "crm_sales_pipeline.apg",
-      "id": "field.Opportunity.expected_close_date",
+    "field.Opportunity.competitor": {
+      "file": "crm_sales.apg",
+      "id": "field.Opportunity.competitor",
       "kind": "field",
-      "name": "Opportunity.expected_close_date",
+      "name": "Opportunity.competitor",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Opportunity.expected_close": {
+      "file": "crm_sales.apg",
+      "id": "field.Opportunity.expected_close",
+      "kind": "field",
+      "name": "Opportunity.expected_close",
       "range": {
         "end": {
           "character": 1,
@@ -407,7 +875,7 @@
       "references": []
     },
     "field.Opportunity.lead_id": {
-      "file": "crm_sales_pipeline.apg",
+      "file": "crm_sales.apg",
       "id": "field.Opportunity.lead_id",
       "kind": "field",
       "name": "Opportunity.lead_id",
@@ -423,8 +891,76 @@
       },
       "references": []
     },
+    "field.Opportunity.loss_reason": {
+      "file": "crm_sales.apg",
+      "id": "field.Opportunity.loss_reason",
+      "kind": "field",
+      "name": "Opportunity.loss_reason",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Opportunity.name": {
+      "file": "crm_sales.apg",
+      "id": "field.Opportunity.name",
+      "kind": "field",
+      "name": "Opportunity.name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Opportunity.opportunity_id": {
+      "file": "crm_sales.apg",
+      "id": "field.Opportunity.opportunity_id",
+      "kind": "field",
+      "name": "Opportunity.opportunity_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Opportunity.owner_id": {
+      "file": "crm_sales.apg",
+      "id": "field.Opportunity.owner_id",
+      "kind": "field",
+      "name": "Opportunity.owner_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
     "field.Opportunity.probability": {
-      "file": "crm_sales_pipeline.apg",
+      "file": "crm_sales.apg",
       "id": "field.Opportunity.probability",
       "kind": "field",
       "name": "Opportunity.probability",
@@ -441,7 +977,7 @@
       "references": []
     },
     "field.Opportunity.stage": {
-      "file": "crm_sales_pipeline.apg",
+      "file": "crm_sales.apg",
       "id": "field.Opportunity.stage",
       "kind": "field",
       "name": "Opportunity.stage",
@@ -457,11 +993,11 @@
       },
       "references": []
     },
-    "module.crm_sales_pipeline": {
-      "file": "crm_sales_pipeline.apg",
-      "id": "module.crm_sales_pipeline",
+    "module.crm_sales": {
+      "file": "crm_sales.apg",
+      "id": "module.crm_sales",
       "kind": "module",
-      "name": "crm_sales_pipeline",
+      "name": "crm_sales",
       "range": {
         "end": {
           "character": 1,
@@ -475,7 +1011,7 @@
       "references": []
     },
     "table.Lead": {
-      "file": "crm_sales_pipeline.apg",
+      "file": "crm_sales.apg",
       "id": "table.Lead",
       "kind": "table",
       "name": "Lead",
@@ -492,7 +1028,7 @@
       "references": []
     },
     "table.Opportunity": {
-      "file": "crm_sales_pipeline.apg",
+      "file": "crm_sales.apg",
       "id": "table.Opportunity",
       "kind": "table",
       "name": "Opportunity",
@@ -513,11 +1049,15 @@
     "Lead": {
       "fields": {
         "company": {
-          "relationship": null,
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
           "required": true,
-          "type": "str"
+          "type": "str?"
         },
-        "contact_name": {
+        "created_at": {
           "relationship": null,
           "required": true,
           "type": "str"
@@ -527,28 +1067,12 @@
           "required": true,
           "type": "str"
         },
-        "qualified": {
+        "first_name": {
           "relationship": null,
           "required": true,
-          "type": "bool"
+          "type": "str"
         },
-        "score": {
-          "relationship": null,
-          "required": true,
-          "type": "int"
-        }
-      },
-      "lookup_paths": {},
-      "name": "Lead"
-    },
-    "Opportunity": {
-      "fields": {
-        "amount": {
-          "relationship": null,
-          "required": true,
-          "type": "float"
-        },
-        "expected_close_date": {
+        "last_name": {
           "relationship": null,
           "required": true,
           "type": "str"
@@ -561,12 +1085,155 @@
             "target_table": "Lead"
           },
           "required": true,
-          "type": "int"
+          "type": "str"
+        },
+        "notes": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "owner_id": {
+          "relationship": {
+            "alias": "owner",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Owner"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "phone": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "score": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "source": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "company.id": {
+          "chain": [
+            "Lead.company",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "notes.id": {
+          "chain": [
+            "Lead.notes",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "phone.id": {
+          "chain": [
+            "Lead.phone",
+            "str?.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Lead"
+    },
+    "Opportunity": {
+      "fields": {
+        "account_id": {
+          "relationship": {
+            "alias": "account",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Account"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "amount": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "competitor": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "expected_close": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "lead_id": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "loss_reason": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "opportunity_id": {
+          "relationship": {
+            "alias": "opportunity",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Opportunity"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "owner_id": {
+          "relationship": {
+            "alias": "owner",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Owner"
+          },
+          "required": true,
+          "type": "str"
         },
         "probability": {
           "relationship": null,
           "required": true,
-          "type": "int"
+          "type": "float"
         },
         "stage": {
           "relationship": null,
@@ -574,7 +1241,29 @@
           "type": "str"
         }
       },
-      "lookup_paths": {},
+      "lookup_paths": {
+        "competitor.id": {
+          "chain": [
+            "Opportunity.competitor",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "lead_id.id": {
+          "chain": [
+            "Opportunity.lead_id",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "loss_reason.id": {
+          "chain": [
+            "Opportunity.loss_reason",
+            "str?.id"
+          ],
+          "valid": true
+        }
+      },
       "name": "Opportunity"
     }
   },

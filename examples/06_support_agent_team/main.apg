@@ -1,34 +1,65 @@
-// Example 06: multi-agent team.
-// Complexity focus: two agents connected by a handoff flow and grouped as a team.
+// Example 06: multi-agent support team with full agent_team coverage.
+// Features: agent_team, conditional flow, team capabilities, team rules
 
 module support_team version 1.0.0 {
-    description: "Planner and writer agent team for support responses";
+    description: "Planner + writer support team with conditional handoffs";
 }
 
 agent Planner {
-    role: "planner";
+    role: "support planner";
     model: "openai:gpt-4.1-mini";
     runtime: codex;
-    system: "Break the ticket into concrete resolution steps.";
-    tools: [tickets.read, docs.search];
+    system: "Break the customer's support request into a concrete resolution plan.";
+    tools: [tickets.read, docs.search, product.lookup];
+    memory: vector planner_memory;
+    configuration: {temperature: 0.1, max_turns: 5};
 }
 
 agent Writer {
-    role: "writer";
+    role: "support writer";
     model: "openai:gpt-4.1-mini";
     runtime: codex;
-    system: "Write concise customer-facing replies from a plan.";
-    tools: [tickets.update];
+    system: "Write concise, empathetic customer-facing replies based on the resolution plan.";
+    tools: [tickets.update, templates.fetch];
+    configuration: {temperature: 0.3, max_turns: 4};
 }
 
-team SupportCrew {
-    // `agents` declares the composable team members.
-    agents: [Planner, Writer];
+agent Reviewer {
+    role: "quality reviewer";
+    model: "openai:gpt-4.1-mini";
+    runtime: codex;
+    system: "Review the draft reply for accuracy, tone, and completeness. Flag any issues.";
+    tools: [knowledge.verify, compliance.check];
+    configuration: {temperature: 0.0, max_turns: 3};
+}
 
-    // `flow` declares the relationship between members.
-    flow: Planner -> Writer;
+agent_team SupportCrew {
+    // All three agents participate
+    agents: [Planner, Writer, Reviewer];
 
-    // Team configuration is preserved in generated manifests.
-    config: {handoff_mode: sequential};
-    rules: [{name: "low_confidence", when: "confidence < 0.6", action: "human_review"}];
+    // Handoff flow: Planner -> Writer always; Writer -> Reviewer when draft_ready
+    flow: Planner -> Writer -> Reviewer when draft_ready;
+
+    // Team-level capability access
+    capabilities: [support_response, ticket_management];
+
+    // Team configuration
+    configuration: {
+        handoff_mode: sequential,
+        max_team_turns: 15,
+        escalation_threshold: 0.5
+    };
+
+    // Team rules applied before any agent is invoked
+    rules: [
+        {name: "ticket_required",   when: "ticket_id missing",     action: deny},
+        {name: "low_confidence",    when: "confidence < 0.6",      action: require_review},
+        {name: "sensitive_content", when: "is_sensitive == true",  action: require_review}
+    ];
+}
+
+app SupportTeamApp {
+    description: "Multi-agent support response platform";
+    agent_teams: [SupportCrew];
+    routes: ["/support", "/agent-teams/support"];
 }

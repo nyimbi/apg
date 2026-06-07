@@ -1,4 +1,4 @@
-# operations_dashboard_capability
+# operations_dashboard
 
 Dependency-free APG generated Python application.
 
@@ -66,9 +66,13 @@ Generated deployment artifacts:
 - `semantic_model.json` - normalized APG semantic model for IDEs, agents, and release checks
 - `smoke_test.py` - standalone generated app smoke test
 
+## Entities
+
+- `OperationsDashboardApp`
+
 ## Capabilities
 
-- `OperationsDashboard` - provides executive_kpis, exception_queue, operations_scorecards
+- `OperationsDashboard` - provides operations_ui, kpi_views, approval_interfaces
 
 Capability operations:
 
@@ -82,5 +86,10 @@ Capability operations:
 
 Capability screens:
 
-- `GET /ops/dashboard`
-- `GET /ops/executive`
+- `GET /ops`
+- `GET /ops/activity`
+- `GET /ops/approvals`
+- `GET /ops/config`
+- `GET /ops/kpis`
+- `GET /ops/period-close`
+- `GET /ops/reports`

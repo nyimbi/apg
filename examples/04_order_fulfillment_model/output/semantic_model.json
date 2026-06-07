@@ -2,23 +2,190 @@
   "agents": {},
   "app": {
     "description": null,
-    "entity_count": 4,
-    "name": "fulfillment_ops",
+    "entity_count": 7,
+    "name": "order_fulfillment",
     "version": "1.0.0"
   },
   "capabilities": {},
   "composition": {
     "agent_teams": {},
-    "applications": {},
+    "applications": {
+      "FulfilmentApp": {
+        "agent_teams": [],
+        "agents": [],
+        "capabilities": [],
+        "components": {},
+        "configuration": {},
+        "deployments": {},
+        "description": "Order fulfilment and returns management",
+        "integrations": {},
+        "name": "FulfilmentApp",
+        "policies": {},
+        "routes": [
+          "/orders",
+          "/shipments",
+          "/returns"
+        ],
+        "runtime": {},
+        "screens": {},
+        "theme": {},
+        "workflows": []
+      }
+    },
     "capability_dependencies": {}
   },
   "contracts": {},
   "deployment": {
-    "source": "fulfillment_ops.apg",
+    "source": "order_fulfillment.apg",
     "target": "python"
   },
   "diagnostics": [],
-  "flows": {},
+  "flows": {
+    "OrderFulfilment": {
+      "assignments": {
+        "packing": "packing_station",
+        "picking": "warehouse_operator"
+      },
+      "compensation": {
+        "dispatched": "initiate_carrier_recall",
+        "payment_authorised": "void_payment_authorisation",
+        "picking": "return_items_to_stock"
+      },
+      "guards": {
+        "dispatched": "all_items_packed and carrier_confirmed",
+        "payment_authorised": "payment_status == approved and fraud_score < 0.7"
+      },
+      "human_tasks": [
+        "picking",
+        "packing"
+      ],
+      "methods": [],
+      "name": "OrderFulfilment",
+      "properties": {},
+      "retry_policy": {
+        "dispatched": "2",
+        "payment_authorised": "3"
+      },
+      "states": [
+        "received",
+        "payment_authorised",
+        "picking",
+        "packing",
+        "dispatched",
+        "delivered"
+      ],
+      "steps": [
+        "received",
+        "payment_authorised",
+        "picking",
+        "packing",
+        "dispatched",
+        "delivered"
+      ],
+      "steps_raw": "received -> payment_authorised -> picking -> packing -> dispatched -> delivered",
+      "timers": {
+        "dispatched": "PT24H",
+        "packing": "PT2H",
+        "picking": "PT4H"
+      },
+      "transitions": [
+        {
+          "guard": "payment_status == approved and fraud_score < 0.7",
+          "source": "received",
+          "target": "payment_authorised"
+        },
+        {
+          "guard": null,
+          "source": "payment_authorised",
+          "target": "picking"
+        },
+        {
+          "guard": null,
+          "source": "picking",
+          "target": "packing"
+        },
+        {
+          "guard": "all_items_packed and carrier_confirmed",
+          "source": "packing",
+          "target": "dispatched"
+        },
+        {
+          "guard": null,
+          "source": "dispatched",
+          "target": "delivered"
+        }
+      ],
+      "type": "workflow",
+      "waits": {
+        "delivered": "delivery_confirmation_received",
+        "payment_authorised": "payment_confirmed"
+      }
+    },
+    "ReturnProcess": {
+      "assignments": {
+        "approved": "returns_manager",
+        "inspected": "quality_inspector"
+      },
+      "compensation": {
+        "refunded": "reverse_refund"
+      },
+      "guards": {
+        "approved": "return_reason in [defective, wrong_item, not_as_described]",
+        "refunded": "inspection_passed == true"
+      },
+      "human_tasks": [
+        "approved",
+        "inspected"
+      ],
+      "methods": [],
+      "name": "ReturnProcess",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "requested",
+        "approved",
+        "received",
+        "inspected",
+        "refunded"
+      ],
+      "steps": [
+        "requested",
+        "approved",
+        "received",
+        "inspected",
+        "refunded"
+      ],
+      "steps_raw": "requested -> approved -> received -> inspected -> refunded",
+      "timers": {
+        "approved": "PT48H",
+        "inspected": "PT24H"
+      },
+      "transitions": [
+        {
+          "guard": "return_reason in [defective, wrong_item, not_as_described]",
+          "source": "requested",
+          "target": "approved"
+        },
+        {
+          "guard": null,
+          "source": "approved",
+          "target": "received"
+        },
+        {
+          "guard": null,
+          "source": "received",
+          "target": "inspected"
+        },
+        {
+          "guard": "inspection_passed == true",
+          "source": "inspected",
+          "target": "refunded"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    }
+  },
   "format": "apg.semantic-model.v1",
   "graphs": {
     "agent": {
@@ -29,42 +196,42 @@
     "capability": {
       "edges": 0,
       "kind": "capability",
-      "nodes": 0
+      "nodes": 1
     },
     "deployment": {
-      "edges": 4,
+      "edges": 7,
       "kind": "deployment",
-      "nodes": 5
+      "nodes": 8
     },
     "er": {
-      "edges": 16,
+      "edges": 26,
       "kind": "er",
-      "nodes": 17
+      "nodes": 25
     },
     "handler": {
-      "edges": 4,
+      "edges": 7,
       "kind": "handler",
-      "nodes": 5
+      "nodes": 8
     },
     "lookup": {
-      "edges": 4,
+      "edges": 7,
       "kind": "lookup",
-      "nodes": 5
+      "nodes": 8
     },
     "package": {
-      "edges": 4,
+      "edges": 7,
       "kind": "package",
-      "nodes": 5
+      "nodes": 8
     },
     "security": {
-      "edges": 4,
+      "edges": 7,
       "kind": "security",
-      "nodes": 5
+      "nodes": 8
     },
     "workflow": {
-      "edges": 4,
+      "edges": 7,
       "kind": "workflow",
-      "nodes": 5
+      "nodes": 8
     }
   },
   "llms": {},
@@ -75,14 +242,14 @@
   "rules": {},
   "security": {},
   "source_files": [
-    "fulfillment_ops.apg"
+    "order_fulfillment.apg"
   ],
   "symbols": {
-    "field.Customer.email": {
-      "file": "fulfillment_ops.apg",
-      "id": "field.Customer.email",
-      "kind": "field",
-      "name": "Customer.email",
+    "app.FulfilmentApp": {
+      "file": "order_fulfillment.apg",
+      "id": "app.FulfilmentApp",
+      "kind": "app",
+      "name": "FulfilmentApp",
       "range": {
         "end": {
           "character": 1,
@@ -95,11 +262,11 @@
       },
       "references": []
     },
-    "field.Customer.name": {
-      "file": "fulfillment_ops.apg",
-      "id": "field.Customer.name",
+    "field.Order.customer_id": {
+      "file": "order_fulfillment.apg",
+      "id": "field.Order.customer_id",
       "kind": "field",
-      "name": "Customer.name",
+      "name": "Order.customer_id",
       "range": {
         "end": {
           "character": 1,
@@ -112,11 +279,11 @@
       },
       "references": []
     },
-    "field.FulfillmentEvent.event_time": {
-      "file": "fulfillment_ops.apg",
-      "id": "field.FulfillmentEvent.event_time",
+    "field.Order.order_number": {
+      "file": "order_fulfillment.apg",
+      "id": "field.Order.order_number",
       "kind": "field",
-      "name": "FulfillmentEvent.event_time",
+      "name": "Order.order_number",
       "range": {
         "end": {
           "character": 1,
@@ -129,11 +296,11 @@
       },
       "references": []
     },
-    "field.FulfillmentEvent.event_type": {
-      "file": "fulfillment_ops.apg",
-      "id": "field.FulfillmentEvent.event_type",
+    "field.Order.priority": {
+      "file": "order_fulfillment.apg",
+      "id": "field.Order.priority",
       "kind": "field",
-      "name": "FulfillmentEvent.event_type",
+      "name": "Order.priority",
       "range": {
         "end": {
           "character": 1,
@@ -146,11 +313,11 @@
       },
       "references": []
     },
-    "field.FulfillmentEvent.shipment_id": {
-      "file": "fulfillment_ops.apg",
-      "id": "field.FulfillmentEvent.shipment_id",
+    "field.Order.status": {
+      "file": "order_fulfillment.apg",
+      "id": "field.Order.status",
       "kind": "field",
-      "name": "FulfillmentEvent.shipment_id",
+      "name": "Order.status",
       "range": {
         "end": {
           "character": 1,
@@ -163,11 +330,11 @@
       },
       "references": []
     },
-    "field.SalesOrder.customer_id": {
-      "file": "fulfillment_ops.apg",
-      "id": "field.SalesOrder.customer_id",
+    "field.Order.total": {
+      "file": "order_fulfillment.apg",
+      "id": "field.Order.total",
       "kind": "field",
-      "name": "SalesOrder.customer_id",
+      "name": "Order.total",
       "range": {
         "end": {
           "character": 1,
@@ -180,11 +347,11 @@
       },
       "references": []
     },
-    "field.SalesOrder.order_number": {
-      "file": "fulfillment_ops.apg",
-      "id": "field.SalesOrder.order_number",
+    "field.PaymentRetry.attempt": {
+      "file": "order_fulfillment.apg",
+      "id": "field.PaymentRetry.attempt",
       "kind": "field",
-      "name": "SalesOrder.order_number",
+      "name": "PaymentRetry.attempt",
       "range": {
         "end": {
           "character": 1,
@@ -197,11 +364,11 @@
       },
       "references": []
     },
-    "field.SalesOrder.status": {
-      "file": "fulfillment_ops.apg",
-      "id": "field.SalesOrder.status",
+    "field.PaymentRetry.order_id": {
+      "file": "order_fulfillment.apg",
+      "id": "field.PaymentRetry.order_id",
       "kind": "field",
-      "name": "SalesOrder.status",
+      "name": "PaymentRetry.order_id",
       "range": {
         "end": {
           "character": 1,
@@ -214,11 +381,113 @@
       },
       "references": []
     },
-    "field.SalesOrder.total": {
-      "file": "fulfillment_ops.apg",
-      "id": "field.SalesOrder.total",
+    "field.PaymentRetry.retry_id": {
+      "file": "order_fulfillment.apg",
+      "id": "field.PaymentRetry.retry_id",
       "kind": "field",
-      "name": "SalesOrder.total",
+      "name": "PaymentRetry.retry_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PaymentRetry.status": {
+      "file": "order_fulfillment.apg",
+      "id": "field.PaymentRetry.status",
+      "kind": "field",
+      "name": "PaymentRetry.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Return.order_id": {
+      "file": "order_fulfillment.apg",
+      "id": "field.Return.order_id",
+      "kind": "field",
+      "name": "Return.order_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Return.reason": {
+      "file": "order_fulfillment.apg",
+      "id": "field.Return.reason",
+      "kind": "field",
+      "name": "Return.reason",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Return.refund_amount": {
+      "file": "order_fulfillment.apg",
+      "id": "field.Return.refund_amount",
+      "kind": "field",
+      "name": "Return.refund_amount",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Return.return_id": {
+      "file": "order_fulfillment.apg",
+      "id": "field.Return.return_id",
+      "kind": "field",
+      "name": "Return.return_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Return.status": {
+      "file": "order_fulfillment.apg",
+      "id": "field.Return.status",
+      "kind": "field",
+      "name": "Return.status",
       "range": {
         "end": {
           "character": 1,
@@ -232,7 +501,7 @@
       "references": []
     },
     "field.Shipment.carrier": {
-      "file": "fulfillment_ops.apg",
+      "file": "order_fulfillment.apg",
       "id": "field.Shipment.carrier",
       "kind": "field",
       "name": "Shipment.carrier",
@@ -248,11 +517,11 @@
       },
       "references": []
     },
-    "field.Shipment.delivered": {
-      "file": "fulfillment_ops.apg",
-      "id": "field.Shipment.delivered",
+    "field.Shipment.delivered_at": {
+      "file": "order_fulfillment.apg",
+      "id": "field.Shipment.delivered_at",
       "kind": "field",
-      "name": "Shipment.delivered",
+      "name": "Shipment.delivered_at",
       "range": {
         "end": {
           "character": 1,
@@ -265,11 +534,62 @@
       },
       "references": []
     },
-    "field.Shipment.sales_order_id": {
-      "file": "fulfillment_ops.apg",
-      "id": "field.Shipment.sales_order_id",
+    "field.Shipment.dispatched_at": {
+      "file": "order_fulfillment.apg",
+      "id": "field.Shipment.dispatched_at",
       "kind": "field",
-      "name": "Shipment.sales_order_id",
+      "name": "Shipment.dispatched_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Shipment.order_id": {
+      "file": "order_fulfillment.apg",
+      "id": "field.Shipment.order_id",
+      "kind": "field",
+      "name": "Shipment.order_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Shipment.shipment_id": {
+      "file": "order_fulfillment.apg",
+      "id": "field.Shipment.shipment_id",
+      "kind": "field",
+      "name": "Shipment.shipment_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Shipment.status": {
+      "file": "order_fulfillment.apg",
+      "id": "field.Shipment.status",
+      "kind": "field",
+      "name": "Shipment.status",
       "range": {
         "end": {
           "character": 1,
@@ -283,7 +603,7 @@
       "references": []
     },
     "field.Shipment.tracking_number": {
-      "file": "fulfillment_ops.apg",
+      "file": "order_fulfillment.apg",
       "id": "field.Shipment.tracking_number",
       "kind": "field",
       "name": "Shipment.tracking_number",
@@ -299,11 +619,11 @@
       },
       "references": []
     },
-    "module.fulfillment_ops": {
-      "file": "fulfillment_ops.apg",
-      "id": "module.fulfillment_ops",
+    "module.order_fulfillment": {
+      "file": "order_fulfillment.apg",
+      "id": "module.order_fulfillment",
       "kind": "module",
-      "name": "fulfillment_ops",
+      "name": "order_fulfillment",
       "range": {
         "end": {
           "character": 1,
@@ -316,11 +636,11 @@
       },
       "references": []
     },
-    "table.Customer": {
-      "file": "fulfillment_ops.apg",
-      "id": "table.Customer",
+    "table.Order": {
+      "file": "order_fulfillment.apg",
+      "id": "table.Order",
       "kind": "table",
-      "name": "Customer",
+      "name": "Order",
       "range": {
         "end": {
           "character": 1,
@@ -333,11 +653,11 @@
       },
       "references": []
     },
-    "table.FulfillmentEvent": {
-      "file": "fulfillment_ops.apg",
-      "id": "table.FulfillmentEvent",
+    "table.PaymentRetry": {
+      "file": "order_fulfillment.apg",
+      "id": "table.PaymentRetry",
       "kind": "table",
-      "name": "FulfillmentEvent",
+      "name": "PaymentRetry",
       "range": {
         "end": {
           "character": 1,
@@ -350,11 +670,11 @@
       },
       "references": []
     },
-    "table.SalesOrder": {
-      "file": "fulfillment_ops.apg",
-      "id": "table.SalesOrder",
+    "table.Return": {
+      "file": "order_fulfillment.apg",
+      "id": "table.Return",
       "kind": "table",
-      "name": "SalesOrder",
+      "name": "Return",
       "range": {
         "end": {
           "character": 1,
@@ -368,7 +688,7 @@
       "references": []
     },
     "table.Shipment": {
-      "file": "fulfillment_ops.apg",
+      "file": "order_fulfillment.apg",
       "id": "table.Shipment",
       "kind": "table",
       "name": "Shipment",
@@ -383,34 +703,212 @@
         }
       },
       "references": []
+    },
+    "workflow.OrderFulfilment": {
+      "file": "order_fulfillment.apg",
+      "id": "workflow.OrderFulfilment",
+      "kind": "workflow",
+      "name": "OrderFulfilment",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.ReturnProcess": {
+      "file": "order_fulfillment.apg",
+      "id": "workflow.ReturnProcess",
+      "kind": "workflow",
+      "name": "ReturnProcess",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
     }
   },
   "tables": {
-    "Customer": {
+    "Order": {
       "fields": {
-        "email": {
+        "customer_id": {
+          "relationship": {
+            "alias": "customer",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Customer"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "order_number": {
           "relationship": null,
           "required": true,
           "type": "str"
         },
-        "name": {
+        "priority": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "total": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        }
+      },
+      "lookup_paths": {
+        "total.id": {
+          "chain": [
+            "Order.total",
+            "decimal.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Order"
+    },
+    "PaymentRetry": {
+      "fields": {
+        "attempt": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "order_id": {
+          "relationship": {
+            "alias": "order",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Order"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "retry_id": {
+          "relationship": {
+            "alias": "retry",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Retry"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "status": {
           "relationship": null,
           "required": true,
           "type": "str"
         }
       },
       "lookup_paths": {},
-      "name": "Customer"
+      "name": "PaymentRetry"
     },
-    "FulfillmentEvent": {
+    "Return": {
       "fields": {
-        "event_time": {
+        "order_id": {
+          "relationship": {
+            "alias": "order",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Order"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "reason": {
           "relationship": null,
           "required": true,
           "type": "str"
         },
-        "event_type": {
+        "refund_amount": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "return_id": {
+          "relationship": {
+            "alias": "return",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Return"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "status": {
           "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "refund_amount.id": {
+          "chain": [
+            "Return.refund_amount",
+            "decimal.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Return"
+    },
+    "Shipment": {
+      "fields": {
+        "carrier": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "delivered_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime?"
+          },
+          "required": true,
+          "type": "datetime?"
+        },
+        "dispatched_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime?"
+          },
+          "required": true,
+          "type": "datetime?"
+        },
+        "order_id": {
+          "relationship": {
+            "alias": "order",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Order"
+          },
           "required": true,
           "type": "str"
         },
@@ -422,27 +920,6 @@
             "target_table": "Shipment"
           },
           "required": true,
-          "type": "int"
-        }
-      },
-      "lookup_paths": {},
-      "name": "FulfillmentEvent"
-    },
-    "SalesOrder": {
-      "fields": {
-        "customer_id": {
-          "relationship": {
-            "alias": "customer",
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "Customer"
-          },
-          "required": true,
-          "type": "int"
-        },
-        "order_number": {
-          "relationship": null,
-          "required": true,
           "type": "str"
         },
         "status": {
@@ -450,44 +927,39 @@
           "required": true,
           "type": "str"
         },
-        "total": {
-          "relationship": null,
-          "required": true,
-          "type": "float"
-        }
-      },
-      "lookup_paths": {},
-      "name": "SalesOrder"
-    },
-    "Shipment": {
-      "fields": {
-        "carrier": {
-          "relationship": null,
-          "required": true,
-          "type": "str"
-        },
-        "delivered": {
-          "relationship": null,
-          "required": true,
-          "type": "bool"
-        },
-        "sales_order_id": {
+        "tracking_number": {
           "relationship": {
-            "alias": "sales_order",
             "cardinality": "many-to-one",
             "target_field": "id",
-            "target_table": "SalesOrder"
+            "target_table": "str?"
           },
           "required": true,
-          "type": "int"
-        },
-        "tracking_number": {
-          "relationship": null,
-          "required": true,
-          "type": "str"
+          "type": "str?"
         }
       },
-      "lookup_paths": {},
+      "lookup_paths": {
+        "delivered_at.id": {
+          "chain": [
+            "Shipment.delivered_at",
+            "datetime?.id"
+          ],
+          "valid": true
+        },
+        "dispatched_at.id": {
+          "chain": [
+            "Shipment.dispatched_at",
+            "datetime?.id"
+          ],
+          "valid": true
+        },
+        "tracking_number.id": {
+          "chain": [
+            "Shipment.tracking_number",
+            "str?.id"
+          ],
+          "valid": true
+        }
+      },
       "name": "Shipment"
     }
   },

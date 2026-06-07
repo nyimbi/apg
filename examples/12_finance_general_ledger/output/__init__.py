@@ -1,6 +1,6 @@
 """
-finance_general_ledger - APG Generated Package
-===============================================
+finance_gl - APG Generated Package
+===================================
 
 Version: 1.0.0
 

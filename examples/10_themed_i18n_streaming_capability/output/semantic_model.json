@@ -2,17 +2,20 @@
   "agents": {},
   "app": {
     "description": null,
-    "entity_count": 1,
-    "name": "localized_streaming_capability",
+    "entity_count": 2,
+    "name": "localised_inventory",
     "version": "1.0.0"
   },
   "capabilities": {
-    "OperationsFeed": {
+    "LocalisedInventory": {
       "approvals": {},
       "business_rules": [],
       "components": {},
       "configuration": {
-        "tenant_scoped": true
+        "auto_reorder": true,
+        "default_warehouse": "NBO-01",
+        "low_stock_threshold": 10,
+        "tenant_id": "default"
       },
       "erp_modules": [],
       "i18n": {
@@ -21,46 +24,148 @@
         "supported_languages": [
           "en",
           "sw",
-          "ha",
+          "fr",
+          "pt",
+          "ar",
+          "rw",
+          "rn",
           "yo",
+          "ig",
+          "ha",
+          "tw",
+          "ak",
+          "ee",
+          "gaa",
+          "fon",
           "zu",
+          "xh",
+          "st",
+          "tn",
+          "ss",
+          "ve",
+          "nr",
+          "nso",
+          "ts",
           "am",
-          "rw"
+          "ti",
+          "so",
+          "om",
+          "ln",
+          "lu",
+          "kg",
+          "sg"
         ]
       },
-      "master_data": {},
-      "name": "OperationsFeed",
+      "master_data": {
+        "entities": [
+          "warehouse",
+          "bin_location",
+          "item_category",
+          "unit_of_measure"
+        ]
+      },
+      "name": "LocalisedInventory",
       "provides": [
-        "operations_events",
-        "operations_dashboard"
+        "stock_balances",
+        "inventory_events",
+        "reorder_alerts"
       ],
-      "requires": [],
+      "requires": [
+        "audit_events"
+      ],
       "rule_engine": {},
-      "rules": [],
+      "rules": [
+        {
+          "action": "deny",
+          "name": "no_negative_stock",
+          "when": "on_hand - reserved < 0",
+          "when_ast": {
+            "field": "on_hand",
+            "op": "==",
+            "type": "compare",
+            "value": true
+          }
+        },
+        {
+          "action": "warn",
+          "name": "reorder_required",
+          "when": "on_hand <= low_stock_threshold",
+          "when_ast": {
+            "field": "on_hand",
+            "op": "<=",
+            "type": "compare",
+            "value": "low_stock_threshold"
+          }
+        }
+      ],
       "runtime": {
-        "backend": "python",
         "streaming": {
           "processor": "bytewax"
-        }
+        },
+        "target": "python"
       },
       "screens": {},
       "streaming": {
+        "input": "inventory_event_bus",
+        "output": "reorder_alert_stream",
         "processor": "bytewax",
-        "state": "operations_feed_state"
+        "state": "inventory_state",
+        "window": "15min"
       },
       "theme": {
-        "name": "ops_theme",
+        "allow_tenant_overrides": true,
+        "components": {
+          "movement_table": {
+            "compact": false,
+            "stripe": true
+          },
+          "reorder_alert": {
+            "icon": "alert-circle",
+            "position": "top-right"
+          },
+          "stock_level_badge": {
+            "color_scheme": "status",
+            "variant": "filled"
+          }
+        },
+        "name": "inventory_theme",
         "tokens": {
-          "accent": "#126E82",
-          "surface": "#F7FAFC"
+          "border.radius": "4px",
+          "color.accent": "#F57F17",
+          "color.background": "#F5F5F5",
+          "color.error": "#C62828",
+          "color.primary": "#1B5E20",
+          "color.success": "#2E7D32",
+          "color.surface": "#FFFFFF",
+          "color.text.muted": "#757575",
+          "color.text.primary": "#212121",
+          "color.warning": "#E65100",
+          "density": "comfortable",
+          "font.family": "Inter, sans-serif",
+          "font.size.base": "14px",
+          "shadow.card": "0 2px 4px rgba(0,0,0,0.12)"
         }
       },
       "ui": {
+        "requires_theme": true,
         "routes": [
           {
-            "component": "OperationsScreen",
-            "name": "Operations",
-            "path": "/ops"
+            "component": "StockDashboard",
+            "name": "Stock",
+            "path": "/inventory",
+            "permission": "inventory:view"
+          },
+          {
+            "component": "ReorderQueue",
+            "name": "Reorders",
+            "path": "/inventory/reorder",
+            "permission": "inventory:reorder"
+          },
+          {
+            "component": "MovementLog",
+            "name": "Movements",
+            "path": "/inventory/movements",
+            "permission": "inventory:movements"
           }
         ],
         "shell": "python"
@@ -69,40 +174,136 @@
   },
   "composition": {
     "agent_teams": {},
-    "applications": {},
+    "applications": {
+      "LocalisedInventoryApp": {
+        "agent_teams": [],
+        "agents": [],
+        "capabilities": [
+          "LocalisedInventory"
+        ],
+        "components": {},
+        "configuration": {},
+        "deployments": {},
+        "description": "Localised inventory management with streaming",
+        "integrations": {},
+        "name": "LocalisedInventoryApp",
+        "policies": {},
+        "routes": [
+          "/inventory"
+        ],
+        "runtime": {},
+        "screens": {},
+        "theme": {},
+        "workflows": []
+      }
+    },
     "capability_dependencies": {
-      "OperationsFeed": []
+      "LocalisedInventory": [
+        "audit_events"
+      ]
     }
   },
   "contracts": {
-    "OperationsFeed": {
+    "LocalisedInventory": {
       "configuration": {
-        "tenant_scoped": true
+        "auto_reorder": true,
+        "default_warehouse": "NBO-01",
+        "low_stock_threshold": 10,
+        "tenant_id": "default"
       },
-      "id": "operations_feed",
+      "id": "localised_inventory",
       "provides": [
-        "operations_events",
-        "operations_dashboard"
+        "stock_balances",
+        "inventory_events",
+        "reorder_alerts"
+      ],
+      "requires": [
+        "audit_events"
+      ],
+      "rules": [
+        {
+          "action": "deny",
+          "name": "no_negative_stock",
+          "when": "on_hand - reserved < 0",
+          "when_ast": {
+            "field": "on_hand",
+            "op": "==",
+            "type": "compare",
+            "value": true
+          }
+        },
+        {
+          "action": "warn",
+          "name": "reorder_required",
+          "when": "on_hand <= low_stock_threshold",
+          "when_ast": {
+            "field": "on_hand",
+            "op": "<=",
+            "type": "compare",
+            "value": "low_stock_threshold"
+          }
+        }
       ],
       "runtime": {
-        "backend": "python",
         "streaming": {
           "processor": "bytewax"
-        }
+        },
+        "target": "python"
       },
       "theme": {
-        "name": "ops_theme",
+        "allow_tenant_overrides": true,
+        "components": {
+          "movement_table": {
+            "compact": false,
+            "stripe": true
+          },
+          "reorder_alert": {
+            "icon": "alert-circle",
+            "position": "top-right"
+          },
+          "stock_level_badge": {
+            "color_scheme": "status",
+            "variant": "filled"
+          }
+        },
+        "name": "inventory_theme",
         "tokens": {
-          "accent": "#126E82",
-          "surface": "#F7FAFC"
+          "border.radius": "4px",
+          "color.accent": "#F57F17",
+          "color.background": "#F5F5F5",
+          "color.error": "#C62828",
+          "color.primary": "#1B5E20",
+          "color.success": "#2E7D32",
+          "color.surface": "#FFFFFF",
+          "color.text.muted": "#757575",
+          "color.text.primary": "#212121",
+          "color.warning": "#E65100",
+          "density": "comfortable",
+          "font.family": "Inter, sans-serif",
+          "font.size.base": "14px",
+          "shadow.card": "0 2px 4px rgba(0,0,0,0.12)"
         }
       },
       "ui": {
+        "requires_theme": true,
         "routes": [
           {
-            "component": "OperationsScreen",
-            "name": "Operations",
-            "path": "/ops"
+            "component": "StockDashboard",
+            "name": "Stock",
+            "path": "/inventory",
+            "permission": "inventory:view"
+          },
+          {
+            "component": "ReorderQueue",
+            "name": "Reorders",
+            "path": "/inventory/reorder",
+            "permission": "inventory:reorder"
+          },
+          {
+            "component": "MovementLog",
+            "name": "Movements",
+            "path": "/inventory/movements",
+            "permission": "inventory:movements"
           }
         ],
         "shell": "python"
@@ -110,10 +311,31 @@
     }
   },
   "deployment": {
-    "source": "localized_streaming_capability.apg",
+    "source": "localised_inventory.apg",
     "target": "python"
   },
-  "diagnostics": [],
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "localised_inventory.apg",
+      "fixes": [],
+      "message": "Capability 'LocalisedInventory' requires 'audit_events' which is not declared in this module",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
   "flows": {},
   "format": "apg.semantic-model.v1",
   "graphs": {
@@ -123,14 +345,14 @@
       "nodes": 0
     },
     "capability": {
-      "edges": 0,
+      "edges": 2,
       "kind": "capability",
-      "nodes": 1
+      "nodes": 3
     },
     "deployment": {
-      "edges": 1,
+      "edges": 2,
       "kind": "deployment",
-      "nodes": 2
+      "nodes": 3
     },
     "er": {
       "edges": 0,
@@ -138,29 +360,29 @@
       "nodes": 0
     },
     "handler": {
-      "edges": 1,
+      "edges": 2,
       "kind": "handler",
-      "nodes": 2
+      "nodes": 3
     },
     "lookup": {
-      "edges": 1,
+      "edges": 2,
       "kind": "lookup",
-      "nodes": 2
+      "nodes": 3
     },
     "package": {
-      "edges": 1,
+      "edges": 2,
       "kind": "package",
-      "nodes": 2
+      "nodes": 3
     },
     "security": {
-      "edges": 1,
+      "edges": 2,
       "kind": "security",
-      "nodes": 2
+      "nodes": 3
     },
     "workflow": {
-      "edges": 1,
+      "edges": 2,
       "kind": "workflow",
-      "nodes": 2
+      "nodes": 3
     }
   },
   "llms": {},
@@ -168,17 +390,40 @@
   "operations": {},
   "packages": {},
   "roles": {},
-  "rules": {},
+  "rules": {
+    "LocalisedInventory.no_negative_stock": {
+      "action": "deny",
+      "name": "no_negative_stock",
+      "when": "on_hand - reserved < 0",
+      "when_ast": {
+        "field": "on_hand",
+        "op": "==",
+        "type": "compare",
+        "value": true
+      }
+    },
+    "LocalisedInventory.reorder_required": {
+      "action": "warn",
+      "name": "reorder_required",
+      "when": "on_hand <= low_stock_threshold",
+      "when_ast": {
+        "field": "on_hand",
+        "op": "<=",
+        "type": "compare",
+        "value": "low_stock_threshold"
+      }
+    }
+  },
   "security": {},
   "source_files": [
-    "localized_streaming_capability.apg"
+    "localised_inventory.apg"
   ],
   "symbols": {
-    "capability.OperationsFeed": {
-      "file": "localized_streaming_capability.apg",
-      "id": "capability.OperationsFeed",
-      "kind": "capability",
-      "name": "OperationsFeed",
+    "app.LocalisedInventoryApp": {
+      "file": "localised_inventory.apg",
+      "id": "app.LocalisedInventoryApp",
+      "kind": "app",
+      "name": "LocalisedInventoryApp",
       "range": {
         "end": {
           "character": 1,
@@ -191,11 +436,28 @@
       },
       "references": []
     },
-    "module.localized_streaming_capability": {
-      "file": "localized_streaming_capability.apg",
-      "id": "module.localized_streaming_capability",
+    "capability.LocalisedInventory": {
+      "file": "localised_inventory.apg",
+      "id": "capability.LocalisedInventory",
+      "kind": "capability",
+      "name": "LocalisedInventory",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.localised_inventory": {
+      "file": "localised_inventory.apg",
+      "id": "module.localised_inventory",
       "kind": "module",
-      "name": "localized_streaming_capability",
+      "name": "localised_inventory",
       "range": {
         "end": {
           "character": 1,

@@ -2,8 +2,8 @@
   "agents": {},
   "app": {
     "description": null,
-    "entity_count": 1,
-    "name": "capability_basics",
+    "entity_count": 3,
+    "name": "capability_contract",
     "version": "1.0.0"
   },
   "capabilities": {
@@ -12,21 +12,123 @@
       "business_rules": [],
       "components": {},
       "configuration": {
-        "retention_days": 365
+        "compress_after_days": 90,
+        "encrypt_at_rest": true,
+        "max_event_size_kb": 64,
+        "retention_days": 2555,
+        "tenant_id": "default"
       },
       "erp_modules": [],
       "i18n": {},
       "master_data": {
         "entities": [
-          "audit_event"
+          "audit_event",
+          "audit_session",
+          "compliance_rule"
         ]
       },
       "name": "AuditLog",
       "provides": [
-        "audit_events"
+        "audit_events",
+        "audit_reports",
+        "compliance_trail"
       ],
       "requires": [],
-      "rule_engine": {},
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
+          {
+            "action": "deny",
+            "name": "tenant_required",
+            "priority": 100,
+            "when": "tenant_id missing"
+          },
+          {
+            "action": "deny",
+            "name": "size_limit",
+            "priority": 90,
+            "when": "event_size_kb > max_event_size_kb"
+          },
+          {
+            "action": "require_review",
+            "name": "sensitive_data",
+            "priority": 80,
+            "when": "contains_pii == true"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [],
+      "runtime": {},
+      "screens": {},
+      "streaming": {},
+      "theme": {
+        "name": "audit_theme",
+        "tokens": {
+          "accent": "#5C6BC0"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "AuditLogViewer",
+            "name": "Audit Log",
+            "path": "/audit",
+            "permission": "audit:view"
+          },
+          {
+            "component": "ComplianceView",
+            "name": "Compliance",
+            "path": "/audit/compliance",
+            "permission": "audit:compliance"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "NotificationEngine": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "default_channel": "email",
+        "retry_attempts": 3,
+        "retry_delay_seconds": 60,
+        "tenant_id": "default"
+      },
+      "erp_modules": [],
+      "i18n": {},
+      "master_data": {},
+      "name": "NotificationEngine",
+      "provides": [
+        "notifications",
+        "alert_dispatch",
+        "delivery_tracking"
+      ],
+      "requires": [
+        "audit_events"
+      ],
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
+          {
+            "action": "deny",
+            "name": "rate_limit",
+            "when": "notifications_per_hour > 1000"
+          },
+          {
+            "action": "allow",
+            "name": "valid_channel",
+            "when": "channel in [email, sms, push, webhook]"
+          },
+          {
+            "action": "deny",
+            "name": "invalid_channel",
+            "when": "channel not in [email, sms, push, webhook]"
+          }
+        ],
+        "type": "policy"
+      },
       "rules": [],
       "runtime": {},
       "screens": {},
@@ -37,24 +139,155 @@
   },
   "composition": {
     "agent_teams": {},
-    "applications": {},
+    "applications": {
+      "CapabilityContractApp": {
+        "agent_teams": [],
+        "agents": [],
+        "capabilities": [
+          "AuditLog",
+          "NotificationEngine"
+        ],
+        "components": {},
+        "configuration": {},
+        "deployments": {},
+        "description": "Audit and notification capabilities",
+        "integrations": {},
+        "name": "CapabilityContractApp",
+        "policies": {},
+        "routes": [
+          "/audit",
+          "/notifications"
+        ],
+        "runtime": {},
+        "screens": {},
+        "theme": {},
+        "workflows": []
+      }
+    },
     "capability_dependencies": {
-      "AuditLog": []
+      "AuditLog": [],
+      "NotificationEngine": [
+        "audit_events"
+      ]
     }
   },
   "contracts": {
     "AuditLog": {
       "configuration": {
-        "retention_days": 365
+        "compress_after_days": 90,
+        "encrypt_at_rest": true,
+        "max_event_size_kb": 64,
+        "retention_days": 2555,
+        "tenant_id": "default"
+      },
+      "configuration_schema": {
+        "required": [
+          "tenant_id",
+          "retention_days"
+        ]
       },
       "id": "audit_log",
       "provides": [
+        "audit_events",
+        "audit_reports",
+        "compliance_trail"
+      ],
+      "requires": [],
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
+          {
+            "action": "deny",
+            "name": "tenant_required",
+            "priority": 100,
+            "when": "tenant_id missing"
+          },
+          {
+            "action": "deny",
+            "name": "size_limit",
+            "priority": 90,
+            "when": "event_size_kb > max_event_size_kb"
+          },
+          {
+            "action": "require_review",
+            "name": "sensitive_data",
+            "priority": 80,
+            "when": "contains_pii == true"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "theme": {
+        "name": "audit_theme",
+        "tokens": {
+          "accent": "#5C6BC0"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "AuditLogViewer",
+            "name": "Audit Log",
+            "path": "/audit",
+            "permission": "audit:view"
+          },
+          {
+            "component": "ComplianceView",
+            "name": "Compliance",
+            "path": "/audit/compliance",
+            "permission": "audit:compliance"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "NotificationEngine": {
+      "configuration": {
+        "default_channel": "email",
+        "retry_attempts": 3,
+        "retry_delay_seconds": 60,
+        "tenant_id": "default"
+      },
+      "configuration_schema": {
+        "required": [
+          "tenant_id",
+          "default_channel"
+        ]
+      },
+      "id": "notification_engine",
+      "provides": [
+        "notifications",
+        "alert_dispatch",
+        "delivery_tracking"
+      ],
+      "requires": [
         "audit_events"
-      ]
+      ],
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
+          {
+            "action": "deny",
+            "name": "rate_limit",
+            "when": "notifications_per_hour > 1000"
+          },
+          {
+            "action": "allow",
+            "name": "valid_channel",
+            "when": "channel in [email, sms, push, webhook]"
+          },
+          {
+            "action": "deny",
+            "name": "invalid_channel",
+            "when": "channel not in [email, sms, push, webhook]"
+          }
+        ],
+        "type": "policy"
+      }
     }
   },
   "deployment": {
-    "source": "capability_basics.apg",
+    "source": "capability_contract.apg",
     "target": "python"
   },
   "diagnostics": [],
@@ -67,14 +300,14 @@
       "nodes": 0
     },
     "capability": {
-      "edges": 0,
+      "edges": 3,
       "kind": "capability",
-      "nodes": 1
+      "nodes": 4
     },
     "deployment": {
-      "edges": 1,
+      "edges": 3,
       "kind": "deployment",
-      "nodes": 2
+      "nodes": 4
     },
     "er": {
       "edges": 0,
@@ -82,29 +315,29 @@
       "nodes": 0
     },
     "handler": {
-      "edges": 1,
+      "edges": 3,
       "kind": "handler",
-      "nodes": 2
+      "nodes": 4
     },
     "lookup": {
-      "edges": 1,
+      "edges": 3,
       "kind": "lookup",
-      "nodes": 2
+      "nodes": 4
     },
     "package": {
-      "edges": 1,
+      "edges": 3,
       "kind": "package",
-      "nodes": 2
+      "nodes": 4
     },
     "security": {
-      "edges": 1,
+      "edges": 3,
       "kind": "security",
-      "nodes": 2
+      "nodes": 4
     },
     "workflow": {
-      "edges": 1,
+      "edges": 3,
       "kind": "workflow",
-      "nodes": 2
+      "nodes": 4
     }
   },
   "llms": {},
@@ -112,14 +345,65 @@
   "operations": {},
   "packages": {},
   "roles": {},
-  "rules": {},
+  "rules": {
+    "AuditLog.sensitive_data": {
+      "action": "require_review",
+      "name": "sensitive_data",
+      "priority": 80,
+      "when": "contains_pii == true"
+    },
+    "AuditLog.size_limit": {
+      "action": "deny",
+      "name": "size_limit",
+      "priority": 90,
+      "when": "event_size_kb > max_event_size_kb"
+    },
+    "AuditLog.tenant_required": {
+      "action": "deny",
+      "name": "tenant_required",
+      "priority": 100,
+      "when": "tenant_id missing"
+    },
+    "NotificationEngine.invalid_channel": {
+      "action": "deny",
+      "name": "invalid_channel",
+      "when": "channel not in [email, sms, push, webhook]"
+    },
+    "NotificationEngine.rate_limit": {
+      "action": "deny",
+      "name": "rate_limit",
+      "when": "notifications_per_hour > 1000"
+    },
+    "NotificationEngine.valid_channel": {
+      "action": "allow",
+      "name": "valid_channel",
+      "when": "channel in [email, sms, push, webhook]"
+    }
+  },
   "security": {},
   "source_files": [
-    "capability_basics.apg"
+    "capability_contract.apg"
   ],
   "symbols": {
+    "app.CapabilityContractApp": {
+      "file": "capability_contract.apg",
+      "id": "app.CapabilityContractApp",
+      "kind": "app",
+      "name": "CapabilityContractApp",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
     "capability.AuditLog": {
-      "file": "capability_basics.apg",
+      "file": "capability_contract.apg",
       "id": "capability.AuditLog",
       "kind": "capability",
       "name": "AuditLog",
@@ -135,11 +419,28 @@
       },
       "references": []
     },
-    "module.capability_basics": {
-      "file": "capability_basics.apg",
-      "id": "module.capability_basics",
+    "capability.NotificationEngine": {
+      "file": "capability_contract.apg",
+      "id": "capability.NotificationEngine",
+      "kind": "capability",
+      "name": "NotificationEngine",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.capability_contract": {
+      "file": "capability_contract.apg",
+      "id": "module.capability_contract",
       "kind": "module",
-      "name": "capability_basics",
+      "name": "capability_contract",
       "range": {
         "end": {
           "character": 1,

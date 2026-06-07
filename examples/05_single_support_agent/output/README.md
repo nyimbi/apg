@@ -66,9 +66,13 @@ Generated deployment artifacts:
 - `semantic_model.json` - normalized APG semantic model for IDEs, agents, and release checks
 - `smoke_test.py` - standalone generated app smoke test
 
+## Entities
+
+- `SupportAgent`
+
 ## AI agents
 
-- `TriageAgent` - runtime `codex`, invoke with `POST /agents/TriageAgent/invoke`
+- `TriageAgent` - runtime `local`, invoke with `POST /agents/TriageAgent/invoke`
 
 Typed agent stub classes live in `agent_stubs.py`. Wire up a runtime adapter by setting the environment variable:
 

@@ -1,41 +1,102 @@
-// Example 14: inventory and warehouse operations.
-// Complexity focus: inventory data records plus warehouse capability contracts.
+// Example 14: inventory warehouse with form and standalone screen entities.
+// Features: form entity type, standalone screen entity
 
-module inventory_warehouse_operations version 1.0.0 {
-    description: "Warehouse app with stock records and inventory capability metadata";
+module inventory_warehouse version 1.0.0 {
+    description: "Warehouse operations with form and screen entity coverage";
 }
 
-table StockItem {
+table InventoryItem {
     sku: str;
     description: str;
-    on_hand: int;
-    reserved: int;
-    reorder_level: int;
-    active: bool;
+    unit_of_measure: str = "EA";
+    quantity_on_hand: int = 0;
+    quantity_reserved: int = 0;
+    reorder_point: int = 10;
+    cost_price: decimal;
+    status: str = "active";
+    bin_location: str?;
+}
+
+table BinLocation {
+    bin_id: str;
+    warehouse_id: str;
+    aisle: str;
+    shelf: str;
+    position: str;
+    max_capacity: int;
+    current_count: int = 0;
+    is_active: bool = true;
 }
 
 table StockMovement {
-    stock_item_id: int;
+    movement_id: str;
+    item_sku: str;
+    from_bin: str?;
+    to_bin: str?;
     movement_type: str;
     quantity: int;
-    reference: str;
+    reference: str?;
+    performed_by: str;
+    performed_at: datetime;
 }
 
-capability WarehouseInventory {
-    contract: {
-        id: warehouse_inventory,
-        provides: [stock_balances, stock_movements, reorder_alerts],
-        requires: [audit_events],
-        configuration: {default_warehouse: "NBO-01", cycle_count_days: 30},
-        rules: [
-            {name: "no_negative_stock", when: "on_hand - reserved < 0", action: "deny"},
-            {name: "reorder_needed", when: "on_hand <= reorder_level", action: "warn"}
-        ],
-        ui: {shell: python, routes: [{name: "Inventory", path: "/warehouse/inventory", component: "InventoryScreen"}]},
-        theme: {name: warehouse_theme, tokens: {accent: "#2F855A"}}
-    };
+// Standalone form entity — data-entry form for stock receipts
+form StockReceiptForm {
+    title: "Stock Receipt";
+    table: InventoryItem;
+    fields: [sku, quantity_on_hand, cost_price, bin_location];
+    actions: [save, save_and_add, cancel];
+}
 
-    erp_modules: [inventory, warehouse, procurement];
-    master_data: {entities: [stock_item, warehouse, bin_location]};
-    streaming: {processor: bytewax, state: inventory_movement_state};
+// Standalone screen entity
+screen WarehouseMap {
+    route: "/warehouse/map";
+    title: "Warehouse Map";
+    layout: grid;
+    contains: [BinGrid, ItemSearch, MovementLog];
+    binds: [bins.all, movements.recent];
+    actions: [transfer, receive, count, adjust];
+    relationships: [
+        BinGrid -> MovementLog,
+        {from: ItemSearch, to: BinGrid, via: sku_filter}
+    ];
+}
+
+capability WarehouseOps {
+    contract: {
+        id: warehouse_ops,
+        provides: [stock_movements, bin_management, cycle_counting],
+        requires: [inventory_items, audit_events],
+        configuration: {tenant_id: "default", warehouse_id: "WH-001"},
+        rules: [
+            {name: "bin_capacity",   when: "current_count >= max_capacity",                           action: deny},
+            {name: "valid_movement", when: "movement_type in [receipt, issue, transfer, adjustment]", action: allow},
+            {name: "sku_required",   when: "item_sku missing",                                        action: deny}
+        ],
+        ui: {
+            shell: python,
+            routes: [
+                {name: "Movements", path: "/warehouse/movements", component: "MovementLog",  permission: "wh:movements"},
+                {name: "Bins",      path: "/warehouse/bins",      component: "BinManager",   permission: "wh:bins"},
+                {name: "Map",       path: "/warehouse/map",       component: "WarehouseMap", permission: "wh:map"}
+            ]
+        },
+        theme: {name: warehouse_theme, tokens: {accent: "#546E7A"}}
+    };
+}
+
+workflow StockReceipt {
+    steps: str = "initiated -> inspection -> put_away -> confirmed";
+    human_tasks: [inspection, put_away];
+    assignments: {inspection: quality_controller, put_away: warehouse_operator};
+    guards: {
+        put_away:  "inspection_passed == true",
+        confirmed: "bin_location not missing"
+    };
+}
+
+app WarehouseOpsApp {
+    description: "Warehouse operations management";
+    capabilities: [WarehouseOps];
+    routes: ["/warehouse"];
 }

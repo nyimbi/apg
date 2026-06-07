@@ -4,8 +4,6 @@ support_agent - APG Generated Package
 
 Version: 1.0.0
 
-Single support triage agent
-
 This package was automatically generated from APG source code.
 """
 

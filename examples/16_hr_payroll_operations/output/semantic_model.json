@@ -1,75 +1,162 @@
 {
-  "agents": {},
+  "agents": {
+    "HRAdvisor": {
+      "capabilities": [
+        "employee_records",
+        "hr_policies"
+      ],
+      "configuration": {
+        "max_turns": 6,
+        "temperature": 0.1
+      },
+      "handoffs": [],
+      "inputs": [],
+      "memory": {
+        "kind": "vector",
+        "name": "hr_memory"
+      },
+      "model": "openai:gpt-4.1-mini",
+      "name": "HRAdvisor",
+      "outputs": [],
+      "role": "HR policy advisor",
+      "rules": [],
+      "runtime": null,
+      "system": "Advise on HR policies, leave entitlements, and employment law compliance. Cite relevant sections.",
+      "theme": {},
+      "tools": [
+        "policy.lookup",
+        "employment_law.search",
+        "leave_balance.check"
+      ],
+      "ui": {}
+    },
+    "PayrollAssistant": {
+      "capabilities": [
+        "payroll_runs",
+        "statutory_deductions"
+      ],
+      "configuration": {
+        "max_turns": 4,
+        "temperature": 0.0
+      },
+      "handoffs": [],
+      "inputs": [],
+      "memory": null,
+      "model": "openai:gpt-4.1-mini",
+      "name": "PayrollAssistant",
+      "outputs": [],
+      "role": "payroll calculation assistant",
+      "rules": [],
+      "runtime": null,
+      "system": "Assist with payroll calculations, statutory deductions, and compliance. Always verify statutory rates.",
+      "theme": {},
+      "tools": [
+        "tax_table.lookup",
+        "statutory_rates.fetch",
+        "payslip.calculate"
+      ],
+      "ui": {}
+    }
+  },
   "app": {
     "description": null,
-    "entity_count": 3,
-    "name": "hr_payroll_operations",
+    "entity_count": 11,
+    "name": "hr_payroll",
     "version": "1.0.0"
   },
   "capabilities": {
-    "PayrollOperations": {
+    "HRPayroll": {
       "approvals": {
         "approvers": [
           "hr_manager",
-          "payroll_controller"
+          "finance_controller"
         ],
         "levels": 2
       },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "country": "KE",
         "currency": "KES",
-        "pay_frequency": "monthly"
+        "tenant_id": "default"
       },
       "erp_modules": [
         "hr",
         "payroll",
-        "finance"
+        "time_attendance"
       ],
-      "i18n": {
-        "default_language": "en",
-        "fallback_language": "en",
-        "supported_languages": [
-          "en",
-          "sw",
-          "am",
-          "rw",
-          "zu"
+      "i18n": {},
+      "master_data": {
+        "entities": [
+          "employee",
+          "department",
+          "position",
+          "pay_grade",
+          "statutory_rate"
         ]
       },
-      "master_data": {},
-      "name": "PayrollOperations",
+      "name": "HRPayroll",
       "provides": [
-        "employee_master",
+        "employee_records",
         "payroll_runs",
-        "payslip_generation"
+        "payslips",
+        "statutory_deductions",
+        "leave_management",
+        "hr_policies"
       ],
-      "requires": [
-        "audit_events",
-        "general_ledger"
-      ],
+      "requires": [],
       "rule_engine": {},
       "rules": [
         {
-          "action": "require_review",
-          "name": "payrun_requires_approval",
-          "when": "approved == false",
+          "action": "deny",
+          "name": "bank_account_required",
+          "when": "bank_account missing",
           "when_ast": {
-            "field": "approved",
-            "op": "==",
-            "type": "compare",
-            "value": false
+            "field": "bank_account",
+            "negated": false,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "tax_pin_required",
+          "when": "tax_pin missing",
+          "when_ast": {
+            "field": "tax_pin",
+            "negated": false,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "nssf_required",
+          "when": "nssf_number missing",
+          "when_ast": {
+            "field": "nssf_number",
+            "negated": false,
+            "type": "missing"
           }
         },
         {
           "action": "deny",
-          "name": "positive_net_pay",
-          "when": "net_amount < 0",
+          "name": "payslip_authorised",
+          "when": "pay_run_status != approved",
           "when_ast": {
-            "field": "net_amount",
-            "op": "<",
+            "field": "pay_run_status",
+            "op": "!=",
             "type": "compare",
-            "value": 0
+            "value": "approved"
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "back_date_limit",
+          "when": "pay_date_months_ago > 3",
+          "when_ast": {
+            "field": "pay_date_months_ago",
+            "op": ">",
+            "type": "compare",
+            "value": 3
           }
         }
       ],
@@ -77,17 +164,30 @@
       "screens": {},
       "streaming": {},
       "theme": {
-        "name": "people_ops_theme",
+        "name": "hr_theme",
         "tokens": {
-          "accent": "#805AD5"
+          "accent": "#6A1B9A"
         }
       },
       "ui": {
         "routes": [
           {
-            "component": "PayrollScreen",
-            "name": "Payroll",
-            "path": "/hr/payroll"
+            "component": "EmployeeList",
+            "name": "Employees",
+            "path": "/hr/employees",
+            "permission": "hr:view"
+          },
+          {
+            "component": "PayRunList",
+            "name": "Pay Runs",
+            "path": "/hr/payroll",
+            "permission": "hr:payroll"
+          },
+          {
+            "component": "PayslipView",
+            "name": "Payslips",
+            "path": "/hr/payslips",
+            "permission": "hr:payslips"
           }
         ],
         "shell": "python"
@@ -96,66 +196,137 @@
   },
   "composition": {
     "agent_teams": {},
-    "applications": {},
+    "applications": {
+      "HRPayrollApp": {
+        "agent_teams": [
+          "HRPayrollTeam"
+        ],
+        "agents": [],
+        "capabilities": [
+          "HRPayroll"
+        ],
+        "components": {},
+        "configuration": {},
+        "deployments": {},
+        "description": "Human resources and payroll management",
+        "integrations": {},
+        "name": "HRPayrollApp",
+        "policies": {},
+        "routes": [
+          "/hr",
+          "/hr/employees",
+          "/hr/payroll"
+        ],
+        "runtime": {},
+        "screens": {},
+        "theme": {
+          "name": "hr_app_theme",
+          "tokens": {
+            "accent": "#6A1B9A"
+          }
+        },
+        "workflows": []
+      }
+    },
     "capability_dependencies": {
-      "PayrollOperations": [
-        "audit_events",
-        "general_ledger"
-      ]
+      "HRPayroll": []
     }
   },
   "contracts": {
-    "PayrollOperations": {
+    "HRPayroll": {
       "configuration": {
+        "country": "KE",
         "currency": "KES",
-        "pay_frequency": "monthly"
+        "tenant_id": "default"
       },
-      "id": "payroll_operations",
+      "id": "hr_payroll",
       "provides": [
-        "employee_master",
+        "employee_records",
         "payroll_runs",
-        "payslip_generation"
-      ],
-      "requires": [
-        "audit_events",
-        "general_ledger"
+        "payslips",
+        "statutory_deductions",
+        "leave_management",
+        "hr_policies"
       ],
       "rules": [
         {
-          "action": "require_review",
-          "name": "payrun_requires_approval",
-          "when": "approved == false",
+          "action": "deny",
+          "name": "bank_account_required",
+          "when": "bank_account missing",
           "when_ast": {
-            "field": "approved",
-            "op": "==",
-            "type": "compare",
-            "value": false
+            "field": "bank_account",
+            "negated": false,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "tax_pin_required",
+          "when": "tax_pin missing",
+          "when_ast": {
+            "field": "tax_pin",
+            "negated": false,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "nssf_required",
+          "when": "nssf_number missing",
+          "when_ast": {
+            "field": "nssf_number",
+            "negated": false,
+            "type": "missing"
           }
         },
         {
           "action": "deny",
-          "name": "positive_net_pay",
-          "when": "net_amount < 0",
+          "name": "payslip_authorised",
+          "when": "pay_run_status != approved",
           "when_ast": {
-            "field": "net_amount",
-            "op": "<",
+            "field": "pay_run_status",
+            "op": "!=",
             "type": "compare",
-            "value": 0
+            "value": "approved"
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "back_date_limit",
+          "when": "pay_date_months_ago > 3",
+          "when_ast": {
+            "field": "pay_date_months_ago",
+            "op": ">",
+            "type": "compare",
+            "value": 3
           }
         }
       ],
       "theme": {
-        "name": "people_ops_theme",
+        "name": "hr_theme",
         "tokens": {
-          "accent": "#805AD5"
+          "accent": "#6A1B9A"
         }
       },
       "ui": {
         "routes": [
           {
-            "component": "PayrollScreen",
-            "name": "Payroll",
-            "path": "/hr/payroll"
+            "component": "EmployeeList",
+            "name": "Employees",
+            "path": "/hr/employees",
+            "permission": "hr:view"
+          },
+          {
+            "component": "PayRunList",
+            "name": "Pay Runs",
+            "path": "/hr/payroll",
+            "permission": "hr:payroll"
+          },
+          {
+            "component": "PayslipView",
+            "name": "Payslips",
+            "path": "/hr/payslips",
+            "permission": "hr:payslips"
           }
         ],
         "shell": "python"
@@ -163,119 +334,347 @@
     }
   },
   "deployment": {
-    "source": "hr_payroll_operations.apg",
+    "source": "hr_payroll.apg",
     "target": "python"
   },
-  "diagnostics": [
-    {
-      "code": "APG0100",
-      "docs_url": "docs/tooling.md#semantic-model-contract",
-      "file": "hr_payroll_operations.apg",
-      "fixes": [],
-      "message": "Capability 'PayrollOperations' requires 'audit_events' which is not declared in this module",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
+  "diagnostics": [],
+  "flows": {
+    "EmployeeOnboarding": {
+      "assignments": {
+        "confirmed": "department_manager",
+        "documents_submitted": "hr_officer",
+        "orientation": "hr_manager",
+        "system_access": "it_administrator"
       },
-      "related_locations": [],
-      "severity": "warning",
-      "title": "Semantic warning"
+      "compensation": {},
+      "guards": {
+        "system_access": "all_documents_received == true\";\n        orientation:    \"system_access_granted == true\";\n        confirmed:      \"probation_assessment_complete == true\";"
+      },
+      "human_tasks": [
+        "documents_submitted",
+        "system_access",
+        "orientation",
+        "confirmed"
+      ],
+      "methods": [],
+      "name": "EmployeeOnboarding",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "offer_accepted",
+        "documents_submitted",
+        "system_access",
+        "orientation",
+        "probation",
+        "confirmed"
+      ],
+      "steps": [
+        "offer_accepted",
+        "documents_submitted",
+        "system_access",
+        "orientation",
+        "probation",
+        "confirmed"
+      ],
+      "steps_raw": "offer_accepted -> documents_submitted -> system_access -> orientation -> probation -> confirmed",
+      "timers": {
+        "documents_submitted": "P3D",
+        "orientation": "P1D",
+        "system_access": "PT8H"
+      },
+      "transitions": [
+        {
+          "guard": null,
+          "source": "offer_accepted",
+          "target": "documents_submitted"
+        },
+        {
+          "guard": "all_documents_received == true\";\n        orientation:    \"system_access_granted == true\";\n        confirmed:      \"probation_assessment_complete == true\";",
+          "source": "documents_submitted",
+          "target": "system_access"
+        },
+        {
+          "guard": null,
+          "source": "system_access",
+          "target": "orientation"
+        },
+        {
+          "guard": null,
+          "source": "orientation",
+          "target": "probation"
+        },
+        {
+          "guard": null,
+          "source": "probation",
+          "target": "confirmed"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    },
+    "LeaveRequest": {
+      "assignments": {
+        "hr_approval": "hr_officer",
+        "manager_approval": "line_manager"
+      },
+      "compensation": {},
+      "guards": {
+        "manager_approval": "leave_balance >= requested_days\";\n        hr_approval:      \"manager_approved == true\";"
+      },
+      "human_tasks": [
+        "manager_approval",
+        "hr_approval"
+      ],
+      "methods": [],
+      "name": "LeaveRequest",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "submitted",
+        "manager_approval",
+        "hr_approval",
+        "approved",
+        "active",
+        "closed"
+      ],
+      "steps": [
+        "submitted",
+        "manager_approval",
+        "hr_approval",
+        "approved",
+        "active",
+        "closed"
+      ],
+      "steps_raw": "submitted -> manager_approval -> hr_approval -> approved -> active -> closed",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": "leave_balance >= requested_days\";\n        hr_approval:      \"manager_approved == true\";",
+          "source": "submitted",
+          "target": "manager_approval"
+        },
+        {
+          "guard": null,
+          "source": "manager_approval",
+          "target": "hr_approval"
+        },
+        {
+          "guard": null,
+          "source": "hr_approval",
+          "target": "approved"
+        },
+        {
+          "guard": null,
+          "source": "approved",
+          "target": "active"
+        },
+        {
+          "guard": null,
+          "source": "active",
+          "target": "closed"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    },
+    "PayRunProcess": {
+      "assignments": {
+        "approved": "finance_controller",
+        "reviewed": "hr_manager"
+      },
+      "compensation": {
+        "approved": "void_bank_transfers",
+        "disbursed": "initiate_recalls"
+      },
+      "guards": {
+        "reviewed": "all_payslips_generated == true\";\n        approved:   \"review_complete == true\";\n        disbursed:  \"bank_file_generated == true\";"
+      },
+      "human_tasks": [
+        "reviewed",
+        "approved"
+      ],
+      "methods": [],
+      "name": "PayRunProcess",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "draft",
+        "calculated",
+        "reviewed",
+        "approved",
+        "disbursed",
+        "closed"
+      ],
+      "steps": [
+        "draft",
+        "calculated",
+        "reviewed",
+        "approved",
+        "disbursed",
+        "closed"
+      ],
+      "steps_raw": "draft -> calculated -> reviewed -> approved -> disbursed -> closed",
+      "timers": {
+        "approved": "PT48H",
+        "reviewed": "PT24H"
+      },
+      "transitions": [
+        {
+          "guard": null,
+          "source": "draft",
+          "target": "calculated"
+        },
+        {
+          "guard": "all_payslips_generated == true\";\n        approved:   \"review_complete == true\";\n        disbursed:  \"bank_file_generated == true\";",
+          "source": "calculated",
+          "target": "reviewed"
+        },
+        {
+          "guard": null,
+          "source": "reviewed",
+          "target": "approved"
+        },
+        {
+          "guard": null,
+          "source": "approved",
+          "target": "disbursed"
+        },
+        {
+          "guard": null,
+          "source": "disbursed",
+          "target": "closed"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
     }
-  ],
-  "flows": {},
+  },
   "format": "apg.semantic-model.v1",
   "graphs": {
     "agent": {
       "edges": 0,
       "kind": "agent",
-      "nodes": 0
-    },
-    "capability": {
-      "edges": 2,
-      "kind": "capability",
       "nodes": 3
     },
+    "capability": {
+      "edges": 1,
+      "kind": "capability",
+      "nodes": 2
+    },
     "deployment": {
-      "edges": 3,
+      "edges": 11,
       "kind": "deployment",
-      "nodes": 4
+      "nodes": 12
     },
     "er": {
-      "edges": 8,
+      "edges": 39,
       "kind": "er",
-      "nodes": 10
+      "nodes": 38
     },
     "handler": {
-      "edges": 3,
+      "edges": 11,
       "kind": "handler",
-      "nodes": 4
+      "nodes": 12
     },
     "lookup": {
-      "edges": 3,
+      "edges": 11,
       "kind": "lookup",
-      "nodes": 4
+      "nodes": 12
     },
     "package": {
-      "edges": 3,
+      "edges": 11,
       "kind": "package",
-      "nodes": 4
+      "nodes": 12
     },
     "security": {
-      "edges": 3,
+      "edges": 11,
       "kind": "security",
-      "nodes": 4
+      "nodes": 12
     },
     "workflow": {
-      "edges": 3,
+      "edges": 11,
       "kind": "workflow",
-      "nodes": 4
+      "nodes": 12
     }
   },
-  "llms": {},
+  "llms": {
+    "HRAdvisor": {
+      "model": "openai:gpt-4.1-mini",
+      "runtime": null
+    },
+    "PayrollAssistant": {
+      "model": "openai:gpt-4.1-mini",
+      "runtime": null
+    }
+  },
   "ok": true,
   "operations": {},
   "packages": {},
   "roles": {},
   "rules": {
-    "PayrollOperations.payrun_requires_approval": {
+    "HRPayroll.back_date_limit": {
       "action": "require_review",
-      "name": "payrun_requires_approval",
-      "when": "approved == false",
+      "name": "back_date_limit",
+      "when": "pay_date_months_ago > 3",
       "when_ast": {
-        "field": "approved",
-        "op": "==",
+        "field": "pay_date_months_ago",
+        "op": ">",
         "type": "compare",
-        "value": false
+        "value": 3
       }
     },
-    "PayrollOperations.positive_net_pay": {
+    "HRPayroll.bank_account_required": {
       "action": "deny",
-      "name": "positive_net_pay",
-      "when": "net_amount < 0",
+      "name": "bank_account_required",
+      "when": "bank_account missing",
       "when_ast": {
-        "field": "net_amount",
-        "op": "<",
+        "field": "bank_account",
+        "negated": false,
+        "type": "missing"
+      }
+    },
+    "HRPayroll.nssf_required": {
+      "action": "require_review",
+      "name": "nssf_required",
+      "when": "nssf_number missing",
+      "when_ast": {
+        "field": "nssf_number",
+        "negated": false,
+        "type": "missing"
+      }
+    },
+    "HRPayroll.payslip_authorised": {
+      "action": "deny",
+      "name": "payslip_authorised",
+      "when": "pay_run_status != approved",
+      "when_ast": {
+        "field": "pay_run_status",
+        "op": "!=",
         "type": "compare",
-        "value": 0
+        "value": "approved"
+      }
+    },
+    "HRPayroll.tax_pin_required": {
+      "action": "require_review",
+      "name": "tax_pin_required",
+      "when": "tax_pin missing",
+      "when_ast": {
+        "field": "tax_pin",
+        "negated": false,
+        "type": "missing"
       }
     }
   },
   "security": {},
   "source_files": [
-    "hr_payroll_operations.apg"
+    "hr_payroll.apg"
   ],
   "symbols": {
-    "capability.PayrollOperations": {
-      "file": "hr_payroll_operations.apg",
-      "id": "capability.PayrollOperations",
-      "kind": "capability",
-      "name": "PayrollOperations",
+    "agent.HRAdvisor": {
+      "file": "hr_payroll.apg",
+      "id": "agent.HRAdvisor",
+      "kind": "agent",
+      "name": "HRAdvisor",
       "range": {
         "end": {
           "character": 1,
@@ -288,11 +687,96 @@
       },
       "references": []
     },
-    "field.Employee.active": {
-      "file": "hr_payroll_operations.apg",
-      "id": "field.Employee.active",
+    "agent.PayrollAssistant": {
+      "file": "hr_payroll.apg",
+      "id": "agent.PayrollAssistant",
+      "kind": "agent",
+      "name": "PayrollAssistant",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "agent_team.HRPayrollTeam": {
+      "file": "hr_payroll.apg",
+      "id": "agent_team.HRPayrollTeam",
+      "kind": "agent_team",
+      "name": "HRPayrollTeam",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "app.HRPayrollApp": {
+      "file": "hr_payroll.apg",
+      "id": "app.HRPayrollApp",
+      "kind": "app",
+      "name": "HRPayrollApp",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.HRPayroll": {
+      "file": "hr_payroll.apg",
+      "id": "capability.HRPayroll",
+      "kind": "capability",
+      "name": "HRPayroll",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Employee.bank_account": {
+      "file": "hr_payroll.apg",
+      "id": "field.Employee.bank_account",
       "kind": "field",
-      "name": "Employee.active",
+      "name": "Employee.bank_account",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Employee.currency": {
+      "file": "hr_payroll.apg",
+      "id": "field.Employee.currency",
+      "kind": "field",
+      "name": "Employee.currency",
       "range": {
         "end": {
           "character": 1,
@@ -306,7 +790,7 @@
       "references": []
     },
     "field.Employee.department": {
-      "file": "hr_payroll_operations.apg",
+      "file": "hr_payroll.apg",
       "id": "field.Employee.department",
       "kind": "field",
       "name": "Employee.department",
@@ -322,8 +806,25 @@
       },
       "references": []
     },
+    "field.Employee.email": {
+      "file": "hr_payroll.apg",
+      "id": "field.Employee.email",
+      "kind": "field",
+      "name": "Employee.email",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
     "field.Employee.employee_number": {
-      "file": "hr_payroll_operations.apg",
+      "file": "hr_payroll.apg",
       "id": "field.Employee.employee_number",
       "kind": "field",
       "name": "Employee.employee_number",
@@ -339,11 +840,11 @@
       },
       "references": []
     },
-    "field.Employee.full_name": {
-      "file": "hr_payroll_operations.apg",
-      "id": "field.Employee.full_name",
+    "field.Employee.employment_type": {
+      "file": "hr_payroll.apg",
+      "id": "field.Employee.employment_type",
       "kind": "field",
-      "name": "Employee.full_name",
+      "name": "Employee.employment_type",
       "range": {
         "end": {
           "character": 1,
@@ -356,11 +857,11 @@
       },
       "references": []
     },
-    "field.PayRun.approved": {
-      "file": "hr_payroll_operations.apg",
-      "id": "field.PayRun.approved",
+    "field.Employee.first_name": {
+      "file": "hr_payroll.apg",
+      "id": "field.Employee.first_name",
       "kind": "field",
-      "name": "PayRun.approved",
+      "name": "Employee.first_name",
       "range": {
         "end": {
           "character": 1,
@@ -373,11 +874,11 @@
       },
       "references": []
     },
-    "field.PayRun.gross_amount": {
-      "file": "hr_payroll_operations.apg",
-      "id": "field.PayRun.gross_amount",
+    "field.Employee.hire_date": {
+      "file": "hr_payroll.apg",
+      "id": "field.Employee.hire_date",
       "kind": "field",
-      "name": "PayRun.gross_amount",
+      "name": "Employee.hire_date",
       "range": {
         "end": {
           "character": 1,
@@ -390,11 +891,198 @@
       },
       "references": []
     },
-    "field.PayRun.net_amount": {
-      "file": "hr_payroll_operations.apg",
-      "id": "field.PayRun.net_amount",
+    "field.Employee.is_active": {
+      "file": "hr_payroll.apg",
+      "id": "field.Employee.is_active",
       "kind": "field",
-      "name": "PayRun.net_amount",
+      "name": "Employee.is_active",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Employee.last_name": {
+      "file": "hr_payroll.apg",
+      "id": "field.Employee.last_name",
+      "kind": "field",
+      "name": "Employee.last_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Employee.nhif_number": {
+      "file": "hr_payroll.apg",
+      "id": "field.Employee.nhif_number",
+      "kind": "field",
+      "name": "Employee.nhif_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Employee.nssf_number": {
+      "file": "hr_payroll.apg",
+      "id": "field.Employee.nssf_number",
+      "kind": "field",
+      "name": "Employee.nssf_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Employee.position": {
+      "file": "hr_payroll.apg",
+      "id": "field.Employee.position",
+      "kind": "field",
+      "name": "Employee.position",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Employee.salary": {
+      "file": "hr_payroll.apg",
+      "id": "field.Employee.salary",
+      "kind": "field",
+      "name": "Employee.salary",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Employee.tax_pin": {
+      "file": "hr_payroll.apg",
+      "id": "field.Employee.tax_pin",
+      "kind": "field",
+      "name": "Employee.tax_pin",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Employee.termination_date": {
+      "file": "hr_payroll.apg",
+      "id": "field.Employee.termination_date",
+      "kind": "field",
+      "name": "Employee.termination_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PayRun.approved_at": {
+      "file": "hr_payroll.apg",
+      "id": "field.PayRun.approved_at",
+      "kind": "field",
+      "name": "PayRun.approved_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PayRun.approved_by": {
+      "file": "hr_payroll.apg",
+      "id": "field.PayRun.approved_by",
+      "kind": "field",
+      "name": "PayRun.approved_by",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PayRun.pay_date": {
+      "file": "hr_payroll.apg",
+      "id": "field.PayRun.pay_date",
+      "kind": "field",
+      "name": "PayRun.pay_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PayRun.pay_run_id": {
+      "file": "hr_payroll.apg",
+      "id": "field.PayRun.pay_run_id",
+      "kind": "field",
+      "name": "PayRun.pay_run_id",
       "range": {
         "end": {
           "character": 1,
@@ -408,7 +1096,7 @@
       "references": []
     },
     "field.PayRun.period": {
-      "file": "hr_payroll_operations.apg",
+      "file": "hr_payroll.apg",
       "id": "field.PayRun.period",
       "kind": "field",
       "name": "PayRun.period",
@@ -424,11 +1112,266 @@
       },
       "references": []
     },
-    "module.hr_payroll_operations": {
-      "file": "hr_payroll_operations.apg",
-      "id": "module.hr_payroll_operations",
+    "field.PayRun.status": {
+      "file": "hr_payroll.apg",
+      "id": "field.PayRun.status",
+      "kind": "field",
+      "name": "PayRun.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PayRun.total_deductions": {
+      "file": "hr_payroll.apg",
+      "id": "field.PayRun.total_deductions",
+      "kind": "field",
+      "name": "PayRun.total_deductions",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PayRun.total_gross": {
+      "file": "hr_payroll.apg",
+      "id": "field.PayRun.total_gross",
+      "kind": "field",
+      "name": "PayRun.total_gross",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PayRun.total_net": {
+      "file": "hr_payroll.apg",
+      "id": "field.PayRun.total_net",
+      "kind": "field",
+      "name": "PayRun.total_net",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Payslip.employee_id": {
+      "file": "hr_payroll.apg",
+      "id": "field.Payslip.employee_id",
+      "kind": "field",
+      "name": "Payslip.employee_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Payslip.gross_pay": {
+      "file": "hr_payroll.apg",
+      "id": "field.Payslip.gross_pay",
+      "kind": "field",
+      "name": "Payslip.gross_pay",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Payslip.net_pay": {
+      "file": "hr_payroll.apg",
+      "id": "field.Payslip.net_pay",
+      "kind": "field",
+      "name": "Payslip.net_pay",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Payslip.nhif_employee": {
+      "file": "hr_payroll.apg",
+      "id": "field.Payslip.nhif_employee",
+      "kind": "field",
+      "name": "Payslip.nhif_employee",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Payslip.nssf_employee": {
+      "file": "hr_payroll.apg",
+      "id": "field.Payslip.nssf_employee",
+      "kind": "field",
+      "name": "Payslip.nssf_employee",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Payslip.other_deductions": {
+      "file": "hr_payroll.apg",
+      "id": "field.Payslip.other_deductions",
+      "kind": "field",
+      "name": "Payslip.other_deductions",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Payslip.pay_run_id": {
+      "file": "hr_payroll.apg",
+      "id": "field.Payslip.pay_run_id",
+      "kind": "field",
+      "name": "Payslip.pay_run_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Payslip.paye_tax": {
+      "file": "hr_payroll.apg",
+      "id": "field.Payslip.paye_tax",
+      "kind": "field",
+      "name": "Payslip.paye_tax",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Payslip.payment_status": {
+      "file": "hr_payroll.apg",
+      "id": "field.Payslip.payment_status",
+      "kind": "field",
+      "name": "Payslip.payment_status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Payslip.payslip_id": {
+      "file": "hr_payroll.apg",
+      "id": "field.Payslip.payslip_id",
+      "kind": "field",
+      "name": "Payslip.payslip_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "llm.openai:gpt-4.1-mini": {
+      "file": "hr_payroll.apg",
+      "id": "llm.openai:gpt-4.1-mini",
+      "kind": "llm",
+      "name": "openai:gpt-4.1-mini",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.hr_payroll": {
+      "file": "hr_payroll.apg",
+      "id": "module.hr_payroll",
       "kind": "module",
-      "name": "hr_payroll_operations",
+      "name": "hr_payroll",
       "range": {
         "end": {
           "character": 1,
@@ -442,7 +1385,7 @@
       "references": []
     },
     "table.Employee": {
-      "file": "hr_payroll_operations.apg",
+      "file": "hr_payroll.apg",
       "id": "table.Employee",
       "kind": "table",
       "name": "Employee",
@@ -459,10 +1402,78 @@
       "references": []
     },
     "table.PayRun": {
-      "file": "hr_payroll_operations.apg",
+      "file": "hr_payroll.apg",
       "id": "table.PayRun",
       "kind": "table",
       "name": "PayRun",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Payslip": {
+      "file": "hr_payroll.apg",
+      "id": "table.Payslip",
+      "kind": "table",
+      "name": "Payslip",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.EmployeeOnboarding": {
+      "file": "hr_payroll.apg",
+      "id": "workflow.EmployeeOnboarding",
+      "kind": "workflow",
+      "name": "EmployeeOnboarding",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.LeaveRequest": {
+      "file": "hr_payroll.apg",
+      "id": "workflow.LeaveRequest",
+      "kind": "workflow",
+      "name": "LeaveRequest",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.PayRunProcess": {
+      "file": "hr_payroll.apg",
+      "id": "workflow.PayRunProcess",
+      "kind": "workflow",
+      "name": "PayRunProcess",
       "range": {
         "end": {
           "character": 1,
@@ -479,12 +1490,26 @@
   "tables": {
     "Employee": {
       "fields": {
-        "active": {
+        "bank_account": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "currency": {
           "relationship": null,
           "required": true,
-          "type": "bool"
+          "type": "str"
         },
         "department": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "email": {
           "relationship": null,
           "required": true,
           "type": "str"
@@ -494,40 +1519,266 @@
           "required": true,
           "type": "str"
         },
-        "full_name": {
+        "employment_type": {
           "relationship": null,
           "required": true,
           "type": "str"
-        }
-      },
-      "lookup_paths": {},
-      "name": "Employee"
-    },
-    "PayRun": {
-      "fields": {
-        "approved": {
+        },
+        "first_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "hire_date": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "is_active": {
           "relationship": null,
           "required": true,
           "type": "bool"
         },
-        "gross_amount": {
+        "last_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "nhif_number": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "nssf_number": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "position": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "salary": {
           "relationship": null,
           "required": true,
           "type": "float"
         },
-        "net_amount": {
+        "tax_pin": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "termination_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        }
+      },
+      "lookup_paths": {
+        "bank_account.id": {
+          "chain": [
+            "Employee.bank_account",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "nhif_number.id": {
+          "chain": [
+            "Employee.nhif_number",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "nssf_number.id": {
+          "chain": [
+            "Employee.nssf_number",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "tax_pin.id": {
+          "chain": [
+            "Employee.tax_pin",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "termination_date.id": {
+          "chain": [
+            "Employee.termination_date",
+            "str?.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Employee"
+    },
+    "PayRun": {
+      "fields": {
+        "approved_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "approved_by": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "pay_date": {
           "relationship": null,
           "required": true,
-          "type": "float"
+          "type": "str"
+        },
+        "pay_run_id": {
+          "relationship": {
+            "alias": "pay_run",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "PayRun"
+          },
+          "required": true,
+          "type": "str"
         },
         "period": {
           "relationship": null,
           "required": true,
           "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "total_deductions": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "total_gross": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "total_net": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        }
+      },
+      "lookup_paths": {
+        "approved_at.id": {
+          "chain": [
+            "PayRun.approved_at",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "approved_by.id": {
+          "chain": [
+            "PayRun.approved_by",
+            "str?.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "PayRun"
+    },
+    "Payslip": {
+      "fields": {
+        "employee_id": {
+          "relationship": {
+            "alias": "employee",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Employee"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "gross_pay": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "net_pay": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "nhif_employee": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "nssf_employee": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "other_deductions": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "pay_run_id": {
+          "relationship": {
+            "alias": "pay_run",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "PayRun"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "paye_tax": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "payment_status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "payslip_id": {
+          "relationship": {
+            "alias": "payslip",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Payslip"
+          },
+          "required": true,
+          "type": "str"
         }
       },
       "lookup_paths": {},
-      "name": "PayRun"
+      "name": "Payslip"
     }
   },
   "views": {}

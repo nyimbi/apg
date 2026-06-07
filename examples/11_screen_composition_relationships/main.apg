@@ -1,33 +1,122 @@
-// Example 11: screen composition.
-// Complexity focus: a capability screen that contains, composes, binds, and relates UI elements.
+// Example 11: comprehensive screen composition.
+// Features: all layouts, contains/composes/binds/actions/events/relationships,
+//           both relationship syntaxes (arrow and object form)
 
-module screen_composition version 1.0.0 {
-    description: "Capability screen with explicit element relationships";
+module operations_workbench version 1.0.0 {
+    description: "Operations workbench with full screen composition coverage";
 }
 
 capability OperationsWorkbench {
     contract: {
         id: operations_workbench,
-        provides: [operations_ui],
-        configuration: {tenant_scoped: true},
-        ui: {shell: python},
-        theme: {name: ops_theme, tokens: {accent: "#345995"}}
+        provides: [operations_ui, approval_queue, kpi_dashboard],
+        configuration: {tenant_id: "default"},
+        ui: {
+            shell: python,
+            routes: [
+                {name: "Dashboard",   path: "/ops",            component: "OpsDashboard",    permission: "ops:view"},
+                {name: "Approvals",   path: "/ops/approvals",  component: "ApprovalQueue",   permission: "ops:approve"},
+                {name: "Reports",     path: "/ops/reports",    component: "OpsReports",      permission: "ops:reports"}
+            ]
+        },
+        theme: {name: ops_theme, tokens: {accent: "#345995", "border.radius": "4px"}}
     };
 
     screens: {
-        Dashboard: {
+        // dashboard layout — all fields exercised
+        MainDashboard: {
             route: "/ops",
             title: "Operations Dashboard",
             layout: dashboard,
-            contains: [KpiStrip, ApprovalQueue],
-            composes: [LedgerTable],
-            binds: [ledger.entries],
-            actions: [approve, reject],
-            events: [{on: "select", do: "filter", target: LedgerTable}],
+            contains: [KpiStrip, AlertBanner, ActivityFeed],
+            composes: [LedgerSummary, ApprovalWidget],
+            binds: [ledger.entries, approvals.pending, alerts.active],
+            actions: [refresh, export, configure],
+            events: [
+                {on: "select",  do: "filter",    target: LedgerSummary},
+                {on: "click",   do: "navigate",  target: ApprovalWidget},
+                {on: "hover",   do: "tooltip",   target: KpiStrip}
+            ],
             relationships: [
-                {from: KpiStrip, to: LedgerTable, via: filters},
-                ApprovalQueue -> LedgerTable
+                // Arrow syntax (shorthand)
+                KpiStrip -> LedgerSummary,
+                AlertBanner -> ApprovalWidget,
+                // Object syntax with metadata
+                {from: KpiStrip,       to: ActivityFeed,    via: filters,   type: filter},
+                {from: ApprovalWidget, to: LedgerSummary,   via: selection, type: drill_down}
             ]
+        },
+
+        // split layout
+        ApprovalQueue: {
+            route: "/ops/approvals",
+            title: "Approval Queue",
+            layout: split,
+            contains: [RequestList, ApprovalDetail],
+            binds: [approvals.pending, approvals.history],
+            actions: [approve, reject, request_changes, escalate],
+            events: [
+                {on: "select", do: "load_detail", target: ApprovalDetail}
+            ],
+            relationships: [
+                RequestList -> ApprovalDetail
+            ]
+        },
+
+        // tabs layout
+        ReportingHub: {
+            route: "/ops/reports",
+            title: "Reporting Hub",
+            layout: tabs,
+            contains: [SummaryTab, DetailTab, TrendTab],
+            binds: [reports.summary, reports.detail, reports.trends],
+            actions: [download, schedule, share]
+        },
+
+        // grid layout
+        KpiGrid: {
+            route: "/ops/kpis",
+            title: "KPI Grid",
+            layout: grid,
+            contains: [RevenueKpi, CostKpi, MarginKpi, VolumeKpi],
+            binds: [kpis.daily],
+            actions: [drill_down, compare]
+        },
+
+        // wizard layout
+        OnboardingWizard: {
+            route: "/ops/onboard",
+            title: "Onboarding Wizard",
+            layout: wizard,
+            contains: [Step1, Step2, Step3, Step4],
+            binds: [onboarding.state],
+            actions: [next, back, save_progress, finish]
+        },
+
+        // stack layout
+        ActivityStack: {
+            route: "/ops/activity",
+            title: "Activity Feed",
+            layout: stack,
+            contains: [ActivityItem],
+            binds: [activity.events],
+            actions: [load_more, filter]
+        },
+
+        // form layout
+        ConfigForm: {
+            route: "/ops/config",
+            title: "Configuration",
+            layout: form,
+            contains: [ConfigFields],
+            binds: [config.current],
+            actions: [save, reset, preview]
         }
     };
+}
+
+app OperationsWorkbenchApp {
+    description: "Operations management workbench";
+    capabilities: [OperationsWorkbench];
+    routes: ["/ops"];
 }

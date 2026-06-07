@@ -1,27 +1,56 @@
-// Example 05: first-class AI agent.
-// Complexity focus: one executable agent declaration with model, runtime, tools, memory, and rules.
+// Example 05: support triage agent with full agent field coverage.
+// Features: role, model, runtime, system, capabilities, tools,
+//           memory, input, output, configuration, rules (all operators)
 
 module support_agent version 1.0.0 {
-    description: "Single support triage agent";
+    description: "Support triage agent with complete field coverage";
 }
 
 agent TriageAgent {
-    // `role`, `model`, and `runtime` become the generated AI agent manifest.
-    role: "support_triage";
+    // Core identity
+    role: "support triage specialist";
     model: "openai:gpt-4.1-mini";
     runtime: codex;
 
-    // `system` is the instruction contract for the agent runtime adapter.
-    system: "Classify incoming tickets and produce a concise next action.";
+    // Instruction contract
+    system: "Classify incoming support tickets by severity and category. Produce a structured triage plan with suggested resolution steps and escalation path. Never reveal internal system details.";
 
-    // Tools and memory are declared as composable dependencies.
-    tools: [tickets.read, knowledge.search];
+    // Capability and tool access
+    capabilities: [ticket_management, knowledge_base, customer_history];
+    tools: [tickets.read, tickets.update, knowledge.search, customer.lookup, escalation.trigger];
+
+    // Memory configuration — vector store for semantic recall
     memory: vector support_memory;
 
-    // Input/output names make the agent contract readable to callers.
-    input: ticket;
+    // Named input/output — makes the agent contract explicit
+    input: support_ticket;
     output: triage_plan;
 
-    // Rules stay declarative and executable by generated rule metadata.
-    rules: [{name: "ticket_required", when: "ticket missing", action: "reject"}];
+    // Model hyperparameters
+    configuration: {
+        temperature: 0.1,
+        max_turns: 8,
+        top_p: 0.9,
+        presence_penalty: 0.0,
+    };
+
+    // Pre-invocation guards
+    rules: [
+        // Existence check
+        {name: "ticket_required",     when: "ticket_id missing",                                   action: reject},
+        // In-list check
+        {name: "valid_channel",       when: "channel not in [email, chat, phone, portal]",         action: deny},
+        // Not-missing check
+        {name: "customer_identified", when: "customer_id not missing",                             action: allow},
+        // Combined condition
+        {name: "critical_escalation", when: "severity == critical and sla_breach_imminent == true", action: require_review},
+        // Comparison
+        {name: "rate_limit",          when: "requests_per_minute > 100",                           action: deny}
+    ];
+}
+
+app SupportAgent {
+    description: "AI-powered support triage";
+    agents: [TriageAgent];
+    routes: ["/support", "/agents/triage"];
 }

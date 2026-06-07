@@ -1,6 +1,6 @@
 """
-manufacturing_quality_control - APG Generated Package
-======================================================
+manufacturing_qc - APG Generated Package
+=========================================
 
 Version: 1.0.0
 

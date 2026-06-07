@@ -1,6 +1,6 @@
 """
-crm_sales_pipeline - APG Generated Package
-===========================================
+crm_sales - APG Generated Package
+==================================
 
 Version: 1.0.0
 

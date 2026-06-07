@@ -2,8 +2,8 @@
   "agents": {},
   "app": {
     "description": null,
-    "entity_count": 2,
-    "name": "procurement_approval_workbench",
+    "entity_count": 6,
+    "name": "procurement_workbench",
     "version": "1.0.0"
   },
   "capabilities": {
@@ -14,21 +14,21 @@
           "procurement_lead",
           "finance_controller"
         ],
-        "levels": 3
-      },
-      "business_rules": [],
-      "components": {
-        "requesting": {
-          "capability": "purchase_requests",
-          "permissions": [
-            "create",
-            "approve"
-          ]
+        "levels": 3,
+        "segregation_of_duties": true,
+        "thresholds": {
+          "level1": 50000,
+          "level2": 200000,
+          "level3": 1000000
         }
       },
+      "business_rules": [],
+      "components": {},
       "configuration": {
         "approval_threshold": 50000,
-        "currency": "KES"
+        "currency": "KES",
+        "tenant_id": "default",
+        "three_quote_minimum": 100000
       },
       "erp_modules": [
         "procurement",
@@ -40,7 +40,8 @@
         "entities": [
           "supplier",
           "item_catalog",
-          "cost_center"
+          "cost_center",
+          "budget_line"
         ]
       },
       "name": "ProcurementWorkbench",
@@ -51,13 +52,14 @@
       ],
       "requires": [
         "audit_events",
-        "supplier_master"
+        "supplier_master",
+        "budget_control"
       ],
       "rule_engine": {},
       "rules": [
         {
           "action": "deny",
-          "name": "budget_required",
+          "name": "budget_code_required",
           "when": "budget_code missing",
           "when_ast": {
             "field": "budget_code",
@@ -74,6 +76,40 @@
             "op": ">",
             "type": "compare",
             "value": "approval_threshold"
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "three_quote_required",
+          "when": "amount > three_quote_minimum and quote_count < 3",
+          "when_ast": {
+            "left": {
+              "field": "amount",
+              "op": ">",
+              "type": "compare",
+              "value": "three_quote_minimum"
+            },
+            "right": {
+              "field": "quote_count",
+              "op": "<",
+              "type": "compare",
+              "value": 3
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "approved_supplier",
+          "when": "supplier_status not in [approved, preferred]",
+          "when_ast": {
+            "field": "supplier_status",
+            "negated": true,
+            "type": "in",
+            "values": [
+              "approved",
+              "preferred"
+            ]
           }
         }
       ],
@@ -90,15 +126,18 @@
           ],
           "contains": [
             "RequestList",
-            "ApprovalPanel"
+            "ApprovalDetail"
           ],
           "layout": "split",
+          "relationships": [
+            "RequestList -> ApprovalDetail"
+          ],
           "route": "/procurement/approvals"
         }
       },
       "streaming": {},
       "theme": {
-        "name": "procurement_theme",
+        "name": "proc_theme",
         "tokens": {
           "accent": "#6C8EAD"
         }
@@ -106,9 +145,22 @@
       "ui": {
         "routes": [
           {
-            "component": "ProcurementScreen",
-            "name": "Procurement",
-            "path": "/procurement"
+            "component": "RequestList",
+            "name": "Requests",
+            "path": "/procurement",
+            "permission": "proc:view"
+          },
+          {
+            "component": "ApprovalQueue",
+            "name": "Approvals",
+            "path": "/procurement/approvals",
+            "permission": "proc:approve"
+          },
+          {
+            "component": "QuoteComparison",
+            "name": "Quotes",
+            "path": "/procurement/quotes",
+            "permission": "proc:quotes"
           }
         ],
         "shell": "python"
@@ -117,11 +169,34 @@
   },
   "composition": {
     "agent_teams": {},
-    "applications": {},
+    "applications": {
+      "ProcurementApp": {
+        "agent_teams": [],
+        "agents": [],
+        "capabilities": [
+          "ProcurementWorkbench"
+        ],
+        "components": {},
+        "configuration": {},
+        "deployments": {},
+        "description": "Procurement approval workbench",
+        "integrations": {},
+        "name": "ProcurementApp",
+        "policies": {},
+        "routes": [
+          "/procurement"
+        ],
+        "runtime": {},
+        "screens": {},
+        "theme": {},
+        "workflows": []
+      }
+    },
     "capability_dependencies": {
       "ProcurementWorkbench": [
         "audit_events",
-        "supplier_master"
+        "supplier_master",
+        "budget_control"
       ]
     }
   },
@@ -129,7 +204,9 @@
     "ProcurementWorkbench": {
       "configuration": {
         "approval_threshold": 50000,
-        "currency": "KES"
+        "currency": "KES",
+        "tenant_id": "default",
+        "three_quote_minimum": 100000
       },
       "id": "procurement_workbench",
       "provides": [
@@ -139,12 +216,13 @@
       ],
       "requires": [
         "audit_events",
-        "supplier_master"
+        "supplier_master",
+        "budget_control"
       ],
       "rules": [
         {
           "action": "deny",
-          "name": "budget_required",
+          "name": "budget_code_required",
           "when": "budget_code missing",
           "when_ast": {
             "field": "budget_code",
@@ -162,10 +240,44 @@
             "type": "compare",
             "value": "approval_threshold"
           }
+        },
+        {
+          "action": "require_review",
+          "name": "three_quote_required",
+          "when": "amount > three_quote_minimum and quote_count < 3",
+          "when_ast": {
+            "left": {
+              "field": "amount",
+              "op": ">",
+              "type": "compare",
+              "value": "three_quote_minimum"
+            },
+            "right": {
+              "field": "quote_count",
+              "op": "<",
+              "type": "compare",
+              "value": 3
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "approved_supplier",
+          "when": "supplier_status not in [approved, preferred]",
+          "when_ast": {
+            "field": "supplier_status",
+            "negated": true,
+            "type": "in",
+            "values": [
+              "approved",
+              "preferred"
+            ]
+          }
         }
       ],
       "theme": {
-        "name": "procurement_theme",
+        "name": "proc_theme",
         "tokens": {
           "accent": "#6C8EAD"
         }
@@ -173,9 +285,22 @@
       "ui": {
         "routes": [
           {
-            "component": "ProcurementScreen",
-            "name": "Procurement",
-            "path": "/procurement"
+            "component": "RequestList",
+            "name": "Requests",
+            "path": "/procurement",
+            "permission": "proc:view"
+          },
+          {
+            "component": "ApprovalQueue",
+            "name": "Approvals",
+            "path": "/procurement/approvals",
+            "permission": "proc:approve"
+          },
+          {
+            "component": "QuoteComparison",
+            "name": "Quotes",
+            "path": "/procurement/quotes",
+            "permission": "proc:quotes"
           }
         ],
         "shell": "python"
@@ -183,14 +308,34 @@
     }
   },
   "deployment": {
-    "source": "procurement_approval_workbench.apg",
+    "source": "procurement_workbench.apg",
     "target": "python"
   },
   "diagnostics": [
     {
       "code": "APG0100",
       "docs_url": "docs/tooling.md#semantic-model-contract",
-      "file": "procurement_approval_workbench.apg",
+      "file": "procurement_workbench.apg",
+      "fixes": [],
+      "message": "Database 'ProcurementDB' should have connection configuration",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "procurement_workbench.apg",
       "fixes": [],
       "message": "Capability 'ProcurementWorkbench' requires 'audit_events' which is not declared in this module",
       "range": {
@@ -210,9 +355,29 @@
     {
       "code": "APG0100",
       "docs_url": "docs/tooling.md#semantic-model-contract",
-      "file": "procurement_approval_workbench.apg",
+      "file": "procurement_workbench.apg",
       "fixes": [],
       "message": "Capability 'ProcurementWorkbench' requires 'supplier_master' which is not declared in this module",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "procurement_workbench.apg",
+      "fixes": [],
+      "message": "Capability 'ProcurementWorkbench' requires 'budget_control' which is not declared in this module",
       "range": {
         "end": {
           "character": 1,
@@ -230,43 +395,77 @@
   ],
   "flows": {
     "ProcurementApproval": {
-      "assignments": {},
-      "compensation": {},
-      "guards": {},
-      "human_tasks": [],
+      "assignments": {
+        "budget_review": "budget_owner",
+        "finance_approval": "finance_controller",
+        "procurement_review": "procurement_lead"
+      },
+      "compensation": {
+        "budget_review": "release_budget_reservation",
+        "ordered": "cancel_purchase_order"
+      },
+      "guards": {
+        "budget_review": "amount <= budget_limit and budget_code not missing",
+        "finance_approval": "amount > finance_threshold or is_strategic == true",
+        "ordered": "all_approvals_complete and preferred_supplier_selected",
+        "procurement_review": "budget_review_complete == true"
+      },
+      "human_tasks": [
+        "budget_review",
+        "procurement_review",
+        "finance_approval"
+      ],
       "methods": [],
       "name": "ProcurementApproval",
       "properties": {},
-      "retry_policy": {},
+      "retry_policy": {
+        "budget_review": "3",
+        "finance_approval": "2",
+        "procurement_review": "2"
+      },
       "states": [
         "draft",
+        "submitted",
         "budget_review",
         "procurement_review",
         "finance_approval",
-        "approved"
+        "approved",
+        "ordered"
       ],
       "steps": [
         "draft",
+        "submitted",
         "budget_review",
         "procurement_review",
         "finance_approval",
-        "approved"
+        "approved",
+        "ordered"
       ],
-      "steps_raw": "draft -> budget_review -> procurement_review -> finance_approval -> approved",
-      "timers": {},
+      "steps_raw": "draft -> submitted -> budget_review -> procurement_review -> finance_approval -> approved -> ordered",
+      "timers": {
+        "budget_review": "PT24H",
+        "finance_approval": "PT24H",
+        "ordered": "PT72H",
+        "procurement_review": "PT48H"
+      },
       "transitions": [
         {
           "guard": null,
           "source": "draft",
+          "target": "submitted"
+        },
+        {
+          "guard": "amount <= budget_limit and budget_code not missing",
+          "source": "submitted",
           "target": "budget_review"
         },
         {
-          "guard": null,
+          "guard": "budget_review_complete == true",
           "source": "budget_review",
           "target": "procurement_review"
         },
         {
-          "guard": null,
+          "guard": "amount > finance_threshold or is_strategic == true",
           "source": "procurement_review",
           "target": "finance_approval"
         },
@@ -274,10 +473,17 @@
           "guard": null,
           "source": "finance_approval",
           "target": "approved"
+        },
+        {
+          "guard": "all_approvals_complete and preferred_supplier_selected",
+          "source": "approved",
+          "target": "ordered"
         }
       ],
       "type": "workflow",
-      "waits": {}
+      "waits": {
+        "ordered": "purchase_order_issued"
+      }
     }
   },
   "format": "apg.semantic-model.v1",
@@ -288,44 +494,44 @@
       "nodes": 0
     },
     "capability": {
-      "edges": 2,
+      "edges": 4,
       "kind": "capability",
-      "nodes": 3
+      "nodes": 5
     },
     "deployment": {
-      "edges": 2,
+      "edges": 6,
       "kind": "deployment",
-      "nodes": 3
+      "nodes": 7
     },
     "er": {
-      "edges": 0,
+      "edges": 21,
       "kind": "er",
-      "nodes": 0
+      "nodes": 24
     },
     "handler": {
-      "edges": 2,
+      "edges": 6,
       "kind": "handler",
-      "nodes": 3
+      "nodes": 7
     },
     "lookup": {
-      "edges": 2,
+      "edges": 6,
       "kind": "lookup",
-      "nodes": 3
+      "nodes": 7
     },
     "package": {
-      "edges": 2,
+      "edges": 6,
       "kind": "package",
-      "nodes": 3
+      "nodes": 7
     },
     "security": {
-      "edges": 2,
+      "edges": 6,
       "kind": "security",
-      "nodes": 3
+      "nodes": 7
     },
     "workflow": {
-      "edges": 2,
+      "edges": 6,
       "kind": "workflow",
-      "nodes": 3
+      "nodes": 7
     }
   },
   "llms": {},
@@ -334,9 +540,23 @@
   "packages": {},
   "roles": {},
   "rules": {
-    "ProcurementWorkbench.budget_required": {
+    "ProcurementWorkbench.approved_supplier": {
       "action": "deny",
-      "name": "budget_required",
+      "name": "approved_supplier",
+      "when": "supplier_status not in [approved, preferred]",
+      "when_ast": {
+        "field": "supplier_status",
+        "negated": true,
+        "type": "in",
+        "values": [
+          "approved",
+          "preferred"
+        ]
+      }
+    },
+    "ProcurementWorkbench.budget_code_required": {
+      "action": "deny",
+      "name": "budget_code_required",
       "when": "budget_code missing",
       "when_ast": {
         "field": "budget_code",
@@ -354,15 +574,52 @@
         "type": "compare",
         "value": "approval_threshold"
       }
+    },
+    "ProcurementWorkbench.three_quote_required": {
+      "action": "require_review",
+      "name": "three_quote_required",
+      "when": "amount > three_quote_minimum and quote_count < 3",
+      "when_ast": {
+        "left": {
+          "field": "amount",
+          "op": ">",
+          "type": "compare",
+          "value": "three_quote_minimum"
+        },
+        "right": {
+          "field": "quote_count",
+          "op": "<",
+          "type": "compare",
+          "value": 3
+        },
+        "type": "and"
+      }
     }
   },
   "security": {},
   "source_files": [
-    "procurement_approval_workbench.apg"
+    "procurement_workbench.apg"
   ],
   "symbols": {
+    "app.ProcurementApp": {
+      "file": "procurement_workbench.apg",
+      "id": "app.ProcurementApp",
+      "kind": "app",
+      "name": "ProcurementApp",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
     "capability.ProcurementWorkbench": {
-      "file": "procurement_approval_workbench.apg",
+      "file": "procurement_workbench.apg",
       "id": "capability.ProcurementWorkbench",
       "kind": "capability",
       "name": "ProcurementWorkbench",
@@ -378,11 +635,368 @@
       },
       "references": []
     },
-    "module.procurement_approval_workbench": {
-      "file": "procurement_approval_workbench.apg",
-      "id": "module.procurement_approval_workbench",
+    "database.ProcurementDB": {
+      "file": "procurement_workbench.apg",
+      "id": "database.ProcurementDB",
+      "kind": "database",
+      "name": "ProcurementDB",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PurchaseRequest.amount": {
+      "file": "procurement_workbench.apg",
+      "id": "field.PurchaseRequest.amount",
+      "kind": "field",
+      "name": "PurchaseRequest.amount",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PurchaseRequest.budget_code": {
+      "file": "procurement_workbench.apg",
+      "id": "field.PurchaseRequest.budget_code",
+      "kind": "field",
+      "name": "PurchaseRequest.budget_code",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PurchaseRequest.created_at": {
+      "file": "procurement_workbench.apg",
+      "id": "field.PurchaseRequest.created_at",
+      "kind": "field",
+      "name": "PurchaseRequest.created_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PurchaseRequest.currency": {
+      "file": "procurement_workbench.apg",
+      "id": "field.PurchaseRequest.currency",
+      "kind": "field",
+      "name": "PurchaseRequest.currency",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PurchaseRequest.department": {
+      "file": "procurement_workbench.apg",
+      "id": "field.PurchaseRequest.department",
+      "kind": "field",
+      "name": "PurchaseRequest.department",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PurchaseRequest.description": {
+      "file": "procurement_workbench.apg",
+      "id": "field.PurchaseRequest.description",
+      "kind": "field",
+      "name": "PurchaseRequest.description",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PurchaseRequest.justification": {
+      "file": "procurement_workbench.apg",
+      "id": "field.PurchaseRequest.justification",
+      "kind": "field",
+      "name": "PurchaseRequest.justification",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PurchaseRequest.priority": {
+      "file": "procurement_workbench.apg",
+      "id": "field.PurchaseRequest.priority",
+      "kind": "field",
+      "name": "PurchaseRequest.priority",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PurchaseRequest.request_id": {
+      "file": "procurement_workbench.apg",
+      "id": "field.PurchaseRequest.request_id",
+      "kind": "field",
+      "name": "PurchaseRequest.request_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PurchaseRequest.requestor_id": {
+      "file": "procurement_workbench.apg",
+      "id": "field.PurchaseRequest.requestor_id",
+      "kind": "field",
+      "name": "PurchaseRequest.requestor_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PurchaseRequest.status": {
+      "file": "procurement_workbench.apg",
+      "id": "field.PurchaseRequest.status",
+      "kind": "field",
+      "name": "PurchaseRequest.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SupplierQuote.amount": {
+      "file": "procurement_workbench.apg",
+      "id": "field.SupplierQuote.amount",
+      "kind": "field",
+      "name": "SupplierQuote.amount",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SupplierQuote.quote_id": {
+      "file": "procurement_workbench.apg",
+      "id": "field.SupplierQuote.quote_id",
+      "kind": "field",
+      "name": "SupplierQuote.quote_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SupplierQuote.request_id": {
+      "file": "procurement_workbench.apg",
+      "id": "field.SupplierQuote.request_id",
+      "kind": "field",
+      "name": "SupplierQuote.request_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SupplierQuote.status": {
+      "file": "procurement_workbench.apg",
+      "id": "field.SupplierQuote.status",
+      "kind": "field",
+      "name": "SupplierQuote.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SupplierQuote.submitted_at": {
+      "file": "procurement_workbench.apg",
+      "id": "field.SupplierQuote.submitted_at",
+      "kind": "field",
+      "name": "SupplierQuote.submitted_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SupplierQuote.supplier_id": {
+      "file": "procurement_workbench.apg",
+      "id": "field.SupplierQuote.supplier_id",
+      "kind": "field",
+      "name": "SupplierQuote.supplier_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SupplierQuote.validity_days": {
+      "file": "procurement_workbench.apg",
+      "id": "field.SupplierQuote.validity_days",
+      "kind": "field",
+      "name": "SupplierQuote.validity_days",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.procurement_workbench": {
+      "file": "procurement_workbench.apg",
+      "id": "module.procurement_workbench",
       "kind": "module",
-      "name": "procurement_approval_workbench",
+      "name": "procurement_workbench",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.PurchaseRequest": {
+      "file": "procurement_workbench.apg",
+      "id": "table.PurchaseRequest",
+      "kind": "table",
+      "name": "PurchaseRequest",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.SupplierQuote": {
+      "file": "procurement_workbench.apg",
+      "id": "table.SupplierQuote",
+      "kind": "table",
+      "name": "SupplierQuote",
       "range": {
         "end": {
           "character": 1,
@@ -396,7 +1010,7 @@
       "references": []
     },
     "workflow.ProcurementApproval": {
-      "file": "procurement_approval_workbench.apg",
+      "file": "procurement_workbench.apg",
       "id": "workflow.ProcurementApproval",
       "kind": "workflow",
       "name": "ProcurementApproval",
@@ -413,6 +1027,202 @@
       "references": []
     }
   },
-  "tables": {},
+  "tables": {
+    "PurchaseRequest": {
+      "fields": {
+        "amount": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "budget_code": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "created_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "currency": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "department": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "description": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "justification": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "priority": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "request_id": {
+          "relationship": {
+            "alias": "request",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Request"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "requestor_id": {
+          "relationship": {
+            "alias": "requestor",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Requestor"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "amount.id": {
+          "chain": [
+            "PurchaseRequest.amount",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "budget_code.id": {
+          "chain": [
+            "PurchaseRequest.budget_code",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "created_at.id": {
+          "chain": [
+            "PurchaseRequest.created_at",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "justification.id": {
+          "chain": [
+            "PurchaseRequest.justification",
+            "str?.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "PurchaseRequest"
+    },
+    "SupplierQuote": {
+      "fields": {
+        "amount": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "quote_id": {
+          "relationship": {
+            "alias": "quote",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Quote"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "request_id": {
+          "relationship": {
+            "alias": "request",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Request"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "submitted_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "supplier_id": {
+          "relationship": {
+            "alias": "supplier",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Supplier"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "validity_days": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        }
+      },
+      "lookup_paths": {
+        "amount.id": {
+          "chain": [
+            "SupplierQuote.amount",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "submitted_at.id": {
+          "chain": [
+            "SupplierQuote.submitted_at",
+            "datetime.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "SupplierQuote"
+    }
+  },
   "views": {}
 }

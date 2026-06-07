@@ -1,39 +1,158 @@
-// Example 16: HR and payroll operations.
-// Complexity focus: employee/payroll records, approvals, policy rules, and localized UI.
+// Example 16: HR and payroll with multiple workflows and agent team in app.
+// Features: multiple workflows, agent_team in app declaration
 
-module hr_payroll_operations version 1.0.0 {
-    description: "HR and payroll capability for employee records and pay-run approval";
+module hr_payroll version 1.0.0 {
+    description: "HR and payroll with multiple workflows and agent team";
 }
 
 table Employee {
     employee_number: str;
-    full_name: str;
+    first_name: str;
+    last_name: str;
+    email: str;
     department: str;
-    active: bool;
+    position: str;
+    employment_type: str = "permanent";
+    hire_date: str;
+    termination_date: str?;
+    salary: float;
+    currency: str = "KES";
+    bank_account: str?;
+    tax_pin: str?;
+    nssf_number: str?;
+    nhif_number: str?;
+    is_active: bool = true;
 }
 
 table PayRun {
+    pay_run_id: str;
     period: str;
-    gross_amount: float;
-    net_amount: float;
-    approved: bool;
+    pay_date: str;
+    status: str = "draft";
+    total_gross: float = 0.0;
+    total_deductions: float = 0.0;
+    total_net: float = 0.0;
+    approved_by: str?;
+    approved_at: str?;
 }
 
-capability PayrollOperations {
+table Payslip {
+    payslip_id: str;
+    pay_run_id: str;
+    employee_id: str;
+    gross_pay: float;
+    paye_tax: float;
+    nssf_employee: float;
+    nhif_employee: float;
+    other_deductions: float = 0.0;
+    net_pay: float;
+    payment_status: str = "pending";
+}
+
+agent HRAdvisor {
+    role: "HR policy advisor";
+    model: "openai:gpt-4.1-mini";
+    runtime: codex;
+    system: "Advise on HR policies, leave entitlements, and employment law compliance. Cite relevant sections.";
+    capabilities: [employee_records, hr_policies];
+    tools: [policy.lookup, employment_law.search, leave_balance.check];
+    memory: vector hr_memory;
+    configuration: {temperature: 0.1, max_turns: 6};
+}
+
+agent PayrollAssistant {
+    role: "payroll calculation assistant";
+    model: "openai:gpt-4.1-mini";
+    runtime: codex;
+    system: "Assist with payroll calculations, statutory deductions, and compliance. Always verify statutory rates.";
+    capabilities: [payroll_runs, statutory_deductions];
+    tools: [tax_table.lookup, statutory_rates.fetch, payslip.calculate];
+    configuration: {temperature: 0.0, max_turns: 4};
+}
+
+agent_team HRPayrollTeam {
+    agents: [HRAdvisor, PayrollAssistant];
+    flow: HRAdvisor -> PayrollAssistant [condition: payroll_query];
+    capabilities: [employee_records, payroll_runs];
+    configuration: {handoff_mode: conditional};
+}
+
+capability HRPayroll {
     contract: {
-        id: payroll_operations,
-        provides: [employee_master, payroll_runs, payslip_generation],
-        requires: [audit_events, general_ledger],
-        configuration: {currency: "KES", pay_frequency: "monthly"},
+        id: hr_payroll,
+        provides: [employee_records, payroll_runs, payslips, statutory_deductions, leave_management, hr_policies],
+        configuration: {tenant_id: "default", country: "KE", currency: "KES"},
         rules: [
-            {name: "payrun_requires_approval", when: "approved == false", action: "require_review"},
-            {name: "positive_net_pay", when: "net_amount < 0", action: "deny"}
+            {name: "bank_account_required",   when: "bank_account missing",               action: deny},
+            {name: "tax_pin_required",         when: "tax_pin missing",                    action: require_review},
+            {name: "nssf_required",            when: "nssf_number missing",                action: require_review},
+            {name: "payslip_authorised",       when: "pay_run_status != approved",         action: deny},
+            {name: "back_date_limit",          when: "pay_date_months_ago > 3",            action: require_review}
         ],
-        ui: {shell: python, routes: [{name: "Payroll", path: "/hr/payroll", component: "PayrollScreen"}]},
-        theme: {name: people_ops_theme, tokens: {accent: "#805AD5"}}
+        ui: {
+            shell: python,
+            routes: [
+                {name: "Employees",   path: "/hr/employees",  component: "EmployeeList",  permission: "hr:view"},
+                {name: "Pay Runs",    path: "/hr/payroll",    component: "PayRunList",    permission: "hr:payroll"},
+                {name: "Payslips",    path: "/hr/payslips",   component: "PayslipView",   permission: "hr:payslips"}
+            ]
+        },
+        theme: {name: hr_theme, tokens: {accent: "#6A1B9A"}}
     };
 
-    erp_modules: [hr, payroll, finance];
-    approvals: {levels: 2, approvers: [hr_manager, payroll_controller]};
-    i18n: {supported_languages: [en, sw, am, rw, zu], default_language: en, fallback_language: en};
+    erp_modules: [hr, payroll, time_attendance];
+    approvals: {levels: 2, approvers: [hr_manager, finance_controller]};
+    master_data: {entities: [employee, department, position, pay_grade, statutory_rate]};
+}
+
+workflow PayRunProcess {
+    steps: str = "draft -> calculated -> reviewed -> approved -> disbursed -> closed";
+    human_tasks: [reviewed, approved];
+    assignments: {reviewed: hr_manager, approved: finance_controller};
+    guards: {
+        reviewed:   "all_payslips_generated == true";
+        approved:   "review_complete == true";
+        disbursed:  "bank_file_generated == true";
+    };
+    timers: {reviewed: "PT24H", approved: "PT48H"};
+    compensation: {approved: void_bank_transfers, disbursed: initiate_recalls};
+}
+
+workflow EmployeeOnboarding {
+    steps: str = "offer_accepted -> documents_submitted -> system_access -> orientation -> probation -> confirmed";
+    human_tasks: [documents_submitted, system_access, orientation, confirmed];
+    assignments: {
+        documents_submitted: hr_officer,
+        system_access:       it_administrator,
+        orientation:         hr_manager,
+        confirmed:           department_manager
+    };
+    guards: {
+        system_access:  "all_documents_received == true";
+        orientation:    "system_access_granted == true";
+        confirmed:      "probation_assessment_complete == true";
+    };
+    timers: {
+        documents_submitted: "P3D",
+        system_access:       "PT8H",
+        orientation:         "P1D"
+    };
+}
+
+workflow LeaveRequest {
+    steps: str = "submitted -> manager_approval -> hr_approval -> approved -> active -> closed";
+    human_tasks: [manager_approval, hr_approval];
+    assignments: {manager_approval: line_manager, hr_approval: hr_officer};
+    guards: {
+        manager_approval: "leave_balance >= requested_days";
+        hr_approval:      "manager_approved == true";
+    };
+}
+
+app HRPayrollApp {
+    description: "Human resources and payroll management";
+    capabilities: [HRPayroll];
+    agent_teams: [HRPayrollTeam];
+    routes: ["/hr", "/hr/employees", "/hr/payroll"];
+    theme: {name: hr_app_theme, tokens: {accent: "#6A1B9A"}};
 }

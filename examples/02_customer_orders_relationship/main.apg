@@ -1,20 +1,51 @@
-// Example 02: two related tables.
-// Complexity focus: composing records with a conventional foreign-key field.
+// Example 02: customer and order entities with relationship convention.
+// Features: multiple tables, List[str], Dict[str,str], Dict[str,Any],
+//           explicit str | None, default values, decimal
 
 module customer_orders version 1.0.0 {
-    description: "Customer and order records with a simple relationship";
+    description: "Customer and order data model with relationships";
 }
 
 table Customer {
-    // This entity is the parent side of the relationship.
-    name: str;
+    customer_number: str;
+    legal_name: str;
     email: str;
+    phone: str?;
+    segment: str = "standard";
+    credit_limit: decimal = 10000.0;
+    is_active: bool = true;
+    tags: List[str];
+    attributes: Dict[str, str];
 }
 
-table SalesOrder {
-    // The generated relationship graph recognizes *_id naming conventions.
-    customer_id: int;
+table Order {
     order_number: str;
-    total: float;
-    status: str;
+    customer_id: str;          // foreign-key to Customer by convention
+    order_date: date;
+    delivery_date: date?;
+    status: str = "draft";
+    currency: str = "KES";
+    subtotal: decimal = 0.0;
+    tax: decimal = 0.0;
+    total: decimal = 0.0;
+    notes: str | None;
+    line_items: List[str];     // list of line item IDs
+    metadata: Dict[str, Any];
+}
+
+table OrderLine {
+    line_id: str;
+    order_id: str;             // foreign-key to Order
+    product_code: str;
+    description: str;
+    quantity: int = 1;
+    unit_price: decimal;
+    discount_pct: float = 0.0;
+    line_total: decimal = 0.0;
+    is_taxable: bool = true;
+}
+
+app CustomerOrders {
+    description: "Customer and order management";
+    routes: ["/customers", "/orders"];
 }

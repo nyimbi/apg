@@ -1,4 +1,4 @@
-# inventory_warehouse_operations
+# inventory_warehouse
 
 Dependency-free APG generated Python application.
 
@@ -68,12 +68,17 @@ Generated deployment artifacts:
 
 ## Entities
 
-- `StockItem`
+- `InventoryItem`
+- `BinLocation`
 - `StockMovement`
+- `StockReceiptForm`
+- `WarehouseMap`
+- `StockReceipt`
+- `WarehouseOpsApp`
 
 ## Capabilities
 
-- `WarehouseInventory` - provides stock_balances, stock_movements, reorder_alerts
+- `WarehouseOps` - provides stock_movements, bin_management, cycle_counting
 
 Capability operations:
 
@@ -87,4 +92,6 @@ Capability operations:
 
 Capability screens:
 
-- `GET /warehouse/inventory`
+- `GET /warehouse/bins`
+- `GET /warehouse/map`
+- `GET /warehouse/movements`

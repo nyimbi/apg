@@ -58,39 +58,50 @@ class AgentBase:
             return out
 
 
-class Researcher(AgentBase):
-    name = 'Researcher'
-    role = 'researcher'
+class CloudAnalyst(AgentBase):
+    name = 'CloudAnalyst'
+    role = 'cloud analyst'
+    model = 'openai:gpt-4.1'
+    runtime = 'codex'
+    system = 'Perform deep technical analysis. Use the highest-capability model available.'
+    capabilities = ()
+    tools = ('data.query', 'reports.generate')
+
+
+class LocalPrivacyAgent(AgentBase):
+    name = 'LocalPrivacyAgent'
+    role = 'privacy-safe local analyst'
+    model = 'ollama:llama3.3'
+    runtime = 'codex'
+    system = 'Analyse data locally. No data leaves this environment. Use Llama for privacy-sensitive workloads.'
+    capabilities = ()
+    tools = ('local_data.query', 'local_reports.generate')
+
+
+class ConversationalAgent(AgentBase):
+    name = 'ConversationalAgent'
+    role = 'customer conversation handler'
     model = 'openai:gpt-4.1-mini'
     runtime = 'codex'
-    system = 'Gather structured evidence and cite source IDs.'
+    system = 'Handle warm, empathetic customer conversations. Keep responses concise and human.'
     capabilities = ()
-    tools = ('web.search', 'docs.read')
+    tools = ('customer.profile', 'conversation.history')
 
 
-class Coder(AgentBase):
-    name = 'Coder'
-    role = 'implementation_engineer'
-    model = 'claude:sonnet'
-    runtime = 'claude_code'
-    system = 'Implement focused code changes from accepted plans.'
+class OpenSourceCoder(AgentBase):
+    name = 'OpenSourceCoder'
+    role = 'open source code generator'
+    model = 'ollama:mistral'
+    runtime = 'codex'
+    system = 'Generate code using open-weight models. Prefer Apache/MIT licensed outputs.'
     capabilities = ()
-    tools = ('repo.edit', 'tests.run')
-
-
-class LocalReviewer(AgentBase):
-    name = 'LocalReviewer'
-    role = 'local_review'
-    model = 'ollama:llama3.1'
-    runtime = 'ollama'
-    system = 'Review diffs locally without sending code to external services.'
-    capabilities = ()
-    tools = ()
+    tools = ('code.search', 'docs.lookup')
 
 
 # Registry of all declared agents
 AGENTS = {
-    'Researcher': Researcher,
-    'Coder': Coder,
-    'LocalReviewer': LocalReviewer,
+    'CloudAnalyst': CloudAnalyst,
+    'LocalPrivacyAgent': LocalPrivacyAgent,
+    'ConversationalAgent': ConversationalAgent,
+    'OpenSourceCoder': OpenSourceCoder,
 }

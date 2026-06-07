@@ -66,9 +66,13 @@ Generated deployment artifacts:
 - `semantic_model.json` - normalized APG semantic model for IDEs, agents, and release checks
 - `smoke_test.py` - standalone generated app smoke test
 
+## Entities
+
+- `CreditControlApp`
+
 ## Capabilities
 
-- `CreditControl` - provides credit_limit_checks, hold_release
+- `CreditControl` - provides credit_limit_checks, hold_release, credit_scoring
 
 Capability operations:
 

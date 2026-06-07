@@ -1,8 +1,9 @@
-// Example 09: capability rules and configuration.
-// Complexity focus: executable rule metadata plus tenant-ready configuration.
+// Example 09: comprehensive rule condition coverage.
+// Features: ==, !=, >, >=, <, <=, missing, not missing,
+//           in [...], not in [...], and, or, parenthesised combinations
 
 module credit_control version 1.0.0 {
-    description: "Credit-control capability with rules and approvals";
+    description: "Credit control with comprehensive rule condition coverage";
 }
 
 capability CreditControl {
@@ -10,15 +11,61 @@ capability CreditControl {
         id: credit_control,
         name: "Credit Control",
         version: "1.0.0",
-        provides: [credit_limit_checks, hold_release],
-        requires: [audit_events],
-        configuration: {default_limit: 10000, currency: "KES"},
+        provides: [credit_limit_checks, hold_release, credit_scoring],
+        requires: [audit_events, customer_master],
+        configuration: {
+            default_limit: 50000,
+            currency: "KES",
+            high_risk_threshold: 0.7,
+            review_threshold: 0.5,
+            max_days_overdue: 30
+        },
+        configuration_schema: {
+            required: ["default_limit", "currency"]
+        },
         rules: [
-            {name: "over_limit", when: "order_total > credit_limit", action: "deny"},
-            {name: "manual_review", when: "risk_score > 0.75", action: "require_review"}
-        ]
+            // Existence checks
+            {name: "tenant_required",         when: "tenant_id missing",                                                   action: deny,           priority: 100},
+            {name: "customer_present",        when: "customer_id not missing",                                             action: allow,          priority: 99},
+
+            // Comparison operators: >, <, >=, <=, ==, !=
+            {name: "over_limit",              when: "order_total > credit_limit",                                          action: deny,           priority: 90},
+            {name: "under_minimum",           when: "order_total < 100",                                                   action: deny,           priority: 89},
+            {name: "at_limit",                when: "order_total >= credit_limit",                                         action: require_review, priority: 88},
+            {name: "safe_order",              when: "order_total <= 1000",                                                 action: allow,          priority: 87},
+            {name: "premium_customer",        when: "customer_tier == premium",                                            action: allow,          priority: 86},
+            {name: "non_standard_currency",   when: "currency != KES",                                                    action: require_review, priority: 85},
+
+            // Set membership: in, not in
+            {name: "high_risk_region",        when: "country in [NG, SD, LY]",                                            action: require_review, priority: 80},
+            {name: "approved_currency",       when: "currency in [KES, UGX, TZS, USD, EUR]",                             action: allow,          priority: 79},
+            {name: "blocked_category",        when: "product_category not in [food, medicine, education]",                action: require_review, priority: 78},
+
+            // AND combinations
+            {name: "high_value_new_customer", when: "order_total > 100000 and customer_age_days < 90",                    action: require_review, priority: 70},
+            {name: "risk_and_overdue",        when: "risk_score > high_risk_threshold and days_overdue > max_days_overdue", action: deny,          priority: 69},
+            {name: "fraud_pattern",           when: "velocity_score > 0.8 and geo_anomaly == true",                       action: deny,           priority: 68},
+
+            // OR combinations
+            {name: "urgent_review",           when: "amount > 500000 or customer_tier == vip",                            action: require_review, priority: 60},
+            {name: "any_block_reason",        when: "is_blacklisted == true or is_frozen == true",                        action: deny,           priority: 59},
+
+            // Parenthesised combinations
+            {name: "complex_approval",        when: "(amount > 50000 or is_international == true) and risk_score < review_threshold",            action: require_review, priority: 50},
+            {name: "multi_factor_deny",       when: "(fraud_score > 0.9 or velocity_flag == true) and customer_age_days < 30",                   action: deny,           priority: 49},
+
+            // High-risk shortcut
+            {name: "high_risk_score",         when: "risk_score >= high_risk_threshold",                                  action: require_review, priority: 40}
+        ],
+        rule_engine: {type: deterministic, default_decision: allow}
     };
 
     approvals: {levels: 2, approvers: [credit_manager, finance_controller]};
-    master_data: {entities: [customer_credit_profile]};
+    master_data: {entities: [customer_credit_profile, credit_limit, payment_history]};
+}
+
+app CreditControlApp {
+    description: "Credit control and risk management";
+    capabilities: [CreditControl];
+    routes: ["/credit", "/credit/checks", "/credit/approvals"];
 }

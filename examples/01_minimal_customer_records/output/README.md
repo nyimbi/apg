@@ -69,3 +69,4 @@ Generated deployment artifacts:
 ## Entities
 
 - `Customer`
+- `CustomerRecords`

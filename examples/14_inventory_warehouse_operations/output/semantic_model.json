@@ -2,84 +2,100 @@
   "agents": {},
   "app": {
     "description": null,
-    "entity_count": 3,
-    "name": "inventory_warehouse_operations",
+    "entity_count": 8,
+    "name": "inventory_warehouse",
     "version": "1.0.0"
   },
   "capabilities": {
-    "WarehouseInventory": {
+    "WarehouseOps": {
       "approvals": {},
       "business_rules": [],
       "components": {},
       "configuration": {
-        "cycle_count_days": 30,
-        "default_warehouse": "NBO-01"
+        "tenant_id": "default",
+        "warehouse_id": "WH-001"
       },
-      "erp_modules": [
-        "inventory",
-        "warehouse",
-        "procurement"
-      ],
+      "erp_modules": [],
       "i18n": {},
-      "master_data": {
-        "entities": [
-          "stock_item",
-          "warehouse",
-          "bin_location"
-        ]
-      },
-      "name": "WarehouseInventory",
+      "master_data": {},
+      "name": "WarehouseOps",
       "provides": [
-        "stock_balances",
         "stock_movements",
-        "reorder_alerts"
+        "bin_management",
+        "cycle_counting"
       ],
       "requires": [
+        "inventory_items",
         "audit_events"
       ],
       "rule_engine": {},
       "rules": [
         {
           "action": "deny",
-          "name": "no_negative_stock",
-          "when": "on_hand - reserved < 0",
+          "name": "bin_capacity",
+          "when": "current_count >= max_capacity",
           "when_ast": {
-            "field": "on_hand",
-            "op": "==",
+            "field": "current_count",
+            "op": ">=",
             "type": "compare",
-            "value": true
+            "value": "max_capacity"
           }
         },
         {
-          "action": "warn",
-          "name": "reorder_needed",
-          "when": "on_hand <= reorder_level",
+          "action": "allow",
+          "name": "valid_movement",
+          "when": "movement_type in [receipt, issue, transfer, adjustment]",
           "when_ast": {
-            "field": "on_hand",
-            "op": "<=",
-            "type": "compare",
-            "value": "reorder_level"
+            "field": "movement_type",
+            "negated": false,
+            "type": "in",
+            "values": [
+              "receipt",
+              "issue",
+              "transfer",
+              "adjustment"
+            ]
+          }
+        },
+        {
+          "action": "deny",
+          "name": "sku_required",
+          "when": "item_sku missing",
+          "when_ast": {
+            "field": "item_sku",
+            "negated": false,
+            "type": "missing"
           }
         }
       ],
       "runtime": {},
       "screens": {},
-      "streaming": {
-        "processor": "bytewax",
-        "state": "inventory_movement_state"
-      },
+      "streaming": {},
       "theme": {
         "name": "warehouse_theme",
         "tokens": {
-          "accent": "#2F855A"
+          "accent": "#546E7A"
         }
       },
       "ui": {
         "routes": [
           {
-            "component": "InventoryScreen",
-            "name": "Inventory",
-            "path": "/warehouse/inventory"
+            "component": "MovementLog",
+            "name": "Movements",
+            "path": "/warehouse/movements",
+            "permission": "wh:movements"
+          },
+          {
+            "component": "BinManager",
+            "name": "Bins",
+            "path": "/warehouse/bins",
+            "permission": "wh:bins"
+          },
+          {
+            "component": "WarehouseMap",
+            "name": "Map",
+            "path": "/warehouse/map",
+            "permission": "wh:map"
           }
         ],
         "shell": "python"
@@ -88,64 +104,116 @@
   },
   "composition": {
     "agent_teams": {},
-    "applications": {},
+    "applications": {
+      "WarehouseOpsApp": {
+        "agent_teams": [],
+        "agents": [],
+        "capabilities": [
+          "WarehouseOps"
+        ],
+        "components": {},
+        "configuration": {},
+        "deployments": {},
+        "description": "Warehouse operations management",
+        "integrations": {},
+        "name": "WarehouseOpsApp",
+        "policies": {},
+        "routes": [
+          "/warehouse"
+        ],
+        "runtime": {},
+        "screens": {},
+        "theme": {},
+        "workflows": []
+      }
+    },
     "capability_dependencies": {
-      "WarehouseInventory": [
+      "WarehouseOps": [
+        "inventory_items",
         "audit_events"
       ]
     }
   },
   "contracts": {
-    "WarehouseInventory": {
+    "WarehouseOps": {
       "configuration": {
-        "cycle_count_days": 30,
-        "default_warehouse": "NBO-01"
+        "tenant_id": "default",
+        "warehouse_id": "WH-001"
       },
-      "id": "warehouse_inventory",
+      "id": "warehouse_ops",
       "provides": [
-        "stock_balances",
         "stock_movements",
-        "reorder_alerts"
+        "bin_management",
+        "cycle_counting"
       ],
       "requires": [
+        "inventory_items",
         "audit_events"
       ],
       "rules": [
         {
           "action": "deny",
-          "name": "no_negative_stock",
-          "when": "on_hand - reserved < 0",
+          "name": "bin_capacity",
+          "when": "current_count >= max_capacity",
           "when_ast": {
-            "field": "on_hand",
-            "op": "==",
+            "field": "current_count",
+            "op": ">=",
             "type": "compare",
-            "value": true
+            "value": "max_capacity"
           }
         },
         {
-          "action": "warn",
-          "name": "reorder_needed",
-          "when": "on_hand <= reorder_level",
+          "action": "allow",
+          "name": "valid_movement",
+          "when": "movement_type in [receipt, issue, transfer, adjustment]",
           "when_ast": {
-            "field": "on_hand",
-            "op": "<=",
-            "type": "compare",
-            "value": "reorder_level"
+            "field": "movement_type",
+            "negated": false,
+            "type": "in",
+            "values": [
+              "receipt",
+              "issue",
+              "transfer",
+              "adjustment"
+            ]
+          }
+        },
+        {
+          "action": "deny",
+          "name": "sku_required",
+          "when": "item_sku missing",
+          "when_ast": {
+            "field": "item_sku",
+            "negated": false,
+            "type": "missing"
           }
         }
       ],
       "theme": {
         "name": "warehouse_theme",
         "tokens": {
-          "accent": "#2F855A"
+          "accent": "#546E7A"
         }
       },
       "ui": {
         "routes": [
           {
-            "component": "InventoryScreen",
-            "name": "Inventory",
-            "path": "/warehouse/inventory"
+            "component": "MovementLog",
+            "name": "Movements",
+            "path": "/warehouse/movements",
+            "permission": "wh:movements"
+          },
+          {
+            "component": "BinManager",
+            "name": "Bins",
+            "path": "/warehouse/bins",
+            "permission": "wh:bins"
+          },
+          {
+            "component": "WarehouseMap",
+            "name": "Map",
+            "path": "/warehouse/map",
+            "permission": "wh:map"
           }
         ],
         "shell": "python"
@@ -153,16 +221,16 @@
     }
   },
   "deployment": {
-    "source": "inventory_warehouse_operations.apg",
+    "source": "inventory_warehouse.apg",
     "target": "python"
   },
   "diagnostics": [
     {
       "code": "APG0100",
       "docs_url": "docs/tooling.md#semantic-model-contract",
-      "file": "inventory_warehouse_operations.apg",
+      "file": "inventory_warehouse.apg",
       "fixes": [],
-      "message": "Capability 'WarehouseInventory' requires 'audit_events' which is not declared in this module",
+      "message": "Capability 'WarehouseOps' requires 'inventory_items' which is not declared in this module",
       "range": {
         "end": {
           "character": 1,
@@ -176,9 +244,122 @@
       "related_locations": [],
       "severity": "warning",
       "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "inventory_warehouse.apg",
+      "fixes": [],
+      "message": "Capability 'WarehouseOps' requires 'audit_events' which is not declared in this module",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0402",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "inventory_warehouse.apg",
+      "fixes": [],
+      "message": "Form 'StockReceiptForm' binds 'fields', but table 'InventoryItem' has no such field or lookup path.",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "error",
+      "title": "Invalid view binding"
+    },
+    {
+      "code": "APG0402",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "inventory_warehouse.apg",
+      "fixes": [],
+      "message": "Form 'StockReceiptForm' binds 'actions', but table 'InventoryItem' has no such field or lookup path.",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "error",
+      "title": "Invalid view binding"
     }
   ],
-  "flows": {},
+  "flows": {
+    "StockReceipt": {
+      "assignments": {
+        "inspection": "quality_controller",
+        "put_away": "warehouse_operator"
+      },
+      "compensation": {},
+      "guards": {
+        "confirmed": "bin_location not missing",
+        "put_away": "inspection_passed == true"
+      },
+      "human_tasks": [
+        "inspection",
+        "put_away"
+      ],
+      "methods": [],
+      "name": "StockReceipt",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "initiated",
+        "inspection",
+        "put_away",
+        "confirmed"
+      ],
+      "steps": [
+        "initiated",
+        "inspection",
+        "put_away",
+        "confirmed"
+      ],
+      "steps_raw": "initiated -> inspection -> put_away -> confirmed",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": null,
+          "source": "initiated",
+          "target": "inspection"
+        },
+        {
+          "guard": "inspection_passed == true",
+          "source": "inspection",
+          "target": "put_away"
+        },
+        {
+          "guard": "bin_location not missing",
+          "source": "put_away",
+          "target": "confirmed"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    }
+  },
   "format": "apg.semantic-model.v1",
   "graphs": {
     "agent": {
@@ -187,85 +368,117 @@
       "nodes": 0
     },
     "capability": {
-      "edges": 1,
+      "edges": 3,
       "kind": "capability",
-      "nodes": 2
+      "nodes": 4
     },
     "deployment": {
-      "edges": 3,
+      "edges": 8,
       "kind": "deployment",
-      "nodes": 4
+      "nodes": 9
     },
     "er": {
-      "edges": 11,
+      "edges": 26,
       "kind": "er",
-      "nodes": 12
+      "nodes": 29
     },
     "handler": {
-      "edges": 3,
+      "edges": 8,
       "kind": "handler",
-      "nodes": 4
+      "nodes": 9
     },
     "lookup": {
-      "edges": 3,
+      "edges": 8,
       "kind": "lookup",
-      "nodes": 4
+      "nodes": 9
     },
     "package": {
-      "edges": 3,
+      "edges": 8,
       "kind": "package",
-      "nodes": 4
+      "nodes": 9
     },
     "security": {
-      "edges": 3,
+      "edges": 8,
       "kind": "security",
-      "nodes": 4
+      "nodes": 9
     },
     "workflow": {
-      "edges": 3,
+      "edges": 8,
       "kind": "workflow",
-      "nodes": 4
+      "nodes": 9
     }
   },
   "llms": {},
-  "ok": true,
+  "ok": false,
   "operations": {},
   "packages": {},
   "roles": {},
   "rules": {
-    "WarehouseInventory.no_negative_stock": {
+    "WarehouseOps.bin_capacity": {
       "action": "deny",
-      "name": "no_negative_stock",
-      "when": "on_hand - reserved < 0",
+      "name": "bin_capacity",
+      "when": "current_count >= max_capacity",
       "when_ast": {
-        "field": "on_hand",
-        "op": "==",
+        "field": "current_count",
+        "op": ">=",
         "type": "compare",
-        "value": true
+        "value": "max_capacity"
       }
     },
-    "WarehouseInventory.reorder_needed": {
-      "action": "warn",
-      "name": "reorder_needed",
-      "when": "on_hand <= reorder_level",
+    "WarehouseOps.sku_required": {
+      "action": "deny",
+      "name": "sku_required",
+      "when": "item_sku missing",
       "when_ast": {
-        "field": "on_hand",
-        "op": "<=",
-        "type": "compare",
-        "value": "reorder_level"
+        "field": "item_sku",
+        "negated": false,
+        "type": "missing"
+      }
+    },
+    "WarehouseOps.valid_movement": {
+      "action": "allow",
+      "name": "valid_movement",
+      "when": "movement_type in [receipt, issue, transfer, adjustment]",
+      "when_ast": {
+        "field": "movement_type",
+        "negated": false,
+        "type": "in",
+        "values": [
+          "receipt",
+          "issue",
+          "transfer",
+          "adjustment"
+        ]
       }
     }
   },
   "security": {},
   "source_files": [
-    "inventory_warehouse_operations.apg"
+    "inventory_warehouse.apg"
   ],
   "symbols": {
-    "capability.WarehouseInventory": {
-      "file": "inventory_warehouse_operations.apg",
-      "id": "capability.WarehouseInventory",
+    "app.WarehouseOpsApp": {
+      "file": "inventory_warehouse.apg",
+      "id": "app.WarehouseOpsApp",
+      "kind": "app",
+      "name": "WarehouseOpsApp",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.WarehouseOps": {
+      "file": "inventory_warehouse.apg",
+      "id": "capability.WarehouseOps",
       "kind": "capability",
-      "name": "WarehouseInventory",
+      "name": "WarehouseOps",
       "range": {
         "end": {
           "character": 1,
@@ -278,11 +491,11 @@
       },
       "references": []
     },
-    "field.StockItem.active": {
-      "file": "inventory_warehouse_operations.apg",
-      "id": "field.StockItem.active",
+    "field.BinLocation.aisle": {
+      "file": "inventory_warehouse.apg",
+      "id": "field.BinLocation.aisle",
       "kind": "field",
-      "name": "StockItem.active",
+      "name": "BinLocation.aisle",
       "range": {
         "end": {
           "character": 1,
@@ -295,11 +508,11 @@
       },
       "references": []
     },
-    "field.StockItem.description": {
-      "file": "inventory_warehouse_operations.apg",
-      "id": "field.StockItem.description",
+    "field.BinLocation.bin_id": {
+      "file": "inventory_warehouse.apg",
+      "id": "field.BinLocation.bin_id",
       "kind": "field",
-      "name": "StockItem.description",
+      "name": "BinLocation.bin_id",
       "range": {
         "end": {
           "character": 1,
@@ -312,11 +525,11 @@
       },
       "references": []
     },
-    "field.StockItem.on_hand": {
-      "file": "inventory_warehouse_operations.apg",
-      "id": "field.StockItem.on_hand",
+    "field.BinLocation.current_count": {
+      "file": "inventory_warehouse.apg",
+      "id": "field.BinLocation.current_count",
       "kind": "field",
-      "name": "StockItem.on_hand",
+      "name": "BinLocation.current_count",
       "range": {
         "end": {
           "character": 1,
@@ -329,11 +542,11 @@
       },
       "references": []
     },
-    "field.StockItem.reorder_level": {
-      "file": "inventory_warehouse_operations.apg",
-      "id": "field.StockItem.reorder_level",
+    "field.BinLocation.is_active": {
+      "file": "inventory_warehouse.apg",
+      "id": "field.BinLocation.is_active",
       "kind": "field",
-      "name": "StockItem.reorder_level",
+      "name": "BinLocation.is_active",
       "range": {
         "end": {
           "character": 1,
@@ -346,11 +559,11 @@
       },
       "references": []
     },
-    "field.StockItem.reserved": {
-      "file": "inventory_warehouse_operations.apg",
-      "id": "field.StockItem.reserved",
+    "field.BinLocation.max_capacity": {
+      "file": "inventory_warehouse.apg",
+      "id": "field.BinLocation.max_capacity",
       "kind": "field",
-      "name": "StockItem.reserved",
+      "name": "BinLocation.max_capacity",
       "range": {
         "end": {
           "character": 1,
@@ -363,11 +576,249 @@
       },
       "references": []
     },
-    "field.StockItem.sku": {
-      "file": "inventory_warehouse_operations.apg",
-      "id": "field.StockItem.sku",
+    "field.BinLocation.position": {
+      "file": "inventory_warehouse.apg",
+      "id": "field.BinLocation.position",
       "kind": "field",
-      "name": "StockItem.sku",
+      "name": "BinLocation.position",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.BinLocation.shelf": {
+      "file": "inventory_warehouse.apg",
+      "id": "field.BinLocation.shelf",
+      "kind": "field",
+      "name": "BinLocation.shelf",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.BinLocation.warehouse_id": {
+      "file": "inventory_warehouse.apg",
+      "id": "field.BinLocation.warehouse_id",
+      "kind": "field",
+      "name": "BinLocation.warehouse_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.bin_location": {
+      "file": "inventory_warehouse.apg",
+      "id": "field.InventoryItem.bin_location",
+      "kind": "field",
+      "name": "InventoryItem.bin_location",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.cost_price": {
+      "file": "inventory_warehouse.apg",
+      "id": "field.InventoryItem.cost_price",
+      "kind": "field",
+      "name": "InventoryItem.cost_price",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.description": {
+      "file": "inventory_warehouse.apg",
+      "id": "field.InventoryItem.description",
+      "kind": "field",
+      "name": "InventoryItem.description",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.quantity_on_hand": {
+      "file": "inventory_warehouse.apg",
+      "id": "field.InventoryItem.quantity_on_hand",
+      "kind": "field",
+      "name": "InventoryItem.quantity_on_hand",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.quantity_reserved": {
+      "file": "inventory_warehouse.apg",
+      "id": "field.InventoryItem.quantity_reserved",
+      "kind": "field",
+      "name": "InventoryItem.quantity_reserved",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.reorder_point": {
+      "file": "inventory_warehouse.apg",
+      "id": "field.InventoryItem.reorder_point",
+      "kind": "field",
+      "name": "InventoryItem.reorder_point",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.sku": {
+      "file": "inventory_warehouse.apg",
+      "id": "field.InventoryItem.sku",
+      "kind": "field",
+      "name": "InventoryItem.sku",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.status": {
+      "file": "inventory_warehouse.apg",
+      "id": "field.InventoryItem.status",
+      "kind": "field",
+      "name": "InventoryItem.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.unit_of_measure": {
+      "file": "inventory_warehouse.apg",
+      "id": "field.InventoryItem.unit_of_measure",
+      "kind": "field",
+      "name": "InventoryItem.unit_of_measure",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockMovement.from_bin": {
+      "file": "inventory_warehouse.apg",
+      "id": "field.StockMovement.from_bin",
+      "kind": "field",
+      "name": "StockMovement.from_bin",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockMovement.item_sku": {
+      "file": "inventory_warehouse.apg",
+      "id": "field.StockMovement.item_sku",
+      "kind": "field",
+      "name": "StockMovement.item_sku",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockMovement.movement_id": {
+      "file": "inventory_warehouse.apg",
+      "id": "field.StockMovement.movement_id",
+      "kind": "field",
+      "name": "StockMovement.movement_id",
       "range": {
         "end": {
           "character": 1,
@@ -381,7 +832,7 @@
       "references": []
     },
     "field.StockMovement.movement_type": {
-      "file": "inventory_warehouse_operations.apg",
+      "file": "inventory_warehouse.apg",
       "id": "field.StockMovement.movement_type",
       "kind": "field",
       "name": "StockMovement.movement_type",
@@ -397,8 +848,42 @@
       },
       "references": []
     },
+    "field.StockMovement.performed_at": {
+      "file": "inventory_warehouse.apg",
+      "id": "field.StockMovement.performed_at",
+      "kind": "field",
+      "name": "StockMovement.performed_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockMovement.performed_by": {
+      "file": "inventory_warehouse.apg",
+      "id": "field.StockMovement.performed_by",
+      "kind": "field",
+      "name": "StockMovement.performed_by",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
     "field.StockMovement.quantity": {
-      "file": "inventory_warehouse_operations.apg",
+      "file": "inventory_warehouse.apg",
       "id": "field.StockMovement.quantity",
       "kind": "field",
       "name": "StockMovement.quantity",
@@ -415,7 +900,7 @@
       "references": []
     },
     "field.StockMovement.reference": {
-      "file": "inventory_warehouse_operations.apg",
+      "file": "inventory_warehouse.apg",
       "id": "field.StockMovement.reference",
       "kind": "field",
       "name": "StockMovement.reference",
@@ -431,11 +916,11 @@
       },
       "references": []
     },
-    "field.StockMovement.stock_item_id": {
-      "file": "inventory_warehouse_operations.apg",
-      "id": "field.StockMovement.stock_item_id",
+    "field.StockMovement.to_bin": {
+      "file": "inventory_warehouse.apg",
+      "id": "field.StockMovement.to_bin",
       "kind": "field",
-      "name": "StockMovement.stock_item_id",
+      "name": "StockMovement.to_bin",
       "range": {
         "end": {
           "character": 1,
@@ -448,11 +933,28 @@
       },
       "references": []
     },
-    "module.inventory_warehouse_operations": {
-      "file": "inventory_warehouse_operations.apg",
-      "id": "module.inventory_warehouse_operations",
+    "form.StockReceiptForm": {
+      "file": "inventory_warehouse.apg",
+      "id": "form.StockReceiptForm",
+      "kind": "form",
+      "name": "StockReceiptForm",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.inventory_warehouse": {
+      "file": "inventory_warehouse.apg",
+      "id": "module.inventory_warehouse",
       "kind": "module",
-      "name": "inventory_warehouse_operations",
+      "name": "inventory_warehouse",
       "range": {
         "end": {
           "character": 1,
@@ -465,11 +967,45 @@
       },
       "references": []
     },
-    "table.StockItem": {
-      "file": "inventory_warehouse_operations.apg",
-      "id": "table.StockItem",
+    "screen.WarehouseMap": {
+      "file": "inventory_warehouse.apg",
+      "id": "screen.WarehouseMap",
+      "kind": "screen",
+      "name": "WarehouseMap",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.BinLocation": {
+      "file": "inventory_warehouse.apg",
+      "id": "table.BinLocation",
       "kind": "table",
-      "name": "StockItem",
+      "name": "BinLocation",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.InventoryItem": {
+      "file": "inventory_warehouse.apg",
+      "id": "table.InventoryItem",
+      "kind": "table",
+      "name": "InventoryItem",
       "range": {
         "end": {
           "character": 1,
@@ -483,7 +1019,7 @@
       "references": []
     },
     "table.StockMovement": {
-      "file": "inventory_warehouse_operations.apg",
+      "file": "inventory_warehouse.apg",
       "id": "table.StockMovement",
       "kind": "table",
       "name": "StockMovement",
@@ -498,32 +1034,118 @@
         }
       },
       "references": []
+    },
+    "workflow.StockReceipt": {
+      "file": "inventory_warehouse.apg",
+      "id": "workflow.StockReceipt",
+      "kind": "workflow",
+      "name": "StockReceipt",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
     }
   },
   "tables": {
-    "StockItem": {
+    "BinLocation": {
       "fields": {
-        "active": {
+        "aisle": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "bin_id": {
+          "relationship": {
+            "alias": "bin",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Bin"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "current_count": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "is_active": {
           "relationship": null,
           "required": true,
           "type": "bool"
+        },
+        "max_capacity": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "position": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "shelf": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "warehouse_id": {
+          "relationship": {
+            "alias": "warehouse",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Warehouse"
+          },
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {},
+      "name": "BinLocation"
+    },
+    "InventoryItem": {
+      "fields": {
+        "bin_location": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "cost_price": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
         },
         "description": {
           "relationship": null,
           "required": true,
           "type": "str"
         },
-        "on_hand": {
+        "quantity_on_hand": {
           "relationship": null,
           "required": true,
           "type": "int"
         },
-        "reorder_level": {
+        "quantity_reserved": {
           "relationship": null,
           "required": true,
           "type": "int"
         },
-        "reserved": {
+        "reorder_point": {
           "relationship": null,
           "required": true,
           "type": "int"
@@ -532,14 +1154,77 @@
           "relationship": null,
           "required": true,
           "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "unit_of_measure": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
         }
       },
-      "lookup_paths": {},
-      "name": "StockItem"
+      "lookup_paths": {
+        "bin_location.id": {
+          "chain": [
+            "InventoryItem.bin_location",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "cost_price.id": {
+          "chain": [
+            "InventoryItem.cost_price",
+            "decimal.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "InventoryItem"
     },
     "StockMovement": {
       "fields": {
+        "from_bin": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "item_sku": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "movement_id": {
+          "relationship": {
+            "alias": "movement",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Movement"
+          },
+          "required": true,
+          "type": "str"
+        },
         "movement_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "performed_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "performed_by": {
           "relationship": null,
           "required": true,
           "type": "str"
@@ -550,24 +1235,125 @@
           "type": "int"
         },
         "reference": {
-          "relationship": null,
-          "required": true,
-          "type": "str"
-        },
-        "stock_item_id": {
           "relationship": {
-            "alias": "stock_item",
             "cardinality": "many-to-one",
             "target_field": "id",
-            "target_table": "StockItem"
+            "target_table": "str?"
           },
           "required": true,
-          "type": "int"
+          "type": "str?"
+        },
+        "to_bin": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
         }
       },
-      "lookup_paths": {},
+      "lookup_paths": {
+        "from_bin.id": {
+          "chain": [
+            "StockMovement.from_bin",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "performed_at.id": {
+          "chain": [
+            "StockMovement.performed_at",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "reference.id": {
+          "chain": [
+            "StockMovement.reference",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "to_bin.id": {
+          "chain": [
+            "StockMovement.to_bin",
+            "str?.id"
+          ],
+          "valid": true
+        }
+      },
       "name": "StockMovement"
     }
   },
-  "views": {}
+  "views": {
+    "StockReceiptForm": {
+      "bindings": [
+        "title",
+        "table",
+        "fields",
+        "actions"
+      ],
+      "methods": [],
+      "name": "StockReceiptForm",
+      "properties": {
+        "actions": {
+          "required": true,
+          "type": "[save, save_and_add, cancel]"
+        },
+        "fields": {
+          "required": true,
+          "type": "[sku, quantity_on_hand, cost_price, bin_location]"
+        },
+        "table": {
+          "required": true,
+          "type": "InventoryItem"
+        },
+        "title": {
+          "required": true,
+          "type": "\"Stock Receipt\""
+        }
+      },
+      "type": "form"
+    },
+    "WarehouseMap": {
+      "bindings": [
+        "route",
+        "title",
+        "layout",
+        "contains",
+        "binds",
+        "actions"
+      ],
+      "methods": [],
+      "name": "WarehouseMap",
+      "properties": {
+        "actions": {
+          "required": true,
+          "type": "[transfer, receive, count, adjust]"
+        },
+        "binds": {
+          "required": true,
+          "type": "[bins.all, movements.recent]"
+        },
+        "contains": {
+          "required": true,
+          "type": "[BinGrid, ItemSearch, MovementLog]"
+        },
+        "layout": {
+          "required": true,
+          "type": "grid"
+        },
+        "route": {
+          "required": true,
+          "type": "\"/warehouse/map\""
+        },
+        "title": {
+          "required": true,
+          "type": "\"Warehouse Map\""
+        }
+      },
+      "type": "screen"
+    }
+  }
 }

@@ -1,4 +1,4 @@
-# localized_streaming_capability
+# localised_inventory
 
 Dependency-free APG generated Python application.
 
@@ -66,9 +66,13 @@ Generated deployment artifacts:
 - `semantic_model.json` - normalized APG semantic model for IDEs, agents, and release checks
 - `smoke_test.py` - standalone generated app smoke test
 
+## Entities
+
+- `LocalisedInventoryApp`
+
 ## Capabilities
 
-- `OperationsFeed` - provides operations_events, operations_dashboard
+- `LocalisedInventory` - provides stock_balances, inventory_events, reorder_alerts
 
 Capability operations:
 
@@ -82,4 +86,6 @@ Capability operations:
 
 Capability screens:
 
-- `GET /ops`
+- `GET /inventory`
+- `GET /inventory/movements`
+- `GET /inventory/reorder`

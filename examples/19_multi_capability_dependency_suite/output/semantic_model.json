@@ -1,74 +1,172 @@
 {
-  "agents": {},
+  "agents": {
+    "ComplianceAdvisor": {
+      "capabilities": [
+        "audit_events",
+        "kyc_status"
+      ],
+      "configuration": {
+        "max_turns": 4,
+        "temperature": 0.0
+      },
+      "handoffs": [],
+      "inputs": [],
+      "memory": null,
+      "model": "ollama:llama3.3",
+      "name": "ComplianceAdvisor",
+      "outputs": [],
+      "role": "compliance advisor",
+      "rules": [],
+      "runtime": null,
+      "system": "Review transactions for AML and KYC compliance. Flag any concerns.",
+      "theme": {},
+      "tools": [
+        "kyc.verify",
+        "aml.screen",
+        "compliance.report"
+      ],
+      "ui": {}
+    },
+    "SalesAdvisor": {
+      "capabilities": [
+        "customer_records",
+        "sales_dashboard",
+        "order_management"
+      ],
+      "configuration": {
+        "max_turns": 8,
+        "temperature": 0.2
+      },
+      "handoffs": [],
+      "inputs": [],
+      "memory": {
+        "kind": "vector",
+        "name": "sales_memory"
+      },
+      "model": "openai:gpt-4.1-mini",
+      "name": "SalesAdvisor",
+      "outputs": [],
+      "role": "sales advisor",
+      "rules": [],
+      "runtime": null,
+      "system": "Advise sales team on customer engagement, upsell opportunities, and deal risk.",
+      "theme": {},
+      "tools": [
+        "customer.lookup",
+        "order.history",
+        "credit.check"
+      ],
+      "ui": {}
+    }
+  },
   "app": {
     "description": null,
-    "entity_count": 4,
-    "name": "multi_capability_dependency_suite",
+    "entity_count": 8,
+    "name": "platform_suite",
     "version": "1.0.0"
   },
   "capabilities": {
-    "AuditEvents": {
+    "AuditTrail": {
       "approvals": {},
       "business_rules": [],
       "components": {},
       "configuration": {
-        "retention_days": 365
+        "immutable": true,
+        "retention_days": 2555,
+        "tenant_id": "default"
       },
       "erp_modules": [],
       "i18n": {},
       "master_data": {},
-      "name": "AuditEvents",
+      "name": "AuditTrail",
       "provides": [
-        "audit_events"
-      ],
-      "requires": [],
-      "rule_engine": {},
-      "rules": [],
-      "runtime": {},
-      "screens": {},
-      "streaming": {
-        "processor": "bytewax",
-        "state": "audit_event_state"
-      },
-      "theme": {},
-      "ui": {}
-    },
-    "Billing": {
-      "approvals": {},
-      "business_rules": [],
-      "components": {},
-      "configuration": {
-        "currency": "KES"
-      },
-      "erp_modules": [
-        "finance",
-        "sales"
-      ],
-      "i18n": {},
-      "master_data": {},
-      "name": "Billing",
-      "provides": [
-        "invoice_generation",
-        "payment_allocation"
+        "audit_events",
+        "compliance_trail",
+        "change_history"
       ],
       "requires": [
-        "sales_orders",
-        "customer_master",
-        "audit_events"
+        "identity_verification"
       ],
       "rule_engine": {},
       "rules": [
         {
           "action": "deny",
-          "name": "invoice_requires_order",
-          "when": "order_id missing",
+          "name": "actor_required",
+          "when": "actor_id missing",
           "when_ast": {
-            "field": "order_id",
+            "field": "actor_id",
+            "negated": false,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "event_type_valid",
+          "when": "event_type missing",
+          "when_ast": {
+            "field": "event_type",
             "negated": false,
             "type": "missing"
           }
         }
       ],
+      "runtime": {},
+      "screens": {},
+      "streaming": {},
+      "theme": {},
+      "ui": {}
+    },
+    "Authentication": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "mfa_required": false,
+        "tenant_id": "default",
+        "token_ttl_seconds": 3600
+      },
+      "erp_modules": [],
+      "i18n": {},
+      "master_data": {},
+      "name": "Authentication",
+      "provides": [
+        "identity_verification",
+        "session_management",
+        "role_assignment",
+        "jwt_tokens"
+      ],
+      "requires": [],
+      "rule_engine": {
+        "default_decision": "deny",
+        "rules": [
+          {
+            "action": "allow",
+            "name": "valid_session",
+            "priority": 100,
+            "when": "session_token not missing"
+          },
+          {
+            "action": "deny",
+            "name": "mfa_required",
+            "priority": 90,
+            "when": "mfa_token missing"
+          },
+          {
+            "action": "deny",
+            "name": "locked_account",
+            "priority": 80,
+            "when": "account_locked == true"
+          },
+          {
+            "action": "deny",
+            "name": "rate_limited",
+            "priority": 70,
+            "when": "login_attempts > 5"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [],
       "runtime": {},
       "screens": {},
       "streaming": {},
@@ -80,78 +178,224 @@
       "business_rules": [],
       "components": {},
       "configuration": {
-        "deduplicate": true
+        "credit_check_provider": "internal",
+        "kyc_required": true,
+        "tenant_id": "default"
       },
       "erp_modules": [],
       "i18n": {},
       "master_data": {
         "entities": [
           "customer",
-          "address",
-          "contact"
+          "credit_profile",
+          "kyc_document"
         ]
       },
       "name": "CustomerMaster",
       "provides": [
-        "customer_master"
+        "customer_records",
+        "credit_profiles",
+        "kyc_status"
       ],
       "requires": [
+        "identity_verification",
         "audit_events"
       ],
-      "rule_engine": {},
-      "rules": [],
-      "runtime": {},
-      "screens": {},
-      "streaming": {},
-      "theme": {},
-      "ui": {}
-    },
-    "OrderManagement": {
-      "approvals": {},
-      "business_rules": [],
-      "components": {},
-      "configuration": {
-        "default_status": "pending"
+      "rule_engine": {
+        "default_decision": "allow",
+        "type": "policy"
       },
-      "erp_modules": [
-        "sales",
-        "inventory",
-        "finance"
-      ],
-      "i18n": {},
-      "master_data": {},
-      "name": "OrderManagement",
-      "provides": [
-        "sales_orders",
-        "order_fulfillment"
-      ],
-      "requires": [
-        "customer_master",
-        "audit_events"
-      ],
-      "rule_engine": {},
       "rules": [
         {
           "action": "deny",
-          "name": "customer_required",
-          "when": "customer_id missing",
+          "name": "kyc_required",
+          "when": "kyc_status == pending",
           "when_ast": {
-            "field": "customer_id",
-            "negated": false,
-            "type": "missing"
+            "field": "kyc_status",
+            "op": "==",
+            "type": "compare",
+            "value": "pending"
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "duplicate_email",
+          "when": "email_exists == true",
+          "when_ast": {
+            "field": "email_exists",
+            "op": "==",
+            "type": "compare",
+            "value": true
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "credit_limit",
+          "when": "credit_score < 300",
+          "when_ast": {
+            "field": "credit_score",
+            "op": "<",
+            "type": "compare",
+            "value": 300
           }
         }
       ],
       "runtime": {},
       "screens": {},
       "streaming": {},
-      "theme": {},
+      "theme": {
+        "name": "customer_theme",
+        "tokens": {
+          "accent": "#00695C"
+        }
+      },
       "ui": {
         "routes": [
           {
-            "component": "OrderScreen",
+            "component": "CustomerList",
+            "name": "Customers",
+            "path": "/customers",
+            "permission": "customers:view"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "SalesPortal": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "max_order_value": 5000000,
+        "tenant_id": "default"
+      },
+      "erp_modules": [],
+      "i18n": {},
+      "master_data": {},
+      "name": "SalesPortal",
+      "provides": [
+        "sales_dashboard",
+        "order_management",
+        "customer_engagement"
+      ],
+      "requires": [
+        "identity_verification",
+        "audit_events",
+        "customer_records",
+        "credit_profiles"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "deny",
+          "name": "auth_required",
+          "when": "session_token missing",
+          "when_ast": {
+            "field": "session_token",
+            "negated": false,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "kyc_gate",
+          "when": "kyc_status != verified",
+          "when_ast": {
+            "field": "kyc_status",
+            "op": "!=",
+            "type": "compare",
+            "value": "verified"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "credit_gate",
+          "when": "available_credit < 0",
+          "when_ast": {
+            "field": "available_credit",
+            "op": "<",
+            "type": "compare",
+            "value": 0
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "large_order",
+          "when": "order_total > 1000000",
+          "when_ast": {
+            "field": "order_total",
+            "op": ">",
+            "type": "compare",
+            "value": 1000000
+          }
+        },
+        {
+          "action": "allow",
+          "name": "approved_region",
+          "when": "customer_region == KE",
+          "when_ast": {
+            "field": "customer_region",
+            "op": "==",
+            "type": "compare",
+            "value": "KE"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "unsupported_region",
+          "when": "customer_region missing",
+          "when_ast": {
+            "field": "customer_region",
+            "negated": false,
+            "type": "missing"
+          }
+        }
+      ],
+      "runtime": {},
+      "screens": {
+        "SalesDashboard": {
+          "actions": [
+            "create_order",
+            "refresh",
+            "export"
+          ],
+          "binds": [
+            "sales.summary",
+            "customers.top",
+            "orders.recent"
+          ],
+          "contains": [
+            "RevenueChart",
+            "TopCustomers",
+            "RecentOrders"
+          ],
+          "layout": "dashboard",
+          "route": "/sales"
+        }
+      },
+      "streaming": {
+        "processor": "bytewax",
+        "state": "sales_event_state"
+      },
+      "theme": {
+        "name": "sales_theme",
+        "tokens": {
+          "accent": "#1565C0"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "SalesDashboard",
+            "name": "Dashboard",
+            "path": "/sales",
+            "permission": "sales:view"
+          },
+          {
+            "component": "OrderList",
             "name": "Orders",
-            "path": "/orders"
+            "path": "/sales/orders",
+            "permission": "sales:orders"
           }
         ],
         "shell": "python"
@@ -160,103 +404,334 @@
   },
   "composition": {
     "agent_teams": {},
-    "applications": {},
+    "applications": {
+      "PlatformSuite": {
+        "agent_teams": [
+          "SalesComplianceCrew"
+        ],
+        "agents": [],
+        "capabilities": [
+          "Authentication",
+          "AuditTrail",
+          "CustomerMaster",
+          "SalesPortal"
+        ],
+        "components": {
+          "auth_service": {
+            "capability": "identity_verification",
+            "route": "/auth"
+          },
+          "customer_portal": {
+            "capability": "customer_records",
+            "route": "/customers"
+          },
+          "sales_portal": {
+            "capability": "sales_dashboard",
+            "route": "/sales"
+          }
+        },
+        "configuration": {},
+        "deployments": {
+          "cloud": "kubernetes",
+          "container": "docker",
+          "default": "local"
+        },
+        "description": "Multi-capability platform with full dependency chain",
+        "integrations": {},
+        "name": "PlatformSuite",
+        "policies": {},
+        "routes": [
+          "/",
+          "/customers",
+          "/sales"
+        ],
+        "runtime": {
+          "deployment": "container",
+          "streaming": {
+            "processor": "bytewax"
+          },
+          "target": "python"
+        },
+        "screens": {},
+        "theme": {},
+        "workflows": []
+      }
+    },
     "capability_dependencies": {
-      "AuditEvents": [],
-      "Billing": [
-        "sales_orders",
-        "customer_master",
-        "audit_events"
+      "AuditTrail": [
+        "identity_verification"
       ],
+      "Authentication": [],
       "CustomerMaster": [
+        "identity_verification",
         "audit_events"
       ],
-      "OrderManagement": [
-        "customer_master",
-        "audit_events"
+      "SalesPortal": [
+        "identity_verification",
+        "audit_events",
+        "customer_records",
+        "credit_profiles"
       ]
     }
   },
   "contracts": {
-    "AuditEvents": {
+    "AuditTrail": {
       "configuration": {
-        "retention_days": 365
+        "immutable": true,
+        "retention_days": 2555,
+        "tenant_id": "default"
       },
-      "id": "audit_events",
+      "id": "audl",
       "provides": [
-        "audit_events"
-      ]
-    },
-    "Billing": {
-      "configuration": {
-        "currency": "KES"
-      },
-      "id": "billing",
-      "provides": [
-        "invoice_generation",
-        "payment_allocation"
+        "audit_events",
+        "compliance_trail",
+        "change_history"
       ],
       "requires": [
-        "sales_orders",
-        "customer_master",
-        "audit_events"
+        "identity_verification"
       ],
       "rules": [
         {
           "action": "deny",
-          "name": "invoice_requires_order",
-          "when": "order_id missing",
+          "name": "actor_required",
+          "when": "actor_id missing",
           "when_ast": {
-            "field": "order_id",
+            "field": "actor_id",
+            "negated": false,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "event_type_valid",
+          "when": "event_type missing",
+          "when_ast": {
+            "field": "event_type",
             "negated": false,
             "type": "missing"
           }
         }
       ]
+    },
+    "Authentication": {
+      "configuration": {
+        "mfa_required": false,
+        "tenant_id": "default",
+        "token_ttl_seconds": 3600
+      },
+      "id": "auth",
+      "provides": [
+        "identity_verification",
+        "session_management",
+        "role_assignment",
+        "jwt_tokens"
+      ],
+      "rule_engine": {
+        "default_decision": "deny",
+        "rules": [
+          {
+            "action": "allow",
+            "name": "valid_session",
+            "priority": 100,
+            "when": "session_token not missing"
+          },
+          {
+            "action": "deny",
+            "name": "mfa_required",
+            "priority": 90,
+            "when": "mfa_token missing"
+          },
+          {
+            "action": "deny",
+            "name": "locked_account",
+            "priority": 80,
+            "when": "account_locked == true"
+          },
+          {
+            "action": "deny",
+            "name": "rate_limited",
+            "priority": 70,
+            "when": "login_attempts > 5"
+          }
+        ],
+        "type": "deterministic"
+      }
     },
     "CustomerMaster": {
       "configuration": {
-        "deduplicate": true
+        "credit_check_provider": "internal",
+        "kyc_required": true,
+        "tenant_id": "default"
       },
       "id": "customer_master",
       "provides": [
-        "customer_master"
+        "customer_records",
+        "credit_profiles",
+        "kyc_status"
       ],
       "requires": [
+        "identity_verification",
         "audit_events"
-      ]
-    },
-    "OrderManagement": {
-      "configuration": {
-        "default_status": "pending"
+      ],
+      "rule_engine": {
+        "default_decision": "allow",
+        "type": "policy"
       },
-      "id": "order_management",
+      "rules": [
+        {
+          "action": "deny",
+          "name": "kyc_required",
+          "when": "kyc_status == pending",
+          "when_ast": {
+            "field": "kyc_status",
+            "op": "==",
+            "type": "compare",
+            "value": "pending"
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "duplicate_email",
+          "when": "email_exists == true",
+          "when_ast": {
+            "field": "email_exists",
+            "op": "==",
+            "type": "compare",
+            "value": true
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "credit_limit",
+          "when": "credit_score < 300",
+          "when_ast": {
+            "field": "credit_score",
+            "op": "<",
+            "type": "compare",
+            "value": 300
+          }
+        }
+      ],
+      "theme": {
+        "name": "customer_theme",
+        "tokens": {
+          "accent": "#00695C"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "CustomerList",
+            "name": "Customers",
+            "path": "/customers",
+            "permission": "customers:view"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "SalesPortal": {
+      "configuration": {
+        "max_order_value": 5000000,
+        "tenant_id": "default"
+      },
+      "id": "sales_portal",
       "provides": [
-        "sales_orders",
-        "order_fulfillment"
+        "sales_dashboard",
+        "order_management",
+        "customer_engagement"
       ],
       "requires": [
-        "customer_master",
-        "audit_events"
+        "identity_verification",
+        "audit_events",
+        "customer_records",
+        "credit_profiles"
       ],
       "rules": [
         {
           "action": "deny",
-          "name": "customer_required",
-          "when": "customer_id missing",
+          "name": "auth_required",
+          "when": "session_token missing",
           "when_ast": {
-            "field": "customer_id",
+            "field": "session_token",
+            "negated": false,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "kyc_gate",
+          "when": "kyc_status != verified",
+          "when_ast": {
+            "field": "kyc_status",
+            "op": "!=",
+            "type": "compare",
+            "value": "verified"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "credit_gate",
+          "when": "available_credit < 0",
+          "when_ast": {
+            "field": "available_credit",
+            "op": "<",
+            "type": "compare",
+            "value": 0
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "large_order",
+          "when": "order_total > 1000000",
+          "when_ast": {
+            "field": "order_total",
+            "op": ">",
+            "type": "compare",
+            "value": 1000000
+          }
+        },
+        {
+          "action": "allow",
+          "name": "approved_region",
+          "when": "customer_region == KE",
+          "when_ast": {
+            "field": "customer_region",
+            "op": "==",
+            "type": "compare",
+            "value": "KE"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "unsupported_region",
+          "when": "customer_region missing",
+          "when_ast": {
+            "field": "customer_region",
             "negated": false,
             "type": "missing"
           }
         }
       ],
+      "theme": {
+        "name": "sales_theme",
+        "tokens": {
+          "accent": "#1565C0"
+        }
+      },
       "ui": {
         "routes": [
           {
-            "component": "OrderScreen",
+            "component": "SalesDashboard",
+            "name": "Dashboard",
+            "path": "/sales",
+            "permission": "sales:view"
+          },
+          {
+            "component": "OrderList",
             "name": "Orders",
-            "path": "/orders"
+            "path": "/sales/orders",
+            "permission": "sales:orders"
           }
         ],
         "shell": "python"
@@ -264,7 +739,7 @@
     }
   },
   "deployment": {
-    "source": "multi_capability_dependency_suite.apg",
+    "source": "platform_suite.apg",
     "target": "python"
   },
   "diagnostics": [],
@@ -274,17 +749,17 @@
     "agent": {
       "edges": 0,
       "kind": "agent",
-      "nodes": 0
+      "nodes": 3
     },
     "capability": {
-      "edges": 6,
+      "edges": 11,
       "kind": "capability",
-      "nodes": 7
+      "nodes": 9
     },
     "deployment": {
-      "edges": 4,
+      "edges": 8,
       "kind": "deployment",
-      "nodes": 5
+      "nodes": 9
     },
     "er": {
       "edges": 0,
@@ -292,53 +767,183 @@
       "nodes": 0
     },
     "handler": {
-      "edges": 4,
+      "edges": 8,
       "kind": "handler",
-      "nodes": 5
+      "nodes": 9
     },
     "lookup": {
-      "edges": 4,
+      "edges": 8,
       "kind": "lookup",
-      "nodes": 5
+      "nodes": 9
     },
     "package": {
-      "edges": 4,
+      "edges": 8,
       "kind": "package",
-      "nodes": 5
+      "nodes": 9
     },
     "security": {
-      "edges": 4,
+      "edges": 8,
       "kind": "security",
-      "nodes": 5
+      "nodes": 9
     },
     "workflow": {
-      "edges": 4,
+      "edges": 8,
       "kind": "workflow",
-      "nodes": 5
+      "nodes": 9
     }
   },
-  "llms": {},
+  "llms": {
+    "ComplianceAdvisor": {
+      "model": "ollama:llama3.3",
+      "runtime": null
+    },
+    "SalesAdvisor": {
+      "model": "openai:gpt-4.1-mini",
+      "runtime": null
+    }
+  },
   "ok": true,
   "operations": {},
   "packages": {},
   "roles": {},
   "rules": {
-    "Billing.invoice_requires_order": {
+    "AuditTrail.actor_required": {
       "action": "deny",
-      "name": "invoice_requires_order",
-      "when": "order_id missing",
+      "name": "actor_required",
+      "when": "actor_id missing",
       "when_ast": {
-        "field": "order_id",
+        "field": "actor_id",
         "negated": false,
         "type": "missing"
       }
     },
-    "OrderManagement.customer_required": {
+    "AuditTrail.event_type_valid": {
       "action": "deny",
-      "name": "customer_required",
-      "when": "customer_id missing",
+      "name": "event_type_valid",
+      "when": "event_type missing",
       "when_ast": {
-        "field": "customer_id",
+        "field": "event_type",
+        "negated": false,
+        "type": "missing"
+      }
+    },
+    "Authentication.locked_account": {
+      "action": "deny",
+      "name": "locked_account",
+      "priority": 80,
+      "when": "account_locked == true"
+    },
+    "Authentication.mfa_required": {
+      "action": "deny",
+      "name": "mfa_required",
+      "priority": 90,
+      "when": "mfa_token missing"
+    },
+    "Authentication.rate_limited": {
+      "action": "deny",
+      "name": "rate_limited",
+      "priority": 70,
+      "when": "login_attempts > 5"
+    },
+    "Authentication.valid_session": {
+      "action": "allow",
+      "name": "valid_session",
+      "priority": 100,
+      "when": "session_token not missing"
+    },
+    "CustomerMaster.credit_limit": {
+      "action": "require_review",
+      "name": "credit_limit",
+      "when": "credit_score < 300",
+      "when_ast": {
+        "field": "credit_score",
+        "op": "<",
+        "type": "compare",
+        "value": 300
+      }
+    },
+    "CustomerMaster.duplicate_email": {
+      "action": "require_review",
+      "name": "duplicate_email",
+      "when": "email_exists == true",
+      "when_ast": {
+        "field": "email_exists",
+        "op": "==",
+        "type": "compare",
+        "value": true
+      }
+    },
+    "CustomerMaster.kyc_required": {
+      "action": "deny",
+      "name": "kyc_required",
+      "when": "kyc_status == pending",
+      "when_ast": {
+        "field": "kyc_status",
+        "op": "==",
+        "type": "compare",
+        "value": "pending"
+      }
+    },
+    "SalesPortal.approved_region": {
+      "action": "allow",
+      "name": "approved_region",
+      "when": "customer_region == KE",
+      "when_ast": {
+        "field": "customer_region",
+        "op": "==",
+        "type": "compare",
+        "value": "KE"
+      }
+    },
+    "SalesPortal.auth_required": {
+      "action": "deny",
+      "name": "auth_required",
+      "when": "session_token missing",
+      "when_ast": {
+        "field": "session_token",
+        "negated": false,
+        "type": "missing"
+      }
+    },
+    "SalesPortal.credit_gate": {
+      "action": "deny",
+      "name": "credit_gate",
+      "when": "available_credit < 0",
+      "when_ast": {
+        "field": "available_credit",
+        "op": "<",
+        "type": "compare",
+        "value": 0
+      }
+    },
+    "SalesPortal.kyc_gate": {
+      "action": "deny",
+      "name": "kyc_gate",
+      "when": "kyc_status != verified",
+      "when_ast": {
+        "field": "kyc_status",
+        "op": "!=",
+        "type": "compare",
+        "value": "verified"
+      }
+    },
+    "SalesPortal.large_order": {
+      "action": "require_review",
+      "name": "large_order",
+      "when": "order_total > 1000000",
+      "when_ast": {
+        "field": "order_total",
+        "op": ">",
+        "type": "compare",
+        "value": 1000000
+      }
+    },
+    "SalesPortal.unsupported_region": {
+      "action": "deny",
+      "name": "unsupported_region",
+      "when": "customer_region missing",
+      "when_ast": {
+        "field": "customer_region",
         "negated": false,
         "type": "missing"
       }
@@ -346,14 +951,14 @@
   },
   "security": {},
   "source_files": [
-    "multi_capability_dependency_suite.apg"
+    "platform_suite.apg"
   ],
   "symbols": {
-    "capability.AuditEvents": {
-      "file": "multi_capability_dependency_suite.apg",
-      "id": "capability.AuditEvents",
-      "kind": "capability",
-      "name": "AuditEvents",
+    "agent.ComplianceAdvisor": {
+      "file": "platform_suite.apg",
+      "id": "agent.ComplianceAdvisor",
+      "kind": "agent",
+      "name": "ComplianceAdvisor",
       "range": {
         "end": {
           "character": 1,
@@ -366,11 +971,79 @@
       },
       "references": []
     },
-    "capability.Billing": {
-      "file": "multi_capability_dependency_suite.apg",
-      "id": "capability.Billing",
+    "agent.SalesAdvisor": {
+      "file": "platform_suite.apg",
+      "id": "agent.SalesAdvisor",
+      "kind": "agent",
+      "name": "SalesAdvisor",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "agent_team.SalesComplianceCrew": {
+      "file": "platform_suite.apg",
+      "id": "agent_team.SalesComplianceCrew",
+      "kind": "agent_team",
+      "name": "SalesComplianceCrew",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "app.PlatformSuite": {
+      "file": "platform_suite.apg",
+      "id": "app.PlatformSuite",
+      "kind": "app",
+      "name": "PlatformSuite",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.AuditTrail": {
+      "file": "platform_suite.apg",
+      "id": "capability.AuditTrail",
       "kind": "capability",
-      "name": "Billing",
+      "name": "AuditTrail",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.Authentication": {
+      "file": "platform_suite.apg",
+      "id": "capability.Authentication",
+      "kind": "capability",
+      "name": "Authentication",
       "range": {
         "end": {
           "character": 1,
@@ -384,7 +1057,7 @@
       "references": []
     },
     "capability.CustomerMaster": {
-      "file": "multi_capability_dependency_suite.apg",
+      "file": "platform_suite.apg",
       "id": "capability.CustomerMaster",
       "kind": "capability",
       "name": "CustomerMaster",
@@ -400,11 +1073,11 @@
       },
       "references": []
     },
-    "capability.OrderManagement": {
-      "file": "multi_capability_dependency_suite.apg",
-      "id": "capability.OrderManagement",
+    "capability.SalesPortal": {
+      "file": "platform_suite.apg",
+      "id": "capability.SalesPortal",
       "kind": "capability",
-      "name": "OrderManagement",
+      "name": "SalesPortal",
       "range": {
         "end": {
           "character": 1,
@@ -417,11 +1090,45 @@
       },
       "references": []
     },
-    "module.multi_capability_dependency_suite": {
-      "file": "multi_capability_dependency_suite.apg",
-      "id": "module.multi_capability_dependency_suite",
+    "llm.ollama:llama3.3": {
+      "file": "platform_suite.apg",
+      "id": "llm.ollama:llama3.3",
+      "kind": "llm",
+      "name": "ollama:llama3.3",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "llm.openai:gpt-4.1-mini": {
+      "file": "platform_suite.apg",
+      "id": "llm.openai:gpt-4.1-mini",
+      "kind": "llm",
+      "name": "openai:gpt-4.1-mini",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.platform_suite": {
+      "file": "platform_suite.apg",
+      "id": "module.platform_suite",
       "kind": "module",
-      "name": "multi_capability_dependency_suite",
+      "name": "platform_suite",
       "range": {
         "end": {
           "character": 1,

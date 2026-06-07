@@ -2,96 +2,127 @@
   "agents": {},
   "app": {
     "description": null,
-    "entity_count": 2,
-    "name": "manufacturing_quality_control",
+    "entity_count": 5,
+    "name": "manufacturing_qc",
     "version": "1.0.0"
   },
   "capabilities": {
-    "QualityControl": {
+    "ManufacturingQC": {
       "approvals": {},
       "business_rules": [],
       "components": {},
       "configuration": {
-        "defect_threshold": 3,
-        "inspection_frequency_minutes": 60
+        "alert_email": "env(\"QC_ALERT_EMAIL\")",
+        "auto_fail_threshold": 0.05,
+        "db_url": "env(\"MANUFACTURING_DB_URL\")",
+        "erp_api_key": "$ERP_API_KEY",
+        "erp_endpoint": "env(\"ERP_API_ENDPOINT\")",
+        "inspection_interval": 50,
+        "max_defect_rate": 0.02,
+        "tenant_id": "env(\"APG_TENANT_ID\")"
       },
       "erp_modules": [
         "manufacturing",
-        "inventory"
+        "quality",
+        "production_planning"
       ],
       "i18n": {},
-      "master_data": {},
-      "name": "QualityControl",
+      "master_data": {
+        "entities": [
+          "product_spec",
+          "quality_standard",
+          "defect_category",
+          "production_line"
+        ]
+      },
+      "name": "ManufacturingQC",
       "provides": [
         "quality_inspections",
         "defect_tracking",
-        "production_oee"
+        "production_yield"
       ],
       "requires": [
-        "stock_movements",
-        "audit_events"
+        "audit_events",
+        "work_orders"
       ],
       "rule_engine": {},
       "rules": [
         {
-          "action": "require_review",
-          "name": "defect_threshold",
-          "when": "defect_count > defect_threshold",
+          "action": "deny",
+          "name": "defect_rate_fail",
+          "when": "defect_rate >= auto_fail_threshold",
           "when_ast": {
-            "field": "defect_count",
-            "op": ">",
+            "field": "defect_rate",
+            "op": ">=",
             "type": "compare",
-            "value": "defect_threshold"
+            "value": "auto_fail_threshold"
           }
         },
         {
-          "action": "audit",
-          "name": "run_completion",
-          "when": "completed_quantity >= planned_quantity",
+          "action": "require_review",
+          "name": "defect_review",
+          "when": "defect_rate > max_defect_rate",
           "when_ast": {
-            "field": "completed_quantity",
-            "op": ">=",
+            "field": "defect_rate",
+            "op": ">",
             "type": "compare",
-            "value": "planned_quantity"
+            "value": "max_defect_rate"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "inspector_required",
+          "when": "inspector_id missing",
+          "when_ast": {
+            "field": "inspector_id",
+            "negated": false,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "allow",
+          "name": "valid_result",
+          "when": "result in [pass, fail, conditional]",
+          "when_ast": {
+            "field": "result",
+            "negated": false,
+            "type": "in",
+            "values": [
+              "pass",
+              "fail",
+              "conditional"
+            ]
           }
         }
       ],
       "runtime": {},
-      "screens": {
-        "LineDashboard": {
-          "actions": [
-            "pause_line",
-            "approve_run",
-            "escalate_quality"
-          ],
-          "binds": [
-            "production_runs.active"
-          ],
-          "contains": [
-            "RunSummary",
-            "DefectChart",
-            "InspectionQueue"
-          ],
-          "layout": "dashboard",
-          "route": "/manufacturing/line"
-        }
-      },
-      "streaming": {
-        "processor": "bytewax",
-        "state": "quality_event_state"
-      },
+      "screens": {},
+      "streaming": {},
       "theme": {
-        "name": "shop_floor_theme",
+        "name": "manufacturing_theme",
         "tokens": {
-          "accent": "#B83280"
+          "accent": "#F57F17"
         }
       },
       "ui": {
         "routes": [
           {
-            "component": "QualityScreen",
-            "name": "Quality",
-            "path": "/manufacturing/quality"
+            "component": "InspectionQueue",
+            "name": "Inspections",
+            "path": "/qc",
+            "permission": "qc:view"
+          },
+          {
+            "component": "DefectTracker",
+            "name": "Defects",
+            "path": "/qc/defects",
+            "permission": "qc:defects"
+          },
+          {
+            "component": "YieldReport",
+            "name": "Yield",
+            "path": "/qc/yield",
+            "permission": "qc:reports"
           }
         ],
         "shell": "python"
@@ -100,66 +131,140 @@
   },
   "composition": {
     "agent_teams": {},
-    "applications": {},
+    "applications": {
+      "ManufacturingQCApp": {
+        "agent_teams": [],
+        "agents": [],
+        "capabilities": [
+          "ManufacturingQC"
+        ],
+        "components": {},
+        "configuration": {},
+        "deployments": {},
+        "description": "Manufacturing quality control",
+        "integrations": {},
+        "name": "ManufacturingQCApp",
+        "policies": {},
+        "routes": [
+          "/qc",
+          "/production"
+        ],
+        "runtime": {},
+        "screens": {},
+        "theme": {},
+        "workflows": []
+      }
+    },
     "capability_dependencies": {
-      "QualityControl": [
-        "stock_movements",
-        "audit_events"
+      "ManufacturingQC": [
+        "audit_events",
+        "work_orders"
       ]
     }
   },
   "contracts": {
-    "QualityControl": {
+    "ManufacturingQC": {
       "configuration": {
-        "defect_threshold": 3,
-        "inspection_frequency_minutes": 60
+        "alert_email": "env(\"QC_ALERT_EMAIL\")",
+        "auto_fail_threshold": 0.05,
+        "db_url": "env(\"MANUFACTURING_DB_URL\")",
+        "erp_api_key": "$ERP_API_KEY",
+        "erp_endpoint": "env(\"ERP_API_ENDPOINT\")",
+        "inspection_interval": 50,
+        "max_defect_rate": 0.02,
+        "tenant_id": "env(\"APG_TENANT_ID\")"
       },
-      "id": "quality_control",
+      "configuration_schema": {
+        "required": [
+          "tenant_id",
+          "db_url",
+          "erp_api_key"
+        ]
+      },
+      "id": "manufacturing_qc",
       "provides": [
         "quality_inspections",
         "defect_tracking",
-        "production_oee"
+        "production_yield"
       ],
       "requires": [
-        "stock_movements",
-        "audit_events"
+        "audit_events",
+        "work_orders"
       ],
       "rules": [
         {
-          "action": "require_review",
-          "name": "defect_threshold",
-          "when": "defect_count > defect_threshold",
+          "action": "deny",
+          "name": "defect_rate_fail",
+          "when": "defect_rate >= auto_fail_threshold",
           "when_ast": {
-            "field": "defect_count",
-            "op": ">",
+            "field": "defect_rate",
+            "op": ">=",
             "type": "compare",
-            "value": "defect_threshold"
+            "value": "auto_fail_threshold"
           }
         },
         {
-          "action": "audit",
-          "name": "run_completion",
-          "when": "completed_quantity >= planned_quantity",
+          "action": "require_review",
+          "name": "defect_review",
+          "when": "defect_rate > max_defect_rate",
           "when_ast": {
-            "field": "completed_quantity",
-            "op": ">=",
+            "field": "defect_rate",
+            "op": ">",
             "type": "compare",
-            "value": "planned_quantity"
+            "value": "max_defect_rate"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "inspector_required",
+          "when": "inspector_id missing",
+          "when_ast": {
+            "field": "inspector_id",
+            "negated": false,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "allow",
+          "name": "valid_result",
+          "when": "result in [pass, fail, conditional]",
+          "when_ast": {
+            "field": "result",
+            "negated": false,
+            "type": "in",
+            "values": [
+              "pass",
+              "fail",
+              "conditional"
+            ]
           }
         }
       ],
       "theme": {
-        "name": "shop_floor_theme",
+        "name": "manufacturing_theme",
         "tokens": {
-          "accent": "#B83280"
+          "accent": "#F57F17"
         }
       },
       "ui": {
         "routes": [
           {
-            "component": "QualityScreen",
-            "name": "Quality",
-            "path": "/manufacturing/quality"
+            "component": "InspectionQueue",
+            "name": "Inspections",
+            "path": "/qc",
+            "permission": "qc:view"
+          },
+          {
+            "component": "DefectTracker",
+            "name": "Defects",
+            "path": "/qc/defects",
+            "permission": "qc:defects"
+          },
+          {
+            "component": "YieldReport",
+            "name": "Yield",
+            "path": "/qc/yield",
+            "permission": "qc:reports"
           }
         ],
         "shell": "python"
@@ -167,16 +272,16 @@
     }
   },
   "deployment": {
-    "source": "manufacturing_quality_control.apg",
+    "source": "manufacturing_qc.apg",
     "target": "python"
   },
   "diagnostics": [
     {
       "code": "APG0100",
       "docs_url": "docs/tooling.md#semantic-model-contract",
-      "file": "manufacturing_quality_control.apg",
+      "file": "manufacturing_qc.apg",
       "fixes": [],
-      "message": "Capability 'QualityControl' requires 'stock_movements' which is not declared in this module",
+      "message": "Capability 'ManufacturingQC' requires 'audit_events' which is not declared in this module",
       "range": {
         "end": {
           "character": 1,
@@ -194,9 +299,9 @@
     {
       "code": "APG0100",
       "docs_url": "docs/tooling.md#semantic-model-contract",
-      "file": "manufacturing_quality_control.apg",
+      "file": "manufacturing_qc.apg",
       "fixes": [],
-      "message": "Capability 'QualityControl' requires 'audit_events' which is not declared in this module",
+      "message": "Capability 'ManufacturingQC' requires 'work_orders' which is not declared in this module",
       "range": {
         "end": {
           "character": 1,
@@ -212,7 +317,73 @@
       "title": "Semantic warning"
     }
   ],
-  "flows": {},
+  "flows": {
+    "QualityInspectionFlow": {
+      "assignments": {
+        "disposition": "production_manager",
+        "final_inspection": "quality_manager",
+        "in_process_check": "line_inspector"
+      },
+      "compensation": {},
+      "guards": {
+        "closed": "disposition_recorded == true",
+        "disposition": "final_inspection_complete == true",
+        "final_inspection": "in_process_check_passed == true"
+      },
+      "human_tasks": [
+        "in_process_check",
+        "final_inspection",
+        "disposition"
+      ],
+      "methods": [],
+      "name": "QualityInspectionFlow",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "initiated",
+        "in_process_check",
+        "final_inspection",
+        "disposition",
+        "closed"
+      ],
+      "steps": [
+        "initiated",
+        "in_process_check",
+        "final_inspection",
+        "disposition",
+        "closed"
+      ],
+      "steps_raw": "initiated -> in_process_check -> final_inspection -> disposition -> closed",
+      "timers": {
+        "final_inspection": "PT4H",
+        "in_process_check": "PT2H"
+      },
+      "transitions": [
+        {
+          "guard": null,
+          "source": "initiated",
+          "target": "in_process_check"
+        },
+        {
+          "guard": "in_process_check_passed == true",
+          "source": "in_process_check",
+          "target": "final_inspection"
+        },
+        {
+          "guard": "final_inspection_complete == true",
+          "source": "final_inspection",
+          "target": "disposition"
+        },
+        {
+          "guard": "disposition_recorded == true",
+          "source": "disposition",
+          "target": "closed"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    }
+  },
   "format": "apg.semantic-model.v1",
   "graphs": {
     "agent": {
@@ -221,44 +392,44 @@
       "nodes": 0
     },
     "capability": {
-      "edges": 2,
+      "edges": 3,
       "kind": "capability",
-      "nodes": 3
+      "nodes": 4
     },
     "deployment": {
-      "edges": 2,
+      "edges": 5,
       "kind": "deployment",
-      "nodes": 3
+      "nodes": 6
     },
     "er": {
-      "edges": 6,
+      "edges": 20,
       "kind": "er",
-      "nodes": 7
+      "nodes": 20
     },
     "handler": {
-      "edges": 2,
+      "edges": 5,
       "kind": "handler",
-      "nodes": 3
+      "nodes": 6
     },
     "lookup": {
-      "edges": 2,
+      "edges": 5,
       "kind": "lookup",
-      "nodes": 3
+      "nodes": 6
     },
     "package": {
-      "edges": 2,
+      "edges": 5,
       "kind": "package",
-      "nodes": 3
+      "nodes": 6
     },
     "security": {
-      "edges": 2,
+      "edges": 5,
       "kind": "security",
-      "nodes": 3
+      "nodes": 6
     },
     "workflow": {
-      "edges": 2,
+      "edges": 5,
       "kind": "workflow",
-      "nodes": 3
+      "nodes": 6
     }
   },
   "llms": {},
@@ -267,39 +438,81 @@
   "packages": {},
   "roles": {},
   "rules": {
-    "QualityControl.defect_threshold": {
-      "action": "require_review",
-      "name": "defect_threshold",
-      "when": "defect_count > defect_threshold",
+    "ManufacturingQC.defect_rate_fail": {
+      "action": "deny",
+      "name": "defect_rate_fail",
+      "when": "defect_rate >= auto_fail_threshold",
       "when_ast": {
-        "field": "defect_count",
-        "op": ">",
-        "type": "compare",
-        "value": "defect_threshold"
-      }
-    },
-    "QualityControl.run_completion": {
-      "action": "audit",
-      "name": "run_completion",
-      "when": "completed_quantity >= planned_quantity",
-      "when_ast": {
-        "field": "completed_quantity",
+        "field": "defect_rate",
         "op": ">=",
         "type": "compare",
-        "value": "planned_quantity"
+        "value": "auto_fail_threshold"
+      }
+    },
+    "ManufacturingQC.defect_review": {
+      "action": "require_review",
+      "name": "defect_review",
+      "when": "defect_rate > max_defect_rate",
+      "when_ast": {
+        "field": "defect_rate",
+        "op": ">",
+        "type": "compare",
+        "value": "max_defect_rate"
+      }
+    },
+    "ManufacturingQC.inspector_required": {
+      "action": "deny",
+      "name": "inspector_required",
+      "when": "inspector_id missing",
+      "when_ast": {
+        "field": "inspector_id",
+        "negated": false,
+        "type": "missing"
+      }
+    },
+    "ManufacturingQC.valid_result": {
+      "action": "allow",
+      "name": "valid_result",
+      "when": "result in [pass, fail, conditional]",
+      "when_ast": {
+        "field": "result",
+        "negated": false,
+        "type": "in",
+        "values": [
+          "pass",
+          "fail",
+          "conditional"
+        ]
       }
     }
   },
   "security": {},
   "source_files": [
-    "manufacturing_quality_control.apg"
+    "manufacturing_qc.apg"
   ],
   "symbols": {
-    "capability.QualityControl": {
-      "file": "manufacturing_quality_control.apg",
-      "id": "capability.QualityControl",
+    "app.ManufacturingQCApp": {
+      "file": "manufacturing_qc.apg",
+      "id": "app.ManufacturingQCApp",
+      "kind": "app",
+      "name": "ManufacturingQCApp",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.ManufacturingQC": {
+      "file": "manufacturing_qc.apg",
+      "id": "capability.ManufacturingQC",
       "kind": "capability",
-      "name": "QualityControl",
+      "name": "ManufacturingQC",
       "range": {
         "end": {
           "character": 1,
@@ -312,11 +525,11 @@
       },
       "references": []
     },
-    "field.ProductionRun.active": {
-      "file": "manufacturing_quality_control.apg",
-      "id": "field.ProductionRun.active",
+    "field.QualityInspection.defect_count": {
+      "file": "manufacturing_qc.apg",
+      "id": "field.QualityInspection.defect_count",
       "kind": "field",
-      "name": "ProductionRun.active",
+      "name": "QualityInspection.defect_count",
       "range": {
         "end": {
           "character": 1,
@@ -329,11 +542,11 @@
       },
       "references": []
     },
-    "field.ProductionRun.completed_quantity": {
-      "file": "manufacturing_quality_control.apg",
-      "id": "field.ProductionRun.completed_quantity",
+    "field.QualityInspection.defect_rate": {
+      "file": "manufacturing_qc.apg",
+      "id": "field.QualityInspection.defect_rate",
       "kind": "field",
-      "name": "ProductionRun.completed_quantity",
+      "name": "QualityInspection.defect_rate",
       "range": {
         "end": {
           "character": 1,
@@ -346,11 +559,11 @@
       },
       "references": []
     },
-    "field.ProductionRun.defect_count": {
-      "file": "manufacturing_quality_control.apg",
-      "id": "field.ProductionRun.defect_count",
+    "field.QualityInspection.inspected_at": {
+      "file": "manufacturing_qc.apg",
+      "id": "field.QualityInspection.inspected_at",
       "kind": "field",
-      "name": "ProductionRun.defect_count",
+      "name": "QualityInspection.inspected_at",
       "range": {
         "end": {
           "character": 1,
@@ -363,11 +576,11 @@
       },
       "references": []
     },
-    "field.ProductionRun.line_code": {
-      "file": "manufacturing_quality_control.apg",
-      "id": "field.ProductionRun.line_code",
+    "field.QualityInspection.inspection_id": {
+      "file": "manufacturing_qc.apg",
+      "id": "field.QualityInspection.inspection_id",
       "kind": "field",
-      "name": "ProductionRun.line_code",
+      "name": "QualityInspection.inspection_id",
       "range": {
         "end": {
           "character": 1,
@@ -380,11 +593,11 @@
       },
       "references": []
     },
-    "field.ProductionRun.planned_quantity": {
-      "file": "manufacturing_quality_control.apg",
-      "id": "field.ProductionRun.planned_quantity",
+    "field.QualityInspection.inspection_type": {
+      "file": "manufacturing_qc.apg",
+      "id": "field.QualityInspection.inspection_type",
       "kind": "field",
-      "name": "ProductionRun.planned_quantity",
+      "name": "QualityInspection.inspection_type",
       "range": {
         "end": {
           "character": 1,
@@ -397,11 +610,11 @@
       },
       "references": []
     },
-    "field.ProductionRun.product_sku": {
-      "file": "manufacturing_quality_control.apg",
-      "id": "field.ProductionRun.product_sku",
+    "field.QualityInspection.inspector_id": {
+      "file": "manufacturing_qc.apg",
+      "id": "field.QualityInspection.inspector_id",
       "kind": "field",
-      "name": "ProductionRun.product_sku",
+      "name": "QualityInspection.inspector_id",
       "range": {
         "end": {
           "character": 1,
@@ -414,11 +627,215 @@
       },
       "references": []
     },
-    "module.manufacturing_quality_control": {
-      "file": "manufacturing_quality_control.apg",
-      "id": "module.manufacturing_quality_control",
+    "field.QualityInspection.notes": {
+      "file": "manufacturing_qc.apg",
+      "id": "field.QualityInspection.notes",
+      "kind": "field",
+      "name": "QualityInspection.notes",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.QualityInspection.result": {
+      "file": "manufacturing_qc.apg",
+      "id": "field.QualityInspection.result",
+      "kind": "field",
+      "name": "QualityInspection.result",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.QualityInspection.work_order_id": {
+      "file": "manufacturing_qc.apg",
+      "id": "field.QualityInspection.work_order_id",
+      "kind": "field",
+      "name": "QualityInspection.work_order_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.WorkOrder.completed_at": {
+      "file": "manufacturing_qc.apg",
+      "id": "field.WorkOrder.completed_at",
+      "kind": "field",
+      "name": "WorkOrder.completed_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.WorkOrder.product_code": {
+      "file": "manufacturing_qc.apg",
+      "id": "field.WorkOrder.product_code",
+      "kind": "field",
+      "name": "WorkOrder.product_code",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.WorkOrder.production_line": {
+      "file": "manufacturing_qc.apg",
+      "id": "field.WorkOrder.production_line",
+      "kind": "field",
+      "name": "WorkOrder.production_line",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.WorkOrder.quantity_planned": {
+      "file": "manufacturing_qc.apg",
+      "id": "field.WorkOrder.quantity_planned",
+      "kind": "field",
+      "name": "WorkOrder.quantity_planned",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.WorkOrder.quantity_produced": {
+      "file": "manufacturing_qc.apg",
+      "id": "field.WorkOrder.quantity_produced",
+      "kind": "field",
+      "name": "WorkOrder.quantity_produced",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.WorkOrder.quantity_rejected": {
+      "file": "manufacturing_qc.apg",
+      "id": "field.WorkOrder.quantity_rejected",
+      "kind": "field",
+      "name": "WorkOrder.quantity_rejected",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.WorkOrder.started_at": {
+      "file": "manufacturing_qc.apg",
+      "id": "field.WorkOrder.started_at",
+      "kind": "field",
+      "name": "WorkOrder.started_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.WorkOrder.status": {
+      "file": "manufacturing_qc.apg",
+      "id": "field.WorkOrder.status",
+      "kind": "field",
+      "name": "WorkOrder.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.WorkOrder.work_order_id": {
+      "file": "manufacturing_qc.apg",
+      "id": "field.WorkOrder.work_order_id",
+      "kind": "field",
+      "name": "WorkOrder.work_order_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.manufacturing_qc": {
+      "file": "manufacturing_qc.apg",
+      "id": "module.manufacturing_qc",
       "kind": "module",
-      "name": "manufacturing_quality_control",
+      "name": "manufacturing_qc",
       "range": {
         "end": {
           "character": 1,
@@ -431,11 +848,45 @@
       },
       "references": []
     },
-    "table.ProductionRun": {
-      "file": "manufacturing_quality_control.apg",
-      "id": "table.ProductionRun",
+    "table.QualityInspection": {
+      "file": "manufacturing_qc.apg",
+      "id": "table.QualityInspection",
       "kind": "table",
-      "name": "ProductionRun",
+      "name": "QualityInspection",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.WorkOrder": {
+      "file": "manufacturing_qc.apg",
+      "id": "table.WorkOrder",
+      "kind": "table",
+      "name": "WorkOrder",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.QualityInspectionFlow": {
+      "file": "manufacturing_qc.apg",
+      "id": "workflow.QualityInspectionFlow",
+      "kind": "workflow",
+      "name": "QualityInspectionFlow",
       "range": {
         "end": {
           "character": 1,
@@ -450,41 +901,184 @@
     }
   },
   "tables": {
-    "ProductionRun": {
+    "QualityInspection": {
       "fields": {
-        "active": {
-          "relationship": null,
-          "required": true,
-          "type": "bool"
-        },
-        "completed_quantity": {
-          "relationship": null,
-          "required": true,
-          "type": "int"
-        },
         "defect_count": {
           "relationship": null,
           "required": true,
           "type": "int"
         },
-        "line_code": {
+        "defect_rate": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "inspected_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "inspection_id": {
+          "relationship": {
+            "alias": "inspection",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Inspection"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "inspection_type": {
           "relationship": null,
           "required": true,
           "type": "str"
         },
-        "planned_quantity": {
-          "relationship": null,
+        "inspector_id": {
+          "relationship": {
+            "alias": "inspector",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Inspector"
+          },
           "required": true,
-          "type": "int"
+          "type": "str"
         },
-        "product_sku": {
-          "relationship": null,
+        "notes": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "result": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "work_order_id": {
+          "relationship": {
+            "alias": "work_order",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "WorkOrder"
+          },
           "required": true,
           "type": "str"
         }
       },
-      "lookup_paths": {},
-      "name": "ProductionRun"
+      "lookup_paths": {
+        "inspected_at.id": {
+          "chain": [
+            "QualityInspection.inspected_at",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "notes.id": {
+          "chain": [
+            "QualityInspection.notes",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "result.id": {
+          "chain": [
+            "QualityInspection.result",
+            "str?.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "QualityInspection"
+    },
+    "WorkOrder": {
+      "fields": {
+        "completed_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime?"
+          },
+          "required": true,
+          "type": "datetime?"
+        },
+        "product_code": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "production_line": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "quantity_planned": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "quantity_produced": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "quantity_rejected": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "started_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime?"
+          },
+          "required": true,
+          "type": "datetime?"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "work_order_id": {
+          "relationship": {
+            "alias": "work_order",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "WorkOrder"
+          },
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "completed_at.id": {
+          "chain": [
+            "WorkOrder.completed_at",
+            "datetime?.id"
+          ],
+          "valid": true
+        },
+        "started_at.id": {
+          "chain": [
+            "WorkOrder.started_at",
+            "datetime?.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "WorkOrder"
     }
   },
   "views": {}

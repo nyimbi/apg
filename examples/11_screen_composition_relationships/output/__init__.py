@@ -1,6 +1,6 @@
 """
-screen_composition - APG Generated Package
-===========================================
+operations_workbench - APG Generated Package
+=============================================
 
 Version: 1.0.0
 

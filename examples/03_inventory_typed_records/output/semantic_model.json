@@ -2,14 +2,35 @@
   "agents": {},
   "app": {
     "description": null,
-    "entity_count": 1,
+    "entity_count": 3,
     "name": "inventory_records",
     "version": "1.0.0"
   },
   "capabilities": {},
   "composition": {
     "agent_teams": {},
-    "applications": {},
+    "applications": {
+      "InventoryRecords": {
+        "agent_teams": [],
+        "agents": [],
+        "capabilities": [],
+        "components": {},
+        "configuration": {},
+        "deployments": {},
+        "description": "Inventory management",
+        "integrations": {},
+        "name": "InventoryRecords",
+        "policies": {},
+        "routes": [
+          "/inventory",
+          "/stock-movements"
+        ],
+        "runtime": {},
+        "screens": {},
+        "theme": {},
+        "workflows": []
+      }
+    },
     "capability_dependencies": {}
   },
   "contracts": {},
@@ -29,42 +50,42 @@
     "capability": {
       "edges": 0,
       "kind": "capability",
-      "nodes": 0
+      "nodes": 1
     },
     "deployment": {
-      "edges": 1,
+      "edges": 3,
       "kind": "deployment",
-      "nodes": 2
+      "nodes": 4
     },
     "er": {
-      "edges": 5,
+      "edges": 35,
       "kind": "er",
-      "nodes": 6
+      "nodes": 37
     },
     "handler": {
-      "edges": 1,
+      "edges": 3,
       "kind": "handler",
-      "nodes": 2
+      "nodes": 4
     },
     "lookup": {
-      "edges": 1,
+      "edges": 3,
       "kind": "lookup",
-      "nodes": 2
+      "nodes": 4
     },
     "package": {
-      "edges": 1,
+      "edges": 3,
       "kind": "package",
-      "nodes": 2
+      "nodes": 4
     },
     "security": {
-      "edges": 1,
+      "edges": 3,
       "kind": "security",
-      "nodes": 2
+      "nodes": 4
     },
     "workflow": {
-      "edges": 1,
+      "edges": 3,
       "kind": "workflow",
-      "nodes": 2
+      "nodes": 4
     }
   },
   "llms": {},
@@ -78,11 +99,11 @@
     "inventory_records.apg"
   ],
   "symbols": {
-    "field.InventoryItem.active": {
+    "app.InventoryRecords": {
       "file": "inventory_records.apg",
-      "id": "field.InventoryItem.active",
-      "kind": "field",
-      "name": "InventoryItem.active",
+      "id": "app.InventoryRecords",
+      "kind": "app",
+      "name": "InventoryRecords",
       "range": {
         "end": {
           "character": 1,
@@ -95,11 +116,11 @@
       },
       "references": []
     },
-    "field.InventoryItem.name": {
+    "field.InventoryItem.attributes": {
       "file": "inventory_records.apg",
-      "id": "field.InventoryItem.name",
+      "id": "field.InventoryItem.attributes",
       "kind": "field",
-      "name": "InventoryItem.name",
+      "name": "InventoryItem.attributes",
       "range": {
         "end": {
           "character": 1,
@@ -112,11 +133,11 @@
       },
       "references": []
     },
-    "field.InventoryItem.quantity": {
+    "field.InventoryItem.barcode": {
       "file": "inventory_records.apg",
-      "id": "field.InventoryItem.quantity",
+      "id": "field.InventoryItem.barcode",
       "kind": "field",
-      "name": "InventoryItem.quantity",
+      "name": "InventoryItem.barcode",
       "range": {
         "end": {
           "character": 1,
@@ -129,11 +150,334 @@
       },
       "references": []
     },
-    "field.InventoryItem.reorder_level": {
+    "field.InventoryItem.best_before": {
       "file": "inventory_records.apg",
-      "id": "field.InventoryItem.reorder_level",
+      "id": "field.InventoryItem.best_before",
       "kind": "field",
-      "name": "InventoryItem.reorder_level",
+      "name": "InventoryItem.best_before",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.categories": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.categories",
+      "kind": "field",
+      "name": "InventoryItem.categories",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.cost_price": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.cost_price",
+      "kind": "field",
+      "name": "InventoryItem.cost_price",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.created_at": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.created_at",
+      "kind": "field",
+      "name": "InventoryItem.created_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.description": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.description",
+      "kind": "field",
+      "name": "InventoryItem.description",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.dimensions": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.dimensions",
+      "kind": "field",
+      "name": "InventoryItem.dimensions",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.image_thumbnail": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.image_thumbnail",
+      "kind": "field",
+      "name": "InventoryItem.image_thumbnail",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.is_active": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.is_active",
+      "kind": "field",
+      "name": "InventoryItem.is_active",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.is_hazardous": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.is_hazardous",
+      "kind": "field",
+      "name": "InventoryItem.is_hazardous",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.is_serialised": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.is_serialised",
+      "kind": "field",
+      "name": "InventoryItem.is_serialised",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.last_counted_at": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.last_counted_at",
+      "kind": "field",
+      "name": "InventoryItem.last_counted_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.metadata": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.metadata",
+      "kind": "field",
+      "name": "InventoryItem.metadata",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.notes": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.notes",
+      "kind": "field",
+      "name": "InventoryItem.notes",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.quantity_on_hand": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.quantity_on_hand",
+      "kind": "field",
+      "name": "InventoryItem.quantity_on_hand",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.quantity_on_order": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.quantity_on_order",
+      "kind": "field",
+      "name": "InventoryItem.quantity_on_order",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.quantity_reserved": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.quantity_reserved",
+      "kind": "field",
+      "name": "InventoryItem.quantity_reserved",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.reorder_point": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.reorder_point",
+      "kind": "field",
+      "name": "InventoryItem.reorder_point",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.reorder_quantity": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.reorder_quantity",
+      "kind": "field",
+      "name": "InventoryItem.reorder_quantity",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.reorder_time": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.reorder_time",
+      "kind": "field",
+      "name": "InventoryItem.reorder_time",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.requires_refrigeration": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.requires_refrigeration",
+      "kind": "field",
+      "name": "InventoryItem.requires_refrigeration",
       "range": {
         "end": {
           "character": 1,
@@ -151,6 +495,210 @@
       "id": "field.InventoryItem.sku",
       "kind": "field",
       "name": "InventoryItem.sku",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.status": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.status",
+      "kind": "field",
+      "name": "InventoryItem.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.unit_price": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.unit_price",
+      "kind": "field",
+      "name": "InventoryItem.unit_price",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.warehouse_location": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.warehouse_location",
+      "kind": "field",
+      "name": "InventoryItem.warehouse_location",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.weight_kg": {
+      "file": "inventory_records.apg",
+      "id": "field.InventoryItem.weight_kg",
+      "kind": "field",
+      "name": "InventoryItem.weight_kg",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockMovement.item_id": {
+      "file": "inventory_records.apg",
+      "id": "field.StockMovement.item_id",
+      "kind": "field",
+      "name": "StockMovement.item_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockMovement.movement_date": {
+      "file": "inventory_records.apg",
+      "id": "field.StockMovement.movement_date",
+      "kind": "field",
+      "name": "StockMovement.movement_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockMovement.movement_id": {
+      "file": "inventory_records.apg",
+      "id": "field.StockMovement.movement_id",
+      "kind": "field",
+      "name": "StockMovement.movement_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockMovement.movement_type": {
+      "file": "inventory_records.apg",
+      "id": "field.StockMovement.movement_type",
+      "kind": "field",
+      "name": "StockMovement.movement_type",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockMovement.notes": {
+      "file": "inventory_records.apg",
+      "id": "field.StockMovement.notes",
+      "kind": "field",
+      "name": "StockMovement.notes",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockMovement.performed_by": {
+      "file": "inventory_records.apg",
+      "id": "field.StockMovement.performed_by",
+      "kind": "field",
+      "name": "StockMovement.performed_by",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockMovement.quantity": {
+      "file": "inventory_records.apg",
+      "id": "field.StockMovement.quantity",
+      "kind": "field",
+      "name": "StockMovement.quantity",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockMovement.reference": {
+      "file": "inventory_records.apg",
+      "id": "field.StockMovement.reference",
+      "kind": "field",
+      "name": "StockMovement.reference",
       "range": {
         "end": {
           "character": 1,
@@ -196,17 +744,368 @@
         }
       },
       "references": []
+    },
+    "table.StockMovement": {
+      "file": "inventory_records.apg",
+      "id": "table.StockMovement",
+      "kind": "table",
+      "name": "StockMovement",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
     }
   },
   "tables": {
     "InventoryItem": {
       "fields": {
-        "active": {
+        "attributes": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Dict"
+          },
+          "required": true,
+          "type": "Dict"
+        },
+        "barcode": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "best_before": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date?"
+          },
+          "required": true,
+          "type": "date?"
+        },
+        "categories": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "List"
+          },
+          "required": true,
+          "type": "List"
+        },
+        "cost_price": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "created_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "description": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "dimensions": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Dict"
+          },
+          "required": true,
+          "type": "Dict"
+        },
+        "image_thumbnail": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "bytes?"
+          },
+          "required": true,
+          "type": "bytes?"
+        },
+        "is_active": {
           "relationship": null,
           "required": true,
           "type": "bool"
         },
-        "name": {
+        "is_hazardous": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "is_serialised": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "last_counted_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime?"
+          },
+          "required": true,
+          "type": "datetime?"
+        },
+        "metadata": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Dict"
+          },
+          "required": true,
+          "type": "Dict"
+        },
+        "notes": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str | None"
+          },
+          "required": true,
+          "type": "str | None"
+        },
+        "quantity_on_hand": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "quantity_on_order": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "quantity_reserved": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "reorder_point": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "reorder_quantity": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "reorder_time": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "time?"
+          },
+          "required": true,
+          "type": "time?"
+        },
+        "requires_refrigeration": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "sku": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "unit_price": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "warehouse_location": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "weight_kg": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        }
+      },
+      "lookup_paths": {
+        "attributes.id": {
+          "chain": [
+            "InventoryItem.attributes",
+            "Dict.id"
+          ],
+          "valid": true
+        },
+        "barcode.id": {
+          "chain": [
+            "InventoryItem.barcode",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "best_before.id": {
+          "chain": [
+            "InventoryItem.best_before",
+            "date?.id"
+          ],
+          "valid": true
+        },
+        "categories.id": {
+          "chain": [
+            "InventoryItem.categories",
+            "List.id"
+          ],
+          "valid": true
+        },
+        "cost_price.id": {
+          "chain": [
+            "InventoryItem.cost_price",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "created_at.id": {
+          "chain": [
+            "InventoryItem.created_at",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "dimensions.id": {
+          "chain": [
+            "InventoryItem.dimensions",
+            "Dict.id"
+          ],
+          "valid": true
+        },
+        "image_thumbnail.id": {
+          "chain": [
+            "InventoryItem.image_thumbnail",
+            "bytes?.id"
+          ],
+          "valid": true
+        },
+        "last_counted_at.id": {
+          "chain": [
+            "InventoryItem.last_counted_at",
+            "datetime?.id"
+          ],
+          "valid": true
+        },
+        "metadata.id": {
+          "chain": [
+            "InventoryItem.metadata",
+            "Dict.id"
+          ],
+          "valid": true
+        },
+        "notes.id": {
+          "chain": [
+            "InventoryItem.notes",
+            "str | None.id"
+          ],
+          "valid": true
+        },
+        "reorder_time.id": {
+          "chain": [
+            "InventoryItem.reorder_time",
+            "time?.id"
+          ],
+          "valid": true
+        },
+        "unit_price.id": {
+          "chain": [
+            "InventoryItem.unit_price",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "warehouse_location.id": {
+          "chain": [
+            "InventoryItem.warehouse_location",
+            "str?.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "InventoryItem"
+    },
+    "StockMovement": {
+      "fields": {
+        "item_id": {
+          "relationship": {
+            "alias": "item",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Item"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "movement_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "movement_id": {
+          "relationship": {
+            "alias": "movement",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Movement"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "movement_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "notes": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str | None"
+          },
+          "required": true,
+          "type": "str | None"
+        },
+        "performed_by": {
           "relationship": null,
           "required": true,
           "type": "str"
@@ -216,19 +1115,40 @@
           "required": true,
           "type": "int"
         },
-        "reorder_level": {
-          "relationship": null,
+        "reference": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
           "required": true,
-          "type": "int"
-        },
-        "sku": {
-          "relationship": null,
-          "required": true,
-          "type": "str"
+          "type": "str?"
         }
       },
-      "lookup_paths": {},
-      "name": "InventoryItem"
+      "lookup_paths": {
+        "movement_date.id": {
+          "chain": [
+            "StockMovement.movement_date",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "notes.id": {
+          "chain": [
+            "StockMovement.notes",
+            "str | None.id"
+          ],
+          "valid": true
+        },
+        "reference.id": {
+          "chain": [
+            "StockMovement.reference",
+            "str?.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "StockMovement"
     }
   },
   "views": {}

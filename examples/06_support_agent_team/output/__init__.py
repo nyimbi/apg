@@ -4,8 +4,6 @@ support_team - APG Generated Package
 
 Version: 1.0.0
 
-Planner and writer agent team for support responses
-
 This package was automatically generated from APG source code.
 """
 

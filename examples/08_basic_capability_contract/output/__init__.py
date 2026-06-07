@@ -1,6 +1,6 @@
 """
-capability_basics - APG Generated Package
-==========================================
+capability_contract - APG Generated Package
+============================================
 
 Version: 1.0.0
 

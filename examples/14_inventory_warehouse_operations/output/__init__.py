@@ -1,6 +1,6 @@
 """
-inventory_warehouse_operations - APG Generated Package
-=======================================================
+inventory_warehouse - APG Generated Package
+============================================
 
 Version: 1.0.0
 

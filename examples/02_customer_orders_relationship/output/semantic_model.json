@@ -2,14 +2,35 @@
   "agents": {},
   "app": {
     "description": null,
-    "entity_count": 2,
+    "entity_count": 4,
     "name": "customer_orders",
     "version": "1.0.0"
   },
   "capabilities": {},
   "composition": {
     "agent_teams": {},
-    "applications": {},
+    "applications": {
+      "CustomerOrders": {
+        "agent_teams": [],
+        "agents": [],
+        "capabilities": [],
+        "components": {},
+        "configuration": {},
+        "deployments": {},
+        "description": "Customer and order management",
+        "integrations": {},
+        "name": "CustomerOrders",
+        "policies": {},
+        "routes": [
+          "/customers",
+          "/orders"
+        ],
+        "runtime": {},
+        "screens": {},
+        "theme": {},
+        "workflows": []
+      }
+    },
     "capability_dependencies": {}
   },
   "contracts": {},
@@ -29,42 +50,42 @@
     "capability": {
       "edges": 0,
       "kind": "capability",
-      "nodes": 0
+      "nodes": 1
     },
     "deployment": {
-      "edges": 2,
+      "edges": 4,
       "kind": "deployment",
-      "nodes": 3
+      "nodes": 5
     },
     "er": {
-      "edges": 7,
+      "edges": 32,
       "kind": "er",
-      "nodes": 8
+      "nodes": 33
     },
     "handler": {
-      "edges": 2,
+      "edges": 4,
       "kind": "handler",
-      "nodes": 3
+      "nodes": 5
     },
     "lookup": {
-      "edges": 2,
+      "edges": 4,
       "kind": "lookup",
-      "nodes": 3
+      "nodes": 5
     },
     "package": {
-      "edges": 2,
+      "edges": 4,
       "kind": "package",
-      "nodes": 3
+      "nodes": 5
     },
     "security": {
-      "edges": 2,
+      "edges": 4,
       "kind": "security",
-      "nodes": 3
+      "nodes": 5
     },
     "workflow": {
-      "edges": 2,
+      "edges": 4,
       "kind": "workflow",
-      "nodes": 3
+      "nodes": 5
     }
   },
   "llms": {},
@@ -78,6 +99,74 @@
     "customer_orders.apg"
   ],
   "symbols": {
+    "app.CustomerOrders": {
+      "file": "customer_orders.apg",
+      "id": "app.CustomerOrders",
+      "kind": "app",
+      "name": "CustomerOrders",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.attributes": {
+      "file": "customer_orders.apg",
+      "id": "field.Customer.attributes",
+      "kind": "field",
+      "name": "Customer.attributes",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.credit_limit": {
+      "file": "customer_orders.apg",
+      "id": "field.Customer.credit_limit",
+      "kind": "field",
+      "name": "Customer.credit_limit",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.customer_number": {
+      "file": "customer_orders.apg",
+      "id": "field.Customer.customer_number",
+      "kind": "field",
+      "name": "Customer.customer_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
     "field.Customer.email": {
       "file": "customer_orders.apg",
       "id": "field.Customer.email",
@@ -95,11 +184,11 @@
       },
       "references": []
     },
-    "field.Customer.name": {
+    "field.Customer.is_active": {
       "file": "customer_orders.apg",
-      "id": "field.Customer.name",
+      "id": "field.Customer.is_active",
       "kind": "field",
-      "name": "Customer.name",
+      "name": "Customer.is_active",
       "range": {
         "end": {
           "character": 1,
@@ -112,11 +201,11 @@
       },
       "references": []
     },
-    "field.SalesOrder.customer_id": {
+    "field.Customer.legal_name": {
       "file": "customer_orders.apg",
-      "id": "field.SalesOrder.customer_id",
+      "id": "field.Customer.legal_name",
       "kind": "field",
-      "name": "SalesOrder.customer_id",
+      "name": "Customer.legal_name",
       "range": {
         "end": {
           "character": 1,
@@ -129,11 +218,11 @@
       },
       "references": []
     },
-    "field.SalesOrder.order_number": {
+    "field.Customer.phone": {
       "file": "customer_orders.apg",
-      "id": "field.SalesOrder.order_number",
+      "id": "field.Customer.phone",
       "kind": "field",
-      "name": "SalesOrder.order_number",
+      "name": "Customer.phone",
       "range": {
         "end": {
           "character": 1,
@@ -146,11 +235,11 @@
       },
       "references": []
     },
-    "field.SalesOrder.status": {
+    "field.Customer.segment": {
       "file": "customer_orders.apg",
-      "id": "field.SalesOrder.status",
+      "id": "field.Customer.segment",
       "kind": "field",
-      "name": "SalesOrder.status",
+      "name": "Customer.segment",
       "range": {
         "end": {
           "character": 1,
@@ -163,11 +252,368 @@
       },
       "references": []
     },
-    "field.SalesOrder.total": {
+    "field.Customer.tags": {
       "file": "customer_orders.apg",
-      "id": "field.SalesOrder.total",
+      "id": "field.Customer.tags",
       "kind": "field",
-      "name": "SalesOrder.total",
+      "name": "Customer.tags",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.currency": {
+      "file": "customer_orders.apg",
+      "id": "field.Order.currency",
+      "kind": "field",
+      "name": "Order.currency",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.customer_id": {
+      "file": "customer_orders.apg",
+      "id": "field.Order.customer_id",
+      "kind": "field",
+      "name": "Order.customer_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.delivery_date": {
+      "file": "customer_orders.apg",
+      "id": "field.Order.delivery_date",
+      "kind": "field",
+      "name": "Order.delivery_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.line_items": {
+      "file": "customer_orders.apg",
+      "id": "field.Order.line_items",
+      "kind": "field",
+      "name": "Order.line_items",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.metadata": {
+      "file": "customer_orders.apg",
+      "id": "field.Order.metadata",
+      "kind": "field",
+      "name": "Order.metadata",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.notes": {
+      "file": "customer_orders.apg",
+      "id": "field.Order.notes",
+      "kind": "field",
+      "name": "Order.notes",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.order_date": {
+      "file": "customer_orders.apg",
+      "id": "field.Order.order_date",
+      "kind": "field",
+      "name": "Order.order_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.order_number": {
+      "file": "customer_orders.apg",
+      "id": "field.Order.order_number",
+      "kind": "field",
+      "name": "Order.order_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.status": {
+      "file": "customer_orders.apg",
+      "id": "field.Order.status",
+      "kind": "field",
+      "name": "Order.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.subtotal": {
+      "file": "customer_orders.apg",
+      "id": "field.Order.subtotal",
+      "kind": "field",
+      "name": "Order.subtotal",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.tax": {
+      "file": "customer_orders.apg",
+      "id": "field.Order.tax",
+      "kind": "field",
+      "name": "Order.tax",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.total": {
+      "file": "customer_orders.apg",
+      "id": "field.Order.total",
+      "kind": "field",
+      "name": "Order.total",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OrderLine.description": {
+      "file": "customer_orders.apg",
+      "id": "field.OrderLine.description",
+      "kind": "field",
+      "name": "OrderLine.description",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OrderLine.discount_pct": {
+      "file": "customer_orders.apg",
+      "id": "field.OrderLine.discount_pct",
+      "kind": "field",
+      "name": "OrderLine.discount_pct",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OrderLine.is_taxable": {
+      "file": "customer_orders.apg",
+      "id": "field.OrderLine.is_taxable",
+      "kind": "field",
+      "name": "OrderLine.is_taxable",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OrderLine.line_id": {
+      "file": "customer_orders.apg",
+      "id": "field.OrderLine.line_id",
+      "kind": "field",
+      "name": "OrderLine.line_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OrderLine.line_total": {
+      "file": "customer_orders.apg",
+      "id": "field.OrderLine.line_total",
+      "kind": "field",
+      "name": "OrderLine.line_total",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OrderLine.order_id": {
+      "file": "customer_orders.apg",
+      "id": "field.OrderLine.order_id",
+      "kind": "field",
+      "name": "OrderLine.order_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OrderLine.product_code": {
+      "file": "customer_orders.apg",
+      "id": "field.OrderLine.product_code",
+      "kind": "field",
+      "name": "OrderLine.product_code",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OrderLine.quantity": {
+      "file": "customer_orders.apg",
+      "id": "field.OrderLine.quantity",
+      "kind": "field",
+      "name": "OrderLine.quantity",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OrderLine.unit_price": {
+      "file": "customer_orders.apg",
+      "id": "field.OrderLine.unit_price",
+      "kind": "field",
+      "name": "OrderLine.unit_price",
       "range": {
         "end": {
           "character": 1,
@@ -214,11 +660,28 @@
       },
       "references": []
     },
-    "table.SalesOrder": {
+    "table.Order": {
       "file": "customer_orders.apg",
-      "id": "table.SalesOrder",
+      "id": "table.Order",
       "kind": "table",
-      "name": "SalesOrder",
+      "name": "Order",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.OrderLine": {
+      "file": "customer_orders.apg",
+      "id": "table.OrderLine",
+      "kind": "table",
+      "name": "OrderLine",
       "range": {
         "end": {
           "character": 1,
@@ -235,22 +698,107 @@
   "tables": {
     "Customer": {
       "fields": {
+        "attributes": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Dict"
+          },
+          "required": true,
+          "type": "Dict"
+        },
+        "credit_limit": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "customer_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
         "email": {
           "relationship": null,
           "required": true,
           "type": "str"
         },
-        "name": {
+        "is_active": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "legal_name": {
           "relationship": null,
           "required": true,
           "type": "str"
+        },
+        "phone": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "segment": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "tags": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "List"
+          },
+          "required": true,
+          "type": "List"
         }
       },
-      "lookup_paths": {},
+      "lookup_paths": {
+        "attributes.id": {
+          "chain": [
+            "Customer.attributes",
+            "Dict.id"
+          ],
+          "valid": true
+        },
+        "credit_limit.id": {
+          "chain": [
+            "Customer.credit_limit",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "phone.id": {
+          "chain": [
+            "Customer.phone",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "tags.id": {
+          "chain": [
+            "Customer.tags",
+            "List.id"
+          ],
+          "valid": true
+        }
+      },
       "name": "Customer"
     },
-    "SalesOrder": {
+    "Order": {
       "fields": {
+        "currency": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
         "customer_id": {
           "relationship": {
             "alias": "customer",
@@ -259,7 +807,52 @@
             "target_table": "Customer"
           },
           "required": true,
-          "type": "int"
+          "type": "str"
+        },
+        "delivery_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date?"
+          },
+          "required": true,
+          "type": "date?"
+        },
+        "line_items": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "List"
+          },
+          "required": true,
+          "type": "List"
+        },
+        "metadata": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Dict"
+          },
+          "required": true,
+          "type": "Dict"
+        },
+        "notes": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str | None"
+          },
+          "required": true,
+          "type": "str | None"
+        },
+        "order_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
         },
         "order_number": {
           "relationship": null,
@@ -271,14 +864,177 @@
           "required": true,
           "type": "str"
         },
+        "subtotal": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "tax": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
         "total": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        }
+      },
+      "lookup_paths": {
+        "delivery_date.id": {
+          "chain": [
+            "Order.delivery_date",
+            "date?.id"
+          ],
+          "valid": true
+        },
+        "line_items.id": {
+          "chain": [
+            "Order.line_items",
+            "List.id"
+          ],
+          "valid": true
+        },
+        "metadata.id": {
+          "chain": [
+            "Order.metadata",
+            "Dict.id"
+          ],
+          "valid": true
+        },
+        "notes.id": {
+          "chain": [
+            "Order.notes",
+            "str | None.id"
+          ],
+          "valid": true
+        },
+        "order_date.id": {
+          "chain": [
+            "Order.order_date",
+            "date.id"
+          ],
+          "valid": true
+        },
+        "subtotal.id": {
+          "chain": [
+            "Order.subtotal",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "tax.id": {
+          "chain": [
+            "Order.tax",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "total.id": {
+          "chain": [
+            "Order.total",
+            "decimal.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Order"
+    },
+    "OrderLine": {
+      "fields": {
+        "description": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "discount_pct": {
           "relationship": null,
           "required": true,
           "type": "float"
+        },
+        "is_taxable": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "line_id": {
+          "relationship": {
+            "alias": "line",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Line"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "line_total": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "order_id": {
+          "relationship": {
+            "alias": "order",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Order"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "product_code": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "quantity": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "unit_price": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
         }
       },
-      "lookup_paths": {},
-      "name": "SalesOrder"
+      "lookup_paths": {
+        "line_total.id": {
+          "chain": [
+            "OrderLine.line_total",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "unit_price.id": {
+          "chain": [
+            "OrderLine.unit_price",
+            "decimal.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "OrderLine"
     }
   },
   "views": {}

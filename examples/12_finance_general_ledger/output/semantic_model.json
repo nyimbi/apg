@@ -2,83 +2,31 @@
   "agents": {},
   "app": {
     "description": null,
-    "entity_count": 1,
-    "name": "finance_general_ledger",
+    "entity_count": 5,
+    "name": "finance_gl",
     "version": "1.0.0"
   },
   "capabilities": {
     "GeneralLedger": {
       "approvals": {
         "approvers": [
+          "finance_manager",
           "controller",
           "cfo"
         ],
-        "levels": 2
+        "escalation": "finance_director",
+        "levels": 3,
+        "segregation_of_duties": true,
+        "thresholds": {
+          "level1": 100000,
+          "level2": 500000,
+          "level3": 1000000
+        }
       },
       "business_rules": [
         {
           "action": "deny",
-          "name": "period_open",
-          "priority": 100,
-          "when": "period.closed",
-          "when_ast": {
-            "field": "period.closed",
-            "op": "==",
-            "type": "compare",
-            "value": true
-          }
-        }
-      ],
-      "components": {
-        "posting": {
-          "capability": "journal_entries",
-          "permissions": [
-            "post",
-            "reverse"
-          ]
-        }
-      },
-      "configuration": {
-        "currency": "KES",
-        "fiscal_calendar": "monthly"
-      },
-      "erp_modules": [
-        "finance",
-        "general_ledger",
-        "accounts_payable"
-      ],
-      "i18n": {
-        "default_language": "en",
-        "fallback_language": "en",
-        "supported_languages": [
-          "en",
-          "sw",
-          "ha",
-          "yo",
-          "zu"
-        ]
-      },
-      "master_data": {
-        "entities": [
-          "account",
-          "cost_center",
-          "financial_period"
-        ]
-      },
-      "name": "GeneralLedger",
-      "provides": [
-        "journal_entries",
-        "chart_of_accounts",
-        "financial_periods"
-      ],
-      "requires": [
-        "audit_events"
-      ],
-      "rule_engine": {},
-      "rules": [
-        {
-          "action": "deny",
-          "name": "balanced_journal",
+          "name": "balanced_entry",
           "when": "debits != credits",
           "when_ast": {
             "field": "debits",
@@ -86,26 +34,225 @@
             "type": "compare",
             "value": "credits"
           }
+        },
+        {
+          "action": "deny",
+          "name": "valid_period",
+          "when": "period_status == closed",
+          "when_ast": {
+            "field": "period_status",
+            "op": "==",
+            "type": "compare",
+            "value": "closed"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "active_account",
+          "when": "account_is_active == false",
+          "when_ast": {
+            "field": "account_is_active",
+            "op": "==",
+            "type": "compare",
+            "value": false
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "budget_exceeded",
+          "when": "commitment > budget_line",
+          "when_ast": {
+            "field": "commitment",
+            "op": ">",
+            "type": "compare",
+            "value": "budget_line"
+          }
+        }
+      ],
+      "components": {},
+      "configuration": {
+        "base_currency": "KES",
+        "decimal_places": 2,
+        "fiscal_year_start": "01-01",
+        "supported_currencies": [
+          "KES",
+          "UGX",
+          "TZS",
+          "USD",
+          "EUR"
+        ],
+        "tenant_id": "default"
+      },
+      "erp_modules": [
+        "finance",
+        "general_ledger",
+        "accounts_payable",
+        "accounts_receivable",
+        "fixed_assets",
+        "project_accounting",
+        "reporting"
+      ],
+      "i18n": {
+        "default_language": "en",
+        "fallback_language": "en",
+        "supported_languages": [
+          "en",
+          "sw",
+          "fr"
+        ]
+      },
+      "master_data": {
+        "deduplication": "account_code",
+        "entities": [
+          "account",
+          "cost_centre",
+          "financial_period",
+          "currency",
+          "exchange_rate",
+          "budget",
+          "budget_line",
+          "project",
+          "department"
+        ],
+        "governance": {
+          "rules": [
+            {
+              "action": "deny",
+              "name": "unique_code",
+              "when": "account_code exists"
+            }
+          ],
+          "type": "deterministic"
+        },
+        "ownership": {
+          "account": "finance",
+          "cost_centre": "operations",
+          "currency": "finance",
+          "financial_period": "finance"
+        }
+      },
+      "name": "GeneralLedger",
+      "provides": [
+        "chart_of_accounts",
+        "journal_entries",
+        "period_close",
+        "trial_balance",
+        "financial_statements"
+      ],
+      "requires": [
+        "audit_events",
+        "auth"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "deny",
+          "name": "journal_balanced",
+          "when": "total_debit != total_credit",
+          "when_ast": {
+            "field": "total_debit",
+            "op": "!=",
+            "type": "compare",
+            "value": "total_credit"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "open_period_required",
+          "when": "period_status != open",
+          "when_ast": {
+            "field": "period_status",
+            "op": "!=",
+            "type": "compare",
+            "value": "open"
+          }
+        },
+        {
+          "action": "allow",
+          "name": "posting_authorised",
+          "when": "user_role in [accountant, controller, cfo]",
+          "when_ast": {
+            "field": "user_role",
+            "negated": false,
+            "type": "in",
+            "values": [
+              "accountant",
+              "controller",
+              "cfo"
+            ]
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "large_entry_review",
+          "when": "total_debit > 1000000",
+          "when_ast": {
+            "field": "total_debit",
+            "op": ">",
+            "type": "compare",
+            "value": 1000000
+          }
+        },
+        {
+          "action": "deny",
+          "name": "period_close_check",
+          "when": "reconciled == false and period_close_initiated == true",
+          "when_ast": {
+            "left": {
+              "field": "reconciled",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "right": {
+              "field": "period_close_initiated",
+              "op": "==",
+              "type": "compare",
+              "value": true
+            },
+            "type": "and"
+          }
         }
       ],
       "runtime": {},
       "screens": {},
       "streaming": {
+        "input": "gl_events",
         "processor": "bytewax",
-        "state": "ledger_posting_state"
+        "state": "gl_state"
       },
       "theme": {
-        "name": "finance_ops",
+        "name": "finance_theme",
         "tokens": {
-          "accent": "#126E82"
+          "accent": "#1A237E",
+          "color.primary": "#283593"
         }
       },
       "ui": {
         "routes": [
           {
-            "component": "JournalScreen",
-            "name": "Journals",
-            "path": "/finance/gl/journals"
+            "component": "AccountList",
+            "name": "Chart of Accounts",
+            "path": "/gl/accounts",
+            "permission": "gl:accounts"
+          },
+          {
+            "component": "JournalList",
+            "name": "Journal Entries",
+            "path": "/gl/journals",
+            "permission": "gl:journals"
+          },
+          {
+            "component": "TrialBalance",
+            "name": "Trial Balance",
+            "path": "/gl/trial",
+            "permission": "gl:reports"
+          },
+          {
+            "component": "PeriodClose",
+            "name": "Period Close",
+            "path": "/gl/period-close",
+            "permission": "gl:close"
           }
         ],
         "shell": "python"
@@ -114,70 +261,186 @@
   },
   "composition": {
     "agent_teams": {},
-    "applications": {},
+    "applications": {
+      "FinanceGL": {
+        "agent_teams": [],
+        "agents": [],
+        "capabilities": [
+          "GeneralLedger"
+        ],
+        "components": {},
+        "configuration": {},
+        "deployments": {},
+        "description": "General ledger financial application",
+        "integrations": {},
+        "name": "FinanceGL",
+        "policies": {},
+        "routes": [
+          "/gl"
+        ],
+        "runtime": {},
+        "screens": {},
+        "theme": {},
+        "workflows": []
+      }
+    },
     "capability_dependencies": {
       "GeneralLedger": [
-        "audit_events"
+        "audit_events",
+        "auth"
       ]
     }
   },
   "contracts": {
     "GeneralLedger": {
       "configuration": {
-        "currency": "KES",
-        "fiscal_calendar": "monthly"
+        "base_currency": "KES",
+        "decimal_places": 2,
+        "fiscal_year_start": "01-01",
+        "supported_currencies": [
+          "KES",
+          "UGX",
+          "TZS",
+          "USD",
+          "EUR"
+        ],
+        "tenant_id": "default"
+      },
+      "configuration_schema": {
+        "required": [
+          "tenant_id",
+          "base_currency"
+        ]
       },
       "id": "general_ledger",
-      "name": "General Ledger",
       "provides": [
-        "journal_entries",
         "chart_of_accounts",
-        "financial_periods"
+        "journal_entries",
+        "period_close",
+        "trial_balance",
+        "financial_statements"
       ],
       "requires": [
-        "audit_events"
+        "audit_events",
+        "auth"
       ],
       "rules": [
         {
           "action": "deny",
-          "name": "balanced_journal",
-          "when": "debits != credits",
+          "name": "journal_balanced",
+          "when": "total_debit != total_credit",
           "when_ast": {
-            "field": "debits",
+            "field": "total_debit",
             "op": "!=",
             "type": "compare",
-            "value": "credits"
+            "value": "total_credit"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "open_period_required",
+          "when": "period_status != open",
+          "when_ast": {
+            "field": "period_status",
+            "op": "!=",
+            "type": "compare",
+            "value": "open"
+          }
+        },
+        {
+          "action": "allow",
+          "name": "posting_authorised",
+          "when": "user_role in [accountant, controller, cfo]",
+          "when_ast": {
+            "field": "user_role",
+            "negated": false,
+            "type": "in",
+            "values": [
+              "accountant",
+              "controller",
+              "cfo"
+            ]
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "large_entry_review",
+          "when": "total_debit > 1000000",
+          "when_ast": {
+            "field": "total_debit",
+            "op": ">",
+            "type": "compare",
+            "value": 1000000
+          }
+        },
+        {
+          "action": "deny",
+          "name": "period_close_check",
+          "when": "reconciled == false and period_close_initiated == true",
+          "when_ast": {
+            "left": {
+              "field": "reconciled",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "right": {
+              "field": "period_close_initiated",
+              "op": "==",
+              "type": "compare",
+              "value": true
+            },
+            "type": "and"
           }
         }
       ],
       "theme": {
-        "name": "finance_ops",
+        "name": "finance_theme",
         "tokens": {
-          "accent": "#126E82"
+          "accent": "#1A237E",
+          "color.primary": "#283593"
         }
       },
       "ui": {
         "routes": [
           {
-            "component": "JournalScreen",
-            "name": "Journals",
-            "path": "/finance/gl/journals"
+            "component": "AccountList",
+            "name": "Chart of Accounts",
+            "path": "/gl/accounts",
+            "permission": "gl:accounts"
+          },
+          {
+            "component": "JournalList",
+            "name": "Journal Entries",
+            "path": "/gl/journals",
+            "permission": "gl:journals"
+          },
+          {
+            "component": "TrialBalance",
+            "name": "Trial Balance",
+            "path": "/gl/trial",
+            "permission": "gl:reports"
+          },
+          {
+            "component": "PeriodClose",
+            "name": "Period Close",
+            "path": "/gl/period-close",
+            "permission": "gl:close"
           }
         ],
         "shell": "python"
-      },
-      "version": "1.0.0"
+      }
     }
   },
   "deployment": {
-    "source": "finance_general_ledger.apg",
+    "source": "finance_gl.apg",
     "target": "python"
   },
   "diagnostics": [
     {
       "code": "APG0100",
       "docs_url": "docs/tooling.md#semantic-model-contract",
-      "file": "finance_general_ledger.apg",
+      "file": "finance_gl.apg",
       "fixes": [],
       "message": "Capability 'GeneralLedger' requires 'audit_events' which is not declared in this module",
       "range": {
@@ -204,44 +467,44 @@
       "nodes": 0
     },
     "capability": {
-      "edges": 1,
+      "edges": 3,
       "kind": "capability",
-      "nodes": 2
+      "nodes": 4
     },
     "deployment": {
-      "edges": 1,
+      "edges": 5,
       "kind": "deployment",
-      "nodes": 2
+      "nodes": 6
     },
     "er": {
-      "edges": 0,
+      "edges": 26,
       "kind": "er",
-      "nodes": 0
+      "nodes": 29
     },
     "handler": {
-      "edges": 1,
+      "edges": 5,
       "kind": "handler",
-      "nodes": 2
+      "nodes": 6
     },
     "lookup": {
-      "edges": 1,
+      "edges": 5,
       "kind": "lookup",
-      "nodes": 2
+      "nodes": 6
     },
     "package": {
-      "edges": 1,
+      "edges": 5,
       "kind": "package",
-      "nodes": 2
+      "nodes": 6
     },
     "security": {
-      "edges": 1,
+      "edges": 5,
       "kind": "security",
-      "nodes": 2
+      "nodes": 6
     },
     "workflow": {
-      "edges": 1,
+      "edges": 5,
       "kind": "workflow",
-      "nodes": 2
+      "nodes": 6
     }
   },
   "llms": {},
@@ -250,9 +513,20 @@
   "packages": {},
   "roles": {},
   "rules": {
-    "GeneralLedger.balanced_journal": {
+    "GeneralLedger.active_account": {
       "action": "deny",
-      "name": "balanced_journal",
+      "name": "active_account",
+      "when": "account_is_active == false",
+      "when_ast": {
+        "field": "account_is_active",
+        "op": "==",
+        "type": "compare",
+        "value": false
+      }
+    },
+    "GeneralLedger.balanced_entry": {
+      "action": "deny",
+      "name": "balanced_entry",
       "when": "debits != credits",
       "when_ast": {
         "field": "debits",
@@ -261,26 +535,121 @@
         "value": "credits"
       }
     },
-    "GeneralLedger.period_open": {
-      "action": "deny",
-      "name": "period_open",
-      "priority": 100,
-      "when": "period.closed",
+    "GeneralLedger.budget_exceeded": {
+      "action": "require_review",
+      "name": "budget_exceeded",
+      "when": "commitment > budget_line",
       "when_ast": {
-        "field": "period.closed",
+        "field": "commitment",
+        "op": ">",
+        "type": "compare",
+        "value": "budget_line"
+      }
+    },
+    "GeneralLedger.journal_balanced": {
+      "action": "deny",
+      "name": "journal_balanced",
+      "when": "total_debit != total_credit",
+      "when_ast": {
+        "field": "total_debit",
+        "op": "!=",
+        "type": "compare",
+        "value": "total_credit"
+      }
+    },
+    "GeneralLedger.large_entry_review": {
+      "action": "require_review",
+      "name": "large_entry_review",
+      "when": "total_debit > 1000000",
+      "when_ast": {
+        "field": "total_debit",
+        "op": ">",
+        "type": "compare",
+        "value": 1000000
+      }
+    },
+    "GeneralLedger.open_period_required": {
+      "action": "deny",
+      "name": "open_period_required",
+      "when": "period_status != open",
+      "when_ast": {
+        "field": "period_status",
+        "op": "!=",
+        "type": "compare",
+        "value": "open"
+      }
+    },
+    "GeneralLedger.period_close_check": {
+      "action": "deny",
+      "name": "period_close_check",
+      "when": "reconciled == false and period_close_initiated == true",
+      "when_ast": {
+        "left": {
+          "field": "reconciled",
+          "op": "==",
+          "type": "compare",
+          "value": false
+        },
+        "right": {
+          "field": "period_close_initiated",
+          "op": "==",
+          "type": "compare",
+          "value": true
+        },
+        "type": "and"
+      }
+    },
+    "GeneralLedger.posting_authorised": {
+      "action": "allow",
+      "name": "posting_authorised",
+      "when": "user_role in [accountant, controller, cfo]",
+      "when_ast": {
+        "field": "user_role",
+        "negated": false,
+        "type": "in",
+        "values": [
+          "accountant",
+          "controller",
+          "cfo"
+        ]
+      }
+    },
+    "GeneralLedger.valid_period": {
+      "action": "deny",
+      "name": "valid_period",
+      "when": "period_status == closed",
+      "when_ast": {
+        "field": "period_status",
         "op": "==",
         "type": "compare",
-        "value": true
+        "value": "closed"
       }
     }
   },
   "security": {},
   "source_files": [
-    "finance_general_ledger.apg"
+    "finance_gl.apg"
   ],
   "symbols": {
+    "app.FinanceGL": {
+      "file": "finance_gl.apg",
+      "id": "app.FinanceGL",
+      "kind": "app",
+      "name": "FinanceGL",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
     "capability.GeneralLedger": {
-      "file": "finance_general_ledger.apg",
+      "file": "finance_gl.apg",
       "id": "capability.GeneralLedger",
       "kind": "capability",
       "name": "GeneralLedger",
@@ -296,11 +665,504 @@
       },
       "references": []
     },
-    "module.finance_general_ledger": {
-      "file": "finance_general_ledger.apg",
-      "id": "module.finance_general_ledger",
+    "field.Account.account_code": {
+      "file": "finance_gl.apg",
+      "id": "field.Account.account_code",
+      "kind": "field",
+      "name": "Account.account_code",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Account.account_name": {
+      "file": "finance_gl.apg",
+      "id": "field.Account.account_name",
+      "kind": "field",
+      "name": "Account.account_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Account.account_type": {
+      "file": "finance_gl.apg",
+      "id": "field.Account.account_type",
+      "kind": "field",
+      "name": "Account.account_type",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Account.currency": {
+      "file": "finance_gl.apg",
+      "id": "field.Account.currency",
+      "kind": "field",
+      "name": "Account.currency",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Account.is_active": {
+      "file": "finance_gl.apg",
+      "id": "field.Account.is_active",
+      "kind": "field",
+      "name": "Account.is_active",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Account.is_control": {
+      "file": "finance_gl.apg",
+      "id": "field.Account.is_control",
+      "kind": "field",
+      "name": "Account.is_control",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Account.normal_balance": {
+      "file": "finance_gl.apg",
+      "id": "field.Account.normal_balance",
+      "kind": "field",
+      "name": "Account.normal_balance",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Account.parent_code": {
+      "file": "finance_gl.apg",
+      "id": "field.Account.parent_code",
+      "kind": "field",
+      "name": "Account.parent_code",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.JournalEntry.description": {
+      "file": "finance_gl.apg",
+      "id": "field.JournalEntry.description",
+      "kind": "field",
+      "name": "JournalEntry.description",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.JournalEntry.entry_date": {
+      "file": "finance_gl.apg",
+      "id": "field.JournalEntry.entry_date",
+      "kind": "field",
+      "name": "JournalEntry.entry_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.JournalEntry.journal_id": {
+      "file": "finance_gl.apg",
+      "id": "field.JournalEntry.journal_id",
+      "kind": "field",
+      "name": "JournalEntry.journal_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.JournalEntry.period": {
+      "file": "finance_gl.apg",
+      "id": "field.JournalEntry.period",
+      "kind": "field",
+      "name": "JournalEntry.period",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.JournalEntry.posted_at": {
+      "file": "finance_gl.apg",
+      "id": "field.JournalEntry.posted_at",
+      "kind": "field",
+      "name": "JournalEntry.posted_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.JournalEntry.posted_by": {
+      "file": "finance_gl.apg",
+      "id": "field.JournalEntry.posted_by",
+      "kind": "field",
+      "name": "JournalEntry.posted_by",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.JournalEntry.reference": {
+      "file": "finance_gl.apg",
+      "id": "field.JournalEntry.reference",
+      "kind": "field",
+      "name": "JournalEntry.reference",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.JournalEntry.status": {
+      "file": "finance_gl.apg",
+      "id": "field.JournalEntry.status",
+      "kind": "field",
+      "name": "JournalEntry.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.JournalEntry.total_credit": {
+      "file": "finance_gl.apg",
+      "id": "field.JournalEntry.total_credit",
+      "kind": "field",
+      "name": "JournalEntry.total_credit",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.JournalEntry.total_debit": {
+      "file": "finance_gl.apg",
+      "id": "field.JournalEntry.total_debit",
+      "kind": "field",
+      "name": "JournalEntry.total_debit",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.JournalLine.account_code": {
+      "file": "finance_gl.apg",
+      "id": "field.JournalLine.account_code",
+      "kind": "field",
+      "name": "JournalLine.account_code",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.JournalLine.cost_centre": {
+      "file": "finance_gl.apg",
+      "id": "field.JournalLine.cost_centre",
+      "kind": "field",
+      "name": "JournalLine.cost_centre",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.JournalLine.credit": {
+      "file": "finance_gl.apg",
+      "id": "field.JournalLine.credit",
+      "kind": "field",
+      "name": "JournalLine.credit",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.JournalLine.debit": {
+      "file": "finance_gl.apg",
+      "id": "field.JournalLine.debit",
+      "kind": "field",
+      "name": "JournalLine.debit",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.JournalLine.journal_id": {
+      "file": "finance_gl.apg",
+      "id": "field.JournalLine.journal_id",
+      "kind": "field",
+      "name": "JournalLine.journal_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.JournalLine.line_id": {
+      "file": "finance_gl.apg",
+      "id": "field.JournalLine.line_id",
+      "kind": "field",
+      "name": "JournalLine.line_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.JournalLine.memo": {
+      "file": "finance_gl.apg",
+      "id": "field.JournalLine.memo",
+      "kind": "field",
+      "name": "JournalLine.memo",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.JournalLine.project": {
+      "file": "finance_gl.apg",
+      "id": "field.JournalLine.project",
+      "kind": "field",
+      "name": "JournalLine.project",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.finance_gl": {
+      "file": "finance_gl.apg",
+      "id": "module.finance_gl",
       "kind": "module",
-      "name": "finance_general_ledger",
+      "name": "finance_gl",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Account": {
+      "file": "finance_gl.apg",
+      "id": "table.Account",
+      "kind": "table",
+      "name": "Account",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.JournalEntry": {
+      "file": "finance_gl.apg",
+      "id": "table.JournalEntry",
+      "kind": "table",
+      "name": "JournalEntry",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.JournalLine": {
+      "file": "finance_gl.apg",
+      "id": "table.JournalLine",
+      "kind": "table",
+      "name": "JournalLine",
       "range": {
         "end": {
           "character": 1,
@@ -314,6 +1176,294 @@
       "references": []
     }
   },
-  "tables": {},
+  "tables": {
+    "Account": {
+      "fields": {
+        "account_code": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "account_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "account_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "currency": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "is_active": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "is_control": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "normal_balance": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "parent_code": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        }
+      },
+      "lookup_paths": {
+        "parent_code.id": {
+          "chain": [
+            "Account.parent_code",
+            "str?.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Account"
+    },
+    "JournalEntry": {
+      "fields": {
+        "description": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "entry_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "journal_id": {
+          "relationship": {
+            "alias": "journal",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Journal"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "period": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "posted_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime?"
+          },
+          "required": true,
+          "type": "datetime?"
+        },
+        "posted_by": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "reference": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "total_credit": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "total_debit": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        }
+      },
+      "lookup_paths": {
+        "entry_date.id": {
+          "chain": [
+            "JournalEntry.entry_date",
+            "date.id"
+          ],
+          "valid": true
+        },
+        "posted_at.id": {
+          "chain": [
+            "JournalEntry.posted_at",
+            "datetime?.id"
+          ],
+          "valid": true
+        },
+        "posted_by.id": {
+          "chain": [
+            "JournalEntry.posted_by",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "total_credit.id": {
+          "chain": [
+            "JournalEntry.total_credit",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "total_debit.id": {
+          "chain": [
+            "JournalEntry.total_debit",
+            "decimal.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "JournalEntry"
+    },
+    "JournalLine": {
+      "fields": {
+        "account_code": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "cost_centre": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "credit": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "debit": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "journal_id": {
+          "relationship": {
+            "alias": "journal",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Journal"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "line_id": {
+          "relationship": {
+            "alias": "line",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Line"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "memo": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "project": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        }
+      },
+      "lookup_paths": {
+        "cost_centre.id": {
+          "chain": [
+            "JournalLine.cost_centre",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "credit.id": {
+          "chain": [
+            "JournalLine.credit",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "debit.id": {
+          "chain": [
+            "JournalLine.debit",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "memo.id": {
+          "chain": [
+            "JournalLine.memo",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "project.id": {
+          "chain": [
+            "JournalLine.project",
+            "str?.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "JournalLine"
+    }
+  },
   "views": {}
 }

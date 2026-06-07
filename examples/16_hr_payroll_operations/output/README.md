@@ -1,4 +1,4 @@
-# hr_payroll_operations
+# hr_payroll
 
 Dependency-free APG generated Python application.
 
@@ -70,10 +70,29 @@ Generated deployment artifacts:
 
 - `Employee`
 - `PayRun`
+- `Payslip`
+- `HRPayrollTeam`
+- `PayRunProcess`
+- `EmployeeOnboarding`
+- `LeaveRequest`
+- `HRPayrollApp`
+
+## AI agents
+
+- `HRAdvisor` - runtime `local`, invoke with `POST /agents/HRAdvisor/invoke`
+- `PayrollAssistant` - runtime `local`, invoke with `POST /agents/PayrollAssistant/invoke`
+
+Typed agent stub classes live in `agent_stubs.py`. Wire up a runtime adapter by setting the environment variable:
+
+```
+export APG_AGENT_CODEX_PROVIDER_COMMAND='python my_provider.py'
+```
+
+The provider receives JSON `{"agent": {...}, "input": "...", "context": {...}}` on stdin and writes `{"output": "..."}` to stdout.
 
 ## Capabilities
 
-- `PayrollOperations` - provides employee_master, payroll_runs, payslip_generation
+- `HRPayroll` - provides employee_records, payroll_runs, payslips, statutory_deductions, leave_management, hr_policies
 
 Capability operations:
 
@@ -87,4 +106,6 @@ Capability operations:
 
 Capability screens:
 
+- `GET /hr/employees`
 - `GET /hr/payroll`
+- `GET /hr/payslips`

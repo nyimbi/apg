@@ -1,28 +1,132 @@
-// Example 12: finance ERP capability.
-// Complexity focus: ERP modules, components, rules, approvals, screens, i18n, and streaming.
+// Example 12: finance general ledger with comprehensive ERP metadata.
+// Features: erp_modules, approvals (levels/thresholds/approvers/segregation),
+//           master_data with ownership and deduplication, business_rules
 
-module finance_general_ledger version 1.0.0 {
-    description: "General Ledger capability suitable for an ERP finance app";
+module finance_gl version 1.0.0 {
+    description: "General ledger with full ERP metadata coverage";
+}
+
+table Account {
+    account_code: str;
+    account_name: str;
+    account_type: str;      // asset | liability | equity | revenue | expense
+    parent_code: str?;
+    currency: str = "KES";
+    is_active: bool = true;
+    is_control: bool = false;
+    normal_balance: str;    // debit | credit
+}
+
+table JournalEntry {
+    journal_id: str;
+    reference: str;
+    period: str;            // YYYY-MM
+    entry_date: date;
+    description: str;
+    status: str = "draft";  // draft | posted | reversed
+    total_debit: decimal = 0.0;
+    total_credit: decimal = 0.0;
+    posted_by: str?;
+    posted_at: datetime?;
+}
+
+table JournalLine {
+    line_id: str;
+    journal_id: str;
+    account_code: str;
+    debit: decimal = 0.0;
+    credit: decimal = 0.0;
+    cost_centre: str?;
+    project: str?;
+    memo: str?;
 }
 
 capability GeneralLedger {
     contract: {
         id: general_ledger,
-        name: "General Ledger",
-        version: "1.0.0",
-        provides: [journal_entries, chart_of_accounts, financial_periods],
-        requires: [audit_events],
-        configuration: {currency: "KES", fiscal_calendar: "monthly"},
-        rules: [{name: "balanced_journal", when: "debits != credits", action: "deny"}],
-        ui: {shell: python, routes: [{name: "Journals", path: "/finance/gl/journals", component: "JournalScreen"}]},
-        theme: {name: finance_ops, tokens: {accent: "#126E82"}}
+        provides: [chart_of_accounts, journal_entries, period_close, trial_balance, financial_statements],
+        requires: [audit_events, auth],
+        configuration: {
+            tenant_id: "default",
+            fiscal_year_start: "01-01",
+            base_currency: "KES",
+            supported_currencies: ["KES", "UGX", "TZS", "USD", "EUR"],
+            decimal_places: 2
+        },
+        configuration_schema: {
+            required: ["tenant_id", "base_currency"]
+        },
+        rules: [
+            {name: "journal_balanced",     when: "total_debit != total_credit",                            action: deny},
+            {name: "open_period_required", when: "period_status != open",                                  action: deny},
+            {name: "posting_authorised",   when: "user_role in [accountant, controller, cfo]",             action: allow},
+            {name: "large_entry_review",   when: "total_debit > 1000000",                                  action: require_review},
+            {name: "period_close_check",   when: "reconciled == false and period_close_initiated == true", action: deny}
+        ],
+        ui: {
+            shell: python,
+            routes: [
+                {name: "Chart of Accounts", path: "/gl/accounts",     component: "AccountList",  permission: "gl:accounts"},
+                {name: "Journal Entries",   path: "/gl/journals",     component: "JournalList",  permission: "gl:journals"},
+                {name: "Trial Balance",     path: "/gl/trial",        component: "TrialBalance", permission: "gl:reports"},
+                {name: "Period Close",      path: "/gl/period-close", component: "PeriodClose",  permission: "gl:close"}
+            ]
+        },
+        theme: {name: finance_theme, tokens: {accent: "#1A237E", "color.primary": "#283593"}}
     };
 
-    erp_modules: [finance, general_ledger, accounts_payable];
-    components: {posting: {capability: journal_entries, permissions: [post, reverse]}};
-    business_rules: [{name: "period_open", when: "period.closed", action: "deny", priority: 100}];
-    approvals: {levels: 2, approvers: [controller, cfo]};
-    master_data: {entities: [account, cost_center, financial_period]};
-    i18n: {supported_languages: [en, sw, ha, yo, zu], default_language: en, fallback_language: en};
-    streaming: {processor: bytewax, state: ledger_posting_state};
+    // Full ERP module coverage
+    erp_modules: [
+        finance, general_ledger, accounts_payable, accounts_receivable,
+        fixed_assets, project_accounting, reporting
+    ];
+
+    // Full approvals structure
+    approvals: {
+        levels: 3,
+        thresholds: {
+            level1: 100000,
+            level2: 500000,
+            level3: 1000000
+        },
+        approvers: [finance_manager, controller, cfo],
+        segregation_of_duties: true,
+        escalation: "finance_director"
+    };
+
+    // Master data with ownership and governance
+    master_data: {
+        entities: [
+            account, cost_centre, financial_period, currency, exchange_rate,
+            budget, budget_line, project, department
+        ],
+        ownership: {
+            account:          finance,
+            cost_centre:      operations,
+            financial_period: finance,
+            currency:         finance
+        },
+        deduplication: account_code,
+        governance: {
+            type: deterministic,
+            rules: [{name: "unique_code", when: "account_code exists", action: deny}]
+        }
+    };
+
+    // Business rules (separate from contract rules)
+    business_rules: [
+        {name: "balanced_entry",  when: "debits != credits",          action: deny},
+        {name: "valid_period",    when: "period_status == closed",    action: deny},
+        {name: "active_account",  when: "account_is_active == false", action: deny},
+        {name: "budget_exceeded", when: "commitment > budget_line",   action: require_review}
+    ];
+
+    i18n: {supported_languages: [en, sw, fr], default_language: en, fallback_language: en};
+    streaming: {processor: bytewax, input: gl_events, state: gl_state};
+}
+
+app FinanceGL {
+    description: "General ledger financial application";
+    capabilities: [GeneralLedger];
+    routes: ["/gl"];
 }

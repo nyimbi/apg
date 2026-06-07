@@ -1,6 +1,6 @@
 """
-procurement_approval_workbench - APG Generated Package
-=======================================================
+procurement_workbench - APG Generated Package
+==============================================
 
 Version: 1.0.0
 

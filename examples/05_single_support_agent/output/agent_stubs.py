@@ -60,12 +60,12 @@ class AgentBase:
 
 class TriageAgent(AgentBase):
     name = 'TriageAgent'
-    role = 'support_triage'
+    role = 'support triage specialist'
     model = 'openai:gpt-4.1-mini'
     runtime = 'codex'
-    system = 'Classify incoming tickets and produce a concise next action.'
-    capabilities = ()
-    tools = ('tickets.read', 'knowledge.search')
+    system = 'Classify incoming support tickets by severity and category. Produce a structured triage plan with su'
+    capabilities = ('ticket_management', 'knowledge_base', 'customer_history')
+    tools = ('tickets.read', 'tickets.update', 'knowledge.search', 'customer.lookup', 'escalation.trigger')
 
 
 # Registry of all declared agents

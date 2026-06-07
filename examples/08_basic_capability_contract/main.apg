@@ -1,22 +1,76 @@
-// Example 08: first-class capability contract.
-// Complexity focus: one capability with explicit provides/requires metadata.
+// Example 08: capability contract with configuration_schema and rule_engine.
+// Features: configuration_schema with required fields, standalone rule_engine
+//           block, provides, requires, master_data
 
-module capability_basics version 1.0.0 {
-    description: "Small capability contract with a generated runtime manifest";
+module capability_contract version 1.0.0 {
+    description: "Capability contract with schema validation and rule engine";
 }
 
 capability AuditLog {
     contract: {
-        // `id` is the stable capability identifier.
         id: audit_log,
-
-        // `provides` names services that other capabilities can depend on.
-        provides: [audit_events],
-
-        // Configuration values are available to generated config helpers.
-        configuration: {retention_days: 365}
+        provides: [audit_events, audit_reports, compliance_trail],
+        requires: [],
+        configuration: {
+            tenant_id: "default",
+            retention_days: 2555,
+            max_event_size_kb: 64,
+            compress_after_days: 90,
+            encrypt_at_rest: true
+        },
+        configuration_schema: {
+            required: ["tenant_id", "retention_days"]
+        },
+        rule_engine: {
+            type: deterministic,
+            default_decision: allow,
+            rules: [
+                {name: "tenant_required",  when: "tenant_id missing",                    action: deny,           priority: 100},
+                {name: "size_limit",       when: "event_size_kb > max_event_size_kb",    action: deny,           priority: 90},
+                {name: "sensitive_data",   when: "contains_pii == true",                 action: require_review, priority: 80}
+            ]
+        },
+        ui: {
+            shell: python,
+            routes: [
+                {name: "Audit Log",  path: "/audit",            component: "AuditLogViewer",  permission: "audit:view"},
+                {name: "Compliance", path: "/audit/compliance", component: "ComplianceView",  permission: "audit:compliance"}
+            ]
+        },
+        theme: {name: audit_theme, tokens: {accent: "#5C6BC0"}}
     };
 
-    // Master data names make the capability composable into ERP apps.
-    master_data: {entities: [audit_event]};
+    master_data: {entities: [audit_event, audit_session, compliance_rule]};
+}
+
+capability NotificationEngine {
+    contract: {
+        id: notification_engine,
+        provides: [notifications, alert_dispatch, delivery_tracking],
+        requires: [audit_events],
+        configuration: {
+            tenant_id: "default",
+            default_channel: "email",
+            retry_attempts: 3,
+            retry_delay_seconds: 60
+        },
+        configuration_schema: {
+            required: ["tenant_id", "default_channel"]
+        },
+        rule_engine: {
+            type: policy,
+            default_decision: allow,
+            rules: [
+                {name: "rate_limit",      when: "notifications_per_hour > 1000",                   action: deny},
+                {name: "valid_channel",   when: "channel in [email, sms, push, webhook]",           action: allow},
+                {name: "invalid_channel", when: "channel not in [email, sms, push, webhook]",       action: deny}
+            ]
+        }
+    };
+}
+
+app CapabilityContractApp {
+    description: "Audit and notification capabilities";
+    capabilities: [AuditLog, NotificationEngine];
+    routes: ["/audit", "/notifications"];
 }

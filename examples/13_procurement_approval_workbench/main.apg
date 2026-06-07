@@ -1,45 +1,127 @@
-// Example 13: procurement approvals.
-// Complexity focus: approval planning, purchasing components, and an approval screen.
+// Example 13: procurement with workflow coverage and db entity.
+// Features: db entity, workflow with all fields (timers, waits, retry_policy,
+//           compensation), capability with full contract
 
-module procurement_approval_workbench version 1.0.0 {
-    description: "Procurement capability for purchase requests and approvals";
+module procurement_workbench version 1.0.0 {
+    description: "Procurement with database declaration and full workflow";
+}
+
+// Explicit database declaration
+db ProcurementDB {
+    engine: postgresql;
+    schema: procurement;
+    migrations: alembic;
+}
+
+table PurchaseRequest {
+    request_id: str;
+    requestor_id: str;
+    department: str;
+    description: str;
+    amount: decimal;
+    currency: str = "KES";
+    priority: str = "normal";
+    status: str = "draft";
+    justification: str?;
+    budget_code: str?;
+    created_at: datetime;
+}
+
+table SupplierQuote {
+    quote_id: str;
+    request_id: str;
+    supplier_id: str;
+    amount: decimal;
+    validity_days: int = 30;
+    submitted_at: datetime;
+    status: str = "pending";
 }
 
 capability ProcurementWorkbench {
     contract: {
         id: procurement_workbench,
         provides: [purchase_requests, supplier_quotes, approval_plans],
-        requires: [audit_events, supplier_master],
-        configuration: {currency: "KES", approval_threshold: 50000},
+        requires: [audit_events, supplier_master, budget_control],
+        configuration: {
+            tenant_id: "default",
+            currency: "KES",
+            approval_threshold: 50000,
+            three_quote_minimum: 100000
+        },
         rules: [
-            {name: "budget_required", when: "budget_code missing", action: "deny"},
-            {name: "high_value_approval", when: "amount > approval_threshold", action: "require_review"}
+            {name: "budget_code_required", when: "budget_code missing",                              action: deny},
+            {name: "high_value_approval",  when: "amount > approval_threshold",                      action: require_review},
+            {name: "three_quote_required", when: "amount > three_quote_minimum and quote_count < 3", action: require_review},
+            {name: "approved_supplier",    when: "supplier_status not in [approved, preferred]",     action: deny}
         ],
-        ui: {shell: python, routes: [{name: "Procurement", path: "/procurement", component: "ProcurementScreen"}]},
-        theme: {name: procurement_theme, tokens: {accent: "#6C8EAD"}}
+        ui: {
+            shell: python,
+            routes: [
+                {name: "Requests",  path: "/procurement",           component: "RequestList",     permission: "proc:view"},
+                {name: "Approvals", path: "/procurement/approvals", component: "ApprovalQueue",   permission: "proc:approve"},
+                {name: "Quotes",    path: "/procurement/quotes",    component: "QuoteComparison", permission: "proc:quotes"}
+            ]
+        },
+        theme: {name: proc_theme, tokens: {accent: "#6C8EAD"}}
     };
 
     erp_modules: [procurement, finance, inventory];
-    components: {requesting: {capability: purchase_requests, permissions: [create, approve]}};
-    approvals: {levels: 3, approvers: [request_manager, procurement_lead, finance_controller]};
-    master_data: {entities: [supplier, item_catalog, cost_center]};
+    approvals: {
+        levels: 3,
+        thresholds: {level1: 50000, level2: 200000, level3: 1000000},
+        approvers: [request_manager, procurement_lead, finance_controller],
+        segregation_of_duties: true
+    };
+    master_data: {entities: [supplier, item_catalog, cost_center, budget_line]};
     screens: {
         ApprovalQueue: {
             route: "/procurement/approvals",
             layout: split,
-            contains: [RequestList, ApprovalPanel],
+            contains: [RequestList, ApprovalDetail],
             binds: [purchase_requests.pending],
-            actions: [approve, reject, request_changes]
+            actions: [approve, reject, request_changes],
+            relationships: [RequestList -> ApprovalDetail]
         }
     };
 }
 
+// Full workflow: all seven field types
 workflow ProcurementApproval {
-    // Workflow properties make the approval path visible to the semantic model
-    // without introducing framework-specific process-engine code.
-    steps: str = "draft -> budget_review -> procurement_review -> finance_approval -> approved";
-    stages: str = "draft, review, approval, complete";
-    process: () -> bool = {
-        return true;
+    steps: str = "draft -> submitted -> budget_review -> procurement_review -> finance_approval -> approved -> ordered";
+    human_tasks: [budget_review, procurement_review, finance_approval];
+    assignments: {
+        budget_review:      budget_owner,
+        procurement_review: procurement_lead,
+        finance_approval:   finance_controller
     };
+    guards: {
+        budget_review:      "amount <= budget_limit and budget_code not missing",
+        procurement_review: "budget_review_complete == true",
+        finance_approval:   "amount > finance_threshold or is_strategic == true",
+        ordered:            "all_approvals_complete and preferred_supplier_selected"
+    };
+    timers: {
+        budget_review:      "PT24H",
+        procurement_review: "PT48H",
+        finance_approval:   "PT24H",
+        ordered:            "PT72H"
+    };
+    waits: {
+        ordered: purchase_order_issued
+    };
+    retry_policy: {
+        budget_review:      "3",
+        procurement_review: "2",
+        finance_approval:   "2"
+    };
+    compensation: {
+        budget_review: release_budget_reservation,
+        ordered:       cancel_purchase_order
+    };
+}
+
+app ProcurementApp {
+    description: "Procurement approval workbench";
+    capabilities: [ProcurementWorkbench];
+    routes: ["/procurement"];
 }

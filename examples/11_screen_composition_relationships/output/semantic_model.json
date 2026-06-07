@@ -2,8 +2,8 @@
   "agents": {},
   "app": {
     "description": null,
-    "entity_count": 1,
-    "name": "screen_composition",
+    "entity_count": 2,
+    "name": "operations_workbench",
     "version": "1.0.0"
   },
   "capabilities": {
@@ -12,70 +12,256 @@
       "business_rules": [],
       "components": {},
       "configuration": {
-        "tenant_scoped": true
+        "tenant_id": "default"
       },
       "erp_modules": [],
       "i18n": {},
       "master_data": {},
       "name": "OperationsWorkbench",
       "provides": [
-        "operations_ui"
+        "operations_ui",
+        "approval_queue",
+        "kpi_dashboard"
       ],
       "requires": [],
       "rule_engine": {},
       "rules": [],
       "runtime": {},
       "screens": {
-        "Dashboard": {
+        "ActivityStack": {
           "actions": [
-            "approve",
-            "reject"
+            "load_more",
+            "filter"
           ],
           "binds": [
-            "ledger.entries"
+            "activity.events"
+          ],
+          "contains": [
+            "ActivityItem"
+          ],
+          "layout": "stack",
+          "route": "/ops/activity",
+          "title": "Activity Feed"
+        },
+        "ApprovalQueue": {
+          "actions": [
+            "approve",
+            "reject",
+            "request_changes",
+            "escalate"
+          ],
+          "binds": [
+            "approvals.pending",
+            "approvals.history"
+          ],
+          "contains": [
+            "RequestList",
+            "ApprovalDetail"
+          ],
+          "events": [
+            {
+              "do": "load_detail",
+              "on": "select",
+              "target": "ApprovalDetail"
+            }
+          ],
+          "layout": "split",
+          "relationships": [
+            "RequestList -> ApprovalDetail"
+          ],
+          "route": "/ops/approvals",
+          "title": "Approval Queue"
+        },
+        "ConfigForm": {
+          "actions": [
+            "save",
+            "reset",
+            "preview"
+          ],
+          "binds": [
+            "config.current"
+          ],
+          "contains": [
+            "ConfigFields"
+          ],
+          "layout": "form",
+          "route": "/ops/config",
+          "title": "Configuration"
+        },
+        "KpiGrid": {
+          "actions": [
+            "drill_down",
+            "compare"
+          ],
+          "binds": [
+            "kpis.daily"
+          ],
+          "contains": [
+            "RevenueKpi",
+            "CostKpi",
+            "MarginKpi",
+            "VolumeKpi"
+          ],
+          "layout": "grid",
+          "route": "/ops/kpis",
+          "title": "KPI Grid"
+        },
+        "MainDashboard": {
+          "actions": [
+            "refresh",
+            "export",
+            "configure"
+          ],
+          "binds": [
+            "ledger.entries",
+            "approvals.pending",
+            "alerts.active"
           ],
           "composes": [
-            "LedgerTable"
+            "LedgerSummary",
+            "ApprovalWidget"
           ],
           "contains": [
             "KpiStrip",
-            "ApprovalQueue"
+            "AlertBanner",
+            "ActivityFeed"
           ],
           "events": [
             {
               "do": "filter",
               "on": "select",
-              "target": "LedgerTable"
+              "target": "LedgerSummary"
+            },
+            {
+              "do": "navigate",
+              "on": "click",
+              "target": "ApprovalWidget"
+            },
+            {
+              "do": "tooltip",
+              "on": "hover",
+              "target": "KpiStrip"
             }
           ],
           "layout": "dashboard",
           "relationships": [
+            "KpiStrip -> LedgerSummary",
+            "AlertBanner -> ApprovalWidget",
             {
               "from": "KpiStrip",
-              "to": "LedgerTable",
+              "to": "ActivityFeed",
+              "type": "filter",
               "via": "filters"
             },
-            "ApprovalQueue -> LedgerTable"
+            {
+              "from": "ApprovalWidget",
+              "to": "LedgerSummary",
+              "type": "drill_down",
+              "via": "selection"
+            }
           ],
           "route": "/ops",
           "title": "Operations Dashboard"
+        },
+        "OnboardingWizard": {
+          "actions": [
+            "next",
+            "back",
+            "save_progress",
+            "finish"
+          ],
+          "binds": [
+            "onboarding.state"
+          ],
+          "contains": [
+            "Step1",
+            "Step2",
+            "Step3",
+            "Step4"
+          ],
+          "layout": "wizard",
+          "route": "/ops/onboard",
+          "title": "Onboarding Wizard"
+        },
+        "ReportingHub": {
+          "actions": [
+            "download",
+            "schedule",
+            "share"
+          ],
+          "binds": [
+            "reports.summary",
+            "reports.detail",
+            "reports.trends"
+          ],
+          "contains": [
+            "SummaryTab",
+            "DetailTab",
+            "TrendTab"
+          ],
+          "layout": "tabs",
+          "route": "/ops/reports",
+          "title": "Reporting Hub"
         }
       },
       "streaming": {},
       "theme": {
         "name": "ops_theme",
         "tokens": {
-          "accent": "#345995"
+          "accent": "#345995",
+          "border.radius": "4px"
         }
       },
       "ui": {
+        "routes": [
+          {
+            "component": "OpsDashboard",
+            "name": "Dashboard",
+            "path": "/ops",
+            "permission": "ops:view"
+          },
+          {
+            "component": "ApprovalQueue",
+            "name": "Approvals",
+            "path": "/ops/approvals",
+            "permission": "ops:approve"
+          },
+          {
+            "component": "OpsReports",
+            "name": "Reports",
+            "path": "/ops/reports",
+            "permission": "ops:reports"
+          }
+        ],
         "shell": "python"
       }
     }
   },
   "composition": {
     "agent_teams": {},
-    "applications": {},
+    "applications": {
+      "OperationsWorkbenchApp": {
+        "agent_teams": [],
+        "agents": [],
+        "capabilities": [
+          "OperationsWorkbench"
+        ],
+        "components": {},
+        "configuration": {},
+        "deployments": {},
+        "description": "Operations management workbench",
+        "integrations": {},
+        "name": "OperationsWorkbenchApp",
+        "policies": {},
+        "routes": [
+          "/ops"
+        ],
+        "runtime": {},
+        "screens": {},
+        "theme": {},
+        "workflows": []
+      }
+    },
     "capability_dependencies": {
       "OperationsWorkbench": []
     }
@@ -83,25 +269,48 @@
   "contracts": {
     "OperationsWorkbench": {
       "configuration": {
-        "tenant_scoped": true
+        "tenant_id": "default"
       },
       "id": "operations_workbench",
       "provides": [
-        "operations_ui"
+        "operations_ui",
+        "approval_queue",
+        "kpi_dashboard"
       ],
       "theme": {
         "name": "ops_theme",
         "tokens": {
-          "accent": "#345995"
+          "accent": "#345995",
+          "border.radius": "4px"
         }
       },
       "ui": {
+        "routes": [
+          {
+            "component": "OpsDashboard",
+            "name": "Dashboard",
+            "path": "/ops",
+            "permission": "ops:view"
+          },
+          {
+            "component": "ApprovalQueue",
+            "name": "Approvals",
+            "path": "/ops/approvals",
+            "permission": "ops:approve"
+          },
+          {
+            "component": "OpsReports",
+            "name": "Reports",
+            "path": "/ops/reports",
+            "permission": "ops:reports"
+          }
+        ],
         "shell": "python"
       }
     }
   },
   "deployment": {
-    "source": "screen_composition.apg",
+    "source": "operations_workbench.apg",
     "target": "python"
   },
   "diagnostics": [],
@@ -114,14 +323,14 @@
       "nodes": 0
     },
     "capability": {
-      "edges": 0,
+      "edges": 1,
       "kind": "capability",
-      "nodes": 1
+      "nodes": 2
     },
     "deployment": {
-      "edges": 1,
+      "edges": 2,
       "kind": "deployment",
-      "nodes": 2
+      "nodes": 3
     },
     "er": {
       "edges": 0,
@@ -129,29 +338,29 @@
       "nodes": 0
     },
     "handler": {
-      "edges": 1,
+      "edges": 2,
       "kind": "handler",
-      "nodes": 2
+      "nodes": 3
     },
     "lookup": {
-      "edges": 1,
+      "edges": 2,
       "kind": "lookup",
-      "nodes": 2
+      "nodes": 3
     },
     "package": {
-      "edges": 1,
+      "edges": 2,
       "kind": "package",
-      "nodes": 2
+      "nodes": 3
     },
     "security": {
-      "edges": 1,
+      "edges": 2,
       "kind": "security",
-      "nodes": 2
+      "nodes": 3
     },
     "workflow": {
-      "edges": 1,
+      "edges": 2,
       "kind": "workflow",
-      "nodes": 2
+      "nodes": 3
     }
   },
   "llms": {},
@@ -162,11 +371,28 @@
   "rules": {},
   "security": {},
   "source_files": [
-    "screen_composition.apg"
+    "operations_workbench.apg"
   ],
   "symbols": {
+    "app.OperationsWorkbenchApp": {
+      "file": "operations_workbench.apg",
+      "id": "app.OperationsWorkbenchApp",
+      "kind": "app",
+      "name": "OperationsWorkbenchApp",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
     "capability.OperationsWorkbench": {
-      "file": "screen_composition.apg",
+      "file": "operations_workbench.apg",
       "id": "capability.OperationsWorkbench",
       "kind": "capability",
       "name": "OperationsWorkbench",
@@ -182,11 +408,11 @@
       },
       "references": []
     },
-    "module.screen_composition": {
-      "file": "screen_composition.apg",
-      "id": "module.screen_composition",
+    "module.operations_workbench": {
+      "file": "operations_workbench.apg",
+      "id": "module.operations_workbench",
       "kind": "module",
-      "name": "screen_composition",
+      "name": "operations_workbench",
       "range": {
         "end": {
           "character": 1,

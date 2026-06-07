@@ -2,7 +2,7 @@
   "agents": {},
   "app": {
     "description": null,
-    "entity_count": 1,
+    "entity_count": 2,
     "name": "credit_control",
     "version": "1.0.0"
   },
@@ -19,28 +19,61 @@
       "components": {},
       "configuration": {
         "currency": "KES",
-        "default_limit": 10000
+        "default_limit": 50000,
+        "high_risk_threshold": 0.7,
+        "max_days_overdue": 30,
+        "review_threshold": 0.5
       },
       "erp_modules": [],
       "i18n": {},
       "master_data": {
         "entities": [
-          "customer_credit_profile"
+          "customer_credit_profile",
+          "credit_limit",
+          "payment_history"
         ]
       },
       "name": "CreditControl",
       "provides": [
         "credit_limit_checks",
-        "hold_release"
+        "hold_release",
+        "credit_scoring"
       ],
       "requires": [
-        "audit_events"
+        "audit_events",
+        "customer_master"
       ],
-      "rule_engine": {},
+      "rule_engine": {
+        "default_decision": "allow",
+        "type": "deterministic"
+      },
       "rules": [
         {
           "action": "deny",
+          "name": "tenant_required",
+          "priority": 100,
+          "when": "tenant_id missing",
+          "when_ast": {
+            "field": "tenant_id",
+            "negated": false,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "allow",
+          "name": "customer_present",
+          "priority": 99,
+          "when": "customer_id not missing",
+          "when_ast": {
+            "field": "customer_id",
+            "negated": true,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "deny",
           "name": "over_limit",
+          "priority": 90,
           "when": "order_total > credit_limit",
           "when_ast": {
             "field": "order_total",
@@ -50,14 +83,290 @@
           }
         },
         {
+          "action": "deny",
+          "name": "under_minimum",
+          "priority": 89,
+          "when": "order_total < 100",
+          "when_ast": {
+            "field": "order_total",
+            "op": "<",
+            "type": "compare",
+            "value": 100
+          }
+        },
+        {
           "action": "require_review",
-          "name": "manual_review",
-          "when": "risk_score > 0.75",
+          "name": "at_limit",
+          "priority": 88,
+          "when": "order_total >= credit_limit",
+          "when_ast": {
+            "field": "order_total",
+            "op": ">=",
+            "type": "compare",
+            "value": "credit_limit"
+          }
+        },
+        {
+          "action": "allow",
+          "name": "safe_order",
+          "priority": 87,
+          "when": "order_total <= 1000",
+          "when_ast": {
+            "field": "order_total",
+            "op": "<=",
+            "type": "compare",
+            "value": 1000
+          }
+        },
+        {
+          "action": "allow",
+          "name": "premium_customer",
+          "priority": 86,
+          "when": "customer_tier == premium",
+          "when_ast": {
+            "field": "customer_tier",
+            "op": "==",
+            "type": "compare",
+            "value": "premium"
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "non_standard_currency",
+          "priority": 85,
+          "when": "currency != KES",
+          "when_ast": {
+            "field": "currency",
+            "op": "!=",
+            "type": "compare",
+            "value": "KES"
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "high_risk_region",
+          "priority": 80,
+          "when": "country in [NG, SD, LY]",
+          "when_ast": {
+            "field": "country",
+            "negated": false,
+            "type": "in",
+            "values": [
+              "NG",
+              "SD",
+              "LY"
+            ]
+          }
+        },
+        {
+          "action": "allow",
+          "name": "approved_currency",
+          "priority": 79,
+          "when": "currency in [KES, UGX, TZS, USD, EUR]",
+          "when_ast": {
+            "field": "currency",
+            "negated": false,
+            "type": "in",
+            "values": [
+              "KES",
+              "UGX",
+              "TZS",
+              "USD",
+              "EUR"
+            ]
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "blocked_category",
+          "priority": 78,
+          "when": "product_category not in [food, medicine, education]",
+          "when_ast": {
+            "field": "product_category",
+            "negated": true,
+            "type": "in",
+            "values": [
+              "food",
+              "medicine",
+              "education"
+            ]
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "high_value_new_customer",
+          "priority": 70,
+          "when": "order_total > 100000 and customer_age_days < 90",
+          "when_ast": {
+            "left": {
+              "field": "order_total",
+              "op": ">",
+              "type": "compare",
+              "value": 100000
+            },
+            "right": {
+              "field": "customer_age_days",
+              "op": "<",
+              "type": "compare",
+              "value": 90
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "risk_and_overdue",
+          "priority": 69,
+          "when": "risk_score > high_risk_threshold and days_overdue > max_days_overdue",
+          "when_ast": {
+            "left": {
+              "field": "risk_score",
+              "op": ">",
+              "type": "compare",
+              "value": "high_risk_threshold"
+            },
+            "right": {
+              "field": "days_overdue",
+              "op": ">",
+              "type": "compare",
+              "value": "max_days_overdue"
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "fraud_pattern",
+          "priority": 68,
+          "when": "velocity_score > 0.8 and geo_anomaly == true",
+          "when_ast": {
+            "left": {
+              "field": "velocity_score",
+              "op": ">",
+              "type": "compare",
+              "value": 0.8
+            },
+            "right": {
+              "field": "geo_anomaly",
+              "op": "==",
+              "type": "compare",
+              "value": true
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "urgent_review",
+          "priority": 60,
+          "when": "amount > 500000 or customer_tier == vip",
+          "when_ast": {
+            "left": {
+              "field": "amount",
+              "op": ">",
+              "type": "compare",
+              "value": 500000
+            },
+            "right": {
+              "field": "customer_tier",
+              "op": "==",
+              "type": "compare",
+              "value": "vip"
+            },
+            "type": "or"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "any_block_reason",
+          "priority": 59,
+          "when": "is_blacklisted == true or is_frozen == true",
+          "when_ast": {
+            "left": {
+              "field": "is_blacklisted",
+              "op": "==",
+              "type": "compare",
+              "value": true
+            },
+            "right": {
+              "field": "is_frozen",
+              "op": "==",
+              "type": "compare",
+              "value": true
+            },
+            "type": "or"
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "complex_approval",
+          "priority": 50,
+          "when": "(amount > 50000 or is_international == true) and risk_score < review_threshold",
+          "when_ast": {
+            "left": {
+              "left": {
+                "field": "amount",
+                "op": ">",
+                "type": "compare",
+                "value": 50000
+              },
+              "right": {
+                "field": "is_international",
+                "op": "==",
+                "type": "compare",
+                "value": true
+              },
+              "type": "or"
+            },
+            "right": {
+              "field": "risk_score",
+              "op": "<",
+              "type": "compare",
+              "value": "review_threshold"
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "multi_factor_deny",
+          "priority": 49,
+          "when": "(fraud_score > 0.9 or velocity_flag == true) and customer_age_days < 30",
+          "when_ast": {
+            "left": {
+              "left": {
+                "field": "fraud_score",
+                "op": ">",
+                "type": "compare",
+                "value": 0.9
+              },
+              "right": {
+                "field": "velocity_flag",
+                "op": "==",
+                "type": "compare",
+                "value": true
+              },
+              "type": "or"
+            },
+            "right": {
+              "field": "customer_age_days",
+              "op": "<",
+              "type": "compare",
+              "value": 30
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "high_risk_score",
+          "priority": 40,
+          "when": "risk_score >= high_risk_threshold",
           "when_ast": {
             "field": "risk_score",
-            "op": ">",
+            "op": ">=",
             "type": "compare",
-            "value": 0.75
+            "value": "high_risk_threshold"
           }
         }
       ],
@@ -70,10 +379,35 @@
   },
   "composition": {
     "agent_teams": {},
-    "applications": {},
+    "applications": {
+      "CreditControlApp": {
+        "agent_teams": [],
+        "agents": [],
+        "capabilities": [
+          "CreditControl"
+        ],
+        "components": {},
+        "configuration": {},
+        "deployments": {},
+        "description": "Credit control and risk management",
+        "integrations": {},
+        "name": "CreditControlApp",
+        "policies": {},
+        "routes": [
+          "/credit",
+          "/credit/checks",
+          "/credit/approvals"
+        ],
+        "runtime": {},
+        "screens": {},
+        "theme": {},
+        "workflows": []
+      }
+    },
     "capability_dependencies": {
       "CreditControl": [
-        "audit_events"
+        "audit_events",
+        "customer_master"
       ]
     }
   },
@@ -81,21 +415,59 @@
     "CreditControl": {
       "configuration": {
         "currency": "KES",
-        "default_limit": 10000
+        "default_limit": 50000,
+        "high_risk_threshold": 0.7,
+        "max_days_overdue": 30,
+        "review_threshold": 0.5
+      },
+      "configuration_schema": {
+        "required": [
+          "default_limit",
+          "currency"
+        ]
       },
       "id": "credit_control",
       "name": "Credit Control",
       "provides": [
         "credit_limit_checks",
-        "hold_release"
+        "hold_release",
+        "credit_scoring"
       ],
       "requires": [
-        "audit_events"
+        "audit_events",
+        "customer_master"
       ],
+      "rule_engine": {
+        "default_decision": "allow",
+        "type": "deterministic"
+      },
       "rules": [
         {
           "action": "deny",
+          "name": "tenant_required",
+          "priority": 100,
+          "when": "tenant_id missing",
+          "when_ast": {
+            "field": "tenant_id",
+            "negated": false,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "allow",
+          "name": "customer_present",
+          "priority": 99,
+          "when": "customer_id not missing",
+          "when_ast": {
+            "field": "customer_id",
+            "negated": true,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "deny",
           "name": "over_limit",
+          "priority": 90,
           "when": "order_total > credit_limit",
           "when_ast": {
             "field": "order_total",
@@ -105,14 +477,290 @@
           }
         },
         {
+          "action": "deny",
+          "name": "under_minimum",
+          "priority": 89,
+          "when": "order_total < 100",
+          "when_ast": {
+            "field": "order_total",
+            "op": "<",
+            "type": "compare",
+            "value": 100
+          }
+        },
+        {
           "action": "require_review",
-          "name": "manual_review",
-          "when": "risk_score > 0.75",
+          "name": "at_limit",
+          "priority": 88,
+          "when": "order_total >= credit_limit",
+          "when_ast": {
+            "field": "order_total",
+            "op": ">=",
+            "type": "compare",
+            "value": "credit_limit"
+          }
+        },
+        {
+          "action": "allow",
+          "name": "safe_order",
+          "priority": 87,
+          "when": "order_total <= 1000",
+          "when_ast": {
+            "field": "order_total",
+            "op": "<=",
+            "type": "compare",
+            "value": 1000
+          }
+        },
+        {
+          "action": "allow",
+          "name": "premium_customer",
+          "priority": 86,
+          "when": "customer_tier == premium",
+          "when_ast": {
+            "field": "customer_tier",
+            "op": "==",
+            "type": "compare",
+            "value": "premium"
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "non_standard_currency",
+          "priority": 85,
+          "when": "currency != KES",
+          "when_ast": {
+            "field": "currency",
+            "op": "!=",
+            "type": "compare",
+            "value": "KES"
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "high_risk_region",
+          "priority": 80,
+          "when": "country in [NG, SD, LY]",
+          "when_ast": {
+            "field": "country",
+            "negated": false,
+            "type": "in",
+            "values": [
+              "NG",
+              "SD",
+              "LY"
+            ]
+          }
+        },
+        {
+          "action": "allow",
+          "name": "approved_currency",
+          "priority": 79,
+          "when": "currency in [KES, UGX, TZS, USD, EUR]",
+          "when_ast": {
+            "field": "currency",
+            "negated": false,
+            "type": "in",
+            "values": [
+              "KES",
+              "UGX",
+              "TZS",
+              "USD",
+              "EUR"
+            ]
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "blocked_category",
+          "priority": 78,
+          "when": "product_category not in [food, medicine, education]",
+          "when_ast": {
+            "field": "product_category",
+            "negated": true,
+            "type": "in",
+            "values": [
+              "food",
+              "medicine",
+              "education"
+            ]
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "high_value_new_customer",
+          "priority": 70,
+          "when": "order_total > 100000 and customer_age_days < 90",
+          "when_ast": {
+            "left": {
+              "field": "order_total",
+              "op": ">",
+              "type": "compare",
+              "value": 100000
+            },
+            "right": {
+              "field": "customer_age_days",
+              "op": "<",
+              "type": "compare",
+              "value": 90
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "risk_and_overdue",
+          "priority": 69,
+          "when": "risk_score > high_risk_threshold and days_overdue > max_days_overdue",
+          "when_ast": {
+            "left": {
+              "field": "risk_score",
+              "op": ">",
+              "type": "compare",
+              "value": "high_risk_threshold"
+            },
+            "right": {
+              "field": "days_overdue",
+              "op": ">",
+              "type": "compare",
+              "value": "max_days_overdue"
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "fraud_pattern",
+          "priority": 68,
+          "when": "velocity_score > 0.8 and geo_anomaly == true",
+          "when_ast": {
+            "left": {
+              "field": "velocity_score",
+              "op": ">",
+              "type": "compare",
+              "value": 0.8
+            },
+            "right": {
+              "field": "geo_anomaly",
+              "op": "==",
+              "type": "compare",
+              "value": true
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "urgent_review",
+          "priority": 60,
+          "when": "amount > 500000 or customer_tier == vip",
+          "when_ast": {
+            "left": {
+              "field": "amount",
+              "op": ">",
+              "type": "compare",
+              "value": 500000
+            },
+            "right": {
+              "field": "customer_tier",
+              "op": "==",
+              "type": "compare",
+              "value": "vip"
+            },
+            "type": "or"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "any_block_reason",
+          "priority": 59,
+          "when": "is_blacklisted == true or is_frozen == true",
+          "when_ast": {
+            "left": {
+              "field": "is_blacklisted",
+              "op": "==",
+              "type": "compare",
+              "value": true
+            },
+            "right": {
+              "field": "is_frozen",
+              "op": "==",
+              "type": "compare",
+              "value": true
+            },
+            "type": "or"
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "complex_approval",
+          "priority": 50,
+          "when": "(amount > 50000 or is_international == true) and risk_score < review_threshold",
+          "when_ast": {
+            "left": {
+              "left": {
+                "field": "amount",
+                "op": ">",
+                "type": "compare",
+                "value": 50000
+              },
+              "right": {
+                "field": "is_international",
+                "op": "==",
+                "type": "compare",
+                "value": true
+              },
+              "type": "or"
+            },
+            "right": {
+              "field": "risk_score",
+              "op": "<",
+              "type": "compare",
+              "value": "review_threshold"
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "multi_factor_deny",
+          "priority": 49,
+          "when": "(fraud_score > 0.9 or velocity_flag == true) and customer_age_days < 30",
+          "when_ast": {
+            "left": {
+              "left": {
+                "field": "fraud_score",
+                "op": ">",
+                "type": "compare",
+                "value": 0.9
+              },
+              "right": {
+                "field": "velocity_flag",
+                "op": "==",
+                "type": "compare",
+                "value": true
+              },
+              "type": "or"
+            },
+            "right": {
+              "field": "customer_age_days",
+              "op": "<",
+              "type": "compare",
+              "value": 30
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "high_risk_score",
+          "priority": 40,
+          "when": "risk_score >= high_risk_threshold",
           "when_ast": {
             "field": "risk_score",
-            "op": ">",
+            "op": ">=",
             "type": "compare",
-            "value": 0.75
+            "value": "high_risk_threshold"
           }
         }
       ],
@@ -143,6 +791,26 @@
       "related_locations": [],
       "severity": "warning",
       "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "credit_control.apg",
+      "fixes": [],
+      "message": "Capability 'CreditControl' requires 'customer_master' which is not declared in this module",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
     }
   ],
   "flows": {},
@@ -154,14 +822,14 @@
       "nodes": 0
     },
     "capability": {
-      "edges": 1,
+      "edges": 3,
       "kind": "capability",
-      "nodes": 2
+      "nodes": 4
     },
     "deployment": {
-      "edges": 1,
+      "edges": 2,
       "kind": "deployment",
-      "nodes": 2
+      "nodes": 3
     },
     "er": {
       "edges": 0,
@@ -169,29 +837,29 @@
       "nodes": 0
     },
     "handler": {
-      "edges": 1,
+      "edges": 2,
       "kind": "handler",
-      "nodes": 2
+      "nodes": 3
     },
     "lookup": {
-      "edges": 1,
+      "edges": 2,
       "kind": "lookup",
-      "nodes": 2
+      "nodes": 3
     },
     "package": {
-      "edges": 1,
+      "edges": 2,
       "kind": "package",
-      "nodes": 2
+      "nodes": 3
     },
     "security": {
-      "edges": 1,
+      "edges": 2,
       "kind": "security",
-      "nodes": 2
+      "nodes": 3
     },
     "workflow": {
-      "edges": 1,
+      "edges": 2,
       "kind": "workflow",
-      "nodes": 2
+      "nodes": 3
     }
   },
   "llms": {},
@@ -200,26 +868,325 @@
   "packages": {},
   "roles": {},
   "rules": {
-    "CreditControl.manual_review": {
+    "CreditControl.any_block_reason": {
+      "action": "deny",
+      "name": "any_block_reason",
+      "priority": 59,
+      "when": "is_blacklisted == true or is_frozen == true",
+      "when_ast": {
+        "left": {
+          "field": "is_blacklisted",
+          "op": "==",
+          "type": "compare",
+          "value": true
+        },
+        "right": {
+          "field": "is_frozen",
+          "op": "==",
+          "type": "compare",
+          "value": true
+        },
+        "type": "or"
+      }
+    },
+    "CreditControl.approved_currency": {
+      "action": "allow",
+      "name": "approved_currency",
+      "priority": 79,
+      "when": "currency in [KES, UGX, TZS, USD, EUR]",
+      "when_ast": {
+        "field": "currency",
+        "negated": false,
+        "type": "in",
+        "values": [
+          "KES",
+          "UGX",
+          "TZS",
+          "USD",
+          "EUR"
+        ]
+      }
+    },
+    "CreditControl.at_limit": {
       "action": "require_review",
-      "name": "manual_review",
-      "when": "risk_score > 0.75",
+      "name": "at_limit",
+      "priority": 88,
+      "when": "order_total >= credit_limit",
+      "when_ast": {
+        "field": "order_total",
+        "op": ">=",
+        "type": "compare",
+        "value": "credit_limit"
+      }
+    },
+    "CreditControl.blocked_category": {
+      "action": "require_review",
+      "name": "blocked_category",
+      "priority": 78,
+      "when": "product_category not in [food, medicine, education]",
+      "when_ast": {
+        "field": "product_category",
+        "negated": true,
+        "type": "in",
+        "values": [
+          "food",
+          "medicine",
+          "education"
+        ]
+      }
+    },
+    "CreditControl.complex_approval": {
+      "action": "require_review",
+      "name": "complex_approval",
+      "priority": 50,
+      "when": "(amount > 50000 or is_international == true) and risk_score < review_threshold",
+      "when_ast": {
+        "left": {
+          "left": {
+            "field": "amount",
+            "op": ">",
+            "type": "compare",
+            "value": 50000
+          },
+          "right": {
+            "field": "is_international",
+            "op": "==",
+            "type": "compare",
+            "value": true
+          },
+          "type": "or"
+        },
+        "right": {
+          "field": "risk_score",
+          "op": "<",
+          "type": "compare",
+          "value": "review_threshold"
+        },
+        "type": "and"
+      }
+    },
+    "CreditControl.customer_present": {
+      "action": "allow",
+      "name": "customer_present",
+      "priority": 99,
+      "when": "customer_id not missing",
+      "when_ast": {
+        "field": "customer_id",
+        "negated": true,
+        "type": "missing"
+      }
+    },
+    "CreditControl.fraud_pattern": {
+      "action": "deny",
+      "name": "fraud_pattern",
+      "priority": 68,
+      "when": "velocity_score > 0.8 and geo_anomaly == true",
+      "when_ast": {
+        "left": {
+          "field": "velocity_score",
+          "op": ">",
+          "type": "compare",
+          "value": 0.8
+        },
+        "right": {
+          "field": "geo_anomaly",
+          "op": "==",
+          "type": "compare",
+          "value": true
+        },
+        "type": "and"
+      }
+    },
+    "CreditControl.high_risk_region": {
+      "action": "require_review",
+      "name": "high_risk_region",
+      "priority": 80,
+      "when": "country in [NG, SD, LY]",
+      "when_ast": {
+        "field": "country",
+        "negated": false,
+        "type": "in",
+        "values": [
+          "NG",
+          "SD",
+          "LY"
+        ]
+      }
+    },
+    "CreditControl.high_risk_score": {
+      "action": "require_review",
+      "name": "high_risk_score",
+      "priority": 40,
+      "when": "risk_score >= high_risk_threshold",
       "when_ast": {
         "field": "risk_score",
-        "op": ">",
+        "op": ">=",
         "type": "compare",
-        "value": 0.75
+        "value": "high_risk_threshold"
+      }
+    },
+    "CreditControl.high_value_new_customer": {
+      "action": "require_review",
+      "name": "high_value_new_customer",
+      "priority": 70,
+      "when": "order_total > 100000 and customer_age_days < 90",
+      "when_ast": {
+        "left": {
+          "field": "order_total",
+          "op": ">",
+          "type": "compare",
+          "value": 100000
+        },
+        "right": {
+          "field": "customer_age_days",
+          "op": "<",
+          "type": "compare",
+          "value": 90
+        },
+        "type": "and"
+      }
+    },
+    "CreditControl.multi_factor_deny": {
+      "action": "deny",
+      "name": "multi_factor_deny",
+      "priority": 49,
+      "when": "(fraud_score > 0.9 or velocity_flag == true) and customer_age_days < 30",
+      "when_ast": {
+        "left": {
+          "left": {
+            "field": "fraud_score",
+            "op": ">",
+            "type": "compare",
+            "value": 0.9
+          },
+          "right": {
+            "field": "velocity_flag",
+            "op": "==",
+            "type": "compare",
+            "value": true
+          },
+          "type": "or"
+        },
+        "right": {
+          "field": "customer_age_days",
+          "op": "<",
+          "type": "compare",
+          "value": 30
+        },
+        "type": "and"
+      }
+    },
+    "CreditControl.non_standard_currency": {
+      "action": "require_review",
+      "name": "non_standard_currency",
+      "priority": 85,
+      "when": "currency != KES",
+      "when_ast": {
+        "field": "currency",
+        "op": "!=",
+        "type": "compare",
+        "value": "KES"
       }
     },
     "CreditControl.over_limit": {
       "action": "deny",
       "name": "over_limit",
+      "priority": 90,
       "when": "order_total > credit_limit",
       "when_ast": {
         "field": "order_total",
         "op": ">",
         "type": "compare",
         "value": "credit_limit"
+      }
+    },
+    "CreditControl.premium_customer": {
+      "action": "allow",
+      "name": "premium_customer",
+      "priority": 86,
+      "when": "customer_tier == premium",
+      "when_ast": {
+        "field": "customer_tier",
+        "op": "==",
+        "type": "compare",
+        "value": "premium"
+      }
+    },
+    "CreditControl.risk_and_overdue": {
+      "action": "deny",
+      "name": "risk_and_overdue",
+      "priority": 69,
+      "when": "risk_score > high_risk_threshold and days_overdue > max_days_overdue",
+      "when_ast": {
+        "left": {
+          "field": "risk_score",
+          "op": ">",
+          "type": "compare",
+          "value": "high_risk_threshold"
+        },
+        "right": {
+          "field": "days_overdue",
+          "op": ">",
+          "type": "compare",
+          "value": "max_days_overdue"
+        },
+        "type": "and"
+      }
+    },
+    "CreditControl.safe_order": {
+      "action": "allow",
+      "name": "safe_order",
+      "priority": 87,
+      "when": "order_total <= 1000",
+      "when_ast": {
+        "field": "order_total",
+        "op": "<=",
+        "type": "compare",
+        "value": 1000
+      }
+    },
+    "CreditControl.tenant_required": {
+      "action": "deny",
+      "name": "tenant_required",
+      "priority": 100,
+      "when": "tenant_id missing",
+      "when_ast": {
+        "field": "tenant_id",
+        "negated": false,
+        "type": "missing"
+      }
+    },
+    "CreditControl.under_minimum": {
+      "action": "deny",
+      "name": "under_minimum",
+      "priority": 89,
+      "when": "order_total < 100",
+      "when_ast": {
+        "field": "order_total",
+        "op": "<",
+        "type": "compare",
+        "value": 100
+      }
+    },
+    "CreditControl.urgent_review": {
+      "action": "require_review",
+      "name": "urgent_review",
+      "priority": 60,
+      "when": "amount > 500000 or customer_tier == vip",
+      "when_ast": {
+        "left": {
+          "field": "amount",
+          "op": ">",
+          "type": "compare",
+          "value": 500000
+        },
+        "right": {
+          "field": "customer_tier",
+          "op": "==",
+          "type": "compare",
+          "value": "vip"
+        },
+        "type": "or"
       }
     }
   },
@@ -228,6 +1195,23 @@
     "credit_control.apg"
   ],
   "symbols": {
+    "app.CreditControlApp": {
+      "file": "credit_control.apg",
+      "id": "app.CreditControlApp",
+      "kind": "app",
+      "name": "CreditControlApp",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
     "capability.CreditControl": {
       "file": "credit_control.apg",
       "id": "capability.CreditControl",

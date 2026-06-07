@@ -1,49 +1,116 @@
-// Example 17: CRM and sales pipeline.
-// Complexity focus: sales data records, pipeline rules, and dashboard route.
+// Example 17: CRM sales pipeline with imports, components, and app-level screens.
+// Features: import statement, app.components, app.screens, multiple capabilities
 
-module crm_sales_pipeline version 1.0.0 {
-    description: "CRM capability for leads, opportunities, and sales forecasting";
+module crm_sales version 1.0.0 {
+    description: "CRM sales pipeline with multi-capability composition";
 }
 
+from common.contacts import BaseContact;
+import common.enumerations;
+
 table Lead {
-    company: str;
-    contact_name: str;
+    lead_id: str;
+    first_name: str;
+    last_name: str;
     email: str;
-    score: int;
-    qualified: bool;
+    phone: str?;
+    company: str?;
+    source: str = "website";
+    status: str = "new";
+    score: float = 0.0;
+    owner_id: str;
+    created_at: str;
+    notes: str?;
 }
 
 table Opportunity {
-    lead_id: int;
-    stage: str;
+    opportunity_id: str;
+    lead_id: str?;
+    account_id: str;
+    name: str;
+    stage: str = "prospecting";
     amount: float;
-    probability: int;
-    // Use an ISO date string until the semantic analyzer promotes `date` to a core field type.
-    expected_close_date: str;
+    probability: float = 0.0;
+    expected_close: str;
+    owner_id: str;
+    competitor: str?;
+    loss_reason: str?;
 }
 
-capability SalesPipeline {
+capability LeadManagement {
     contract: {
-        id: sales_pipeline,
-        provides: [lead_management, opportunity_tracking, forecast_metrics],
-        requires: [customer_master],
-        configuration: {default_probability: 25, forecast_currency: "KES"},
+        id: lead_management,
+        provides: [lead_capture, lead_scoring, lead_conversion],
+        configuration: {tenant_id: "default", lead_timeout_days: 30},
         rules: [
-            {name: "qualified_lead_minimum", when: "score < 50", action: "warn"},
-            {name: "large_deal_review", when: "amount > 1000000", action: "require_review"}
+            {name: "duplicate_check",  when: "email_exists == true",  action: require_review},
+            {name: "score_threshold",  when: "score >= 75",           action: warn},
+            {name: "stale_lead",       when: "days_since_contact > 30", action: warn}
         ],
-        ui: {shell: python, routes: [{name: "Pipeline", path: "/crm/pipeline", component: "PipelineScreen"}]},
-        theme: {name: sales_theme, tokens: {accent: "#DD6B20"}}
+        ui: {shell: python, routes: [
+            {name: "Leads", path: "/crm/leads", component: "LeadList", permission: "crm:leads"}
+        ]},
+        theme: {name: lead_theme, tokens: {accent: "#00838F"}}
+    };
+}
+
+capability OpportunityPipeline {
+    contract: {
+        id: opportunity_pipeline,
+        provides: [deal_tracking, pipeline_analytics, forecast],
+        requires: [lead_capture],
+        configuration: {
+            tenant_id: "default",
+            max_discount_pct: 30
+        },
+        rules: [
+            {name: "large_deal_review",  when: "amount > 500000",        action: require_review},
+            {name: "discount_limit",     when: "discount_pct > 30",      action: deny},
+            {name: "stage_progression",  when: "next_stage missing",     action: warn}
+        ],
+        ui: {shell: python, routes: [
+            {name: "Pipeline",   path: "/crm/pipeline",   component: "PipelineView",   permission: "crm:pipeline"},
+            {name: "Forecast",   path: "/crm/forecast",   component: "ForecastView",   permission: "crm:forecast"},
+            {name: "Analytics",  path: "/crm/analytics",  component: "SalesAnalytics", permission: "crm:analytics"}
+        ]},
+        theme: {name: pipeline_theme, tokens: {accent: "#E65100"}}
     };
 
-    erp_modules: [crm, sales, project_accounting];
     screens: {
-        ForecastDashboard: {
-            route: "/crm/forecast",
-            layout: dashboard,
-            contains: [StageFunnel, OpportunityTable, ForecastKpis],
-            binds: [opportunities.active],
-            actions: [advance_stage, mark_won, mark_lost]
+        PipelineKanban: {
+            route: "/crm/kanban",
+            title: "Pipeline Board",
+            layout: grid,
+            contains: [StageColumn, DealCard],
+            binds: [opportunities.by_stage],
+            actions: [move_stage, create_deal, filter]
         }
     };
+}
+
+app CRMSalesPipeline {
+    description: "CRM sales pipeline with lead and opportunity management";
+    capabilities: [LeadManagement, OpportunityPipeline];
+    routes: ["/crm", "/crm/leads", "/crm/pipeline", "/crm/forecast"];
+
+    components: {
+        lead_desk:        {capability: lead_capture,       route: "/crm/leads"},
+        deal_pipeline:    {capability: deal_tracking,      route: "/crm/pipeline"},
+        forecast_console: {capability: forecast,           route: "/crm/forecast"},
+        analytics_hub:    {capability: pipeline_analytics, route: "/crm/analytics"}
+    };
+
+    screens: {
+        SalesDashboard: {
+            route: "/crm",
+            title: "Sales Dashboard",
+            layout: dashboard,
+            contains: [PipelineSummary, LeadFunnel, ForecastWidget, RecentActivity],
+            binds: [pipeline.summary, leads.recent, forecast.current],
+            actions: [create_lead, refresh, export]
+        }
+    };
+
+    theme: {name: crm_theme, tokens: {accent: "#FF6D00", "border.radius": "4px"}};
+    runtime: {target: python, deployment: container, streaming: {processor: bytewax}};
 }

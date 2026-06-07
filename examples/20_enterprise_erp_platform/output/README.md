@@ -1,4 +1,4 @@
-# enterprise_erp_platform
+# enterprise_erp
 
 Dependency-free APG generated Python application.
 
@@ -68,16 +68,43 @@ Generated deployment artifacts:
 
 ## Entities
 
-- `EnterpriseERPPlatform`
+- `Vendor`
 - `Customer`
-- `Item`
-- `SalesOrder`
+- `Employee`
+- `ERPDB`
+- `ERPAdvisors`
+- `HireToRetire`
+- `MonthEndClose`
+- `EnterpriseERP`
+
+## Databases
+
+- `GET /databases` - database catalog with connection and schema metadata
+- `GET /databases/status` - database validation status and schema/reference counts
+- `GET /databases/{Database}/schemas` - schema, table, column, index, and relationship metadata for one database
+- `GET /relationships` - generated entity and database relationship graph
+
+Declared databases:
+
+- `ERPDB` - 0 schema(s), 0 table(s)
+
+## AI agents
+
+- `ERPAnalyst` - runtime `local`, invoke with `POST /agents/ERPAnalyst/invoke`
+- `PrivacyAgent` - runtime `local`, invoke with `POST /agents/PrivacyAgent/invoke`
+
+Typed agent stub classes live in `agent_stubs.py`. Wire up a runtime adapter by setting the environment variable:
+
+```
+export APG_AGENT_CODEX_PROVIDER_COMMAND='python my_provider.py'
+```
+
+The provider receives JSON `{"agent": {...}, "input": "...", "context": {...}}` on stdin and writes `{"output": "..."}` to stdout.
 
 ## Capabilities
 
-- `PlatformAudit` - provides audit_events
-- `EnterpriseFinance` - provides journal_entries, invoice_generation, payment_allocation
-- `EnterpriseOperations` - provides stock_balances, order_fulfillment, executive_kpis
+- `ERPCore` - provides erp_entities, erp_config, erp_audit
+- `ExecutiveERP` - provides executive_dashboard, board_reporting
 
 Capability operations:
 
@@ -91,6 +118,5 @@ Capability operations:
 
 Capability screens:
 
-- `GET /erp/finance`
-- `GET /erp/operations`
-- `GET /erp/operations/dashboard`
+- `GET /erp/board`
+- `GET /erp/exec`

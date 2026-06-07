@@ -1,4 +1,4 @@
-# multi_capability_dependency_suite
+# platform_suite
 
 Dependency-free APG generated Python application.
 
@@ -66,12 +66,30 @@ Generated deployment artifacts:
 - `semantic_model.json` - normalized APG semantic model for IDEs, agents, and release checks
 - `smoke_test.py` - standalone generated app smoke test
 
+## Entities
+
+- `SalesComplianceCrew`
+- `PlatformSuite`
+
+## AI agents
+
+- `SalesAdvisor` - runtime `local`, invoke with `POST /agents/SalesAdvisor/invoke`
+- `ComplianceAdvisor` - runtime `local`, invoke with `POST /agents/ComplianceAdvisor/invoke`
+
+Typed agent stub classes live in `agent_stubs.py`. Wire up a runtime adapter by setting the environment variable:
+
+```
+export APG_AGENT_CODEX_PROVIDER_COMMAND='python my_provider.py'
+```
+
+The provider receives JSON `{"agent": {...}, "input": "...", "context": {...}}` on stdin and writes `{"output": "..."}` to stdout.
+
 ## Capabilities
 
-- `AuditEvents` - provides audit_events
-- `CustomerMaster` - provides customer_master
-- `OrderManagement` - provides sales_orders, order_fulfillment
-- `Billing` - provides invoice_generation, payment_allocation
+- `Authentication` - provides identity_verification, session_management, role_assignment, jwt_tokens
+- `AuditTrail` - provides audit_events, compliance_trail, change_history
+- `CustomerMaster` - provides customer_records, credit_profiles, kyc_status
+- `SalesPortal` - provides sales_dashboard, order_management, customer_engagement
 
 Capability operations:
 
@@ -85,4 +103,6 @@ Capability operations:
 
 Capability screens:
 
-- `GET /orders`
+- `GET /customers`
+- `GET /sales`
+- `GET /sales/orders`

@@ -1,4 +1,4 @@
-# manufacturing_quality_control
+# manufacturing_qc
 
 Dependency-free APG generated Python application.
 
@@ -68,11 +68,14 @@ Generated deployment artifacts:
 
 ## Entities
 
-- `ProductionRun`
+- `WorkOrder`
+- `QualityInspection`
+- `QualityInspectionFlow`
+- `ManufacturingQCApp`
 
 ## Capabilities
 
-- `QualityControl` - provides quality_inspections, defect_tracking, production_oee
+- `ManufacturingQC` - provides quality_inspections, defect_tracking, production_yield
 
 Capability operations:
 
@@ -86,5 +89,6 @@ Capability operations:
 
 Capability screens:
 
-- `GET /manufacturing/line`
-- `GET /manufacturing/quality`
+- `GET /qc`
+- `GET /qc/defects`
+- `GET /qc/yield`

@@ -1,4 +1,4 @@
-# capability_basics
+# capability_contract
 
 Dependency-free APG generated Python application.
 
@@ -66,9 +66,14 @@ Generated deployment artifacts:
 - `semantic_model.json` - normalized APG semantic model for IDEs, agents, and release checks
 - `smoke_test.py` - standalone generated app smoke test
 
+## Entities
+
+- `CapabilityContractApp`
+
 ## Capabilities
 
-- `AuditLog` - provides audit_events
+- `AuditLog` - provides audit_events, audit_reports, compliance_trail
+- `NotificationEngine` - provides notifications, alert_dispatch, delivery_tracking
 
 Capability operations:
 
@@ -79,3 +84,8 @@ Capability operations:
 - `POST /capabilities/{Capability}/configuration/resolve` - resolve configuration
 - `POST /capabilities/{Capability}/configuration/validate` - validate configuration
 - `POST /capabilities/{Capability}/approval/plan` - plan approvals
+
+Capability screens:
+
+- `GET /audit`
+- `GET /audit/compliance`

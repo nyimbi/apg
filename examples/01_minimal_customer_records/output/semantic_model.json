@@ -2,14 +2,34 @@
   "agents": {},
   "app": {
     "description": null,
-    "entity_count": 1,
+    "entity_count": 2,
     "name": "customer_records",
     "version": "1.0.0"
   },
   "capabilities": {},
   "composition": {
     "agent_teams": {},
-    "applications": {},
+    "applications": {
+      "CustomerRecords": {
+        "agent_teams": [],
+        "agents": [],
+        "capabilities": [],
+        "components": {},
+        "configuration": {},
+        "deployments": {},
+        "description": "Customer records application",
+        "integrations": {},
+        "name": "CustomerRecords",
+        "policies": {},
+        "routes": [
+          "/customers"
+        ],
+        "runtime": {},
+        "screens": {},
+        "theme": {},
+        "workflows": []
+      }
+    },
     "capability_dependencies": {}
   },
   "contracts": {},
@@ -29,42 +49,42 @@
     "capability": {
       "edges": 0,
       "kind": "capability",
-      "nodes": 0
+      "nodes": 1
     },
     "deployment": {
-      "edges": 1,
-      "kind": "deployment",
-      "nodes": 2
-    },
-    "er": {
       "edges": 2,
-      "kind": "er",
+      "kind": "deployment",
       "nodes": 3
     },
+    "er": {
+      "edges": 17,
+      "kind": "er",
+      "nodes": 18
+    },
     "handler": {
-      "edges": 1,
+      "edges": 2,
       "kind": "handler",
-      "nodes": 2
+      "nodes": 3
     },
     "lookup": {
-      "edges": 1,
+      "edges": 2,
       "kind": "lookup",
-      "nodes": 2
+      "nodes": 3
     },
     "package": {
-      "edges": 1,
+      "edges": 2,
       "kind": "package",
-      "nodes": 2
+      "nodes": 3
     },
     "security": {
-      "edges": 1,
+      "edges": 2,
       "kind": "security",
-      "nodes": 2
+      "nodes": 3
     },
     "workflow": {
-      "edges": 1,
+      "edges": 2,
       "kind": "workflow",
-      "nodes": 2
+      "nodes": 3
     }
   },
   "llms": {},
@@ -78,6 +98,108 @@
     "customer_records.apg"
   ],
   "symbols": {
+    "app.CustomerRecords": {
+      "file": "customer_records.apg",
+      "id": "app.CustomerRecords",
+      "kind": "app",
+      "name": "CustomerRecords",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.company_name": {
+      "file": "customer_records.apg",
+      "id": "field.Customer.company_name",
+      "kind": "field",
+      "name": "Customer.company_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.credit_limit": {
+      "file": "customer_records.apg",
+      "id": "field.Customer.credit_limit",
+      "kind": "field",
+      "name": "Customer.credit_limit",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.customer_number": {
+      "file": "customer_records.apg",
+      "id": "field.Customer.customer_number",
+      "kind": "field",
+      "name": "Customer.customer_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.date_of_birth": {
+      "file": "customer_records.apg",
+      "id": "field.Customer.date_of_birth",
+      "kind": "field",
+      "name": "Customer.date_of_birth",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.discount_rate": {
+      "file": "customer_records.apg",
+      "id": "field.Customer.discount_rate",
+      "kind": "field",
+      "name": "Customer.discount_rate",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
     "field.Customer.email": {
       "file": "customer_records.apg",
       "id": "field.Customer.email",
@@ -95,11 +217,181 @@
       },
       "references": []
     },
-    "field.Customer.name": {
+    "field.Customer.is_active": {
       "file": "customer_records.apg",
-      "id": "field.Customer.name",
+      "id": "field.Customer.is_active",
       "kind": "field",
-      "name": "Customer.name",
+      "name": "Customer.is_active",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.is_verified": {
+      "file": "customer_records.apg",
+      "id": "field.Customer.is_verified",
+      "kind": "field",
+      "name": "Customer.is_verified",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.legal_name": {
+      "file": "customer_records.apg",
+      "id": "field.Customer.legal_name",
+      "kind": "field",
+      "name": "Customer.legal_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.loyalty_points": {
+      "file": "customer_records.apg",
+      "id": "field.Customer.loyalty_points",
+      "kind": "field",
+      "name": "Customer.loyalty_points",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.metadata": {
+      "file": "customer_records.apg",
+      "id": "field.Customer.metadata",
+      "kind": "field",
+      "name": "Customer.metadata",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.phone": {
+      "file": "customer_records.apg",
+      "id": "field.Customer.phone",
+      "kind": "field",
+      "name": "Customer.phone",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.preferences": {
+      "file": "customer_records.apg",
+      "id": "field.Customer.preferences",
+      "kind": "field",
+      "name": "Customer.preferences",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.registered_at": {
+      "file": "customer_records.apg",
+      "id": "field.Customer.registered_at",
+      "kind": "field",
+      "name": "Customer.registered_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.secondary_email": {
+      "file": "customer_records.apg",
+      "id": "field.Customer.secondary_email",
+      "kind": "field",
+      "name": "Customer.secondary_email",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.status": {
+      "file": "customer_records.apg",
+      "id": "field.Customer.status",
+      "kind": "field",
+      "name": "Customer.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.tags": {
+      "file": "customer_records.apg",
+      "id": "field.Customer.tags",
+      "kind": "field",
+      "name": "Customer.tags",
       "range": {
         "end": {
           "character": 1,
@@ -150,18 +442,182 @@
   "tables": {
     "Customer": {
       "fields": {
+        "company_name": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str | None"
+          },
+          "required": true,
+          "type": "str | None"
+        },
+        "credit_limit": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "customer_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "date_of_birth": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date?"
+          },
+          "required": true,
+          "type": "date?"
+        },
+        "discount_rate": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
         "email": {
           "relationship": null,
           "required": true,
           "type": "str"
         },
-        "name": {
+        "is_active": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "is_verified": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "legal_name": {
           "relationship": null,
           "required": true,
           "type": "str"
+        },
+        "loyalty_points": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "metadata": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Dict"
+          },
+          "required": true,
+          "type": "Dict"
+        },
+        "phone": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "preferences": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Dict"
+          },
+          "required": true,
+          "type": "Dict"
+        },
+        "registered_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "secondary_email": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "tags": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "List"
+          },
+          "required": true,
+          "type": "List"
         }
       },
-      "lookup_paths": {},
+      "lookup_paths": {
+        "company_name.id": {
+          "chain": [
+            "Customer.company_name",
+            "str | None.id"
+          ],
+          "valid": true
+        },
+        "credit_limit.id": {
+          "chain": [
+            "Customer.credit_limit",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "date_of_birth.id": {
+          "chain": [
+            "Customer.date_of_birth",
+            "date?.id"
+          ],
+          "valid": true
+        },
+        "metadata.id": {
+          "chain": [
+            "Customer.metadata",
+            "Dict.id"
+          ],
+          "valid": true
+        },
+        "preferences.id": {
+          "chain": [
+            "Customer.preferences",
+            "Dict.id"
+          ],
+          "valid": true
+        },
+        "registered_at.id": {
+          "chain": [
+            "Customer.registered_at",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "secondary_email.id": {
+          "chain": [
+            "Customer.secondary_email",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "tags.id": {
+          "chain": [
+            "Customer.tags",
+            "List.id"
+          ],
+          "valid": true
+        }
+      },
       "name": "Customer"
     }
   },

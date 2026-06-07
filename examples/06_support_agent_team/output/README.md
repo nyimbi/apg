@@ -66,10 +66,16 @@ Generated deployment artifacts:
 - `semantic_model.json` - normalized APG semantic model for IDEs, agents, and release checks
 - `smoke_test.py` - standalone generated app smoke test
 
+## Entities
+
+- `SupportCrew`
+- `SupportTeamApp`
+
 ## AI agents
 
-- `Planner` - runtime `codex`, invoke with `POST /agents/Planner/invoke`
-- `Writer` - runtime `codex`, invoke with `POST /agents/Writer/invoke`
+- `Planner` - runtime `local`, invoke with `POST /agents/Planner/invoke`
+- `Writer` - runtime `local`, invoke with `POST /agents/Writer/invoke`
+- `Reviewer` - runtime `local`, invoke with `POST /agents/Reviewer/invoke`
 
 Typed agent stub classes live in `agent_stubs.py`. Wire up a runtime adapter by setting the environment variable:
 
@@ -78,7 +84,3 @@ export APG_AGENT_CODEX_PROVIDER_COMMAND='python my_provider.py'
 ```
 
 The provider receives JSON `{"agent": {...}, "input": "...", "context": {...}}` on stdin and writes `{"output": "..."}` to stdout.
-
-## AI agent teams
-
-- `SupportCrew` - invoke with `POST /agent-teams/SupportCrew/invoke`

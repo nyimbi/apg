@@ -1,13 +1,13 @@
 """
-enterprise_erp_platform - APG Generated Package
-================================================
+enterprise_erp - APG Generated Package
+=======================================
 
-Version: 1.0.0
+Version: 2.0.0
 
 This package was automatically generated from APG source code.
 """
 
-__version__ = "1.0.0"
+__version__ = "2.0.0"
 
 from .app import approval_plan, auth_status, capability_configuration, capability_health, capability_health_report, capability_languages, capability_rules, capability_screens, capability_streaming, capability_theme, coerce_record_types, component_manifest, create_record, database_status, delete_record, describe_application, describe_capabilities, describe_capability, describe_workflow, describe_workflows, evaluate_capability_rules, execute_workflow_compensations, get_record, get_workflow_run, invoke_agent, invoke_team, list_agent_teams, list_agents, list_capabilities, list_databases, list_entities, list_events, list_records, list_workflow_runs, list_workflows, main, metrics_snapshot, openapi_document, query_records, relationship_graph, resume_workflow, run_workflow, runtime_adapter_command_candidates, runtime_adapter_environment_keys, self_test, semantic_model, storage_status, theme_token, update_record, validate_agent_runtimes, validate_application, validate_capability_configuration, validate_component_manifest_contract, validate_openapi_contract, validate_route_dispatch_contract, validate_record
 

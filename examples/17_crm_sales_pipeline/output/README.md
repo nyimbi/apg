@@ -1,4 +1,4 @@
-# crm_sales_pipeline
+# crm_sales
 
 Dependency-free APG generated Python application.
 
@@ -70,10 +70,12 @@ Generated deployment artifacts:
 
 - `Lead`
 - `Opportunity`
+- `CRMSalesPipeline`
 
 ## Capabilities
 
-- `SalesPipeline` - provides lead_management, opportunity_tracking, forecast_metrics
+- `LeadManagement` - provides lead_capture, lead_scoring, lead_conversion
+- `OpportunityPipeline` - provides deal_tracking, pipeline_analytics, forecast
 
 Capability operations:
 
@@ -87,5 +89,8 @@ Capability operations:
 
 Capability screens:
 
+- `GET /crm/analytics`
 - `GET /crm/forecast`
+- `GET /crm/kanban`
+- `GET /crm/leads`
 - `GET /crm/pipeline`

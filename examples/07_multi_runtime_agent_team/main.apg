@@ -1,37 +1,65 @@
-// Example 07: agent composition across rapidly changing runtimes.
-// Complexity focus: Codex, Claude Code, OpenCode, OpenAI, Ollama, and Pi as swappable runtimes.
+// Example 07: agents with multiple runtimes including ollama and pi.
+// Features: codex, claude_code, ollama, opencode, and pi runtimes;
+//           conditional team flow; local open-weight model
 
-module agent_runtime_portfolio version 1.0.0 {
-    description: "Agent team that can route work across several AI runtimes";
+module multi_runtime_team version 1.0.0 {
+    description: "Diverse agent runtimes with model diversity and local fallback";
 }
 
-agent Researcher {
-    role: "researcher";
-    model: "openai:gpt-4.1-mini";
+// Cloud-primary agent for deep technical analysis
+agent CloudAnalyst {
+    role: "cloud analyst";
+    model: "openai:gpt-4.1";
     runtime: codex;
-    system: "Gather structured evidence and cite source IDs.";
-    tools: [web.search, docs.read];
+    system: "Perform deep technical analysis. Use the highest-capability model available.";
+    tools: [data.query, reports.generate];
+    configuration: {temperature: 0.1, max_turns: 10};
 }
 
-agent Coder {
-    role: "implementation_engineer";
-    model: "claude:sonnet";
-    runtime: claude_code;
-    system: "Implement focused code changes from accepted plans.";
-    tools: [repo.edit, tests.run];
-}
-
-agent LocalReviewer {
-    role: "local_review";
-    model: "ollama:llama3.1";
+// Privacy-first agent running on local Ollama
+agent LocalPrivacyAgent {
+    role: "privacy-safe local analyst";
+    model: "ollama:llama3.3";
     runtime: ollama;
-    system: "Review diffs locally without sending code to external services.";
+    system: "Analyse data locally. No data leaves this environment. Use Llama for privacy-sensitive workloads.";
+    tools: [local_data.query, local_reports.generate];
+    memory: vector local_memory;
+    configuration: {temperature: 0.2, max_turns: 6};
 }
 
-swarm DeliverySwarm {
-    agents: [Researcher, Coder, LocalReviewer];
-    runtimes: [codex, claude_code, opencode, openai, ollama, pi];
-    flow: Researcher -> Coder -> LocalReviewer;
-    config: {handoff_mode: sequential, fallback_runtime: opencode};
-    rules: [{name: "local_review_required", when: "code_changed", action: "require_review"}];
+// Conversational agent using Pi runtime
+agent ConversationalAgent {
+    role: "customer conversation handler";
+    model: "openai:gpt-4.1-mini";
+    runtime: pi;
+    system: "Handle warm, empathetic customer conversations. Keep responses concise and human.";
+    tools: [customer.profile, conversation.history];
+    configuration: {temperature: 0.7, max_turns: 20};
+}
+
+// Open-source agent via opencode runtime
+agent OpenSourceCoder {
+    role: "open source code generator";
+    model: "ollama:mistral";
+    runtime: opencode;
+    system: "Generate code using open-weight models. Prefer Apache/MIT licensed outputs.";
+    tools: [code.search, docs.lookup];
+    configuration: {temperature: 0.0, max_turns: 8};
+}
+
+agent_team AnalyticsCrew {
+    agents: [CloudAnalyst, LocalPrivacyAgent];
+    flow: CloudAnalyst -> LocalPrivacyAgent when requires_privacy;
+    capabilities: [analytics_reports];
+    configuration: {handoff_mode: conditional};
+    rules: [
+        {name: "privacy_routing", when: "data_sensitivity == high", action: require_review}
+    ];
+}
+
+app MultiRuntimeApp {
+    description: "Multi-runtime agent platform with model diversity";
+    agents: [ConversationalAgent, OpenSourceCoder];
+    agent_teams: [AnalyticsCrew];
+    routes: ["/analytics", "/conversations", "/codegen"];
 }

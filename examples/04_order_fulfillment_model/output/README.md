@@ -1,4 +1,4 @@
-# fulfillment_ops
+# order_fulfillment
 
 Dependency-free APG generated Python application.
 
@@ -68,7 +68,10 @@ Generated deployment artifacts:
 
 ## Entities
 
-- `Customer`
-- `SalesOrder`
+- `Order`
 - `Shipment`
-- `FulfillmentEvent`
+- `Return`
+- `PaymentRetry`
+- `OrderFulfilment`
+- `ReturnProcess`
+- `FulfilmentApp`

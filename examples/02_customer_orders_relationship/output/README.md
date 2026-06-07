@@ -69,4 +69,6 @@ Generated deployment artifacts:
 ## Entities
 
 - `Customer`
-- `SalesOrder`
+- `Order`
+- `OrderLine`
+- `CustomerOrders`

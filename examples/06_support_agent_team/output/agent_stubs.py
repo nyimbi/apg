@@ -60,26 +60,37 @@ class AgentBase:
 
 class Planner(AgentBase):
     name = 'Planner'
-    role = 'planner'
+    role = 'support planner'
     model = 'openai:gpt-4.1-mini'
     runtime = 'codex'
-    system = 'Break the ticket into concrete resolution steps.'
+    system = "Break the customer's support request into a concrete resolution plan."
     capabilities = ()
-    tools = ('tickets.read', 'docs.search')
+    tools = ('tickets.read', 'docs.search', 'product.lookup')
 
 
 class Writer(AgentBase):
     name = 'Writer'
-    role = 'writer'
+    role = 'support writer'
     model = 'openai:gpt-4.1-mini'
     runtime = 'codex'
-    system = 'Write concise customer-facing replies from a plan.'
+    system = 'Write concise, empathetic customer-facing replies based on the resolution plan.'
     capabilities = ()
-    tools = ('tickets.update',)
+    tools = ('tickets.update', 'templates.fetch')
+
+
+class Reviewer(AgentBase):
+    name = 'Reviewer'
+    role = 'quality reviewer'
+    model = 'openai:gpt-4.1-mini'
+    runtime = 'codex'
+    system = 'Review the draft reply for accuracy, tone, and completeness. Flag any issues.'
+    capabilities = ()
+    tools = ('knowledge.verify', 'compliance.check')
 
 
 # Registry of all declared agents
 AGENTS = {
     'Planner': Planner,
     'Writer': Writer,
+    'Reviewer': Reviewer,
 }

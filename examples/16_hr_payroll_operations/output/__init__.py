@@ -1,6 +1,6 @@
 """
-hr_payroll_operations - APG Generated Package
-==============================================
+hr_payroll - APG Generated Package
+===================================
 
 Version: 1.0.0
 

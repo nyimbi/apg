@@ -1,14 +1,66 @@
-// Example 03: typed record validation.
-// Complexity focus: integer and boolean fields that generated forms coerce before validation.
+// Example 03: inventory item with comprehensive type coverage.
+// Features: all scalar types (str, int, float, decimal, bool, bytes,
+//           datetime, date, time, Any), optional variants
 
 module inventory_records version 1.0.0 {
-    description: "Inventory item records with typed quantities and active flags";
+    description: "Inventory item record demonstrating all scalar types";
 }
 
 table InventoryItem {
+    // String types
     sku: str;
-    name: str;
+    description: str;
+    barcode: str?;
+    notes: str | None;
+
+    // Numeric types
+    quantity_on_hand: int = 0;
+    quantity_reserved: int = 0;
+    quantity_on_order: int = 0;
+    unit_price: decimal;
+    cost_price: decimal;
+    weight_kg: float = 0.0;
+    reorder_point: int = 10;
+    reorder_quantity: int = 50;
+
+    // Boolean flags
+    is_active: bool = true;
+    is_serialised: bool = false;
+    is_hazardous: bool = false;
+    requires_refrigeration: bool = false;
+
+    // Date/time types
+    created_at: datetime;
+    last_counted_at: datetime?;
+    best_before: date?;
+    reorder_time: time?;
+
+    // Binary data — e.g. product image thumbnail
+    image_thumbnail: bytes?;
+
+    // Collections
+    categories: List[str];
+    attributes: Dict[str, str];
+    dimensions: Dict[str, float];
+    metadata: Dict[str, Any];
+
+    // Status
+    status: str = "active";
+    warehouse_location: str?;
+}
+
+table StockMovement {
+    movement_id: str;
+    item_id: str;
+    movement_type: str;      // receipt | issue | adjustment | transfer
     quantity: int;
-    reorder_level: int;
-    active: bool;
+    reference: str?;
+    notes: str | None;
+    movement_date: datetime;
+    performed_by: str;
+}
+
+app InventoryRecords {
+    description: "Inventory management";
+    routes: ["/inventory", "/stock-movements"];
 }

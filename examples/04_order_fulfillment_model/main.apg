@@ -1,32 +1,101 @@
-// Example 04: small operational data model.
-// Complexity focus: multiple tables that become generated CRUD screens and JSON APIs.
+// Example 04: order fulfillment with comprehensive workflow coverage.
+// Features: workflow with steps, human_tasks, assignments, guards,
+//           timers, waits, retry_policy, compensation; multiple workflows
 
-module fulfillment_ops version 1.0.0 {
-    description: "Order fulfillment records for customers, orders, shipments, and events";
+module order_fulfillment version 1.0.0 {
+    description: "Order fulfilment with full workflow coverage";
 }
 
-table Customer {
-    name: str;
-    email: str;
-}
-
-table SalesOrder {
-    customer_id: int;
+table Order {
     order_number: str;
-    total: float;
-    status: str;
+    customer_id: str;
+    status: str = "pending";
+    total: decimal;
+    priority: str = "standard";
 }
 
 table Shipment {
-    sales_order_id: int;
+    shipment_id: str;
+    order_id: str;
     carrier: str;
-    tracking_number: str;
-    delivered: bool;
+    tracking_number: str?;
+    status: str = "pending";
+    dispatched_at: datetime?;
+    delivered_at: datetime?;
 }
 
-table FulfillmentEvent {
-    shipment_id: int;
-    event_type: str;
-    // Use `str` for timestamps in this executable baseline; apps can later add richer date types.
-    event_time: str;
+table Return {
+    return_id: str;
+    order_id: str;
+    reason: str;
+    status: str = "requested";
+    refund_amount: decimal = 0.0;
+}
+
+table PaymentRetry {
+    retry_id: str;
+    order_id: str;
+    attempt: int = 1;
+    status: str = "pending";
+}
+
+workflow OrderFulfilment {
+    // Full state machine: new order → picked → packed → dispatched → delivered
+    steps: str = "received -> payment_authorised -> picking -> packing -> dispatched -> delivered";
+    human_tasks: [picking, packing];
+    assignments: {
+        picking: warehouse_operator,
+        packing: packing_station,
+    };
+    guards: {
+        payment_authorised: "payment_status == approved and fraud_score < 0.7",
+        dispatched: "all_items_packed and carrier_confirmed",
+    };
+    // SLA timers
+    timers: {
+        picking: "PT4H",
+        packing: "PT2H",
+        dispatched: "PT24H",
+    };
+    // External event waits
+    waits: {
+        payment_authorised: payment_confirmed,
+        delivered: delivery_confirmation_received,
+    };
+    // Retry policies for automated steps
+    retry_policy: {
+        payment_authorised: "3",
+        dispatched: "2",
+    };
+    // Compensation actions on cancellation
+    compensation: {
+        payment_authorised: void_payment_authorisation,
+        picking: return_items_to_stock,
+        dispatched: initiate_carrier_recall,
+    };
+}
+
+workflow ReturnProcess {
+    steps: str = "requested -> approved -> received -> inspected -> refunded";
+    human_tasks: [approved, inspected];
+    assignments: {
+        approved: returns_manager,
+        inspected: quality_inspector,
+    };
+    guards: {
+        approved: "return_reason in [defective, wrong_item, not_as_described]",
+        refunded: "inspection_passed == true",
+    };
+    timers: {
+        approved: "PT48H",
+        inspected: "PT24H",
+    };
+    compensation: {
+        refunded: reverse_refund,
+    };
+}
+
+app FulfilmentApp {
+    description: "Order fulfilment and returns management";
+    routes: ["/orders", "/shipments", "/returns"];
 }
