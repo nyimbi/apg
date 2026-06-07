@@ -10,7 +10,7 @@ from typing import Any
 import click
 from rich.console import Console
 
-from compiler.linting import audit_lint_fixtures, lint_path
+from compiler.linting import audit_lint_fixtures, lint_path, _format_diagnostic_with_source
 
 
 console = Console()
@@ -28,11 +28,11 @@ def _print_text_report(report: dict[str, Any]) -> None:
 		f"{counts['error']} error(s), {counts['warning']} warning(s)"
 	)
 	for diagnostic in report["diagnostics"]:
-		start = diagnostic["range"]["start"]
-		console.print(
-			f"  {diagnostic['file']}:{start['line'] + 1}:{start['character']}: "
-			f"{diagnostic['code']} {diagnostic['severity']}: {diagnostic['message']}"
-		)
+		file_path = Path(diagnostic.get("file", "")) if diagnostic.get("file") else None
+		if file_path and not file_path.exists():
+			file_path = None
+		formatted = _format_diagnostic_with_source(diagnostic, file_path)
+		console.print(formatted)
 
 
 @click.command()

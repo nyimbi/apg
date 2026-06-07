@@ -84,6 +84,8 @@ def _build_snapshot_from_model(model: dict[str, Any], path: Path, source: str) -
 				"add_agent",
 				"add_capability",
 				"add_screen",
+				"add_rule",
+				"add_workflow_state",
 			],
 			"invalid_visual_edits_are_rejected": True,
 		},
@@ -239,11 +241,14 @@ def _graph_explain_panel(model: dict[str, Any]) -> dict[str, Any]:
 def _validate_edit(edit: dict[str, Any], snapshot: dict[str, Any]) -> list[str]:
 	errors: list[str] = []
 	operation = edit.get("operation")
-	if operation not in {"add_table", "add_field", "add_agent", "add_capability", "add_screen"}:
+	if operation not in {
+		"add_table", "add_field", "add_agent", "add_capability", "add_screen",
+		"add_rule", "add_workflow_state",
+	}:
 		return [f"Unsupported Studio edit operation: {operation}"]
 
 	name = str(edit.get("name", ""))
-	if operation != "add_field" and not _valid_identifier(name):
+	if operation not in {"add_field", "add_rule", "add_workflow_state"} and not _valid_identifier(name):
 		errors.append(f"Invalid APG identifier for name: {name}")
 
 	tables = {
@@ -270,6 +275,28 @@ def _validate_edit(edit: dict[str, Any], snapshot: dict[str, Any]) -> list[str]:
 		table_name = str(edit.get("table", ""))
 		if table_name and table_name not in tables:
 			errors.append(f"Cannot bind screen to unknown table: {table_name}")
+	elif operation == "add_rule":
+		cap_name = str(edit.get("capability", ""))
+		rule_name = str(edit.get("name", ""))
+		when = str(edit.get("when", ""))
+		action = str(edit.get("action", ""))
+		if not cap_name:
+			errors.append("add_rule requires 'capability'")
+		if not rule_name:
+			errors.append("add_rule requires 'name'")
+		if not when:
+			errors.append("add_rule requires 'when'")
+		if not action:
+			errors.append("add_rule requires 'action'")
+	elif operation == "add_workflow_state":
+		workflow_name = str(edit.get("workflow", ""))
+		state = str(edit.get("state", ""))
+		if not workflow_name:
+			errors.append("add_workflow_state requires 'workflow'")
+		if not state:
+			errors.append("add_workflow_state requires 'state'")
+		if not _valid_identifier(state):
+			errors.append(f"Invalid APG identifier for state: {state!r}")
 	return errors
 
 
@@ -285,6 +312,10 @@ def _apply_visual_edit(source: str, edit: dict[str, Any]) -> str:
 		return _append_block(source, _capability_block(edit))
 	if operation == "add_screen":
 		return _append_block(source, _screen_block(edit))
+	if operation == "add_rule":
+		return _add_rule_to_capability(source, edit)
+	if operation == "add_workflow_state":
+		return _add_state_to_workflow(source, edit)
 	return source
 
 
@@ -380,6 +411,108 @@ def _snapshot_summary(snapshot: dict[str, Any] | None) -> dict[str, Any]:
 	}
 
 
+def _add_rule_to_capability(source: str, edit: dict[str, Any]) -> str:
+	"""Append a rule entry to the rules list inside a named capability's contract block."""
+	cap_name = edit["capability"]
+	rule_name = edit["name"]
+	when = edit["when"]
+	action = edit["action"]
+	rule_text = f'{{name: "{rule_name}", when: "{when}", action: {action}}}'
+
+	# Find 'rules: [' inside the capability block and append before closing ']'
+	# Strategy: locate the capability block, then find the rules list within it.
+	cap_pattern = re.compile(
+		rf'(capability\s+{re.escape(cap_name)}\s*\{{.*?rules\s*:\s*\[)(.*?)(\])',
+		re.DOTALL,
+	)
+	match = cap_pattern.search(source)
+	if not match:
+		# No rules list found — append the capability block unchanged, add rules key
+		# Find end of capability contract block and insert a rules list
+		cap_block_pattern = re.compile(
+			rf'(capability\s+{re.escape(cap_name)}\s*\{{.*?contract\s*:\s*\{{)(.*?)(\}}\s*;)',
+			re.DOTALL,
+		)
+		block_match = cap_block_pattern.search(source)
+		if not block_match:
+			return source
+		inner = block_match.group(2).rstrip()
+		indent = "        "
+		new_inner = f"{inner}\n{indent}rules: [{rule_text}]"
+		return (
+			source[: block_match.start()]
+			+ block_match.group(1)
+			+ new_inner
+			+ "\n    "
+			+ block_match.group(3)
+			+ source[block_match.end() :]
+		)
+
+	existing = match.group(2).rstrip()
+	separator = ",\n            " if existing.strip() else ""
+	if existing.strip():
+		new_rules_body = f"{existing}{separator}{rule_text}"
+	else:
+		new_rules_body = f"\n            {rule_text}\n        "
+	return (
+		source[: match.start()]
+		+ match.group(1)
+		+ new_rules_body
+		+ match.group(3)
+		+ source[match.end() :]
+	)
+
+
+def _add_state_to_workflow(source: str, edit: dict[str, Any]) -> str:
+	"""Insert a new state into a workflow's steps string, after the specified state."""
+	workflow_name = edit["workflow"]
+	new_state = edit["state"]
+	after_state = edit.get("after", "")
+
+	# Find 'steps: str = "..."' inside the named workflow block
+	steps_pattern = re.compile(
+		rf'(workflow\s+{re.escape(workflow_name)}\s*\{{.*?steps\s*:\s*str\s*=\s*")(.*?)(")',
+		re.DOTALL,
+	)
+	match = steps_pattern.search(source)
+	if not match:
+		# Fallback: append a steps line to the workflow block
+		wf_block_pattern = re.compile(
+			rf'(workflow\s+{re.escape(workflow_name)}\s*\{{)(.*?)(\}})',
+			re.DOTALL,
+		)
+		block_match = wf_block_pattern.search(source)
+		if not block_match:
+			return source
+		inner = block_match.group(2).rstrip()
+		new_inner = f'{inner}\n    steps: str = "{new_state}";\n'
+		return (
+			source[: block_match.start()]
+			+ block_match.group(1)
+			+ new_inner
+			+ block_match.group(3)
+			+ source[block_match.end() :]
+		)
+
+	steps_str = match.group(2)
+	states = [s.strip() for s in re.split(r'\s*->\s*', steps_str)]
+
+	if after_state and after_state in states:
+		idx = states.index(after_state)
+		states.insert(idx + 1, new_state)
+	else:
+		states.append(new_state)
+
+	new_steps = " -> ".join(states)
+	return (
+		source[: match.start()]
+		+ match.group(1)
+		+ new_steps
+		+ match.group(3)
+		+ source[match.end() :]
+	)
+
+
 def _review_reasons(edit: dict[str, Any]) -> list[str]:
 	return {
 		"add_table": ["database designer edit changes schema and migration surface"],
@@ -387,6 +520,8 @@ def _review_reasons(edit: dict[str, Any]) -> list[str]:
 		"add_agent": ["agent designer edit changes runtime, model, and permission surface"],
 		"add_capability": ["capability designer edit changes composition contract surface"],
 		"add_screen": ["screen designer edit changes UI bindings and generated routes"],
+		"add_rule": ["capability rule edit changes enforcement logic and access control surface"],
+		"add_workflow_state": ["workflow state edit changes lifecycle and human-task assignment surface"],
 	}.get(str(edit.get("operation")), ["visual edit requires review"])
 
 

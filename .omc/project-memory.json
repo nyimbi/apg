@@ -10,7 +10,7 @@
   },
   "build": {
     "buildCommand": null,
-    "testCommand": "/Users/nyimbiodero/src/pjs/apg/.venv/bin/python -m pytest tests/ \\\n  --ignore=tests/test_tooling_audit.py \\\n  -q --tb=no 2>&1 | grep \"^FAILED\" | wc -l && \\\n/Users/nyimbiodero/src/pjs/apg/.venv/bin/python -m pytest tests/ \\\n  --ignore=tests/test_tooling_audit.py \\\n  -q --tb=no 2>&1 | tail -3",
+    "testCommand": "\\\n.venv/bin/python -m pytest tests/ \\\n  --ignore=tests/test_tooling_audit.py \\\n  -q --tb=short 2>&1 | tail -10",
     "lintCommand": null,
     "devCommand": null,
     "scripts": {}
@@ -377,9 +377,33 @@
   },
   "hotPaths": [
     {
+      "path": "compiler/semantic_model.py",
+      "accessCount": 36,
+      "lastAccessed": 1780849481393,
+      "type": "file"
+    },
+    {
+      "path": "compiler/parser.py",
+      "accessCount": 32,
+      "lastAccessed": 1780801167568,
+      "type": "file"
+    },
+    {
+      "path": "compiler/compiler.py",
+      "accessCount": 23,
+      "lastAccessed": 1780800935591,
+      "type": "file"
+    },
+    {
       "path": "capabilities/hcm/tat/time_attendance/service.py",
       "accessCount": 20,
       "lastAccessed": 1780735398492,
+      "type": "file"
+    },
+    {
+      "path": "compiler/studio.py",
+      "accessCount": 16,
+      "lastAccessed": 1780849582538,
       "type": "file"
     },
     {
@@ -389,9 +413,9 @@
       "type": "file"
     },
     {
-      "path": "compiler/studio.py",
-      "accessCount": 8,
-      "lastAccessed": 1780701701961,
+      "path": "compiler/nl_plan.py",
+      "accessCount": 12,
+      "lastAccessed": 1780849567484,
       "type": "file"
     },
     {
@@ -401,27 +425,21 @@
       "type": "file"
     },
     {
-      "path": "compiler/semantic_model.py",
-      "accessCount": 7,
-      "lastAccessed": 1780701628227,
-      "type": "file"
-    },
-    {
       "path": "capabilities/fin/glr/general_ledger/service.py",
       "accessCount": 7,
       "lastAccessed": 1780734942645,
       "type": "file"
     },
     {
-      "path": "compiler/nl_plan.py",
-      "accessCount": 5,
-      "lastAccessed": 1780701664008,
+      "path": "tests/test_compiled_program_tables.py",
+      "accessCount": 7,
+      "lastAccessed": 1780807269305,
       "type": "file"
     },
     {
-      "path": "compiler/compiler.py",
-      "accessCount": 3,
-      "lastAccessed": 1780693795638,
+      "path": "capabilities/crm/adv/api.py",
+      "accessCount": 5,
+      "lastAccessed": 1780737728184,
       "type": "file"
     },
     {
@@ -462,14 +480,8 @@
     },
     {
       "path": "compiler/ai_agent_composition.py",
-      "accessCount": 2,
-      "lastAccessed": 1780693732705,
-      "type": "file"
-    },
-    {
-      "path": "compiler/parser.py",
-      "accessCount": 2,
-      "lastAccessed": 1780693805472,
+      "accessCount": 3,
+      "lastAccessed": 1780800971368,
       "type": "file"
     },
     {
@@ -512,18 +524,6 @@
       "path": "capabilities/crm/adv/database.py",
       "accessCount": 2,
       "lastAccessed": 1780735814288,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/crm/adv/api.py",
-      "accessCount": 2,
-      "lastAccessed": 1780735917277,
-      "type": "file"
-    },
-    {
-      "path": "tests/test_compiled_program_tables.py",
-      "accessCount": 1,
-      "lastAccessed": 1780693591591,
       "type": "file"
     },
     {

@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"find /Users/nyimbiodero/src/pjs/apg/capabilities/crm/adv/database -name \\\"*.pyc\\\" -delete && .venv/bin/python -m pytest tests/test_crm_adv_core_records.py -q --tb=short 2>&1\",\"description\"...",
-  "error": "Exit code 1\n....F..                                                                  [100%]\n=================================== FAILURES ===================================\n_________ test_crm_contact_import_export_endpoints_execute_standalone __________\ncapabilities/crm/adv/import_export.py:481: in export_contacts\n    filtered_contacts = self._filter_export_fields(contacts, include_fields, exclude_fields)\n                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^...",
-  "timestamp": "2026-06-06T08:55:05.176Z",
-  "retry_count": 3
+  "tool_input_preview": "{\"command\":\".venv/bin/python -c \\\"\\nimport sys; sys.path.insert(0, '.')\\nfrom compiler.nl_plan import build_nl_plan\\nfrom pathlib import Path\\np = Path('examples/crm_platform/main.apg')\\nfor prompt in...",
+  "error": "Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 3, in <module>\n  File \"/Users/nyimbiodero/src/pjs/apg/compiler/__init__.py\", line 39, in <module>\n    from .tooling_audit import audit_tooling_fixtures, build_tooling_fixture_audit\n  File \"/Users/nyimbiodero/src/pjs/apg/compiler/tooling_audit.py\", line 25, in <module>\n    from compiler.studio import build_studio_edit_plan, build_studio_snapshot\n  File \"/Users/nyimbiodero/src/pjs/apg/compiler/studio.py\", line 481\n    rf'(workf...",
+  "timestamp": "2026-06-07T16:26:14.916Z",
+  "retry_count": 1
 }

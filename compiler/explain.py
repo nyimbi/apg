@@ -15,14 +15,31 @@ def build_explain_report(
 	symbol: str | None = None,
 	diagnostic: str | None = None,
 	handler: str | None = None,
+	all_capabilities: bool = False,
+	all_workflows: bool = False,
+	all_rules: str | None = None,
 ) -> dict[str, Any]:
-	"""Build an ``apg.explain-report.v1`` payload."""
+	"""Build an ``apg.explain-report.v1`` payload.
+
+	Bulk modes:
+	  all_capabilities=True  — explain every capability in the file
+	  all_workflows=True     — explain every workflow/flow
+	  all_rules=NAME         — explain every rule in the named capability
+	"""
 	requested = {
 		"symbol": symbol,
 		"diagnostic": diagnostic,
 		"handler": handler,
+		"all_capabilities": all_capabilities or None,
+		"all_workflows": all_workflows or None,
+		"all_rules": all_rules,
 	}
-	active = [key for key, value in requested.items() if value]
+	# Count singular query modes (not bulk)
+	singular = {"symbol": symbol, "diagnostic": diagnostic, "handler": handler}
+	bulk = {"all_capabilities": all_capabilities, "all_workflows": all_workflows, "all_rules": all_rules}
+	active_singular = [key for key, value in singular.items() if value]
+	active_bulk = [key for key, value in bulk.items() if value]
+
 	report: dict[str, Any] = {
 		"format": "apg.explain-report.v1",
 		"ok": False,
@@ -34,8 +51,12 @@ def build_explain_report(
 		"warnings": [],
 	}
 
-	if len(active) != 1:
-		report["errors"].append("Specify exactly one of --symbol, --diagnostic, or --handler")
+	total_active = len(active_singular) + len(active_bulk)
+	if total_active != 1:
+		report["errors"].append(
+			"Specify exactly one of --symbol, --diagnostic, --handler, "
+			"--all-capabilities, --all-workflows, or --all-rules"
+		)
 		return report
 
 	model = build_semantic_model(source_file)
@@ -55,9 +76,20 @@ def build_explain_report(
 		report["explanations"] = _explain_diagnostic(model, diagnostic)
 	elif handler:
 		report["explanations"] = _explain_handler(model, handler)
+	elif all_capabilities:
+		report["explanations"] = _explain_all_capabilities(model)
+	elif all_workflows:
+		report["explanations"] = _explain_all_workflows(model)
+	elif all_rules:
+		report["explanations"] = _explain_all_rules(model, all_rules)
 
 	if not report["explanations"]:
-		report["errors"].append(f"No explanation found for {active[0]} {requested[active[0]]!r}")
+		if active_singular:
+			report["errors"].append(f"No explanation found for {active_singular[0]} {singular[active_singular[0]]!r}")
+		elif active_bulk:
+			key = active_bulk[0]
+			value = bulk[key]
+			report["errors"].append(f"No explanation found for {key}={value!r}")
 	report["ok"] = not report["errors"]
 	return report
 
@@ -182,6 +214,65 @@ def _explain_handler(model: dict[str, Any], query: str) -> list[dict[str, Any]]:
 		}
 		for match in matches
 	]
+
+
+def _explain_all_capabilities(model: dict[str, Any]) -> list[dict[str, Any]]:
+	capabilities = model.get("capabilities", {})
+	results = []
+	for name, capability in sorted(capabilities.items()):
+		symbol = model.get("symbols", {}).get(f"capability.{name}")
+		results.append({
+			"kind": "capability",
+			"summary": f"capability {name} provides {capability.get('provides', [])} and requires {capability.get('requires', [])}.",
+			"name": name,
+			"detail": capability,
+			"related": _related_symbol_context(model, "capability", name, capability),
+			"symbol": symbol,
+		})
+	return results
+
+
+def _explain_all_workflows(model: dict[str, Any]) -> list[dict[str, Any]]:
+	flows = model.get("flows", {})
+	results = []
+	for name, flow in sorted(flows.items()):
+		states = flow.get("states") or flow.get("steps", [])
+		transitions = flow.get("transitions", [])
+		results.append({
+			"kind": "workflow",
+			"summary": f"workflow {name} has {len(states)} state(s) and {len(transitions)} transition(s).",
+			"name": name,
+			"detail": flow,
+			"states": states,
+			"transitions": transitions,
+		})
+	return results
+
+
+def _explain_all_rules(model: dict[str, Any], capability_name: str) -> list[dict[str, Any]]:
+	capability = model.get("capabilities", {}).get(capability_name)
+	if capability is None:
+		return []
+	results = []
+	all_rules = [
+		*capability.get("rules", []),
+		*capability.get("business_rules", []),
+		*capability.get("rule_engine", {}).get("rules", []),
+	]
+	for rule in all_rules:
+		if not isinstance(rule, dict):
+			continue
+		rule_name = str(rule.get("name") or "unnamed_rule")
+		when = str(rule.get("when") or "")
+		action = str(rule.get("action") or "")
+		results.append({
+			"kind": "rule",
+			"summary": f"rule {rule_name}: when {when!r} → {action}",
+			"capability": capability_name,
+			"name": rule_name,
+			"detail": rule,
+		})
+	return results
 
 
 def _handler_summary(match: dict[str, Any]) -> str:

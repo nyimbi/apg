@@ -30,6 +30,7 @@ from cli.drift_command import drift
 from cli.evidence_command import evidence
 from cli.explain_command import explain
 from cli.format_command import format_cmd
+from cli.schema_command import schema
 from cli.graph_command import graph, graph_suite
 from cli.hygiene_command import hygiene
 from cli.ide_command import ide
@@ -45,6 +46,7 @@ from cli.run_command import run
 from cli.studio_command import studio
 from cli.tooling_command import tooling
 from cli.validate_command import validate
+from cli.refactor_command import refactor
 
 console = Console()
 
@@ -90,6 +92,8 @@ cli.add_command(run)
 cli.add_command(studio)
 cli.add_command(tooling)
 cli.add_command(validate)
+cli.add_command(schema)
+cli.add_command(refactor)
 
 
 @cli.command()
@@ -269,19 +273,183 @@ def language_server(
 		console.print("\n[yellow]Language server stopped[/yellow]")
 
 
+_INIT_TEMPLATES: dict[str, str] = {
+	"saas-app": '''\
+module saas_app version 1.0.0 {
+    description: "Multi-tenant SaaS application";
+}
+
+table Tenant {
+    tenant_id: str;
+    name: str;
+    plan: str = "starter";
+    is_active: bool = true;
+    created_at: datetime;
+}
+
+table User {
+    user_id: str;
+    tenant_id: str;
+    email: str;
+    role: str = "member";
+    is_active: bool = true;
+}
+
+capability TenantManagement {
+    contract: {
+        id: tenant_management,
+        provides: [tenant_auth, user_management, billing],
+        requires: [],
+        configuration: {tenant_id: "default"},
+        rules: [
+            {name: "tenant_required", when: "tenant_id missing", action: deny}
+        ]
+    };
+}
+
+app SaaSApp {
+    description: "Multi-tenant SaaS application";
+    capabilities: [TenantManagement];
+    routes: ["/", "/dashboard", "/settings"];
+}
+''',
+	"erp-module": '''\
+module erp_module version 1.0.0 {
+    description: "ERP module — replace with your domain";
+}
+
+table Entity {
+    entity_id: str;
+    name: str;
+    status: str = "active";
+    created_at: datetime;
+}
+
+capability ERPModule {
+    contract: {
+        id: erp_module,
+        provides: [entity_management],
+        requires: [audit_events],
+        configuration: {
+            tenant_id: "default",
+            currency: "USD"
+        },
+        rules: [
+            {name: "active_only", when: "status != active", action: deny}
+        ],
+        ui: {shell: python, routes: [
+            {name: "Entities", path: "/entities", component: "EntityList", permission: "module:view"}
+        ]},
+        theme: {name: module_theme, tokens: {accent: "#1565C0"}}
+    };
+    erp_modules: [finance];
+    approvals: {levels: 1, approvers: [manager]};
+    master_data: {entities: [entity]};
+}
+
+app ERPModuleApp {
+    description: "ERP module application";
+    capabilities: [ERPModule];
+    routes: ["/module"];
+}
+''',
+	"ai-agent": '''\
+module ai_agent_app version 1.0.0 {
+    description: "AI agent application";
+}
+
+agent PrimaryAgent {
+    role: "primary assistant";
+    model: "openai:gpt-4.1-mini";
+    runtime: codex;
+    system: "You are a helpful assistant. Be concise and accurate.";
+    tools: [];
+    memory: vector agent_memory;
+    configuration: {temperature: 0.1, max_turns: 8};
+}
+
+agent ReviewAgent {
+    role: "quality reviewer";
+    model: "openai:gpt-4.1-mini";
+    runtime: codex;
+    system: "Review responses for accuracy and completeness.";
+    configuration: {temperature: 0.0, max_turns: 4};
+}
+
+agent_team MainCrew {
+    agents: [PrimaryAgent, ReviewAgent];
+    flow: PrimaryAgent -> ReviewAgent [condition: review_needed];
+    configuration: {handoff_mode: conditional};
+}
+
+app AIAgentApp {
+    description: "AI agent application";
+    agent_teams: [MainCrew];
+    routes: ["/chat", "/agents"];
+}
+''',
+	"workflow-app": '''\
+module workflow_app version 1.0.0 {
+    description: "Approval workflow application";
+}
+
+table Request {
+    request_id: str;
+    title: str;
+    description: str;
+    amount: decimal;
+    status: str = "draft";
+    submitted_by: str;
+    created_at: datetime;
+}
+
+capability RequestManagement {
+    contract: {
+        id: request_management,
+        provides: [request_lifecycle, approval_queue],
+        configuration: {tenant_id: "default", approval_threshold: 10000},
+        rules: [
+            {name: "large_request", when: "amount > approval_threshold", action: require_review}
+        ]
+    };
+}
+
+workflow ApprovalFlow {
+    steps: str = "draft -> submitted -> reviewed -> approved";
+    human_tasks: [reviewed, approved];
+    assignments: {reviewed: reviewer, approved: approver};
+    guards: {reviewed: "title not missing"};
+    timers: {reviewed: "PT48H"};
+}
+
+app WorkflowApp {
+    description: "Request approval workflow";
+    capabilities: [RequestManagement];
+    routes: ["/requests", "/approvals"];
+}
+''',
+}
+
+
 @cli.command()
-def init():
+@click.option(
+	"--template",
+	type=click.Choice(list(_INIT_TEMPLATES.keys())),
+	default=None,
+	help="Project template to use (saas-app, erp-module, ai-agent, workflow-app)",
+)
+def init(template: str | None):
 	"""Initialize APG project in current directory"""
 	current_dir = Path.cwd()
-	
+
 	# Check if already APG project
 	if (current_dir / 'apg.json').exists():
 		console.print("[yellow]Already an APG project[/yellow]")
 		return
-	
+
 	# Create basic APG project structure
 	console.print(f"[blue]Initializing APG project in {current_dir}[/blue]")
-	
+
 	# Basic project configuration
 	project_config = {
 		'name': current_dir.name,
@@ -289,7 +457,7 @@ def init():
 		'description': f'APG project: {current_dir.name}',
 		'author': 'APG Developer',
 		'license': 'MIT',
-		'template': 'custom',
+		'template': template or 'custom',
 		'target_language': 'python',
 		'python_version': f'{sys.version_info.major}.{sys.version_info.minor}',
 		'features': {
@@ -305,15 +473,19 @@ def init():
 			'include_runtime': True
 		}
 	}
-	
+
 	# Create apg.json
 	with open(current_dir / 'apg.json', 'w') as f:
 		import json
 		json.dump(project_config, f, indent=2)
-	
+
 	# Create basic APG file if it doesn't exist
 	if not (current_dir / 'main.apg').exists():
-		basic_apg = f'''module {current_dir.name} version 1.0.0 {{
+		if template and template in _INIT_TEMPLATES:
+			apg_source = _INIT_TEMPLATES[template]
+			console.print(f"[green]Using template: {template}[/green]")
+		else:
+			apg_source = f'''module {current_dir.name} version 1.0.0 {{
 	description: "APG project: {current_dir.name}";
 	author: "APG Developer";
 	license: "MIT";
@@ -323,13 +495,13 @@ agent BasicAgent {{
 	name: str = "{current_dir.name} Agent";
 	status: str = "inactive";
 	counter: int = 0;
-	
+
 	initialize: () -> bool = {{
 		status = "active";
 		counter = 0;
 		return true;
 	}};
-	
+
 	process: () -> str = {{
 		if (status == "active") {{
 			counter = counter + 1;
@@ -337,7 +509,7 @@ agent BasicAgent {{
 		}}
 		return "Agent is inactive";
 	}};
-	
+
 	get_status: () -> dict = {{
 		return {{
 			"name": name,
@@ -347,20 +519,20 @@ agent BasicAgent {{
 		}};
 	}};
 }}'''
-		
+
 		with open(current_dir / 'main.apg', 'w') as f:
-			f.write(basic_apg)
-	
+			f.write(apg_source)
+
 	# Create directories
 	(current_dir / 'generated').mkdir(exist_ok=True)
 	(current_dir / 'templates').mkdir(exist_ok=True)
 	(current_dir / 'tests').mkdir(exist_ok=True)
-	
-	console.print("✅ APG project initialized")
-	console.print(f"✅ Created: apg.json")
-	console.print(f"✅ Created: main.apg")
-	console.print(f"✅ Created: generated/ directory")
-	
+
+	console.print("APG project initialized")
+	console.print(f"Created: apg.json")
+	console.print(f"Created: main.apg")
+	console.print(f"Created: generated/ directory")
+
 	console.print("\n[green]Next steps:[/green]")
 	console.print("  1. Edit main.apg to define your application")
 	console.print("  2. Run 'apg compile' to generate Python artifacts")

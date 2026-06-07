@@ -6,6 +6,51 @@ import json
 from pathlib import Path
 from typing import Any
 
+
+def _format_diagnostic_with_source(diagnostic: dict[str, Any], source_file: Path | None) -> str:
+	"""Format a diagnostic with source-line context (Rust/TypeScript style).
+
+	Returns a multi-line string. Falls back to a compact single-line format when
+	the source file is unreadable or position info is absent.
+	"""
+	code = diagnostic.get("code", "APG9999")
+	severity = diagnostic.get("severity", "error")
+	message = diagnostic.get("message", "")
+	file_str = diagnostic.get("file", str(source_file or ""))
+	range_info = diagnostic.get("range", {})
+	start = range_info.get("start", {})
+	line_0 = int(start.get("line", 0))       # 0-based
+	col_0 = int(start.get("character", 0))   # 0-based
+	line_1 = line_0 + 1                       # 1-based for display
+
+	# Header line: error[CODE]: message
+	lines = [f"{severity}[{code}]: {message}"]
+
+	# Arrow line: --> file:line:col
+	lines.append(f"  --> {file_str}:{line_1}:{col_0}")
+
+	# Source snippet — only when we have real position info and a readable file
+	if line_1 > 0 and source_file is not None:
+		try:
+			source_lines = source_file.read_text(encoding="utf-8").splitlines()
+			if 1 <= line_1 <= len(source_lines):
+				src_line = source_lines[line_1 - 1]
+				line_prefix = f"{line_1} | "
+				blank_prefix = " " * len(str(line_1)) + " | "
+				caret_col = max(0, col_0)
+				# Determine caret width from end position if available
+				end = range_info.get("end", {})
+				end_char = int(end.get("character", col_0 + 1)) if end else col_0 + 1
+				caret_width = max(1, end_char - col_0)
+				caret = " " * caret_col + "^" * caret_width
+				lines.append(blank_prefix)
+				lines.append(f"{line_prefix}{src_line}")
+				lines.append(f"{blank_prefix}{caret}")
+		except OSError:
+			pass
+
+	return "\n".join(lines)
+
 from capabilities.capability_contract_registry import validate_contract_registry
 from compiler.capability_publish import (
 	CAPABILITY_CATALOG_FORMAT,
@@ -20,10 +65,10 @@ LINT_FIXTURE_AUDIT_FORMAT = "apg.lint-fixture-audit.v1"
 DEFAULT_LINT_CATALOG = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "lint" / "catalog.json"
 
 
-def lint_path(path: Path, strict: bool = False, catalog: Path | None = None) -> dict[str, Any]:
+def lint_path(path: Path, strict: bool = False, catalog: Path | None = None, collect_all_errors: bool = False) -> dict[str, Any]:
 	"""Build an ``apg.lint-report.v1`` report for a file or directory."""
 	source_mode, files = _source_files(path)
-	file_reports = [_lint_file(file_path, strict=strict, catalog=catalog) for file_path in files]
+	file_reports = [_lint_file(file_path, strict=strict, catalog=catalog, collect_all_errors=collect_all_errors) for file_path in files]
 	diagnostics = [
 		diagnostic
 		for file_report in file_reports
@@ -95,13 +140,13 @@ def audit_lint_fixtures(catalog_path: Path | None = None) -> dict[str, Any]:
 	}
 
 
-def _lint_file(file_path: Path, strict: bool = False, catalog: Path | None = None) -> dict[str, Any]:
+def _lint_file(file_path: Path, strict: bool = False, catalog: Path | None = None, collect_all_errors: bool = False) -> dict[str, Any]:
 	diagnostics: list[dict[str, Any]] = []
 	semantic_model_available = False
 	capability_catalog: dict[str, Any] = _empty_catalog_report(catalog)
 
 	try:
-		model = build_semantic_model(file_path)
+		model = build_semantic_model(file_path, collect_all_errors=collect_all_errors)
 		semantic_model_available = model.get("format") == "apg.semantic-model.v1"
 		diagnostics.extend(_strict_diagnostics(model.get("diagnostics", []), strict))
 		if catalog is not None and semantic_model_available:

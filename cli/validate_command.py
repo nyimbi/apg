@@ -16,6 +16,7 @@ from rich.console import Console
 from rich.table import Table
 
 from cli.lint_command import lint_path
+from compiler.linting import _format_diagnostic_with_source
 
 
 console = Console()
@@ -64,8 +65,9 @@ def validate_path(
 	target: str = "python",
 	strict: bool = False,
 	catalog: Path | None = None,
+	collect_all_errors: bool = False,
 ) -> dict[str, Any]:
-	lint_report = lint_path(path, strict=strict, catalog=catalog)
+	lint_report = lint_path(path, strict=strict, catalog=catalog, collect_all_errors=collect_all_errors)
 	target_diagnostics = _target_diagnostics(target, lint_report["files"])
 	diagnostics = [*lint_report["diagnostics"], *target_diagnostics]
 	counts = dict(lint_report["severity_counts"])
@@ -101,11 +103,10 @@ def _print_plain(report: dict[str, Any]) -> None:
 		f"{counts['warning']} warning(s)"
 	)
 	for diagnostic in report["diagnostics"]:
-		start = diagnostic["range"]["start"]
-		click.echo(
-			f"{diagnostic['file']}:{start['line'] + 1}:{start['character']}: "
-			f"{diagnostic['code']} {diagnostic['severity']}: {diagnostic['message']}"
-		)
+		file_path = Path(diagnostic.get("file", "")) if diagnostic.get("file") else None
+		if file_path and not file_path.exists():
+			file_path = None
+		click.echo(_format_diagnostic_with_source(diagnostic, file_path))
 
 
 def _print_table(report: dict[str, Any]) -> None:
@@ -153,6 +154,7 @@ def _print_table(report: dict[str, Any]) -> None:
 @click.option("--recursive", "-r", is_flag=True, help="Validate all APG files in the current directory")
 @click.option("--syntax-only", is_flag=True, help="Compatibility flag; validation still builds the shared lint report")
 @click.option("--semantic-only", is_flag=True, help="Compatibility flag; validation still builds the shared lint report")
+@click.option("--all-errors", "all_errors", is_flag=True, help="Run all semantic analysis phases and collect every error before stopping")
 def validate(
 	source_file: Path | None,
 	target: str,
@@ -164,6 +166,7 @@ def validate(
 	recursive: bool,
 	syntax_only: bool,
 	semantic_only: bool,
+	all_errors: bool,
 ) -> None:
 	"""Validate APG source for lint cleanliness and generator readiness."""
 	if syntax_only and semantic_only:
@@ -180,7 +183,7 @@ def validate(
 	if catalog is not None and not catalog.exists():
 		raise click.ClickException(f"Capability catalog not found: {catalog}")
 
-	report = validate_path(path, target=target, strict=strict, catalog=catalog)
+	report = validate_path(path, target=target, strict=strict, catalog=catalog, collect_all_errors=all_errors)
 	if as_json or output_format == "json":
 		click.echo(json.dumps(report, indent=2, sort_keys=True))
 	elif output_format == "plain":

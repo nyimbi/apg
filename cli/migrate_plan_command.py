@@ -8,7 +8,7 @@ from pathlib import Path
 
 import click
 
-from compiler.migrations import SUPPORTED_MIGRATION_BACKENDS, audit_migration_fixtures, build_migration_plan
+from compiler.migrations import SUPPORTED_MIGRATION_BACKENDS, audit_migration_fixtures, build_migration_plan, _generate_apg_patch
 
 
 def _parse_rename_hint(_ctx: click.Context, _param: click.Parameter, values: tuple[str, ...]) -> dict[str, str]:
@@ -43,6 +43,7 @@ def _parse_rename_hint(_ctx: click.Context, _param: click.Parameter, values: tup
 	help="Confirm a rename candidate as OLD=NEW, for example table.Customer=Client",
 )
 @click.option("--json", "as_json", is_flag=True, help="Emit apg.migration-plan.v1 JSON")
+@click.option("--patch", "as_patch", is_flag=True, help="Emit an APG DSL patch fragment for additive changes")
 def migrate_plan(
 	previous: Path | None,
 	current: Path | None,
@@ -51,6 +52,7 @@ def migrate_plan(
 	backend: str,
 	rename_hint: dict[str, str],
 	as_json: bool,
+	as_patch: bool,
 ) -> None:
 	"""Compare previous/current APG sources or semantic-model JSON files."""
 	if audit_fixtures:
@@ -78,7 +80,16 @@ def migrate_plan(
 		if not path.is_file():
 			raise click.ClickException(f"Migration input must be a file: {path}")
 
+	from compiler.migrations import _load_model
 	report = build_migration_plan(previous, current, backend=backend, rename_hints=rename_hint)
+
+	if as_patch:
+		old_model = _load_model(previous)
+		new_model = _load_model(current)
+		patch = _generate_apg_patch(old_model, new_model)
+		click.echo(patch)
+		return
+
 	if as_json:
 		click.echo(json.dumps(report, indent=2, sort_keys=True))
 	else:

@@ -206,57 +206,51 @@ class SemanticAnalyzer:
 		})
 		self.builtin_functions = self._initialize_builtins()
 	
-	def analyze(self, ast: ModuleDeclaration) -> Dict[str, Any]:
+	def analyze(self, ast: ModuleDeclaration, collect_all_errors: bool = False) -> Dict[str, Any]:
 		"""
 		Perform semantic analysis on the AST.
-		
+
 		Args:
 			ast: Root AST node (ModuleDeclaration)
-			
+			collect_all_errors: When True, run all phases even if earlier phases
+			    produced errors, collecting every diagnostic before returning.
+
 		Returns:
 			Analysis results including errors, warnings, and symbol table
 		"""
 		self.errors.clear()
 		self.warnings.clear()
 		self.current_module = ast
-		
-		try:
-			# Phase 1: Symbol declaration - declare all entities and their members
-			self._declare_module_symbols(ast)
-			
-			# Phase 2: Type resolution - resolve all type references
-			self._resolve_types(ast)
-			
-			# Phase 3: Semantic validation - check method bodies, expressions, etc.
-			self._validate_semantics(ast)
-			
-			# Phase 4: Dead code analysis
-			self._analyze_dead_code(ast)
 
-			# Phase 5: Cross-entity reference resolution (warnings only)
-			self._resolve_references(ast)
+		phases = [
+			("symbol_declaration", lambda: self._declare_module_symbols(ast)),
+			("type_resolution",    lambda: self._resolve_types(ast)),
+			("semantic_validation",lambda: self._validate_semantics(ast)),
+			("dead_code_analysis", lambda: self._analyze_dead_code(ast)),
+			("reference_resolution", lambda: self._resolve_references(ast)),
+		]
 
-			return {
-				'success': len(self.errors) == 0,
-				'errors': self.errors.copy(),
-				'warnings': self.warnings.copy(),
-				'symbol_table': self.symbol_table,
-				'module': ast
-			}
-			
-		except Exception as e:
-			self.errors.append(SemanticError(
-				f"Internal analyzer error: {e}",
-				ast,
-				"internal"
-			))
-			return {
-				'success': False,
-				'errors': self.errors.copy(),
-				'warnings': self.warnings.copy(),
-				'symbol_table': self.symbol_table,
-				'module': ast
-			}
+		for phase_name, phase_fn in phases:
+			try:
+				phase_fn()
+			except Exception as exc:
+				self.errors.append(SemanticError(
+					f"Internal analyzer error in {phase_name}: {exc}",
+					ast,
+					"internal",
+				))
+				# Without --all-errors stop after the first phase failure so
+				# later phases don't cascade on broken state.
+				if not collect_all_errors:
+					break
+
+		return {
+			'success': len(self.errors) == 0,
+			'errors': self.errors.copy(),
+			'warnings': self.warnings.copy(),
+			'symbol_table': self.symbol_table,
+			'module': ast,
+		}
 	
 	# ========================================
 	# Phase 1: Symbol Declaration

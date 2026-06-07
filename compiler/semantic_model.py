@@ -49,11 +49,12 @@ SEMANTIC_MODEL_FIXTURE_AUDIT_FORMAT = "apg.semantic-model-fixture-audit.v1"
 DEFAULT_SEMANTIC_MODEL_CATALOG = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "semantic_model" / "catalog.json"
 
 
-def build_semantic_model(path: Path) -> dict[str, Any]:
+def build_semantic_model(path: Path, collect_all_errors: bool = False) -> dict[str, Any]:
 	"""Build apg.semantic-model.v1 for one APG source file.
 
 	Cached by (resolved_path, mtime_ns); LRU-evicted at 256 entries.
 	Call invalidate_semantic_model_cache(path) after writing to path.
+	Cache is bypassed when *collect_all_errors* is True.
 	"""
 	resolved = str(path.resolve())
 	try:
@@ -62,22 +63,26 @@ def build_semantic_model(path: Path) -> dict[str, Any]:
 		mtime_ns = 0
 	cache_key = (resolved, mtime_ns)
 
-	with _MODEL_CACHE_LOCK:
-		cached = _MODEL_CACHE.get(cache_key)
-		if cached is not None:
-			_MODEL_CACHE.move_to_end(cache_key)
-			return cached
+	# Don't serve cached model for all-errors pass — it may have been built
+	# with collect_all_errors=False and be missing diagnostics.
+	if not collect_all_errors:
+		with _MODEL_CACHE_LOCK:
+			cached = _MODEL_CACHE.get(cache_key)
+			if cached is not None:
+				_MODEL_CACHE.move_to_end(cache_key)
+				return cached
 
 	# Build outside lock so concurrent unrelated files don't serialize
 	source = path.read_text(encoding="utf-8")
-	model = build_semantic_model_from_source(source, display_path=path)
+	model = build_semantic_model_from_source(source, display_path=path, collect_all_errors=collect_all_errors)
 
-	with _MODEL_CACHE_LOCK:
-		# Evict any stale entries for this path (different mtime)
-		for k in [k for k in _MODEL_CACHE if k[0] == resolved and k != cache_key]:
-			_MODEL_CACHE.pop(k, None)
-		_MODEL_CACHE[cache_key] = model
-		_MODEL_CACHE.move_to_end(cache_key)
+	if not collect_all_errors:
+		with _MODEL_CACHE_LOCK:
+			# Evict any stale entries for this path (different mtime)
+			for k in [k for k in _MODEL_CACHE if k[0] == resolved and k != cache_key]:
+				_MODEL_CACHE.pop(k, None)
+			_MODEL_CACHE[cache_key] = model
+			_MODEL_CACHE.move_to_end(cache_key)
 		while len(_MODEL_CACHE) > _MODEL_CACHE_MAX:
 			_MODEL_CACHE.popitem(last=False)
 	return model
@@ -97,8 +102,14 @@ def invalidate_semantic_model_cache(path: Path | None = None) -> None:
 def build_semantic_model_from_source(
 	source: str,
 	display_path: Path | None = None,
+	collect_all_errors: bool = False,
 ) -> dict[str, Any]:
-	"""Build a semantic model directly from source text without touching disk."""
+	"""Build a semantic model directly from source text without touching disk.
+
+	When *collect_all_errors* is True the semantic analyzer runs all five phases
+	even if earlier phases produced errors, so every diagnostic is surfaced in a
+	single pass.
+	"""
 	label = str(display_path) if display_path else "<string>"
 	path_for_model = display_path or Path(label)
 
@@ -116,7 +127,7 @@ def build_semantic_model_from_source(
 	if module is None:
 		return _empty_model(path_for_model, diagnostics)
 
-	analysis = SemanticAnalyzer().analyze(module)
+	analysis = SemanticAnalyzer().analyze(module, collect_all_errors=collect_all_errors)
 	for error in analysis.get("errors", []):
 		diagnostics.append(_diagnostic_from_error(error, path_for_model, "error"))
 	for warning in analysis.get("warnings", []):

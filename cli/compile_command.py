@@ -394,38 +394,73 @@ def _verify_generated_app(output_dir: Path) -> bool:
 	return True
 
 
+try:
+	from watchfiles import watch as _wfiles_watch
+	HAS_WATCHFILES = True
+except ImportError:
+	HAS_WATCHFILES = False
+
+
 def _watch_and_compile(source_path: Path, config: CodeGenConfig, catalog: Path | None = None):
-	"""Watch source file for changes and recompile"""
-	
-	console.print(f"[blue]Watching {source_path} for changes...[/blue]")
-	console.print("[yellow]Press Ctrl+C to stop[/yellow]")
-	
-	import time
-	import hashlib
-	
-	def get_file_hash(path: Path) -> str:
-		"""Get hash of file content"""
+	"""Watch source file for changes and recompile, printing timestamped status lines."""
+	from datetime import datetime
+
+	click.echo(f"Watching {source_path}")
+
+	def _do_compile() -> tuple[bool, int, float]:
+		"""Run a single compile pass. Returns (success, file_count, elapsed_ms)."""
+		compiler = APGCompiler(config)
+		t0 = time.monotonic()
 		try:
-			with open(path, 'rb') as f:
-				return hashlib.md5(f.read()).hexdigest()
-		except:
-			return ""
-	
-	last_hash = get_file_hash(source_path)
-	
+			with open(source_path, "r", encoding="utf-8") as fh:
+				source_content = fh.read()
+			result = compiler.compile_string(source_content, source_path.stem)
+		except Exception as exc:
+			elapsed_ms = (time.monotonic() - t0) * 1000
+			click.echo(f"[{_ts()}] FAILED: {exc}")
+			return False, 0, elapsed_ms
+		elapsed_ms = (time.monotonic() - t0) * 1000
+		if result.success:
+			output_dir = Path(config.output_directory)
+			_write_generated_files(result.generated_files, output_dir)
+			click.echo(f"[{_ts()}] Compiled OK ({len(result.generated_files)} files, {elapsed_ms:.0f}ms)")
+			return True, len(result.generated_files), elapsed_ms
+		else:
+			n_errors = len(result.errors)
+			click.echo(f"[{_ts()}] FAILED: {n_errors} error(s)")
+			for err in result.errors:
+				click.echo(f"  {err}")
+			return False, 0, elapsed_ms
+
+	def _ts() -> str:
+		return datetime.now().strftime("%H:%M:%S")
+
+	# Initial compile
+	_do_compile()
+
 	try:
-		while True:
-			time.sleep(1)  # Check every second
-			
-			current_hash = get_file_hash(source_path)
-			if current_hash != last_hash and current_hash:
-				console.print(f"\n[cyan]Change detected in {source_path}[/cyan]")
-				_compile_single(source_path, config, False, catalog=catalog)
-				last_hash = current_hash
-				console.print(f"\n[blue]Watching {source_path} for changes...[/blue]")
-			
+		if HAS_WATCHFILES:
+			for _changes in _wfiles_watch(source_path):
+				click.echo(f"[{_ts()}] Change detected — recompiling...")
+				_do_compile()
+		else:
+			# Polling fallback: check mtime every 500 ms
+			try:
+				last_mtime = source_path.stat().st_mtime
+			except OSError:
+				last_mtime = 0.0
+			while True:
+				time.sleep(0.5)
+				try:
+					mtime = source_path.stat().st_mtime
+				except OSError:
+					continue
+				if mtime != last_mtime:
+					last_mtime = mtime
+					click.echo(f"[{_ts()}] Change detected — recompiling...")
+					_do_compile()
 	except KeyboardInterrupt:
-		console.print("\n[yellow]Stopped watching[/yellow]")
+		click.echo("\nStopped watching.")
 
 
 if __name__ == '__main__':
