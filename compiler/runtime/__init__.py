@@ -7,6 +7,7 @@ import without requiring the full APG platform to be installed.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from types import MappingProxyType
 from typing import Any
 
 
@@ -57,8 +58,8 @@ class AgentBase:
 	system: str = ""
 	capabilities: tuple[str, ...] = ()
 	tools: tuple[str, ...] = ()
-	# Note: do NOT use a mutable default here — subclasses replace this at the class level
-	configuration: "dict[str, Any]" = {}  # type: ignore[assignment]
+	# MappingProxyType raises TypeError on mutation, enforcing the "replace, don't mutate" contract
+	configuration: "dict[str, Any]" = MappingProxyType({})  # type: ignore[assignment]
 
 	async def invoke(self, prompt: str, context: AgentContext | None = None) -> str:
 		"""Invoke the agent with a prompt.

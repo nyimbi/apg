@@ -184,6 +184,13 @@ class TestImportResolution:
 		)
 		r = APGCompiler().compile_file(str(tmp_path / "a.apg"))
 		assert r.success  # cycle must be detected and skipped, not infinite loop
+		names = {e.name for e in r.module.entities}
+		# A is always present (it's the root file); B may or may not be imported
+		# depending on processing order, but the compiler must not crash
+		assert "A" in names, "Root entity A must always be present"
+		# Cycle was detected: no stack overflow, no duplicate B entities
+		b_count = sum(1 for e in r.module.entities if e.name == "B")
+		assert b_count <= 1, f"B should appear at most once (no duplicate from cycle), got {b_count}"
 
 	def test_resolve_imports_rejects_path_traversal(self, tmp_path):
 		from compiler.compiler import APGCompiler
@@ -214,11 +221,22 @@ class TestImportResolution:
 		assert "UserB" not in names, "Non-imported entity must be excluded"
 
 
-class TestANTLRVisitorCorrectness:
-	"""Verify ANTLR visitor produces same results as regex parser."""
+class TestCompilerEntityConsistency:
+	"""Verify that the compiler produces consistent entity results for numbered examples.
+
+	NOTE: The ANTLR visitor path (antlr_clean=True) is NOT exercised by these
+	tests because the APG grammar has implicit keyword tokens (e.g. 'id', 'name',
+	'status' from capability_contract_member rules) that shadow IDENTIFIER tokens.
+	This causes antlr_clean=False for virtually all valid APG source files, so
+	the compiler falls back to the regex parser for entity extraction.
+
+	These tests verify that the full compile path (including future visitor fixes)
+	produces the same entity names/types as the direct regex parser.
+	See docs/grammar-analysis1.md §1 for the migration plan.
+	"""
 
 	@pytest.mark.parametrize("example_num", [1, 2, 3, 4, 5])
-	def test_visitor_entity_names_match_regex_parser(self, example_num):
+	def test_compiler_entity_names_match_regex_parser(self, example_num):
 		dirs = sorted(ROOT.glob(f"examples/{example_num:02d}_*"))
 		if not dirs:
 			pytest.skip(f"No example {example_num:02d}")
@@ -231,7 +249,7 @@ class TestANTLRVisitorCorrectness:
 		src = path.read_text(encoding="utf-8")
 		ref = ASTBuilder()._build_source_ast(src, str(path))
 
-		# Subject: full compile path
+		# Subject: full compile path (currently uses regex fallback due to grammar keyword issue)
 		from compiler.compiler import APGCompiler
 		r = APGCompiler().compile_file(str(path))
 		assert r.success

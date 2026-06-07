@@ -901,10 +901,11 @@ class SemanticAnalyzer:
 							entity, "reference"
 						))
 
-			# Application capabilities cross-check
+			# Application capabilities/agents cross-check (same rule as capability.requires:
+			# system capabilities from MANIFEST are accepted without local declaration)
 			if isinstance(entity, ApplicationDeclaration):
 				for ref in (entity.capabilities or []):
-					if ref and ref not in local_names:
+					if ref and not _is_known(ref):
 						self.warnings.append(SemanticError(
 							f"Application '{entity.name}' references capability '{ref}' not declared in this module",
 							entity, "reference"
