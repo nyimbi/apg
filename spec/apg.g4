@@ -248,7 +248,35 @@ member_name
     | 'key' | 'group' | 'tag' | 'category' | 'priority' | 'rank' | 'score'
     | 'date' | 'time' | 'start' | 'end' | 'count' | 'total' | 'level'
     | 'data' | 'payload' | 'body' | 'header' | 'content' | 'message' | 'text'
-    | 'user' | 'steps' | 'stage' | 'type' | 'id'
+    | 'user' | 'steps' | 'stage' | 'type' | 'id' | 'version'
+    // Database/engine keywords
+    | 'engine' | 'postgresql' | 'mysql' | 'sqlite' | 'mongodb' | 'redis'
+    | 'alembic' | 'schema' | 'table' | 'column' | 'index' | 'migration'
+    // Additional missing values
+    | 'query' | 'configure' | 'all' | 'check' | 'fields' | 'format'
+    | 'sequential' | 'conditional' | 'parallel' | 'concurrent' | 'serial'
+    | 'encode' | 'decode' | 'encrypt' | 'decrypt' | 'sign' | 'verify'
+    | 'generate' | 'validate' | 'transform' | 'normalize' | 'sanitize'
+    | 'connect' | 'disconnect' | 'authenticate' | 'authorize' | 'revoke'
+    | 'allocate' | 'deallocate' | 'reserve' | 'release' | 'acquire'
+    // Rule body keywords
+    | 'when' | 'then' | 'effect' | 'exception' | 'applies_to'
+    | 'effective_from' | 'effective_to' | 'approval' | 'priority'
+    // Contract fields that also appear as config keys
+    | 'rule_engine' | 'rules' | 'ui' | 'theme' | 'streaming'
+    | 'i18n' | 'localization' | 'screens' | 'agents' | 'handoffs'
+    | 'erp_modules' | 'components' | 'approvals' | 'master_data'
+    | 'business_rules' | 'configuration' | 'provides' | 'requires'
+    // More entity/capability reference names
+    | 'identity_verification' | 'session_management' | 'role_assignment'
+    | 'jwt_tokens' | 'audit_events' | 'compliance_trail' | 'change_history'
+    | 'customer_records' | 'credit_profiles' | 'kyc_status'
+    | 'sales_dashboard' | 'order_management' | 'customer_engagement'
+    // Additional value keywords commonly used as identifiers
+    | 'supported_languages' | 'default_language' | 'fallback_language'
+    | 'profile' | 'portfolio' | 'dashboard' | 'workbench' | 'portal'
+    | 'hub' | 'centre' | 'center' | 'desk' | 'console' | 'panel'
+    | 'interface' | 'facade' | 'proxy' | 'adapter' | 'bridge' | 'bus'
     // Entity-type keywords usable as identifiers in non-entity contexts
     | 'workflow' | 'agent' | 'table' | 'capability' | 'capability_contract'
     | 'capability_pack' | 'composition' | 'contract' | 'rule_set' | 'policy'
@@ -308,6 +336,16 @@ member_name
     | 'materials_planning' | 'production_planning' | 'purchase_orders'
     | 'supplier_management' | 'priority' | 'parallel' | 'timeout' | 'retry'
     | 'condition' | 'filter' | 'icon' | 'variant' | 'size' | 'alignment'
+    | 'share' | 'back' | 'forward' | 'reload' | 'grid' | 'config'
+    | 'from' | 'to' | 'top' | 'bottom' | 'left' | 'right' | 'center'
+    | 'x' | 'y' | 'z' | 'f' | 'n' | 'k' | 'r' | 's' | 't' | 'v' | 'w'
+    | 'up' | 'down' | 'smooth' | 'auto' | 'behavior'
+    | 'px' | 'em' | 'rem' | 'vh' | 'vw' | 'vmin' | 'vmax' | 'pt' | 'pc'
+    | 'cm' | 'mm' | 'deg' | 'rad' | 'grad' | 'turn' | 'ms' | 'min' | 'h'
+    | 'max' | 'min' | 'avg' | 'sum' | 'new' | 'return' | 'return_type'
+    | 'quality' | 'immutable' | 'stable' | 'volatile'
+    | 'stripe' | 'compact' | 'color' | 'color_scheme' | 'font' | 'border'
+    | 'schedule' | 'download' | 'next' | 'finish' | 'save_progress'
     | 'location' | 'address' | 'country' | 'city' | 'state' | 'zip'
     | 'phone_number' | 'mobile' | 'fax' | 'website' | 'social'
     | 'notes' | 'comments' | 'remarks' | 'observation' | 'description'
@@ -327,6 +365,129 @@ member_name
     // Workflow body fields (NOT the workflow entity keyword itself)
     | 'assignments' | 'guards' | 'timers' | 'waits' | 'retry_policy'
     | 'compensation' | 'human_tasks' | 'stages' | 'process'
+    // Auto-generated: all remaining parser keywords
+    | 'actuator' | 'agent_handoff' | 'agent_memory' | 'agent_runtime' | 'agent_team' | 'agent_tool' | 'aggregate' | 'alert'
+    | 'alert_manager' | 'analyze' | 'anomaly' | 'as' | 'auto_system' | 'benchmark' | 'biz' | 'cache'
+    | 'calc' | 'camera' | 'chain' | 'chat' | 'classify' | 'comply' | 'const' | 'context'
+    | 'correlate' | 'crm' | 'dbt_model' | 'debugger' | 'defect' | 'dependencies' | 'deploy' | 'deployment_pattern'
+    | 'deployment_strategy' | 'detect' | 'drone' | 'ecommerce' | 'env' | 'erp' | 'erp_component' | 'erp_module'
+    | 'ethics' | 'etl' | 'event_schema' | 'event_store' | 'exports' | 'extends' | 'failure' | 'fairness'
+    | 'finance' | 'fixture' | 'fixture_data' | 'formula' | 'fsm' | 'fuse' | 'gateway' | 'geo'
+    | 'graph' | 'handoff' | 'hr' | 'hunt' | 'include' | 'inspect' | 'instrumenter' | 'intel'
+    | 'interceptor' | 'kpi' | 'lazy' | 'license' | 'line' | 'llm' | 'logger' | 'machine'
+    | 'map' | 'mapper' | 'master' | 'memory_store' | 'messenger' | 'metric' | 'middleware' | 'mirror'
+    | 'mock' | 'module' | 'monitor' | 'notify' | 'once' | 'opsec' | 'optimize' | 'pattern'
+    | 'physical' | 'predictive' | 'private' | 'process_monitor' | 'production' | 'profiler' | 'projection' | 'prompt'
+    | 'protect' | 'publisher' | 'registry' | 'repository' | 'robot' | 'sales' | 'scenario' | 'secrets'
+    | 'seed' | 'sense' | 'sensor' | 'session' | 'settings' | 'simulate' | 'standards' | 'state_machine'
+    | 'statement' | 'store' | 'struct' | 'stub' | 'subscriber' | 'swarm' | 'team' | 'temporal'
+    | 'test' | 'threshold' | 'tool' | 'tracer' | 'track' | 'transformer' | 'twin' | 'type_alias'
+    | 'vault' | 'view' | 'virtual' | 'vision' | 'widget'
+    // Auto-generated: remaining parser keywords
+    | 'Any' | 'DELETE' | 'Dict' | 'GET' | 'GHz' | 'GPa' | 'GW' | 'Hz'
+    | 'List' | 'MHz' | 'MPa' | 'MV' | 'MW' | 'PATCH' | 'POST' | 'PUT'
+    | 'Pa' | 'ab_testing' | 'absolute' | 'acceptance_test' | 'access_policy' | 'accessibility' | 'accessibility_test' | 'accordion'
+    | 'adaptive' | 'after' | 'aggregation' | 'ai_assisted' | 'alerting' | 'allow_tenant_overrides' | 'alpha' | 'alphanumeric'
+    | 'alt' | 'alternate' | 'alternate_reverse' | 'and' | 'announcement_system' | 'anomaly_score' | 'apg' | 'api'
+    | 'api_endpoints' | 'api_gateway' | 'api_key' | 'api_prefix' | 'apis' | 'approval_required' | 'approvers' | 'aqua'
+    | 'aria_describedby' | 'aria_label' | 'array' | 'asc' | 'assert' | 'async' | 'at' | 'atm'
+    | 'attribute' | 'audit_logging' | 'auto_increment' | 'auto_resolution' | 'auto_spec' | 'autocomplete' | 'await' | 'aws_secrets'
+    | 'azure_keyvault' | 'backdrop_filter' | 'background' | 'background_checks' | 'backup' | 'backwards' | 'badge' | 'bar'
+    | 'baseline' | 'basic' | 'bearer' | 'before' | 'before_all' | 'before_each' | 'begin' | 'bigint'
+    | 'bigserial' | 'binary' | 'bind' | 'binding' | 'bit' | 'bit_vector' | 'black' | 'blob'
+    | 'block' | 'blue' | 'blur' | 'bold' | 'bolder' | 'bool' | 'boolean' | 'border_box'
+    | 'both' | 'box_shadow' | 'breadcrumb' | 'break' | 'breakpoint' | 'brightness' | 'brin' | 'broadcast'
+    | 'brown' | 'browser' | 'btree' | 'buckets' | 'business' | 'business_intelligence' | 'button' | 'by'
+    | 'bytes' | 'calendar' | 'call_count' | 'call_graph' | 'called_on_null_input' | 'calls' | 'calls_through' | 'card'
+    | 'cascade' | 'cascaded' | 'change' | 'char' | 'chart' | 'check_option' | 'checkbox' | 'checked'
+    | 'chrome' | 'cidr' | 'circle' | 'circuit_breakers' | 'class' | 'click' | 'clip_path' | 'closest_corner'
+    | 'closest_side' | 'cluster' | 'coarse' | 'cohort_analysis' | 'colors' | 'commands' | 'commission_structure' | 'communication'
+    | 'compliance_frameworks' | 'composite' | 'compression' | 'compute' | 'computed' | 'conditions' | 'configuration_schema' | 'conic_gradient'
+    | 'connections' | 'constraint' | 'constraints' | 'contain' | 'contained' | 'content_box' | 'content_moderation' | 'contents'
+    | 'continue' | 'contrast' | 'conversion_tracking' | 'correlation' | 'cosine' | 'cosine_similarity' | 'cost' | 'cost_limit'
+    | 'counter' | 'cover' | 'coverage' | 'critical' | 'cross_field' | 'csv' | 'cubic_bezier' | 'currency_conversion'
+    | 'currentColor' | 'cursive' | 'custom' | 'cyan' | 'dark' | 'dashed' | 'data_access' | 'data_model'
+    | 'data_warehouse' | 'datetime' | 'day' | 'days' | 'deadman' | 'debounce' | 'debug' | 'decimal'
+    | 'decision' | 'deduplication' | 'deep' | 'def' | 'default_decision' | 'definer' | 'delivery_method' | 'dependency'
+    | 'depends_on' | 'desc' | 'desktop' | 'deterministic' | 'deviation' | 'device' | 'discord' | 'dispatch'
+    | 'dispute_resolution' | 'distance' | 'distance_function' | 'distributed_tracing' | 'distribution' | 'do' | 'dot_product' | 'dotted'
+    | 'double' | 'dpcm' | 'dpi' | 'dppx' | 'dpr' | 'draggable' | 'drawing' | 'dynamic'
+    | 'e2e_test' | 'ease' | 'ease_in' | 'ease_in_out' | 'ease_out' | 'edge' | 'ef_construction' | 'ef_search'
+    | 'effective_dates' | 'elasticsearch' | 'elif' | 'ellipse' | 'else' | 'emergency' | 'emit' | 'enable_if'
+    | 'encrypted' | 'encryption' | 'enrichment' | 'entities' | 'environment' | 'error' | 'errors' | 'escalation_policy'
+    | 'escrow_enabled' | 'eu' | 'euclidean' | 'eventually' | 'evidence_required' | 'except' | 'execute' | 'execution_time'
+    | 'expect' | 'expression' | 'extrabold' | 'faceted_search' | 'fake' | 'family' | 'fantasy' | 'farthest_corner'
+    | 'farthest_side' | 'fatal' | 'fee_structure' | 'fieldset' | 'fifo' | 'fill_available' | 'filled' | 'filtering'
+    | 'finally' | 'fine' | 'firefox' | 'first' | 'fit_content' | 'fixed' | 'fixtures' | 'flat'
+    | 'flex' | 'float' | 'float4' | 'float8' | 'fluid' | 'focus_trap' | 'for' | 'for_each'
+    | 'foreign' | 'forwards' | 'fraud_detection' | 'fraud_prevention' | 'frequency' | 'ftp' | 'ftps' | 'fuchsia'
+    | 'function' | 'g' | 'gauge' | 'gcp_secret_manager' | 'geography' | 'geolocation' | 'geometry' | 'get'
+    | 'gigabytes' | 'gin' | 'gist' | 'global' | 'governance' | 'gray' | 'grayscale' | 'green'
+    | 'grey' | 'groove' | 'guard' | 'halfvec' | 'hamming' | 'handlers' | 'has' | 'hashicorp_vault'
+    | 'having' | 'headers' | 'headless' | 'health' | 'heartbeat' | 'help' | 'help_text' | 'hidden'
+    | 'high' | 'high_contrast' | 'histogram' | 'hnsw' | 'hour' | 'hours' | 'hover' | 'hsl'
+    | 'hsla' | 'hstore' | 'http' | 'https' | 'hue_rotate' | 'ie' | 'if' | 'immediate'
+    | 'implementation' | 'in' | 'in_app' | 'incident' | 'increment' | 'indexes' | 'indexing_strategy' | 'inet'
+    | 'infinite' | 'info' | 'inherit' | 'initial' | 'inline' | 'inline_block' | 'inout' | 'inputs'
+    | 'insert' | 'inset' | 'instead_of' | 'int' | 'integer' | 'integration_test' | 'interval' | 'into'
+    | 'invert' | 'invoker' | 'is' | 'iso' | 'italic' | 'ivf_pq' | 'ivfflat' | 'javascript'
+    | 'json' | 'jsonb' | 'justify' | 'kA' | 'kHz' | 'kPa' | 'kV' | 'kW'
+    | 'key_rotation' | 'keyboard_navigation' | 'kg' | 'kilobytes' | 'km' | 'labels' | 'landscape' | 'lang'
+    | 'language' | 'large' | 'larger' | 'last' | 'letter_spacing' | 'levels' | 'lfu' | 'lg'
+    | 'light' | 'lighter' | 'lime' | 'limit' | 'line_height' | 'linear' | 'linear_gradient' | 'link'
+    | 'load_balancing' | 'load_test' | 'localization_strategy' | 'logfmt' | 'longblob' | 'longtext' | 'loop' | 'low'
+    | 'lru' | 'lsh' | 'm' | 'mA' | 'mV' | 'macaddr' | 'machine_learning' | 'magenta'
+    | 'manhattan' | 'margin' | 'maroon' | 'masking' | 'match' | 'matches' | 'materialized' | 'matrix'
+    | 'maxResults' | 'max_content' | 'max_length' | 'max_value' | 'max_width' | 'md' | 'measure' | 'measures'
+    | 'medium' | 'mediumtext' | 'megabytes' | 'memory_usage' | 'messaging' | 'method' | 'mg' | 'microseconds'
+    | 'microservices' | 'milliseconds' | 'minLength' | 'min_content' | 'min_length' | 'min_value' | 'min_width' | 'mobile_first'
+    | 'mocks' | 'modal' | 'models' | 'money' | 'monitoring' | 'monospace' | 'month' | 'multi_party_splits'
+    | 'must' | 'nanoseconds' | 'navbar' | 'navigate' | 'navy' | 'nearby' | 'negotiation_system' | 'networking'
+    | 'nm' | 'no_action' | 'no_preference' | 'no_repeat' | 'none' | 'normal' | 'normalized' | 'not'
+    | 'not_matches' | 'not_throws' | 'ns' | 'nulls' | 'number' | 'numeric' | 'oblique' | 'off'
+    | 'offset' | 'olive' | 'on' | 'onblur' | 'onboarding_flow' | 'onchange' | 'onclick' | 'onfocus'
+    | 'onhover' | 'onsubmit' | 'opacity' | 'operational' | 'operations' | 'or' | 'orange' | 'orchestration'
+    | 'orientation' | 'others' | 'out' | 'outlier_detection' | 'outline' | 'outlined' | 'outputs' | 'outset'
+    | 'ownership' | 'padding' | 'padding_box' | 'pager' | 'pagination' | 'params' | 'pass' | 'payment_methods'
+    | 'payment_providers' | 'performance' | 'performance_metrics' | 'permissions' | 'persistence' | 'persistent' | 'personalization' | 'pink'
+    | 'pk' | 'placeholder' | 'placement_strategy' | 'plain' | 'plpgsql' | 'point' | 'pointer' | 'polygon'
+    | 'pool_size' | 'popover' | 'portrait' | 'predictive_analytics' | 'prefers_reduced_motion' | 'primary' | 'print' | 'procedure'
+    | 'progress' | 'ps' | 'psi' | 'purple' | 'quantiles' | 'queries' | 'radial_gradient' | 'radio'
+    | 'range' | 'rate_limiting' | 'rating_system' | 'ratio' | 'reactive' | 'readonly' | 'real' | 'real_time_analytics'
+    | 'real_time_chat' | 'recipients' | 'recommendation_engine' | 'red' | 'redirect' | 'reduce' | 'ref' | 'references'
+    | 'refund_policies' | 'regression_test' | 'relative' | 'repeat' | 'repeat_x' | 'repeat_y' | 'repeater' | 'requests'
+    | 'require_if' | 'requires_theme' | 'resizable' | 'resolution' | 'resource_requirements' | 'responsibilities' | 'responsive' | 'restrict'
+    | 'restricted' | 'rete' | 'retention' | 'retries' | 'return_value' | 'returns' | 'returns_null_on_null_input' | 'reverse'
+    | 'review_system' | 'rgb' | 'rgba' | 'rich_text' | 'ridge' | 'roles' | 'rotate' | 'rotation'
+    | 'round' | 'routing' | 'row' | 'row_level_security' | 'rows' | 'rpm' | 'rps' | 'runbook'
+    | 'runner' | 'safari' | 'safe' | 'sampling' | 'sandbox' | 'sans_serif' | 'saturate' | 'scale'
+    | 'scaling' | 'scheduling' | 'scientific' | 'screen_reader' | 'screen_reader_only' | 'screenshot' | 'scroll' | 'search_analytics'
+    | 'search_discovery' | 'search_engine' | 'sec' | 'secondary' | 'seconds' | 'secrets_management' | 'section' | 'security'
+    | 'security_barrier' | 'security_test' | 'segregation_of_duties' | 'select' | 'selected' | 'semibold' | 'seo' | 'sepia'
+    | 'serif' | 'service_discovery' | 'service_mesh' | 'services' | 'set' | 'set_default' | 'set_null' | 'setof'
+    | 'setup' | 'severity' | 'shadows' | 'shipping_zones' | 'should' | 'showMask' | 'show_if' | 'side_effect'
+    | 'sidebar' | 'silver' | 'skew' | 'skill' | 'slack' | 'slider' | 'slot' | 'sm'
+    | 'small' | 'smaller' | 'smallint' | 'smoke_test' | 'sms' | 'solid' | 'sortable' | 'space'
+    | 'space_around' | 'space_between' | 'space_evenly' | 'spacing' | 'sparse' | 'sparsevec' | 'spec_set' | 'speech'
+    | 'spgist' | 'spinner' | 'split' | 'spy' | 'sql' | 'sqlstate' | 'ssl' | 'stack'
+    | 'stack_trace' | 'static' | 'stepper' | 'sticky' | 'storage' | 'str' | 'strategy' | 'stretch'
+    | 'strict' | 'structured' | 'success' | 'supported_currencies' | 'supported_regions' | 'suppression' | 'switch' | 'symbol'
+    | 'system_ui' | 'tabindex' | 'table_cell' | 'table_row' | 'tablegroup' | 'tables' | 'tablet' | 'tabs'
+    | 'tax_calculation' | 'teal' | 'teams' | 'teardown' | 'technical' | 'template' | 'tenant_scoped' | 'text_shadow'
+    | 'textarea' | 'thick' | 'thin' | 'thresholds' | 'throws' | 'timeline' | 'timer' | 'timeseries'
+    | 'timestamp' | 'timezone' | 'tinyint' | 'to_be' | 'to_be_called' | 'to_be_called_times' | 'to_be_called_with' | 'to_be_falsy'
+    | 'to_be_greater_than' | 'to_be_less_than' | 'to_be_null' | 'to_be_truthy' | 'to_be_undefined' | 'to_contain' | 'to_equal' | 'to_have_length'
+    | 'to_have_property' | 'to_match' | 'tokens' | 'tooltip' | 'touch' | 'trace' | 'tracking' | 'transactions'
+    | 'transformation' | 'translate' | 'transparent' | 'tree' | 'trend' | 'triggers' | 'truncate' | 'trust_safety'
+    | 'try' | 'tsquery' | 'tsrange' | 'tstzrange' | 'tsvector' | 'ttl' | 'two_way' | 'twotone'
+    | 'typeahead' | 'typography' | 'ui_monospace' | 'ui_sans_serif' | 'ui_serif' | 'unique' | 'unit_test' | 'unsafe'
+    | 'unset' | 'urgent' | 'us' | 'user_types' | 'uuid' | 'valid_from' | 'valid_to' | 'validation'
+    | 'values' | 'var' | 'varbinary' | 'varchar' | 'variables' | 'vector_dims' | 'vector_index' | 'vector_norm'
+    | 'verification_required' | 'video_calls' | 'view_module' | 'visible' | 'visual_test' | 'voice' | 'void' | 'wait'
+    | 'warning' | 'watch' | 'week' | 'weight' | 'where' | 'while' | 'white' | 'window'
+    | 'with' | 'with_data' | 'with_no_data' | 'within' | 'wizard' | 'workflows' | 'wrap' | 'x_large'
+    | 'x_small' | 'xl' | 'xml' | 'xpath' | 'xs' | 'xx_large' | 'xx_small' | 'year'
+    | 'yellow' | 'yield' | 'z_index'
     ;
 
 // CONFIGURATION with type annotations
@@ -359,7 +520,7 @@ capability_contract_member
     | 'ui' ':' ui_contract contract_separator?
     | 'theme' ':' theme_contract contract_separator?
     | 'runtime' ':' runtime_contract contract_separator?
-    | IDENTIFIER ':' contract_value contract_separator?
+    | member_name ':' contract_value contract_separator?
     ;
 
 erp_component_block
@@ -423,7 +584,7 @@ erp_component_member
     | 'ui' ':' ui_contract contract_separator?
     | 'theme' ':' theme_contract contract_separator?
     | 'i18n' ':' i18n_contract contract_separator?
-    | IDENTIFIER ':' contract_value contract_separator?
+    | member_name ':' contract_value contract_separator?
     ;
 
 erp_data_contract
@@ -438,7 +599,7 @@ erp_data_member
     | 'measures' ':' reference_list contract_separator?
     | 'master_data' ':' reference_list contract_separator?
     | 'retention' ':' contract_value contract_separator?
-    | IDENTIFIER ':' contract_value contract_separator?
+    | member_name ':' contract_value contract_separator?
     ;
 
 erp_api_contract
@@ -451,7 +612,7 @@ erp_api_member
     | 'queries' ':' reference_list contract_separator?
     | 'events' ':' reference_list contract_separator?
     | 'exports' ':' reference_list contract_separator?
-    | IDENTIFIER ':' contract_value contract_separator?
+    | member_name ':' contract_value contract_separator?
     ;
 
 erp_workflow_contract
@@ -461,7 +622,7 @@ erp_workflow_contract
 
 erp_workflow_member
     : IDENTIFIER ':' handoff_graph contract_separator?
-    | IDENTIFIER ':' contract_value contract_separator?
+    | member_name ':' contract_value contract_separator?
     ;
 
 erp_rule_set
@@ -484,7 +645,7 @@ approval_member
     | 'approvers' ':' reference_list contract_separator?
     | 'segregation_of_duties' ':' BOOLEAN contract_separator?
     | 'escalation' ':' contract_value contract_separator?
-    | IDENTIFIER ':' contract_value contract_separator?
+    | member_name ':' contract_value contract_separator?
     ;
 
 permission_contract
@@ -497,7 +658,7 @@ permission_member
     | 'operations' ':' reference_list contract_separator?
     | 'tenant_scoped' ':' BOOLEAN contract_separator?
     | 'row_level_security' ':' BOOLEAN contract_separator?
-    | IDENTIFIER ':' contract_value contract_separator?
+    | member_name ':' contract_value contract_separator?
     ;
 
 audit_contract
@@ -509,7 +670,7 @@ audit_member
     | 'fields' ':' reference_list contract_separator?
     | 'retention' ':' contract_value contract_separator?
     | 'evidence_required' ':' BOOLEAN contract_separator?
-    | IDENTIFIER ':' contract_value contract_separator?
+    | member_name ':' contract_value contract_separator?
     ;
 
 effective_date_contract
@@ -521,7 +682,7 @@ effective_date_member
     | 'valid_to' ':' contract_value contract_separator?
     | 'calendar' ':' contract_value contract_separator?
     | 'timezone' ':' contract_value contract_separator?
-    | IDENTIFIER ':' contract_value contract_separator?
+    | member_name ':' contract_value contract_separator?
     ;
 
 master_data_contract
@@ -534,7 +695,7 @@ master_data_member
     | 'ownership' ':' contract_object contract_separator?
     | 'deduplication' ':' contract_value contract_separator?
     | 'governance' ':' rule_engine_contract contract_separator?
-    | IDENTIFIER ':' contract_value contract_separator?
+    | member_name ':' contract_value contract_separator?
     ;
 
 agent_composition_block
@@ -542,6 +703,7 @@ agent_composition_block
     | 'runtimes' ':' agent_runtime_set contract_separator?
     | 'tools' ':' agent_tool_set contract_separator?
     | 'handoffs' ':' handoff_graph contract_separator?
+    | 'flow' ':' handoff_graph contract_separator?
     | 'memory' ':' agent_memory_contract contract_separator?
     ;
 
@@ -575,7 +737,7 @@ agent_contract_member
     | 'rules' ':' rule_list contract_separator?
     | 'ui' ':' ui_contract contract_separator?
     | 'theme' ':' theme_contract contract_separator?
-    | IDENTIFIER ':' contract_value contract_separator?
+    | member_name ':' contract_value contract_separator?
     ;
 
 agent_runtime_set
@@ -619,7 +781,7 @@ handoff_edge
     ;
 
 handoff_modifier
-    : '[' IDENTIFIER ':' contract_value ']'
+    : '[' member_name ':' contract_value ']'
     ;
 
 model_chain
@@ -658,7 +820,7 @@ rule_engine_member
     | 'rules' ':' rule_list contract_separator?
     | 'inputs' ':' reference_list contract_separator?
     | 'outputs' ':' reference_list contract_separator?
-    | IDENTIFIER ':' contract_value contract_separator?
+    | member_name ':' contract_value contract_separator?
     ;
 
 rule_engine_type
@@ -691,7 +853,7 @@ rule_contract_member
     | 'exception' ':' contract_value contract_separator?
     | 'approval' ':' approval_contract contract_separator?
     | 'audit' ':' audit_contract contract_separator?
-    | IDENTIFIER ':' contract_value contract_separator?
+    | member_name ':' contract_value contract_separator?
     ;
 
 rule_decision
@@ -714,7 +876,7 @@ ui_contract_member
     | 'screens' ':' screen_set contract_separator?
     | 'components' ':' contract_object contract_separator?
     | 'requires_theme' ':' BOOLEAN contract_separator?
-    | IDENTIFIER ':' contract_value contract_separator?
+    | member_name ':' contract_value contract_separator?
     ;
 
 screen_contract_block
@@ -756,12 +918,12 @@ screen_contract_member
     | 'rules' ':' rule_list contract_separator?
     | 'ui' ':' ui_contract contract_separator?
     | 'theme' ':' theme_contract contract_separator?
-    | IDENTIFIER ':' contract_value contract_separator?
+    | member_name ':' contract_value contract_separator?
     ;
 
 screen_layout
     : 'stack' | 'grid' | 'tabs' | 'split' | 'wizard' | 'dashboard' | 'form'
-    | IDENTIFIER | STRING
+    | member_name | STRING
     ;
 
 screen_element_list
@@ -780,7 +942,7 @@ screen_element_member
     | 'slot' ':' contract_scalar contract_separator?
     | 'binds' ':' reference_list contract_separator?
     | 'rules' ':' rule_list contract_separator?
-    | IDENTIFIER ':' contract_value contract_separator?
+    | member_name ':' contract_value contract_separator?
     ;
 
 screen_event_list
@@ -796,7 +958,7 @@ screen_event_member
     | 'do' ':' contract_value contract_separator?
     | 'target' ':' contract_scalar contract_separator?
     | 'when' ':' contract_value contract_separator?
-    | IDENTIFIER ':' contract_value contract_separator?
+    | member_name ':' contract_value contract_separator?
     ;
 
 screen_relationship_list
@@ -822,7 +984,7 @@ screen_relationship_member
     | 'via' ':' contract_scalar contract_separator?
     | 'type' ':' contract_scalar contract_separator?
     | 'when' ':' contract_value contract_separator?
-    | IDENTIFIER ':' contract_value contract_separator?
+    | member_name ':' contract_value contract_separator?
     ;
 
 ui_shell
@@ -844,7 +1006,7 @@ ui_route_member
     | 'component' ':' contract_scalar contract_separator?
     | 'permission' ':' contract_scalar contract_separator?
     | 'nav_group' ':' contract_scalar contract_separator?
-    | IDENTIFIER ':' contract_value contract_separator?
+    | member_name ':' contract_value contract_separator?
     ;
 
 theme_contract_block
@@ -860,7 +1022,7 @@ theme_contract_member
     | 'tokens' ':' theme_token_map contract_separator?
     | 'components' ':' contract_object contract_separator?
     | 'allow_tenant_overrides' ':' BOOLEAN contract_separator?
-    | IDENTIFIER ':' contract_value contract_separator?
+    | member_name ':' contract_value contract_separator?
     ;
 
 theme_token_map
@@ -868,7 +1030,7 @@ theme_token_map
     ;
 
 theme_token
-    : (IDENTIFIER | STRING) ':' contract_value contract_separator?
+    : (member_name | STRING) ':' contract_value contract_separator?
     ;
 
 runtime_contract
@@ -882,7 +1044,7 @@ runtime_contract_member
     | 'approval_required' ':' BOOLEAN contract_separator?
     | 'cost_limit' ':' contract_value contract_separator?
     | 'streaming' ':' stream_runtime_contract contract_separator?
-    | IDENTIFIER ':' contract_value contract_separator?
+    | member_name ':' contract_value contract_separator?
     ;
 
 runtime_backend
@@ -905,7 +1067,7 @@ stream_runtime_member
     | 'output' ':' contract_value contract_separator?
     | 'state' ':' contract_value contract_separator?
     | 'window' ':' time_expr contract_separator?
-    | IDENTIFIER ':' contract_value contract_separator?
+    | member_name ':' contract_value contract_separator?
     ;
 
 stream_processor
@@ -925,7 +1087,7 @@ i18n_contract_member
     : 'supported_languages' ':' language_collection contract_separator?
     | 'default_language' ':' language_code contract_separator?
     | 'fallback_language' ':' language_code contract_separator?
-    | IDENTIFIER ':' contract_value contract_separator?
+    | member_name ':' contract_value contract_separator?
     ;
 
 language_collection
@@ -937,13 +1099,8 @@ language_list
     ;
 
 language_code
-    : STRING
-    | 'af' | 'ak' | 'am' | 'ar' | 'bm' | 'bem' | 'ber' | 'bin' | 'din' | 'dyu'
-    | 'ee' | 'ff' | 'fon' | 'gaa' | 'ha' | 'ig' | 'kab' | 'kam' | 'ki' | 'kln'
-    | 'kg' | 'kj' | 'kmb' | 'kr' | 'lg' | 'ln' | 'loz' | 'lu' | 'lua' | 'mg'
-    | 'mos' | 'nd' | 'nr' | 'nso' | 'ny' | 'om' | 'rn' | 'rw' | 'sg' | 'sn'
-    | 'so' | 'ss' | 'st' | 'sw' | 'ti' | 'tn' | 'ts' | 'tum' | 'tw' | 've'
-    | 'wo' | 'xh' | 'yo' | 'zu'
+    : member_name
+    | STRING
     ;
 
 reference_list
@@ -952,7 +1109,7 @@ reference_list
 
 contract_object
     : '{' contract_member* '}'
-    ;
+    ;  // contract_member already has optional separator
 
 contract_member
     : (member_name | STRING) ':' contract_value contract_separator?
@@ -1062,7 +1219,7 @@ list_value
     ;
 
 dict_value
-    : '{' (key_value_pair (',' key_value_pair)*)? '}'
+    : '{' (key_value_pair ((',' | ';') key_value_pair)* (','|';')?)? '}'
     ;
 
 key_value_pair
@@ -1086,9 +1243,9 @@ agent_memory_value
     ;
 
 reference_value
-    : IDENTIFIER ('.' IDENTIFIER)*           // Object reference: user.location
-    | IDENTIFIER '*'                         // Collection: cameras*
-    | IDENTIFIER '++'                        // All instances
+    : member_name ('.' member_name)*         // Object reference: user.location
+    | member_name '*'                        // Collection: cameras*
+    | member_name '++'                       // All instances
     ;
 
 combination_expr
@@ -3177,9 +3334,7 @@ scroll_options
     ;
 
 scroll_property
-    : 'x' ':' NUMBER
-    | 'y' ':' NUMBER
-    | 'behavior' ':' ('smooth' | 'auto')
+    : member_name ':' contract_value
     ;
 
 scroll_direction

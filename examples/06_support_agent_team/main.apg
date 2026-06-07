@@ -38,7 +38,7 @@ agent_team SupportCrew {
     agents: [Planner, Writer, Reviewer];
 
     // Handoff flow: Planner -> Writer always; Writer -> Reviewer when draft_ready
-    flow: Planner -> Writer -> Reviewer when draft_ready;
+    flow: Planner -> Writer, Writer -> Reviewer [condition: draft_ready];
 
     // Team-level capability access
     capabilities: [support_response, ticket_management];
