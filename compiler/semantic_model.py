@@ -694,6 +694,17 @@ VIEW_METADATA_BINDINGS = {
 	"route",
 	"layout",
 	"description",
+	# Form entity meta-properties — not table field references
+	"fields",
+	"display_fields",
+	"form_fields",
+	"actions",
+	"submit_actions",
+	"form_actions",
+	"permissions",
+	"rules",
+	"theme",
+	"i18n",
 }
 
 

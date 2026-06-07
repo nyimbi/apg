@@ -476,10 +476,20 @@ def _sample_value_for_field(field: dict[str, Any]) -> Any:
 		return 1.0
 	if field_type in {"bool", "boolean"}:
 		return True
+	if field_type in {"bytes"}:
+		return ""
+	if field_type.startswith(("list", "List")):
+		return []
+	if field_type.startswith(("dict", "Dict")):
+		return {}
+	if field_type in {"any"}:
+		return "baseline_value"
 	if "email" in field_name.lower():
 		return "baseline@example.com"
 	if "date" in field_name.lower():
 		return "2026-05-29"
+	if field_type in {"str?", "str | none", "str|none"}:
+		return None
 	return f"baseline_{field_name}"
 
 

@@ -264,46 +264,6 @@
       "related_locations": [],
       "severity": "warning",
       "title": "Semantic warning"
-    },
-    {
-      "code": "APG0402",
-      "docs_url": "docs/tooling.md#semantic-model-contract",
-      "file": "inventory_warehouse.apg",
-      "fixes": [],
-      "message": "Form 'StockReceiptForm' binds 'fields', but table 'InventoryItem' has no such field or lookup path.",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
-      },
-      "related_locations": [],
-      "severity": "error",
-      "title": "Invalid view binding"
-    },
-    {
-      "code": "APG0402",
-      "docs_url": "docs/tooling.md#semantic-model-contract",
-      "file": "inventory_warehouse.apg",
-      "fixes": [],
-      "message": "Form 'StockReceiptForm' binds 'actions', but table 'InventoryItem' has no such field or lookup path.",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
-      },
-      "related_locations": [],
-      "severity": "error",
-      "title": "Invalid view binding"
     }
   ],
   "flows": {
@@ -409,7 +369,7 @@
     }
   },
   "llms": {},
-  "ok": false,
+  "ok": true,
   "operations": {},
   "packages": {},
   "roles": {},
