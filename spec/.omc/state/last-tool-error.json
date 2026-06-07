@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"/Users/nyimbiodero/src/pjs/apg/.venv/bin/python 2>&1 << 'EOF'\\nimport sys; sys.path.insert(0, '.'); sys.path.insert(0, 'spec')\\nfor m in list(sys.modules.keys()):\\n    if m in ('apgParser'...",
+  "error": "Exit code 1\nTraceback (most recent call last):\n  File \"<stdin>\", line 14, in <module>\nFileNotFoundError: [Errno 2] No such file or directory: 'examples/crm_platform/main.apg'",
+  "timestamp": "2026-06-07T20:11:39.391Z",
+  "retry_count": 1
+}

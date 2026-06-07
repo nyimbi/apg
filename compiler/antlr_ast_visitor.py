@@ -117,6 +117,27 @@ class APGASTVisitor(apgVisitor):  # type: ignore[misc]
 				# getText() returns "version1.2.3" — strip the keyword
 				module.version = ver_text[7:] if ver_text.startswith("version") else ver_text
 
+		# Import statements
+		for imp_ctx in ctx.import_statement():
+			try:
+				import_text = self._span_text(imp_ctx)
+				# Parse 'from X import A, B' or 'import X'
+				import re as _re
+				from_m = _re.search(r'\bfrom\s+([A-Za-z_][A-Za-z0-9_.]*)\s+import\s+([^;]+)', import_text)
+				bare_m = _re.search(r'\bimport\s+([A-Za-z_][A-Za-z0-9_.]*)', import_text) if not from_m else None
+				if from_m:
+					mod_name = from_m.group(1).strip()
+					items_raw = from_m.group(2).strip()
+					items = [i.strip() for i in items_raw.split(',') if i.strip() and i.strip() != '*']
+					from .ast_builder import ImportDeclaration
+					module.imports.append(ImportDeclaration(module_name=mod_name, import_items=items))
+				elif bare_m:
+					mod_name = bare_m.group(1).strip()
+					from .ast_builder import ImportDeclaration
+					module.imports.append(ImportDeclaration(module_name=mod_name, import_items=[]))
+			except Exception:
+				pass
+
 		# Top-level entities
 		for entity_ctx in ctx.entity():
 			try:

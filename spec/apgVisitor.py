@@ -169,6 +169,11 @@ class apgVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by apgParser#member_name.
+    def visitMember_name(self, ctx:apgParser.Member_nameContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by apgParser#config_item.
     def visitConfig_item(self, ctx:apgParser.Config_itemContext):
         return self.visitChildren(ctx)

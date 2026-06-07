@@ -19,7 +19,7 @@ module_declaration
     ;
 
 module_name
-    : IDENTIFIER ('.' IDENTIFIER)*
+    : member_name ('.' member_name)*
     ;
 
 module_metadata
@@ -147,7 +147,7 @@ decorator
 
 entity_type
     : 'agent' | 'team' | 'agent_team' | 'robot' | 'sensor' | 'camera' | 'actuator' | 'drone'
-    | 'chat' | 'llm' | 'db' | 'table' | 'biz' | 'flow' | 'rule'
+    | 'chat' | 'llm' | 'db' | 'table' | 'biz' | 'flow' | 'workflow' | 'rule'
     | 'report' | 'form' | 'erp' | 'protocol' | 'chain' | 'master'
     | 'auto_system' | 'sense' | 'deploy' | 'process' | 'stream' | 'swarm'
     // Composable APG platform surface
@@ -233,11 +233,107 @@ entity_member
     | enum_variant_decl     // Enum variant for enum entities
     ;
 
+// member_name: accept IDENTIFIER or any keyword that may also be used as a field name.
+// APG field names like 'name', 'description', 'path', 'action' etc. conflict with
+// implicit keyword tokens created by the grammar's many inline string literals.
+// Listing them here as a "soft keyword" rule restores their use as field names.
+member_name
+    : IDENTIFIER
+    // Common field names shadowed by contract-member keywords
+    | 'name' | 'description' | 'title' | 'label' | 'code' | 'note' | 'author'
+    | 'path' | 'route' | 'component' | 'permission' | 'nav_group'
+    | 'action' | 'status' | 'state' | 'value' | 'source' | 'target' | 'via'
+    | 'email' | 'phone' | 'address' | 'url' | 'format' | 'mode' | 'style'
+    | 'required' | 'optional' | 'default' | 'enabled' | 'disabled'
+    | 'key' | 'group' | 'tag' | 'category' | 'priority' | 'rank' | 'score'
+    | 'date' | 'time' | 'start' | 'end' | 'count' | 'total' | 'level'
+    | 'data' | 'payload' | 'body' | 'header' | 'content' | 'message' | 'text'
+    | 'user' | 'steps' | 'stage' | 'type' | 'id'
+    // Entity-type keywords usable as identifiers in non-entity contexts
+    | 'workflow' | 'agent' | 'table' | 'capability' | 'capability_contract'
+    | 'capability_pack' | 'composition' | 'contract' | 'rule_set' | 'policy'
+    | 'guardrail' | 'app' | 'application' | 'form' | 'screen'
+    | 'enum' | 'statemachine' | 'migration' | 'deployment' | 'marketplace'
+    | 'platform' | 'pipeline' | 'db' | 'database' | 'flow' | 'rule'
+    // Common APG service/system identifiers
+    | 'auth' | 'audl' | 'ntfy' | 'wflo' | 'colb' | 'mten'
+    // Common field/value names not yet in member_name
+    | 'tags' | 'routes' | 'currency' | 'region' | 'tenant' | 'locale'
+    | 'system' | 'notifications' | 'notification' | 'stream' | 'streams'
+    // UI shell values  
+    | 'python' | 'react' | 'mobile' | 'cli'
+    // Stream processor values
+    | 'bytewax' | 'bytewax_streams'
+    // Memory/vector types
+    | 'vector' | 'embedding' | 'redis' | 'postgres' | 'sqlite' | 'chroma' | 'pinecone'
+    // Runtime/deployment values
+    | 'container' | 'docker' | 'kubernetes' | 'serverless' | 'lambda' | 'local'
+    // Agent runtime values (from agent_runtime_ref)
+    | 'codex' | 'codex_cli' | 'claude' | 'claude_code' | 'opencode'
+    | 'open_code' | 'pi' | 'openai' | 'ollama'
+    // CSS / layout field names (from style/layout sub-language)
+    | 'position' | 'display' | 'overflow' | 'cursor' | 'transition' | 'animation'
+    | 'transform' | 'filter' | 'gradient' | 'shadow' | 'clip' | 'mask'
+    // Common field names not yet covered
+    | 'escalation' | 'dimensions' | 'ledger' | 'general_ledger'
+    | 'en' | 'fr' | 'de' | 'es' | 'pt' | 'ja' | 'ko' | 'zh'
+    | 'active' | 'inactive' | 'pending' | 'blocked' | 'suspended' | 'archived'
+    | 'draft' | 'published' | 'reviewed' | 'approved' | 'rejected' | 'closed'
+    // Additional common values used as identifiers
+    | 'summary' | 'export' | 'import' | 'detail' | 'overview' | 'list' | 'search'
+    | 'create' | 'update' | 'delete' | 'read' | 'write' | 'approve' | 'reject'
+    | 'submit' | 'cancel' | 'complete' | 'process' | 'start' | 'stop' | 'pause'
+    | 'resume' | 'reset' | 'refresh' | 'sync' | 'push' | 'pull' | 'merge'
+    | 'connection' | 'socket' | 'port' | 'host' | 'scheme' | 'protocol'
+    | 'username' | 'password' | 'token' | 'secret' | 'key' | 'salt'
+    | 'algorithm' | 'cipher' | 'digest' | 'hash' | 'checksum' | 'signature'
+    | 'metrics' | 'quota' | 'timeout' | 'retry' | 'fallback'
+    | 'webhook' | 'endpoint' | 'service' | 'domain' | 'namespace'
+    // Rule decision keywords (used as values in rule action fields)
+    | 'require_review' | 'allow' | 'deny' | 'warn' | 'audit' | 'reject'
+    // Common field names in tables/configs
+    | 'metadata' | 'required' | 'department' | 'division' | 'unit'
+    | 'quantity' | 'amount' | 'balance' | 'percentage' | 'rate' | 'price'
+    | 'category' | 'subcategory' | 'product' | 'order' | 'invoice'
+    | 'supplier' | 'vendor' | 'customer' | 'employee' | 'account'
+    | 'project' | 'task' | 'issue' | 'ticket' | 'case' | 'record'
+    | 'document' | 'report' | 'file' | 'image' | 'video' | 'audio'
+    // Additional keywords from examples
+    | 'forecast' | 'icon' | 'procurement' | 'payroll' | 'inventory'
+    | 'manufacturing' | 'supply_chain' | 'general_ledger' | 'accounts_payable'
+    | 'accounts_receivable' | 'fixed_assets' | 'project_accounting'
+    | 'time_attendance' | 'benefits' | 'asset_management' | 'maintenance'
+    | 'service_management' | 'reporting' | 'analytics' | 'budgeting'
+    | 'tax' | 'compliance' | 'warehouse' | 'order_management'
+    | 'materials_planning' | 'production_planning' | 'purchase_orders'
+    | 'supplier_management' | 'priority' | 'parallel' | 'timeout' | 'retry'
+    | 'condition' | 'filter' | 'icon' | 'variant' | 'size' | 'alignment'
+    | 'location' | 'address' | 'country' | 'city' | 'state' | 'zip'
+    | 'phone_number' | 'mobile' | 'fax' | 'website' | 'social'
+    | 'notes' | 'comments' | 'remarks' | 'observation' | 'description'
+    // Contract block names used as capability/agent field names
+    // Note: do NOT include entity_type keywords here (agent, table, workflow, app, etc.)
+    | 'rules' | 'ui' | 'streaming' | 'tools' | 'memory'
+    | 'input' | 'output' | 'configuration' | 'provides' | 'requires'
+    | 'capabilities' | 'agents' | 'handoffs' | 'runtimes'
+    | 'erp_modules' | 'components' | 'screens' | 'i18n'
+    | 'approvals' | 'master_data' | 'business_rules' | 'role' | 'model'
+    // Deployment and runtime fields
+    | 'deployments' | 'runtime' | 'deployment' | 'processor'
+    | 'backend' | 'shell' | 'trigger' | 'handler' | 'condition'
+    // Layout and UI fields
+    | 'layout' | 'contains' | 'composes' | 'binds' | 'actions' | 'events'
+    | 'relationships' | 'width' | 'height' | 'color' | 'font' | 'border'
+    // Workflow body fields (NOT the workflow entity keyword itself)
+    | 'assignments' | 'guards' | 'timers' | 'waits' | 'retry_policy'
+    | 'compensation' | 'human_tasks' | 'stages' | 'process'
+    ;
+
 // CONFIGURATION with type annotations
 config_item
-    : IDENTIFIER ':' type_annotation? '=' value_expr ';'
-    | IDENTIFIER ':' value_expr ';'             // Terse readable AI-agent and capability config
-    | IDENTIFIER ':' type_annotation ';'
+    : member_name ':' type_annotation? '=' value_expr ';'
+    | member_name ':' value_expr ';'             // Terse readable AI-agent and capability config
+    | member_name ':' type_annotation ';'
     ;
 
 // FIRST-CLASS CAPABILITY AND AGENT CONTRACTS
@@ -859,7 +955,7 @@ contract_object
     ;
 
 contract_member
-    : (IDENTIFIER | STRING) ':' contract_value contract_separator?
+    : (member_name | STRING) ':' contract_value contract_separator?
     ;
 
 contract_value
@@ -878,7 +974,7 @@ contract_array
     ;
 
 contract_scalar
-    : IDENTIFIER ('.' IDENTIFIER)*
+    : member_name ('.' member_name)*
     | STRING
     | NUMBER
     | BOOLEAN
@@ -946,7 +1042,7 @@ value_expr
     ;
 
 simple_value
-    : STRING | NUMBER | BOOLEAN | IDENTIFIER
+    : STRING | NUMBER | BOOLEAN | member_name
     | env_var
     | f_string
     ;
@@ -970,7 +1066,7 @@ dict_value
     ;
 
 key_value_pair
-    : (IDENTIFIER | STRING) ':' value_expr
+    : (member_name | STRING) ':' value_expr
     ;
 
 cascade_value
@@ -986,7 +1082,7 @@ physical_literal
     ;
 
 agent_memory_value
-    : IDENTIFIER IDENTIFIER?                     // vector support_memory
+    : member_name member_name?                     // vector support_memory
     ;
 
 reference_value
@@ -1470,11 +1566,11 @@ flow_modifiers
     ;
 
 flow_modifier
-    : 'timeout:' time_expr
-    | 'retry:' NUMBER
-    | 'condition:' expression
-    | 'priority:' NUMBER
-    | 'parallel:' NUMBER
+    : 'timeout' ':' time_expr
+    | 'retry' ':' NUMBER
+    | 'condition' ':' expression
+    | 'priority' ':' NUMBER
+    | 'parallel' ':' NUMBER
     ;
 
 conditional_flow_step
@@ -1539,7 +1635,7 @@ exception_body
 
 // VARIABLE DECLARATIONS
 variable_declaration
-    : IDENTIFIER ':' type_annotation ('=' value_expr)? ';'
+    : member_name ':' type_annotation ('=' value_expr)? ';'
     ;
 
 // ========================================
@@ -1782,6 +1878,9 @@ video_call_configuration: IDENTIFIER | STRING | '{' config_property* '}' ;
 // ========================================
 
 // Identifiers
+// BOOLEAN and NULL must precede IDENTIFIER for correct priority
+BOOLEAN: 'True' | 'False' | 'true' | 'false';
+NULL: 'null' | 'NULL' | 'nil';
 IDENTIFIER: [a-zA-Z_][a-zA-Z0-9_]*;
 
 // Numbers with full support
@@ -1843,8 +1942,6 @@ CRON_EXPR: '"' [0-9*,-/]+ (' ' [0-9*,-/]+){4,5} '"';
 SEMVER: [0-9]+ '.' [0-9]+ '.' [0-9]+ ('-' [a-zA-Z0-9-]+)? ('+' [a-zA-Z0-9-]+)?;
 
 // Booleans and NULL
-BOOLEAN: 'True' | 'False' | 'true' | 'false';
-NULL: 'null' | 'NULL' | 'nil';
 
 // Comments
 COMMENT: '//' ~[\r\n]* -> skip;
@@ -1939,49 +2036,6 @@ COLON: ':';
 QUESTION: '?';
 ELLIPSIS: '...';
 
-// Keywords (reserved words)
-ASYNC: 'async';
-AWAIT: 'await';
-BREAK: 'break';
-CONTINUE: 'continue';
-DEF: 'def';
-ELIF: 'elif';
-ELSE: 'else';
-EXCEPT: 'except';
-FINALLY: 'finally';
-FOR: 'for';
-FROM: 'from';
-IF: 'if';
-IMPORT: 'import';
-IN: 'in';
-IS: 'is';
-LAMBDA: 'lambda';
-MATCH: 'match';
-CASE: 'case';
-NONE: 'None';
-PASS: 'pass';
-RETURN: 'return';
-TRY: 'try';
-WHILE: 'while';
-WITH: 'with';
-YIELD: 'yield';
-CLASS: 'class';
-EXTENDS: 'extends';
-VERSION: 'version';
-
-// Business and calculation keywords
-WHEN: 'when';
-THEN: 'then';
-FORMULA: 'formula';
-VARIABLES: 'variables';
-CALC: 'calc';
-REPORT: 'report';
-LAYOUT: 'layout';
-DATA: 'data';
-SECTIONS: 'sections';
-OUTPUTS: 'outputs';
-SCHEDULE: 'schedule';
-DISTRIBUTION: 'distribution';
 
 // ========================================
 // FORM LAYOUT SUBLANGUAGE
@@ -3743,7 +3797,7 @@ vector_index_option
     | 'dimensions' ':' NUMBER
     | 'ef_construction' ':' NUMBER
     | 'ef_search' ':' NUMBER
-    | 'm' ':' NUMBER
+    | IDENTIFIER ':' NUMBER
     ;
 
 vector_index_method

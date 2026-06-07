@@ -296,6 +296,15 @@ class apgListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by apgParser#member_name.
+    def enterMember_name(self, ctx:apgParser.Member_nameContext):
+        pass
+
+    # Exit a parse tree produced by apgParser#member_name.
+    def exitMember_name(self, ctx:apgParser.Member_nameContext):
+        pass
+
+
     # Enter a parse tree produced by apgParser#config_item.
     def enterConfig_item(self, ctx:apgParser.Config_itemContext):
         pass
