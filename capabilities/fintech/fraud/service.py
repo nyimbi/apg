@@ -613,11 +613,39 @@ class FraudDetectionService:
 		self,
 		features: dict[str, Any],
 	) -> dict[str, Any]:
-		"""Score a feature vector through the ML fraud model."""
+		"""Score a feature vector through the ML fraud model.
+
+		Uses Ollama-backed MLCapability when OLLAMA_BASE_URL is configured;
+		falls back to the deterministic rule-based scorer for offline/test use.
+		"""
 		assert features, "features must be non-empty"
 
-		# Simulate async model call latency
-		await asyncio.sleep(0)
+		import os
+		if os.environ.get("OLLAMA_BASE_URL"):
+			try:
+				from capabilities.common.mlx import MLCapability
+				ml = MLCapability()
+				result = await ml.score(
+					features,
+					task="fraud_risk",
+					labels={
+						"0.0–0.3": "Low risk — approve",
+						"0.3–0.6": "Medium risk — step-up authentication",
+						"0.6–0.8": "High risk — review required",
+						"0.8–1.0": "Critical risk — block",
+					},
+				)
+				return {
+					"score": round(result.score, 2),
+					"risk_band": risk_band(result.score),
+					"recommended_decision": recommended_decision(result.score),
+					"top_contributing_features": result.factors[:3],
+					"model_version": f"ollama:{ml._model}",
+					"scored_at": _iso(),
+					"rationale": result.rationale,
+				}
+			except Exception:
+				pass  # Fall through to deterministic scorer
 
 		score = _ml_score_from_features(features)
 		band = risk_band(score)

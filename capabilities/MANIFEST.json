@@ -1,7 +1,7 @@
 {
   "format": "apg.capability-manifest.v1",
   "generated": "2026-06-04",
-  "capability_count": 264,
+  "capability_count": 265,
   "capabilities": {
     "bia_anl": {
       "id": "bia_anl",
@@ -64831,6 +64831,17 @@
       "package": "apg-common-esig",
       "module": "apg_common_esig",
       "description": "Qualified electronic signatures meeting FDA 21 CFR Part 11. Three-component binding: meaning, identity, timestamp."
+    },
+    "vault": {
+      "id": "vault",
+      "display_name": "Vault (PCI DSS Tokenization)",
+      "version": "1.0.0",
+      "domain": "common",
+      "code": "vault",
+      "path": "capabilities/common/vault",
+      "package": "apg-common-vault",
+      "module": "apg_common_vault",
+      "description": "PCI DSS format-preserving tokenization for cardholder PANs. Tokens preserve BIN and last 4 digits; Luhn-valid. OPA-gated detokenization."
     }
   },
   "by_domain": {
@@ -64935,7 +64946,8 @@
       "temporal",
       "mlx",
       "phi",
-      "esig"
+      "esig",
+      "vault"
     ],
     "composition": [
       "composition_access",
