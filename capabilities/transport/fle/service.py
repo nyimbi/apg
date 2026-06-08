@@ -1194,6 +1194,27 @@ class FleetService:
 							supporting_signals=["scheduled_date_passed"],
 						))
 
+		# MLX enhancement: AI confidence scoring for maintenance alerts
+		import os
+		if alerts and os.environ.get("OLLAMA_BASE_URL"):
+			try:
+				from capabilities.common.mlx import MLCapability
+				ml = MLCapability()
+				for alert in alerts:
+					ml_result = await ml.score(
+						{
+							"urgency": {"low": 0.2, "medium": 0.5, "high": 0.8, "critical": 1.0}.get(alert.urgency, 0.5),
+							"component": alert.component,
+							"confidence_pct": alert.confidence_pct / 100,
+						},
+						task="fleet_predictive_maintenance",
+					)
+					# Blend ML confidence with rule-based confidence
+					blended = (alert.confidence_pct + ml_result.score * 100) / 2
+					object.__setattr__(alert, "confidence_pct", round(blended, 1))
+			except Exception:
+				pass
+
 		self._log_op("predictive_maintenance_alerts", "", alerts=str(len(alerts)))
 		return alerts
 

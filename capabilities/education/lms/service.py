@@ -354,6 +354,22 @@ class LmsService:
 				"operation": "override_grade",
 				"approval_reference_present": _present(override_approval),
 			})
+		# MLX enhancement: AI-generated feedback when no manual feedback provided
+		import os
+		if not feedback and os.environ.get("OLLAMA_BASE_URL"):
+			try:
+				from capabilities.common.mlx import MLCapability
+				ml = MLCapability()
+				submission_content = str(getattr(item, "content", "") or getattr(item, "response", ""))
+				if submission_content:
+					ml_result = await ml.summarize(
+						submission_content[:2000],
+						focus=f"educational feedback for score {score}/100",
+					)
+					feedback = ml_result.summary or feedback
+			except Exception:
+				pass
+
 		merged = item.model_copy(update={
 			"score": score, "feedback": feedback, "graded_by": graded_by,
 			"graded_at": datetime.utcnow(), "status": "graded",
