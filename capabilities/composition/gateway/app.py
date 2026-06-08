@@ -167,6 +167,30 @@ try:
 		def _semantic_model():
 			return _jsonify(semantic_model())
 
+		@app.get("/api/capabilities/manifest")
+		def _capabilities_manifest():
+			"""Serve the APG capability manifest for Backstage Software Catalog discovery."""
+			import json
+			from pathlib import Path
+			manifest_path = Path(__file__).parents[3] / "MANIFEST.json"
+			if manifest_path.exists():
+				return _jsonify(json.loads(manifest_path.read_text()))
+			return _jsonify({"error": "MANIFEST.json not found"}), 404
+
+		@app.get("/api/connectors")
+		def _connector_registry():
+			"""List available APG connectors for the Backstage connector marketplace."""
+			try:
+				from capabilities.composition.orchestration.connectors.connector_registry import ConnectorRegistry
+				r = ConnectorRegistry()
+				return _jsonify({
+					"connectors": r.list_available(),
+					"installed": r.list_installed(),
+					"total": len(r.list_available()),
+				})
+			except Exception as exc:
+				return _jsonify({"error": str(exc)}), 500
+
 		return app
 
 except ImportError:
