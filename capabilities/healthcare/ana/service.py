@@ -519,6 +519,30 @@ class ClinicalAnalyticsService:
 		model_score = base_score + gap_adjustment
 		if active_models:
 			model_score = min(0.99, active_models[0].auc_score * model_score * 2)
+
+		# MLX enhancement: Ollama-backed readmission risk scoring
+		import os
+		if os.environ.get("OLLAMA_BASE_URL"):
+			try:
+				from capabilities.common.mlx import MLCapability
+				ml = MLCapability()
+				ml_result = await ml.score(
+					{
+						"open_care_gaps": len(gaps),
+						"active_prediction_models": len(active_models),
+						"base_readmission_score": round(model_score, 3),
+					},
+					task="patient_readmission_risk",
+					labels={
+						"0.0–0.25": "Low risk — routine follow-up",
+						"0.25–0.5": "Medium risk — 14-day follow-up",
+						"0.5–1.0": "High risk — intensive care coordination",
+					},
+				)
+				model_score = ml_result.score
+			except Exception:
+				pass  # Use heuristic score
+
 		risk_level = "high" if model_score >= 0.5 else ("medium" if model_score >= 0.25 else "low")
 		interventions = []
 		if risk_level == "high":

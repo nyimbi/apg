@@ -656,6 +656,41 @@ class LendingService:
 		self.credit_scores[customer_id] = cs
 		return cs.to_dict()
 
+	async def ml_credit_score_assess(self, customer_id: str) -> dict[str, Any]:
+		"""AI-enhanced credit assessment combining rule-based score with Ollama risk classification.
+
+		Calls credit_score_calculate() then uses MLCapability.classify() to provide
+		a narrative risk tier and recommended credit actions. Requires OLLAMA_BASE_URL.
+		"""
+		base = self.credit_score_calculate(customer_id)
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {**base, "ml_enhanced": False}
+
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			features = {
+				"credit_score": base.get("score", 0),
+				"risk_grade": base.get("risk_grade", ""),
+				"probability_of_default": base.get("probability_of_default", 1.0),
+				"behavioural_score": base.get("components", {}).get("behavioural", {}).get("raw", 0.5),
+				"bureau_defaults": base.get("components", {}).get("bureau", {}).get("defaults", 0),
+			}
+			result = await ml.classify(
+				str(features),
+				labels=["approve", "approve_with_conditions", "refer_for_review", "decline"],
+			)
+			return {
+				**base,
+				"ml_enhanced": True,
+				"ml_recommendation": result.label,
+				"ml_confidence": result.confidence,
+				"ml_rationale": result.rationale,
+			}
+		except Exception:
+			return {**base, "ml_enhanced": False}
+
 	def credit_bureau_check(self, customer_id: str, id_number: str, country: str) -> dict[str, Any]:
 		"""
 		Simulate a credit bureau query (TransUnion Africa / Creditinfo Africa / CRB Africa).
