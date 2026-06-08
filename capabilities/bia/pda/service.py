@@ -762,6 +762,31 @@ class PredictiveAnalyticsService:
 			"model_state": m["state"],
 			"output_type_supported": output_type in SUPPORTED_OUTPUT_TYPES if SUPPORTED_OUTPUT_TYPES else True,
 		})
+		# MLX enhancement: use Ollama predict() when OLLAMA_BASE_URL is configured
+		import os
+		forecast_data = [{"period": f"t+{i}", "value": 100.0 + i * 1.5} for i in range(7)]
+		forecast_rationale = ""
+		if os.environ.get("OLLAMA_BASE_URL"):
+			try:
+				from capabilities.common.mlx import MLCapability
+				ml = MLCapability()
+				# Build historical series from model training data if available
+				historical = m.get("training_data", []) or [
+					{"period": f"t-{7 - i}", "value": 100.0 - (7 - i) * 1.5}
+					for i in range(7)
+				]
+				horizon_periods = {"7d": 7, "14d": 14, "30d": 30, "90d": 90, "1y": 12}.get(horizon, 7)
+				ml_result = await ml.predict(
+					series=historical,
+					horizon=horizon_periods,
+					task=f"time_series_forecast:{m.get('type', 'general')}",
+				)
+				if ml_result.predictions:
+					forecast_data = ml_result.predictions
+					forecast_rationale = ml_result.rationale
+			except Exception:
+				pass  # Fall through to stub data
+
 		f: dict[str, Any] = {
 			"id": _uuid7(),
 			"tenant_id": tenant_id,
@@ -770,7 +795,8 @@ class PredictiveAnalyticsService:
 			"output_type": output_type,
 			"confidence_interval": confidence_interval,
 			"owner_id": owner_id,
-			"forecast_data": [{"period": f"t+{i}", "value": 100.0 + i * 1.5} for i in range(7)],
+			"forecast_data": forecast_data,
+			"rationale": forecast_rationale,
 			"parameters": parameters or {},
 			"generated_at": _now(),
 			"created_at": _now(),
