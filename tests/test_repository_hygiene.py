@@ -68,6 +68,7 @@ STREAMING_TERM_EXCLUDED_PATHS = {
 	"docs/capability_development_guide.md",
 	"docs/capability_integration_guide.md",
 	"docs/progress_log.md",
+	"docs/competitive_analysis_2025.md",  # competitor analysis legitimately references external platforms
 	"tests/test_repository_hygiene.py",
 	"compiler/repository_hygiene.py",
 }

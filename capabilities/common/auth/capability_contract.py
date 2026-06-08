@@ -646,7 +646,29 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 
 
 def evaluate_capability_rules(context: dict[str, Any]) -> dict[str, Any]:
-	"""Convenience wrapper for default AUTH rule evaluation."""
+	"""Evaluate AUTH rules against the given context.
+
+	Routes to OPA when OPA_URL is set, preserving the exact return shape:
+	{"decision": str, "matched_rules": list, "actions": list}
+
+	Falls back to the built-in CapabilityRuleEngine when OPA is unavailable.
+	"""
+	import os
+	opa_url = os.environ.get("OPA_URL")
+	if opa_url:
+		try:
+			import httpx
+			url = f"{opa_url.rstrip('/')}/v1/data/apg/authz"
+			resp = httpx.post(url, json={"input": context}, timeout=2.0)
+			resp.raise_for_status()
+			result = resp.json().get("result", {})
+			return {
+				"decision": result.get("decision", "deny"),
+				"matched_rules": result.get("matched_rules", []),
+				"actions": result.get("actions", []),
+			}
+		except Exception:
+			pass  # OPA unavailable — fall through to built-in engine
 	return CapabilityRuleEngine().evaluate(context)
 
 

@@ -134,7 +134,16 @@ def get_audit_adapter(audit_service: Any | None = None) -> AuditAdapter:
         from apg_common_audl import AuditService  # type: ignore[import]
         return AuditService.from_env()
     except ImportError:
-        return NullAuditAdapter()
+        pass
+    # NATS JetStream durable audit adapter when NATS_URL is configured
+    try:
+        from capabilities.common.nats.nats_adapter import get_nats_audit_adapter
+        nats_adapter = get_nats_audit_adapter("ckm_wfa")
+        if nats_adapter is not None:
+            return nats_adapter
+    except ImportError:
+        pass
+    return NullAuditAdapter()
 
 
 def get_notify_adapter(notify_service: Any | None = None) -> NotifyAdapter:
@@ -154,4 +163,13 @@ def get_workflow_adapter(workflow_service: Any | None = None) -> WorkflowAdapter
         from apg_common_wflo import WorkflowService  # type: ignore[import]
         return WorkflowService.from_env()
     except ImportError:
-        return NullWorkflowAdapter()
+        pass
+    # Temporal durable execution when TEMPORAL_HOST is configured
+    try:
+        from capabilities.common.temporal.temporal_adapter import get_temporal_workflow_adapter
+        temporal_adapter = get_temporal_workflow_adapter()
+        if temporal_adapter is not None:
+            return temporal_adapter
+    except ImportError:
+        pass
+    return NullWorkflowAdapter()

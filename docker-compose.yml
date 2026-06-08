@@ -17,6 +17,9 @@ version: "3.9"
 x-common-env: &common-env
   APG_DATABASE_URL: postgresql+asyncpg://apg:apg_secret@apg-db:5432/apg
   APG_DEFAULT_TENANT: platform
+  NATS_URL: nats://apg-nats:4222
+  TEMPORAL_HOST: apg-temporal:7233
+  OPA_URL: http://apg-opa:8181
 
 x-capability-defaults: &capability-defaults
   build:
@@ -32,6 +35,93 @@ x-capability-defaults: &capability-defaults
     - apg-net
 
 services:
+
+  # ── Core Infrastructure (NATS, Temporal, OPA) ────────────────────────────
+
+  apg-nats:
+    image: nats:2.10-alpine
+    container_name: apg-nats
+    command: ["--jetstream", "--cluster_name", "APG", "--store_dir", "/data", "--http_port", "8222"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - apg-nats-data:/data
+    networks:
+      - apg-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  apg-temporal:
+    image: temporalio/auto-setup:1.26
+    container_name: apg-temporal
+    depends_on:
+      apg-db:
+        condition: service_healthy
+    environment:
+      DB: postgres12
+      DB_PORT: "5432"
+      POSTGRES_USER: apg
+      POSTGRES_PWD: apg_secret
+      POSTGRES_SEEDS: apg-db
+      DYNAMIC_CONFIG_FILE_PATH: /etc/temporal/dynamicconfig.yaml
+    ports:
+      - "7233:7233"
+    volumes:
+      - ./devops/temporal/dynamicconfig.yaml:/etc/temporal/dynamicconfig.yaml
+    networks:
+      - apg-net
+    healthcheck:
+      test: ["CMD", "temporal", "workflow", "list", "--address", "localhost:7233"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+  apg-temporal-ui:
+    image: temporalio/ui:2.28
+    container_name: apg-temporal-ui
+    depends_on:
+      - apg-temporal
+    environment:
+      TEMPORAL_ADDRESS: apg-temporal:7233
+    ports:
+      - "8088:8080"
+    networks:
+      - apg-net
+
+  apg-temporal-worker:
+    <<: *capability-defaults
+    container_name: apg-temporal-worker
+    command: ["python", "-m", "capabilities.common.temporal.temporal_worker"]
+    depends_on:
+      apg-temporal:
+        condition: service_healthy
+      apg-nats:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+    labels:
+      apg.service: "temporal-worker"
+      apg.description: "APG durable workflow execution worker"
+
+  apg-opa:
+    image: openpolicyagent/opa:0.65-rootless
+    container_name: apg-opa
+    command: ["run", "--server", "--log-format=json", "--bundle", "/policies", "--addr=0.0.0.0:8181"]
+    ports:
+      - "8181:8181"
+    volumes:
+      - ./policies:/policies:ro
+    networks:
+      - apg-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8181/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   # ── Database ──────────────────────────────────────────────────────────────
 
@@ -212,6 +302,7 @@ services:
 
 volumes:
   apg-db-data:
+  apg-nats-data:
 
 networks:
   apg-net:

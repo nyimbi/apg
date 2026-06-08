@@ -1,7 +1,7 @@
 {
   "format": "apg.capability-manifest.v1",
   "generated": "2026-06-04",
-  "capability_count": 259,
+  "capability_count": 261,
   "capabilities": {
     "bia_anl": {
       "id": "bia_anl",
@@ -64776,6 +64776,28 @@
       "install": "pip install apg-transport-war",
       "import_as": "import apg_transport_war",
       "run_server": "apg-transport-war --port 8080"
+    },
+    "nats": {
+      "id": "nats",
+      "display_name": "NATS JetStream Event Bus",
+      "version": "1.0.0",
+      "domain": "common",
+      "code": "nats",
+      "path": "capabilities/common/nats",
+      "package": "apg-common-nats",
+      "module": "apg_common_nats",
+      "description": "Durable publish/subscribe event bus via NATS JetStream. Replaces in-process event dispatch with crash-resilient message delivery."
+    },
+    "temporal": {
+      "id": "temporal",
+      "display_name": "Temporal Durable Workflow",
+      "version": "1.0.0",
+      "domain": "common",
+      "code": "temporal",
+      "path": "capabilities/common/temporal",
+      "package": "apg-common-temporal",
+      "module": "apg_common_temporal",
+      "description": "Durable workflow execution via Temporal.io. Workflow state survives process restarts. Supports human tasks, guards, and timers."
     }
   },
   "by_domain": {
@@ -64875,7 +64897,9 @@
       "walt",
       "wflo",
       "wsbl",
-      "ztna"
+      "ztna",
+      "nats",
+      "temporal"
     ],
     "composition": [
       "composition_access",

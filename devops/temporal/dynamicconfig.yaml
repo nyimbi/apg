@@ -1,0 +1,14 @@
+# Temporal dynamic configuration for APG platform
+# https://docs.temporal.io/references/dynamic-configuration
+
+limit.maxIDLength:
+  - value: 255
+    constraints: {}
+
+system.forceSearchAttributesCacheRefreshOnRead:
+  - value: true
+    constraints: {}
+
+frontend.enableServerVersionCheck:
+  - value: false
+    constraints: {}
