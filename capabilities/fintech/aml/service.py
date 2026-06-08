@@ -1092,6 +1092,35 @@ class AMLService:
 
 		risk_delta = len(patterns) * 15
 
+		# MLX enhancement: Ollama-based holistic AML risk assessment
+		import os
+		if os.environ.get("OLLAMA_BASE_URL") and patterns:
+			try:
+				from capabilities.common.mlx import MLCapability
+				ml = MLCapability()
+				ml_result = await ml.score(
+					{
+						"structuring_detected": struct["detected"],
+						"velocity_anomaly": vel["detected"],
+						"round_trip_detected": rt["detected"],
+						"layering_detected": layer["detected"],
+						"pattern_count": len(patterns),
+						"transaction_count": len(txns),
+					},
+					task="aml_risk_assessment",
+					labels={
+						"0.0–0.3": "Low AML risk",
+						"0.3–0.6": "Medium risk — monitor",
+						"0.6–0.8": "High risk — review required",
+						"0.8–1.0": "Critical — immediate escalation",
+					},
+				)
+				# Blend ML score with rule-based risk_delta
+				ml_risk_delta = int(ml_result.score * 60)  # ML contributes up to 60 points
+				risk_delta = max(risk_delta, ml_risk_delta)
+			except Exception:
+				pass  # ML unavailable — use rule-based risk_delta
+
 		result = PatternDetectionResult(
 			subject_reference=customer_id,
 			tenant_id=self.tenant_id,
