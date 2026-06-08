@@ -164,6 +164,91 @@ class AdvancedCRMService:
 		self._emit("lead_scored", tenant_id, lead_id, {"score": total_score, "qualified": qualified})
 		return score_record
 
+	async def ml_lead_scoring(
+		self,
+		lead_id: str,
+		tenant_id: str = "default",
+		scoring_factors: dict[str, float] | None = None,
+	) -> dict[str, Any]:
+		"""AI-powered lead scoring using the MLX Ollama meta-capability.
+
+		Uses local Ollama model when OLLAMA_BASE_URL is configured; falls back
+		to the rule-based scorer for offline/test operation.
+
+		This async variant is the AI-native equivalent of lead_scoring() with
+		model_type="predictive". Call from async API handlers.
+		"""
+		import os
+		lead = self._require_lead(lead_id, tenant_id)
+		features: dict[str, Any] = {
+			"has_email": bool(lead.get("email")),
+			"has_company": bool(lead.get("company")),
+			"has_phone": bool(lead.get("phone")),
+			"from_campaign": bool(lead.get("campaign_id")),
+			"lead_source": lead.get("source", "unknown"),
+			**(scoring_factors or {}),
+		}
+
+		top_factors: list[str] = []
+		rationale = ""
+
+		if os.environ.get("OLLAMA_BASE_URL"):
+			try:
+				from capabilities.common.mlx import MLCapability
+				ml = MLCapability()
+				result = await ml.score(
+					features,
+					task="lead_qualification",
+					labels={
+						"0.0–0.3": "Cold lead — low conversion probability",
+						"0.3–0.6": "Warm lead — needs nurturing",
+						"0.6–0.8": "Hot lead — ready for outreach",
+						"0.8–1.0": "Sales-qualified lead — immediate action",
+					},
+				)
+				total_score = int(result.score * 100)
+				top_factors = result.factors[:3]
+				rationale = result.rationale
+			except Exception:
+				pass  # Fallback below
+
+		if not top_factors:
+			# Rule-based fallback (same as lead_scoring predictive)
+			base_score = 30
+			if lead.get("email"):
+				base_score += 15
+				top_factors.append("email_present")
+			if lead.get("company"):
+				base_score += 20
+				top_factors.append("company_present")
+			if lead.get("phone"):
+				base_score += 10
+				top_factors.append("phone_present")
+			if lead.get("campaign_id"):
+				base_score += 10
+				top_factors.append("campaign_attributed")
+			total_score = min(100, base_score)
+
+		qualified = total_score >= 60
+		lead["score"] = total_score
+		lead["status"] = "qualified" if qualified else "active"
+		lead["updated_at"] = _now()
+		score_id = _record_id("ml_score", f"{lead_id}")
+		score_record = {
+			"score_id": score_id,
+			"lead_id": lead_id,
+			"tenant_id": tenant_id,
+			"model_type": "ml_predictive",
+			"score": total_score,
+			"qualified": qualified,
+			"top_factors": top_factors,
+			"rationale": rationale,
+			"scored_at": _now(),
+		}
+		self._lead_scores[score_id] = score_record
+		self._emit("lead_scored", tenant_id, lead_id, {"score": total_score, "qualified": qualified})
+		return score_record
+
 	def lead_assignment(
 		self,
 		lead_id: str,
