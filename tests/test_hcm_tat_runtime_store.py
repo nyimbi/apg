@@ -52,6 +52,7 @@ def _run(coro):
 async def _seed_runtime(service: TimeAttendanceService, tenant_id: str = "tenant_tat") -> dict:
 	entry = await service.clock_in("emp_001", tenant_id, {"device_id": "web"})
 	entry.clock_in = entry.clock_in - timedelta(hours=9)
+	entry.entry_date = date.today()  # pin to today even if clock_in adjustment crosses midnight
 	await service._save_time_entry(entry)
 	clocked_out = await service.clock_out("emp_001", tenant_id, {"device_id": "web"})
 
