@@ -199,6 +199,33 @@ class RiskAssessmentService:
 		risk["updated_at"] = _now()
 		await self._store.put("risks", risk)
 
+		# MLX enhancement: Ollama-backed risk narrative and mitigation suggestions
+		import os
+		if os.environ.get("OLLAMA_BASE_URL"):
+			try:
+				from capabilities.common.mlx import MLCapability
+				ml = MLCapability()
+				ml_result = await ml.score(
+					{
+						"likelihood": likelihood_1_5,
+						"impact": impact_1_5,
+						"velocity": {"low": 1, "medium": 2, "high": 3, "very_high": 4}.get(velocity, 2),
+						"inherent_score": inherent,
+					},
+					task="enterprise_risk_assessment",
+					labels={
+						"0.0–0.3": "Low — monitor quarterly",
+						"0.3–0.6": "Medium — monthly review with controls",
+						"0.6–0.8": "High — immediate mitigation required",
+						"0.8–1.0": "Critical — escalate to board immediately",
+					},
+				)
+				assessment["ml_risk_score"] = round(ml_result.score, 3)
+				assessment["ml_risk_narrative"] = ml_result.rationale
+				assessment["ml_top_factors"] = ml_result.factors[:3]
+			except Exception:
+				pass  # Built-in score only
+
 		if rating in {"critical", "high"}:
 			await self._notify.send(
 				risk["owner_id"], "email",
