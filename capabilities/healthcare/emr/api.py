@@ -1201,3 +1201,69 @@ def report_controlled_substances():
 	"""Controlled substance prescriptions today."""
 	results = _run(_svc().controlled_substance_report(_tenant()))
 	return jsonify(results)
+
+
+# ── FHIR R4 endpoints ─────────────────────────────────────────────────────────
+# Exposes APG EMR data as HL7 FHIR R4 resources for interoperability with
+# Epic, Cerner, OpenMRS, Apple Health Records, and national health exchanges.
+
+@bp.get("/fhir/r4/metadata")
+def fhir_capability_statement():
+	"""FHIR R4 CapabilityStatement — server capabilities declaration."""
+	from .fhir import FHIRAdapter
+	base_url = request.host_url.rstrip("/") + bp.url_prefix
+	adapter = FHIRAdapter(base_url=f"{base_url}/fhir/r4")
+	return jsonify(adapter.capability_statement()), 200, {
+		"Content-Type": "application/fhir+json",
+		"Cache-Control": "max-age=86400",
+	}
+
+
+@bp.get("/fhir/r4/Patient/<patient_id>")
+def fhir_get_patient(patient_id: str):
+	"""Return FHIR R4 Patient resource for a given patient ID."""
+	from .fhir import FHIRAdapter
+	try:
+		patient = _run(_svc().get_patient(patient_id))
+		if patient is None:
+			return jsonify({"resourceType": "OperationOutcome", "issue": [{"severity": "error", "code": "not-found"}]}), 404
+		base_url = request.host_url.rstrip("/") + bp.url_prefix
+		adapter = FHIRAdapter(base_url=f"{base_url}/fhir/r4")
+		return jsonify(adapter.patient_to_fhir(patient)), 200, {"Content-Type": "application/fhir+json"}
+	except Exception as exc:
+		return _err(str(exc), 500)
+
+
+@bp.get("/fhir/r4/Patient")
+def fhir_search_patients():
+	"""FHIR R4 Patient search (supports ?_count= and simple text search)."""
+	from .fhir import FHIRAdapter
+	limit = int(request.args.get("_count", 20))
+	patients = _run(_svc().list_patients(_tenant()))[:limit]
+	base_url = request.host_url.rstrip("/") + bp.url_prefix
+	adapter = FHIRAdapter(base_url=f"{base_url}/fhir/r4")
+	bundle = {
+		"resourceType": "Bundle",
+		"type": "searchset",
+		"total": len(patients),
+		"entry": [
+			{"resource": adapter.patient_to_fhir(p), "fullUrl": f"{base_url}/fhir/r4/Patient/{p.get('id', '')}"}
+			for p in patients
+		],
+	}
+	return jsonify(bundle), 200, {"Content-Type": "application/fhir+json"}
+
+
+@bp.get("/fhir/r4/Encounter/<encounter_id>")
+def fhir_get_encounter(encounter_id: str):
+	"""Return FHIR R4 Encounter resource."""
+	from .fhir import FHIRAdapter
+	try:
+		encounter = _run(_svc().get_encounter(encounter_id))
+		if encounter is None:
+			return jsonify({"resourceType": "OperationOutcome", "issue": [{"severity": "error", "code": "not-found"}]}), 404
+		base_url = request.host_url.rstrip("/") + bp.url_prefix
+		adapter = FHIRAdapter(base_url=f"{base_url}/fhir/r4")
+		return jsonify(adapter.encounter_to_fhir(encounter)), 200, {"Content-Type": "application/fhir+json"}
+	except Exception as exc:
+		return _err(str(exc), 500)
