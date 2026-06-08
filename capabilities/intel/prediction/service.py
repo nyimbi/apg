@@ -617,10 +617,27 @@ class PredictiveIntelligenceService:
 			raise RuntimeError(f"Model {model_id} is not trained; current status={state.get('status')}")
 
 		accuracy = state["accuracy_history"][-1] if state.get("accuracy_history") else 0.5
-		# Naive inference: apply sigmoid to sum of numeric input values
-		numeric_sum = sum(float(v) for v in input_data.values() if isinstance(v, (int, float)))
-		raw_score = numeric_sum / max(len(input_data), 1)
-		output_probability = round(_sigmoid(raw_score) * accuracy, 4)
+
+		# MLX enhancement: Ollama-backed scoring when OLLAMA_BASE_URL is set
+		import os
+		output_probability = None
+		if os.environ.get("OLLAMA_BASE_URL"):
+			try:
+				from capabilities.common.mlx import MLCapability
+				ml = MLCapability()
+				ml_result = await ml.score(
+					input_data,
+					task=f"intelligence_prediction:{model.get('prediction_type', 'general')}",
+				)
+				output_probability = round(ml_result.score * accuracy, 4)
+			except Exception:
+				pass  # Fall through to sigmoid scorer
+
+		if output_probability is None:
+			# Built-in sigmoid scorer (sigmoid of mean of numeric features × accuracy)
+			numeric_sum = sum(float(v) for v in input_data.values() if isinstance(v, (int, float)))
+			raw_score = numeric_sum / max(len(input_data), 1)
+			output_probability = round(_sigmoid(raw_score) * accuracy, 4)
 
 		run_id = f"run_{model_id}_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%f')}"
 		result = {
