@@ -710,6 +710,24 @@ class GridOperationsService:
 		self._frequency_records[rec_id] = rec
 		if alert:
 			self._audit(self.tenant_id, "frequency_alert", rec_id, "frequency", {"hz": hz})
+
+			# MLX: AI-powered grid stability threat classification on alerts
+			import os
+			if os.environ.get("OLLAMA_BASE_URL"):
+				try:
+					from capabilities.common.mlx import MLCapability
+					ml = MLCapability()
+					ml_result = await ml.classify(
+						f"Frequency: {hz} Hz, deviation: {deviation_hz} Hz, "
+						f"RoCoF: {rocof_hz_s} Hz/s, under_freq: {under_freq}, high_rocof: {high_rocof}",
+						labels=["normal_transient", "frequency_deviation_monitor", "load_shedding_required", "grid_emergency"],
+					)
+					rec["ml_threat_class"] = ml_result.label
+					rec["ml_threat_confidence"] = round(ml_result.confidence, 3)
+					self._frequency_records[rec_id] = rec
+				except Exception:
+					pass
+
 		return rec
 
 	async def voltage_control(
