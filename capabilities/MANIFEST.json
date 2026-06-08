@@ -1,7 +1,7 @@
 {
   "format": "apg.capability-manifest.v1",
   "generated": "2026-06-04",
-  "capability_count": 261,
+  "capability_count": 262,
   "capabilities": {
     "bia_anl": {
       "id": "bia_anl",
@@ -64798,6 +64798,17 @@
       "package": "apg-common-temporal",
       "module": "apg_common_temporal",
       "description": "Durable workflow execution via Temporal.io. Workflow state survives process restarts. Supports human tasks, guards, and timers."
+    },
+    "mlx": {
+      "id": "mlx",
+      "display_name": "ML Meta-Capability (Ollama)",
+      "version": "1.0.0",
+      "domain": "common",
+      "code": "mlx",
+      "path": "capabilities/common/mlx",
+      "package": "apg-common-mlx",
+      "module": "apg_common_mlx",
+      "description": "Ollama-backed ML tools: score, classify, predict, summarize, extract. Data stays local \u2014 100% data sovereignty."
     }
   },
   "by_domain": {
@@ -64899,7 +64910,8 @@
       "wsbl",
       "ztna",
       "nats",
-      "temporal"
+      "temporal",
+      "mlx"
     ],
     "composition": [
       "composition_access",

@@ -127,8 +127,10 @@ class AuditLoggingService:
 		self._packages:   dict[str, EvidencePackageResponse]    = {}
 		self._tampers:    dict[str, TamperDetectionResponse]    = {}
 		self._queries:    dict[str, AuditQueryResponse]         = {}
-		# last chain hash per tenant (init to zero-hash)
+		# last chain hash per tenant (init to zero-hash; loaded from DB on first log_event)
 		self._chain_tip:  str = "0" * 64
+		self._chain_prev: str = "0" * 64  # chain_hash of the immediately preceding event
+		self._chain_tip_initialized: bool = False  # lazy DB load flag
 		# SIEM stream subscribers
 		self._siem_queues: list[asyncio.Queue[SIEMEvent]] = []
 
@@ -202,6 +204,12 @@ class AuditLoggingService:
 		assert_actor_present(who)
 		assert_tenant_context({"tenant_id": self.tenant_id})
 
+		# Lazy-load chain_tip from DB on first call to survive service restarts
+		if not self._chain_tip_initialized:
+			self._chain_tip = await self._load_chain_tip_from_db()
+			self._chain_prev = self._chain_tip
+			self._chain_tip_initialized = True
+
 		ts = when or datetime.now(timezone.utc)
 		event_id = uuid7str()
 
@@ -216,6 +224,7 @@ class AuditLoggingService:
 			resource_id   = on_what,
 			success       = result,
 		)
+		self._chain_prev = self._chain_tip  # record prev before advancing
 		chain_hash   = calculate_chain_hash(self._chain_tip, checksum)
 		self._chain_tip = chain_hash
 
@@ -278,6 +287,11 @@ class AuditLoggingService:
 		)
 
 		self._events[event_id] = resp
+
+		# SOC 2: persist to append-only DB table + publish to NATS event bus
+		await self._persist_audit_event_to_db(resp)
+		await self._publish_audit_to_nats(resp)
+
 		self._log_operation("log_event", event_id,
 							f"type={how} actor={who} resource={on_what} ok={result}")
 		self._emit_event("audit_event_logged", event_id, {"event_type": how, "risk_score": resp.risk_score})
@@ -1901,6 +1915,110 @@ class AuditLoggingService:
 			]
 		lines = [json.dumps(ev.model_dump(mode="json"), default=str) for ev in evs]
 		return "\n".join(lines)
+
+
+	# ------------------------------------------------------------------
+	# SOC 2 / regulatory: durable PostgreSQL + NATS persistence
+	# ------------------------------------------------------------------
+
+	async def _load_chain_tip_from_db(self) -> str:
+		"""Read the last chain_hash from apg_audit_events for this tenant.
+
+		Called lazily on the first log_event invocation so the chain is
+		continuous across service restarts (SOC 2 tamper-evidence requirement).
+		Returns "0" * 64 if the table is empty or the DB is unavailable.
+		"""
+		if self.db is None:
+			return "0" * 64
+		try:
+			from sqlalchemy import text
+			result = await self.db.execute(
+				text(
+					"SELECT chain_hash FROM apg_audit_events "
+					"WHERE tenant_id = :tid "
+					"ORDER BY timestamp DESC LIMIT 1"
+				),
+				{"tid": self.tenant_id},
+			)
+			row = result.fetchone()
+			return row[0] if row else "0" * 64
+		except Exception:
+			return "0" * 64
+
+	async def _persist_audit_event_to_db(self, resp: Any) -> None:
+		"""INSERT the event into apg_audit_events (append-only).
+
+		The table has PostgreSQL rules preventing UPDATE/DELETE, satisfying
+		the SOC 2 immutability requirement. Silently no-ops when the DB is
+		unavailable so standalone operation is never broken.
+		"""
+		if self.db is None:
+			return
+		try:
+			from sqlalchemy import text
+			await self.db.execute(
+				text("""
+					INSERT INTO apg_audit_events
+					(id, tenant_id, actor_id, event_type, resource_type, resource_id,
+					 action, success, ip_address, timestamp, payload,
+					 checksum, prev_hash, chain_hash)
+					VALUES
+					(:id, :tenant_id, :actor_id, :event_type, :resource_type, :resource_id,
+					 :action, :success, :ip_address, :timestamp, :payload,
+					 :checksum, :prev_hash, :chain_hash)
+					ON CONFLICT (id) DO NOTHING
+				"""),
+				{
+					"id":            resp.id,
+					"tenant_id":     resp.tenant_id,
+					"actor_id":      resp.actor_id,
+					"event_type":    resp.event_type,
+					"resource_type": resp.resource_type,
+					"resource_id":   resp.resource_id,
+					"action":        resp.action,
+					"success":       resp.success,
+					"ip_address":    resp.ip_address,
+					"timestamp":     resp.created_at,
+					"payload":       json.dumps(resp.details or {}, default=str),
+					"checksum":      resp.checksum or "",
+					"prev_hash":     self._chain_prev or "0" * 64,
+					"chain_hash":    resp.chain_hash or "",
+				},
+			)
+			await self.db.commit()
+		except Exception as exc:
+			import logging
+			logging.getLogger(__name__).warning("Audit DB persist failed: %s", exc)
+
+	async def _publish_audit_to_nats(self, resp: Any) -> None:
+		"""Publish the event to NATS JetStream when NATS_URL is configured.
+
+		Subject: apg.events.audl.audit_event
+		All subscribing capabilities (e.g. intel, grc) receive the event.
+		Silently no-ops when NATS is unavailable.
+		"""
+		import os
+		if not os.environ.get("NATS_URL"):
+			return
+		try:
+			from capabilities.common.nats.nats_adapter import NATSEventAdapter
+			adapter = NATSEventAdapter(capability_id="audl")
+			await adapter.log_event(
+				event_type=resp.event_type,
+				actor_id=resp.actor_id,
+				tenant_id=resp.tenant_id,
+				resource_id=resp.resource_id,
+				details={
+					"action":     resp.action,
+					"success":    resp.success,
+					"risk_score": float(resp.risk_score or 0),
+					"checksum":   resp.checksum or "",
+					"chain_hash": resp.chain_hash or "",
+				},
+			)
+		except Exception as exc:
+			import logging
+			logging.getLogger(__name__).debug("Audit NATS publish failed: %s", exc)
 
 
 __all__ = ["AuditLoggingService", "subscribe_domain_events"]
