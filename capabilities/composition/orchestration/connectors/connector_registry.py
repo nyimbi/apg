@@ -74,12 +74,16 @@ CONNECTORS_MANIFEST: dict[str, dict[str, Any]] = {
 	},
 	"salesforce": {
 		"display_name": "Salesforce",
-		"description": "Salesforce CRM — sync contacts, opportunities, and cases.",
+		"description": "Salesforce REST API — contacts, leads, opportunities, accounts, cases, SOQL queries.",
 		"category": "crm",
 		"regions": ["global"],
 		"module": "capabilities.composition.orchestration.connectors.salesforce_connector",
 		"class": "SalesforceConnector",
-		"status": "planned",
+		"config_class": "SalesforceConfiguration",
+		"env_factory": "salesforce_connector_from_env",
+		"required_env": ["SFDC_CLIENT_ID", "SFDC_CLIENT_SECRET", "SFDC_USERNAME", "SFDC_PASSWORD"],
+		"optional_env": ["SFDC_ENV"],
+		"docs_url": "https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/",
 	},
 	"whatsapp": {
 		"display_name": "WhatsApp Business API",

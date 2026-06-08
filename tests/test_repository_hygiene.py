@@ -33,6 +33,7 @@ ALLOWED_ROOT_TRACKED_FILES = {
 	"setup.py",
 	"uuid_extensions.py",
 	"prompt.md",
+	"catalog-info.yaml",   # Backstage software catalog for APG developer portal
 }
 ALLOWED_ROOT_MARKDOWN = {"README.md", "PACKAGES.md", "CONTRIBUTING.md", "prompt.md"}
 SOURCE_ROOT_OPERATIONAL_DOC_DIRECTORIES = {"capabilities", "gen", "mobile_apps"}

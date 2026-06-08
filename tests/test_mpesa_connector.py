@@ -255,11 +255,12 @@ def test_connector_registry_unknown_raises():
 		registry.get("nonexistent", tenant_id=TENANT)
 
 
-def test_connector_registry_planned_raises_import_error():
+def test_connector_registry_all_six_connectors_available():
+	"""All 6 connector implementations are now available (no more planned stubs)."""
 	from capabilities.composition.orchestration.connectors.connector_registry import ConnectorRegistry
 	registry = ConnectorRegistry()
-	with pytest.raises(ImportError, match="planned but not yet implemented"):
-		registry.get("salesforce", tenant_id=TENANT)
+	installed = set(registry.list_installed())
+	assert installed == {"mpesa", "stripe", "equity_bank", "kcb", "salesforce", "whatsapp"}
 
 
 def test_connector_registry_get_metadata():
