@@ -134,7 +134,16 @@ def get_audit_adapter(audit_service: Any | None = None) -> AuditAdapter:
         from apg_common_audl import AuditService  # type: ignore[import]
         return AuditService.from_env()
     except ImportError:
-        return NullAuditAdapter()
+        pass
+    # NATS JetStream durable audit when NATS_URL is configured
+    try:
+        from capabilities.common.nats.nats_adapter import get_nats_audit_adapter
+        _nats = get_nats_audit_adapter("intel_finint")
+        if _nats is not None:
+            return _nats
+    except ImportError:
+        pass
+    return NullAuditAdapter()
 
 
 def get_notify_adapter(notify_service: Any | None = None) -> NotifyAdapter:
