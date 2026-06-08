@@ -259,7 +259,7 @@ def test_connector_registry_planned_raises_import_error():
 	from capabilities.composition.orchestration.connectors.connector_registry import ConnectorRegistry
 	registry = ConnectorRegistry()
 	with pytest.raises(ImportError, match="planned but not yet implemented"):
-		registry.get("stripe", tenant_id=TENANT)
+		registry.get("salesforce", tenant_id=TENANT)
 
 
 def test_connector_registry_get_metadata():

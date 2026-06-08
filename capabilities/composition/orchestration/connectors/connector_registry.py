@@ -35,7 +35,7 @@ CONNECTORS_MANIFEST: dict[str, dict[str, Any]] = {
 	},
 	"stripe": {
 		"display_name": "Stripe",
-		"description": "Global payment processing. Cards, subscriptions, payouts.",
+		"description": "Global payment processing. Cards, subscriptions, payouts, refunds, disputes.",
 		"category": "payment",
 		"regions": ["global"],
 		"module": "capabilities.composition.orchestration.connectors.stripe_connector",
@@ -45,7 +45,6 @@ CONNECTORS_MANIFEST: dict[str, dict[str, Any]] = {
 		"required_env": ["STRIPE_SECRET_KEY"],
 		"optional_env": ["STRIPE_WEBHOOK_SECRET", "STRIPE_API_VERSION"],
 		"docs_url": "https://stripe.com/docs/api",
-		"status": "planned",
 	},
 	"equity_bank": {
 		"display_name": "Equity Bank",
@@ -62,12 +61,16 @@ CONNECTORS_MANIFEST: dict[str, dict[str, Any]] = {
 	},
 	"kcb": {
 		"display_name": "KCB Bank",
-		"description": "Kenya Commercial Bank APIs — corporate banking, bulk payroll, MPESA-to-KCB.",
+		"description": "Kenya Commercial Bank APIs — corporate banking, bulk payroll, MPESA↔KCB transfers.",
 		"category": "banking",
-		"regions": ["KE", "UG", "TZ", "RW", "ET"],
+		"regions": ["KE", "UG", "TZ", "RW", "ET", "SS", "BI"],
 		"module": "capabilities.composition.orchestration.connectors.africa.kcb_connector",
 		"class": "KCBConnector",
-		"status": "planned",
+		"config_class": "KCBConfiguration",
+		"env_factory": "kcb_connector_from_env",
+		"required_env": ["KCB_CONSUMER_KEY", "KCB_CONSUMER_SECRET"],
+		"optional_env": ["KCB_ENV", "KCB_SHORTCODE"],
+		"docs_url": "https://developer.kcbgroup.com/",
 	},
 	"salesforce": {
 		"display_name": "Salesforce",
