@@ -13,7 +13,8 @@ analysis gaps. Starting from the analysis which identified ~45 critical and ~110
 gaps, this session addressed all 5 systemic gaps plus significant domain-specific gaps.
 
 **Before this work:** 10/22 examples antlr_clean, 0 systemic infrastructure, 0 connectors  
-**After this work:** 22/22 examples antlr_clean, all 5 systemic gaps closed, 6 connectors, 265 capabilities
+**After this work:** 22/22 examples antlr_clean, all 5 systemic gaps closed, 6 connectors, 265 capabilities  
+**Additional**: All 259 capabilities now publish to NATS JetStream when configured (platform-wide audit)
 
 ---
 
@@ -28,6 +29,8 @@ gaps, this session addressed all 5 systemic gaps plus significant domain-specifi
 | No k8s/hybrid deployment | Helm chart with Temporal/NATS/OPA/gateway templates | `devops/helm/apg-platform/` |
 
 **Infrastructure added to docker-compose.yml**: apg-nats, apg-temporal, apg-temporal-ui, apg-opa, apg-temporal-worker
+
+**Platform-wide NATS audit**: All 259 capabilities' `get_audit_adapter()` functions updated to route to NATS JetStream when `NATS_URL` is set. Before: 1 capability. After: 259 capabilities publish structured audit events to `apg.events.{capability_id}.{event_type}`.
 
 ---
 
