@@ -83,12 +83,16 @@ CONNECTORS_MANIFEST: dict[str, dict[str, Any]] = {
 	},
 	"whatsapp": {
 		"display_name": "WhatsApp Business API",
-		"description": "WhatsApp Business Cloud API — send messages, templates, and media.",
+		"description": "WhatsApp Business Cloud API — text, templates, interactive buttons, media. 2B+ users in Africa.",
 		"category": "messaging",
 		"regions": ["global"],
 		"module": "capabilities.composition.orchestration.connectors.whatsapp_connector",
 		"class": "WhatsAppConnector",
-		"status": "planned",
+		"config_class": "WhatsAppConfiguration",
+		"env_factory": "whatsapp_connector_from_env",
+		"required_env": ["WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID"],
+		"optional_env": ["WHATSAPP_BUSINESS_ACCOUNT_ID", "WHATSAPP_API_VERSION"],
+		"docs_url": "https://developers.facebook.com/docs/whatsapp/cloud-api",
 	},
 }
 
