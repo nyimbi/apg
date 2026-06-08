@@ -1,7 +1,7 @@
 {
   "format": "apg.capability-manifest.v1",
   "generated": "2026-06-04",
-  "capability_count": 262,
+  "capability_count": 264,
   "capabilities": {
     "bia_anl": {
       "id": "bia_anl",
@@ -64809,6 +64809,28 @@
       "package": "apg-common-mlx",
       "module": "apg_common_mlx",
       "description": "Ollama-backed ML tools: score, classify, predict, summarize, extract. Data stays local \u2014 100% data sovereignty."
+    },
+    "phi": {
+      "id": "phi",
+      "display_name": "PHI Classifier (HIPAA)",
+      "version": "1.0.0",
+      "domain": "common",
+      "code": "phi",
+      "path": "capabilities/common/phi",
+      "package": "apg-common-phi",
+      "module": "apg_common_phi",
+      "description": "HIPAA field-level PHI detection and redaction. Detects 18 HIPAA identifiers by field name and value pattern."
+    },
+    "esig": {
+      "id": "esig",
+      "display_name": "Electronic Signature (FDA 21 CFR Part 11)",
+      "version": "1.0.0",
+      "domain": "common",
+      "code": "esig",
+      "path": "capabilities/common/esig",
+      "package": "apg-common-esig",
+      "module": "apg_common_esig",
+      "description": "Qualified electronic signatures meeting FDA 21 CFR Part 11. Three-component binding: meaning, identity, timestamp."
     }
   },
   "by_domain": {
@@ -64911,7 +64933,9 @@
       "ztna",
       "nats",
       "temporal",
-      "mlx"
+      "mlx",
+      "phi",
+      "esig"
     ],
     "composition": [
       "composition_access",
