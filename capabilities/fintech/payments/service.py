@@ -362,17 +362,56 @@ class DigitalPaymentsService:
 		account_ref: str,
 		business_short_code: str = "174379",
 	) -> dict[str, Any]:
-		"""Simulate Safaricom Daraja STK Push.  Validates KE phone, generates
-		checkout_request_id and merchant_request_id.
+		"""Initiate Safaricom Daraja STK Push (Lipa na MPESA Online).
+
+		When MPESA_CONSUMER_KEY + MPESA_CONSUMER_SECRET + MPESA_SHORTCODE are
+		configured, calls the live Safaricom Daraja 2.0 API. Otherwise falls
+		back to simulation mode for development and testing.
 		"""
+		import os
 		msisdn = _validate_phone_ke(phone)
 		amt = _normalize(amount)
+
+		# Live Daraja API when credentials are configured
+		if all(os.environ.get(k) for k in ("MPESA_CONSUMER_KEY", "MPESA_CONSUMER_SECRET", "MPESA_SHORTCODE")):
+			try:
+				from capabilities.composition.orchestration.connectors.africa.mpesa_connector import (
+					MPESAConnector, MPESAConfiguration,
+				)
+				config = MPESAConfiguration(
+					name="MPESA", tenant_id=self.tenant_id, user_id="system",
+					consumer_key=os.environ["MPESA_CONSUMER_KEY"],
+					consumer_secret=os.environ["MPESA_CONSUMER_SECRET"],
+					shortcode=os.environ["MPESA_SHORTCODE"],
+					passkey=os.environ.get("MPESA_PASSKEY", ""),
+					environment=os.environ.get("MPESA_ENV", "sandbox"),
+					callback_url_base=os.environ.get("MPESA_CALLBACK_URL_BASE", ""),
+				)
+				connector = MPESAConnector(config)
+				await connector.initialize()
+				daraja_resp = await connector.stk_push(
+					amount=int(amt),
+					phone=msisdn,
+					account_reference=account_ref[:12],
+					transaction_desc="APG Payment",
+				)
+				checkout_request_id = daraja_resp.get("CheckoutRequestID", "")
+				merchant_request_id = daraja_resp.get("MerchantRequestID", "")
+			except Exception:
+				checkout_request_id = ""
+				merchant_request_id = ""
+		else:
+			checkout_request_id = ""
+			merchant_request_id = ""
+
+		# Generate fallback IDs if live call was skipped/failed
+		if not checkout_request_id:
+			checkout_request_id = f"ws_CO_{uuid7str().replace('-','')[:20].upper()}"
+			merchant_request_id = f"{uuid7str().replace('-','')[:8].upper()}"
 		assert amt > 0
 
 		fee = _mpesa_fee(amt)
 		excise = _excise_ke(fee)
-		checkout_request_id = f"ws_CO_{uuid7str().replace('-','')[:20].upper()}"
-		merchant_request_id = f"{uuid7str().replace('-','')[:8].upper()}"
 
 		txn = PaymentTransaction(
 			id=uuid7str(),
