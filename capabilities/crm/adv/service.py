@@ -937,6 +937,123 @@ class AdvancedCRMService:
 		return self.list_accounts(tenant_id)
 
 	# ------------------------------------------------------------------
+	# CPQ — Configure-Price-Quote (closes critical competitive gap)
+	# ------------------------------------------------------------------
+
+	def create_quote(
+		self,
+		opportunity_id: str,
+		line_items: list[dict[str, Any]],
+		tenant_id: str = "default",
+		discount_pct: float = 0.0,
+		valid_days: int = 30,
+		notes: str = "",
+	) -> dict[str, Any]:
+		"""Generate a formal quote for an opportunity.
+
+		Args:
+			opportunity_id: ID of the opportunity this quote relates to
+			line_items: List of {"product": str, "qty": int, "unit_price": float, "description": str}
+			discount_pct: Overall discount percentage (0–100)
+			valid_days: Quote validity in days from today
+			notes: Additional terms or notes
+
+		Returns:
+			Quote record with subtotal, discount, total, expiry date.
+		"""
+		if discount_pct < 0 or discount_pct > 100:
+			raise ValueError(f"discount_pct must be 0–100, got {discount_pct}")
+
+		subtotal = sum(
+			float(item.get("qty", 1)) * float(item.get("unit_price", 0))
+			for item in line_items
+		)
+		discount_amount = round(subtotal * discount_pct / 100, 2)
+		total = round(subtotal - discount_amount, 2)
+
+		quote_id = _record_id("quote", f"{opportunity_id}")
+		from datetime import datetime, timedelta
+		expiry = (datetime.utcnow() + timedelta(days=valid_days)).strftime("%Y-%m-%d")
+
+		quote: dict[str, Any] = {
+			"quote_id": quote_id,
+			"opportunity_id": opportunity_id,
+			"tenant_id": tenant_id,
+			"line_items": line_items,
+			"subtotal": round(subtotal, 2),
+			"discount_pct": discount_pct,
+			"discount_amount": discount_amount,
+			"total": total,
+			"valid_until": expiry,
+			"status": "draft",
+			"notes": notes,
+			"created_at": _now(),
+		}
+		# Persist in quotes store
+		if not hasattr(self, "_quotes"):
+			self._quotes: dict[str, Any] = {}
+		self._quotes[quote_id] = quote
+		self._emit("quote_created", tenant_id, quote_id, {"total": total, "opportunity_id": opportunity_id})
+		return quote
+
+	def apply_discount_governance(
+		self,
+		quote_id: str,
+		requested_discount_pct: float,
+		rep_id: str,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Apply discount governance rules to a quote.
+
+		Enforces tiered approval thresholds:
+		  0–10%:  Rep can approve (auto-approved)
+		  10–20%: Sales manager approval required
+		  20–30%: VP Sales approval required
+		  >30%:   Executive approval required
+
+		Returns approval_status and required_approver.
+		"""
+		if not hasattr(self, "_quotes") or quote_id not in self._quotes:
+			raise KeyError(f"Quote not found: {quote_id}")
+
+		thresholds = [
+			(10.0, "auto_approved", ""),
+			(20.0, "manager_approval_required", "sales_manager"),
+			(30.0, "vp_approval_required", "vp_sales"),
+			(float("inf"), "executive_approval_required", "ceo"),
+		]
+
+		approval_status = "auto_approved"
+		required_approver = ""
+		for threshold, status, approver in thresholds:
+			if requested_discount_pct <= threshold:
+				approval_status = status
+				required_approver = approver
+				break
+
+		quote = self._quotes[quote_id]
+		quote["approval_status"] = approval_status
+		quote["required_approver"] = required_approver
+		quote["requested_by"] = rep_id
+		quote["updated_at"] = _now()
+
+		self._emit("discount_governance_applied", tenant_id, quote_id, {
+			"discount_pct": requested_discount_pct, "approval_status": approval_status,
+		})
+		return {
+			"quote_id": quote_id,
+			"requested_discount_pct": requested_discount_pct,
+			"approval_status": approval_status,
+			"required_approver": required_approver,
+		}
+
+	def list_quotes(self, tenant_id: str = "default") -> list[dict[str, Any]]:
+		"""Return all quotes for a tenant."""
+		if not hasattr(self, "_quotes"):
+			return []
+		return [q for q in self._quotes.values() if q.get("tenant_id") == tenant_id]
+
+	# ------------------------------------------------------------------
 	# Private helpers
 	# ------------------------------------------------------------------
 
