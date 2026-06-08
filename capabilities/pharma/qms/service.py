@@ -1016,4 +1016,47 @@ class QualityManagementService:
 		"""Compliance Report"""
 		return {"standard": standard, "tenant_id": tenant_id, "status": "compliant", "generated_at": _now()}
 
+	async def sign_and_approve_document(
+		self,
+		doc_id: str,
+		tenant_id: str,
+		approver_id: str,
+		meaning: str,
+	) -> dict[str, Any]:
+		"""Approve a QMS document with a 21 CFR Part 11 qualified electronic signature.
+
+		Creates an ESignatureRecord binding the approver's identity, the document,
+		and the stated meaning — then marks the document as effective.
+
+		Args:
+			doc_id:       Document to approve
+			tenant_id:    Tenant context
+			approver_id:  Authenticated identity of the approving person
+			meaning:      Signer's stated intent (e.g. "I approve this SOP for release")
+
+		Returns:
+			{"document": ControlledDocument.model_dump(),
+			 "signature": ESignatureRecord fields,
+			 "approved": True}
+		"""
+		from capabilities.common.esig import ESignatureService
+		esig_svc = ESignatureService(tenant_id=tenant_id)
+		signature = await esig_svc.sign(
+			document_id=doc_id,
+			signer_id=approver_id,
+			meaning=meaning,
+			context={"capability_id": "pharma_qms", "action": "document_approval"},
+		)
+		# Now perform the actual approval
+		doc = self.approve_document(doc_id, tenant_id, approver_id)
+		return {
+			"document": doc.model_dump() if hasattr(doc, "model_dump") else doc,
+			"signature_id": signature.signature_id,
+			"signer_id": signature.signer_id,
+			"meaning": signature.meaning,
+			"timestamp": signature.timestamp,
+			"approved": True,
+		}
+
+
 PharmaQmsService = QualityManagementService
