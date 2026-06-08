@@ -524,6 +524,33 @@ class VendorManagementService:
 			"assessed_at": _now(),
 		}
 
+	async def ml_vendor_risk_assess(
+		self,
+		vendor_id: str,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""AI-enhanced vendor risk assessment with Ollama classification.
+
+		Runs the rule-based assessment then classifies vendor risk tier using MLX.
+		Returns full risk report with ml_risk_tier and ml_rationale when Ollama
+		is configured; falls back to rule-based tier otherwise.
+		"""
+		base = self.vendor_risk_assessment(vendor_id, tenant_id)
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {**base, "ml_enhanced": False}
+
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.classify(
+				str({k: v for k, v in base.items() if k not in ("assessed_at", "tenant_id")}),
+				labels=["low_risk", "medium_risk", "high_risk", "critical_risk"],
+			)
+			return {**base, "ml_enhanced": True, "ml_risk_tier": result.label, "ml_confidence": result.confidence, "ml_rationale": result.rationale}
+		except Exception:
+			return {**base, "ml_enhanced": False}
+
 	def vendor_portal_access(
 		self,
 		vendor_id: str,
