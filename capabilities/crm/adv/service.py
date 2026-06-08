@@ -937,6 +937,100 @@ class AdvancedCRMService:
 		return self.list_accounts(tenant_id)
 
 	# ------------------------------------------------------------------
+	# Salesforce bidirectional sync
+	# ------------------------------------------------------------------
+
+	async def sync_lead_to_salesforce(
+		self,
+		lead_id: str,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Push a local APG lead to Salesforce CRM as a Lead object.
+
+		Requires SFDC_CLIENT_ID, SFDC_CLIENT_SECRET, SFDC_USERNAME, SFDC_PASSWORD.
+		Returns the Salesforce Lead ID on success, or {"skipped": True} if
+		Salesforce credentials are not configured.
+		"""
+		import os
+		if not all(os.environ.get(k) for k in ("SFDC_CLIENT_ID", "SFDC_CLIENT_SECRET", "SFDC_USERNAME", "SFDC_PASSWORD")):
+			return {"skipped": True, "reason": "SFDC credentials not configured"}
+
+		lead = self._require_lead(lead_id, tenant_id)
+		try:
+			from capabilities.composition.orchestration.connectors.salesforce_connector import (
+				SalesforceConnector, SalesforceConfiguration,
+			)
+			config = SalesforceConfiguration(
+				name="Salesforce CRM", tenant_id=tenant_id, user_id="system",
+				client_id=os.environ["SFDC_CLIENT_ID"],
+				client_secret=os.environ["SFDC_CLIENT_SECRET"],
+				username=os.environ["SFDC_USERNAME"],
+				password=os.environ["SFDC_PASSWORD"],
+				environment=os.environ.get("SFDC_ENV", "sandbox"),
+			)
+			connector = SalesforceConnector(config)
+			await connector.initialize()
+			sfdc_result = await connector.create_lead({
+				"LastName": lead.get("name", "Unknown").split()[-1],
+				"FirstName": " ".join(lead.get("name", "").split()[:-1]) or "Unknown",
+				"Company": lead.get("company", tenant_id),
+				"LeadSource": lead.get("source", "Web"),
+				"Status": "Open - Not Contacted",
+				"Email": lead.get("email", ""),
+				"Phone": lead.get("phone", ""),
+				"Rating": "Hot" if (lead.get("score", 0) or 0) >= 70 else "Warm",
+				"Description": f"APG Lead ID: {lead_id}. Score: {lead.get('score', 'N/A')}",
+			})
+			sfdc_id = sfdc_result.get("id", "")
+			# Store Salesforce ID in lead record for future sync
+			lead["salesforce_id"] = sfdc_id
+			lead["updated_at"] = _now()
+			self._emit("lead_synced_to_salesforce", tenant_id, lead_id, {"sfdc_id": sfdc_id})
+			return {"synced": True, "salesforce_id": sfdc_id}
+		except Exception as exc:
+			return {"synced": False, "error": str(exc)}
+
+	async def sync_contact_to_salesforce(
+		self,
+		account_id: str,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Push an APG account to Salesforce as a Contact."""
+		import os
+		if not all(os.environ.get(k) for k in ("SFDC_CLIENT_ID", "SFDC_CLIENT_SECRET", "SFDC_USERNAME", "SFDC_PASSWORD")):
+			return {"skipped": True}
+
+		account = self._require_account(account_id, tenant_id)
+		try:
+			from capabilities.composition.orchestration.connectors.salesforce_connector import (
+				SalesforceConnector, SalesforceConfiguration,
+			)
+			config = SalesforceConfiguration(
+				name="Salesforce", tenant_id=tenant_id, user_id="system",
+				client_id=os.environ["SFDC_CLIENT_ID"],
+				client_secret=os.environ["SFDC_CLIENT_SECRET"],
+				username=os.environ["SFDC_USERNAME"],
+				password=os.environ["SFDC_PASSWORD"],
+				environment=os.environ.get("SFDC_ENV", "sandbox"),
+			)
+			connector = SalesforceConnector(config)
+			await connector.initialize()
+			name = account.get("name", "")
+			parts = name.split()
+			result = await connector.create_contact({
+				"LastName": parts[-1] if parts else name,
+				"FirstName": " ".join(parts[:-1]) if len(parts) > 1 else "",
+				"Email": account.get("email", ""),
+				"Phone": account.get("phone", ""),
+				"AccountId": account.get("salesforce_account_id", ""),
+			})
+			account["salesforce_contact_id"] = result.get("id", "")
+			account["updated_at"] = _now()
+			return {"synced": True, "salesforce_contact_id": result.get("id", "")}
+		except Exception as exc:
+			return {"synced": False, "error": str(exc)}
+
+	# ------------------------------------------------------------------
 	# CPQ — Configure-Price-Quote (closes critical competitive gap)
 	# ------------------------------------------------------------------
 
