@@ -1764,6 +1764,26 @@ class TelecomBillingService:
 			"currency": "KES",
 			"generated_at": _now(),
 		}
+		# MLX enhancement: AI-powered revenue assurance risk scoring
+		import os
+		if os.environ.get("OLLAMA_BASE_URL") and (len(unrated) > 0):
+			try:
+				from capabilities.common.mlx import MLCapability
+				ml = MLCapability()
+				ml_result = await ml.score(
+					{
+						"unrated_cdr_count": len(unrated),
+						"leakage_pct": float(leakage_pct),
+						"total_cdrs": len(all_cdrs),
+					},
+					task="telecom_revenue_assurance",
+					labels={"0.0–0.3": "Acceptable", "0.3–0.6": "Monitor", "0.6–1.0": "Investigate immediately"},
+				)
+				report["ml_risk_score"] = round(ml_result.score, 3)
+				report["ml_recommendation"] = ml_result.rationale
+			except Exception:
+				pass
+
 		self._emit("leakage_report_generated", self.tenant_id, {"leakage_pct": str(leakage_pct)})
 		return report
 

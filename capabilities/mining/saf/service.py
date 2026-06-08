@@ -81,6 +81,25 @@ class SafService:
 		self._log_op("report_incident", "incident", resp.id)
 		if resp.incident_type in (IncidentType.FATALITY, IncidentType.LOST_TIME_INJURY):
 			self._log_escalation(resp.id, f"Mandatory escalation for {resp.incident_type.value}")
+
+		# MLX enhancement: AI-based severity classification for safety prioritization
+		import os
+		if os.environ.get("OLLAMA_BASE_URL"):
+			try:
+				from capabilities.common.mlx import MLCapability
+				ml = MLCapability()
+				ml_result = await ml.classify(
+					f"Incident type: {resp.incident_type.value}. "
+					f"Description: {getattr(resp, 'description', '')}",
+					labels=["minor_first_aid", "medical_treatment", "lost_time_injury", "critical_emergency"],
+				)
+				incident_dict = self._incidents[resp.id]
+				incident_dict["ml_severity_class"] = ml_result.label
+				incident_dict["ml_severity_confidence"] = round(ml_result.confidence, 3)
+				self._incidents[resp.id] = incident_dict
+			except Exception:
+				pass
+
 		return resp
 
 	async def get_incident(self, id: str) -> IncidentResponse | None:
