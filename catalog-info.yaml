@@ -1,0 +1,134 @@
+# APG Platform Backstage Software Catalog
+# Registers all APG services and infrastructure in the Backstage catalog.
+# https://backstage.io/docs/features/software-catalog/descriptor-format
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: apg-platform
+  description: APG (Application Programming Generation) composable business application platform
+  tags: [apg, erp, fintech, healthcare, composable, ollama]
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+spec:
+  owner: datacraft
+  domain: apg
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: apg-gateway
+  description: APG API gateway — capability routing and discovery
+  annotations:
+    backstage.io/kubernetes-id: apg-gateway
+    backstage.io/techdocs-ref: dir:docs
+spec:
+  type: service
+  lifecycle: production
+  owner: datacraft
+  system: apg-platform
+  dependsOn:
+    - component:apg-nats
+    - component:apg-temporal
+    - component:apg-opa
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: apg-nats
+  description: NATS JetStream durable event bus — platform-wide pub/sub
+  annotations:
+    backstage.io/kubernetes-id: apg-nats
+spec:
+  type: service
+  lifecycle: production
+  owner: datacraft
+  system: apg-platform
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: apg-temporal
+  description: Temporal.io durable workflow execution engine
+  links:
+    - url: http://localhost:8088
+      title: Temporal UI
+      icon: dashboard
+spec:
+  type: service
+  lifecycle: production
+  owner: datacraft
+  system: apg-platform
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: apg-opa
+  description: Open Policy Agent — policy-as-code authorization
+  annotations:
+    backstage.io/kubernetes-id: apg-opa
+spec:
+  type: service
+  lifecycle: production
+  owner: datacraft
+  system: apg-platform
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: apg-temporal-worker
+  description: APG Temporal worker — executes APG state machine workflows
+spec:
+  type: service
+  lifecycle: production
+  owner: datacraft
+  system: apg-platform
+  dependsOn:
+    - component:apg-temporal
+    - component:apg-nats
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: apg-capability-catalog-api
+  description: APG capability catalog and manifest API
+spec:
+  type: openapi
+  lifecycle: production
+  owner: datacraft
+  system: apg-platform
+  definition: |
+    openapi: 3.0.0
+    info:
+      title: APG Capability Catalog API
+      version: 1.0.0
+    paths:
+      /api/capabilities/manifest:
+        get:
+          summary: Get full capability manifest
+          responses:
+            '200':
+              description: MANIFEST.json with all 265 capabilities
+      /api/connectors:
+        get:
+          summary: List available connectors
+          responses:
+            '200':
+              description: Connector registry with installed status
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Location
+metadata:
+  name: apg-root
+  description: APG platform root catalog location
+spec:
+  type: url
+  target: https://github.com/nyimbi/apg/blob/main/catalog-info.yaml

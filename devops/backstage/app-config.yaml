@@ -1,0 +1,82 @@
+# Backstage Developer Portal for APG Platform
+# https://backstage.io/docs/conf/
+
+app:
+  title: APG Developer Portal
+  baseUrl: ${BACKSTAGE_BASE_URL:-http://localhost:3000}
+
+organization:
+  name: Datacraft APG
+
+backend:
+  baseUrl: ${BACKSTAGE_BACKEND_URL:-http://localhost:7007}
+  listen:
+    port: 7007
+    host: 0.0.0.0
+  cors:
+    origin: ${BACKSTAGE_BASE_URL:-http://localhost:3000}
+    methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+    credentials: true
+  database:
+    client: better-sqlite3
+    connection: ':memory:'
+
+auth:
+  environment: development
+  providers: {}  # Replace with your IdP (Okta, Azure AD, Google)
+
+catalog:
+  import:
+    entityFilename: catalog-info.yaml
+    pullRequestBranchName: backstage-integration
+  rules:
+    - allow: [Component, API, Resource, Location, System, Domain]
+  locations:
+    # APG platform capabilities — auto-discovered from MANIFEST.json
+    - type: url
+      target: ${APG_BASE_URL:-http://gateway:8000}/api/catalog/all
+      rules:
+        - allow: [Component, API]
+
+    # Static catalog definitions for APG infrastructure services
+    - type: file
+      target: ../../catalog-info.yaml
+
+techdocs:
+  builder: local
+  generator:
+    runIn: local
+  publisher:
+    type: local
+
+integrations:
+  github:
+    - host: github.com
+      token: ${GITHUB_TOKEN}
+
+proxy:
+  /apg-api:
+    target: ${APG_GATEWAY_URL:-http://gateway:8000}
+    changeOrigin: true
+    headers:
+      Authorization: Bearer ${APG_API_TOKEN}
+
+  /opa:
+    target: ${OPA_URL:-http://apg-opa:8181}
+    changeOrigin: true
+
+  /temporal:
+    target: ${TEMPORAL_UI_URL:-http://apg-temporal-ui:8080}
+    changeOrigin: true
+
+# APG-specific portal configuration
+apg:
+  gatewayUrl: ${APG_GATEWAY_URL:-http://gateway:8000}
+  manifestUrl: ${APG_GATEWAY_URL:-http://gateway:8000}/api/capabilities/manifest
+  connectorRegistryUrl: ${APG_GATEWAY_URL:-http://gateway:8000}/api/connectors
+  features:
+    capabilityBrowser: true
+    connectorMarketplace: true
+    workflowMonitor: true    # Temporal UI embed
+    apiExplorer: true
+    policyEditor: false      # OPA Rego editor (enterprise only)

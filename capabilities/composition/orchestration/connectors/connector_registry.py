@@ -49,12 +49,16 @@ CONNECTORS_MANIFEST: dict[str, dict[str, Any]] = {
 	},
 	"equity_bank": {
 		"display_name": "Equity Bank",
-		"description": "Equity Bank APIs — East Africa's largest bank by customer count.",
+		"description": "Equity Bank APIs — East Africa's largest bank by customer count. Account inquiry, PesaLink, MPESA↔Equity transfers, standing orders.",
 		"category": "banking",
 		"regions": ["KE", "UG", "TZ", "RW", "CD", "SS"],
 		"module": "capabilities.composition.orchestration.connectors.africa.equity_connector",
 		"class": "EquityBankConnector",
-		"status": "planned",
+		"config_class": "EquityBankConfiguration",
+		"env_factory": "equity_connector_from_env",
+		"required_env": ["EQUITY_CLIENT_ID", "EQUITY_CLIENT_SECRET"],
+		"optional_env": ["EQUITY_ENV", "EQUITY_MERCHANT_CODE"],
+		"docs_url": "https://developer.equitybankgroup.com/",
 	},
 	"kcb": {
 		"display_name": "KCB Bank",
