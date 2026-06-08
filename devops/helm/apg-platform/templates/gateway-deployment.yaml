@@ -1,0 +1,116 @@
+{{- if .Values.gateway.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "apg-platform.fullname" . }}-gateway
+  labels:
+    {{- include "apg-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  replicas: {{ .Values.gateway.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "apg-platform.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: gateway
+  template:
+    metadata:
+      labels:
+        {{- include "apg-platform.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: gateway
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: gateway
+          image: "{{ .Values.gateway.image.repository }}:{{ .Values.gateway.image.tag }}"
+          imagePullPolicy: {{ .Values.gateway.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.gateway.service.port }}
+          env:
+            - name: APG_DATABASE_URL
+              value: "postgresql+asyncpg://{{ .Values.postgresql.auth.username }}:$(POSTGRES_PASSWORD)@{{ include "apg-platform.fullname" . }}-postgresql:5432/{{ .Values.postgresql.auth.database }}"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "apg-platform.fullname" . }}-postgresql
+                  key: password
+            - name: NATS_URL
+              value: "nats://{{ include "apg-platform.fullname" . }}-nats:{{ .Values.nats.service.ports.client }}"
+            - name: TEMPORAL_HOST
+              value: "{{ include "apg-platform.fullname" . }}-temporal:{{ .Values.temporal.service.port }}"
+            - name: OPA_URL
+              value: "http://{{ include "apg-platform.fullname" . }}-opa:{{ .Values.opa.service.port }}"
+            {{- if .Values.ollama.enabled }}
+            - name: OLLAMA_BASE_URL
+              value: "http://{{ include "apg-platform.fullname" . }}-ollama:{{ .Values.ollama.service.port }}"
+            {{- end }}
+            - name: APG_DEFAULT_TENANT
+              value: {{ .Values.global.defaultTenant | quote }}
+            {{- range $k, $v := .Values.gateway.env }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.gateway.service.port }}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.gateway.service.port }}
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.gateway.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "apg-platform.fullname" . }}-gateway
+  labels:
+    {{- include "apg-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  type: {{ .Values.gateway.service.type }}
+  ports:
+    - port: {{ .Values.gateway.service.port }}
+      targetPort: {{ .Values.gateway.service.port }}
+      name: http
+  selector:
+    {{- include "apg-platform.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+{{- if .Values.gateway.ingress.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "apg-platform.fullname" . }}-gateway
+  annotations:
+    {{- toYaml .Values.gateway.ingress.annotations | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.gateway.ingress.className }}
+  {{- if .Values.gateway.ingress.tls }}
+  tls:
+    {{- toYaml .Values.gateway.ingress.tls | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- range .Values.gateway.ingress.hosts }}
+    - host: {{ .host }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ include "apg-platform.fullname" $ }}-gateway
+                port:
+                  number: {{ $.Values.gateway.service.port }}
+          {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}

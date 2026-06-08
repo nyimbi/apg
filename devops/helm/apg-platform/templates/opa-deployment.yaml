@@ -1,0 +1,95 @@
+{{- if .Values.opa.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "apg-platform.fullname" . }}-opa-policies
+  labels:
+    {{- include "apg-platform.labels" . | nindent 4 }}
+data:
+  # Base policy — override by mounting policies/apg/*.rego
+  authz.rego: |
+    package apg.authz
+    import rego.v1
+    default allow := false
+    allow if { input.user.roles[_] == "admin" }
+    allow if {
+      some role in input.user.roles
+      some perm in data.apg.roles[role].permissions
+      perm == input.action
+    }
+    decision := "allow" if allow
+    decision := "deny" if not allow
+    matched_rules := []
+    actions := ["audit"] if { allow; input.action in {"create","update","delete"} }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "apg-platform.fullname" . }}-opa
+  labels:
+    {{- include "apg-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: opa
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      {{- include "apg-platform.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: opa
+  template:
+    metadata:
+      labels:
+        {{- include "apg-platform.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: opa
+    spec:
+      containers:
+        - name: opa
+          image: "{{ .Values.opa.image.repository }}:{{ .Values.opa.image.tag }}"
+          args:
+            - "run"
+            - "--server"
+            - "--log-format=json"
+            - "--bundle"
+            - "/policies"
+            - "--addr=0.0.0.0:8181"
+          ports:
+            - containerPort: 8181
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8181
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8181
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          volumeMounts:
+            - name: policies
+              mountPath: /policies
+              readOnly: true
+          resources:
+            {{- toYaml .Values.opa.resources | nindent 12 }}
+      volumes:
+        - name: policies
+          configMap:
+            name: {{ .Values.opa.policiesConfigMap | default (printf "%s-opa-policies" (include "apg-platform.fullname" .)) }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "apg-platform.fullname" . }}-opa
+  labels:
+    {{- include "apg-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: opa
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.opa.service.port }}
+      targetPort: 8181
+      name: http
+  selector:
+    {{- include "apg-platform.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: opa
+{{- end }}

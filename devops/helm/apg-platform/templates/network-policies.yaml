@@ -1,0 +1,119 @@
+{{- if .Values.networkPolicies.enabled }}
+# PCI DSS network isolation: restrict which pods can access fintech capabilities
+# PCI DSS Requirement 1.2: "Restrict inbound and outbound traffic to that
+# which is necessary for the cardholder data environment."
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "apg-platform.fullname" . }}-pci-isolation
+  labels:
+    {{- include "apg-platform.labels" . | nindent 4 }}
+  annotations:
+    apg.io/pci-dss: "req-1.2"
+spec:
+  podSelector:
+    matchLabels:
+      apg.io/pci-scope: "true"
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Only allow ingress from the APG gateway (which enforces OPA PCI DSS policy)
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: gateway
+      ports:
+        - protocol: TCP
+          port: 8080
+    # Allow ingress from other PCI-scoped pods
+    - from:
+        - podSelector:
+            matchLabels:
+              apg.io/pci-scope: "true"
+  egress:
+    # Allow egress to PostgreSQL
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow egress to OPA for PCI DSS authorization decisions
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: opa
+      ports:
+        - protocol: TCP
+          port: 8181
+    # Allow egress to NATS for event publishing
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: nats
+      ports:
+        - protocol: TCP
+          port: 4222
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+---
+# Allow APG gateway to reach all capability services
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "apg-platform.fullname" . }}-gateway-egress
+  labels:
+    {{- include "apg-platform.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: gateway
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: apg-platform
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+---
+# NATS cluster networking
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "apg-platform.fullname" . }}-nats-access
+  labels:
+    {{- include "apg-platform.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: nats
+  policyTypes:
+    - Ingress
+  ingress:
+    # All APG platform pods can publish/subscribe
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: apg-platform
+      ports:
+        - protocol: TCP
+          port: 4222
+{{- end }}
