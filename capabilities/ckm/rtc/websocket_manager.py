@@ -241,11 +241,27 @@ class WebSocketManager:
 	async def start(self) -> None:
 		"""Start the WebSocket manager and background tasks"""
 		self._logger.info("Starting WebSocket manager")
-		
+
 		# Start background tasks
 		self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
 		self._cleanup_task = asyncio.create_task(self._cleanup_loop())
-		
+
+		# NATS cross-instance broadcast subscription (multi-pod support)
+		import os
+		if os.environ.get("NATS_URL"):
+			try:
+				from capabilities.common.nats.nats_adapter import NATSConnector
+				self._nats = NATSConnector("ckm_rtc")
+				await self._nats.connect()
+				await self._nats.subscribe(
+					"page_broadcast",
+					self._handle_nats_broadcast,
+					durable_name="ckm-rtc-ws-manager",
+				)
+				self._logger.info("NATS cross-instance broadcast enabled")
+			except Exception as exc:
+				self._logger.warning("NATS unavailable — single-instance WebSocket mode: %s", exc)
+
 		self._logger.info("WebSocket manager started successfully")
 	
 	async def stop(self) -> None:
@@ -719,25 +735,65 @@ class WebSocketManager:
 				del self._page_presence[page_url]
 	
 	async def _broadcast_to_page(self, page_url: str, message: Dict[str, Any], exclude_connections: Set[str] = None) -> None:
-		"""Broadcast message to all connections on a page"""
+		"""Broadcast message to all connections on a page.
+
+		When NATS is configured, also publishes to apg.events.ckm_rtc.page_broadcast
+		so that other APG instances serving the same page receive the message.
+		"""
 		if exclude_connections is None:
 			exclude_connections = set()
-		
+
+		# Publish to NATS for cross-instance fan-out (adds instance_id to avoid re-broadcast)
+		nats = getattr(self, "_nats", None)
+		if nats is not None:
+			try:
+				import os
+				await nats.publish("page_broadcast", "", {
+					"page_url": page_url,
+					"message": message,
+					"instance_id": os.getpid(),
+					"exclude_connections": list(exclude_connections),
+				})
+			except Exception:
+				pass  # NATS unavailable — continue with local broadcast only
+
 		if page_url not in self._page_connections:
 			return
-		
+
 		message_json = json.dumps(message)
-		
+
 		for conn_id in self._page_connections[page_url]:
 			if conn_id in exclude_connections or conn_id not in self._connections:
 				continue
-			
+
 			try:
 				connection = self._connections[conn_id]
 				await connection.websocket.send(message_json)
 			except Exception as e:
 				self._logger.warning(f"Failed to send message to connection {conn_id}: {e}")
 				# Connection probably dead, will be cleaned up in background
+
+	async def _handle_nats_broadcast(self, payload: Dict[str, Any]) -> None:
+		"""Handle a cross-instance broadcast received from NATS.
+
+		Delivers to local WebSocket connections only. Skips if this instance
+		published the message (detected via instance_id) to prevent re-broadcast.
+		"""
+		import os
+		if payload.get("instance_id") == os.getpid():
+			return  # This instance sent it — skip
+		page_url = payload.get("page_url", "")
+		message = payload.get("message", {})
+		exclude = set(payload.get("exclude_connections", []))
+		if page_url in self._page_connections:
+			message_json = json.dumps(message)
+			for conn_id in self._page_connections[page_url]:
+				if conn_id in exclude or conn_id not in self._connections:
+					continue
+				try:
+					await self._connections[conn_id].websocket.send(message_json)
+				except Exception:
+					pass
 	
 	async def _send_message(self, connection: WebSocketConnection, message: Dict[str, Any]) -> None:
 		"""Send message to specific connection"""
