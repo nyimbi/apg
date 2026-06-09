@@ -930,4 +930,16 @@ class PharmacovigilanceService:
 		assert record_ids
 		return {"deleted_count": len(record_ids), "tenant_id": tenant_id}
 
+	async def ml_adverse_event_classify(self, *args, **kwargs):
+		"""AI classification of adverse event case severity (CIOMS/ICH E2A)."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			result = await MLCapability().classify(str(kwargs.get("description", ""))[:500], labels=["non_serious","serious","life_threatening","fatal"], task="pharmacovigilance_case_severity", )
+			return {"severity_class": result.label, "confidence": result.confidence, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 PharmaPviService = PharmacovigilanceService
