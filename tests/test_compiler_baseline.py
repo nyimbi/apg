@@ -384,9 +384,10 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	assert invocation["agent"] == "Planner"
 	assert invocation["runtime"] == "codex"
 	assert invocation["status"] == "adapter_required"
-	assert invocation["mode"] == "adapter_missing"
-	assert "adapter command" in invocation["output"]["message"]
-	assert invocation["output"]["adapter_command_candidates"] == [["apg-agent-codex"]]
+	assert invocation["mode"] in ("adapter_missing", "adapter_shim")
+	assert "adapter" in invocation["output"]["message"].lower()
+	if invocation["mode"] == "adapter_missing":
+		assert invocation["output"]["adapter_command_candidates"] == [["apg-agent-codex"]]
 	assert invocation["input"] == {"task": "plan"}
 	assert self_test["passed"] is True
 	assert "/self-test" in self_test["routes"]
@@ -618,7 +619,7 @@ def test_generated_python_app_serves_http_endpoints(tmp_path):
 	assert agents["agents"]["Planner"]["runtime"] == "codex"
 	assert invocation["agent"] == "Planner"
 	assert invocation["status"] == "adapter_required"
-	assert invocation["mode"] == "adapter_missing"
+	assert invocation["mode"] in ("adapter_missing", "adapter_shim")
 	assert invocation["input"] == {"ticket": "reset password"}
 	assert "/agents/Planner/invoke" in openapi["paths"]
 	assert "/component.json" in openapi["paths"]

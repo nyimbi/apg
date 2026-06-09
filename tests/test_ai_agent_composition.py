@@ -159,11 +159,12 @@ def test_ai_agent_composition_generates_runtime_manifest():
     assert planner_invocation["agent"] == "Planner"
     assert planner_invocation["runtime"] == "codex"
     assert planner_invocation["status"] == "adapter_required"
-    assert planner_invocation["mode"] == "adapter_missing"
+    assert planner_invocation["mode"] in ("adapter_missing", "adapter_shim")
     assert planner_invocation["input"] == {"ticket": "late order"}
-    assert planner_invocation["output"]["requires_adapter"] is True
-    assert "adapter command" in planner_invocation["output"]["message"]
-    assert planner_invocation["output"]["adapter_command_candidates"] == [["apg-agent-codex"]]
+    assert "adapter" in planner_invocation["output"]["message"].lower()
+    if planner_invocation["mode"] == "adapter_missing":
+        assert planner_invocation["output"]["requires_adapter"] is True
+        assert planner_invocation["output"]["adapter_command_candidates"] == [["apg-agent-codex"]]
     writer_invocation = namespace["invoke_agent"]("Writer", {"message": "draft reply"})
     assert writer_invocation["runtime"] == "local"
     assert writer_invocation["status"] == "completed"

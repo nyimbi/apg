@@ -1896,7 +1896,8 @@
         "auth",
         "conf",
         "encr",
-        "audl"
+        "audl",
+        "nats"
       ],
       "service_methods": [
         "send_notification_request",
@@ -2113,7 +2114,8 @@
         "auth",
         "conf",
         "audl",
-        "ckm_not"
+        "ckm_not",
+        "nats"
       ],
       "service_methods": [
         "_validate_permissions",
@@ -2316,7 +2318,8 @@
         "conf",
         "audl",
         "ckm_not",
-        "ckm_rtc"
+        "ckm_rtc",
+        "temporal"
       ],
       "service_methods": [
         "validate_user_permissions",
@@ -23564,7 +23567,8 @@
         "ntfy",
         "composition_events",
         "composition_config",
-        "mdm"
+        "mdm",
+        "mlx"
       ],
       "service_methods": [
         "lead_capture",
@@ -28236,7 +28240,8 @@
         "keym",
         "fintech_payments",
         "fintech_wallets",
-        "fintech_kyc"
+        "fintech_kyc",
+        "mlx"
       ],
       "service_methods": [
         "_emit_event",
@@ -29306,7 +29311,8 @@
         "fintech_wallets",
         "fintech_kyc",
         "fintech_aml",
-        "fintech_fraud"
+        "fintech_fraud",
+        "vault"
       ],
       "service_methods": [
         "describe",
@@ -40734,7 +40740,8 @@
         "nlpc",
         "moni",
         "mqeb",
-        "schd"
+        "schd",
+        "mlx"
       ],
       "service_methods": [
         "describe",
@@ -40965,7 +40972,8 @@
         "wflo",
         "nlpc",
         "moni",
-        "mqeb"
+        "mqeb",
+        "phi"
       ],
       "service_methods": [
         "describe",
@@ -41424,7 +41432,8 @@
         "ntfy",
         "nlpc",
         "wflo",
-        "mqeb"
+        "mqeb",
+        "phi"
       ],
       "service_methods": [
         "check_permission",
@@ -43010,8 +43019,7 @@
         "ntfy",
         "composition_events",
         "composition_config",
-        "grc_pol",
-        "service_discovery"
+        "grc_pol"
       ],
       "service_methods": [
         "describe",
@@ -46765,7 +46773,7 @@
         "srch",
         "grph",
         "ragn",
-        "geoi"
+        "intel_geoint"
       ],
       "service_methods": [
         "describe",
@@ -53571,7 +53579,8 @@
         "wflo",
         "comp",
         "schd",
-        "mqeb"
+        "mqeb",
+        "esig"
       ],
       "service_methods": [
         "describe",

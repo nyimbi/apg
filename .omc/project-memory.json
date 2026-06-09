@@ -10,7 +10,7 @@
   },
   "build": {
     "buildCommand": null,
-    "testCommand": "uv run pytest tests/ -q --tb=line --ignore=tests/test_hcm_tat_runtime_store.py -x 2>&1 | tail -15",
+    "testCommand": "uv run pytest tests/test_integration_platform.py tests/test_repository_hygiene.py tests/test_capability_contract_registry.py -q --tb=short 2>&1 | tail -5",
     "lintCommand": null,
     "devCommand": null,
     "scripts": {}
@@ -412,6 +412,18 @@
       "path": "capabilities/common/phi/service.py",
       "accessCount": 4,
       "lastAccessed": 1781038454875,
+      "type": "file"
+    },
+    {
+      "path": "tests/test_ai_agent_composition.py",
+      "accessCount": 3,
+      "lastAccessed": 1781039123260,
+      "type": "file"
+    },
+    {
+      "path": "tests/test_compiler_baseline.py",
+      "accessCount": 3,
+      "lastAccessed": 1781039134903,
       "type": "file"
     },
     {
