@@ -1102,4 +1102,18 @@ class NetworkInventoryService:
 
 
 # Backward-compatible alias
+
+	async def ml_inventory_optimize(self, *args, **kwargs):
+		"""AI-powered telecom network inventory optimization recommendation. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="telecom_inventory_optimization")
+			return {"utilization_score": round(result.score,3), "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 TelecomInvService = NetworkInventoryService

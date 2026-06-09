@@ -1013,4 +1013,18 @@ class ProcurementService:
 		return self.procurement_analytics(period)
 
 
+
+	async def ml_contract_risk_assess(self, *args, **kwargs):
+		"""AI-powered government contract delivery risk assessment. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="government_contract_risk")
+			return {"contract_risk": round(result.score,3), "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 GovernmentConService = ProcurementService

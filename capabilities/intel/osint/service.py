@@ -2013,6 +2013,20 @@ class OSINTService:
 
 
 # Alias for backwards compatibility with generated import statements
+
+	async def ml_entity_extract(self, *args, **kwargs):
+		"""AI-powered AI entity and relationship extraction from OSINT text. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.extract(str(kwargs.get("text",""))[:2000], schema={"persons":"person names mentioned","organizations":"org names","locations":"places","events":"key events"}, context="intelligence analysis")
+			return {"entities": result.extracted, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 IntelOSINTService = OSINTService
 
 

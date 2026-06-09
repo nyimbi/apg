@@ -1080,4 +1080,18 @@ class CrawlerDatabaseService(IntelligenceCrawlerService):
 		self.engine_kwargs = engine_kwargs
 
 
+
+	async def ml_content_classify(self, *args, **kwargs):
+		"""AI-powered AI classification of crawled content by threat category. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.classify(str(kwargs.get("content",""))[:1000], labels=["benign","suspicious","malicious","critical_threat"])
+			return {"threat_class": result.label, "confidence": result.confidence, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 CrawlerService = IntelligenceCrawlerService
