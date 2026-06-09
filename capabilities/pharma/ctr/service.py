@@ -1557,4 +1557,18 @@ class ClinicalTrialsService:
 		assert records
 		return {"created_count": len(records), "tenant_id": tenant_id}
 
+
+	async def ml_trial_eligibility_screen(self, *args, **kwargs):
+		"""AI-powered clinical trial eligibility screening using patient criteria. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.classify(str(kwargs), labels=["eligible","borderline_eligible","ineligible","requires_review"])
+			return {"eligibility": result.label, "confidence": result.confidence, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 PharmaCtrService = ClinicalTrialsService

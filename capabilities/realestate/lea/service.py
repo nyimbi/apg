@@ -3100,4 +3100,18 @@ def present_str(v: Any) -> bool:
 
 
 # Aliases
+
+	async def ml_lease_renewal_predict(self, *args, **kwargs):
+		"""AI-powered lease renewal probability prediction. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="lease_renewal_prediction")
+			return {"renewal_probability": round(result.score,3), "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 LeaService = LeaseManagementService

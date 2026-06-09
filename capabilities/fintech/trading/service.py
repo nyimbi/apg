@@ -1120,4 +1120,18 @@ class AlgorithmicTradingService:
 		raise PermissionError(reasons or "trading_policy_denied")
 
 
+
+	async def ml_trade_signal_generate(self, *args, **kwargs):
+		"""AI-powered ML-based trading signal generation from market data. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.classify(str(kwargs), labels=["strong_buy","buy","hold","sell","strong_sell"])
+			return {"signal": result.label, "confidence": result.confidence, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 TradingService = AlgorithmicTradingService

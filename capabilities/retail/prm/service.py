@@ -685,3 +685,17 @@ class PrmService:
 		"""Generate Report"""
 		assert report_type
 		return {"report_type": report_type, "tenant_id": tenant_id, "period": period}
+
+	async def ml_promo_effectiveness_predict(self, *args, **kwargs):
+		"""AI-powered promotion effectiveness and incremental lift prediction. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="promotion_effectiveness")
+			return {"lift_score": round(result.score,3), "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+

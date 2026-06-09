@@ -1219,4 +1219,18 @@ class RouteOptimisationService:
 		}
 
 
+
+	async def ml_route_demand_forecast(self, *args, **kwargs):
+		"""AI-powered transport route passenger demand forecasting. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.predict(kwargs.get("demand_series",[{"period": str(i), "value": 100.0+i*5} for i in range(14)]), horizon=7, task="transport_route_demand")
+			return {"demand_forecast": result.predictions, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 TransportRouteService = RouteOptimisationService
