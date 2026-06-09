@@ -2245,3 +2245,17 @@ class PharmacyManagementService:
 			"entity_id": entity_id,
 			"timestamp": datetime.utcnow().isoformat(),
 		})
+
+	async def ml_dispensing_anomaly(self, *args, **kwargs):
+		"""AI-powered pharmacy dispensing anomaly and drug interaction detection. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="pharmacy_dispensing_anomaly")
+			return {"anomaly_score": round(result.score,3), "flags": result.factors, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+

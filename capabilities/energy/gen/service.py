@@ -986,3 +986,17 @@ class GenerationManagementService:
 		self._regulatory_reports[rec_id] = rec
 		self._audit(self.tenant_id, "regulatory_report_generated", rec_id, "regulatory_report")
 		return rec
+
+	async def ml_generation_efficiency(self, *args, **kwargs):
+		"""AI-powered power generation efficiency and output forecasting. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.predict(kwargs.get("historical",[{"period": str(i), "value": 100.0} for i in range(12)]), horizon=7, task="power_generation_forecast")
+			return {"output_forecast": result.predictions, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
