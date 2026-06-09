@@ -1188,4 +1188,18 @@ class CargoManagementService:
 		}
 
 
+
+	async def ml_cargo_risk_assess(self, *args, **kwargs):
+		"""AI-powered cargo loss and damage risk scoring. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="cargo_risk_assessment")
+			return {"cargo_risk": round(result.score,3), "risk_factors": result.factors, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 TransportCargoService = CargoManagementService

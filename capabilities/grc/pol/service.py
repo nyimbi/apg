@@ -1143,3 +1143,17 @@ class PolicyManagementService:
 			"acknowledgement_rate_pct": dashboard["overall_acknowledgement_rate_pct"],
 			"generated_at": _now(),
 		}
+
+	async def ml_policy_compliance_score(self, *args, **kwargs):
+		"""AI-powered AI policy compliance gap assessment. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="policy_compliance_scoring")
+			return {"compliance_score": round(result.score,3), "gaps": result.factors, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+

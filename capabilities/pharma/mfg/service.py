@@ -911,4 +911,18 @@ class PharmaceuticalManufacturingService:
 		assert query
 		return {"query": query, "results": [], "tenant_id": tenant_id}
 
+
+	async def ml_deviation_detect(self, *args, **kwargs):
+		"""AI-powered manufacturing deviation risk classification. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.classify(str(kwargs), labels=["minor_deviation","major_deviation","critical_deviation","batch_failure"])
+			return {"deviation_class": result.label, "confidence": result.confidence, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 PharmaMfgService = PharmaceuticalManufacturingService

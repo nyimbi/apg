@@ -2011,3 +2011,17 @@ def _compute_match_score(
 	_ = id_number
 
 	return round(min(score, 1.0), 3)
+
+	async def ml_claim_fraud_detect(self, *args, **kwargs):
+		"""AI-powered healthcare insurance claim fraud detection. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="healthcare_claim_fraud")
+			return {"fraud_score": round(result.score,3), "flags": result.factors, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+

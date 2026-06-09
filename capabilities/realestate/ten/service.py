@@ -881,3 +881,17 @@ class TenService:
 		assert record_id and reason, "record_id and reason required"
 		self._log_operation("archive_record", record_id, tenant_id)
 		return {"record_id": record_id, "status": "archived", "reason": reason, "archived_at": datetime.utcnow().isoformat()}
+
+	async def ml_tenant_risk_score(self, *args, **kwargs):
+		"""AI-powered tenant credit and behaviour risk scoring. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="tenant_risk_assessment")
+			return {"risk_score": round(result.score,3), "risk_factors": result.factors, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
