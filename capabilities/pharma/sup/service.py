@@ -971,4 +971,18 @@ class PharmaceuticalSupplyChainService:
 		"""Analytics Summary"""
 		return {"tenant_id": tenant_id, "period": period}
 
+
+	async def ml_supply_chain_risk(self, *args, **kwargs):
+		"""AI-powered pharmaceutical supply chain integrity and counterfeit risk. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="pharma_supply_chain_risk")
+			return {"supply_risk": round(result.score,3), "risk_factors": result.factors, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 PharmaSupService = PharmaceuticalSupplyChainService

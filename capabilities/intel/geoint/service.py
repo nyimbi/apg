@@ -1212,4 +1212,18 @@ class GeospatialIntelligenceService:
 		raise PermissionError(reasons or "geoint_policy_denied")
 
 
+
+	async def ml_geospatial_threat_score(self, *args, **kwargs):
+		"""AI-powered AI geospatial threat assessment from location intelligence. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="geospatial_threat_assessment")
+			return {"threat_score": round(result.score,3), "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 IntelGEOINTService = GeospatialIntelligenceService

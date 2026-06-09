@@ -786,4 +786,18 @@ class EmergencyManagementService:
 		}
 
 
+
+	async def ml_emergency_severity(self, *args, **kwargs):
+		"""AI-powered AI emergency response severity and resource requirement scoring. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="emergency_response_severity")
+			return {"severity_score": round(result.score,3), "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 GovernmentEmeService = EmergencyManagementService

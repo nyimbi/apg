@@ -917,3 +917,17 @@ class MedicalDeviceManagementService:
 
 	def _audit(self, tenant_id: str, event: str, entity_id: str) -> None:
 		self._audit_events.append({"tenant_id": tenant_id, "event": event, "entity_id": entity_id, "timestamp": datetime.utcnow().isoformat()})
+
+	async def ml_device_anomaly_detect(self, *args, **kwargs):
+		"""AI-powered AI anomaly detection in medical device telemetry. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="medical_device_anomaly")
+			return {"device_anomaly": round(result.score,3), "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+

@@ -2042,4 +2042,18 @@ class TaxAdministrationService:
 
 
 # backward-compat alias
+
+	async def ml_tax_audit_select(self, *args, **kwargs):
+		"""AI-powered AI selection scoring for tax audit targeting. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="tax_audit_selection")
+			return {"audit_score": round(result.score,3), "risk_factors": result.factors, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 GovernmentTaxService = TaxAdministrationService
