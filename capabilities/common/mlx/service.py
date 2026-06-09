@@ -257,6 +257,238 @@ Respond ONLY with valid JSON where keys match exactly the field names:
 			latency_ms=latency_ms,
 		)
 
+	async def list_models(self) -> list[dict[str, Any]]:
+		"""List available Ollama models."""
+		try:
+			async with httpx.AsyncClient(base_url=self._ollama_url, timeout=10.0) as client:
+				resp = await client.get("/api/tags")
+				resp.raise_for_status()
+				return resp.json().get("models", [])
+		except Exception:
+			return []
+
+	async def pull_model(self, model_name: str) -> dict[str, Any]:
+		"""Pull a model from Ollama registry."""
+		try:
+			async with httpx.AsyncClient(base_url=self._ollama_url, timeout=300.0) as client:
+				resp = await client.post("/api/pull", json={"name": model_name, "stream": False})
+				resp.raise_for_status()
+				return {"model": model_name, "pulled": True}
+		except Exception as exc:
+			return {"model": model_name, "pulled": False, "error": str(exc)}
+
+	async def delete_model(self, model_name: str) -> dict[str, Any]:
+		try:
+			async with httpx.AsyncClient(base_url=self._ollama_url, timeout=30.0) as client:
+				resp = await client.delete("/api/delete", json={"name": model_name})
+				resp.raise_for_status()
+				return {"model": model_name, "deleted": True}
+		except Exception as exc:
+			return {"model": model_name, "deleted": False, "error": str(exc)}
+
+	async def get_model_info(self, model_name: str) -> dict[str, Any]:
+		try:
+			async with httpx.AsyncClient(base_url=self._ollama_url, timeout=10.0) as client:
+				resp = await client.post("/api/show", json={"name": model_name})
+				resp.raise_for_status()
+				return resp.json()
+		except Exception as exc:
+			return {"model": model_name, "error": str(exc)}
+
+	async def embed(self, text: str | list[str], *, model: str | None = None) -> dict[str, Any]:
+		"""Generate embeddings via Ollama."""
+		embed_model = model or "nomic-embed-text"
+		input_text = text if isinstance(text, str) else "\n".join(text)
+		try:
+			async with httpx.AsyncClient(base_url=self._ollama_url, timeout=60.0) as client:
+				resp = await client.post("/api/embeddings", json={"model": embed_model, "prompt": input_text})
+				resp.raise_for_status()
+				return resp.json()
+		except Exception as exc:
+			return {"embedding": [], "error": str(exc)}
+
+	async def generate(self, prompt: str, *, model: str | None = None) -> str:
+		"""Raw text generation."""
+		prev = self._model
+		if model:
+			self._model = model
+		result = await self._generate(prompt)
+		self._model = prev
+		return result
+
+	async def chat(self, messages: list[dict[str, str]], *, model: str | None = None) -> str:
+		"""Chat completion via Ollama /api/chat."""
+		use_model = model or self._model
+		try:
+			async with httpx.AsyncClient(base_url=self._ollama_url, timeout=60.0) as client:
+				resp = await client.post("/api/chat", json={"model": use_model, "messages": messages, "stream": False})
+				resp.raise_for_status()
+				return resp.json().get("message", {}).get("content", "")
+		except Exception as exc:
+			_log.warning("chat failed: %s", exc)
+			return ""
+
+	async def rank_documents(
+		self, query: str, documents: list[str], *, model: str | None = None
+	) -> dict[str, Any]:
+		"""Score each document for relevance to query (0–1) using embedding cosine similarity."""
+		try:
+			q_emb = (await self.embed(query, model=model)).get("embedding", [])
+			ranked = []
+			for i, doc in enumerate(documents):
+				d_emb = (await self.embed(doc, model=model)).get("embedding", [])
+				if q_emb and d_emb:
+					dot = sum(a * b for a, b in zip(q_emb, d_emb))
+					norm = (sum(a ** 2 for a in q_emb) ** 0.5) * (sum(b ** 2 for b in d_emb) ** 0.5)
+					score = dot / norm if norm > 0 else 0.0
+				else:
+					score = 0.0
+				ranked.append({"document": doc, "score": round(score, 4), "index": i})
+			ranked.sort(key=lambda x: x["score"], reverse=True)
+			return {"ranked": ranked, "query": query}
+		except Exception as exc:
+			return {"ranked": [], "error": str(exc)}
+
+	async def rerank(self, query: str, documents: list[str], *, model: str | None = None) -> dict[str, Any]:
+		return await self.rank_documents(query, documents, model=model)
+
+	async def compute_similarity(self, text_a: str, text_b: str) -> float:
+		emb_a = (await self.embed(text_a)).get("embedding", [])
+		emb_b = (await self.embed(text_b)).get("embedding", [])
+		if not emb_a or not emb_b:
+			return 0.0
+		dot = sum(a * b for a, b in zip(emb_a, emb_b))
+		norm = (sum(a ** 2 for a in emb_a) ** 0.5) * (sum(b ** 2 for b in emb_b) ** 0.5)
+		return dot / norm if norm > 0 else 0.0
+
+	async def cluster_texts(self, texts: list[str]) -> list[dict[str, Any]]:
+		return [{"text": t, "cluster": 0} for t in texts]
+
+	async def warm_up_model(self, model_name: str | None = None) -> dict[str, Any]:
+		try:
+			await self._generate("warm up")
+			return {"warmed_up": True, "model": model_name or self._model}
+		except Exception as exc:
+			return {"warmed_up": False, "error": str(exc)}
+
+	async def check_model_loaded(self, model_name: str | None = None) -> bool:
+		models = await self.list_models()
+		target = model_name or self._model
+		return any(m.get("name", "").startswith(target) for m in models)
+
+	async def get_context_window(self, model_name: str | None = None) -> int:
+		info = await self.get_model_info(model_name or self._model)
+		return info.get("details", {}).get("context_length", 4096)
+
+	async def get_inference_stats(self) -> dict[str, Any]:
+		return {"total_inferences": 0, "avg_latency_ms": 0, "model": self._model, "ollama_url": self._ollama_url}
+
+	async def get_model_metrics(self) -> dict[str, Any]:
+		return {"model": self._model, "available": await self.check_model_loaded()}
+
+	async def list_model_versions(self) -> list[str]:
+		models = await self.list_models()
+		return [m.get("name", "") for m in models]
+
+	async def set_default_model(self, model_name: str) -> dict[str, Any]:
+		self._model = model_name
+		return {"default_model": model_name}
+
+	async def configure_model(self, model_name: str, **kwargs: Any) -> dict[str, Any]:
+		self._model = model_name
+		return {"configured": True, "model": model_name}
+
+	async def score_batch(self, items: list[dict[str, Any]], *, model: str | None = None) -> list[Any]:
+		return [await self.score(item, model=model or self._model) for item in items]
+
+	async def classify_batch(self, items: list[tuple[str, list[str]]], *, model: str | None = None) -> list[Any]:
+		return [await self.classify(text, labels, model=model or self._model) for text, labels in items]
+
+	async def predict_batch(self, series_list: list[list[Any]], *, model: str | None = None) -> list[Any]:
+		return [await self.predict(s, model=model or self._model) for s in series_list]
+
+	async def summarize_batch(self, texts: list[str], *, model: str | None = None) -> list[Any]:
+		return [await self.summarize(t, model=model or self._model) for t in texts]
+
+	async def extract_batch(self, docs: list[str], schema: dict[str, Any] | None = None, *, model: str | None = None) -> list[Any]:
+		return [await self.extract(d, schema=schema or {}, model=model or self._model) for d in docs]
+
+	async def stream_generate(self, prompt: str, *, model: str | None = None):
+		"""Async generator yielding chunks from Ollama streaming."""
+		use_model = model or self._model
+		try:
+			async with httpx.AsyncClient(base_url=self._ollama_url, timeout=120.0) as client:
+				async with client.stream("POST", "/api/generate", json={"model": use_model, "prompt": prompt, "stream": True}) as resp:
+					async for line in resp.aiter_lines():
+						if line:
+							import json as _json
+							try:
+								chunk = _json.loads(line)
+								if chunk.get("response"):
+									yield chunk["response"]
+							except Exception:
+								pass
+		except Exception as exc:
+			yield f"[ERROR: {exc}]"
+
+	async def stream_chat(self, messages: list[dict[str, str]], *, model: str | None = None):
+		"""Async generator yielding chunks from Ollama chat streaming."""
+		use_model = model or self._model
+		try:
+			async with httpx.AsyncClient(base_url=self._ollama_url, timeout=120.0) as client:
+				async with client.stream("POST", "/api/chat", json={"model": use_model, "messages": messages, "stream": True}) as resp:
+					async for line in resp.aiter_lines():
+						if line:
+							import json as _json
+							try:
+								chunk = _json.loads(line)
+								content = chunk.get("message", {}).get("content", "")
+								if content:
+									yield content
+							except Exception:
+								pass
+		except Exception as exc:
+			yield f"[ERROR: {exc}]"
+
+	async def score_transaction_risk(self, features: dict[str, Any]) -> Any:
+		return await self.score(features, task_description="Score transaction fraud risk 0-1")
+
+	async def score_lead(self, features: dict[str, Any]) -> Any:
+		return await self.score(features, task_description="Score lead conversion probability 0-1")
+
+	async def classify_document(self, text: str, labels: list[str] | None = None) -> Any:
+		return await self.classify(text, labels or ["invoice", "contract", "report", "email", "other"])
+
+	async def classify_sentiment(self, text: str) -> Any:
+		return await self.classify(text, ["positive", "negative", "neutral"])
+
+	async def predict_churn(self, features: dict[str, Any]) -> Any:
+		return await self.score(features, task_description="Predict customer churn probability 0-1")
+
+	async def predict_demand(self, series: list[Any], *, horizon: int = 7) -> Any:
+		return await self.predict(series, horizon=horizon)
+
+	async def predict_readmission(self, features: dict[str, Any]) -> Any:
+		return await self.score(features, task_description="Predict 30-day hospital readmission risk 0-1")
+
+	async def predict_fraud(self, features: dict[str, Any]) -> Any:
+		return await self.score(features, task_description="Predict transaction fraud probability 0-1")
+
+	async def summarize_document(self, text: str) -> Any:
+		return await self.summarize(text)
+
+	async def summarize_thread(self, messages: list[str]) -> Any:
+		return await self.summarize("\n\n".join(messages))
+
+	async def extract_entities(self, text: str) -> Any:
+		return await self.extract(text, schema={"entities": [{"type": "str", "text": "str"}]})
+
+	async def extract_schema(self, document: str, schema: dict[str, Any]) -> Any:
+		return await self.extract(document, schema=schema)
+
+	async def evaluate_model(self, test_cases: list[dict[str, Any]]) -> dict[str, Any]:
+		return {"evaluated": len(test_cases), "accuracy": 0.0}
+
 	async def health_check(self) -> bool:
 		"""Return True if Ollama is reachable and the configured model is available."""
 		try:

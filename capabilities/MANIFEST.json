@@ -64801,6 +64801,150 @@
         "pii_protected",
         "data_classified",
         "access_controlled"
+      ],
+      "provides": [
+        "event_publish",
+        "event_subscribe",
+        "stream_provisioning",
+        "subject_routing",
+        "exactly_once_delivery",
+        "consumer_management"
+      ],
+      "service_methods": [
+        "publish",
+        "subscribe",
+        "create_stream",
+        "delete_stream",
+        "list_streams",
+        "get_stream",
+        "create_consumer",
+        "delete_consumer",
+        "list_consumers",
+        "get_consumer",
+        "publish_batch",
+        "fetch_messages",
+        "ack_message",
+        "nack_message",
+        "term_message",
+        "get_stream_info",
+        "purge_stream",
+        "get_stream_sequence",
+        "publish_with_headers",
+        "subscribe_ephemeral",
+        "subscribe_durable",
+        "get_subject_for",
+        "parse_subject",
+        "health_check",
+        "get_connection_info",
+        "reconnect",
+        "drain",
+        "flush",
+        "get_pending_messages",
+        "get_consumer_info",
+        "list_subjects",
+        "publish_domain_event",
+        "subscribe_capability_events",
+        "get_audit_events",
+        "replay_events",
+        "setup_apg_streams",
+        "get_stream_stats",
+        "export_stream",
+        "import_stream",
+        "set_retention_policy",
+        "get_server_info",
+        "check_server_status",
+        "get_throughput_metrics",
+        "get_latency_metrics",
+        "purge_by_subject"
+      ],
+      "configuration_keys": [
+        "tenant_id",
+        "nats_url",
+        "stream_name",
+        "subjects",
+        "replicas",
+        "retention",
+        "max_age",
+        "max_bytes",
+        "dedup_window",
+        "ack_wait",
+        "delivery_policy",
+        "configuration"
+      ],
+      "ui_routes": [
+        {
+          "name": "dashboard",
+          "path": "/common/nats/dashboard",
+          "permission": "nats:view",
+          "nav_group": "Overview"
+        },
+        {
+          "name": "streams",
+          "path": "/common/nats/streams",
+          "permission": "nats:manage",
+          "nav_group": "Streams"
+        },
+        {
+          "name": "consumers",
+          "path": "/common/nats/consumers",
+          "permission": "nats:manage",
+          "nav_group": "Consumers"
+        },
+        {
+          "name": "messages",
+          "path": "/common/nats/messages",
+          "permission": "nats:view",
+          "nav_group": "Messages"
+        },
+        {
+          "name": "settings",
+          "path": "/common/nats/settings",
+          "permission": "nats:admin",
+          "nav_group": "Administration"
+        }
+      ],
+      "route_count": 5,
+      "requires": [
+        "auth",
+        "audl",
+        "mten",
+        "conf",
+        "moni"
+      ],
+      "service_method_count": 45,
+      "streaming_processor": "bytewax",
+      "streaming_stream": "apg.common.nats.lifecycle",
+      "streaming_events": [
+        "stream_created",
+        "stream_deleted",
+        "consumer_created",
+        "consumer_deleted",
+        "message_published",
+        "message_acked",
+        "message_nacked",
+        "message_termed",
+        "stream_purged",
+        "health_checked"
+      ],
+      "streaming_guardrails": [
+        "tenant_context_required",
+        "cross_tenant_stream_denied",
+        "unauthorized_subscribe_denied",
+        "rate_limit_enforced"
+      ],
+      "theme_name": "nats_event_bus",
+      "theme_tokens": [
+        "color.primary",
+        "color.accent",
+        "color.success",
+        "color.warning",
+        "color.danger",
+        "surface.canvas",
+        "surface.panel",
+        "text.primary",
+        "text.secondary",
+        "border.radius",
+        "density"
       ]
     },
     "temporal": {
@@ -64827,6 +64971,149 @@
         "pii_protected",
         "data_classified",
         "access_controlled"
+      ],
+      "provides": [
+        "durable_workflow_execution",
+        "human_task_management",
+        "workflow_state_persistence",
+        "workflow_scheduling",
+        "activity_management",
+        "workflow_visibility"
+      ],
+      "service_methods": [
+        "start_workflow",
+        "cancel_workflow",
+        "terminate_workflow",
+        "signal_workflow",
+        "query_workflow",
+        "get_workflow_status",
+        "list_workflows",
+        "get_workflow_history",
+        "complete_task",
+        "fail_task",
+        "heartbeat_task",
+        "get_task_queue_info",
+        "register_workflow",
+        "register_activity",
+        "list_registered_workflows",
+        "describe_workflow",
+        "get_workflow_result",
+        "await_workflow_result",
+        "schedule_workflow",
+        "list_schedules",
+        "delete_schedule",
+        "pause_schedule",
+        "resume_schedule",
+        "trigger_schedule",
+        "list_schedule_actions",
+        "reset_workflow",
+        "reset_to_first_workflow_task",
+        "count_workflows",
+        "search_workflows",
+        "list_open_workflows",
+        "list_closed_workflows",
+        "get_system_info",
+        "health_check",
+        "get_server_version",
+        "create_namespace",
+        "describe_namespace",
+        "list_namespaces",
+        "update_namespace",
+        "get_worker_reachability",
+        "list_task_queue_partitions",
+        "request_cancel_activity",
+        "list_activity_completions",
+        "get_activity_info",
+        "get_metrics",
+        "get_audit_events"
+      ],
+      "configuration_keys": [
+        "tenant_id",
+        "temporal_host",
+        "namespace",
+        "task_queue",
+        "workflow_execution_timeout",
+        "workflow_run_timeout",
+        "activity_schedule_to_close_timeout",
+        "worker_count",
+        "max_concurrent_workflows",
+        "max_concurrent_activities",
+        "configuration"
+      ],
+      "ui_routes": [
+        {
+          "name": "dashboard",
+          "path": "/common/temporal/dashboard",
+          "permission": "temporal:view",
+          "nav_group": "Overview"
+        },
+        {
+          "name": "workflows",
+          "path": "/common/temporal/workflows",
+          "permission": "temporal:view",
+          "nav_group": "Workflows"
+        },
+        {
+          "name": "workflow_detail",
+          "path": "/common/temporal/workflows/<id>",
+          "permission": "temporal:view",
+          "nav_group": "Workflows"
+        },
+        {
+          "name": "task_queues",
+          "path": "/common/temporal/task-queues",
+          "permission": "temporal:manage",
+          "nav_group": "Workers"
+        },
+        {
+          "name": "settings",
+          "path": "/common/temporal/settings",
+          "permission": "temporal:admin",
+          "nav_group": "Administration"
+        }
+      ],
+      "route_count": 5,
+      "requires": [
+        "auth",
+        "audl",
+        "mten",
+        "conf",
+        "moni"
+      ],
+      "service_method_count": 45,
+      "streaming_processor": "bytewax",
+      "streaming_stream": "apg.common.temporal.lifecycle",
+      "streaming_events": [
+        "workflow_started",
+        "workflow_completed",
+        "workflow_failed",
+        "workflow_cancelled",
+        "workflow_timed_out",
+        "task_scheduled",
+        "task_started",
+        "task_completed",
+        "task_failed",
+        "workflow_signalled"
+      ],
+      "streaming_guardrails": [
+        "tenant_context_required",
+        "cross_tenant_workflow_denied",
+        "unauthorized_signal_denied",
+        "sla_breach_escalated"
+      ],
+      "theme_name": "temporal_workflow",
+      "theme_tokens": [
+        "color.primary",
+        "color.accent",
+        "color.success",
+        "color.warning",
+        "color.danger",
+        "surface.canvas",
+        "surface.panel",
+        "text.primary",
+        "text.secondary",
+        "border.radius",
+        "density"
       ]
     },
     "mlx": {
@@ -64853,6 +65140,151 @@
         "pii_protected",
         "data_classified",
         "access_controlled"
+      ],
+      "provides": [
+        "ml_scoring",
+        "ml_classification",
+        "ml_prediction",
+        "ml_summarization",
+        "ml_extraction",
+        "local_inference",
+        "model_management"
+      ],
+      "service_methods": [
+        "score",
+        "classify",
+        "predict",
+        "summarize",
+        "extract",
+        "health_check",
+        "list_models",
+        "pull_model",
+        "delete_model",
+        "get_model_info",
+        "embed",
+        "generate",
+        "chat",
+        "stream_generate",
+        "stream_chat",
+        "score_batch",
+        "classify_batch",
+        "predict_batch",
+        "summarize_batch",
+        "extract_batch",
+        "score_transaction_risk",
+        "score_lead",
+        "classify_document",
+        "classify_sentiment",
+        "predict_churn",
+        "predict_demand",
+        "predict_readmission",
+        "predict_fraud",
+        "summarize_document",
+        "summarize_thread",
+        "extract_entities",
+        "extract_schema",
+        "evaluate_model",
+        "get_model_metrics",
+        "list_model_versions",
+        "set_default_model",
+        "get_inference_stats",
+        "get_audit_events",
+        "configure_model",
+        "warm_up_model",
+        "check_model_loaded",
+        "get_context_window",
+        "rank_documents",
+        "rerank",
+        "compute_similarity",
+        "cluster_texts"
+      ],
+      "configuration_keys": [
+        "tenant_id",
+        "ollama_base_url",
+        "default_model",
+        "embedding_model",
+        "max_tokens",
+        "temperature",
+        "timeout",
+        "retry_count",
+        "cache_responses",
+        "cache_ttl",
+        "configuration"
+      ],
+      "ui_routes": [
+        {
+          "name": "dashboard",
+          "path": "/common/mlx/dashboard",
+          "permission": "mlx:view",
+          "nav_group": "Overview"
+        },
+        {
+          "name": "models",
+          "path": "/common/mlx/models",
+          "permission": "mlx:manage",
+          "nav_group": "Models"
+        },
+        {
+          "name": "inference",
+          "path": "/common/mlx/inference",
+          "permission": "mlx:infer",
+          "nav_group": "Inference"
+        },
+        {
+          "name": "metrics",
+          "path": "/common/mlx/metrics",
+          "permission": "mlx:view",
+          "nav_group": "Monitoring"
+        },
+        {
+          "name": "settings",
+          "path": "/common/mlx/settings",
+          "permission": "mlx:admin",
+          "nav_group": "Administration"
+        }
+      ],
+      "route_count": 5,
+      "requires": [
+        "auth",
+        "audl",
+        "mten",
+        "conf",
+        "moni"
+      ],
+      "service_method_count": 46,
+      "streaming_processor": "bytewax",
+      "streaming_stream": "apg.common.mlx.lifecycle",
+      "streaming_events": [
+        "inference_requested",
+        "inference_completed",
+        "model_pulled",
+        "model_deleted",
+        "batch_inference_started",
+        "batch_inference_completed",
+        "embedding_computed",
+        "model_loaded",
+        "health_checked",
+        "inference_failed"
+      ],
+      "streaming_guardrails": [
+        "tenant_context_required",
+        "model_not_found_rejected",
+        "token_limit_enforced",
+        "rate_limit_enforced"
+      ],
+      "theme_name": "mlx_inference",
+      "theme_tokens": [
+        "color.primary",
+        "color.accent",
+        "color.success",
+        "color.warning",
+        "color.danger",
+        "surface.canvas",
+        "surface.panel",
+        "text.primary",
+        "text.secondary",
+        "border.radius",
+        "density"
       ]
     },
     "phi": {
@@ -64879,6 +65311,142 @@
         "pii_protected",
         "data_classified",
         "access_controlled"
+      ],
+      "provides": [
+        "phi_detection",
+        "phi_redaction",
+        "hipaa_compliance_check",
+        "minimum_necessary_enforcement",
+        "phi_audit_trail"
+      ],
+      "service_methods": [
+        "classify",
+        "redact",
+        "detect_phi_fields",
+        "get_phi_identifiers",
+        "health_check",
+        "classify_batch",
+        "redact_batch",
+        "scan_document",
+        "scan_record",
+        "scan_fields",
+        "classify_name",
+        "classify_date",
+        "classify_age",
+        "classify_geographic",
+        "classify_contact",
+        "classify_identifier",
+        "classify_financial",
+        "classify_biometric",
+        "get_phi_report",
+        "get_redaction_summary",
+        "validate_minimum_necessary",
+        "check_baa_requirement",
+        "log_phi_access",
+        "get_phi_audit_events",
+        "configure_identifiers",
+        "add_custom_identifier",
+        "remove_custom_identifier",
+        "list_configured_identifiers",
+        "test_identifier_pattern",
+        "export_phi_inventory",
+        "get_phi_density_score",
+        "validate_deidentification",
+        "certify_safe_harbor",
+        "certify_expert_determination",
+        "scan_query_result",
+        "filter_phi_from_response",
+        "mask_phi_in_logs",
+        "get_compliance_status",
+        "generate_phi_report",
+        "get_audit_events",
+        "configure_redaction_strategy",
+        "get_redaction_policies"
+      ],
+      "configuration_keys": [
+        "tenant_id",
+        "redaction_strategy",
+        "identifiers_enabled",
+        "custom_identifiers",
+        "minimum_necessary_roles",
+        "audit_phi_access",
+        "baa_required",
+        "phi_log_retention_days",
+        "configuration"
+      ],
+      "ui_routes": [
+        {
+          "name": "dashboard",
+          "path": "/common/phi/dashboard",
+          "permission": "phi:view",
+          "nav_group": "Overview"
+        },
+        {
+          "name": "scanner",
+          "path": "/common/phi/scanner",
+          "permission": "phi:scan",
+          "nav_group": "Scanning"
+        },
+        {
+          "name": "audit",
+          "path": "/common/phi/audit",
+          "permission": "phi:audit",
+          "nav_group": "Compliance"
+        },
+        {
+          "name": "identifiers",
+          "path": "/common/phi/identifiers",
+          "permission": "phi:admin",
+          "nav_group": "Configuration"
+        },
+        {
+          "name": "settings",
+          "path": "/common/phi/settings",
+          "permission": "phi:admin",
+          "nav_group": "Administration"
+        }
+      ],
+      "route_count": 5,
+      "requires": [
+        "auth",
+        "audl",
+        "mten",
+        "conf"
+      ],
+      "service_method_count": 42,
+      "streaming_processor": "bytewax",
+      "streaming_stream": "apg.common.phi.lifecycle",
+      "streaming_events": [
+        "phi_detected",
+        "phi_redacted",
+        "phi_scan_completed",
+        "baa_required_triggered",
+        "minimum_necessary_violation",
+        "phi_access_logged",
+        "compliance_checked",
+        "identifier_added",
+        "identifier_removed",
+        "audit_exported"
+      ],
+      "streaming_guardrails": [
+        "tenant_context_required",
+        "unauthorized_phi_access_denied",
+        "minimum_necessary_enforced",
+        "baa_required"
+      ],
+      "theme_name": "phi_hipaa_classifier",
+      "theme_tokens": [
+        "color.primary",
+        "color.accent",
+        "color.success",
+        "color.warning",
+        "color.danger",
+        "surface.canvas",
+        "surface.panel",
+        "text.primary",
+        "text.secondary",
+        "border.radius",
+        "density"
       ]
     },
     "esig": {
@@ -64905,6 +65473,144 @@
         "pii_protected",
         "data_classified",
         "access_controlled"
+      ],
+      "provides": [
+        "electronic_signature",
+        "signature_verification",
+        "signature_audit_trail",
+        "fda_cfr_21_part_11_compliance",
+        "signature_workflow"
+      ],
+      "service_methods": [
+        "sign",
+        "verify",
+        "get_signature",
+        "list_signatures",
+        "revoke_signature",
+        "health_check",
+        "sign_batch",
+        "verify_batch",
+        "create_signature_request",
+        "get_signature_request",
+        "list_signature_requests",
+        "cancel_signature_request",
+        "complete_signature_request",
+        "remind_signer",
+        "get_signature_audit_trail",
+        "get_audit_events",
+        "validate_signer_identity",
+        "check_signing_authority",
+        "get_signing_certificate",
+        "sign_document",
+        "sign_record",
+        "sign_approval",
+        "sign_change_control",
+        "sign_batch_record",
+        "sign_lab_result",
+        "sign_qa_review",
+        "verify_document_signature",
+        "verify_record_signature",
+        "export_signature_report",
+        "generate_compliance_report",
+        "configure_signature_policy",
+        "get_signature_policy",
+        "list_signature_policies",
+        "update_signature_policy",
+        "get_certificate_chain",
+        "validate_certificate",
+        "rotate_signing_key",
+        "get_signing_stats",
+        "get_non_repudiation_proof",
+        "archive_signature",
+        "retrieve_archived_signature",
+        "check_21cfr_compliance",
+        "get_fda_audit_report"
+      ],
+      "configuration_keys": [
+        "tenant_id",
+        "signing_algorithm",
+        "key_storage",
+        "certificate_authority",
+        "signature_timeout",
+        "require_reason",
+        "require_two_factor",
+        "audit_all_signatures",
+        "retention_years",
+        "configuration"
+      ],
+      "ui_routes": [
+        {
+          "name": "dashboard",
+          "path": "/common/esig/dashboard",
+          "permission": "esig:view",
+          "nav_group": "Overview"
+        },
+        {
+          "name": "sign",
+          "path": "/common/esig/sign",
+          "permission": "esig:sign",
+          "nav_group": "Signing"
+        },
+        {
+          "name": "verify",
+          "path": "/common/esig/verify",
+          "permission": "esig:verify",
+          "nav_group": "Verification"
+        },
+        {
+          "name": "audit",
+          "path": "/common/esig/audit",
+          "permission": "esig:audit",
+          "nav_group": "Compliance"
+        },
+        {
+          "name": "settings",
+          "path": "/common/esig/settings",
+          "permission": "esig:admin",
+          "nav_group": "Administration"
+        }
+      ],
+      "route_count": 5,
+      "requires": [
+        "auth",
+        "audl",
+        "mten",
+        "conf"
+      ],
+      "service_method_count": 43,
+      "streaming_processor": "bytewax",
+      "streaming_stream": "apg.common.esig.lifecycle",
+      "streaming_events": [
+        "signature_created",
+        "signature_verified",
+        "signature_revoked",
+        "signature_request_created",
+        "signature_request_completed",
+        "signature_request_cancelled",
+        "signer_reminded",
+        "compliance_checked",
+        "key_rotated",
+        "audit_exported"
+      ],
+      "streaming_guardrails": [
+        "tenant_context_required",
+        "unauthorized_signing_denied",
+        "revoked_signature_rejected",
+        "21cfr_compliance_enforced"
+      ],
+      "theme_name": "esig_electronic_signature",
+      "theme_tokens": [
+        "color.primary",
+        "color.accent",
+        "color.success",
+        "color.warning",
+        "color.danger",
+        "surface.canvas",
+        "surface.panel",
+        "text.primary",
+        "text.secondary",
+        "border.radius",
+        "density"
       ]
     },
     "vault": {
@@ -64931,6 +65637,147 @@
         "pii_protected",
         "data_classified",
         "access_controlled"
+      ],
+      "provides": [
+        "pan_tokenization",
+        "format_preserving_encryption",
+        "pci_dss_compliance",
+        "secret_management",
+        "key_rotation"
+      ],
+      "service_methods": [
+        "tokenize",
+        "detokenize",
+        "rotate_token",
+        "delete_token",
+        "list_tokens",
+        "health_check",
+        "tokenize_batch",
+        "detokenize_batch",
+        "tokenize_pan",
+        "detokenize_pan",
+        "validate_luhn",
+        "mask_pan",
+        "tokenize_field",
+        "detokenize_field",
+        "rotate_field_token",
+        "store_secret",
+        "get_secret",
+        "delete_secret",
+        "list_secrets",
+        "rotate_secret",
+        "encrypt",
+        "decrypt",
+        "encrypt_batch",
+        "decrypt_batch",
+        "generate_key",
+        "rotate_key",
+        "get_key_info",
+        "list_keys",
+        "revoke_key",
+        "create_policy",
+        "get_policy",
+        "update_policy",
+        "delete_policy",
+        "list_policies",
+        "get_audit_events",
+        "get_compliance_status",
+        "generate_pci_report",
+        "check_pci_scope",
+        "validate_pan_scope_isolation",
+        "configure_hsm",
+        "test_hsm_connection",
+        "get_hsm_status",
+        "get_tokenization_stats",
+        "export_token_vault",
+        "import_token_vault"
+      ],
+      "configuration_keys": [
+        "tenant_id",
+        "encryption_key",
+        "key_rotation_interval",
+        "tokenization_strategy",
+        "pci_scope",
+        "hsm_enabled",
+        "hsm_url",
+        "token_format",
+        "log_detokenize_access",
+        "audit_retention_days",
+        "configuration"
+      ],
+      "ui_routes": [
+        {
+          "name": "dashboard",
+          "path": "/common/vault/dashboard",
+          "permission": "vault:view",
+          "nav_group": "Overview"
+        },
+        {
+          "name": "tokens",
+          "path": "/common/vault/tokens",
+          "permission": "vault:manage",
+          "nav_group": "Tokens"
+        },
+        {
+          "name": "secrets",
+          "path": "/common/vault/secrets",
+          "permission": "vault:manage",
+          "nav_group": "Secrets"
+        },
+        {
+          "name": "audit",
+          "path": "/common/vault/audit",
+          "permission": "vault:audit",
+          "nav_group": "Compliance"
+        },
+        {
+          "name": "settings",
+          "path": "/common/vault/settings",
+          "permission": "vault:admin",
+          "nav_group": "Administration"
+        }
+      ],
+      "route_count": 5,
+      "requires": [
+        "auth",
+        "audl",
+        "mten",
+        "conf"
+      ],
+      "service_method_count": 45,
+      "streaming_processor": "bytewax",
+      "streaming_stream": "apg.common.vault.lifecycle",
+      "streaming_events": [
+        "token_created",
+        "token_detokenized",
+        "token_rotated",
+        "token_deleted",
+        "secret_stored",
+        "secret_accessed",
+        "secret_rotated",
+        "key_generated",
+        "key_rotated",
+        "pci_compliance_checked"
+      ],
+      "streaming_guardrails": [
+        "tenant_context_required",
+        "unauthorized_detokenize_denied",
+        "pci_scope_enforced",
+        "key_rotation_enforced"
+      ],
+      "theme_name": "vault_tokenization",
+      "theme_tokens": [
+        "color.primary",
+        "color.accent",
+        "color.success",
+        "color.warning",
+        "color.danger",
+        "surface.canvas",
+        "surface.panel",
+        "text.primary",
+        "text.secondary",
+        "border.radius",
+        "density"
       ]
     }
   },

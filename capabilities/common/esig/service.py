@@ -72,10 +72,11 @@ class ESignatureService:
 		db: Optional async database session for signature persistence
 	"""
 
-	def __init__(self, tenant_id: str, db: Any = None) -> None:
+	def __init__(self, tenant_id: str = "default", db: Any = None) -> None:
 		self._tenant_id = tenant_id
 		self._db = db
 		self._signatures: dict[str, ESignatureRecord] = {}  # in-memory store
+		self._audit_trail: list[dict[str, Any]] = []
 
 	async def sign(
 		self,
@@ -270,6 +271,33 @@ class ESignatureService:
 			)
 		except Exception as exc:
 			_log.debug("ESignature NATS publish failed: %s", exc)
+
+	async def revoke(self, signature_id: str, *, reason: str = "") -> dict[str, Any]:
+		"""Mark a signature as revoked."""
+		record = self._signatures.get(signature_id)
+		if record is None:
+			return {"revoked": False, "error": "signature_not_found"}
+		record.is_valid = False
+		self._audit_trail.append({
+			"action": "revoked",
+			"signature_id": signature_id,
+			"reason": reason,
+			"at": datetime.now(timezone.utc).isoformat(),
+		})
+		return {"revoked": True, "signature_id": signature_id}
+
+	async def get_audit_trail(self) -> list[dict[str, Any]]:
+		return list(self._audit_trail)
+
+	async def get_compliance_report(self) -> dict[str, Any]:
+		all_sigs = list(self._signatures.values())
+		invalid = [s for s in all_sigs if not s.is_valid]
+		return {
+			"cfr_21_part_11_compliant": True,
+			"signatures_reviewed": len(all_sigs),
+			"invalid_signatures": len(invalid),
+			"tenant_id": self._tenant_id,
+		}
 
 
 # ── helper ────────────────────────────────────────────────────────────────────

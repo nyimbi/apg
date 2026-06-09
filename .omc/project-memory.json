@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1780693517001,
+  "lastScanned": 1781017850341,
   "projectRoot": "/Users/nyimbiodero/src/pjs/apg",
   "techStack": {
     "languages": [],
@@ -10,7 +10,7 @@
   },
   "build": {
     "buildCommand": null,
-    "testCommand": "\\\n.venv/bin/python -m pytest \\\n  tests/test_tooling_ergonomics.py \\\n  tests/test_compiled_program_tables.py \\\n  tests/test_antlr_visitor.py \\\n  tests/test_rule_expr.py \\\n  -q --tb=short 2>&1 | tail -8",
+    "testCommand": "uv run pytest tests/ -q --tb=line --ignore=tests/test_hcm_tat_runtime_store.py -x 2>&1 | tail -15",
     "lintCommand": null,
     "devCommand": null,
     "scripts": {}
@@ -42,7 +42,7 @@
       "path": "__pycache__",
       "purpose": null,
       "fileCount": 7,
-      "lastAccessed": 1780693516992,
+      "lastAccessed": 1781017850332,
       "keyFiles": [
         "cli.cpython-311.pyc",
         "cli.cpython-314.pyc",
@@ -55,7 +55,7 @@
       "path": "agents",
       "purpose": null,
       "fileCount": 10,
-      "lastAccessed": 1780693516993,
+      "lastAccessed": 1781017850333,
       "keyFiles": [
         "__init__.py",
         "architect_agent.py",
@@ -68,7 +68,7 @@
       "path": "apg",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1780693516993,
+      "lastAccessed": 1781017850333,
       "keyFiles": [
         "__init__.py"
       ]
@@ -77,14 +77,14 @@
       "path": "apg_demo_output",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1780693516993,
+      "lastAccessed": 1781017850333,
       "keyFiles": []
     },
     "apg_language.egg-info": {
       "path": "apg_language.egg-info",
       "purpose": null,
       "fileCount": 7,
-      "lastAccessed": 1780693516994,
+      "lastAccessed": 1781017850334,
       "keyFiles": [
         "PKG-INFO",
         "SOURCES.txt",
@@ -97,7 +97,7 @@
       "path": "capabilities",
       "purpose": null,
       "fileCount": 15,
-      "lastAccessed": 1780693516994,
+      "lastAccessed": 1781017850334,
       "keyFiles": [
         "COMPOSABILITY.md",
         "MANIFEST.json",
@@ -109,8 +109,8 @@
     "cli": {
       "path": "cli",
       "purpose": null,
-      "fileCount": 30,
-      "lastAccessed": 1780693516994,
+      "fileCount": 32,
+      "lastAccessed": 1781017850334,
       "keyFiles": [
         "__init__.py",
         "agent_adapter.py",
@@ -123,7 +123,7 @@
       "path": "common",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1780693516994,
+      "lastAccessed": 1781017850334,
       "keyFiles": [
         "__init__.py",
         "base.py"
@@ -132,30 +132,37 @@
     "compiler": {
       "path": "compiler",
       "purpose": null,
-      "fileCount": 34,
-      "lastAccessed": 1780693516994,
+      "fileCount": 38,
+      "lastAccessed": 1781017850335,
       "keyFiles": [
         "__init__.py",
         "ai_agent_composition.py",
+        "antlr_ast_visitor.py",
         "ast_builder.py",
-        "baseline.py",
-        "capability_implementation.py"
+        "baseline.py"
       ]
     },
     "database": {
       "path": "database",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1780693516994,
+      "lastAccessed": 1781017850335,
       "keyFiles": [
         "init_postgresql.py"
       ]
     },
+    "devops": {
+      "path": "devops",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1781017850335,
+      "keyFiles": []
+    },
     "docs": {
       "path": "docs",
       "purpose": "Documentation",
-      "fileCount": 29,
-      "lastAccessed": 1780693516996,
+      "fileCount": 33,
+      "lastAccessed": 1781017850335,
       "keyFiles": [
         "README.md",
         "ai_agent_composition.md",
@@ -168,7 +175,7 @@
       "path": "examples",
       "purpose": "Example code",
       "fileCount": 20,
-      "lastAccessed": 1780693516996,
+      "lastAccessed": 1781017850335,
       "keyFiles": [
         "FEEL_1_1.g4",
         "README.md",
@@ -181,7 +188,7 @@
       "path": "gen",
       "purpose": null,
       "fileCount": 34,
-      "lastAccessed": 1780693516996,
+      "lastAccessed": 1781017850335,
       "keyFiles": [
         "D2DiagramVisitor.py",
         "FABModelGenerator.py",
@@ -194,14 +201,14 @@
       "path": "installed_capabilities",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1780693516996,
+      "lastAccessed": 1781017850336,
       "keyFiles": []
     },
     "language_server": {
       "path": "language_server",
       "purpose": null,
       "fileCount": 4,
-      "lastAccessed": 1780693516996,
+      "lastAccessed": 1781017850336,
       "keyFiles": [
         "__init__.py",
         "client.py",
@@ -213,7 +220,7 @@
       "path": "marketplace",
       "purpose": null,
       "fileCount": 5,
-      "lastAccessed": 1780693516996,
+      "lastAccessed": 1781017850336,
       "keyFiles": [
         "README.md",
         "capability_marketplace.py",
@@ -226,14 +233,21 @@
       "path": "mobile_apps",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1780693516996,
+      "lastAccessed": 1781017850336,
+      "keyFiles": []
+    },
+    "policies": {
+      "path": "policies",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1781017850336,
       "keyFiles": []
     },
     "ref": {
       "path": "ref",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1780693516996,
+      "lastAccessed": 1781017850336,
       "keyFiles": [
         "types.txt"
       ]
@@ -242,7 +256,7 @@
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 2,
-      "lastAccessed": 1780693516996,
+      "lastAccessed": 1781017850337,
       "keyFiles": [
         "README.md",
         "build_all_packages.sh"
@@ -252,28 +266,28 @@
       "path": "singer_logs",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1780693516997,
+      "lastAccessed": 1781017850337,
       "keyFiles": []
     },
     "singer_runtime": {
       "path": "singer_runtime",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1780693516997,
+      "lastAccessed": 1781017850337,
       "keyFiles": []
     },
     "singer_state": {
       "path": "singer_state",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1780693516997,
+      "lastAccessed": 1781017850337,
       "keyFiles": []
     },
     "spec": {
       "path": "spec",
       "purpose": "Test specifications",
       "fileCount": 15,
-      "lastAccessed": 1780693516997,
+      "lastAccessed": 1781017850337,
       "keyFiles": [
         "apg.g4",
         "apg.interp",
@@ -286,14 +300,14 @@
       "path": "storage",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1780693516997,
+      "lastAccessed": 1781017850337,
       "keyFiles": []
     },
     "templates": {
       "path": "templates",
       "purpose": null,
       "fileCount": 5,
-      "lastAccessed": 1780693516997,
+      "lastAccessed": 1781017850337,
       "keyFiles": [
         "__init__.py",
         "application_template_manager.py",
@@ -305,35 +319,35 @@
     "tests": {
       "path": "tests",
       "purpose": "Test files",
-      "fileCount": 225,
-      "lastAccessed": 1780693516998,
+      "fileCount": 240,
+      "lastAccessed": 1781017850339,
       "keyFiles": [
         "__init__.py",
         "conftest.py",
+        "test_additional_connectors.py",
         "test_agent_adapter_shims.py",
-        "test_agent_basic.py",
-        "test_agent_integrations.py"
+        "test_agent_basic.py"
       ]
     },
     "tmp": {
       "path": "tmp",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1780693516998,
+      "lastAccessed": 1781017850339,
       "keyFiles": []
     },
     "uploads": {
       "path": "uploads",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1780693516998,
+      "lastAccessed": 1781017850339,
       "keyFiles": []
     },
     "vscode-extension": {
       "path": "vscode-extension",
       "purpose": null,
       "fileCount": 3,
-      "lastAccessed": 1780693516999,
+      "lastAccessed": 1781017850339,
       "keyFiles": [
         "README.md",
         "language-configuration.json",
@@ -344,7 +358,7 @@
       "path": "docs/api",
       "purpose": "API routes",
       "fileCount": 1,
-      "lastAccessed": 1780693516999,
+      "lastAccessed": 1781017850340,
       "keyFiles": [
         "README.md"
       ]
@@ -353,7 +367,7 @@
       "path": "scripts/migrations",
       "purpose": "Database migrations",
       "fileCount": 1,
-      "lastAccessed": 1780693517000,
+      "lastAccessed": 1781017850340,
       "keyFiles": [
         "migration_to_v2.py"
       ]
@@ -362,14 +376,14 @@
       "path": "tests/fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1780693517001,
+      "lastAccessed": 1781017850341,
       "keyFiles": []
     },
     "vscode-extension/src": {
       "path": "vscode-extension/src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1780693517001,
+      "lastAccessed": 1781017850341,
       "keyFiles": [
         "extension.ts"
       ]
@@ -377,303 +391,177 @@
   },
   "hotPaths": [
     {
-      "path": "compiler/semantic_model.py",
-      "accessCount": 36,
-      "lastAccessed": 1780849481393,
-      "type": "file"
-    },
-    {
-      "path": "compiler/parser.py",
-      "accessCount": 32,
-      "lastAccessed": 1780801167568,
-      "type": "file"
-    },
-    {
-      "path": "compiler/studio.py",
-      "accessCount": 25,
-      "lastAccessed": 1780855607220,
-      "type": "file"
-    },
-    {
-      "path": "compiler/nl_plan.py",
-      "accessCount": 25,
-      "lastAccessed": 1780855642560,
-      "type": "file"
-    },
-    {
-      "path": "compiler/compiler.py",
-      "accessCount": 23,
-      "lastAccessed": 1780800935591,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/hcm/tat/time_attendance/service.py",
-      "accessCount": 20,
-      "lastAccessed": 1780735398492,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/hcm/tat/time_attendance/api.py",
-      "accessCount": 14,
-      "lastAccessed": 1780735619582,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/hcm/tat/time_attendance/models.py",
-      "accessCount": 8,
-      "lastAccessed": 1780735215556,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/fin/glr/general_ledger/service.py",
+      "path": "capabilities/common/nats/service.py",
       "accessCount": 7,
-      "lastAccessed": 1780734942645,
+      "lastAccessed": 1781038424563,
       "type": "file"
     },
     {
-      "path": "tests/test_compiled_program_tables.py",
-      "accessCount": 7,
-      "lastAccessed": 1780807269305,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/crm/adv/api.py",
+      "path": "capabilities/common/esig/api.py",
       "accessCount": 5,
-      "lastAccessed": 1780737728184,
+      "lastAccessed": 1781038294107,
       "type": "file"
     },
     {
-      "path": "compiler/repository_hygiene.py",
-      "accessCount": 3,
-      "lastAccessed": 1780726020276,
+      "path": "capabilities/common/esig/service.py",
+      "accessCount": 4,
+      "lastAccessed": 1781038279195,
       "type": "file"
     },
     {
-      "path": "compiler/capability_implementation.py",
-      "accessCount": 3,
-      "lastAccessed": 1780733223552,
+      "path": "capabilities/common/phi/service.py",
+      "accessCount": 4,
+      "lastAccessed": 1781038454875,
       "type": "file"
     },
     {
-      "path": "capabilities/common/colb/service.py",
-      "accessCount": 3,
-      "lastAccessed": 1780734724838,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/composition/orchestration/service.py",
-      "accessCount": 3,
-      "lastAccessed": 1780734727510,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/fin/glr/general_ledger/blueprint.py",
-      "accessCount": 3,
-      "lastAccessed": 1780734826628,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/crm/adv/service.py",
-      "accessCount": 3,
-      "lastAccessed": 1780735851959,
-      "type": "file"
-    },
-    {
-      "path": "compiler/ai_agent_composition.py",
-      "accessCount": 3,
-      "lastAccessed": 1780800971368,
-      "type": "file"
-    },
-    {
-      "path": "tests/test_repository_hygiene.py",
+      "path": "capabilities/common/vault/api.py",
       "accessCount": 2,
-      "lastAccessed": 1780733117434,
+      "lastAccessed": 1781038185157,
       "type": "file"
     },
     {
-      "path": "capabilities/fin/glr/general_ledger/models.py",
-      "accessCount": 2,
-      "lastAccessed": 1780734734953,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/composition/registry/service.py",
-      "accessCount": 2,
-      "lastAccessed": 1780734737120,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/composition/config/service.py",
-      "accessCount": 2,
-      "lastAccessed": 1780734758164,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/hcm/tat/time_attendance/mobile_api.py",
-      "accessCount": 2,
-      "lastAccessed": 1780734841420,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/hcm/tat/time_attendance/blueprint.py",
-      "accessCount": 2,
-      "lastAccessed": 1780735271841,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/crm/adv/database.py",
-      "accessCount": 2,
-      "lastAccessed": 1780735814288,
-      "type": "file"
-    },
-    {
-      "path": "cli/studio_command.py",
+      "path": "tests/test_composability_comprehensive.py",
       "accessCount": 1,
-      "lastAccessed": 1780701535036,
+      "lastAccessed": 1781037695516,
       "type": "file"
     },
     {
-      "path": "cli/nl_plan_command.py",
+      "path": "capabilities/common/nats/models.py",
       "accessCount": 1,
-      "lastAccessed": 1780701551840,
+      "lastAccessed": 1781037895084,
       "type": "file"
     },
     {
-      "path": "cli/agent_adapter.py",
+      "path": "capabilities/common/nats/views.py",
       "accessCount": 1,
-      "lastAccessed": 1780701552364,
+      "lastAccessed": 1781037908505,
       "type": "file"
     },
     {
-      "path": "tests/test_tooling_audit.py",
+      "path": "capabilities/common/nats/api.py",
       "accessCount": 1,
-      "lastAccessed": 1780725957628,
+      "lastAccessed": 1781037929554,
       "type": "file"
     },
     {
-      "path": "compiler/tooling_audit.py",
+      "path": "capabilities/common/temporal/service.py",
       "accessCount": 1,
-      "lastAccessed": 1780725963132,
+      "lastAccessed": 1781037966918,
       "type": "file"
     },
     {
-      "path": "tests/test_cli_capability_scaffold.py",
+      "path": "capabilities/common/temporal/models.py",
       "accessCount": 1,
-      "lastAccessed": 1780734171922,
+      "lastAccessed": 1781037979833,
       "type": "file"
     },
     {
-      "path": "tests/test_common_colb_chat_messages.py",
+      "path": "capabilities/common/temporal/views.py",
       "accessCount": 1,
-      "lastAccessed": 1780734646933,
+      "lastAccessed": 1781037985753,
       "type": "file"
     },
     {
-      "path": "tests/test_fin_glr_period_reporting_runtime.py",
+      "path": "capabilities/common/temporal/api.py",
       "accessCount": 1,
-      "lastAccessed": 1780734656362,
+      "lastAccessed": 1781038005205,
       "type": "file"
     },
     {
-      "path": "tests/test_fin_glr_context_resolution.py",
+      "path": "capabilities/common/phi/models.py",
       "accessCount": 1,
-      "lastAccessed": 1780734656626,
+      "lastAccessed": 1781038055762,
       "type": "file"
     },
     {
-      "path": "tests/test_composition_orchestration_service_minimal.py",
+      "path": "capabilities/common/phi/views.py",
       "accessCount": 1,
-      "lastAccessed": 1780734657161,
+      "lastAccessed": 1781038060833,
       "type": "file"
     },
     {
-      "path": "tests/test_composition_config_dependency_light.py",
+      "path": "capabilities/common/phi/api.py",
       "accessCount": 1,
-      "lastAccessed": 1780734657619,
+      "lastAccessed": 1781038072013,
       "type": "file"
     },
     {
-      "path": "tests/test_hcm_tat_runtime_store.py",
+      "path": "capabilities/common/esig/models.py",
       "accessCount": 1,
-      "lastAccessed": 1780734664188,
+      "lastAccessed": 1781038079361,
       "type": "file"
     },
     {
-      "path": "capabilities/common/colb/models.py",
+      "path": "capabilities/common/esig/views.py",
       "accessCount": 1,
-      "lastAccessed": 1780734670337,
+      "lastAccessed": 1781038083979,
       "type": "file"
     },
     {
-      "path": "capabilities/fin/glr/general_ledger/context.py",
+      "path": "capabilities/common/vault/models.py",
       "accessCount": 1,
-      "lastAccessed": 1780734671363,
+      "lastAccessed": 1781038103765,
       "type": "file"
     },
     {
-      "path": "capabilities/fin/glr/general_ledger/api.py",
+      "path": "capabilities/common/vault/views.py",
       "accessCount": 1,
-      "lastAccessed": 1780734678606,
+      "lastAccessed": 1781038108243,
       "type": "file"
     },
     {
-      "path": "tests/test_composition_registry_service_metadata.py",
+      "path": "capabilities/common/mlx/views.py",
       "accessCount": 1,
-      "lastAccessed": 1780734680349,
+      "lastAccessed": 1781038132679,
       "type": "file"
     },
     {
-      "path": "tests/test_composition_registry_service_recommendations.py",
+      "path": "capabilities/common/mlx/api.py",
       "accessCount": 1,
-      "lastAccessed": 1780734680858,
+      "lastAccessed": 1781038146640,
       "type": "file"
     },
     {
-      "path": "tests/test_hcm_tat_context_resolution.py",
+      "path": "capabilities/common/mlx/service.py",
       "accessCount": 1,
-      "lastAccessed": 1780734752914,
+      "lastAccessed": 1781038335490,
       "type": "file"
     },
     {
-      "path": "capabilities/hcm/tat/time_attendance/monitoring.py",
+      "path": "capabilities/common/nats/docs/user_guide.md",
       "accessCount": 1,
-      "lastAccessed": 1780734841904,
+      "lastAccessed": 1781038536368,
       "type": "file"
     },
     {
-      "path": "capabilities/hcm/tat/time_attendance/websocket.py",
+      "path": "capabilities/common/temporal/docs/user_guide.md",
       "accessCount": 1,
-      "lastAccessed": 1780734898297,
+      "lastAccessed": 1781038549753,
       "type": "file"
     },
     {
-      "path": "capabilities/hcm/tat/time_attendance/app.py",
+      "path": "capabilities/common/mlx/docs/user_guide.md",
       "accessCount": 1,
-      "lastAccessed": 1780735290914,
+      "lastAccessed": 1781038571154,
       "type": "file"
     },
     {
-      "path": "tests/test_crm_adv_core_records.py",
+      "path": "capabilities/common/phi/docs/user_guide.md",
       "accessCount": 1,
-      "lastAccessed": 1780735690807,
+      "lastAccessed": 1781038587048,
       "type": "file"
     },
     {
-      "path": "tests/test_common_nlpc_api_context.py",
+      "path": "capabilities/common/esig/docs/user_guide.md",
       "accessCount": 1,
-      "lastAccessed": 1780735702282,
+      "lastAccessed": 1781038601585,
       "type": "file"
     },
     {
-      "path": "tests/test_fin_bfc_context_resolution.py",
+      "path": "capabilities/common/vault/docs/user_guide.md",
       "accessCount": 1,
-      "lastAccessed": 1780735702927,
-      "type": "file"
-    },
-    {
-      "path": "tests/test_composition_config_api_runtime.py",
-      "accessCount": 1,
-      "lastAccessed": 1780735705898,
+      "lastAccessed": 1781038617685,
       "type": "file"
     }
   ],

@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"python3 -c \\\"import json; m=json.load(open('capabilities/MANIFEST.json')); caps=[c['capability_id'] for c in m['capabilities'] if c['capability_id'] in ['esig','mlx','nats','phi','temporal...",
+  "error": "Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n  File \"<string>\", line 1, in <listcomp>\nTypeError: string indices must be integers, not 'str'",
+  "timestamp": "2026-06-09T20:41:23.408Z",
+  "retry_count": 1
+}
