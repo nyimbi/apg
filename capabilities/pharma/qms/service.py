@@ -1059,4 +1059,18 @@ class QualityManagementService:
 		}
 
 
+
+	async def ml_batch_release_risk(self, *args, **kwargs):
+		"""AI-powered ML batch release risk classification. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.classify(str(kwargs), labels=["release_standard","release_with_review","hold_for_investigation","reject"])
+			return {"release_decision": result.label, "confidence": result.confidence, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 PharmaQmsService = QualityManagementService

@@ -695,3 +695,17 @@ APGDocumentService = GrcDocService
 async def create_document_service(*args: Any, **kwargs: Any) -> GrcDocService:
 	tenant_id = kwargs.get("tenant_id")
 	return GrcDocService(tenant_id=tenant_id)
+
+	async def ml_document_classify(self, *args, **kwargs):
+		"""AI-powered GRC document classification and compliance tagging. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.classify(str(kwargs.get("content","")), labels=["policy","procedure","work_instruction","form","record"])
+			return {"doc_type": result.label, "confidence": result.confidence, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+

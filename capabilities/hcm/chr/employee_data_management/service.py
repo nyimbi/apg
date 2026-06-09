@@ -1308,6 +1308,20 @@ class EmployeeDataManagementService:
 		}
 
 
+
+	async def ml_attrition_predict(self, *args, **kwargs):
+		"""AI-powered employee attrition risk prediction. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="employee_attrition_risk")
+			return {"attrition_probability": round(result.score, 3), "risk_factors": result.factors, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 EmployeeLifecycleService = EmployeeDataManagementService
 EmployeeProfileService = EmployeeDataManagementService
 EmployeeDirectoryService = EmployeeDataManagementService

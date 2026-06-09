@@ -2335,3 +2335,17 @@ class LaboratoryInformationService:
 			"entity_id": entity_id,
 			"timestamp": datetime.utcnow().isoformat(),
 		})
+
+	async def ml_critical_lab_flag(self, *args, **kwargs):
+		"""AI-powered ML detection of critical lab result patterns. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.classify(str(kwargs), labels=["normal","borderline","abnormal","critical_alert"])
+			return {"lab_class": result.label, "confidence": result.confidence, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+

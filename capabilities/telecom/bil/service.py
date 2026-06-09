@@ -2161,3 +2161,17 @@ class TelecomBilService(TelecomBillingService):
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:  # type: ignore[override]
 		return get_capability_contract(tenant_id)
+
+	async def ml_usage_anomaly_detect(self, *args, **kwargs):
+		"""AI-powered telecom usage anomaly detection for fraud. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="telecom_usage_anomaly")
+			return {"anomaly_score": round(result.score,3), "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+

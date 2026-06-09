@@ -807,3 +807,17 @@ class ConService:
 		"""Search Records"""
 		assert query, "query required"
 		return {"query": query, "tenant_id": tenant_id, "results": [], "result_count": 0}
+
+	async def ml_construction_risk(self, *args, **kwargs):
+		"""AI-powered construction project cost overrun and delay risk. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="construction_project_risk")
+			return {"risk_score": round(result.score,3), "risk_factors": result.factors, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+

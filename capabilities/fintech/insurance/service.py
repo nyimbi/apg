@@ -1140,3 +1140,17 @@ class InsurTechService:
 			return
 		reasons = ", ".join(action.get("reason", "insurance_policy_denied") for action in result["actions"])
 		raise PermissionError(reasons or "insurance_policy_denied")
+
+	async def ml_premium_score(self, *args, **kwargs):
+		"""AI-powered insurance premium risk scoring. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="insurance_premium_risk")
+			return {"risk_score": round(result.score,3), "premium_band": result.factors[0] if result.factors else "standard", "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
