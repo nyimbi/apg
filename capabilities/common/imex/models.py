@@ -11,7 +11,7 @@ from typing import Any, Annotated
 from uuid_extensions import uuid7str
 
 from pydantic import BaseModel, Field, ConfigDict, AfterValidator, validator, model_validator
-from pydantic.types import Json
+from pydantic import Json
 
 
 class JobType(str, Enum):

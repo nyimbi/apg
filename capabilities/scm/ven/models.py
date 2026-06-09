@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 
 from pydantic import BaseModel, Field, validator, root_validator, ConfigDict
-from pydantic.types import EmailStr, HttpUrl
+from pydantic import EmailStr, HttpUrl
 from uuid_extensions import uuid7str
 
 

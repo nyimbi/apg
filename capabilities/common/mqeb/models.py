@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from uuid_extensions import uuid7str
 from pydantic import BaseModel, Field, ConfigDict, validator, root_validator
-from pydantic.types import conint, constr, conlist
+from pydantic import conint, constr, conlist
 
 
 class MessagePriority(str, Enum):

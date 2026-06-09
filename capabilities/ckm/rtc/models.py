@@ -222,7 +222,7 @@ class RTCActivity(Model, AuditMixin, BaseMixin):
 	# Activity Data
 	old_values = Column(JSON, default=dict)  # Previous state
 	new_values = Column(JSON, default=dict)  # New state after action
-	metadata = Column(JSON, default=dict)  # Additional context data
+	extra_metadata = Column(JSON, default=dict)  # Additional context data
 	
 	# Impact and Classification
 	impact_level = Column(String(20), default='low')  # low, medium, high

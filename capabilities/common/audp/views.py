@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 
 from pydantic import BaseModel, Field, AfterValidator, field_validator, computed_field, ConfigDict
-from pydantic.types import StringConstraints
+from pydantic import StringConstraints
 from annotated_types import Ge, Le
 from typing_extensions import Annotated
 

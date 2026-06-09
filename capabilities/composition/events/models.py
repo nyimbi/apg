@@ -29,7 +29,7 @@ try:
 	from pydantic import field_validator
 except ImportError:  # Pydantic v1 compatibility
 	field_validator = validator
-from pydantic.types import UUID4
+from pydantic import UUID4
 from uuid_extensions import uuid7str
 
 # =============================================================================

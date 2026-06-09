@@ -18,7 +18,7 @@ import json
 import re
 
 from pydantic import BaseModel, Field, ConfigDict, validator, root_validator, AfterValidator
-from pydantic.types import SecretStr
+from pydantic import SecretStr
 
 
 def validate_resource_name(name: str) -> str:

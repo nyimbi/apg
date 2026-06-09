@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete
 from sqlalchemy.orm import selectinload
 from pydantic import BaseModel, Field, ConfigDict, AfterValidator
-from pydantic.types import Annotated
+from typing import Annotated
 
 # APG imports (would be actual imports in real implementation)
 # from ..auth_rbac.service import AuthService

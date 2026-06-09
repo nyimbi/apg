@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional, Set, Union
 from uuid import uuid4
 
 from pydantic import BaseModel, Field, ConfigDict, AfterValidator
-from pydantic.types import Json
+from pydantic import Json
 from typing_extensions import Annotated
 
 # Use uuid7str for IDs following APG standards

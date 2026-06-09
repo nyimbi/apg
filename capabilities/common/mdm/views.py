@@ -13,7 +13,7 @@ from enum import Enum
 import re
 
 from pydantic import BaseModel, Field, ConfigDict, validator, root_validator
-from pydantic.types import EmailStr, UUID4
+from pydantic import EmailStr, UUID4
 from uuid_extensions import uuid7str
 
 from .models import EntityType, EntityStatus, DataQualityStatus, MatchConfidence

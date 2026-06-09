@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional
 from uuid_extensions import uuid7str
 
 from pydantic import BaseModel, Field, ConfigDict, field_validator
-from pydantic.types import UUID4
+from pydantic import UUID4
 
 
 class BillingCurrency(str, Enum):

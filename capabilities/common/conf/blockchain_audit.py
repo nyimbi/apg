@@ -22,7 +22,7 @@ from enum import StrEnum
 from uuid_extensions import uuid7str
 
 from pydantic import BaseModel, Field, ConfigDict
-from pydantic.types import Annotated
+from typing import Annotated
 try:
 	from Crypto.PublicKey import RSA
 	from Crypto.Signature import pkcs1_15

@@ -23,7 +23,7 @@ from enum import Enum
 import aiohttp
 import asyncpg
 from pydantic import BaseModel, ValidationError, Field, ConfigDict
-from pydantic.types import UUID4
+from pydantic import UUID4
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid_extensions import uuid7str
 

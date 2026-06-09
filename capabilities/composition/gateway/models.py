@@ -21,7 +21,7 @@ from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB, INET
 
 from pydantic import BaseModel, Field, ConfigDict, validator
-from pydantic.types import Json
+from pydantic import Json
 from uuid_extensions import uuid7str
 
 # SQLAlchemy Base

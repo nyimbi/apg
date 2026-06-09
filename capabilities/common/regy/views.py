@@ -28,7 +28,7 @@ from wtforms import StringField, SelectField, TextAreaField, BooleanField, Integ
 from wtforms.validators import DataRequired, Optional as OptionalValidator, Length, NumberRange
 
 from pydantic import BaseModel, Field, ConfigDict, field_validator
-from pydantic.types import PositiveInt, NonNegativeFloat
+from pydantic import PositiveInt, NonNegativeFloat
 from pydantic import AfterValidator
 from typing_extensions import Annotated
 

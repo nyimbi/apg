@@ -23,7 +23,7 @@ from sqlalchemy.orm import relationship, validates
 from sqlalchemy.ext.hybrid import hybrid_property
 from flask_appbuilder import Model
 from pydantic import BaseModel, Field, ConfigDict, AfterValidator
-from pydantic.types import StringConstraints
+from pydantic import StringConstraints
 from typing_extensions import Annotated
 from enum import Enum
 import json

@@ -32,7 +32,7 @@ import uuid
 from uuid_extensions import uuid7str
 
 from pydantic import BaseModel, Field, ConfigDict, validator
-from pydantic.types import StrictStr, StrictInt, StrictFloat, StrictBool
+from pydantic import StrictStr, StrictInt, StrictFloat, StrictBool
 
 
 class IntegrationType(str, Enum):

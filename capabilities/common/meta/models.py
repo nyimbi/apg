@@ -15,7 +15,7 @@ import json
 from uuid_extensions import uuid7str
 
 from pydantic import BaseModel, Field, ConfigDict, validator, root_validator, AfterValidator
-from pydantic.types import UUID4
+from pydantic import UUID4
 from sqlalchemy import Column, String, Text, DateTime, Float, Integer, Boolean, JSON, ForeignKey, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship

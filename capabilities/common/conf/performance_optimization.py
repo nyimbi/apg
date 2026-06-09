@@ -25,7 +25,7 @@ import psutil
 import weakref
 
 from pydantic import BaseModel, Field, ConfigDict
-from pydantic.types import Annotated
+from typing import Annotated
 
 # Logging setup following APG patterns
 logger = logging.getLogger(__name__)

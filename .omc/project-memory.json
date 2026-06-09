@@ -10,7 +10,7 @@
   },
   "build": {
     "buildCommand": null,
-    "testCommand": "uv run pytest tests/test_integration_platform.py tests/test_repository_hygiene.py tests/test_capability_contract_registry.py -q --tb=short 2>&1 | tail -5",
+    "testCommand": "uv run pytest tests/test_composability_comprehensive.py tests/test_integration_platform.py tests/test_repository_hygiene.py -q --tb=short 2>&1 | tail -5",
     "lintCommand": null,
     "devCommand": null,
     "scripts": {}

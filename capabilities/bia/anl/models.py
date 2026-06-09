@@ -17,7 +17,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, validator, root_validator
 from pydantic.config import ConfigDict
-from pydantic.types import EmailStr, HttpUrl, Json
+from pydantic import EmailStr, HttpUrl, Json
 from uuid_extensions import uuid7str
 
 

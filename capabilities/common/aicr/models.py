@@ -20,7 +20,7 @@ from typing import Any, Annotated, Optional
 from uuid import uuid4
 
 from pydantic import BaseModel, Field, ConfigDict, AfterValidator
-from pydantic.types import Json
+from pydantic import Json
 
 
 def uuid7str() -> str:

@@ -14,7 +14,7 @@ from typing import Dict, List, Any, Optional, Union, Literal
 from datetime import datetime, timedelta
 from enum import Enum
 from pydantic import BaseModel, Field, ConfigDict, validator, field_validator
-from pydantic.types import EmailStr, HttpUrl
+from pydantic import EmailStr, HttpUrl
 from uuid_extensions import uuid7str
 
 
