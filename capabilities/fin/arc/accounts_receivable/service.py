@@ -2248,4 +2248,18 @@ class AccountsReceivableService:
 # ─────────────────────────────────────────────────────────────
 # Backwards-compat alias
 # ─────────────────────────────────────────────────────────────
+
+	async def ml_collection_risk(self, *args, **kwargs):
+		"""AI-powered accounts receivable collection risk and DSO prediction. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="accounts_receivable_collection_risk")
+			return {"collection_risk": round(result.score,3), "risk_factors": result.factors, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 ARCService = AccountsReceivableService

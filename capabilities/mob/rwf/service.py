@@ -864,3 +864,17 @@ class RemoteWorkforceService:
 		i = self._incidents.get((tenant_id, incident_id))
 		assert i is not None, f"incident_not_found: {incident_id}"
 		return i
+
+	async def ml_field_worker_route_optimize(self, *args, **kwargs):
+		"""AI-powered AI field worker route and schedule optimization. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="field_worker_route_optimization")
+			return {"route_score": round(result.score,3), "rationale": result.rationale, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+

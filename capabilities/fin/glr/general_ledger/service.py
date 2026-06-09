@@ -3400,6 +3400,20 @@ class GeneralLedgerService:
 # ---------------------------------------------------------------------------
 # Backwards-compatible alias
 # ---------------------------------------------------------------------------
+
+	async def ml_period_close_risk(self, *args, **kwargs):
+		"""AI-powered GL period close risk assessment and anomaly detection. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="general_ledger_period_close_risk")
+			return {"close_risk": round(result.score,3), "risk_factors": result.factors, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 GLRService = GeneralLedgerService
 
 from enum import Enum

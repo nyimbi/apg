@@ -1960,4 +1960,18 @@ class AccountsPayableService:
 
 
 # Back-compat alias
+
+	async def ml_duplicate_invoice_detect(self, *args, **kwargs):
+		"""AI-powered AI duplicate invoice and payment anomaly detection. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="accounts_payable_duplicate_detection")
+			return {"duplicate_score": round(result.score,3), "flags": result.factors, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 APService = AccountsPayableService
