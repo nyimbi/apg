@@ -1106,4 +1106,18 @@ class TelecomCustomerService:
 
 
 # Backward-compatible alias
+
+	async def ml_churn_predict(self, *args, **kwargs):
+		"""AI-powered customer churn probability prediction. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="telecom_churn_prediction")
+			return {"churn_probability": round(result.score,3), "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 TelecomCusService = TelecomCustomerService

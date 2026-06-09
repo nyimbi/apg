@@ -985,3 +985,17 @@ class SelfServiceBIService:
 	async def analytics_summary(self, tenant_id: str, period: str = "monthly") -> dict[str, Any]:
 		"""Analytics Summary"""
 		return {"tenant_id": tenant_id, "period": period}
+
+	async def ml_natural_language_query(self, *args, **kwargs):
+		"""AI-powered NL to chart/query generation. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.extract(kwargs.get("question",""), schema={"chart_type": "visualization type", "dimensions": "field names", "aggregation": "sum/count/avg"}, context="business intelligence dashboard")
+			return {"query_intent": result.extracted, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+

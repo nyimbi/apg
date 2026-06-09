@@ -997,4 +997,18 @@ class PortfolioAnalyticsService:
 		assert record_ids
 		return {"deleted_count": len(record_ids), "tenant_id": t}
 
+
+	async def ml_portfolio_risk_assess(self, *args, **kwargs):
+		"""AI-powered project portfolio risk assessment. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="project_portfolio_risk")
+			return {"risk_score": round(result.score,3), "factors": result.factors, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 PpmPanService = PortfolioAnalyticsService

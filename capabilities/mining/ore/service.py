@@ -977,3 +977,17 @@ class OreService:
 	async def export_to_csv(self, ) -> dict[str, Any]:
 		"""Export To Csv"""
 		return {"format": "csv", "tenant_id": self.tenant_id, "content": ""}
+
+	async def ml_ore_grade_predict(self, *args, **kwargs):
+		"""AI-powered ML ore grade forecasting from assay data. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.predict(kwargs.get("assay_series", []), horizon=kwargs.get("horizon",5), task="ore_grade_forecast")
+			return {"grade_forecast": result.predictions, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+

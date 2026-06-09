@@ -990,3 +990,17 @@ class TimetablingService:
 		self.timetables[self._key(tenant_id, timetable_id)] = merged
 		self._audit(tenant_id, "timetable_archived", timetable_id)
 		return merged.model_dump()
+
+	async def ml_timetable_optimize(self, *args, **kwargs):
+		"""AI-powered AI-assisted timetable conflict resolution. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.classify(str(kwargs), labels=["no_conflict","minor_conflict","major_conflict","rescheduling_required"])
+			return {"conflict_class": result.label, "confidence": result.confidence, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+

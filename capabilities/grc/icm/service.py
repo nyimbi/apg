@@ -1272,3 +1272,17 @@ class IncidentComplianceService:
 			"sla_breach_rate_pct": sla_breach_rate,
 			"generated_at": _now(),
 		}
+
+	async def ml_incident_severity(self, *args, **kwargs):
+		"""AI-powered AI-powered incident severity classification. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.classify(str(kwargs), labels=["low","medium","high","critical"])
+			return {"severity": result.label, "confidence": result.confidence, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+

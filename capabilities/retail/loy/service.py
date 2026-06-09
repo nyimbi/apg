@@ -810,3 +810,17 @@ class LoyService:
 	async def get_audit_events(self, tenant_id: str) -> dict[str, Any]:
 		"""Get Audit Events"""
 		return {"tenant_id": tenant_id, "events": []}
+
+	async def ml_detect_loyalty_fraud(self, *args, **kwargs):
+		"""AI-powered loyalty fraud detection. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score({"context": str(kwargs)}, task="loyalty_fraud_detection")
+			return {"fraud_score": round(result.score, 3), "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
