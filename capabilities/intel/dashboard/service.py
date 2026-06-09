@@ -1178,4 +1178,18 @@ class IntelligenceDashboardService:
 		raise PermissionError(reasons or "dashboard_policy_denied")
 
 
+
+	async def ml_threat_landscape_summarize(self, *args, **kwargs):
+		"""AI-powered AI threat landscape executive summary generation. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.summarize(str(kwargs), max_words=150, focus="cybersecurity threat landscape for CISO briefing")
+			return {"threat_briefing": result.summary, "key_points": result.key_points, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 IntelDashboardService = IntelligenceDashboardService

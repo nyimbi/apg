@@ -1246,3 +1246,17 @@ class ChatService:
 
 def _normalize_token(value: str) -> str:
 	return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+	async def ml_intent_classify(self, *args, **kwargs):
+		"""AI-powered AI classification of chat message intent. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.classify(str(kwargs.get("message",""))[:500], labels=["inquiry","complaint","request","feedback","urgent_issue"])
+			return {"intent": result.label, "confidence": result.confidence, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+

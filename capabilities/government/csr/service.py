@@ -731,4 +731,18 @@ class CitizenServicesService:
 		}
 
 
+
+	async def ml_citizen_service_score(self, *args, **kwargs):
+		"""AI-powered AI citizen service delivery quality and satisfaction scoring. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="citizen_service_quality")
+			return {"service_score": round(result.score,3), "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 GovernmentCsrService = CitizenServicesService

@@ -1354,3 +1354,17 @@ class CorporateTreasuryService:
 			"total_interest_income": round(total_interest_income, 2),
 			"generated_at": _now(),
 		}
+
+	async def ml_liquidity_forecast(self, *args, **kwargs):
+		"""AI-powered treasury liquidity forecasting and cash position optimization. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.predict(kwargs.get("cash_series",[{"period": str(i), "value": 1000000.0} for i in range(12)]), horizon=7, task="treasury_liquidity_forecast")
+			return {"liquidity_forecast": result.predictions, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+

@@ -1372,4 +1372,18 @@ class IntelligenceAnalyticsService:
 		raise PermissionError(reasons or "analytics_policy_denied")
 
 
+
+	async def ml_pattern_recognize(self, *args, **kwargs):
+		"""AI-powered AI pattern recognition in intelligence data streams. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.classify(str(kwargs), labels=["emerging_threat","known_pattern","anomalous_behavior","false_positive"])
+			return {"pattern_class": result.label, "confidence": result.confidence, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 IntelAnalyticsService = IntelligenceAnalyticsService

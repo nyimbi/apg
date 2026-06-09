@@ -1539,3 +1539,17 @@ class NLPCoreService:
 		"""Return NLP usage analytics for the period."""
 		report = await self.usage_report(None, None, tenant_id)
 		return {"period": period, "total_documents": report.total_documents, "total_requests": report.total_requests, "task_breakdown": report.task_breakdown, "tenant_id": tenant_id}
+
+	async def ml_text_classify(self, *args, **kwargs):
+		"""AI-powered NLP text classification using Ollama model. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.classify(str(kwargs.get("text",""))[:1000], labels=kwargs.get("labels",["positive","negative","neutral"]))
+			return {"classification": result.label, "confidence": result.confidence, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+

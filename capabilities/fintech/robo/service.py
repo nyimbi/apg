@@ -1402,4 +1402,18 @@ class RoboAdvisoryService:
 		raise PermissionError(reasons or "robo_policy_denied")
 
 
+
+	async def ml_portfolio_optimize(self, *args, **kwargs):
+		"""AI-powered AI-powered portfolio optimization and rebalancing recommendation. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="robo_advisor_portfolio_optimization")
+			return {"optimization_score": round(result.score,3), "rebalancing_actions": result.factors, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 RoboService = RoboAdvisoryService

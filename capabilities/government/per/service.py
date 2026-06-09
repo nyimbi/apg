@@ -1050,4 +1050,18 @@ class PermitsManagementService:
 		}
 
 
+
+	async def ml_permit_approval_predict(self, *args, **kwargs):
+		"""AI-powered AI prediction of permit approval likelihood and timeline. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="government_permit_approval")
+			return {"approval_probability": round(result.score,3), "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 GovernmentPerService = PermitsManagementService

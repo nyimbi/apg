@@ -975,3 +975,17 @@ def _combine_rule_results(*results: dict[str, Any]) -> dict[str, Any]:
 		elif result.get("decision") == "require_review" and decision != "deny":
 			decision = "require_review"
 	return {"decision": decision, "matched_rules": matched_rules, "actions": actions, "context": context}
+
+	async def ml_search_result_rank(self, *args, **kwargs):
+		"""AI-powered AI-powered search result relevance ranking. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score({"query": str(kwargs.get("query","")), "result": str(kwargs.get("result",""))}, task="search_relevance_scoring")
+			return {"relevance_score": round(result.score,3), "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+

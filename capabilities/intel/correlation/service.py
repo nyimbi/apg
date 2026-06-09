@@ -1440,4 +1440,18 @@ class DataCorrelationService:
 		raise PermissionError(reasons or "correlation_policy_denied")
 
 
+
+	async def ml_event_correlation_score(self, *args, **kwargs):
+		"""AI-powered ML-powered event correlation and attack chain detection. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="security_event_correlation")
+			return {"correlation_score": round(result.score,3), "related_events": result.factors, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 IntelCorrelationService = DataCorrelationService
