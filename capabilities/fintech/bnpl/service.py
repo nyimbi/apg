@@ -1430,4 +1430,18 @@ class BuyNowPayLaterService:
 		raise PermissionError(reasons or "bnpl_policy_denied")
 
 
+
+	async def ml_bnpl_eligibility(self, *args, **kwargs):
+		"""AI-powered BNPL (buy-now-pay-later) eligibility and risk scoring. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="bnpl_credit_eligibility")
+			return {"eligibility_score": round(result.score,3), "risk_factors": result.factors, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 BNPLService = BuyNowPayLaterService

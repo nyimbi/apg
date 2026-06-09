@@ -1108,3 +1108,17 @@ class AnalyticsEngineService:
 	async def compliance_check(self, tenant_id: str) -> dict[str, Any]:
 		"""Compliance Check"""
 		return {"tenant_id": tenant_id, "compliant": True}
+
+	async def ml_analysis_narrate(self, *args, **kwargs):
+		"""AI-powered AI natural language narration of analytics results. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.summarize(str(kwargs), focus="business analytics narrative for non-technical stakeholders")
+			return {"narrative": result.summary, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+

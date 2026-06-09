@@ -1390,4 +1390,18 @@ class RemittanceService:
 		raise PermissionError(reasons or "remittance_policy_denied")
 
 
+
+	async def ml_remittance_fraud_detect(self, *args, **kwargs):
+		"""AI-powered remittance fraud and money laundering detection. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="remittance_fraud_detection")
+			return {"fraud_score": round(result.score,3), "flags": result.factors, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 CrossBorderRemittanceService = RemittanceService

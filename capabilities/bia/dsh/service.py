@@ -928,3 +928,17 @@ class DashboardService:
 	async def analytics_summary(self, tenant_id: str, period: str = "monthly") -> dict[str, Any]:
 		"""Analytics Summary"""
 		return {"tenant_id": tenant_id, "period": period}
+
+	async def ml_dashboard_insight_generate(self, *args, **kwargs):
+		"""AI-powered AI-generated executive insights from dashboard metrics. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.summarize(str(kwargs), focus="key business insights and anomalies for executive decision making")
+			return {"insights": result.summary, "key_points": result.key_points, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+

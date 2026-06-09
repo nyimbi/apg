@@ -1306,4 +1306,18 @@ class MobileBankingService:
 		raise PermissionError(reasons or "mobile_policy_denied")
 
 
+
+	async def ml_mobile_security_score(self, *args, **kwargs):
+		"""AI-powered mobile banking session security risk scoring. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="mobile_banking_security")
+			return {"security_risk": round(result.score,3), "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 MobileService = MobileBankingService

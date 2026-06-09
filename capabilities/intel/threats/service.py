@@ -2459,4 +2459,18 @@ class ThreatIntelligenceService:
 
 
 # Alias for backward compatibility
+
+	async def ml_threat_score(self, *args, **kwargs):
+		"""AI-powered AI threat intelligence scoring and priority classification. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="threat_intelligence_priority")
+			return {"threat_priority": round(result.score,3), "threat_factors": result.factors, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 IntelThreatsService = ThreatIntelligenceService

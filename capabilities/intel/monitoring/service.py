@@ -1220,4 +1220,18 @@ class RealTimeMonitoringService:
 		raise PermissionError(reasons or "monitoring_policy_denied")
 
 
+
+	async def ml_alert_triage(self, *args, **kwargs):
+		"""AI-powered AI-powered security alert triage and false positive reduction. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.classify(str(kwargs), labels=["false_positive","informational","low_priority","high_priority","critical"])
+			return {"triage_class": result.label, "confidence": result.confidence, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 IntelMonitoringService = RealTimeMonitoringService

@@ -883,3 +883,17 @@ class ReportBuilderService:
 		"""Generate Report"""
 		assert report_type
 		return {"report_type": report_type, "tenant_id": tenant_id, "period": period}
+
+	async def ml_report_executive_summary(self, *args, **kwargs):
+		"""AI-powered AI executive summary generation from report data. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.summarize(str(kwargs.get("report_data",""))[:3000], max_words=200, focus="business impact and key metrics")
+			return {"summary": result.summary, "key_points": result.key_points, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
