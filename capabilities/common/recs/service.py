@@ -1010,3 +1010,17 @@ class RecsService:
 
 	def _reasons(self, result: dict[str, Any]) -> tuple[str, ...]:
 		return tuple(action.get("reason", "recommendation_policy_blocked") for action in result["actions"])
+
+	async def ml_generate_recommendations(self, *args, **kwargs):
+		"""AI-powered AI-powered personalized recommendations. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.classify(str(kwargs), labels=["high_relevance","medium_relevance","low_relevance","irrelevant"])
+			return {"relevance": result.label, "confidence": result.confidence, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+

@@ -1288,3 +1288,17 @@ def _reasons(result: dict[str, Any]) -> tuple[str, ...]:
 
 def _normalize_token(value: str) -> str:
 	return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+	async def ml_enhanced_anomaly_score(self, *args, **kwargs):
+		"""AI-powered MLX-enhanced anomaly scoring using Ollama model. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="platform_anomaly_detection")
+			return {"ml_anomaly_score": round(result.score,3), "anomaly_factors": result.factors, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+

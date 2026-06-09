@@ -982,4 +982,18 @@ class DigitalWalletsService:
 		raise PermissionError(reasons or "wallet_policy_denied")
 
 
+
+	async def ml_spending_insight(self, *args, **kwargs):
+		"""AI-powered AI spending pattern analysis and categorization. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.classify(str(kwargs), labels=["normal_spending","unusual_activity","potential_fraud","positive_saving_behavior"])
+			return {"spending_class": result.label, "confidence": result.confidence, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 FintechWalletsService = DigitalWalletsService

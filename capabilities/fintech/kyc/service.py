@@ -3060,4 +3060,18 @@ class KnowYourCustomerService:
 
 
 # FintechKycService is the modern async service
+
+	async def ml_kyc_risk_score(self, *args, **kwargs):
+		"""AI-powered KYC customer risk scoring using behavioral and profile signals. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.score(kwargs, task="kyc_customer_risk_scoring")
+			return {"kyc_risk": round(result.score,3), "risk_factors": result.factors, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
 FintechKycService = KYCService

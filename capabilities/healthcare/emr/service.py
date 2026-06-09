@@ -3377,3 +3377,17 @@ class ElectronicMedicalRecordsService(EMRService):
 
 	def __init__(self) -> None:
 		super().__init__(tenant_id="default", actor_id="system")
+
+	async def ml_clinical_note_extract(self, *args, **kwargs):
+		"""AI-powered AI extraction of structured data from clinical notes. Requires OLLAMA_BASE_URL."""
+		import os
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {"ml_enhanced": False}
+		try:
+			from capabilities.common.mlx import MLCapability
+			ml = MLCapability()
+			result = await ml.extract(str(kwargs.get("note",""))[:2000], schema={"diagnoses": "ICD codes or conditions", "medications": "drug names and doses", "procedures": "procedures performed"}, context="electronic medical record")
+			return {"extracted": result.extracted, "ml_enhanced": True}
+		except Exception:
+			return {"ml_enhanced": False}
+
