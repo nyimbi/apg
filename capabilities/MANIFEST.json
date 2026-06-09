@@ -64786,7 +64786,22 @@
       "path": "capabilities/common/nats",
       "package": "apg-common-nats",
       "module": "apg_common_nats",
-      "description": "Durable publish/subscribe event bus via NATS JetStream. Replaces in-process event dispatch with crash-resilient message delivery."
+      "description": "Durable publish/subscribe event bus via NATS JetStream. Replaces in-process event dispatch with crash-resilient message delivery.",
+      "rule_count": 12,
+      "governance_rules": [
+        "tenant_context_required",
+        "operation_type_required",
+        "actor_id_required",
+        "input_validation_required",
+        "output_schema_enforced",
+        "error_handled",
+        "audit_logged",
+        "rate_limited",
+        "tenant_isolation_enforced",
+        "pii_protected",
+        "data_classified",
+        "access_controlled"
+      ]
     },
     "temporal": {
       "id": "temporal",
@@ -64797,7 +64812,22 @@
       "path": "capabilities/common/temporal",
       "package": "apg-common-temporal",
       "module": "apg_common_temporal",
-      "description": "Durable workflow execution via Temporal.io. Workflow state survives process restarts. Supports human tasks, guards, and timers."
+      "description": "Durable workflow execution via Temporal.io. Workflow state survives process restarts. Supports human tasks, guards, and timers.",
+      "rule_count": 12,
+      "governance_rules": [
+        "tenant_context_required",
+        "operation_type_required",
+        "actor_id_required",
+        "input_validation_required",
+        "output_schema_enforced",
+        "error_handled",
+        "audit_logged",
+        "rate_limited",
+        "tenant_isolation_enforced",
+        "pii_protected",
+        "data_classified",
+        "access_controlled"
+      ]
     },
     "mlx": {
       "id": "mlx",
@@ -64808,7 +64838,22 @@
       "path": "capabilities/common/mlx",
       "package": "apg-common-mlx",
       "module": "apg_common_mlx",
-      "description": "Ollama-backed ML tools: score, classify, predict, summarize, extract. Data stays local \u2014 100% data sovereignty."
+      "description": "Ollama-backed ML tools: score, classify, predict, summarize, extract. Data stays local \u2014 100% data sovereignty.",
+      "rule_count": 12,
+      "governance_rules": [
+        "tenant_context_required",
+        "operation_type_required",
+        "actor_id_required",
+        "input_validation_required",
+        "output_schema_enforced",
+        "error_handled",
+        "audit_logged",
+        "rate_limited",
+        "tenant_isolation_enforced",
+        "pii_protected",
+        "data_classified",
+        "access_controlled"
+      ]
     },
     "phi": {
       "id": "phi",
@@ -64819,7 +64864,22 @@
       "path": "capabilities/common/phi",
       "package": "apg-common-phi",
       "module": "apg_common_phi",
-      "description": "HIPAA field-level PHI detection and redaction. Detects 18 HIPAA identifiers by field name and value pattern."
+      "description": "HIPAA field-level PHI detection and redaction. Detects 18 HIPAA identifiers by field name and value pattern.",
+      "rule_count": 12,
+      "governance_rules": [
+        "tenant_context_required",
+        "operation_type_required",
+        "actor_id_required",
+        "input_validation_required",
+        "output_schema_enforced",
+        "error_handled",
+        "audit_logged",
+        "rate_limited",
+        "tenant_isolation_enforced",
+        "pii_protected",
+        "data_classified",
+        "access_controlled"
+      ]
     },
     "esig": {
       "id": "esig",
@@ -64830,7 +64890,22 @@
       "path": "capabilities/common/esig",
       "package": "apg-common-esig",
       "module": "apg_common_esig",
-      "description": "Qualified electronic signatures meeting FDA 21 CFR Part 11. Three-component binding: meaning, identity, timestamp."
+      "description": "Qualified electronic signatures meeting FDA 21 CFR Part 11. Three-component binding: meaning, identity, timestamp.",
+      "rule_count": 12,
+      "governance_rules": [
+        "tenant_context_required",
+        "operation_type_required",
+        "actor_id_required",
+        "input_validation_required",
+        "output_schema_enforced",
+        "error_handled",
+        "audit_logged",
+        "rate_limited",
+        "tenant_isolation_enforced",
+        "pii_protected",
+        "data_classified",
+        "access_controlled"
+      ]
     },
     "vault": {
       "id": "vault",
@@ -64841,7 +64916,22 @@
       "path": "capabilities/common/vault",
       "package": "apg-common-vault",
       "module": "apg_common_vault",
-      "description": "PCI DSS format-preserving tokenization for cardholder PANs. Tokens preserve BIN and last 4 digits; Luhn-valid. OPA-gated detokenization."
+      "description": "PCI DSS format-preserving tokenization for cardholder PANs. Tokens preserve BIN and last 4 digits; Luhn-valid. OPA-gated detokenization.",
+      "rule_count": 12,
+      "governance_rules": [
+        "tenant_context_required",
+        "operation_type_required",
+        "actor_id_required",
+        "input_validation_required",
+        "output_schema_enforced",
+        "error_handled",
+        "audit_logged",
+        "rate_limited",
+        "tenant_isolation_enforced",
+        "pii_protected",
+        "data_classified",
+        "access_controlled"
+      ]
     }
   },
   "by_domain": {
