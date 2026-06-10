@@ -1,0 +1,48 @@
+"""Crop Management views — Flask-AppBuilder compatible + Pydantic re-exports."""
+from __future__ import annotations
+
+from .models import (
+	VarietyCreate,
+	VarietyUpdate,
+	VarietyResponse,
+	PlantingCalendarCreate,
+	PlantingCalendarUpdate,
+	PlantingCalendarResponse,
+	CropCreate,
+	CropUpdate,
+	CropResponse,
+	CropListFilter,
+	PhenologyCreate,
+	PhenologyResponse,
+	RotationPlanCreate,
+	RotationPlanResponse,
+	YieldRecordCreate,
+	YieldRecordResponse,
+	AuditEvent,
+	CropStatus,
+	GrowthStage,
+	RotationStrategy,
+)
+
+__all__ = [
+	"VarietyCreate",
+	"VarietyUpdate",
+	"VarietyResponse",
+	"PlantingCalendarCreate",
+	"PlantingCalendarUpdate",
+	"PlantingCalendarResponse",
+	"CropCreate",
+	"CropUpdate",
+	"CropResponse",
+	"CropListFilter",
+	"PhenologyCreate",
+	"PhenologyResponse",
+	"RotationPlanCreate",
+	"RotationPlanResponse",
+	"YieldRecordCreate",
+	"YieldRecordResponse",
+	"AuditEvent",
+	"CropStatus",
+	"GrowthStage",
+	"RotationStrategy",
+]

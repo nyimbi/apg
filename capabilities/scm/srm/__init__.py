@@ -1,10 +1,4 @@
-"""
-Supplier Relationship Management (SRM)
-
-Part of the APG ERP capabilities suite.
-
-© 2025 Datacraft. All rights reserved.
-"""
-
-__version__ = "1.0.0"
-__all__ = []
+"""Supplier Relationship Management capability."""
+CAPABILITY_ID = "scm_srm"
+DOMAIN = "scm"
+VERSION = "1.0.0"

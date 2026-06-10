@@ -1,0 +1,1 @@
+"""ESS domain layer."""

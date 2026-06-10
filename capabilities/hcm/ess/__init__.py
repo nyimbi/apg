@@ -1,10 +1,4 @@
-"""
-Employee Self-Service (ESS)
-
-Part of the APG ERP capabilities suite.
-
-© 2025 Datacraft. All rights reserved.
-"""
-
-__version__ = "1.0.0"
-__all__ = []
+"""Employee Self-Service capability."""
+CAPABILITY_ID = "hcm_ess"
+DOMAIN = "hcm"
+VERSION = "1.0.0"

@@ -1,0 +1,1 @@
+"""M&E domain adapters."""

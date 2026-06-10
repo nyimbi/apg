@@ -1,10 +1,4 @@
-"""
-Succession Planning (SCP)
-
-Part of the APG ERP capabilities suite.
-
-© 2025 Datacraft. All rights reserved.
-"""
-
-__version__ = "1.0.0"
-__all__ = []
+"""Succession Planning capability."""
+CAPABILITY_ID = "hcm_scp"
+DOMAIN = "hcm"
+VERSION = "1.0.0"

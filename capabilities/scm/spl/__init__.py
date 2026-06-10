@@ -1,10 +1,4 @@
-"""
-Supply Planning (SPL)
-
-Part of the APG ERP capabilities suite.
-
-© 2025 Datacraft. All rights reserved.
-"""
-
-__version__ = "1.0.0"
-__all__ = []
+"""Supply Planning capability."""
+CAPABILITY_ID = "scm_spl"
+DOMAIN = "scm"
+VERSION = "1.0.0"

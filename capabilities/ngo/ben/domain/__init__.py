@@ -1,0 +1,1 @@
+"""Beneficiary Registry domain adapters."""

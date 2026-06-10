@@ -10,7 +10,7 @@
   },
   "build": {
     "buildCommand": null,
-    "testCommand": "uv run pytest tests/test_reliability_framework.py tests/test_reliability_properties.py tests/test_composability_comprehensive.py -q --tb=short 2>&1 | tail -5",
+    "testCommand": "uv run pytest tests/ -q --tb=line 2>&1 | tail -5",
     "lintCommand": null,
     "devCommand": null,
     "scripts": {}
@@ -451,6 +451,12 @@
       "type": "file"
     },
     {
+      "path": "tests/test_composability_comprehensive.py",
+      "accessCount": 5,
+      "lastAccessed": 1781116304052,
+      "type": "file"
+    },
+    {
       "path": "tests/test_ai_agent_composition.py",
       "accessCount": 3,
       "lastAccessed": 1781039123260,
@@ -502,12 +508,6 @@
       "path": "capabilities/common/esig/models.py",
       "accessCount": 2,
       "lastAccessed": 1781111291446,
-      "type": "file"
-    },
-    {
-      "path": "tests/test_composability_comprehensive.py",
-      "accessCount": 1,
-      "lastAccessed": 1781037695516,
       "type": "file"
     },
     {

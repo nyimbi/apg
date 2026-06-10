@@ -1,7 +1,7 @@
 {
-  "tool_name": "Read",
-  "tool_input_preview": "{\"file_path\":\"/Users/nyimbiodero/src/pjs/apg/capabilities/common/reliability\"}",
-  "error": "EISDIR: illegal operation on a directory, read '/Users/nyimbiodero/src/pjs/apg/capabilities/common/reliability'",
-  "timestamp": "2026-06-10T17:17:05.566Z",
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"# Check connectors and gov/scm/hcm stubs\\nls capabilities/composition/orchestration/connectors/africa/ 2>/dev/null\\necho \\\"---\\\"\\nfor d in gov_usd gov_lnd gov_cty; do ls capabilities/gover...",
+  "error": "Exit code 1\n__init__.py\n__pycache__\nairtel_connector.py\nequity_connector.py\nkcb_connector.py\nmpesa_connector.py\nmshwari_connector.py\nmtn_connector.py\norange_connector.py\nwave_connector.py\n---\n[gov_usd]\n[gov_lnd]\n[gov_cty]\n---\n  File \"<string>\", line 13\n    stubs_done.append(f'{stub}:{'✓' if has_svc else '✗'}')\n                                 ^\nSyntaxError: invalid character '✓' (U+2713)",
+  "timestamp": "2026-06-10T18:37:58.008Z",
   "retry_count": 1
 }

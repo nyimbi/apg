@@ -1,0 +1,1 @@
+"""Grant Management domain adapters."""

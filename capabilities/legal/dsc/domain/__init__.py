@@ -1,0 +1,1 @@
+"""Document & eDiscovery domain adapters."""

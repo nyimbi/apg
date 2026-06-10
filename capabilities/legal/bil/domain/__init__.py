@@ -1,0 +1,1 @@
+"""Legal Billing domain adapters."""

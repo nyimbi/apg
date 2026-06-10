@@ -1,10 +1,4 @@
-"""
-Logistics & Transportation (LOG)
-
-Part of the APG ERP capabilities suite.
-
-© 2025 Datacraft. All rights reserved.
-"""
-
-__version__ = "1.0.0"
-__all__ = []
+"""Logistics & Transportation capability."""
+CAPABILITY_ID = "scm_log"
+DOMAIN = "scm"
+VERSION = "1.0.0"
