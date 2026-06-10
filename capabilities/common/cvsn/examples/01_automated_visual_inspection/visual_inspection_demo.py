@@ -762,7 +762,7 @@ class VisualInspectionDemo:
         # Add product type label
         try:
             font = PIL.ImageFont.load_default()
-        except:
+        except Exception:
             font = None
 
         text = f"Sample {product_type.replace('_', ' ').title()}"

@@ -341,7 +341,7 @@ class MDMDatabaseManager:
 				if tenant_id:
 					try:
 						await session.execute(text("RESET mdm.current_tenant_id"))
-					except:
+					except Exception:
 						pass
 	
 	async def execute_tenant_query(self, query: str, params: Dict[str, Any] = None, 

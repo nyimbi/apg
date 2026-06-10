@@ -580,7 +580,7 @@ class VoiceCommandProcessor:
 							self.logger.info(f"Sphinx recognized: {text}")
 							return text.lower()
 							
-						except:
+						except Exception:
 							self.logger.warning("All speech recognition engines failed, using audio pattern analysis")
 							return self._analyze_audio_pattern(audio_data)
 						

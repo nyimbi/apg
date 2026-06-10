@@ -9,6 +9,7 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 """
 
 import asyncio
+import sys
 import time
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone, timedelta
@@ -17,7 +18,24 @@ from dataclasses import dataclass, field
 from enum import Enum
 import json
 import logging
+from pathlib import Path
+
+# Add repo root so reliability imports work regardless of invocation context
+_REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
 from uuid_extensions import uuid7str
+
+try:
+    from capabilities.common.reliability.circuit_breaker import (  # type: ignore[import]
+        CircuitBreaker, CircuitOpenError, get_circuit_breaker,
+    )
+    _HAS_CIRCUIT_BREAKER = True
+except ImportError:
+    _HAS_CIRCUIT_BREAKER = False
+    CircuitBreaker = None  # type: ignore[assignment,misc]
+    CircuitOpenError = RuntimeError  # type: ignore[assignment,misc]
 
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -98,7 +116,17 @@ class BaseConnector(ABC):
 			"request_completed": [],
 			"health_check": []
 		}
-		
+		# Circuit breaker: protects all execute_request calls from cascading failures
+		if _HAS_CIRCUIT_BREAKER:
+			self._circuit_breaker: Any = get_circuit_breaker(
+				service_name=f"connector.{config.name}",
+				failure_threshold=getattr(config, 'circuit_failure_threshold', 5),
+				reset_timeout=float(getattr(config, 'circuit_reset_timeout', 60)),
+				timeout=float(config.timeout_seconds) + 5.0,
+			)
+		else:
+			self._circuit_breaker = None
+
 		logger.info(f"Initialized {self.__class__.__name__} connector: {config.name}")
 	
 	async def initialize(self) -> bool:
@@ -144,15 +172,29 @@ class BaseConnector(ABC):
 		parameters: Dict[str, Any],
 		timeout: Optional[int] = None
 	) -> Dict[str, Any]:
-		"""Execute a request against the external system."""
+		"""Execute a request against the external system.
+
+		Protected by:
+		1. Circuit breaker — fails fast when the external service is degraded
+		2. Per-attempt timeout via asyncio.wait_for
+		3. Exponential backoff retry up to config.retry_attempts
+		"""
 		if self.status != ConnectorStatus.CONNECTED:
 			raise ConnectionError(f"Connector {self.config.name} is not connected")
-		
+
+		# Circuit breaker: reject immediately if the service is fused
+		if self._circuit_breaker is not None:
+			try:
+				await self._circuit_breaker._before_call()
+			except CircuitOpenError:
+				self.metrics.failed_requests += 1
+				raise
+
 		start_time = time.time()
 		timeout = timeout or self.config.timeout_seconds
 		success = False
 		result = {}
-		
+
 		try:
 			# Execute with retry logic
 			for attempt in range(self.config.retry_attempts + 1):
@@ -185,19 +227,26 @@ class BaseConnector(ABC):
 				"response_time": response_time
 			})
 			
+			# Record success in circuit breaker
+			if self._circuit_breaker is not None:
+				await self._circuit_breaker._on_success()
 			return result
-			
+
 		except Exception as e:
 			response_time = time.time() - start_time
 			self.metrics.update_request_metrics(False, response_time)
-			
+
 			await self._notify_event("error", {
 				"connector_id": self.config.id,
 				"operation": operation,
 				"error": str(e),
 				"response_time": response_time
 			})
-			
+
+			# Record failure in circuit breaker (unless it was already a CircuitOpenError)
+			if self._circuit_breaker is not None and not isinstance(e, CircuitOpenError):
+				await self._circuit_breaker._on_failure(e)
+
 			logger.error(f"Request failed for connector {self.config.name}: {e}")
 			raise
 	

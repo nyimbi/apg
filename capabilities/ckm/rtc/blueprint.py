@@ -374,7 +374,7 @@ class RealTimeCollaborationBlueprint:
 		try:
 			loop = asyncio.get_event_loop()
 			loop.create_task(websocket_manager.stop())
-		except:
+		except Exception:
 			pass
 	
 	def _handle_config_update_event(self, event_data: Dict[str, Any]) -> None:

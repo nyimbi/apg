@@ -530,7 +530,8 @@ class TestPerformance:
 			)
 			tasks.append(task)
 		
-		configs = await asyncio.gather(*tasks)
+		configs = await asyncio.gather(*tasks, return_exceptions=True)
+
 		
 		end_time = time.time()
 		duration = end_time - start_time

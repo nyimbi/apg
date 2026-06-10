@@ -259,7 +259,8 @@ class TestAICRServiceIntegration:
 			task = service.register_model(model_data)
 			model_tasks.append(task)
 
-		models = await asyncio.gather(*model_tasks)
+		models = await asyncio.gather(*model_tasks, return_exceptions=True)
+
 		assert len(models) == 5
 		assert len(service.models) == 5
 
@@ -269,7 +270,8 @@ class TestAICRServiceIntegration:
 			task = service.deploy_model(model.model_id)
 			deployment_tasks.append(task)
 
-		deployment_results = await asyncio.gather(*deployment_tasks)
+		deployment_results = await asyncio.gather(*deployment_tasks, return_exceptions=True)
+
 		assert all(result["success"] for result in deployment_results)
 		assert len(service.deployment_registry) == 5
 
@@ -287,7 +289,8 @@ class TestAICRServiceIntegration:
 			task = service.run_inference(request)
 			inference_tasks.append(task)
 
-		inference_responses = await asyncio.gather(*inference_tasks)
+		inference_responses = await asyncio.gather(*inference_tasks, return_exceptions=True)
+
 		assert len(inference_responses) == 5
 		assert all(resp.status == InferenceStatus.COMPLETED for resp in inference_responses)
 

@@ -84,7 +84,8 @@ class TestPerformanceBenchmarks:
 				)
 				tasks.append(task)
 			
-			results = await asyncio.gather(*tasks)
+			results = await asyncio.gather(*tasks, return_exceptions=True)
+
 			end_time = time.time()
 			
 			total_time = end_time - start_time
@@ -143,7 +144,8 @@ class TestPerformanceBenchmarks:
 				)
 				tasks.append(task)
 			
-			results = await asyncio.gather(*tasks)
+			results = await asyncio.gather(*tasks, return_exceptions=True)
+
 			end_time = time.time()
 			
 			total_time = end_time - start_time
@@ -209,7 +211,8 @@ class TestPerformanceBenchmarks:
 					)
 				tasks.append(task)
 			
-			results = await asyncio.gather(*tasks)
+			results = await asyncio.gather(*tasks, return_exceptions=True)
+
 			end_time = time.time()
 			
 			total_time = end_time - start_time
@@ -584,7 +587,8 @@ class TestSecurityValidation:
 			
 			# Run multiple concurrent sessions
 			tasks = [user_session(i, 5) for i in range(10)]  # 10 users, 5 ops each
-			all_results = await asyncio.gather(*tasks)
+			all_results = await asyncio.gather(*tasks, return_exceptions=True)
+
 			
 			# Flatten results
 			flat_results = [item for sublist in all_results for item in sublist]

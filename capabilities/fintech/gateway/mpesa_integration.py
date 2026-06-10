@@ -942,7 +942,7 @@ class MPESAService(AbstractPaymentProcessor):
 			try:
 				await self._get_access_token()
 				token_valid = True
-			except:
+			except Exception:
 				pass
 			
 			# Check account balance (validates configuration)
@@ -950,7 +950,7 @@ class MPESAService(AbstractPaymentProcessor):
 			try:
 				balance_result = await self.get_account_balance()
 				balance_check = balance_result.get("success", False)
-			except:
+			except Exception:
 				pass
 			
 			# Update health metrics

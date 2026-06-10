@@ -699,7 +699,7 @@ class AdvancedFraudDetectionEngine:
 		try:
 			centrality = nx.degree_centrality(self._transaction_graph)
 			return centrality.get(user_node_id, 0.0)
-		except:
+		except Exception:
 			return 0.0
 	
 	async def _analyze_device_sharing(self, device_fingerprint: str | None) -> float:
@@ -808,7 +808,7 @@ class AdvancedFraudDetectionEngine:
 			
 			return 0.0
 			
-		except:
+		except Exception:
 			return 0.0
 	
 	# Advanced utility methods

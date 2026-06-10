@@ -438,7 +438,7 @@ def estimate_cache_value_size(data: Any) -> int:
             return len(json.dumps(data, default=str).encode())
         else:
             return len(str(data).encode())
-    except:
+    except Exception:
         return 0
 
 

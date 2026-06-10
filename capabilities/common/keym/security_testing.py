@@ -522,7 +522,7 @@ class SecurityTester:
 		for key in generated_keys:
 			try:
 				await self.service.delete_key(key.spec.id, "crypto_tester@test.com", secure_delete=True)
-			except:
+			except Exception:
 				pass
 		
 		return vulnerabilities
@@ -988,7 +988,7 @@ class SecurityTester:
 			for key in memory_test_keys:
 				try:
 					await self.service.delete_key(key.spec.id, "resource_tester@test.com", secure_delete=True)
-				except:
+				except Exception:
 					pass
 		
 		return vulnerabilities
@@ -1096,7 +1096,7 @@ class SecurityTester:
 				if hasattr(result, 'spec'):
 					try:
 						await self.service.delete_key(result.spec.id, "flood_tester@test.com", secure_delete=True)
-					except:
+					except Exception:
 						pass
 		
 		except Exception:

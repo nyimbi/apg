@@ -468,7 +468,7 @@ class ProductionValidator:
 			try:
 				response = requests.get(f"{self.base_url}{endpoint}", timeout=5)
 				return response.elapsed.total_seconds() * 1000, response.status_code < 500
-			except:
+			except Exception:
 				return 0, False
 		
 		# Run concurrent requests
@@ -488,7 +488,7 @@ class ProductionValidator:
 							successful_requests += 1
 						else:
 							failed_requests += 1
-					except:
+					except Exception:
 						failed_requests += 1
 						total_requests += 1
 				

@@ -484,7 +484,8 @@ class BillingExamples:
         
         # Process payments concurrently
         tasks = [process_payment_async(customer) for customer in customers]
-        payments = await asyncio.gather(*tasks)
+        payments = await asyncio.gather(*tasks, return_exceptions=True)
+
         
         print(f"✓ Processed {len(payments)} payments concurrently")
         for payment in payments:

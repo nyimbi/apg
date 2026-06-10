@@ -670,14 +670,14 @@ class SQLiteStorage(DataStorage):
         if sql_tweet.hashtags_json:
             try:
                 hashtags = json.loads(sql_tweet.hashtags_json)
-            except:
+            except Exception:
                 pass
         
         urls = []
         if sql_tweet.urls_json:
             try:
                 urls = json.loads(sql_tweet.urls_json)
-            except:
+            except Exception:
                 pass
         
         return TweetModel(

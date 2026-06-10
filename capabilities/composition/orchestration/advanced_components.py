@@ -336,7 +336,7 @@ class HTTPRequestComponent(BaseWorkflowComponent):
 		try:
 			# Try to parse as JSON
 			content = await response.json()
-		except:
+		except Exception:
 			# Fall back to text
 			content = await response.text()
 		

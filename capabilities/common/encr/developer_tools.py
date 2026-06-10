@@ -2494,7 +2494,8 @@ async def load_test_encryption(num_operations: int = 1000):
             tasks.append(task)
         
         # Execute all tasks concurrently
-        results = await asyncio.gather(*tasks)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
         
         end_time = time.time()
         duration = end_time - start_time
@@ -2539,7 +2540,8 @@ async def batch_encrypt(client: APGEncryptionClient, data_items: list[str]):
         
         # Encrypt batch items concurrently
         tasks = [client.encrypt_quantum_safe(item) for item in batch]
-        batch_results = await asyncio.gather(*tasks)
+        batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+
         
         results.extend(batch_results)
         

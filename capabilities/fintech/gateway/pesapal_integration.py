@@ -260,7 +260,7 @@ class PesapalService(BasePaymentProcessor):
                     # Parse expiry date (Pesapal returns ISO format)
                     try:
                         self._token_expires_at = datetime.fromisoformat(expires_in.replace('Z', '+00:00'))
-                    except:
+                    except Exception:
                         # Fallback: assume 1 hour expiry
                         self._token_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
                 else:

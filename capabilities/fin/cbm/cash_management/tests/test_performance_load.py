@@ -194,7 +194,8 @@ class TestCachePerformance:
             else:
                 tasks.append(cache.get(f"valid_key_{i}"))
         
-        await asyncio.gather(*tasks)
+        await asyncio.gather(*tasks, return_exceptions=True)
+
         
         performance_monitor.stop()
         metrics = performance_monitor.get_metrics()
@@ -222,7 +223,8 @@ class TestCachePerformance:
         for i in range(1000):  # 1MB total
             tasks.append(cache.set(f"large_key_{i}", large_data))
         
-        await asyncio.gather(*tasks)
+        await asyncio.gather(*tasks, return_exceptions=True)
+
         
         performance_monitor.stop()
         metrics = performance_monitor.get_metrics()
@@ -289,14 +291,16 @@ class TestDatabasePerformance:
             tasks = []
             for i in range(num_operations):
                 tasks.append(cash_service.get_account_balance(f"ACC{i:03d}"))
-            return await asyncio.gather(*tasks)
+            return await asyncio.gather(*tasks, return_exceptions=True)
+
         
         # Run concurrent batches
         batch_tasks = []
         for _ in range(num_concurrent):
             batch_tasks.append(concurrent_operations())
         
-        await asyncio.gather(*batch_tasks)
+        await asyncio.gather(*batch_tasks, return_exceptions=True)
+
         
         performance_monitor.stop()
         metrics = performance_monitor.get_metrics()
@@ -390,7 +394,8 @@ class TestMLPerformance:
                     model_names=['model1', 'model2']
                 ))
             
-            results = await asyncio.gather(*tasks)
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
         
         performance_monitor.stop()
         metrics = performance_monitor.get_metrics()
@@ -507,7 +512,8 @@ class TestOptimizationPerformance:
         
         # Run concurrent optimizations
         tasks = [run_optimization(accounts) for accounts in portfolios]
-        results = await asyncio.gather(*tasks)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
         
         performance_monitor.stop()
         metrics = performance_monitor.get_metrics()
@@ -626,7 +632,8 @@ class TestSystemLoad:
                 else:
                     operations.append(cash_service.get_account_balance(f"ACC{user_id}"))
             
-            return await asyncio.gather(*operations)
+            return await asyncio.gather(*operations, return_exceptions=True)
+
         
         performance_monitor.start()
         
@@ -636,7 +643,8 @@ class TestSystemLoad:
             for user_id in range(num_users)
         ]
         
-        results = await asyncio.gather(*user_tasks)
+        results = await asyncio.gather(*user_tasks, return_exceptions=True)
+
         
         performance_monitor.stop()
         metrics = performance_monitor.get_metrics()
@@ -714,7 +722,8 @@ class TestSystemLoad:
         
         # Run multiple CPU-intensive tasks
         tasks = [cpu_intensive_task() for _ in range(4)]
-        results = await asyncio.gather(*tasks)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
         
         performance_monitor.stop()
         metrics = performance_monitor.get_metrics()

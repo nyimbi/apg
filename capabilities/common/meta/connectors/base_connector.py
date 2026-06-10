@@ -446,7 +446,7 @@ class BaseConnector(ABC):
 					pass
 			if json_count > len(non_null_values) * 0.5:  # More than 50% are valid JSON
 				return DataType.JSON
-		except:
+		except Exception:
 			pass
 		
 		# Default to string

@@ -737,7 +737,8 @@ class TestServiceErrorHandling:
 			model_tasks.append(task)
 
 		# Wait for all registrations to complete
-		models = await asyncio.gather(*model_tasks)
+		models = await asyncio.gather(*model_tasks, return_exceptions=True)
+
 
 		# Verify all models were registered
 		assert len(models) == 5

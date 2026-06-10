@@ -239,12 +239,12 @@ class ResultScraper:
             # Try common date formats
             import dateutil.parser
             return dateutil.parser.parse(date_str)
-        except:
+        except Exception:
             try:
                 # Fallback to basic parsing
                 from datetime import datetime
                 return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-            except:
+            except Exception:
                 self.logger.debug(f"Failed to parse date: {date_str}")
                 return None
     

@@ -790,7 +790,8 @@ class TestPerformance:
 		start_time = time.time()
 		
 		tasks = [register_service(i) for i in range(20)]
-		service_ids = await asyncio.gather(*tasks)
+		service_ids = await asyncio.gather(*tasks, return_exceptions=True)
+
 		
 		end_time = time.time()
 		total_time = end_time - start_time

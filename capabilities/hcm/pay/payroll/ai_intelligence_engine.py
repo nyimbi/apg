@@ -739,7 +739,7 @@ class PayrollIntelligenceEngine:
 		try:
 			slope, _ = np.polyfit(x, y, 1)
 			return float(slope)
-		except:
+		except Exception:
 			return 0.0
 	
 	async def _extract_turnover_features(self, emp_payroll: PREmployeePayroll) -> Dict[str, float]:

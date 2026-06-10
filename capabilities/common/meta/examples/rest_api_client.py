@@ -54,7 +54,7 @@ class APIClient:
                 try:
                     error_detail = e.response.json()
                     print(f"   Error details: {error_detail}")
-                except:
+                except Exception:
                     print(f"   Response: {e.response.text}")
             raise
     

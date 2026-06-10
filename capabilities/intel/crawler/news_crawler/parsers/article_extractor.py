@@ -287,7 +287,7 @@ class ArticleExtractor:
             # Try to extract additional info
             try:
                 article.nlp()
-            except:
+            except Exception:
                 pass  # NLP processing might fail
             
             return ArticleContent(

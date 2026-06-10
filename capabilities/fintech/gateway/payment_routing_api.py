@@ -44,7 +44,7 @@ class PaymentRoutingAPIView(BaseView):
     
     route_base = "/api/v1/payment-routing"
     
-    def __init__(self):
+    async def __init__(self):
         super().__init__()
         self.routing_service: Optional[PaymentRoutingService] = None
         self.database_service = None
@@ -72,7 +72,7 @@ class PaymentRoutingAPIView(BaseView):
     @expose('/optimal-processor', methods=['POST'])
     @has_access
     @permission_name('payment_routing')
-    def get_optimal_processor(self):
+    async def get_optimal_processor(self):
         """
         Get optimal payment processor for transaction
         
@@ -175,7 +175,7 @@ class PaymentRoutingAPIView(BaseView):
     @expose('/recommendations', methods=['POST'])
     @has_access
     @permission_name('payment_routing')
-    def get_processor_recommendations(self):
+    async def get_processor_recommendations(self):
         """
         Get detailed processor recommendations for transaction
         
@@ -227,7 +227,7 @@ class PaymentRoutingAPIView(BaseView):
     @expose('/performance/update', methods=['POST'])
     @has_access
     @permission_name('payment_routing_admin')
-    def update_processor_performance(self):
+    async def update_processor_performance(self):
         """
         Update processor performance metrics
         
@@ -281,7 +281,7 @@ class PaymentRoutingAPIView(BaseView):
     @expose('/analytics', methods=['GET'])
     @has_access
     @permission_name('payment_routing_analytics')
-    def get_routing_analytics(self):
+    async def get_routing_analytics(self):
         """
         Get comprehensive routing analytics
         
@@ -315,7 +315,7 @@ class PaymentRoutingAPIView(BaseView):
     @expose('/processors/status', methods=['GET'])
     @has_access
     @permission_name('payment_routing_monitor')
-    def get_processors_status(self):
+    async def get_processors_status(self):
         """
         Get real-time status of all processors
         
@@ -359,7 +359,7 @@ class PaymentRoutingAPIView(BaseView):
     @expose('/processors/<processor_name>/metrics', methods=['GET'])
     @has_access
     @permission_name('payment_routing_monitor')
-    def get_processor_metrics(self, processor_name: str):
+    async def get_processor_metrics(self, processor_name: str):
         """
         Get detailed metrics for specific processor
         
@@ -449,7 +449,7 @@ class PaymentRoutingAPIView(BaseView):
     @expose('/criteria', methods=['GET'])
     @has_access
     @permission_name('payment_routing')
-    def list_routing_criteria(self):
+    async def list_routing_criteria(self):
         """
         List all available routing criteria
         
@@ -479,7 +479,7 @@ class PaymentRoutingAPIView(BaseView):
     @expose('/simulate', methods=['POST'])
     @has_access
     @permission_name('payment_routing_admin')
-    def simulate_routing(self):
+    async def simulate_routing(self):
         """
         Simulate routing decisions for testing
         
@@ -571,7 +571,7 @@ class PaymentRoutingAPIView(BaseView):
             return jsonify({"error": "Internal server error"}), 500
     
     @expose('/health', methods=['GET'])
-    def get_routing_service_health(self):
+    async def get_routing_service_health(self):
         """
         Get routing service health status
         

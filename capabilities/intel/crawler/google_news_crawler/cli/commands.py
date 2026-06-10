@@ -529,7 +529,7 @@ async def _set_configuration(config_path: Path, settings: List[List[str]]) -> No
             # Try to parse value as JSON, fall back to string
             try:
                 current[keys[-1]] = json.loads(value)
-            except:
+            except Exception:
                 current[keys[-1]] = value
             
             logger.info(f"✅ Set {key} = {value}")

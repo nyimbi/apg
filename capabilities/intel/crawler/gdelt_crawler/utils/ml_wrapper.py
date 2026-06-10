@@ -374,7 +374,7 @@ class GDELTMLWrapper:
         if isinstance(event_date, str):
             try:
                 event_date = datetime.fromisoformat(event_date.replace('Z', '+00:00'))
-            except:
+            except Exception:
                 return {}
 
         if not isinstance(event_date, datetime):

@@ -268,7 +268,8 @@ class TestMDMPerformanceBenchmarks:
 		# Execute concurrent tasks
 		start_time = time.perf_counter()
 		tasks = [create_entity_task(i) for i in range(concurrent_tasks)]
-		results = await asyncio.gather(*tasks)
+		results = await asyncio.gather(*tasks, return_exceptions=True)
+
 		end_time = time.perf_counter()
 		
 		total_time_seconds = end_time - start_time

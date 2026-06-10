@@ -27,7 +27,7 @@ class HSM:
             try:
                 with open('keys/zmk.key', 'rb') as f:
                     return f.read()
-            except:
+            except Exception:
                 return b'1234567890123456'  # Fallback
         elif self.key_source == 'api':
             # Implement API call to get ZMK
@@ -39,7 +39,7 @@ class HSM:
             try:
                 with open('keys/tmk.key', 'rb') as f:
                     return f.read()
-            except:
+            except Exception:
                 return b'ABCDEFGHIJKLMNOP'  # Fallback
         elif self.key_source == 'api':
             # Implement API call to get TMK

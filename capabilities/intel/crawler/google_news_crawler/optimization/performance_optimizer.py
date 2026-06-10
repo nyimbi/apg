@@ -546,7 +546,7 @@ class DistributedTaskManager:
                         queue_obj = conn.default_channel.queue_declare(queue=queue, passive=True)
                         queue_lengths[queue] = queue_obj.message_count
                         self.queue_size.labels(queue_name=queue).set(queue_obj.message_count)
-                except:
+                except Exception:
                     queue_lengths[queue] = 0
             
             return {

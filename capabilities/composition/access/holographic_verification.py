@@ -1059,7 +1059,7 @@ class RealHologramCapture:
 			try:
 				self.face_detector = dlib.get_frontal_face_detector()
 				self.landmark_predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
-			except:
+			except Exception:
 				print("dlib landmark predictor not found, using MediaPipe only")
 				self.face_detector = None
 				self.landmark_predictor = None

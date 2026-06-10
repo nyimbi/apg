@@ -342,7 +342,7 @@ class ErrorHandler:
 			try:
 				domain = urlparse(context.source_url).netloc
 				message_parts.append(f"Domain: {domain}")
-			except:
+			except Exception:
 				pass
 		
 		if context.attempt_number > 1:

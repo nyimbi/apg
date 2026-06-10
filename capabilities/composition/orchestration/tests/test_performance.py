@@ -196,7 +196,8 @@ return {'task_id': context.get('task_id', 'unknown'), 'completed': True}
 				tasks.append(task)
 			
 			# Wait for all to start
-			instances = await asyncio.gather(*tasks)
+			instances = await asyncio.gather(*tasks, return_exceptions=True)
+
 			
 			# Wait for all to complete
 			completion_tasks = []
@@ -209,7 +210,8 @@ return {'task_id': context.get('task_id', 'unknown'), 'completed': True}
 						await asyncio.sleep(0.01)
 				completion_tasks.append(wait_completion(instance.id))
 			
-			completed_instances = await asyncio.gather(*completion_tasks)
+			completed_instances = await asyncio.gather(*completion_tasks, return_exceptions=True)
+
 			end_time = time.time()
 			
 			total_time = end_time - start_time
@@ -451,7 +453,8 @@ return {'load_test': True, 'timestamp': time.time()}
 				batch_tasks.append(task)
 			
 			# Wait for batch to start
-			instances = await asyncio.gather(*batch_tasks)
+			instances = await asyncio.gather(*batch_tasks, return_exceptions=True)
+
 			execution_count += len(instances)
 			
 			# Check some completed instances (don't wait for all to avoid blocking)
@@ -695,7 +698,8 @@ class TestScalabilityAndLimits:
 						
 						completion_tasks.append(wait_with_timeout(instance.id))
 				
-				completed_instances = await asyncio.gather(*completion_tasks)
+				completed_instances = await asyncio.gather(*completion_tasks, return_exceptions=True)
+
 				successful_completions = sum(1 for inst in completed_instances if inst and inst.status == WorkflowStatus.COMPLETED)
 				
 			except Exception as e:

@@ -157,11 +157,11 @@ class CentralConfigurationGitOps:
 			try:
 				config.load_incluster_config()
 				self.k8s_client = client.ApiClient()
-			except:
+			except Exception:
 				try:
 					config.load_kube_config()
 					self.k8s_client = client.ApiClient()
-				except:
+				except Exception:
 					self.k8s_client = None
 		else:
 			self.k8s_client = None
@@ -882,7 +882,7 @@ spec:
 			merged_data = self._deep_merge_dicts(source_data, target_data)
 			
 			return yaml.dump(merged_data, default_flow_style=False)
-		except:
+		except Exception:
 			# Fall back to source content if parsing fails
 			return source
 	
@@ -896,7 +896,7 @@ spec:
 			merged_data = self._deep_merge_dicts(source_data, target_data)
 			
 			return json.dumps(merged_data, indent=2)
-		except:
+		except Exception:
 			return source
 	
 	async def _resolve_generic_conflict(self, source: str, target: str) -> str:

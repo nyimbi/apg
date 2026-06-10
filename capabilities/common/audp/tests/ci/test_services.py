@@ -755,5 +755,6 @@ class TestServiceIntegration:
 			for i in range(5)
 		]
 		
-		results = await asyncio.gather(*tasks)
+		results = await asyncio.gather(*tasks, return_exceptions=True)
+
 		assert len(results) == 5

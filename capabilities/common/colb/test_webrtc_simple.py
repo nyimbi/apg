@@ -344,7 +344,8 @@ async def test_webrtc_async_operations():
 			)
 			tasks.append(task)
 		
-		results = await asyncio.gather(*tasks)
+		results = await asyncio.gather(*tasks, return_exceptions=True)
+
 		
 		assert len(results) == 5
 		for result in results:

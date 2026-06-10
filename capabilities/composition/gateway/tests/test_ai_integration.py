@@ -859,7 +859,8 @@ class TestPerformanceAndLoad:
             task = speech_engine.transcribe_voice_command(audio_data, sample_rate)
             tasks.append(task)
         
-        results = await asyncio.gather(*tasks)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
         
         assert len(results) == 10
         for result in results:

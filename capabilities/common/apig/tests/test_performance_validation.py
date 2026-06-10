@@ -394,7 +394,8 @@ async def benchmark_concurrent_operations():
             
             # Create 10 concurrent operations
             tasks = [create_clients(i) for i in range(batch * 10, (batch + 1) * 10)]
-            results = await asyncio.gather(*tasks)
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
             
             metrics.stop()
             

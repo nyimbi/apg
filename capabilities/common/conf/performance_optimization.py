@@ -529,7 +529,7 @@ class AdaptiveCache:
 				return sum(self._estimate_size(k) + self._estimate_size(v) for k, v in value.items())
 			else:
 				return 100  # Default size estimate
-		except:
+		except Exception:
 			return 100
 	
 	async def _evict_by_strategy(self) -> None:

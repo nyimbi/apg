@@ -343,7 +343,8 @@ class TestPerformanceBenchmarks:
 		
 		# Create 10 tenants concurrently
 		tasks = [create_test_tenant(i) for i in range(10)]
-		tenants = await asyncio.gather(*tasks)
+		tenants = await asyncio.gather(*tasks, return_exceptions=True)
+
 		
 		end_time = datetime.now(UTC)
 		total_time = (end_time - start_time).total_seconds()

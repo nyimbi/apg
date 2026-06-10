@@ -141,7 +141,7 @@ class DVRLDashboardView(BaseView):
 				try:
 					connector = self._run_async(self.dvrl_service.connector_manager.get_connector(source.id))
 					connector_stats = self._run_async(connector.get_connection_stats()) if connector else {}
-				except:
+				except Exception:
 					connector_stats = {}
 				
 				data_sources.append({
@@ -203,7 +203,7 @@ class DVRLDashboardView(BaseView):
 					try:
 						schema = self._run_async(self.dvrl_service.get_data_source_schema(ds.id))
 						schema_context[ds.name] = schema
-					except:
+					except Exception:
 						continue
 				
 				# Execute NL query

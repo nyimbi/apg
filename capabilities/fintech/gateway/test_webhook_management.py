@@ -366,7 +366,8 @@ async def test_webhook_management_system():
         concurrent_events.append(event_task)
     
     # Wait for all events to be queued
-    all_results = await asyncio.gather(*concurrent_events)
+    all_results = await asyncio.gather(*concurrent_events, return_exceptions=True)
+
     total_events_queued = sum(len(result) for result in all_results)
     
     queueing_time = (datetime.now() - start_time).total_seconds()

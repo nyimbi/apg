@@ -1589,7 +1589,7 @@ class AutonomousPaymentOrchestrator:
 		except Exception as e:
 			logger.error(f"Failed to update ML models: {e}")
 
-	def _update_processor_selection_model(self, result: PaymentOrchestrationResult) -> None:
+	async def _update_processor_selection_model(self, result: PaymentOrchestrationResult) -> None:
 		"""Update the processor selection model with successful routing data"""
 		
 		# In a real implementation, this would:

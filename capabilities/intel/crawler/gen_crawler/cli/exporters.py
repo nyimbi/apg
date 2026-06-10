@@ -55,7 +55,7 @@ class BaseExporter:
             parsed = urlparse(url)
             domain = parsed.netloc or parsed.path
             return domain.replace('www.', '').replace('.', '_')
-        except:
+        except Exception:
             return 'unknown_site'
 
 class MarkdownExporter(BaseExporter):
@@ -185,7 +185,7 @@ class MarkdownExporter(BaseExporter):
                     dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
                     formatted_date = dt.strftime("%Y-%m-%d %H:%M:%S UTC")
                     markdown_lines.append(f"- **Crawled**: {formatted_date}")
-                except:
+                except Exception:
                     markdown_lines.append(f"- **Crawled**: {timestamp}")
             
             content_type = page.get('content_type')
@@ -261,7 +261,7 @@ class MarkdownExporter(BaseExporter):
                     # Try to extract meaningful text from URL
                     link_text = urlparse(link_url).path.split('/')[-1] or link_url
                     markdown_lines.append(f"- [{link_text}]({link_url})")
-                except:
+                except Exception:
                     markdown_lines.append(f"- {link_url}")
             markdown_lines.append("")
         

@@ -225,7 +225,7 @@ class ContentExtractionEngine:
 			try:
 				json.loads(content_stripped)
 				return ContentType.JSON
-			except:
+			except Exception:
 				pass
 		elif content_stripped.startswith('<?xml') or content_stripped.startswith('<'):
 			return ContentType.XML
@@ -509,7 +509,7 @@ class ContentExtractionEngine:
 			try:
 				data = json.loads(script.string)
 				structured_data.append(data)
-			except:
+			except Exception:
 				pass
 		
 		if structured_data:

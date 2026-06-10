@@ -688,7 +688,7 @@ class SmartCrawler:
 				try:
 					await page.wait_for_selector(selector, timeout=3000)
 					break
-				except:
+				except Exception:
 					continue
 			
 			# Wait for network to settle
@@ -709,7 +709,7 @@ class SmartCrawler:
 						content = await element.inner_html()
 						if content and len(content) > 200:
 							return content
-				except:
+				except Exception:
 					continue
 			
 			# Fallback to full page content
@@ -719,7 +719,7 @@ class SmartCrawler:
 			# Final fallback
 			try:
 				return await page.content()
-			except:
+			except Exception:
 				return ""
 
 

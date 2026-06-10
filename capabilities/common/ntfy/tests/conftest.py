@@ -326,7 +326,8 @@ def concurrency_tester():
                 async with semaphore:
                     return await task
             
-            return await asyncio.gather(*[limited_task(task) for task in tasks])
+            return await asyncio.gather(*[limited_task(task) for task in tasks], return_exceptions=True)
+
         
         async def stress_test(self, operation, count=100, duration=60):
             """Run stress test for specified duration"""

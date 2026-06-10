@@ -214,7 +214,7 @@ class KeyManagementClient:
 					# Parse response
 					try:
 						response_data = await response.json()
-					except:
+					except Exception:
 						response_data = {'error': {'message': await response.text()}}
 					
 					if response.status >= 200 and response.status < 300:

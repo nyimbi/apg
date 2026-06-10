@@ -880,7 +880,7 @@ class NewsDataClient:
                         pub_date = datetime.fromisoformat(pub_date_str.replace("Z", "+00:00"))
                         if pub_date >= cutoff_time:
                             recent_articles.append(article)
-                    except:
+                    except Exception:
                         # If date parsing fails, include the article
                         recent_articles.append(article)
                 
@@ -983,7 +983,7 @@ class NewsDataClient:
                                     "urgency": "high" if keyword in ["killed", "attack", "explosion"] else "medium",
                                     "hours_ago": (datetime.now() - pub_date).total_seconds() / 3600
                                 })
-                        except:
+                        except Exception:
                             # If recent, include anyway
                             alerts.append({
                                 "location": location,

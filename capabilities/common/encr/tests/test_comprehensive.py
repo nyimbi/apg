@@ -744,7 +744,8 @@ class TestPerformanceBenchmarks:
 		# Measure concurrent encryption performance
 		start_time = time.time()
 		tasks = [encrypt_task() for _ in range(num_concurrent)]
-		results = await asyncio.gather(*tasks)
+		results = await asyncio.gather(*tasks, return_exceptions=True)
+
 		total_time = time.time() - start_time
 		
 		# Verify all encryptions succeeded

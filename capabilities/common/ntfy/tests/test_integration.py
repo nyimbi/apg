@@ -673,7 +673,8 @@ class TestPerformanceIntegration:
                     tenant_id=test_config['test_tenant_id']
                 )
                 tasks.append(notification_service.send_notification(request))
-            return await asyncio.gather(*tasks)
+            return await asyncio.gather(*tasks, return_exceptions=True)
+
         
         async def track_analytics():
             tasks = []
@@ -686,7 +687,8 @@ class TestPerformanceIntegration:
                     template_id=template.id
                 )
                 tasks.append(task)
-            return await asyncio.gather(*tasks)
+            return await asyncio.gather(*tasks, return_exceptions=True)
+
         
         async def security_operations():
             tasks = []
@@ -699,7 +701,8 @@ class TestPerformanceIntegration:
                     user_id=user_profile.user_id
                 )
                 tasks.append(task)
-            return await asyncio.gather(*tasks)
+            return await asyncio.gather(*tasks, return_exceptions=True)
+
         
         async def location_tracking():
             session_id = await geofencing_engine.start_location_tracking(user_profile.user_id)
@@ -712,7 +715,8 @@ class TestPerformanceIntegration:
                     session_id=session_id
                 )
                 tasks.append(task)
-            return await asyncio.gather(*tasks)
+            return await asyncio.gather(*tasks, return_exceptions=True)
+
         
         # Execute all operations concurrently
         with TestTimer() as timer:

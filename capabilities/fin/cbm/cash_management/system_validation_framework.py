@@ -896,7 +896,7 @@ class SystemValidationFramework:
 						total_requests += 1
 						if response.status == 200:
 							successful_requests += 1
-				except:
+				except Exception:
 					total_requests += 1
 			
 			start_time = time.time()
@@ -940,7 +940,7 @@ class SystemValidationFramework:
 							user_requests += 1
 							if response.status == 200:
 								successful_requests += 1
-					except:
+					except Exception:
 						user_requests += 1
 				
 				return {"user_id": user_id, "requests": user_requests, "successful": successful_requests}

@@ -2592,7 +2592,8 @@ class RealFederationExecutor:
 			chunk = results[i:i + chunk_size]
 			merge_tasks.append(self._merge_chunk(chunk))
 			
-		chunk_results = await asyncio.gather(*merge_tasks)
+		chunk_results = await asyncio.gather(*merge_tasks, return_exceptions=True)
+
 		
 		# Final merge of chunks
 		final_data = []

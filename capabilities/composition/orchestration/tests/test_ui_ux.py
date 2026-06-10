@@ -501,7 +501,7 @@ class TestAccessibilityCompliance:
 					
 					try:
 						return [int(v.strip()) for v in values[:3]]
-					except:
+					except Exception:
 						return None
 				
 				text_rgb = parse_rgb(color)

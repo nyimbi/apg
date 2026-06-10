@@ -791,7 +791,8 @@ class QuantumEntropyHarvestingSystem:
 			self.sources[source_id] = source
 			initialization_tasks.append(source.initialize())
 		
-		await asyncio.gather(*initialization_tasks)
+		await asyncio.gather(*initialization_tasks, return_exceptions=True)
+
 		logger.info(f"Initialized {len(self.sources)} quantum entropy sources")
 	
 	async def _initialize_entropy_pools(self) -> None:

@@ -689,7 +689,7 @@ class JupyterConnector(BaseConnector):
 				try:
 					notebook_path.mkdir(parents=True, exist_ok=True)
 					self.is_connected = True
-				except:
+				except Exception:
 					pass
 			
 			return self.is_connected

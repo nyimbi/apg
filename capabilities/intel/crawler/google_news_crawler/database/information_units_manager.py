@@ -304,7 +304,7 @@ class InformationUnitsManager:
 			try:
 				parsed_url = urlparse(record.content_url)
 				source_domain = parsed_url.netloc
-			except:
+			except Exception:
 				pass
 		
 		# Calculate content metrics
@@ -411,7 +411,7 @@ class InformationUnitsManager:
 			try:
 				parsed_url = urlparse(content_url)
 				source_domain = parsed_url.netloc
-			except:
+			except Exception:
 				pass
 		
 		# Calculate content metrics
@@ -440,7 +440,7 @@ class InformationUnitsManager:
 		if published_at and isinstance(published_at, str):
 			try:
 				published_at = datetime.fromisoformat(published_at.replace('Z', '+00:00'))
-			except:
+			except Exception:
 				published_at = now
 		elif not published_at:
 			published_at = now
@@ -584,7 +584,7 @@ def map_google_news_to_information_units(
 		try:
 			parsed_url = urlparse(url)
 			source_domain = parsed_url.netloc
-		except:
+		except Exception:
 			pass
 	
 	return GoogleNewsRecord(

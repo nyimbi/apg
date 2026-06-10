@@ -735,7 +735,7 @@ class CrawleeNewsEnhancer:
             # Handle various date formats
             from dateutil import parser
             return parser.parse(date_str)
-        except:
+        except Exception:
             return None
     
     async def _compile_enhanced_results(self) -> List[ArticleResult]:

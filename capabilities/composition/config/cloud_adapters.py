@@ -1597,7 +1597,7 @@ class KubernetesAdapter(CloudAdapter):
 				# Try in-cluster config first, then default kubeconfig
 				try:
 					config.load_incluster_config()
-				except:
+				except Exception:
 					config.load_kube_config()
 			
 			self.api_client = client.ApiClient()

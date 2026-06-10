@@ -1371,7 +1371,7 @@ class ReportGenerator:
 			try:
 				time_parts = schedule_time.split(":")
 				hour, minute = time_parts[0], time_parts[1]
-			except:
+			except Exception:
 				pass
 		
 		if frequency == ReportFrequency.HOURLY:

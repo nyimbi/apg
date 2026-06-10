@@ -428,7 +428,7 @@ class GenContentParser:
                     result.keywords = list(article.keywords)
                 if article.summary:
                     result.summary = article.summary
-            except:
+            except Exception:
                 pass  # NLP processing is optional
             
             return result

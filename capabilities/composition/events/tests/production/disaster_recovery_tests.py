@@ -95,7 +95,7 @@ class DisasterRecoveryTester:
 		# Kubernetes client
 		try:
 			config.load_incluster_config()
-		except:
+		except Exception:
 			config.load_kube_config()
 		
 		self.k8s_apps_v1 = client.AppsV1Api()
@@ -563,7 +563,7 @@ class DisasterRecoveryTester:
 						namespace=self.k8s_namespace
 					)
 					await asyncio.sleep(1)
-				except:
+				except Exception:
 					break
 			
 			logger.info(f"Pod {pod_name} deleted")
@@ -607,7 +607,7 @@ class DisasterRecoveryTester:
 						if response.status == 200:
 							health_check_passed = True
 							break
-				except:
+				except Exception:
 					pass
 				await asyncio.sleep(5)
 			
@@ -714,7 +714,7 @@ class DisasterRecoveryTester:
 							if recovered_events > 0:
 								system_healthy = True
 								break
-				except:
+				except Exception:
 					pass
 				
 				await asyncio.sleep(10)

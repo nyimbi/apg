@@ -352,7 +352,8 @@ class TestOptimizationEngine:
             tasks.append(task)
         
         with PerformanceTimer() as concurrent_timer:
-            results = await asyncio.gather(*tasks)
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
         
         # Concurrent operations should be efficient
         assert len(results) == 5

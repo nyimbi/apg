@@ -61,7 +61,7 @@ class APGAccountsPayableBlueprint:
 		self.workflow_service = APWorkflowService()
 		self.analytics_service = APAnalyticsService()
 	
-	def register_with_apg(self) -> None:
+	async def register_with_apg(self) -> None:
 		"""Register capability with APG composition engine"""
 		try:
 			# Register capability metadata

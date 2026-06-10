@@ -480,7 +480,8 @@ class AdvancedReportEngine:
 			calculation_tasks.append(task)
 		
 		# Execute calculations concurrently
-		line_results = await asyncio.gather(*calculation_tasks)
+		line_results = await asyncio.gather(*calculation_tasks, return_exceptions=True)
+
 		calculated_results['lines'] = line_results
 		
 		# Calculate summary metrics

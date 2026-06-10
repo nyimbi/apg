@@ -1952,7 +1952,7 @@ class APIConnector(BaseConnector):
 					response_text = await resp.text()
 					try:
 						response_data = json.loads(response_text)
-					except:
+					except Exception:
 						response_data = {'response': response_text}
 
 				# Handle different response formats

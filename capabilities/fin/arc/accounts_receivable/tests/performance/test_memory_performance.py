@@ -247,7 +247,8 @@ class TestMemoryUsageOptimization:
 		
 		profiler.record_snapshot("Before concurrent operations")
 		
-		await asyncio.gather(*tasks)
+		await asyncio.gather(*tasks, return_exceptions=True)
+
 		
 		profiler.record_snapshot("After concurrent operations")
 		

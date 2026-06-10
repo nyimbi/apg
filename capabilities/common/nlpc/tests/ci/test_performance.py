@@ -712,7 +712,8 @@ class TestScalabilityBenchmarks:
 			)
 			first_pass_tasks.append(task)
 		
-		await asyncio.gather(*first_pass_tasks)
+		await asyncio.gather(*first_pass_tasks, return_exceptions=True)
+
 		first_pass_time = time.perf_counter() - first_pass_start
 		
 		# Second pass: should benefit from cache
@@ -730,7 +731,8 @@ class TestScalabilityBenchmarks:
 			)
 			second_pass_tasks.append(task)
 		
-		await asyncio.gather(*second_pass_tasks)
+		await asyncio.gather(*second_pass_tasks, return_exceptions=True)
+
 		second_pass_time = time.perf_counter() - second_pass_start
 		
 		# Calculate performance improvement

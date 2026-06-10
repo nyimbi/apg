@@ -784,7 +784,8 @@ async def test_performance():
 	for i in range(5):
 		tasks.append(interface.get_interface_state(f"tenant-{i}"))
 	
-	await asyncio.gather(*tasks)
+	await asyncio.gather(*tasks, return_exceptions=True)
+
 	
 	state_time = (datetime.now(UTC) - start_time).total_seconds()
 	avg_time = state_time / 5
@@ -808,7 +809,8 @@ async def test_performance():
 			)
 		)
 	
-	await asyncio.gather(*interactions)
+	await asyncio.gather(*interactions, return_exceptions=True)
+
 	
 	interaction_time = (datetime.now(UTC) - start_time).total_seconds()
 	avg_interaction = interaction_time / 10

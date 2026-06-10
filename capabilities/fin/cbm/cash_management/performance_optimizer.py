@@ -733,7 +733,7 @@ class PerformanceOptimizer:
 			metadata_key = f"cache:{self.tenant_id}:{key}:meta"
 			await redis_client.hincrby(metadata_key, 'access_count', 1)
 			await redis_client.close()
-		except:
+		except Exception:
 			pass
 	
 	async def _record_cache_miss(self, key: str, latency_ms: float) -> None:

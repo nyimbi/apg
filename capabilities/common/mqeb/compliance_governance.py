@@ -185,7 +185,7 @@ class PIIDetectionEngine:
 			# Decode message content
 			try:
 				content = message.payload.decode('utf-8', errors='ignore')
-			except:
+			except Exception:
 				content = str(message.payload)
 			
 			detected_pii = {}
@@ -477,7 +477,7 @@ class ComplianceRuleEngine:
 				'medication', 'hospital', 'doctor', 'physician', 'healthcare'
 			]
 			return any(indicator in content for indicator in phi_indicators)
-		except:
+		except Exception:
 			return False
 	
 	def _detect_financial_data(self, message: MQMessage) -> bool:
@@ -489,7 +489,7 @@ class ComplianceRuleEngine:
 				'expense', 'financial', 'accounting', 'budget', 'cost'
 			]
 			return any(indicator in content for indicator in financial_indicators)
-		except:
+		except Exception:
 			return False
 	
 	async def _check_retention_period(self, message: MQMessage) -> bool:

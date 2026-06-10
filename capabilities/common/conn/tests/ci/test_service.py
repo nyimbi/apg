@@ -486,7 +486,8 @@ class TestServicePerformance:
 			for template in connection_data_templates
 		]
 
-		connections = await asyncio.gather(*tasks)
+		connections = await asyncio.gather(*tasks, return_exceptions=True)
+
 
 		assert len(connections) == 10
 		assert all(conn.name.startswith('Connection') for conn in connections)
@@ -538,5 +539,6 @@ class TestServicePerformance:
 			for conn in connections
 		]
 
-		results = await asyncio.gather(*monitoring_tasks)
+		results = await asyncio.gather(*monitoring_tasks, return_exceptions=True)
+
 		assert all(results)  # All should start successfully

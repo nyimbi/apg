@@ -522,7 +522,8 @@ class TestPerformanceAndScaling:
 			
 			# Execute 5 concurrent queries
 			tasks = [execute_query(i) for i in range(5)]
-			results = await asyncio.gather(*tasks)
+			results = await asyncio.gather(*tasks, return_exceptions=True)
+
 			
 			assert len(results) == 5
 			assert all(result is not None for result in results)

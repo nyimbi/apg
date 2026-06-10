@@ -1005,7 +1005,8 @@ class APGEncryptionService:
 			self.encrypt_data(tenant_id, base64.b64decode(item["plaintext_b64"]), key_id)
 			for item in items
 		]
-		results = await asyncio.gather(*tasks)
+		results = await asyncio.gather(*tasks, return_exceptions=True)
+
 		await self._audit.log_event("bulk_encrypted", self.actor_id, tenant_id, key_id, {"count": len(items)})
 		return list(results)
 

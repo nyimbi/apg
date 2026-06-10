@@ -161,7 +161,8 @@ class TestInferencePerformance:
 			# Start concurrent workers
 			start_time = time.perf_counter()
 			tasks = [worker(i) for i in range(concurrency)]
-			worker_results = await asyncio.gather(*tasks)
+			worker_results = await asyncio.gather(*tasks, return_exceptions=True)
+
 			end_time = time.perf_counter()
 
 			# Calculate throughput
@@ -309,7 +310,8 @@ class TestInferencePerformance:
 		num_workers = min(10, max(1, target_rps // 5))
 		workers = [sustained_worker() for _ in range(num_workers)]
 
-		await asyncio.gather(*workers)
+		await asyncio.gather(*workers, return_exceptions=True)
+
 
 		actual_duration = time.perf_counter() - start_time
 		actual_rps = request_count / actual_duration
@@ -497,7 +499,8 @@ class TestModelManagementPerformance:
 		# Run concurrent registrations
 		start_time = time.perf_counter()
 		tasks = [concurrent_registration(i) for i in range(num_concurrent)]
-		worker_results = await asyncio.gather(*tasks)
+		worker_results = await asyncio.gather(*tasks, return_exceptions=True)
+
 		end_time = time.perf_counter()
 
 		total_duration = (end_time - start_time) * 1000
@@ -694,7 +697,8 @@ class TestMonitoringPerformance:
 		retriever_tasks = [metric_retriever(i) for i in range(num_retrievers)]
 
 		all_tasks = collector_tasks + retriever_tasks
-		results = await asyncio.gather(*all_tasks)
+		results = await asyncio.gather(*all_tasks, return_exceptions=True)
+
 
 		end_time = time.perf_counter()
 
@@ -900,7 +904,8 @@ class TestResourceUtilization:
 		# Start inference workers
 		start_time = time.perf_counter()
 		inference_tasks = [inference_worker() for _ in range(num_concurrent)]
-		await asyncio.gather(*inference_tasks)
+		await asyncio.gather(*inference_tasks, return_exceptions=True)
+
 		end_time = time.perf_counter()
 
 		# Stop monitoring

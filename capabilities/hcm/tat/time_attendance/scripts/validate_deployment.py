@@ -184,7 +184,7 @@ class DeploymentValidator:
             # Load Kubernetes config
             try:
                 config.load_incluster_config()
-            except:
+            except Exception:
                 config.load_kube_config()
             
             v1 = client.CoreV1Api()
@@ -196,7 +196,7 @@ class DeploymentValidator:
             try:
                 v1.read_namespace(namespace)
                 logger.info(f"  ✅ Namespace '{namespace}' exists")
-            except:
+            except Exception:
                 logger.error(f"  ❌ Namespace '{namespace}' not found")
                 return False
             
@@ -336,7 +336,7 @@ class DeploymentValidator:
                     else:
                         logger.warning(f"  ⚠️  Readiness check returned {response.status_code}")
                         self.warnings.append("Readiness check failed")
-                except:
+                except Exception:
                     logger.warning("  ⚠️  Readiness endpoint not available")
                     self.warnings.append("Readiness endpoint missing")
                 
@@ -512,7 +512,7 @@ class DeploymentValidator:
                         logger.warning(f"  ⚠️  Metrics endpoint returned {response.status_code}")
                         self.warnings.append("Metrics endpoint not accessible")
                         
-                except:
+                except Exception:
                     logger.warning("  ⚠️  Metrics endpoint not available")
                     self.warnings.append("Metrics endpoint missing")
                 

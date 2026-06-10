@@ -264,7 +264,9 @@ Respond ONLY with valid JSON where keys match exactly the field names:
 				resp = await client.get("/api/tags")
 				resp.raise_for_status()
 				return resp.json().get("models", [])
-		except Exception:
+		except Exception as exc:
+			_log.warning("list_models: Ollama unavailable at %s — %s: %s",
+						 self._ollama_url, type(exc).__name__, exc)
 			return []
 
 	async def pull_model(self, model_name: str) -> dict[str, Any]:

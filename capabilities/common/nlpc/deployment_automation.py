@@ -655,7 +655,7 @@ CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "{{ s
 				# In production, would parse JSON and check pod statuses
 				return True
 			return False
-		except:
+		except Exception:
 			return False
 	
 	async def _check_service_available(self, config: DeploymentConfig) -> bool:
@@ -664,7 +664,7 @@ CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "{{ s
 			cmd = ["kubectl", "get", "service", f"{config.app_name}-service", "-n", config.namespace]
 			command_result = await self._run_command(cmd)
 			return command_result.returncode == 0
-		except:
+		except Exception:
 			return False
 	
 	async def _check_health_endpoints(self, config: DeploymentConfig) -> bool:
@@ -673,7 +673,7 @@ CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "{{ s
 			# In production, would make HTTP requests to health endpoints
 			await asyncio.sleep(1)  # Simulate health check
 			return True
-		except:
+		except Exception:
 			return False
 	
 	async def _check_resource_usage(self, config: DeploymentConfig) -> bool:
@@ -682,7 +682,7 @@ CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "{{ s
 			# In production, would check actual resource usage
 			await asyncio.sleep(1)  # Simulate resource check
 			return True
-		except:
+		except Exception:
 			return False
 	
 	async def _rollback_deployment(self, config: DeploymentConfig, result: DeploymentResult) -> None:

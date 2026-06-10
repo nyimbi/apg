@@ -1071,7 +1071,7 @@ For more information: https://github.com/your-repo/twitter-crawler
                 try:
                     date_obj = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
                     date_str = date_obj.strftime('%Y-%m-%d')
-                except:
+                except Exception:
                     date_str = created_at[:10]
             else:
                 date_str = 'Unknown'

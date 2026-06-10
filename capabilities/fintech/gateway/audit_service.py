@@ -1256,7 +1256,7 @@ class AuditService:
 			if 'timestamp' in event:
 				try:
 					timestamps.append(datetime.fromisoformat(event['timestamp'].replace('Z', '+00:00')))
-				except:
+				except Exception:
 					continue
 		
 		if len(timestamps) >= 3:

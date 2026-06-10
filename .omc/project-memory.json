@@ -10,7 +10,7 @@
   },
   "build": {
     "buildCommand": null,
-    "testCommand": "uv run pytest \\\n  tests/test_ai_agent_composition.py::test_ai_agent_composition_generates_runtime_manifest \\\n  tests/test_compiler_baseline.py::test_generated_python_package_is_importable_with_runtime_manifests \\\n  tests/test_compiler_baseline.py::test_generated_python_app_serves_http_endpoints \\\n  tests/test_composability_comprehensive.py \\\n  tests/test_integration_platform.py \\\n  -v 2>&1 | tail -15",
+    "testCommand": "uv run pytest tests/ -q --tb=line 2>&1 | tail -6",
     "lintCommand": null,
     "devCommand": null,
     "scripts": {}
@@ -391,9 +391,39 @@
   },
   "hotPaths": [
     {
+      "path": "capabilities/common/mlx/service.py",
+      "accessCount": 15,
+      "lastAccessed": 1781111803947,
+      "type": "file"
+    },
+    {
+      "path": "compiler/code_generator.py",
+      "accessCount": 12,
+      "lastAccessed": 1781111020963,
+      "type": "file"
+    },
+    {
       "path": "capabilities/common/nats/service.py",
+      "accessCount": 9,
+      "lastAccessed": 1781110917893,
+      "type": "file"
+    },
+    {
+      "path": "compiler/compiler.py",
+      "accessCount": 9,
+      "lastAccessed": 1781111306676,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/common/esig/service.py",
       "accessCount": 7,
-      "lastAccessed": 1781038424563,
+      "lastAccessed": 1781111017754,
+      "type": "file"
+    },
+    {
+      "path": "compiler/semantic_analyzer.py",
+      "accessCount": 6,
+      "lastAccessed": 1781111150999,
       "type": "file"
     },
     {
@@ -403,15 +433,21 @@
       "type": "file"
     },
     {
-      "path": "capabilities/common/esig/service.py",
-      "accessCount": 4,
-      "lastAccessed": 1781038279195,
+      "path": "capabilities/common/phi/service.py",
+      "accessCount": 5,
+      "lastAccessed": 1781110935620,
       "type": "file"
     },
     {
-      "path": "capabilities/common/phi/service.py",
+      "path": "capabilities/composition/studio/api.py",
+      "accessCount": 5,
+      "lastAccessed": 1781111056441,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/common/temporal/service.py",
       "accessCount": 4,
-      "lastAccessed": 1781038454875,
+      "lastAccessed": 1781110953733,
       "type": "file"
     },
     {
@@ -433,12 +469,6 @@
       "type": "file"
     },
     {
-      "path": "capabilities/composition/studio/api.py",
-      "accessCount": 2,
-      "lastAccessed": 1781072763955,
-      "type": "file"
-    },
-    {
       "path": "capabilities/composition/studio/templates/compositor.html",
       "accessCount": 2,
       "lastAccessed": 1781072835890,
@@ -448,6 +478,30 @@
       "path": "capabilities/composition/studio/app.py",
       "accessCount": 2,
       "lastAccessed": 1781072859477,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/common/nats/nats_adapter.py",
+      "accessCount": 2,
+      "lastAccessed": 1781111047304,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/common/temporal/temporal_adapter.py",
+      "accessCount": 2,
+      "lastAccessed": 1781111073673,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/common/vault/models.py",
+      "accessCount": 2,
+      "lastAccessed": 1781111288547,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/common/esig/models.py",
+      "accessCount": 2,
+      "lastAccessed": 1781111291446,
       "type": "file"
     },
     {
@@ -472,12 +526,6 @@
       "path": "capabilities/common/nats/api.py",
       "accessCount": 1,
       "lastAccessed": 1781037929554,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/common/temporal/service.py",
-      "accessCount": 1,
-      "lastAccessed": 1781037966918,
       "type": "file"
     },
     {
@@ -517,21 +565,9 @@
       "type": "file"
     },
     {
-      "path": "capabilities/common/esig/models.py",
-      "accessCount": 1,
-      "lastAccessed": 1781038079361,
-      "type": "file"
-    },
-    {
       "path": "capabilities/common/esig/views.py",
       "accessCount": 1,
       "lastAccessed": 1781038083979,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/common/vault/models.py",
-      "accessCount": 1,
-      "lastAccessed": 1781038103765,
       "type": "file"
     },
     {
@@ -550,12 +586,6 @@
       "path": "capabilities/common/mlx/api.py",
       "accessCount": 1,
       "lastAccessed": 1781038146640,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/common/mlx/service.py",
-      "accessCount": 1,
-      "lastAccessed": 1781038335490,
       "type": "file"
     },
     {
@@ -640,6 +670,24 @@
       "path": "capabilities/composition/studio/docs/user_guide.md",
       "accessCount": 1,
       "lastAccessed": 1781072739230,
+      "type": "file"
+    },
+    {
+      "path": "compiler/parser.py",
+      "accessCount": 1,
+      "lastAccessed": 1781110900201,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/common/meta/connectors/api_connectors.py",
+      "accessCount": 1,
+      "lastAccessed": 1781110907039,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/composition/orchestration/connectors/rest_connector.py",
+      "accessCount": 1,
+      "lastAccessed": 1781110912413,
       "type": "file"
     }
   ],

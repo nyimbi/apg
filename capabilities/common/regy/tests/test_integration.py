@@ -390,7 +390,8 @@ class TestAPGCapabilityIntegration:
 			registration_tasks.append(task)
 		
 		# Execute registrations concurrently
-		registered_services = await asyncio.gather(*registration_tasks)
+		registered_services = await asyncio.gather(*registration_tasks, return_exceptions=True)
+
 		assert len(registered_services) == 50
 		
 		# Test concurrent discoveries
@@ -406,7 +407,8 @@ class TestAPGCapabilityIntegration:
 			task = service.discover_services(query)
 			discovery_tasks.append(task)
 		
-		discovery_results = await asyncio.gather(*discovery_tasks)
+		discovery_results = await asyncio.gather(*discovery_tasks, return_exceptions=True)
+
 		
 		# Verify all discoveries succeeded
 		assert len(discovery_results) == 20
@@ -419,7 +421,8 @@ class TestAPGCapabilityIntegration:
 			task = service._compute_service_health(registered_service.id)
 			health_tasks.append(task)
 		
-		health_results = await asyncio.gather(*health_tasks)
+		health_results = await asyncio.gather(*health_tasks, return_exceptions=True)
+
 		
 		# All health checks should succeed
 		assert len(health_results) == 10
@@ -610,7 +613,8 @@ class TestErrorHandlingAndResilience:
 		
 		# Run multiple concurrent operations
 		tasks = [register_and_deregister(i) for i in range(10)]
-		completed_ids = await asyncio.gather(*tasks)
+		completed_ids = await asyncio.gather(*tasks, return_exceptions=True)
+
 		
 		# All operations should have completed successfully
 		assert len(completed_ids) == 10

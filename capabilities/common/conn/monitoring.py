@@ -480,7 +480,7 @@ class HealthChecker:
                 try:
                     await asyncio.sleep(0.01)  # Simulate API call
                     healthy_apis.append(api)
-                except:
+                except Exception:
                     failed_apis.append(api)
 
             status = HealthStatus.HEALTHY

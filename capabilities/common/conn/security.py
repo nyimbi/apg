@@ -286,7 +286,7 @@ class EncryptionManager:
             if field in decrypted_config:
                 try:
                     decrypted_config[field] = self.decrypt(decrypted_config[field])
-                except:
+                except Exception:
                     # If decryption fails, assume it's already decrypted
                     pass
 

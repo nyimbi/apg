@@ -178,7 +178,7 @@ def setup_health_endpoints(app: Flask):
                 try:
                     # Simple connectivity check
                     db_healthy = service.db_manager is not None
-                except:
+                except Exception:
                     db_healthy = False
 
             health_status = {

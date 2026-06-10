@@ -98,7 +98,8 @@ class TestEdgeCasesAndErrorHandling:
                     'port': 8080
                 }
                 tasks.append(discovery.register_service(service_data))
-            return await asyncio.gather(*tasks)
+            return await asyncio.gather(*tasks, return_exceptions=True)
+
         
         # Run multiple concurrent batches
         batch_tasks = [
@@ -107,7 +108,8 @@ class TestEdgeCasesAndErrorHandling:
             register_services(3, 50)
         ]
         
-        results = await asyncio.gather(*batch_tasks)
+        results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+
         
         # Verify all registrations succeeded
         total_registered = sum(len(batch) for batch in results)

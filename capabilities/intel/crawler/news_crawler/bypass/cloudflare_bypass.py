@@ -312,7 +312,7 @@ class CloudflareBypass:
             if driver:
                 try:
                     driver.quit()
-                except:
+                except Exception:
                     pass
     
     async def _bypass_with_aiohttp_stealth(self, url: str, **kwargs) -> BypassResult:
@@ -394,14 +394,14 @@ class CloudflareBypass:
         if self.cloudscraper_session:
             try:
                 self.cloudscraper_session.close()
-            except:
+            except Exception:
                 pass
         
         # Cleanup any remaining drivers
         for driver in self.driver_pool:
             try:
                 driver.quit()
-            except:
+            except Exception:
                 pass
         self.driver_pool.clear()
         

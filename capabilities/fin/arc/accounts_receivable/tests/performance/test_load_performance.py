@@ -467,7 +467,8 @@ class TestAIServicePerformance:
 						credit_task = credit_ai_service.assess_customer_credit(mock_customer)
 						collections_task = collections_ai_service.optimize_collection_strategy(collection_profile)
 						
-						credit_result, strategy_result = await asyncio.gather(credit_task, collections_task)
+						credit_result, strategy_result = await asyncio.gather(credit_task, collections_task, return_exceptions=True)
+
 				
 				response_time = time.time() - start_time
 				metrics.record_response(response_time, True)

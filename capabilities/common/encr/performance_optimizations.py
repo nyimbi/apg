@@ -1264,7 +1264,8 @@ class PerformanceBenchmarkEngine:
 				tasks.append(task)
 			
 			# Wait for all tasks to complete
-			results_list = await asyncio.gather(*tasks)
+			results_list = await asyncio.gather(*tasks, return_exceptions=True)
+
 			end_time = time.perf_counter()
 			
 			total_time = (end_time - start_time) * 1000
@@ -1372,7 +1373,8 @@ class PerformanceBenchmarkEngine:
 		monitor_task = asyncio.create_task(monitor_resources())
 		
 		# Wait for encryption tasks
-		await asyncio.gather(*tasks)
+		await asyncio.gather(*tasks, return_exceptions=True)
+
 		monitor_task.cancel()
 		
 		end_time = time.time()

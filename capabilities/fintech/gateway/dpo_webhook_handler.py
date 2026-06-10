@@ -402,7 +402,7 @@ class DPOWebhookHandler:
         try:
             import ipaddress
             return ipaddress.ip_address(ip) in ipaddress.ip_network(ip_range)
-        except:
+        except Exception:
             return False
 
 

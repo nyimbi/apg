@@ -531,7 +531,8 @@ class TestPaymentGatewayService:
 			for txn in transactions
 		]
 		
-		results = await asyncio.gather(*tasks)
+		results = await asyncio.gather(*tasks, return_exceptions=True)
+
 		
 		# All should succeed
 		assert len(results) == 5
@@ -762,7 +763,8 @@ class TestPaymentGatewayPerformance:
 			for txn in transactions
 		]
 		
-		results = await asyncio.gather(*tasks)
+		results = await asyncio.gather(*tasks, return_exceptions=True)
+
 		
 		end_time = time.time()
 		duration = end_time - start_time

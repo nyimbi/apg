@@ -121,7 +121,8 @@ class TestMDMDatabaseManager:
 		
 		# Create multiple concurrent database operations
 		tasks = [test_query(i) for i in range(5)]
-		results = await asyncio.gather(*tasks)
+		results = await asyncio.gather(*tasks, return_exceptions=True)
+
 		
 		# All operations should complete successfully
 		assert results == list(range(5))

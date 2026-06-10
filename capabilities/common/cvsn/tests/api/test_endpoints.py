@@ -578,6 +578,6 @@ class TestResponseFormats:
 					assert result["success"] == False
 				if "error" in result:
 					assert "message" in result["error"] or "detail" in result
-			except:
+			except Exception:
 				# Some endpoints might return different error formats
 				pass

@@ -388,7 +388,8 @@ class TestEndToEndIntegration:
             for component in all_components
         ]
         
-        registration_results = await asyncio.gather(*registration_tasks)
+        registration_results = await asyncio.gather(*registration_tasks, return_exceptions=True)
+
         
         # Verify all registrations succeeded
         successful_registrations = [
@@ -447,7 +448,8 @@ class TestEndToEndIntegration:
             for tenant_id in tenant_ids
         ]
         
-        reports = await asyncio.gather(*report_tasks)
+        reports = await asyncio.gather(*report_tasks, return_exceptions=True)
+
         
         # Verify all reports generated successfully
         for report in reports:

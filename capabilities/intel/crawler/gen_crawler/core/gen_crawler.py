@@ -695,7 +695,7 @@ class GenCrawler:
         try:
             parsed_url = urlparse(result.url)
             source_domain = parsed_url.netloc
-        except:
+        except Exception:
             pass
         
         # Determine unit type based on content classification

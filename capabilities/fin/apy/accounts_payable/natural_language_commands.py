@@ -407,7 +407,7 @@ class NaturalLanguageCommandService:
 				amount_str = match.group(1).replace(",", "")
 				try:
 					parameters["amount"] = Decimal(amount_str)
-				except:
+				except Exception:
 					pass
 				break
 		

@@ -291,7 +291,7 @@ class HTMLParser:
                     try:
                         data = json.loads(script.string)
                         structured_data.append(data)
-                    except:
+                    except Exception:
                         continue
                 if structured_data:
                     metadata['structured_data'] = structured_data
@@ -426,5 +426,5 @@ def extract_text_only(html: str) -> str:
     try:
         soup = BeautifulSoup(html, 'html.parser')
         return soup.get_text(separator=' ', strip=True)
-    except:
+    except Exception:
         return ""

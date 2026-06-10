@@ -5021,7 +5021,7 @@ class BiometricAutoScaling:
             params, _ = curve_fit(circadian_function, hours, mean_loads, 
                                   bounds=([0, -np.pi, 0], [2, np.pi, 2]))
             amplitude, phase, offset = params
-        except:
+        except Exception:
             # Fallback to simple model if fitting fails
             amplitude, phase, offset = 0.2, 0, np.mean(mean_loads)
         

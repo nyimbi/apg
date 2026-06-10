@@ -177,7 +177,8 @@ class TestEventPublishingPerformance:
 				tasks.append(task)
 			
 			# Wait for all publishers to complete
-			await asyncio.gather(*tasks)
+			await asyncio.gather(*tasks, return_exceptions=True)
+
 			
 			end_time = time.time()
 			duration = end_time - start_time

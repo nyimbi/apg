@@ -3356,7 +3356,7 @@ def send_key_exchange_message(
             if sock:
                 try:
                     sock.close()
-                except:
+                except Exception:
                     pass
             print("Connection closed")
 

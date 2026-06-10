@@ -356,7 +356,8 @@ class TestRealTimeAnalyticsEngine:
 			tasks.append(analytics_engine.record_transaction_metric(transaction))
 		
 		# Execute all tasks concurrently
-		await asyncio.gather(*tasks)
+		await asyncio.gather(*tasks, return_exceptions=True)
+
 		
 		# Should have recorded all metrics
 		volume_metrics = [

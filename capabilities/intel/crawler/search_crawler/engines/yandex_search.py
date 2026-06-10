@@ -112,7 +112,7 @@ class YandexSearchEngine(BaseSearchEngine):
                         self.logger.warning(f"Failed to get main page: {main_response.status}")
                     # Small delay to let cookies settle
                     await asyncio.sleep(0.5)
-            except:
+            except Exception:
                 pass  # Continue even if main page fails
             
             # Then make the search request

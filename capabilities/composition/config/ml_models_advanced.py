@@ -1451,7 +1451,7 @@ class AdvancedCentralConfigurationML:
                 try:
                     y_proba = model.predict_proba(X_test)[:, 1]
                     metrics['auc_roc'] = roc_auc_score(y_test, y_proba)
-                except:
+                except Exception:
                     pass
         else:
             metrics = {
@@ -1556,7 +1556,7 @@ class AdvancedCentralConfigurationML:
         try:
             model_size = len(pickle.dumps(model))
             complexity['memory_usage_mb'] = model_size / (1024 * 1024)
-        except:
+        except Exception:
             complexity['memory_usage_mb'] = 0.0
         
         return complexity

@@ -591,7 +591,7 @@ class AdaptivePolicyEngine:
 							correlation = self._calculate_categorical_correlation(
 								stats['values'], stats['outcomes']
 							)
-					except:
+					except Exception:
 						correlation = 0.0
 				else:
 					correlation = 0.0

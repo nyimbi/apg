@@ -1972,7 +1972,7 @@ class GoogleNewsClient:
             if self._http_session and not self._http_session.closed:
                 try:
                     await self._http_session.close()
-                except:
+                except Exception:
                     pass
 
 

@@ -119,7 +119,7 @@ class DeploymentAutomationService:
             try:
                 # Try in-cluster config first
                 config.load_incluster_config()
-            except:
+            except Exception:
                 # Fall back to local kubeconfig
                 config.load_kube_config()
             
@@ -525,7 +525,7 @@ class DeploymentAutomationService:
             else:
                 raise Exception("Service not found")
                 
-        except:
+        except Exception:
             # Create new service
             response = self.aws_ecs_client.create_service(
                 cluster=cluster_name,
@@ -555,7 +555,7 @@ class DeploymentAutomationService:
             result.message = "ECS deployment completed successfully"
             result.pods_ready = target.replicas
             result.pods_total = target.replicas
-        except:
+        except Exception:
             result.status = DeploymentStatus.FAILED
             result.message = "ECS deployment did not stabilize within timeout"
         
@@ -986,7 +986,7 @@ class DeploymentAutomationService:
                 namespace=namespace
             )
             return deployment.status.ready_replicas or 0
-        except:
+        except Exception:
             return 0
     
     async def _docker_rolling_deployment(

@@ -943,7 +943,7 @@ class ThirdPartyIntegrationManager:
 			try:
 				parsed_date = datetime.fromisoformat(date_value.replace('Z', '+00:00'))
 				return parsed_date.isoformat()
-			except:
+			except Exception:
 				return date_value
 		
 		return str(date_value)
@@ -970,7 +970,7 @@ class ThirdPartyIntegrationManager:
 			cleaned = ''.join(c for c in amount if c.isdigit() or c in '.-')
 			try:
 				return float(cleaned)
-			except:
+			except Exception:
 				return None
 		
 		return None

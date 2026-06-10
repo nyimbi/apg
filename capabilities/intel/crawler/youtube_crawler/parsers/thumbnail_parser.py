@@ -87,7 +87,7 @@ class ThumbnailParser(BaseParser):
                         import json
                         parsed_data = json.loads(data)
                         thumbnail_data = await self._parse_from_dict(parsed_data)
-                    except:
+                    except Exception:
                         # Treat as file path
                         thumbnail_data = await self._parse_from_file(data)
             elif isinstance(data, bytes):

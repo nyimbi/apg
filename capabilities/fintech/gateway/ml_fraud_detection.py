@@ -885,7 +885,7 @@ class MLFraudDetectionEngine:
 		try:
 			# Try to load existing models
 			await self._load_models()
-		except:
+		except Exception:
 			# Create default models if loading fails
 			await self._create_default_models()
 	

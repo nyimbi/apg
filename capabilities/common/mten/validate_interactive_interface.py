@@ -333,7 +333,8 @@ async def test_performance_benchmarks():
 				interface.get_interface_state(f"tenant-{i}", "desktop")
 			)
 		
-		states = await asyncio.gather(*tasks)
+		states = await asyncio.gather(*tasks, return_exceptions=True)
+
 		
 		state_time = (datetime.now(UTC) - start_time).total_seconds()
 		avg_state_time = state_time / 5
@@ -355,7 +356,8 @@ async def test_performance_benchmarks():
 				)
 			)
 		
-		responses = await asyncio.gather(*interactions)
+		responses = await asyncio.gather(*interactions, return_exceptions=True)
+
 		
 		interaction_time = (datetime.now(UTC) - start_time).total_seconds()
 		avg_interaction_time = interaction_time / 10

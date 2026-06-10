@@ -154,7 +154,7 @@ class MetadataParser(BaseParser):
                     parsed_date = self._parse_datetime(pub_date)
                     if parsed_date and parsed_date > datetime.utcnow():
                         validation.add_error('published_date', 'Published date is in the future')
-                except:
+                except Exception:
                     validation.add_error('published_date', 'Invalid date format')
         
         return validation
@@ -664,7 +664,7 @@ class TechnicalMetadataParser(BaseParser):
         """Get approximate size of data in bytes."""
         try:
             return len(str(data).encode('utf-8'))
-        except:
+        except Exception:
             return 0
     
     def _count_nested_levels(self, obj: Any, current_level: int = 0) -> int:

@@ -454,7 +454,8 @@ class TestGraphRAGService:
 		
 		# Execute queries concurrently
 		tasks = [mock_graphrag_service.process_query(query) for query in queries]
-		results = await asyncio.gather(*tasks)
+		results = await asyncio.gather(*tasks, return_exceptions=True)
+
 		
 		# Verify
 		assert len(results) == len(queries)

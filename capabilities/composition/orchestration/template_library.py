@@ -1099,7 +1099,7 @@ result = {
 }
 						"""
 					},
-					"position": {"x": 600, "y": 100)
+					"position": {"x": 600, "y": 100}
 				},
 				{
 					"id": "create_report",

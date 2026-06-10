@@ -532,7 +532,7 @@ class DatabaseOptimizer:
 				for setting, value in optimizations.items():
 					try:
 						await conn.execute(f"ALTER SYSTEM SET {setting} = '{value}'")
-					except:
+					except Exception:
 						pass  # Some settings might not be changeable
 
 				self.logger.info("Optimized database connection settings")
@@ -568,7 +568,7 @@ class DatabaseOptimizer:
 
 					try:
 						await conn.execute(f"VACUUM ANALYZE {schema}.{table_name}")
-					except:
+					except Exception:
 						pass  # Some tables might be locked
 
 			self.logger.info("Completed vacuum analyze on user tables")
@@ -592,7 +592,7 @@ class GPUOptimizer:
 			if len(tf.config.list_physical_devices('GPU')) > 0:
 				return True
 			return False
-		except:
+		except Exception:
 			return False
 
 	async def optimize_gpu_performance(self) -> Dict[str, Any]:
@@ -720,7 +720,7 @@ class GPUOptimizer:
 						'memory_percent': (gpu.memoryUsed / gpu.memoryTotal) * 100,
 						'temperature': gpu.temperature
 					}
-			except:
+			except Exception:
 				pass
 
 			return stats
@@ -1058,14 +1058,14 @@ class PerformanceOptimizer:
 				try:
 					with open('/proc/sys/vm/swappiness', 'w') as f:
 						f.write('10')
-				except:
+				except Exception:
 					pass  # Might not have permission
 
 			# Enable transparent huge pages for better memory performance
 			try:
 				with open('/sys/kernel/mm/transparent_hugepage/enabled', 'w') as f:
 					f.write('always')
-			except:
+			except Exception:
 				pass  # Might not have permission
 
 			self.logger.info("Optimized memory settings")
@@ -1218,7 +1218,7 @@ class PerformanceOptimizer:
 				gpus = GPUtil.getGPUs()
 				if gpus:
 					gpu_percent = gpus[0].load * 100
-			except:
+			except Exception:
 				pass
 
 			# Application metrics (simulated)

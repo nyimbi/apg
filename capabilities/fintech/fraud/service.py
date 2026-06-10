@@ -432,7 +432,8 @@ class FraudDetectionService:
 		device_task = asyncio.create_task(
 			self.device_fingerprint_check(device_id, customer_id)
 		)
-		velocity_result, device_result = await asyncio.gather(velocity_task, device_task)
+		velocity_result, device_result = await asyncio.gather(velocity_task, device_task, return_exceptions=True)
+
 
 		# ML feature vector
 		features: dict[str, Any] = {
@@ -1105,7 +1106,8 @@ class FraudDetectionService:
 	) -> list[dict[str, Any]]:
 		"""Score a list of signal dicts concurrently via ml_fraud_score."""
 		tasks = [self.ml_fraud_score(s) for s in signals]
-		results = await asyncio.gather(*tasks)
+		results = await asyncio.gather(*tasks, return_exceptions=True)
+
 		return list(results)
 
 	async def recalibrate_thresholds(

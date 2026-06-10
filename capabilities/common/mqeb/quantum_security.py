@@ -676,7 +676,7 @@ class ComplianceAutomation:
 			content = message.payload.decode('utf-8', errors='ignore').lower()
 			pii_indicators = ['email', 'phone', 'ssn', 'credit_card', 'address', 'name']
 			return any(indicator in content for indicator in pii_indicators)
-		except:
+		except Exception:
 			return False
 	
 	def _contains_financial_data(self, message: MQMessage) -> bool:
@@ -685,7 +685,7 @@ class ComplianceAutomation:
 			content = message.payload.decode('utf-8', errors='ignore').lower()
 			financial_indicators = ['payment', 'transaction', 'account', 'balance', 'invoice']
 			return any(indicator in content for indicator in financial_indicators)
-		except:
+		except Exception:
 			return False
 	
 	async def generate_compliance_report(self, tenant_id: str, framework: str, 

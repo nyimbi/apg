@@ -666,7 +666,8 @@ class TestAsyncOperations:
 			)
 			session_tasks.append(task)
 		
-		sessions = await asyncio.gather(*session_tasks)
+		sessions = await asyncio.gather(*session_tasks, return_exceptions=True)
+
 		
 		assert len(sessions) == 3
 		for i, session in enumerate(sessions):

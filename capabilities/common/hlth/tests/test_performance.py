@@ -71,7 +71,8 @@ class TestPerformanceBenchmarks:
                 health_service.process_health_metric(metric)
                 for metric in batch
             ]
-            await asyncio.gather(*tasks)
+            await asyncio.gather(*tasks, return_exceptions=True)
+
         
         end_time = time.time()
         duration = end_time - start_time
@@ -197,7 +198,8 @@ class TestPerformanceBenchmarks:
                 )
                 tasks.append(health_service.process_health_metric(metric))
             
-            await asyncio.gather(*tasks)
+            await asyncio.gather(*tasks, return_exceptions=True)
+
             
             # Sample memory usage
             current_memory = process.memory_info().rss / 1024 / 1024
@@ -244,7 +246,8 @@ class TestPerformanceBenchmarks:
                 health_service.register_system_component(component)
             )
         
-        await asyncio.gather(*registration_tasks)
+        await asyncio.gather(*registration_tasks, return_exceptions=True)
+
         
         registration_time = time.time() - start_time
         registration_throughput = operation_count / registration_time
@@ -259,7 +262,8 @@ class TestPerformanceBenchmarks:
             )
             assessment_tasks.append(task)
         
-        await asyncio.gather(*assessment_tasks)
+        await asyncio.gather(*assessment_tasks, return_exceptions=True)
+
         
         assessment_time = time.time() - start_time
         assessment_throughput = operation_count / assessment_time
@@ -455,7 +459,8 @@ class TestPerformanceBenchmarks:
                     health_service.register_system_component(component)
                 )
         
-        await asyncio.gather(*registration_tasks)
+        await asyncio.gather(*registration_tasks, return_exceptions=True)
+
         phase2_time = time.time() - phase2_start
         
         # Phase 3: Metric processing
@@ -477,7 +482,8 @@ class TestPerformanceBenchmarks:
                     )
                 )
         
-        await asyncio.gather(*metric_tasks)
+        await asyncio.gather(*metric_tasks, return_exceptions=True)
+
         phase3_time = time.time() - phase3_start
         
         # Phase 4: Health assessments
@@ -491,7 +497,8 @@ class TestPerformanceBenchmarks:
                 )
             )
         
-        await asyncio.gather(*assessment_tasks)
+        await asyncio.gather(*assessment_tasks, return_exceptions=True)
+
         phase4_time = time.time() - phase4_start
         
         # Phase 5: Report generation
@@ -506,7 +513,8 @@ class TestPerformanceBenchmarks:
                 )
             )
         
-        await asyncio.gather(*report_tasks)
+        await asyncio.gather(*report_tasks, return_exceptions=True)
+
         phase5_time = time.time() - phase5_start
         
         total_time = time.time() - workflow_start

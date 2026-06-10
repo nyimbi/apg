@@ -46,7 +46,7 @@ async def test_complete_ap_workflow_integration(
 	
 	vendor = await vendor_service.create_vendor(
 		sample_vendor_data,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	assert vendor is not None, "Vendor creation should succeed"
 	assert_apg_compliance(vendor)
@@ -80,7 +80,7 @@ async def test_complete_ap_workflow_integration(
 	
 	invoice = await invoice_service.create_invoice(
 		invoice_data,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	assert invoice is not None, "Invoice creation should succeed"
 	assert invoice.vendor_id == vendor.id, "Invoice should link to vendor"
@@ -98,7 +98,7 @@ async def test_complete_ap_workflow_integration(
 	
 	workflow = await workflow_service.create_workflow(
 		workflow_data,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	assert workflow is not None, "Workflow creation should succeed"
 	assert workflow.entity_id == invoice.id, "Workflow should link to invoice"
@@ -110,7 +110,7 @@ async def test_complete_ap_workflow_integration(
 		step_index=0,
 		action="approve",
 		comments="Integration test approval",
-		tenant_context
+		tenant_context=tenant_context
 	)
 	assert approval_result["success"] is True, "Approval should succeed"
 	
@@ -137,7 +137,7 @@ async def test_complete_ap_workflow_integration(
 	
 	payment = await payment_service.create_payment(
 		payment_data,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	assert payment is not None, "Payment creation should succeed"
 	assert payment.vendor_id == vendor.id, "Payment should link to vendor"
@@ -243,7 +243,7 @@ async def test_apg_audit_compliance_integration(
 	
 	vendor = await vendor_service.create_vendor(
 		sample_vendor_data,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Update vendor with audit trail
@@ -255,7 +255,7 @@ async def test_apg_audit_compliance_integration(
 	updated_vendor = await vendor_service.update_vendor(
 		vendor.id,
 		update_data,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Create invoice with audit logging
@@ -275,13 +275,13 @@ async def test_apg_audit_compliance_integration(
 	
 	invoice = await invoice_service.create_invoice(
 		invoice_data,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Approve invoice with audit trail
 	approval_result = await invoice_service.approve_invoice(
 		invoice.id,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Create payment with audit logging
@@ -306,7 +306,7 @@ async def test_apg_audit_compliance_integration(
 	
 	payment = await payment_service.create_payment(
 		payment_data,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Verify audit service integration points
@@ -343,7 +343,7 @@ async def test_apg_computer_vision_integration(
 		mock_invoice_file,
 		vendor_id,
 		tenant_context["tenant_id"],
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Verify computer vision integration
@@ -376,7 +376,7 @@ async def test_apg_real_time_collaboration_integration(
 	
 	workflow = await workflow_service.create_workflow(
 		sample_workflow_data,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Process approval with real-time notifications
@@ -385,7 +385,7 @@ async def test_apg_real_time_collaboration_integration(
 		step_index=0,
 		action="approve",
 		comments="Collaboration test approval",
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Verify collaboration integration points
@@ -615,7 +615,7 @@ async def test_error_handling_integration(
 		
 		await invoice_service.create_invoice(
 			invalid_invoice_data,
-			tenant_context
+			tenant_context=tenant_context
 		)
 	
 	# Test service dependency validation
@@ -631,7 +631,7 @@ async def test_error_handling_integration(
 		
 		await payment_service.create_payment(
 			invalid_payment_data,
-			tenant_context
+			tenant_context=tenant_context
 		)
 	
 	# Test workflow error handling
@@ -646,7 +646,7 @@ async def test_error_handling_integration(
 		
 		await workflow_service.create_workflow(
 			invalid_workflow_data,
-			tenant_context
+			tenant_context=tenant_context
 		)
 
 
@@ -669,7 +669,7 @@ async def test_performance_integration_under_load(
 	# Create base vendor for all tests
 	base_vendor = await vendor_service.create_vendor(
 		sample_vendor_data,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Test concurrent invoice and payment creation

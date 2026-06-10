@@ -380,7 +380,7 @@ class GoogleNewsContentPipeline:
 		if article_dict.get('published_at'):
 			try:
 				published_at = datetime.fromisoformat(article_dict['published_at'].replace('Z', '+00:00'))
-			except:
+			except Exception:
 				pass
 		
 		return GoogleNewsRecord(
@@ -403,7 +403,7 @@ class GoogleNewsContentPipeline:
 		"""Extract domain from URL."""
 		try:
 			return urlparse(url).netloc
-		except:
+		except Exception:
 			return ""
 	
 	def _deduplicate_articles(self, articles: List[GoogleNewsRecord]) -> List[GoogleNewsRecord]:

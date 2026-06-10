@@ -247,7 +247,7 @@ class PostgreSQLConnector(BaseConnector):
 							column.classification_hints = profiled_column.classification_hints
 							column.contains_pii = profiled_column.contains_pii
 							column.contains_phi = profiled_column.contains_phi
-					except:
+					except Exception:
 						pass  # Continue without profiling if it fails
 				
 				columns.append(column)
@@ -258,7 +258,7 @@ class PostgreSQLConnector(BaseConnector):
 				try:
 					count_query = f'SELECT COUNT(*) FROM "{schema_name}"."{table_name}"'
 					row_count = await self.connection.fetchval(count_query)
-				except:
+				except Exception:
 					pass  # Row count not critical
 			
 			asset_metadata = AssetMetadata(

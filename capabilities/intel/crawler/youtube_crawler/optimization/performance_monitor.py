@@ -122,7 +122,7 @@ class MetricsCollector:
                     net_io = psutil.net_io_counters()
                     self.record_counter("system.network.bytes_sent", net_io.bytes_sent, {"host": "local"})
                     self.record_counter("system.network.bytes_recv", net_io.bytes_recv, {"host": "local"})
-                except:
+                except Exception:
                     pass  # Network metrics might not be available
                 
                 await asyncio.sleep(self.system_metrics_interval)

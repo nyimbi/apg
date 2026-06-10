@@ -664,5 +664,5 @@ class MockYouTubeClient:
         # Clean up mock file
         try:
             os.remove('demo_mock_client.py')
-        except:
+        except Exception:
             pass

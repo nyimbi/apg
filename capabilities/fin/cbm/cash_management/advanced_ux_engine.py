@@ -557,7 +557,7 @@ class AdvancedUXEngine:
 		# Try to parse absolute dates
 		try:
 			return pd.to_datetime(text).to_pydatetime()
-		except:
+		except Exception:
 			return now
 	
 	async def _extract_parameters(

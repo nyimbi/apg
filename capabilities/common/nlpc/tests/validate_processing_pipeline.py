@@ -735,7 +735,8 @@ async def validate_performance_and_monitoring():
 		concurrent_tasks = [
 			pipeline.process_single(req) for req in concurrent_requests
 		]
-		concurrent_results = await asyncio.gather(*concurrent_tasks)
+		concurrent_results = await asyncio.gather(*concurrent_tasks, return_exceptions=True)
+
 		concurrent_time = time.time() - concurrent_start
 		
 		assert len(concurrent_results) == len(concurrent_requests)
@@ -767,7 +768,7 @@ async def validate_performance_and_monitoring():
 		
 		try:
 			await pipeline.process_single(error_request)
-		except:
+		except Exception:
 			pass  # Expected error
 		
 		# Error should be tracked in statistics

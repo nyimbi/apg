@@ -657,7 +657,7 @@ class ConflictMonitor:
         try:
             # Twitter time format: "Mon Oct 05 20:20:25 +0000 2020"
             return datetime.strptime(time_str, "%a %b %d %H:%M:%S %z %Y")
-        except:
+        except Exception:
             return datetime.now()
     
     def get_monitoring_status(self) -> Dict[str, Any]:

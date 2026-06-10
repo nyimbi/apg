@@ -437,7 +437,7 @@ class DeploymentTestSuite:
                 )
                 # Port validation might not be enforced by Pydantic, that's OK
                 logger.info("✓ Database config created with high port (allowed)")
-            except:
+            except Exception:
                 logger.info("✓ Correctly caught invalid database port")
 
             # Test required field validation

@@ -824,7 +824,7 @@ class FlowExecutionEngine:
 				return eval(expression)
 			else:
 				return expression  # Return as string if complex
-		except:
+		except Exception:
 			return expression
 
 

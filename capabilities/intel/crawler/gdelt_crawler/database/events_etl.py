@@ -390,7 +390,7 @@ class GDELTEventsETL:
                 dateadded_month = int(dateadded_str[4:6])
                 dateadded_day = int(dateadded_str[6:8])
                 dateadded_datetime = datetime(dateadded_year, dateadded_month, dateadded_day, tzinfo=timezone.utc)
-            except:
+            except Exception:
                 dateadded_datetime = None
 
         # Extract actor information
@@ -512,7 +512,7 @@ class GDELTEventsETL:
                     parsed = urlparse(raw_source_url)
                     if parsed.netloc and parsed.scheme in ['http', 'https']:
                         source_url = raw_source_url
-                except:
+                except Exception:
                     source_url = None
 
         # Create metadatax with complete GDELT row plus additional fields - SAME as iu_load.py
@@ -584,7 +584,7 @@ class GDELTEventsETL:
                     return bool(value)
                 else:
                     return value
-            except:
+            except Exception:
                 return None
 
         return {
@@ -684,7 +684,7 @@ class GDELTEventsETL:
                     return bool(value)
                 else:
                     return value
-            except:
+            except Exception:
                 return None
 
         # Create comprehensive mapping to information_units columns
@@ -991,7 +991,7 @@ class GDELTEventsETL:
                 try:
                     sample_mapping = self._map_all_gdelt_fields(sample_series, datetime.now())
                     gdelt_field_names = list(sample_mapping.keys())
-                except:
+                except Exception:
                     gdelt_field_names = []
 
                 # Generate mapping report
@@ -1134,7 +1134,7 @@ async def run_events_etl(
             report = await etl.get_field_mapping_report()
             logger.info(f"🎯 GDELT Field Mapping: {report['gdelt_fields_total']} total fields, "
                        f"{report['coverage_percentage']}% coverage in information_units table")
-        except:
+        except Exception:
             logger.info("🎯 GDELT Enhanced ETL v2.0 - Complete field mapping enabled")
 
         return await etl.process_date_range(start_date, end_date)

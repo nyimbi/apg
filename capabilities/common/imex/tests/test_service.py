@@ -422,7 +422,8 @@ class TestServicePerformance:
 
 		# Create 10 jobs concurrently
 		tasks = [create_job(i) for i in range(10)]
-		jobs = await asyncio.gather(*tasks)
+		jobs = await asyncio.gather(*tasks, return_exceptions=True)
+
 
 		assert len(jobs) == 10
 		assert len(service.active_jobs) == 10
@@ -447,7 +448,8 @@ class TestServicePerformance:
 
 		# Execute jobs concurrently
 		tasks = [service.execute_job(job.id) for job in jobs]
-		executions = await asyncio.gather(*tasks)
+		executions = await asyncio.gather(*tasks, return_exceptions=True)
+
 
 		assert len(executions) == 5
 		assert all(exec.status == JobStatus.COMPLETED for exec in executions)

@@ -579,7 +579,7 @@ Examples:
 			json_match = re.search(r'\{.*\}', ai_response, re.DOTALL)
 			if json_match:
 				return json.loads(json_match.group(0))
-		except:
+		except Exception:
 			pass
 		
 		# Fallback to keyword-based parsing
@@ -723,7 +723,7 @@ Focus on actionable improvements that provide measurable benefits.
 			if json_match:
 				parsed = json.loads(json_match.group(0))
 				return parsed.get('recommendations', [])
-		except:
+		except Exception:
 			pass
 		
 		return []
@@ -889,7 +889,7 @@ Look for:
 			if json_match:
 				parsed = json.loads(json_match.group(0))
 				return parsed.get('anomalies', [])
-		except:
+		except Exception:
 			pass
 		
 		return []

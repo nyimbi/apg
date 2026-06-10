@@ -591,7 +591,8 @@ class TestServicePerformance:
 				)
 			
 			tasks = [execute_workflow(i) for i in range(5)]
-			results = await asyncio.gather(*tasks)
+			results = await asyncio.gather(*tasks, return_exceptions=True)
+
 			
 			assert len(results) == 5
 			assert all(result.status == WorkflowStatus.RUNNING for result in results)

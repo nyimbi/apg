@@ -172,7 +172,7 @@ class TapSAP:
             try:
                 datetime.fromisoformat(value.replace('Z', '+00:00'))
                 return "string"
-            except:
+            except Exception:
                 return "string"
         elif isinstance(value, (list, tuple)):
             return "array"

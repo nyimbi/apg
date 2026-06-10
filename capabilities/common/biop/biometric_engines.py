@@ -1380,7 +1380,7 @@ class VoiceEngine(BiometricEngine):
 				prosodic_features.extend([np.mean(beat_intervals), np.std(beat_intervals)])
 			else:
 				prosodic_features.extend([0, 0])
-		except:
+		except Exception:
 			prosodic_features.extend([0, 0, 0])  # Fallback if tempo detection fails
 		
 		return np.array(prosodic_features)

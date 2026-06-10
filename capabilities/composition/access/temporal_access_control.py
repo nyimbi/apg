@@ -1520,7 +1520,7 @@ class RealTimeSeriesForecaster:
 				model_fit = model.fit()
 				forecast = model_fit.forecast(steps=steps)
 				return forecast.tolist()
-			except:
+			except Exception:
 				return []
 		elif model_name == 'exponential_smoothing':
 			try:
@@ -1528,7 +1528,7 @@ class RealTimeSeriesForecaster:
 				model_fit = model.fit()
 				forecast = model_fit.forecast(steps=steps)
 				return forecast.tolist()
-			except:
+			except Exception:
 				return []
 		else:
 			return []

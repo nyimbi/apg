@@ -513,7 +513,7 @@ class SystemResourceTest(TimeAttendancePerformanceTest):
                                 tenant_id="performance_test_tenant",
                                 created_by="cpu_test"
                             )
-                        except:
+                        except Exception:
                             # Employee might not be clocked in
                             task = asyncio.sleep(0)
                     tasks.append(task)

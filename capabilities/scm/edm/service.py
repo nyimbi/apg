@@ -325,7 +325,7 @@ class ExpiryDateService:
 			try:
 				last_seq = int(last_disposition.disposition_number[-4:])
 				next_seq = last_seq + 1
-			except:
+			except Exception:
 				next_seq = 1
 		else:
 			next_seq = 1

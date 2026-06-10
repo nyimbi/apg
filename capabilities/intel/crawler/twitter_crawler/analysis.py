@@ -574,7 +574,7 @@ class NetworkAnalyzer:
                     closeness = nx.closeness_centrality(self.interaction_graph)[user_id]
                     centrality_scores['betweenness'] = betweenness
                     centrality_scores['closeness'] = closeness
-                except:
+                except Exception:
                     pass  # Skip if computation fails
             
             # Calculate influence score

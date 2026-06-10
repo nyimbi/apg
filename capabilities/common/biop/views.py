@@ -508,7 +508,7 @@ class UniversalComplianceView(BaseView):
 
 @biometric_api.route('/verify', methods=['POST'])
 @protect()
-def start_biometric_verification():
+async def start_biometric_verification():
 	"""
 	Start biometric verification with revolutionary intelligence
 	
@@ -574,7 +574,7 @@ def start_biometric_verification():
 
 @biometric_api.route('/natural_language/query', methods=['POST'])
 @protect()
-def process_natural_language_query():
+async def process_natural_language_query():
 	"""
 	Process natural language queries about biometric authentication
 	
@@ -681,7 +681,7 @@ def start_collaborative_session():
 
 @biometric_api.route('/behavioral/start_session', methods=['POST'])
 @protect()
-def start_behavioral_session():
+async def start_behavioral_session():
 	"""
 	Start behavioral biometrics session for continuous authentication
 	

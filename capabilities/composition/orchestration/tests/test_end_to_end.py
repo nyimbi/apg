@@ -879,7 +879,8 @@ return {'task_id': context.get('task_id', 'unknown'), 'processed': True}
 			execution_tasks.append(task)
 		
 		# Wait for all to start
-		instances = await asyncio.gather(*execution_tasks)
+		instances = await asyncio.gather(*execution_tasks, return_exceptions=True)
+
 		assert len(instances) == concurrent_executions
 		
 		# Wait for all to complete
@@ -895,7 +896,8 @@ return {'task_id': context.get('task_id', 'unknown'), 'processed': True}
 			completion_tasks.append(asyncio.create_task(wait_for_completion(instance.id)))
 		
 		# Wait for all completions
-		completed_instances = await asyncio.gather(*completion_tasks)
+		completed_instances = await asyncio.gather(*completion_tasks, return_exceptions=True)
+
 		end_time = datetime.utcnow()
 		
 		total_time = (end_time - start_time).total_seconds()

@@ -1021,7 +1021,7 @@ class CloudScraperStealthCrawler:
             domain2 = domain2.replace('www.', '')
 
             return domain1 == domain2
-        except:
+        except Exception:
             return False
 
     def _extract_urls_from_sitemap(self, xml_content: str, base_url: str) -> List[str]:

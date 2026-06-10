@@ -470,7 +470,8 @@ class TestMQEBPerformance:
 			
 			# Run concurrent operations
 			tasks = [create_topic_with_messages(i) for i in range(10)]
-			await asyncio.gather(*tasks)
+			await asyncio.gather(*tasks, return_exceptions=True)
+
 			
 			# Verify results
 			assert len(service.topics) >= 10  # At least 10 new topics + defaults

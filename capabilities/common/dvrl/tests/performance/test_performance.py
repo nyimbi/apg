@@ -357,7 +357,8 @@ class TestConnectionPoolPerformance:
 		
 		# Execute 15 concurrent tasks (3x pool size)
 		tasks = [execute_with_connection(i) for i in range(15)]
-		results = await asyncio.gather(*tasks)
+		results = await asyncio.gather(*tasks, return_exceptions=True)
+
 		
 		# Analyze connection pool performance
 		successful_results = [r for r in results if r['success']]

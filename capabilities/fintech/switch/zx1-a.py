@@ -3607,7 +3607,7 @@ def send_key_exchange_message(
             try:
                 secure_sock.close()
                 print("Connection closed")
-            except:
+            except Exception:
                 pass
 
     except Exception as e:

@@ -582,7 +582,7 @@ class AlertManager:
 					total_hsms = len(hsm_status)
 					
 					return online_hsms / total_hsms if total_hsms > 0 else 0.0
-				except:
+				except Exception:
 					return 0.0
 		
 		return None

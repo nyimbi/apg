@@ -499,7 +499,7 @@ class PerformanceOptimizationDashboard(BaseView):
 			timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
 			cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
 			return timestamp > cutoff
-		except:
+		except Exception:
 			return False
 	
 	async def _calculate_system_health_score(self, metrics: Dict[str, Any]) -> float:

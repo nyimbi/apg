@@ -68,7 +68,7 @@ def _is_protected_domain(url: str) -> bool:
     try:
         domain = urlparse(url).netloc.lower()
         return any(protected_domain in domain for protected_domain in _protected_domains)
-    except:
+    except Exception:
         return False
 
 async def _get_stealth_headers(url: str) -> Dict[str, str]:
@@ -135,7 +135,7 @@ def _stealth_get_html(url: str, config=None, response=None):
                         headers = future.result(timeout=10)
                 else:
                     headers = loop.run_until_complete(_get_stealth_headers(url))
-            except:
+            except Exception:
                 # Fallback to basic headers if async fails
                 headers = {
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -182,7 +182,7 @@ def _stealth_get_html(url: str, config=None, response=None):
         try:
             response = requests.get(url, timeout=30)
             return response.text
-        except:
+        except Exception:
             return ""
 
 def apply_newspaper_stealth_patch():
@@ -232,7 +232,7 @@ def get_stealth_stats() -> Dict[str, Any]:
     if _stealth_orchestrator and hasattr(_stealth_orchestrator, 'get_stealth_report'):
         try:
             return _stealth_orchestrator.get_stealth_report()
-        except:
+        except Exception:
             pass
 
     return {
@@ -295,7 +295,7 @@ AUTO_PATCH_ON_IMPORT = True
 if AUTO_PATCH_ON_IMPORT:
     try:
         apply_newspaper_stealth_patch()
-    except:
+    except Exception:
         pass  # Silently fail if newspaper3k not available
 
 # Export alias for backward compatibility

@@ -36,7 +36,7 @@ async def test_create_workflow_success(
 	# Execute
 	workflow = await workflow_service.create_workflow(
 		sample_workflow_data,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Verify
@@ -102,7 +102,7 @@ async def test_create_workflow_with_custom_approvers(
 	# Execute
 	workflow = await workflow_service.create_workflow(
 		sample_workflow_data,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Verify
@@ -133,7 +133,7 @@ async def test_process_approval_step_success(
 	sample_workflow_data["created_by"] = tenant_context["user_id"]
 	workflow = await workflow_service.create_workflow(
 		sample_workflow_data,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Execute
@@ -142,7 +142,7 @@ async def test_process_approval_step_success(
 		step_index=0,
 		action="approve",
 		comments="Approved - looks good",
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Verify
@@ -166,7 +166,7 @@ async def test_process_approval_step_rejection(
 	sample_workflow_data["created_by"] = tenant_context["user_id"]
 	workflow = await workflow_service.create_workflow(
 		sample_workflow_data,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Execute
@@ -175,7 +175,7 @@ async def test_process_approval_step_rejection(
 		step_index=0,
 		action="reject",
 		comments="Rejected - missing documentation",
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Verify
@@ -199,7 +199,7 @@ async def test_process_approval_invalid_approver(
 	sample_workflow_data["created_by"] = tenant_context["user_id"]
 	workflow = await workflow_service.create_workflow(
 		sample_workflow_data,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Setup invalid approver context
@@ -216,7 +216,7 @@ async def test_process_approval_invalid_approver(
 			step_index=0,
 			action="approve",
 			comments="Unauthorized approval attempt",
-			invalid_approver_context
+			invalid_approver_context=invalid_approver_context
 		)
 	
 	assert "permission" in str(exc_info.value).lower()
@@ -237,7 +237,7 @@ async def test_workflow_auto_routing_by_amount(
 	# Execute
 	workflow = await workflow_service.create_workflow(
 		sample_workflow_data,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Verify
@@ -263,7 +263,7 @@ async def test_workflow_department_routing(
 	# Execute
 	workflow = await workflow_service.create_workflow(
 		sample_workflow_data,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Verify
@@ -287,13 +287,13 @@ async def test_workflow_escalation_timeout(
 	
 	workflow = await workflow_service.create_workflow(
 		sample_workflow_data,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Execute escalation check
 	result = await workflow_service.check_escalation(
 		workflow.id,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Verify
@@ -322,7 +322,7 @@ async def test_workflow_escalation_chain(
 	# Execute
 	workflow = await workflow_service.create_workflow(
 		sample_workflow_data,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Verify escalation chain setup
@@ -352,7 +352,7 @@ async def test_workflow_parallel_approvals(
 	# Execute
 	workflow = await workflow_service.create_workflow(
 		sample_workflow_data,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Verify
@@ -377,13 +377,13 @@ async def test_get_workflow_success(
 	sample_workflow_data["created_by"] = tenant_context["user_id"]
 	workflow = await workflow_service.create_workflow(
 		sample_workflow_data,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Execute
 	retrieved_workflow = await workflow_service.get_workflow(
 		workflow.id,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Verify
@@ -402,7 +402,7 @@ async def test_get_workflows_by_approver(
 	# Execute
 	workflows = await workflow_service.get_workflows_by_approver(
 		approver_id,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Verify
@@ -424,13 +424,13 @@ async def test_get_workflow_history(
 	sample_workflow_data["created_by"] = tenant_context["user_id"]
 	workflow = await workflow_service.create_workflow(
 		sample_workflow_data,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Execute
 	history = await workflow_service.get_workflow_history(
 		workflow.id,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Verify
@@ -492,7 +492,7 @@ async def test_concurrent_approval_processing(
 	sample_workflow_data["created_by"] = tenant_context["user_id"]
 	workflow = await workflow_service.create_workflow(
 		sample_workflow_data,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Execute concurrent approval attempts (should detect race condition)
@@ -585,7 +585,7 @@ async def test_workflow_business_rules_validation(
 	
 	workflow = await workflow_service.create_workflow(
 		sample_workflow_data,
-		tenant_context
+		tenant_context=tenant_context
 	)
 	
 	# Verify high-amount business rules applied

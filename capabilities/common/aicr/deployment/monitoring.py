@@ -744,14 +744,14 @@ class HealthChecker:
 				try:
 					async with session.get('https://www.google.com', timeout=5) as response:
 						external_connectivity = response.status == 200
-				except:
+				except Exception:
 					external_connectivity = False
 
 			# Check DNS resolution
 			try:
 				socket.gethostbyname('google.com')
 				dns_working = True
-			except:
+			except Exception:
 				dns_working = False
 
 			# Check internal connectivity (localhost)
@@ -761,7 +761,7 @@ class HealthChecker:
 				result = sock.connect_ex(('localhost', 8080))
 				sock.close()
 				internal_connectivity = result == 0
-			except:
+			except Exception:
 				internal_connectivity = False
 
 			response_time = (time.time() - start_time) * 1000
@@ -838,7 +838,7 @@ class HealthChecker:
 									  capture_output=True, text=True, timeout=5)
 				if result.returncode != 0:
 					security_issues.append("Automatic security updates not configured")
-			except:
+			except Exception:
 				pass
 
 			# Check file permissions on sensitive files
@@ -915,7 +915,7 @@ class HealthChecker:
 				gpus = GPUtil.getGPUs()
 				if gpus:
 					gpu_percent = gpus[0].load * 100
-			except:
+			except Exception:
 				pass
 
 			response_time = (time.time() - start_time) * 1000
@@ -1037,7 +1037,7 @@ class MetricsCollector:
 					gpu = gpus[0]
 					gpu_percent = gpu.load * 100
 					gpu_memory_percent = (gpu.memoryUsed / gpu.memoryTotal) * 100
-			except:
+			except Exception:
 				pass
 
 			# Update Prometheus metrics
@@ -1103,7 +1103,7 @@ class MetricsCollector:
 			# Load Kubernetes configuration
 			try:
 				k8s_config.load_incluster_config()
-			except:
+			except Exception:
 				k8s_config.load_kube_config()
 
 			v1 = k8s_client.CoreV1Api()

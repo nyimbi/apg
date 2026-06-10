@@ -277,7 +277,7 @@ class IntelligentAutoScaler:
 				try:
 					# This would use metrics-server or custom metrics API
 					pod_metrics = await self._get_pod_metrics(deployment_name)
-				except:
+				except Exception:
 					pod_metrics = {
 						"cpu_usage": 50.0,      # Mock data
 						"memory_usage": 60.0,   # Mock data

@@ -852,7 +852,7 @@ class AdvancedTemplateSystem:
 				patch += 1
 			
 			return f"{major}.{minor}.{patch}"
-		except:
+		except Exception:
 			# Fallback to sequential
 			return f"{current_version}.1"
 	

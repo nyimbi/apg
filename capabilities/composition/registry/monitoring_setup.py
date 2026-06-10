@@ -227,7 +227,7 @@ class RegistryMetricsCollector:
                 
                 for query in slow_queries:
                     self.db_slow_queries.labels(operation="unknown").inc()
-            except:
+            except Exception:
                 pass  # pg_stat_statements might not be available
             
             await conn.close()
@@ -485,7 +485,8 @@ class HealthChecker:
         results["system_resources"] = system_result
         
         # Wait for async checks
-        db_result, redis_result = await asyncio.gather(db_check, redis_check)
+        db_result, redis_result = await asyncio.gather(db_check, redis_check, return_exceptions=True)
+
         
         results["database"] = db_result
         results["redis"] = redis_result

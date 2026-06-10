@@ -263,7 +263,7 @@ class DatabaseMonitor:
 				)
 			""")
 			return bool(result)
-		except:
+		except Exception:
 			return False
 	
 	async def get_vector_index_stats(self, tenant_id: str) -> Dict[str, Any]:

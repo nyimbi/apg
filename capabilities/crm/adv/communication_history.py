@@ -783,7 +783,7 @@ class CommunicationManager:
 					)
 					if not exists:
 						raise ValueError(f"Lead not found: {communication.lead_id}")
-				except:
+				except Exception:
 					# Leads table might not exist yet
 					pass
 			
@@ -796,6 +796,6 @@ class CommunicationManager:
 					)
 					if not exists:
 						raise ValueError(f"Opportunity not found: {communication.opportunity_id}")
-				except:
+				except Exception:
 					# Opportunities table might not exist yet
 					pass

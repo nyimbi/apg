@@ -636,7 +636,7 @@ class DuplicatePreventionService:
 			date_obj = datetime.fromisoformat(invoice_date).date()
 			week_start = date_obj - timedelta(days=date_obj.weekday())
 			return f"WEEK_{week_start.isoformat()}"
-		except:
+		except Exception:
 			return "DATE_UNKNOWN"
 	
 	async def _generate_content_signature(self, line_items: List[Dict[str, Any]]) -> str:

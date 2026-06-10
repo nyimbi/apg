@@ -467,7 +467,8 @@ class AgntService:
 				cost = step_result.get("cost_usd", 0.0)
 				self._cost_ledger.setdefault(key, []).append({"cost_usd": cost, "ts": _now()})
 				return {"agent_id": aid, **step_result}
-			results = list(await asyncio.gather(*[_run(aid) for aid in agent_ids]))
+			results = list(await asyncio.gather(*[_run(aid) for aid in agent_ids]), return_exceptions=True)
+
 		else:
 			raise ValueError(f"unknown strategy: {strategy}")
 		elapsed = time.monotonic() - t0
@@ -486,7 +487,8 @@ class AgntService:
 			if agent is None:
 				return {"agent_id": aid, "status": "error", "error": "not_found"}
 			return {"agent_id": aid, **(await self._simulate_agent_step(agent, task))}
-		return list(await asyncio.gather(*[_run(aid, t) for aid, t in agent_task_pairs]))
+		return list(await asyncio.gather(*[_run(aid, t) for aid, t in agent_task_pairs]), return_exceptions=True)
+
 
 	async def stream_execution(
 		self,
@@ -562,7 +564,8 @@ class AgntService:
 		agent = self._agents.get(key)
 		if agent is None:
 			return [{"error": "agent_not_found"} for _ in tasks_list]
-		results = await asyncio.gather(*[self._simulate_agent_step(agent, t) for t in tasks_list])
+		results = await asyncio.gather(*[self._simulate_agent_step(agent, t) for t in tasks_list], return_exceptions=True)
+
 		total_cost = sum(r.get("cost_usd", 0.0) for r in results)
 		self._cost_ledger.setdefault(key, []).append(
 			{"cost_usd": total_cost, "ts": _now(), "batch_size": len(tasks_list)})

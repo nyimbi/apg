@@ -466,7 +466,8 @@ class TestMLIntegrationPerformance:
             )
             tasks.append(task)
         
-        results = await asyncio.gather(*tasks)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
         
         end_time = datetime.utcnow()
         duration = (end_time - start_time).total_seconds()

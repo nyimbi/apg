@@ -1167,7 +1167,7 @@ class BusinessIntelligenceService:
 		try:
 			correlation, _ = stats.pearsonr(values1, values2)
 			return correlation if not np.isnan(correlation) else 0.0
-		except:
+		except Exception:
 			return 0.0
 	
 	# Advanced analysis methods for comprehensive business intelligence

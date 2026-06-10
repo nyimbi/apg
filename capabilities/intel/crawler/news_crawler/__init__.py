@@ -242,7 +242,7 @@ def get_default_config() -> Dict[str, Any]:
     if CONFIG_AVAILABLE:
         try:
             return get_crawler_config()
-        except:
+        except Exception:
             pass
 
     # Fallback configuration

@@ -654,7 +654,8 @@ class TestAPIPerformance:
 				for _ in range(10)
 			]
 			
-			responses = await asyncio.gather(*tasks)
+			responses = await asyncio.gather(*tasks, return_exceptions=True)
+
 		
 		# All requests should succeed
 		for response in responses:

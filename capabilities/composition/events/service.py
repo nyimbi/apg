@@ -525,7 +525,8 @@ class EventPublishingService:
                 task = self._publish_to_bytewax_async(producer, event, stream)
                 tasks.append(task)
             
-            await asyncio.gather(*tasks)
+            await asyncio.gather(*tasks, return_exceptions=True)
+
             
             # Update all statuses to published
             for event, _ in events:

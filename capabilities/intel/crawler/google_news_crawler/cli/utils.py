@@ -386,7 +386,7 @@ def extract_domain(url: str) -> str:
         from urllib.parse import urlparse
         parsed = urlparse(url)
         return parsed.netloc.lower()
-    except:
+    except Exception:
         return "unknown"
 
 # Export all utility functions

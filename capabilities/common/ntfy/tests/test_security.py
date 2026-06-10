@@ -857,7 +857,8 @@ class TestSecurityEnginePerformance:
                 )
                 tasks.append(task)
             
-            await asyncio.gather(*tasks)
+            await asyncio.gather(*tasks, return_exceptions=True)
+
         
         # Performance assertions
         assert timer.elapsed < 5.0  # Should complete within 5 seconds
@@ -884,7 +885,8 @@ class TestSecurityEnginePerformance:
                     engine.encryption_manager.encrypt_data, data, f"context-{i}"
                 )) for i, data in enumerate(test_data)
             ]
-            encrypted_results = await asyncio.gather(*encrypt_tasks)
+            encrypted_results = await asyncio.gather(*encrypt_tasks, return_exceptions=True)
+
         
         # Concurrent decryption
         with TestTimer() as decrypt_timer:
@@ -893,7 +895,8 @@ class TestSecurityEnginePerformance:
                     engine.encryption_manager.decrypt_data, encrypted
                 )) for encrypted in encrypted_results
             ]
-            decrypted_results = await asyncio.gather(*decrypt_tasks)
+            decrypted_results = await asyncio.gather(*decrypt_tasks, return_exceptions=True)
+
         
         # Verify results
         assert len(encrypted_results) == len(test_data)

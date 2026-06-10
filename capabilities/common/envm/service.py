@@ -933,7 +933,8 @@ class EnvironmentManagementService:
 			)
 			for e in environments
 		]
-		results = await asyncio.gather(*tasks)
+		results = await asyncio.gather(*tasks, return_exceptions=True)
+
 		await self._audit.log_event("bulk_envs_created", self.actor_id, tenant_id, "bulk", {"count": len(environments)})
 		return list(results)
 

@@ -56,7 +56,7 @@ class FaceDetectionEngine:
 						model_selection=1,  # Full range model
 						min_detection_confidence=self.confidence_threshold
 					)
-				except:
+				except Exception:
 					self.face_detector = None
 			
 			# Dlib face detector
@@ -64,7 +64,7 @@ class FaceDetectionEngine:
 				try:
 					self.dlib_detector = dlib.get_frontal_face_detector()
 					self.dlib_predictor = dlib.shape_predictor('shape_predictor_68_face_landmarks.dat')
-				except:
+				except Exception:
 					self.dlib_detector = None
 					self.dlib_predictor = None
 			

@@ -591,7 +591,7 @@ class APGCapabilityManager:
 				health_data = response.json()
 				if isinstance(health_data, dict):
 					metrics = health_data.get("metrics", {})
-			except:
+			except Exception:
 				pass
 			
 		except Exception as e:

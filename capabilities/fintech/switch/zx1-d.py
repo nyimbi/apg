@@ -2968,7 +2968,7 @@ def send_key_exchange_message(host: str = "13.246.138.100", port: int = 12000) -
             try:
                 secure_sock.close()
                 print("Connection closed")
-            except:
+            except Exception:
                 pass
 
     except Exception as e:

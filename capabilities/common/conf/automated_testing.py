@@ -625,7 +625,8 @@ class AutomatedTestingEngine:
                 return await self._execute_test_case(test_case, manifest)
         
         tasks = [run_single_test(test_case) for test_case in test_cases if test_case.enabled]
-        executions = await asyncio.gather(*tasks)
+        executions = await asyncio.gather(*tasks, return_exceptions=True)
+
         
         return executions
     

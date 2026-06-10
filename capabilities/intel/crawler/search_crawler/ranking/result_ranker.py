@@ -259,7 +259,7 @@ class ResultRanker:
             # Try to parse string dates
             try:
                 timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-            except:
+            except Exception:
                 return 0.5
         
         # Calculate age in hours

@@ -75,14 +75,14 @@ class ProductionTestSuite:
 		for config_id in self.created_configs:
 			try:
 				await self.client.delete(f"/configurations/{config_id}")
-			except:
+			except Exception:
 				pass
 		
 		# Clean up test workspace if not default
 		if self.test_workspace_id != "default":
 			try:
 				await self.client.delete(f"/workspaces/{self.test_workspace_id}")
-			except:
+			except Exception:
 				pass
 		
 		await self.client.aclose()

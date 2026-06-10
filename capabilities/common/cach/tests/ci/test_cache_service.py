@@ -275,12 +275,14 @@ class TestCacheService:
         
         # First, set some data
         set_tasks = [set_operation(i) for i in range(50)]
-        set_results = await asyncio.gather(*set_tasks)
+        set_results = await asyncio.gather(*set_tasks, return_exceptions=True)
+
         assert all(set_results)
         
         # Then, concurrently read the data
         get_tasks = [get_operation(i) for i in range(50)]
-        get_results = await asyncio.gather(*get_tasks)
+        get_results = await asyncio.gather(*get_tasks, return_exceptions=True)
+
         
         # Verify results
         for i, result in enumerate(get_results):
@@ -486,7 +488,8 @@ class TestCacheServiceAdvanced:
         ]
         
         # Execute stress test
-        results = await asyncio.gather(*tasks)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
         
         # Aggregate results
         total_success = sum(r['success'] for r in results)

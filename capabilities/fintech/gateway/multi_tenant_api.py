@@ -43,7 +43,7 @@ class MultiTenantAPIView(BaseView):
     
     route_base = "/api/v1/tenants"
     
-    def __init__(self):
+    async def __init__(self):
         super().__init__()
         self.tenant_service: Optional[TenantIsolationService] = None
         self.database_service = None
@@ -71,7 +71,7 @@ class MultiTenantAPIView(BaseView):
     @expose('/', methods=['POST'])
     @has_access
     @permission_name('tenant_create')
-    def create_tenant(self):
+    async def create_tenant(self):
         """
         Create a new tenant
         
@@ -133,7 +133,7 @@ class MultiTenantAPIView(BaseView):
     @expose('/<tenant_id>', methods=['GET'])
     @has_access
     @permission_name('tenant_read')
-    def get_tenant(self, tenant_id: str):
+    async def get_tenant(self, tenant_id: str):
         """
         Get tenant by ID
         
@@ -181,7 +181,7 @@ class MultiTenantAPIView(BaseView):
     @expose('/slug/<slug>', methods=['GET'])
     @has_access
     @permission_name('tenant_read')
-    def get_tenant_by_slug(self, slug: str):
+    async def get_tenant_by_slug(self, slug: str):
         """
         Get tenant by slug
         
@@ -214,7 +214,7 @@ class MultiTenantAPIView(BaseView):
     @expose('/<tenant_id>', methods=['PATCH'])
     @has_access
     @permission_name('tenant_update')
-    def update_tenant(self, tenant_id: str):
+    async def update_tenant(self, tenant_id: str):
         """
         Update tenant configuration
         
@@ -268,7 +268,7 @@ class MultiTenantAPIView(BaseView):
     @expose('/<tenant_id>/resources', methods=['GET'])
     @has_access
     @permission_name('tenant_resources')
-    def get_tenant_resources(self, tenant_id: str):
+    async def get_tenant_resources(self, tenant_id: str):
         """
         Get tenant resource usage and limits
         
@@ -294,7 +294,7 @@ class MultiTenantAPIView(BaseView):
     @expose('/<tenant_id>/resources/<resource_type>/check', methods=['POST'])  
     @has_access
     @permission_name('tenant_resources')
-    def check_resource_limit(self, tenant_id: str, resource_type: str):
+    async def check_resource_limit(self, tenant_id: str, resource_type: str):
         """
         Check if tenant can consume specific resources
         
@@ -331,7 +331,7 @@ class MultiTenantAPIView(BaseView):
     @expose('/<tenant_id>/resources/<resource_type>/consume', methods=['POST'])
     @has_access
     @permission_name('tenant_resources')
-    def consume_resource(self, tenant_id: str, resource_type: str):
+    async def consume_resource(self, tenant_id: str, resource_type: str):
         """
         Consume tenant resources
         
@@ -374,7 +374,7 @@ class MultiTenantAPIView(BaseView):
     @expose('/<tenant_id>/analytics', methods=['GET'])
     @has_access
     @permission_name('tenant_analytics')
-    def get_tenant_analytics(self, tenant_id: str):
+    async def get_tenant_analytics(self, tenant_id: str):
         """
         Get comprehensive tenant analytics
         
@@ -409,7 +409,7 @@ class MultiTenantAPIView(BaseView):
     @expose('/<tenant_id>/isolation/database', methods=['GET'])
     @has_access
     @permission_name('tenant_admin')
-    def get_tenant_database_info(self, tenant_id: str):
+    async def get_tenant_database_info(self, tenant_id: str):
         """
         Get tenant database isolation information
         
@@ -452,7 +452,7 @@ class MultiTenantAPIView(BaseView):
     @expose('/', methods=['GET'])
     @has_access
     @permission_name('tenant_list')
-    def list_tenants(self):
+    async def list_tenants(self):
         """
         List all tenants with optional filtering
         
@@ -536,7 +536,7 @@ class MultiTenantAPIView(BaseView):
             return jsonify({"error": "Internal server error"}), 500
     
     @expose('/health', methods=['GET'])
-    def health_check(self):
+    async def health_check(self):
         """
         Multi-tenant service health check
         

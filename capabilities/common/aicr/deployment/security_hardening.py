@@ -1354,7 +1354,7 @@ class SecurityHardeningManager:
 					if result.returncode == 0 and 'enabled' in result.stdout:
 						subprocess.run(['systemctl', 'disable', service], timeout=10)
 						actions.append(f"Disabled unnecessary service: {service}")
-				except:
+				except Exception:
 					pass  # Service might not exist
 
 			# Configure secure file permissions
@@ -1396,7 +1396,7 @@ class SecurityHardeningManager:
 					if result.returncode == 0 and result.stdout.strip() != value:
 						subprocess.run(['sysctl', '-w', f'{param}={value}'], timeout=5)
 						actions.append(f"Configured kernel parameter: {param}={value}")
-				except:
+				except Exception:
 					pass
 
 		except Exception as e:
@@ -1457,7 +1457,7 @@ class SecurityHardeningManager:
 				try:
 					subprocess.run(rule.split(), timeout=10)
 					actions.append(f"Applied firewall rule: {rule}")
-				except:
+				except Exception:
 					pass  # Rule might already exist or iptables not available
 
 			# Configure network segmentation
@@ -1479,7 +1479,7 @@ class SecurityHardeningManager:
 			# Load Kubernetes configuration
 			try:
 				k8s_config.load_incluster_config()
-			except:
+			except Exception:
 				k8s_config.load_kube_config()
 
 			v1 = k8s_client.CoreV1Api()

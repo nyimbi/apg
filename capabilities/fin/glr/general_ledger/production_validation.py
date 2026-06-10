@@ -521,7 +521,8 @@ class ProductionValidator:
 		
 		# Run load test
 		tasks = [simulate_user() for _ in range(concurrent_users)]
-		user_results = await asyncio.gather(*tasks)
+		user_results = await asyncio.gather(*tasks, return_exceptions=True)
+
 		
 		# Analyze results
 		successful_users = [r for r in user_results if r.get("status") == "PASS"]

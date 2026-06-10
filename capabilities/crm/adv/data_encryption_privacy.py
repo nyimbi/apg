@@ -627,7 +627,7 @@ class DataEncryptionPrivacyManager:
 						return await self.decrypt_field_value(
 							tenant_id, table_name, field_name, encrypted_value, key_id
 						)
-					except:
+					except Exception:
 						continue
 				raise ValueError("No suitable decryption key found")
 			

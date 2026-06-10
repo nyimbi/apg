@@ -909,7 +909,7 @@ class StripeService(AbstractPaymentProcessor):
             try:
                 account = stripe.Account.retrieve()
                 api_healthy = bool(account.id)
-            except:
+            except Exception:
                 pass
             
             # Update health metrics

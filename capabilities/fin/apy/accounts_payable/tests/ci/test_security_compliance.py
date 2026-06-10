@@ -254,7 +254,7 @@ async def test_sox_audit_trail_integrity(
 			step_index=step_index,
 			action=step_data["action"],
 			comments=step_data["comments"],
-			approval_context
+			approval_context=approval_context
 		)
 	
 	# Verify SOX audit trail requirements
@@ -578,8 +578,8 @@ async def test_cross_site_scripting_prevention(
 		try:
 			vendor = await vendor_service.create_vendor(
 				malicious_vendor_data,
-				tenant_context
-			)
+				tenant_context=tenant_context
+		)
 			
 			if vendor:
 				# Verify XSS payload is sanitized

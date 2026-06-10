@@ -315,7 +315,7 @@ def get_all_models():
 	models = []
 	
 	try:
-		from .requisitioning.models import *
+		import importlib; _m = importlib.import_module("." + "requisitioning.models", package=__package__)
 		models.extend([
 			PPRRequisition, PPRRequisitionLine, PPRApprovalWorkflow, PPRRequisitionComment
 		])
@@ -323,7 +323,7 @@ def get_all_models():
 		pass
 	
 	try:
-		from .purchase_order_management.models import *
+		import importlib; _m = importlib.import_module("." + "purchase_order_management.models", package=__package__)
 		models.extend([
 			PPOPurchaseOrder, PPOPurchaseOrderLine, PPOReceipt, PPOReceiptLine,
 			PPOThreeWayMatch, PPOChangeOrder
@@ -332,7 +332,7 @@ def get_all_models():
 		pass
 	
 	try:
-		from .vendor_management.models import *
+		import importlib; _m = importlib.import_module("." + "vendor_management.models", package=__package__)
 		models.extend([
 			PPVVendor, PPVVendorContact, PPVVendorPerformance, PPVVendorCategory,
 			PPVVendorQualification, PPVVendorInsurance
@@ -341,7 +341,7 @@ def get_all_models():
 		pass
 	
 	try:
-		from .sourcing_supplier_selection.models import *
+		import importlib; _m = importlib.import_module("." + "sourcing_supplier_selection.models", package=__package__)
 		models.extend([
 			PPSRFQHeader, PPSRFQLine, PPSBid, PPSBidLine, PPSSupplierEvaluation,
 			PPSEvaluationCriteria, PPSAwardRecommendation
@@ -350,7 +350,7 @@ def get_all_models():
 		pass
 	
 	try:
-		from .contract_management.models import *
+		import importlib; _m = importlib.import_module("." + "contract_management.models", package=__package__)
 		models.extend([
 			PPCContract, PPCContractLine, PPCContractAmendment, PPCContractRenewal,
 			PPCContractMilestone, PPCContractDocument

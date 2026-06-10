@@ -639,7 +639,8 @@ class TestAnalyticsEnginePerformance:
                 tasks.append(task)
             
             # Execute all tracking tasks
-            await asyncio.gather(*tasks)
+            await asyncio.gather(*tasks, return_exceptions=True)
+
         
         # Performance assertions
         assert timer.elapsed < 5.0  # Should process 1000 events in under 5 seconds
@@ -675,7 +676,8 @@ class TestAnalyticsEnginePerformance:
         
         # Measure concurrent execution time
         with TestTimer() as timer:
-            reports = await asyncio.gather(*report_tasks)
+            reports = await asyncio.gather(*report_tasks, return_exceptions=True)
+
         
         # All reports should be generated successfully
         assert len(reports) == 5

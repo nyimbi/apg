@@ -305,7 +305,7 @@ class EnhancedGoogleNewsClient:
 			try:
 				import dateutil.parser
 				published_at = dateutil.parser.parse(article_data['published'])
-			except:
+			except Exception:
 				pass
 		
 		# Extract source domain from URL
@@ -315,7 +315,7 @@ class EnhancedGoogleNewsClient:
 				from urllib.parse import urlparse
 				parsed_url = urlparse(article_data['url'])
 				source_domain = parsed_url.netloc
-			except:
+			except Exception:
 				pass
 		
 		return GoogleNewsRecord(

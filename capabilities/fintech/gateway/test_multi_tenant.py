@@ -368,7 +368,8 @@ async def test_multi_tenant_architecture():
         )
         tasks.append(task)
     
-    results = await asyncio.gather(*tasks)
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
     consumption_time = (datetime.now() - start_time).total_seconds()
     successful_consumptions = sum(results)
     

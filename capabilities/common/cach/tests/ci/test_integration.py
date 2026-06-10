@@ -295,7 +295,8 @@ class TestFullSystemIntegration:
                 read_heavy_worker(i, operations_per_worker) 
                 for i in range(workers)
             ]
-            results = await asyncio.gather(*load_tasks)
+            results = await asyncio.gather(*load_tasks, return_exceptions=True)
+
         
         # Aggregate results
         total_hits = sum(r['hits'] for r in results)

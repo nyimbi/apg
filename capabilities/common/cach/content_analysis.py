@@ -466,7 +466,7 @@ class ContentAnalysisEngine:
 			text = data.decode('utf-8', errors='ignore')
 			printable_chars = sum(1 for c in text if c.isprintable())
 			profile.text_ratio = printable_chars / max(len(text), 1)
-		except:
+		except Exception:
 			profile.text_ratio = 0.0
 		
 		# Calculate entropy
@@ -565,7 +565,7 @@ class ContentAnalysisEngine:
 			ratio = len(compressed) / min(len(data), 1024)
 			compressibility = 1.0 - ratio
 			return max(0.0, min(compressibility, 1.0))
-		except:
+		except Exception:
 			return 0.5
 	
 	async def _analyze_structure_complexity(self, data: bytes) -> float:
@@ -579,7 +579,7 @@ class ContentAnalysisEngine:
 			elif data.startswith(b'<'):
 				# XML/HTML complexity
 				return self._calculate_markup_complexity(data.decode('utf-8'))
-		except:
+		except Exception:
 			pass
 		
 		return 0.5
@@ -698,7 +698,7 @@ class ContentAnalysisEngine:
 		try:
 			obj = json.loads(data.decode('utf-8'))
 			entities.extend(self._extract_json_keys(obj))
-		except:
+		except Exception:
 			pass
 		
 		return entities
@@ -711,7 +711,7 @@ class ContentAnalysisEngine:
 			# Simple entity extraction (would use NLP in production)
 			words = re.findall(r'\b[A-Z][a-z]+\b', text)
 			return list(set(words))[:10]  # Top 10 capitalized words
-		except:
+		except Exception:
 			return []
 	
 	async def _extract_html_entities(self, data: bytes) -> List[str]:
@@ -727,7 +727,7 @@ class ContentAnalysisEngine:
 			
 			entities = list(set(tags + ids + classes))
 			return entities[:20]  # Top 20 entities
-		except:
+		except Exception:
 			return []
 	
 	async def _extract_api_entities(self, data: bytes) -> List[str]:
@@ -737,7 +737,7 @@ class ContentAnalysisEngine:
 			# Try JSON first
 			obj = json.loads(data.decode('utf-8'))
 			return self._extract_json_keys(obj)
-		except:
+		except Exception:
 			# Fall back to text extraction
 			return await self._extract_text_entities(data)
 	
@@ -773,7 +773,7 @@ class ContentAnalysisEngine:
 			elif any(word in text for word in ['der', 'die', 'das', 'und', 'ist', 'in']):
 				return 'de'
 			
-		except:
+		except Exception:
 			pass
 		
 		return None

@@ -362,7 +362,7 @@ try:
 	nltk.download('vader_lexicon', quiet=True)
 	nltk.download('punkt', quiet=True)
 	nltk.download('stopwords', quiet=True)
-except:
+except Exception:
 	pass
 
 class TrafficPredictionModel(tf.keras.Model):
@@ -613,7 +613,7 @@ class NaturalLanguagePolicyModel:
 						json_match = re.search(r'\{.*\}', response_text)
 						if json_match:
 							intent_result = json.loads(json_match.group())
-					except:
+					except Exception:
 						# Fallback to keyword matching
 						intent_result = self._fallback_intent_classification(text)
 				else:
@@ -1198,7 +1198,7 @@ class SimpleFederatedLearningEngine:
 			num_rounds = len(self.clients)
 			epsilon = num_rounds * (1.0 / max(self.noise_multiplier, 0.1))
 			return min(epsilon, 10.0)  # Cap at 10 for safety
-		except:
+		except Exception:
 			return 0.0
 
 class RevolutionaryAIEngine:

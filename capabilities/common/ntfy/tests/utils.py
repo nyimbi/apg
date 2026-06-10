@@ -316,7 +316,8 @@ def assert_security_validated(security_engine: Mock):
 def wait_for_async_completion(coros: List, timeout: float = 5.0):
     """Wait for multiple async operations to complete"""
     async def _wait():
-        await asyncio.gather(*coros)
+        await asyncio.gather(*coros, return_exceptions=True)
+
     
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)

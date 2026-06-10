@@ -417,7 +417,7 @@ class MetaDatabaseManager:
 				if tenant_id:
 					try:
 						await session.execute(text("RESET meta.current_tenant_id"))
-					except:
+					except Exception:
 						pass
 	
 	@asynccontextmanager
@@ -588,7 +588,7 @@ class MetaDatabaseManager:
 						if record:
 							stats["neo4j"]["labels"] = record["labels"]
 							stats["neo4j"]["relationships"] = record["relTypesCount"]
-					except:
+					except Exception:
 						# Fallback if APOC is not available
 						result = await session.run("MATCH (n) RETURN count(n) as node_count")
 						record = await result.single()

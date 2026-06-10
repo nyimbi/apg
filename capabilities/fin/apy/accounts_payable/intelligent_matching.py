@@ -311,7 +311,7 @@ class IntelligentMatchingEngine:
 			# Simple date parsing - in real implementation, use more robust parsing
 			try:
 				return datetime.strptime(date_value, "%Y-%m-%d").date()
-			except:
+			except Exception:
 				return date.today()
 		else:
 			return date.today()

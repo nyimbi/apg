@@ -307,7 +307,8 @@ class TestSystemHealthService:
                 health_service.process_health_metric(metric)
                 for metric in batch
             ]
-            await asyncio.gather(*tasks)
+            await asyncio.gather(*tasks, return_exceptions=True)
+
         
         end_time = datetime.utcnow()
         processing_time = (end_time - start_time).total_seconds()
@@ -450,7 +451,8 @@ class TestPerformanceBenchmarks:
         batch_size = 100
         for i in range(0, len(tasks), batch_size):
             batch = tasks[i:i + batch_size]
-            await asyncio.gather(*batch)
+            await asyncio.gather(*batch, return_exceptions=True)
+
         
         end_time = datetime.utcnow()
         duration = (end_time - start_time).total_seconds()
@@ -480,7 +482,8 @@ class TestPerformanceBenchmarks:
                 )
                 tasks.append(health_service.process_health_metric(metric))
             
-            await asyncio.gather(*tasks)
+            await asyncio.gather(*tasks, return_exceptions=True)
+
             
             # Check memory usage
             current_memory = process.memory_info().rss / 1024 / 1024

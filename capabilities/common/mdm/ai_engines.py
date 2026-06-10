@@ -488,7 +488,7 @@ class EntityMatchingEngine:
             parsed = phonenumbers.parse(phone, None)
             if phonenumbers.is_valid_number(parsed):
                 return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
-        except:
+        except Exception:
             pass
         
         # Fallback: extract digits only
@@ -821,7 +821,7 @@ class DataQualityEngine:
                     passed_checks += 1
                 else:
                     issues.append(f"Invalid phone number: {phone}")
-            except:
+            except Exception:
                 issues.append(f"Invalid phone number format: {phone}")
         
         # URL validation

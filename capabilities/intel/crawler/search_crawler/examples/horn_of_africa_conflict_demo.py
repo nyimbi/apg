@@ -284,7 +284,7 @@ class HornOfAfricaConflictMonitor:
                 from urllib.parse import urlparse
                 domain = urlparse(result.url).netloc
                 sources[domain] = sources.get(domain, 0) + 1
-            except:
+            except Exception:
                 continue
         
         return dict(sorted(sources.items(), key=lambda x: x[1], reverse=True)[:10])

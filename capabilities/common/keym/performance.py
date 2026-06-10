@@ -471,7 +471,7 @@ class PerformanceTester:
 				for key in keys_created:
 					try:
 						await self.service.delete_key(key.spec.id, "benchmark@datacraft.co.ke", secure_delete=True)
-					except:
+					except Exception:
 						pass  # Ignore cleanup errors
 		
 		print("[PERF] Algorithm benchmarking completed")

@@ -1044,7 +1044,7 @@ class NewsCrawler:
                 return True
 
             return False
-        except:
+        except Exception:
             return False
 
     async def _discover_sitemap_urls(self, base_url: str) -> List[str]:

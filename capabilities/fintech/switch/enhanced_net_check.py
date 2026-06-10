@@ -206,7 +206,7 @@ def check_server_status(host: str, port: int, timeout: float = 5.0):
             try:
                 subprocess.check_output(cmd.split(), stderr=subprocess.STDOUT)
                 result["network_info"]["mtu"] = "1500 or larger"
-            except:
+            except Exception:
                 result["network_info"]["mtu"] = "Less than 1500"
 
     except Exception as e:

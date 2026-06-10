@@ -267,7 +267,8 @@ class IncrementalUpdateEngine:
 						self.process_incremental_update(tenant_id, knowledge_graph_id, op)
 						for op in group["operations"]
 					]
-					group_results = await asyncio.gather(*group_tasks)
+					group_results = await asyncio.gather(*group_tasks, return_exceptions=True)
+
 					results.extend(group_results)
 				else:
 					# Process sequentially
@@ -938,7 +939,7 @@ class IncrementalUpdateEngine:
 				return 0.0
 			
 			return 1 - cosine(embedding1, embedding2)
-		except:
+		except Exception:
 			return 0.0
 	
 	def _calculate_string_similarity(self, str1: str, str2: str) -> float:

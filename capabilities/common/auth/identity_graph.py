@@ -591,7 +591,7 @@ class IdentityGraphEngine:
 					"score": 1.0 - (clustering_coeff / avg_clustering),
 					"details": f"Low clustering coefficient ({clustering_coeff:.3f}) with degree {node_degree}"
 				})
-		except:
+		except Exception:
 			pass  # Skip clustering analysis if it fails
 		
 		# Calculate overall anomaly score
@@ -810,7 +810,7 @@ class IdentityGraphEngine:
 				current_centrality = nx.degree_centrality(self.graph.to_undirected()).get(user_node.id, 0.0)
 				if current_centrality > 0.1:  # Significant centrality
 					threat_indicators.append("High network centrality suggesting potential hub activity")
-			except:
+			except Exception:
 				pass
 			
 			# Generate insider threat indicator if multiple red flags
@@ -942,7 +942,7 @@ class IdentityGraphEngine:
 		# Clustering coefficient
 		try:
 			clustering_coefficient = nx.average_clustering(undirected)
-		except:
+		except Exception:
 			clustering_coefficient = 0.0
 		
 		# Diameter (maximum shortest path)
@@ -954,7 +954,7 @@ class IdentityGraphEngine:
 				largest_cc = max(nx.connected_components(undirected), key=len)
 				subgraph = undirected.subgraph(largest_cc)
 				diameter = nx.diameter(subgraph) if len(subgraph) > 1 else 0
-		except:
+		except Exception:
 			diameter = 0
 		
 		# Connected components
@@ -963,20 +963,20 @@ class IdentityGraphEngine:
 		# Density
 		try:
 			density = nx.density(undirected)
-		except:
+		except Exception:
 			density = 0.0
 		
 		# Assortativity (degree correlation)
 		try:
 			assortativity = nx.degree_assortativity_coefficient(undirected)
-		except:
+		except Exception:
 			assortativity = 0.0
 		
 		# Modularity
 		try:
 			communities = list(nx.community.louvain_communities(undirected))
 			modularity = nx.community.modularity(undirected, communities)
-		except:
+		except Exception:
 			modularity = 0.0
 		
 		return GraphMetrics(

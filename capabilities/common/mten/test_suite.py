@@ -704,7 +704,8 @@ class TestPerformanceBenchmarks:
             # Run 100 concurrent requests
             start_time = time.time()
             tasks = [make_request() for _ in range(100)]
-            results = await asyncio.gather(*tasks)
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
             duration = time.time() - start_time
             
             success_rate = sum(results) / len(results)
@@ -739,7 +740,8 @@ class TestPerformanceBenchmarks:
                 tasks.append(task)
             
             # Execute all requests
-            responses = await asyncio.gather(*tasks)
+            responses = await asyncio.gather(*tasks, return_exceptions=True)
+
             for response in responses:
                 await response.json()
                 response.close()
@@ -865,7 +867,8 @@ class TestLoadTesting:
                 if i < int(rps * duration) - 1:  # Don't wait after last request
                     await asyncio.sleep(request_interval)
             
-            return await asyncio.gather(*tasks)
+            return await asyncio.gather(*tasks, return_exceptions=True)
+
         
         async with aiohttp.ClientSession(connector=connector) as session:
             # Normal load phase

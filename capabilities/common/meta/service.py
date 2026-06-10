@@ -1570,7 +1570,7 @@ class APGMetadataService:
 						)
 						result = await session.execute(stmt)
 						self.health.total_assets = result.scalar() or 0
-				except:
+				except Exception:
 					pass
 			
 			# Calculate average response time

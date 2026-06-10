@@ -538,7 +538,7 @@ class SearchContentPipeline:
 		"""Extract domain from URL."""
 		try:
 			return urlparse(url).netloc
-		except:
+		except Exception:
 			return ""
 	
 	def _calculate_content_quality(self, crawl_result: GenCrawlResult) -> float:

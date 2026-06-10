@@ -370,7 +370,7 @@ def format_timestamp(timestamp):
 	if isinstance(timestamp, str):
 		try:
 			timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-		except:
+		except Exception:
 			return timestamp
 	
 	if isinstance(timestamp, datetime):

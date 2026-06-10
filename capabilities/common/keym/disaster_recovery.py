@@ -847,14 +847,14 @@ class BusinessContinuityManager:
 			try:
 				# Test key creation capability
 				return hasattr(self.service, 'create_key')
-			except:
+			except Exception:
 				return False
 		
 		elif operation == 'encryption':
 			try:
 				# Test encryption capability
 				return hasattr(self.service, 'encrypt_data')
-			except:
+			except Exception:
 				return False
 		
 		elif operation == 'hsm_operations':
@@ -863,7 +863,7 @@ class BusinessContinuityManager:
 				if hasattr(self.service, 'hsm_manager'):
 					status = await self.service.hsm_manager.check_health()
 					return status
-			except:
+			except Exception:
 				return False
 		
 		return True  # Default to available if unknown operation

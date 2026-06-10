@@ -169,7 +169,7 @@ class DocumentFormatExtractor:
 							'character_count': len(content)
 						}
 					}
-				except:
+				except Exception:
 					continue
 			raise
 	

@@ -105,7 +105,8 @@ class TestCVProcessingServiceIntegration:
 			
 			# Process all jobs concurrently
 			tasks = [processing_service.process_job(job.id) for job in jobs]
-			results = await asyncio.gather(*tasks)
+			results = await asyncio.gather(*tasks, return_exceptions=True)
+
 			
 			# Verify all jobs completed
 			assert all(result.status == ProcessingStatus.COMPLETED for result in results)
