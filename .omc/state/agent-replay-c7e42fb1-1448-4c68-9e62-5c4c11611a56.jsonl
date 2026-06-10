@@ -709,3 +709,4 @@
 {"t":0,"agent":"ad979eb","agent_type":"workflow-subagent","event":"agent_start","parent_mode":"none"}
 {"t":0,"agent":"a554777","agent_type":"workflow-subagent","event":"agent_start","parent_mode":"none"}
 {"t":0,"agent":"a707827","agent_type":"unknown","event":"agent_stop","success":true}
+{"t":0,"agent":"a46f725","agent_type":"unknown","event":"agent_stop","success":true}

@@ -10,7 +10,7 @@
   },
   "build": {
     "buildCommand": null,
-    "testCommand": "uv run pytest tests/ -q --tb=line 2>&1 | tail -5",
+    "testCommand": "git add -A && git commit -m \"$(cat <<'EOF'\nFix test namespace: add _log to bfc context resolution exec namespace\n\nThe test executes a slice of api.py in a restricted namespace. The\nexception handlers now use _log.debug() (replacing silent pass), but _log\nwas not in the namespace. Add it so the exec context matches the module.\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n)\" && uv run pytest tests/ -q --tb=line 2>&1 | tail -3",
     "lintCommand": null,
     "devCommand": null,
     "scripts": {}

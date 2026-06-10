@@ -44,6 +44,7 @@ def _api_identity_helpers(jwt_identity: Any = None, jwt_error: Exception | None 
 			raise jwt_error
 		return jwt_identity
 
+	import logging as _logging
 	namespace: dict[str, Any] = {
 		"Any": Any,
 		"Dict": Dict,
@@ -51,6 +52,7 @@ def _api_identity_helpers(jwt_identity: Any = None, jwt_error: Exception | None 
 		"get_jwt_identity": get_jwt_identity_stub,
 		"get_tenant_id_from_request": context_helpers["get_tenant_id_from_request"],
 		"request": request,
+		"_log": _logging.getLogger("bfc.api.test"),  # required by _log.debug() in exception handlers
 	}
 	exec(compile(source[start:end], str(API_PATH), "exec"), namespace)
 	return namespace
