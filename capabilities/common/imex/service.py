@@ -37,6 +37,7 @@ from .models import (
 )
 from .database import DatabaseManager, DatabaseConfig, TransactionContext, DatabaseError
 from .ai_intelligence import AIIntelligenceEngine, SchemaAnalysisResult, QualityAssessment
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 
 logger = logging.getLogger(__name__)
 

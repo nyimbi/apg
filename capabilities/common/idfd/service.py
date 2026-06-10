@@ -33,6 +33,7 @@ from .models import (
 StoreKey = tuple[str, str]
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class IdfdService:
 	"""Tenant-aware federation provider, mapping, session, certificate, and audit runtime."""
 

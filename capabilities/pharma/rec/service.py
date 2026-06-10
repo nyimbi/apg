@@ -22,6 +22,7 @@ def _uuid7str() -> str:
 	return str(uuid7())
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class RegulatoryComplianceService:
 	"""Tenant-scoped regulatory compliance service with inspection readiness and commitment tracking."""
 

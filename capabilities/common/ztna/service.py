@@ -20,6 +20,7 @@ from .zero_trust_runtime import (
 )
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class ZtnaService:
 	"""Dependency-light zero-trust runtime behind the capability contract."""
 

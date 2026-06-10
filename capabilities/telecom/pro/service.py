@@ -30,6 +30,7 @@ def _utcnow() -> str:
 	return datetime.datetime.utcnow().isoformat() + "Z"
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class ServiceProvisioningService:
 	"""Tenant-scoped service provisioning engine for APG Telecom."""
 

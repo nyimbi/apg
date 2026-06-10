@@ -46,6 +46,7 @@ def _period_bounds(period: str) -> tuple[str, str]:
 	return period, period
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class IncidentComplianceService:
 	"""GRC incident lifecycle, compliance testing, corrective actions, regulatory
 	notifications, BCP activation, and post-incident review management.

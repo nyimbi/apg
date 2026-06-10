@@ -50,6 +50,7 @@ def _log_claim(encounter_id: str, amount: float, insurer: str) -> str:
 	return f"pmt.claim encounter={encounter_id} amount={amount} insurer={insurer}"
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class PolicyViolationError(ValueError):
 	pass
 

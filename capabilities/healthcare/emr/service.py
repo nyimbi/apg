@@ -68,6 +68,7 @@ def _log_prescribe(prescription_id: str, patient_id: str, drug: str) -> None:
 class PolicyViolationError(ValueError):
 	"""Raised when a capability rule denies an operation."""
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 
 class DrugSafetyError(ValueError):
 	"""Raised when a drug safety check produces a hard stop."""

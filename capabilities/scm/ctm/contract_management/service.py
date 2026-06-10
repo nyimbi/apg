@@ -12,6 +12,7 @@ from sqlalchemy import and_, desc, func
 
 from .models import PPCContract, PPCContractAmendment, PPCContractRenewal, PPCContractMilestone
 from ...auth_rbac.models import get_db_session
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 
 
 class ContractManagementService:

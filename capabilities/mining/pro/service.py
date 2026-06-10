@@ -31,6 +31,7 @@ log = logging.getLogger(__name__)
 class ProService:
 	"""Service for Mine Production Operations.
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 	All state is in-memory; swap for async DB without changing signatures.
 	"""
 

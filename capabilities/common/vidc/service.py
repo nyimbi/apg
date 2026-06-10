@@ -29,6 +29,7 @@ from .video_runtime import (
 )
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class VidcService:
 	"""Deterministic video meeting service for APG composition."""
 

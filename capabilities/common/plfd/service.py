@@ -50,6 +50,7 @@ def _state_key(tenant_id: str, item_id: str) -> str:
 class PlatformFoundationService:
 	"""
 	In-process foundation-service registry, dependency graph, baseline,
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 	readiness, change gate, feature flags, circuit breakers,
 	service discovery, rate limiters, and platform metrics.
 

@@ -42,6 +42,7 @@ from .models import (
 	uuid7str, _validate_tenant_id, _validate_positive_int, _validate_non_negative_float
 )
 from .capability_contract import evaluate_capability_rules, get_capability_contract
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 
 
 def _log_performance_metric(operation: str, duration_ms: float, success: bool) -> str:

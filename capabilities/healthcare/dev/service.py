@@ -39,6 +39,7 @@ def _log_pretty_device(device_id: str, name: str, location: str) -> str:
 	return f"device[{device_id}] name={name!r} loc={location!r}"
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class PolicyViolationError(ValueError):
 	pass
 

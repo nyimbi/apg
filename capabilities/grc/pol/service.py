@@ -45,6 +45,7 @@ def _period_bounds(period: str) -> tuple[str, str]:
 	return period, period
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class PolicyManagementService:
 	"""GRC policy lifecycle management: draft, review, approve, publish, acknowledge,
 	exceptions, revisions, compliance mapping, and gap analysis.

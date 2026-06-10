@@ -36,6 +36,7 @@ def _log_vital_alert(patient_id: str, vital_type: str, value: float, threshold: 
 	logger.warning("tel.vital_alert patient=%s vital=%s value=%s threshold=%s", patient_id, vital_type, value, threshold)
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class PolicyViolationError(ValueError):
 	pass
 

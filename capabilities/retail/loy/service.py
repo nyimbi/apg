@@ -29,6 +29,7 @@ COALITION_TRANSFER_FEE_PCT = 0.05  # 5% fee on coalition point transfers
 class LoyService:
 	"""Service for Loyalty & Rewards capability.
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 	All state is in-memory dicts keyed by tenant_id then entity id.
 	Replace with PostgreSQL-backed repositories for production.
 	"""

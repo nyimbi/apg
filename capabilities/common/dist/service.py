@@ -45,6 +45,7 @@ def _normalize_compute_agent_role(value: str) -> str:
 class DistributedComputingService:
 	"""
 	Tenant worker-pool, partitioned-job, queue, scaling, aggregation,
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 	checkpoint save/restore, distributed lock, and analytics runtime.
 
 	Adapter/store pattern — no external dependencies.

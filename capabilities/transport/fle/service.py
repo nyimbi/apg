@@ -81,6 +81,7 @@ from .domain.calculations import (
 logger = logging.getLogger("apg.transport.fle")
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class FleetService:
 	"""
 	Tenant-scoped, actor-aware fleet management service.

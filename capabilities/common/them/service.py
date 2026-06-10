@@ -38,6 +38,7 @@ _WCAG_AA_NORMAL = 4.5
 _WCAG_AA_LARGE = 3.0
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class ThemService:
 	"""Deterministic theme and brand-governance service for APG composition."""
 

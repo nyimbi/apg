@@ -71,6 +71,7 @@ def _period_bounds(period: str) -> tuple[str, str]:
 # Service
 # ─────────────────────────────────────────────────────────────
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class TerminalBankingService:
 	"""Agency banking terminal network service for rural financial inclusion.
 

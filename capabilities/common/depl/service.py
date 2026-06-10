@@ -33,6 +33,7 @@ def _ts() -> str:
 	return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class DeplService:
 	"""Tenant release console, rollout controller, health gate, and rollback center."""
 

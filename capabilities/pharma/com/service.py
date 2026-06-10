@@ -23,6 +23,7 @@ def _uuid7str() -> str:
 	return str(uuid7())
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class CommercialOperationsService:
 	"""Tenant-scoped commercial operations service for pharma field force management."""
 

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 """
 APG Data Virtualization (DVRL) Service Layer — expanded to 42+ methods.
 Core business logic for federated query processing and data source management.

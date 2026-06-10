@@ -47,6 +47,7 @@ def _period_bounds(period: str) -> tuple[str, str]:
 	return period, period
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class AuditManagementService:
 	"""GRC internal audit programme: plan, engagement, fieldwork, findings,
 	reports, follow-up, QA, fraud investigation, and whistleblower case management.

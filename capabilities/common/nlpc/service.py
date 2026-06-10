@@ -130,6 +130,7 @@ def _col(name: str) -> dict[str, Any]:
 # NLPCoreService
 # ---------------------------------------------------------------------------
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class NLPCoreService:
 	"""
 	Core NLP service.

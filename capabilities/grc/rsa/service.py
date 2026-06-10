@@ -60,6 +60,7 @@ def _score_to_rating(score: float) -> str:
 	return "negligible"
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class RiskAssessmentService:
 	"""GRC risk register, assessment, control, KRI, heat map, treatment, and
 	board reporting service.

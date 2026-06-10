@@ -29,6 +29,7 @@ def _now() -> str:
 class PharmaProductRegistrationService:
 	"""
 	Tenant-scoped pharma product registration service with full lifecycle,
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 	dossier, authority interaction, variation, certificate, procedure,
 	and analytics management.
 

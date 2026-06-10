@@ -1617,6 +1617,7 @@ class MdmService:
 	"""
 
 	def __init__(self, tenant_id: str = "default"):
+		guard_tenant_id(tenant_id)
 		self.tenant_id = tenant_id
 		self.contract = get_capability_contract(tenant_id)
 		self._agent_runtimes = set(SUPPORTED_MDM_AGENT_RUNTIMES)

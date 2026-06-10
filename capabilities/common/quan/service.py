@@ -54,6 +54,7 @@ def _state_key(tenant_id: str, item_id: str) -> str:
 class QuantumComputingService:
 	"""
 	In-process backend, circuit, quota, job, result, experiment,
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 	error mitigation, VQE, QAOA, QKD, post-quantum encryption,
 	quantum simulation, and analytics service.
 

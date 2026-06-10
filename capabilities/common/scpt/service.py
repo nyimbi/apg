@@ -39,6 +39,7 @@ from .script_runtime import (
 )
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class ScptService:
 	"""Tenant-scoped script registry, sandbox, package policy, and execution runtime."""
 

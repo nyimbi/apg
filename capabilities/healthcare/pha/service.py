@@ -47,6 +47,7 @@ def _log_expiry_alert(drug_id: str, lot: str, days_remaining: int) -> str:
 	return f"pha.expiry_alert drug={drug_id} lot={lot} days_remaining={days_remaining}"
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class PolicyViolationError(ValueError):
 	pass
 

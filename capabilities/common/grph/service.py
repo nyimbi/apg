@@ -21,6 +21,7 @@ from .models import (
 )
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class GrphService:
 	"""Tenant-aware graph schema, node, edge, traversal, and quality runtime."""
 

@@ -27,6 +27,7 @@ from .database import FacialDatabaseService
 from .encryption import FaceTemplateEncryption, TemplateVersionManager
 from .face_engine import FaceDetectionEngine, FaceFeatureExtractor, FaceQualityAssessment
 from .liveness_engine import LivenessDetectionEngine
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 
 
 def _uid() -> str:

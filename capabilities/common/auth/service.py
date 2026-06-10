@@ -27,6 +27,7 @@ from .models import (
 )
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class AuthService:
 	"""Tenant identity control plane backed by the executable AUTH contract."""
 

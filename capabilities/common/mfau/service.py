@@ -28,6 +28,7 @@ from .anti_spoofing import AntiSpoofingService
 from .enrollment_wizard import BiometricEnrollmentWizard
 from .recovery_service import RecoveryService
 from .notification_service import MFANotificationService
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 
 
 def _log_service_operation(operation: str, user_id: str, details: str = "") -> str:

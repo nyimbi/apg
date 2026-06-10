@@ -18,6 +18,7 @@ from .capability_contract import (
 )
 from .chat_engine import ChatEngine
 from .models import ChatAgentRecord, ChatAuditEvent, ChatLifecycleBatchRecord, ChatMessage, ChatPresence, ChatRoom, ModerationItem
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 
 
 def _utc_now() -> str:

@@ -22,6 +22,7 @@ import sqlite3
 from pathlib import Path
 import hashlib
 import ssl
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 
 # Optional imports for advanced features
 try:

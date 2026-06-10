@@ -40,6 +40,7 @@ def _log_pretty_period(period: str, start: datetime, end: datetime) -> str:
 class PolicyViolationError(ValueError):
 	"""Raised when a capability rule denies an operation."""
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 
 class ClinicalAnalyticsService:
 	"""Tenant-scoped clinical analytics runtime."""

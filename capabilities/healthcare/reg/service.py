@@ -38,6 +38,7 @@ def _log_hipaa_risk(level: str, tenant_id: str) -> None:
 	logger.warning("reg.hipaa_risk level=%s tenant=%s", level, tenant_id)
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class PolicyViolationError(ValueError):
 	pass
 

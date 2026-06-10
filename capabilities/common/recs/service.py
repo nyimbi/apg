@@ -40,6 +40,7 @@ from .recommendation_runtime import (
 )
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class RecsService:
 	"""In-process catalog, profile, ranking, model, experiment, and recommendation service."""
 

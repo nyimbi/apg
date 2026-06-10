@@ -59,6 +59,7 @@ def _log_external_referral(specimen_id: str, external_lab: str, courier: str) ->
 	return f"lab.external_referral specimen={specimen_id} lab={external_lab} courier={courier}"
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class PolicyViolationError(ValueError):
 	pass
 

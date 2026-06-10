@@ -19,6 +19,7 @@ from .capability_contract import (
 )
 from .edge_engine import artifact_digest, capacity_fits, resource_pressure, stable_digest, sync_status
 from .models import EdgeAgent, EdgeAuditEvent, EdgeDeployment, EdgeFleet, EdgeNode, EdgeSyncSession, EdgeWorkload, utc_now
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 
 
 def _normalize_token(value: str) -> str:

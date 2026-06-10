@@ -28,6 +28,7 @@ from .models import (
 	utc_now,
 )
 from .twin_engine import fuse_state, simulation_outputs, stable_digest, state_version_for
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 
 
 def _utc_now_iso() -> str:

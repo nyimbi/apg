@@ -29,6 +29,7 @@ from .predictive_runtime import (
 )
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class PredService:
 	"""In-process forecasting, scoring, simulation, drift, and governance service."""
 

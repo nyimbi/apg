@@ -28,6 +28,7 @@ def _now_iso() -> str:
 	return datetime.now(timezone.utc).isoformat()
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class SrchService:
 	"""Deterministic enterprise-search service for APG composition."""
 

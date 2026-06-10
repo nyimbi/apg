@@ -95,6 +95,7 @@ def subscribe_domain_events(handler: Callable[[dict[str, Any]], None]) -> None:
 # Service
 # ---------------------------------------------------------------------------
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class AuditLoggingService:
 	"""
 	Tenant-scoped, actor-tracked audit logging runtime.

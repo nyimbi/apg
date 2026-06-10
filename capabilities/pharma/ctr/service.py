@@ -44,6 +44,7 @@ def _log_tmf_upload(trial_id: str, section: str, doc_name: str) -> str:
 	return f"ctr.tmf_upload trial={trial_id} section={section} doc={doc_name}"
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class ClinicalTrialsService:
 	"""Tenant-scoped clinical trials management service with GCP compliance enforcement."""
 

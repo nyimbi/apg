@@ -5,6 +5,7 @@ import logging
 from typing import Any
 
 from .classifier import PHIClassifier, PHIClassificationResult, is_phi_field
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 
 _log = logging.getLogger(__name__)
 

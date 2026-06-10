@@ -29,6 +29,7 @@ from .lifecycle_runtime import (
 )
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class ShdnService:
 	"""Deterministic lifecycle-control service for APG composition."""
 

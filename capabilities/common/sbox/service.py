@@ -51,6 +51,7 @@ def _state_key(tenant_id: str, item_id: str) -> str:
 class SandboxTestingService:
 	"""
 	Tenant-scoped sandbox, dataset, test-run, mock service, event simulation,
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 	cost tracking, and analytics runtime.
 
 	Adapter/store pattern — no external dependencies.

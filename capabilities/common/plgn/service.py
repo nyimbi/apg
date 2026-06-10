@@ -49,6 +49,7 @@ def _state_key(tenant_id: str, item_id: str) -> str:
 class PluginExtensionService:
 	"""
 	In-process plugin registry, permission review, sandbox, release,
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 	install, health check, event hooks, sandboxed execution,
 	marketplace listing, analytics, and dependency resolution service.
 

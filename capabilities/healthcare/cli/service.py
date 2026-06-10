@@ -30,6 +30,7 @@ def _log_mm_review(case_id: str, tenant_id: str) -> None:
 	logger.info("cli.mm_review case=%s tenant=%s — quality committee notified", case_id, tenant_id)
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class PolicyViolationError(ValueError):
 	pass
 

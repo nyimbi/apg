@@ -25,6 +25,7 @@ from .website_runtime import (
 )
 
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 class WsblService:
 	"""Dependency-light website-builder runtime behind the capability contract."""
 

@@ -25,6 +25,7 @@ from .models import (
 	utc_now,
 )
 from .privacy_engine import consent_age_days, consent_coverage, request_due_at, request_sla_state, stable_digest
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 
 
 def _utc_now_iso() -> str:

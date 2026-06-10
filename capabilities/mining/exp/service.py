@@ -29,6 +29,7 @@ log = logging.getLogger(__name__)
 class ExpService:
 	"""Service for Exploration Data Management operations.
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 	All state is held in in-memory dicts keyed by id; swap out for
 	async DB calls (asyncpg / SQLAlchemy async) without changing method
 	signatures.
