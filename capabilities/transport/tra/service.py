@@ -404,8 +404,8 @@ class AssetTrackingService:
 							evt = {"asset_id": asset_id, "geofence_id": gf.geofence_id, "event": "entry", "distance_km": round(dist, 3)}
 							self.geofence_events.append({**evt, "tenant_id": tid, "at": timestamp})
 							geofence_alerts.append(evt)
-					except ValueError:
-						pass
+					except ValueError as _exc:
+						_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 		return {
 			**update,

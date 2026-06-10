@@ -781,8 +781,8 @@ class IncidentComplianceService:
 			try:
 				delta = datetime.fromisoformat(closed_at) - datetime.fromisoformat(created)
 				mttr_hours.append(delta.total_seconds() / 3600)
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 		avg_mttr = sum(mttr_hours) / len(mttr_hours) if mttr_hours else 0.0
 
@@ -1256,8 +1256,8 @@ class IncidentComplianceService:
 				created = _dt.fromisoformat(i["created_at"])
 				closed = _dt.fromisoformat(i["resolved_at"])
 				mttr_hours += (closed - created).total_seconds() / 3600
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		avg_mttr = round(mttr_hours / max(len(resolved), 1), 2)
 		sla_breached = sum(1 for i in period_incs if i.get("sla_breached"))
 		sla_breach_rate = round(sla_breached / max(len(period_incs), 1) * 100, 1)

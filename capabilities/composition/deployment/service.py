@@ -872,8 +872,8 @@ class DeploymentAutomationService:
                     name=composition_name,
                     namespace=target.namespace
                 )
-            except ApiException:
-                pass
+            except ApiException as _exc:
+                _log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
             
             blue_manifest = green_manifest.copy()
             blue_manifest['metadata']['name'] = f"{composition_name}-blue"
@@ -1008,8 +1008,8 @@ class DeploymentAutomationService:
                 existing_container.stop()
                 existing_container.remove()
                 result.logs.append(f"Removed old container: {container_name}")
-            except docker.errors.NotFound:
-                pass
+            except docker.errors.NotFound as _exc:
+                _log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
             
             # Create new container
             container = self.docker_client.containers.run(
@@ -1524,8 +1524,8 @@ http {{
                 name=composition_name,
                 namespace=deployment.namespace
             )
-        except ApiException:
-            pass
+        except ApiException as _exc:
+            _log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
         
         try:
             # Delete service
@@ -1533,8 +1533,8 @@ http {{
                 name=f"{composition_name}-service",
                 namespace=deployment.namespace
             )
-        except ApiException:
-            pass
+        except ApiException as _exc:
+            _log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
         
         try:
             # Delete ingress
@@ -1542,8 +1542,8 @@ http {{
                 name=f"{composition_name}-ingress",
                 namespace=deployment.namespace
             )
-        except ApiException:
-            pass
+        except ApiException as _exc:
+            _log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
     
     async def _cleanup_docker_resources(self, deployment: CRDeployment):
         """Clean up Docker resources for failed deployment."""
@@ -1564,8 +1564,8 @@ http {{
         for container in containers:
             try:
                 container.remove(force=True)
-            except docker.errors.DockerException:
-                pass
+            except docker.errors.DockerException as _exc:
+                _log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
     
     async def _cleanup_aws_resources(self, deployment: CRDeployment):
         """Clean up AWS resources for failed deployment."""
@@ -1583,8 +1583,8 @@ http {{
                 service=service_name,
                 force=True
             )
-        except ClientError:
-            pass
+        except ClientError as _exc:
+            _log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 # Service factory
 _deployment_services: Dict[str, DeploymentAutomationService] = {}

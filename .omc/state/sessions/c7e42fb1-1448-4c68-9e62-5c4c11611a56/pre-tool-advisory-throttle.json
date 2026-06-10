@@ -2,29 +2,17 @@
   "version": 1,
   "entries": {
     "79a93d4a2f8f50b95f852280616242fee1855dc99a3c75211917f55e72e95fae": {
-      "last_emitted_at_ms": 1781116816476,
+      "last_emitted_at_ms": 1781118775910,
       "message": "Use parallel execution for independent tasks. Use run_in_background for long operations (npm install, builds, tests)."
+    },
+    "445ed27a3872b681d98190bae61ccb84954e1bc4e140df5370be958dee776b3a": {
+      "last_emitted_at_ms": 1781118497453,
+      "message": "Verify changes work after editing. Test functionality before marking complete."
     },
     "466399dafa2d20f60587180bad0a07358eb7f2bce724df0ff682f038ad33f5ad": {
       "last_emitted_at_ms": 1781116293030,
       "message": "Read multiple files in parallel when possible for faster analysis."
-    },
-    "445ed27a3872b681d98190bae61ccb84954e1bc4e140df5370be958dee776b3a": {
-      "last_emitted_at_ms": 1781115853672,
-      "message": "Verify changes work after editing. Test functionality before marking complete."
-    },
-    "808cb04420bcb368ab4716038ddd950b51198d0402b6cf8e965d66ca42ebccbe": {
-      "last_emitted_at_ms": 1781114061272,
-      "message": "[SLOP WARNING] Detected fallback/workaround language in this tool input. Do not make potential slop: avoid ad-hoc fallback layers, workaround shims, or environment-specific patches unless explicitly justified. For architecture concerns, consult the architect for a concrete design first. If this seems environment-specific, ask the user to confirm constraints before proceeding.\n\nVerify changes work after editing. Test functionality before marking complete."
-    },
-    "3ff0068e70a8807f642272b2926265e7f2fcf457f7e4020eb899a9c4dde7e42d": {
-      "last_emitted_at_ms": 1781113322307,
-      "message": "Spawning agent: Explore (sonnet) | Task: Identify capability count targets and implementation complexity per domain | Active agents: 162"
-    },
-    "c90014e53582be0dd0998a9d3504145618b3fc9572acc8735eeb16d68c0120c5": {
-      "last_emitted_at_ms": 1781113315822,
-      "message": "Spawning agent: Explore (sonnet) | Task: Survey capability patterns and existing African/agricultural capability code | Active agents: 162"
     }
   },
-  "updated_at": "2026-06-10T18:40:16.476Z"
+  "updated_at": "2026-06-10T19:12:55.910Z"
 }

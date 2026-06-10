@@ -1029,8 +1029,8 @@ class BuyNowPayLaterService:
 					"overdue_amount": overdue_amount,
 					"late_fee": fee,
 				})
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 		self._audit(self.tenant_id, "late_payment_handled", bnpl_id)
 		return {
@@ -1309,8 +1309,8 @@ class BuyNowPayLaterService:
 			for u in upcoming[:50]:
 				try:
 					await self._notify.send({"type": "instalment_reminder", **u})
-				except Exception:
-					pass
+				except Exception as _exc:
+					_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		self._audit(self.tenant_id, "instalment_reminders_sent", f"{len(upcoming)}")
 		return {"reminders_sent": len(upcoming), "sent_at": _iso()}
 

@@ -426,8 +426,8 @@ class DocumentIntelligenceService:
 				from datetime import date
 				exp_date = date.fromisoformat(expiry)
 				is_expired = exp_date < date.today()
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Handled exception: %s", _exc)
 
 		checks = {
 			"has_document_number": bool(fields.get("document_number")),
@@ -645,8 +645,8 @@ class DocumentIntelligenceService:
 		if extraction_id:
 			try:
 				extraction = await self.get_extraction(tenant_id, extraction_id)
-			except KeyError:
-				pass
+			except KeyError as _exc:
+				_log.debug("Handled exception: %s", _exc)
 		return {"document": doc, "extraction": extraction}
 
 	# ── Statistics ────────────────────────────────────────────────

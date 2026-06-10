@@ -32,8 +32,8 @@ def get_audit_adapter(capability_id: str = "gov_cty") -> AuditAdapter | None:
 	try:
 		from apg_common_audl import AuditService  # type: ignore[import]
 		return AuditService.from_env()
-	except ImportError:
-		pass
+	except ImportError as _exc:
+		_log.debug("Handled exception: %s", _exc)
 	return NullAuditAdapter()
 
 

@@ -97,8 +97,8 @@ class SafService:
 				incident_dict["ml_severity_class"] = ml_result.label
 				incident_dict["ml_severity_confidence"] = round(ml_result.confidence, 3)
 				self._incidents[resp.id] = incident_dict
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 		return resp
 

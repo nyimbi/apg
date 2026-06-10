@@ -1020,8 +1020,8 @@ class DigitalPaymentsService:
 							created = created.replace(tzinfo=timezone.utc)
 						if created >= cutoff:
 							return True
-					except (ValueError, TypeError):
-						pass
+					except (ValueError, TypeError) as _exc:
+						_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		return False
 
 	async def confirm_payment(
@@ -1268,8 +1268,8 @@ class DigitalPaymentsService:
 			try:
 				original = await self._get(_COL_TXN, original_id)
 				original_status = original.get("status", "unknown")
-			except KeyError:
-				pass
+			except KeyError as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		return {**rec, "original_transaction_status": original_status}
 
 	# ------------------------------------------------------------------ #
@@ -3023,8 +3023,8 @@ class DigitalPaymentsService:
 		if txn_id:
 			try:
 				txn = await self._get(_COL_TXN, txn_id)
-			except KeyError:
-				pass
+			except KeyError as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		# Use metadata from transaction if not supplied
 		meta = txn.get("metadata") or {}
 		if three_ds_result is None:
@@ -3090,8 +3090,8 @@ class DigitalPaymentsService:
 				t = await self._get(_COL_TXN, tid)
 				if t.get("status") == PaymentStatus.failed.value:
 					failed_txns.append(t)
-			except KeyError:
-				pass
+			except KeyError as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 		recovery_actions: list[dict[str, Any]] = []
 		escalations: list[dict[str, Any]] = []

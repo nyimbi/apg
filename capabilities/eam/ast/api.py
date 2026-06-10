@@ -51,8 +51,8 @@ def _decode_bearer_claims(credentials: _Any) -> dict[str, _Any]:
 		if len(parts) >= 2:
 			padded = parts[1] + "=" * (4 - len(parts[1]) % 4)
 			return _ctx_json.loads(_ctx_b64.urlsafe_b64decode(padded))
-	except Exception:
-		pass
+	except Exception as _exc:
+		_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 	return {}
 
 
@@ -107,8 +107,8 @@ async def get_current_user(request: _Any, credentials: _Any = None) -> _Dict[str
 				"tenant_id": q_tenant or _ctx_os.getenv("APG_DEFAULT_TENANT_ID", "default"),
 				"permissions": ["eam.asset.view"],
 			}
-	except Exception:
-		pass
+	except Exception as _exc:
+		_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 	# 5. Env fallback
 	return {
@@ -123,8 +123,8 @@ def _resolve_tenant_from_request(request: _Any = None) -> str:
 	try:
 		from capabilities.common.request_context import get_tenant_id_from_context
 		return get_tenant_id_from_context()
-	except Exception:
-		pass
+	except Exception as _exc:
+		_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 	if request is not None:
 		headers = getattr(request, "headers", {})
 		t = headers.get("X-APG-Tenant-ID") or headers.get("X-Tenant-ID")

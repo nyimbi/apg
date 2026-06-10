@@ -274,8 +274,8 @@ class MDMSecurityManager:
                         'name': payload.get('name'),
                         'roles': payload.get('roles', [])
                     }
-                except jwt.InvalidTokenError:
-                    pass
+                except jwt.InvalidTokenError as _exc:
+                    _log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
             
             # Option 2: Validate with APG auth service (fallback)
             async with aiohttp.ClientSession() as session:

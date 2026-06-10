@@ -259,8 +259,8 @@ class TaxAdministrationService:
 		for t in (tax_types or []):
 			try:
 				resolved_types.append(TaxType(t.lower()))
-			except ValueError:
-				pass
+			except ValueError as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 		rec = TaxpayerResponse(
 			tenant_id=tenant_id,
@@ -2008,8 +2008,8 @@ class TaxAdministrationService:
 		try:
 			d = date.fromisoformat(p)
 			return d, d
-		except ValueError:
-			pass
+		except ValueError as _exc:
+			_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		raise ValueError(f"Cannot parse period: {period!r}")
 
 	def _has_pin(self, tax_pin: str, tenant_id: str) -> bool:

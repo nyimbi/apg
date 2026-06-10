@@ -595,8 +595,8 @@ class GrcDocService:
 				expiry_dt = created_dt + timedelta(days=int(policy["retention_days"]))
 				if expiry_dt.isoformat() < now_str[:19] and not policy.get("legal_hold"):
 					flagged.append({"document_id": policy["document_id"], "policy_id": policy["id"], "expired_at": expiry_dt.isoformat()})
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		return {"tenant_id": tenant, "flagged_count": len(flagged), "flagged_documents": flagged, "checked_at": now_str}
 
 	def disposition_execute(self, document_id: str, tenant_id: str, disposition: str, executed_by: str) -> dict[str, Any]:

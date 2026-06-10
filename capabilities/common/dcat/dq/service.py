@@ -316,8 +316,8 @@ class DataQualityService:
 							try:
 								if eval(f"{val} {rule['expression']}"):  # noqa: S307 — controlled internal eval
 									pass_count += 1
-							except Exception:
-								pass
+							except Exception as _exc:
+								_log.debug("Handled exception: %s", _exc)
 					actual_score = pass_count / n
 
 			elif rule_type == "range":

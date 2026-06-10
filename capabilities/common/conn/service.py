@@ -860,7 +860,7 @@ class FlowExecutor:
 			try:
 				await task
 			except asyncio.CancelledError:
-				pass
+				raise  # CancelledError must propagate for proper task cancellation
 			del self.active_flows[flow_id]
 
 		return True

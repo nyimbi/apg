@@ -1038,8 +1038,8 @@ class MobileBankingService:
 							pref_id, self.tenant_id, customer_id,
 							channel, f"consent-{customer_id}", bool(enabled),
 						)
-					except Exception:
-						pass
+					except Exception as _exc:
+						_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 		self._audit(self.tenant_id, "push_notification_settings_updated", customer_id)
 		return {
@@ -1108,8 +1108,8 @@ class MobileBankingService:
 		if self._notify is not None:
 			try:
 				await self._notify.send({"type": "otp", "msisdn": msisdn, "otp": otp, "expires_at": expires_at})
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 		self._audit(self.tenant_id, "otp_sent", otp_id)
 		return {

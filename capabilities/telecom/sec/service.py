@@ -676,8 +676,8 @@ class TelecomSecurityService:
 				age_days = (now - activated).days
 				if age_days > required:
 					over_retained.append(intercept.id)
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		compliant = len(over_retained) == 0
 		self._audit(tenant_id, "data_retention_compliance_checked", jurisdiction)
 		return {

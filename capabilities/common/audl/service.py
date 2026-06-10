@@ -172,8 +172,8 @@ class AuditLoggingService:
 		for q in self._siem_queues:
 			try:
 				q.put_nowait(ev)
-			except asyncio.QueueFull:
-				pass
+			except asyncio.QueueFull as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 	# ------------------------------------------------------------------
 	# 1. log_event — immutable write with checksum + chain

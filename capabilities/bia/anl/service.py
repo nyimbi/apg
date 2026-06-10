@@ -87,8 +87,8 @@ class AnalyticsEngineService:
 		if self._audit_adapter:
 			try:
 				self._audit_adapter.log(entry)
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 	def _enforce(self, context: dict[str, Any]) -> None:
 		result = evaluate_capability_rules(context)

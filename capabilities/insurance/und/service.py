@@ -11,6 +11,8 @@ from decimal import Decimal
 from typing import Any
 from uuid import uuid4
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
+
 _log = logging.getLogger(__name__)
 
 RISK_BANDS = {"preferred": (0.0, 0.3), "standard": (0.3, 0.6), "substandard": (0.6, 0.8), "declined": (0.8, 1.0)}

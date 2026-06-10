@@ -43,8 +43,8 @@ def _decode_bearer_claims(credentials):
 		if len(parts) >= 2:
 			padded = parts[1] + "=" * (4 - len(parts[1]) % 4)
 			return _json.loads(_b64.urlsafe_b64decode(padded))
-	except Exception:
-		pass
+	except Exception as _exc:
+		_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 	return {}
 
 
@@ -95,8 +95,8 @@ async def get_current_user(request: Request, credentials=None):
 		q_tenant = _mapping_value(query, "tenant_id") or _mapping_value(query, "tenant")
 		if q_user:
 			return {"user_id": q_user, "tenant_id": q_tenant or os.getenv("APG_DEFAULT_TENANT_ID", "default"), "permissions": ["esg:read"]}
-	except Exception:
-		pass
+	except Exception as _exc:
+		_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 	# 5. Env fallback
 	return {
@@ -139,8 +139,8 @@ def _resolve_tenant_from_request(request=None):
 		import importlib as _il
 		_mod = _il.import_module("capabilities.common.request_context")
 		return _mod.get_tenant_id_from_context()
-	except Exception:
-		pass
+	except Exception as _exc:
+		_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 	if request is not None:
 		headers = getattr(request, "headers", {})
 		t = headers.get("X-APG-Tenant-ID") or headers.get("X-Tenant-ID")

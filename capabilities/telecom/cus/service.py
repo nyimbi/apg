@@ -779,8 +779,8 @@ class TelecomCustomerService:
 						opened_at=_utcnow(),
 					)
 					nps_record["follow_up_case_id"] = case_id
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 			self._audit(tenant_id, "nps_detractor_flagged", customer_id)
 		return nps_record
 

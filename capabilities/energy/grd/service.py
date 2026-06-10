@@ -725,8 +725,8 @@ class GridOperationsService:
 					rec["ml_threat_class"] = ml_result.label
 					rec["ml_threat_confidence"] = round(ml_result.confidence, 3)
 					self._frequency_records[rec_id] = rec
-				except Exception:
-					pass
+				except Exception as _exc:
+					_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 		return rec
 

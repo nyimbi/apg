@@ -1781,8 +1781,8 @@ class TelecomBillingService:
 				)
 				report["ml_risk_score"] = round(ml_result.score, 3)
 				report["ml_recommendation"] = ml_result.rationale
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 		self._emit("leakage_report_generated", self.tenant_id, {"leakage_pct": str(leakage_pct)})
 		return report

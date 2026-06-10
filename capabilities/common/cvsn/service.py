@@ -1310,8 +1310,8 @@ class CVQualityControlService:
 						"processing_time_ms": processing_time,
 						"tenant_id": tenant_id
 					}
-			except RuntimeError:
-				pass
+			except RuntimeError as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 		result = await self.inspect_quality(file_path, parameters, tenant_id)
 		return {

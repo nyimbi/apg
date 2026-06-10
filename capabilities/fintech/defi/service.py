@@ -1195,8 +1195,8 @@ class DecentralizedFinanceService:
 				claim = await self.claim_farming_rewards(customer_id, farm_id)
 				total_harvested_usd += claim.get("total_reward_usd", 0)
 				claims.append(claim)
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		self._audit(self.tenant_id, "staking_rewards_harvested", customer_id)
 		return {
 			"customer_id": customer_id, "farms_harvested": len(claims),

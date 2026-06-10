@@ -1525,8 +1525,8 @@ class PatientManagementService:
 			if created:
 				try:
 					wait_h = calculate_wait_hours(datetime.fromisoformat(created))
-				except Exception:
-					pass
+				except Exception as _exc:
+					_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 			score = calculate_waitlist_priority_score(
 				getattr(obj, "priority", "routine"),
 				wait_h,
@@ -1551,8 +1551,8 @@ class PatientManagementService:
 			wait_h = 0.0
 			try:
 				wait_h = calculate_wait_hours(datetime.fromisoformat(getattr(entry, "created_at", datetime.utcnow().isoformat())))
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 			score = calculate_waitlist_priority_score(
 				getattr(entry, "priority", "routine"), wait_h,
 				getattr(entry, "isolation_required", False),

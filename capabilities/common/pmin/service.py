@@ -353,8 +353,8 @@ class ProcessMiningService:
 					t2 = datetime.fromisoformat(case_events[i + 1]["timestamp"].replace("Z", "+00:00"))
 					duration_s = abs((t2 - t1).total_seconds())
 					edge_durations[(src, tgt)].append(duration_s)
-				except Exception:
-					pass
+				except Exception as _exc:
+					_log.debug("Handled exception: %s", _exc)
 
 		edges = [
 			{
@@ -681,8 +681,8 @@ class ProcessMiningService:
 				t_start = datetime.fromisoformat(events[0]["timestamp"].replace("Z", "+00:00"))
 				t_end = datetime.fromisoformat(events[-1]["timestamp"].replace("Z", "+00:00"))
 				total_duration_s = abs((t_end - t_start).total_seconds())
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Handled exception: %s", _exc)
 		return {
 			"case_id": case_id,
 			"log_id": log_id,
@@ -836,8 +836,8 @@ class ProcessMiningService:
 					t1 = datetime.fromisoformat(case_events[i]["timestamp"].replace("Z", "+00:00"))
 					t2 = datetime.fromisoformat(case_events[i + 1]["timestamp"].replace("Z", "+00:00"))
 					activity_times[src_activity].append(abs((t2 - t1).total_seconds()))
-				except Exception:
-					pass
+				except Exception as _exc:
+					_log.debug("Handled exception: %s", _exc)
 
 		metrics = {}
 		for activity, times in activity_times.items():

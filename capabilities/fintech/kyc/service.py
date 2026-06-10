@@ -834,8 +834,8 @@ class KYCService:
 					yr = int(expiry_str[:2])
 					yr_full = 2000 + yr if yr < 50 else 1900 + yr
 					expiry_from_mrz = date(yr_full, int(expiry_str[2:4]), int(expiry_str[4:6]))
-				except (ValueError, IndexError):
-					pass
+				except (ValueError, IndexError) as _exc:
+					_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 		is_expired = expiry_from_mrz is not None and expiry_from_mrz < _today()
 		result = {
@@ -1072,8 +1072,8 @@ class KYCService:
 		if expiry_str:
 			try:
 				expiry_date = date.fromisoformat(str(expiry_str)[:10])
-			except ValueError:
-				pass
+			except ValueError as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 		is_expired = expiry_date is not None and expiry_date < _today()
 		days_remaining = days_until_expiry(expiry_date)
@@ -1164,8 +1164,8 @@ class KYCService:
 			try:
 				bill_date = date.fromisoformat(str(bill_date_str)[:10])
 				bill_age_days = (_today() - bill_date).days
-			except ValueError:
-				pass
+			except ValueError as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 		too_old = bill_age_days is not None and bill_age_days > 90
 		verified = name_score >= 0.80 and address_confirmed and not too_old
@@ -2091,8 +2091,8 @@ class KYCService:
 		app = None
 		try:
 			app = await self._require_app(entity_id)
-		except KeyError:
-			pass
+		except KeyError as _exc:
+			_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 		ubo_records = await self._store.query(_COL_UBO, {"application_id": entity_id, "tenant_id": self.tenant_id})
 		controlling_ubos = [
@@ -2175,8 +2175,8 @@ class KYCService:
 				doc = await self._get_document(doc_id)
 				if doc.get("status") == DocumentStatus.verified.value:
 					corroborated_docs.append(doc_id)
-			except KeyError:
-				pass
+			except KeyError as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 		corroboration_rate = len(corroborated_docs) / max(len(supporting_docs), 1)
 		verified = corroboration_rate >= 0.5 and not risk_flag

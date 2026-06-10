@@ -549,8 +549,8 @@ class UssdEngService:
 									current_menu_id = result["next_menu"]
 									try:
 										menu = await self.get_menu(current_menu_id, service_code, tenant, session.get("language", language))
-									except KeyError:
-										pass
+									except KeyError as _exc:
+										_log.debug("Handled exception: %s", _exc)
 							except Exception as exc:
 								_log.error("handler %s failed: %s", selected_item["handler"], exc)
 
@@ -581,8 +581,8 @@ class UssdEngService:
 									current_menu_id = result["next_menu"]
 									try:
 										menu = await self.get_menu(current_menu_id, service_code, tenant, session.get("language", language))
-									except KeyError:
-										pass
+									except KeyError as _exc:
+										_log.debug("Handled exception: %s", _exc)
 							except Exception as exc:
 								_log.error("input handler error: %s", exc)
 

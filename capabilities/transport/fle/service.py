@@ -1212,8 +1212,8 @@ class FleetService:
 					# Blend ML confidence with rule-based confidence
 					blended = (alert.confidence_pct + ml_result.score * 100) / 2
 					object.__setattr__(alert, "confidence_pct", round(blended, 1))
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 		self._log_op("predictive_maintenance_alerts", "", alerts=str(len(alerts)))
 		return alerts

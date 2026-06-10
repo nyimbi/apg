@@ -782,8 +782,8 @@ class AccsService:
 			try:
 				self.register_standard(standard_id=standard_id, tenant_id=tenant_id,
 					name="WCAG", version="2.2", level=level)
-			except ValueError:
-				pass
+			except ValueError as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 		# Register target if not present
 		target_key = self._key(tenant_id, target_id)
@@ -899,8 +899,8 @@ class AccsService:
 					description="Keyboard navigation not fully implemented on this surface.",
 					remediation_owner=tested_by,
 				)
-			except ValueError:
-				pass
+			except ValueError as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		self._record_event(tenant_id=tenant_id, event_type="keyboard_nav_test_completed",
 			subject_id=target_id, message=f"Keyboard nav test on {target_id}.",
 			evidence={"passed": passed})
@@ -933,8 +933,8 @@ class AccsService:
 					remediation_owner="ui-team",
 					evidence={"contrast_ratio": ratio, "threshold": wcag_aa_threshold},
 				)
-			except ValueError:
-				pass
+			except ValueError as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		return {"target_id": target_id, "contrast_ratio": ratio, "threshold": wcag_aa_threshold, "passed": passed}
 
 	async def font_size_validate(
@@ -984,8 +984,8 @@ class AccsService:
 					remediation_owner=audited_by,
 					evidence={"image_count": image_count, "images_with_alt": images_with_alt},
 				)
-			except ValueError:
-				pass
+			except ValueError as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		return {
 			"target_id": target_id,
 			"image_count": image_count,
@@ -1031,8 +1031,8 @@ class AccsService:
 					description=f"{issues_found} focus order issue(s) detected.",
 					remediation_owner=audited_by,
 				)
-			except ValueError:
-				pass
+			except ValueError as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		return {"target_id": target_id, "issues_found": issues_found, "passed": passed}
 
 	async def form_accessibility_audit(
@@ -1060,8 +1060,8 @@ class AccsService:
 					remediation_owner=audited_by,
 					evidence={"field_count": field_count, "labelled_fields": labelled_fields},
 				)
-			except ValueError:
-				pass
+			except ValueError as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		return {
 			"target_id": target_id,
 			"field_count": field_count,
@@ -1098,8 +1098,8 @@ class AccsService:
 					remediation_owner=owner,
 					evidence={"document_ref": document_ref},
 				)
-			except ValueError:
-				pass
+			except ValueError as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		return {"document_ref": document_ref, "tagged_pdf": tagged_pdf, "passed": tagged_pdf, "finding": finding}
 
 	async def accessibility_report(

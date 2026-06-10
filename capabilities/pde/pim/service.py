@@ -556,8 +556,8 @@ class ProductInfoManagementService:
 			try:
 				score = self.data_quality_score(product["sku"], tenant)
 				quality_scores.append(score["total_score"])
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		avg_quality = round(sum(quality_scores) / len(quality_scores), 1) if quality_scores else 0.0
 		return {
 			"tenant_id": tenant,

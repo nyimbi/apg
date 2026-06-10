@@ -1347,15 +1347,15 @@ class NeobanksService:
 		if self._audit_adapter is not None:
 			try:
 				await self._audit_adapter.record(record)
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 	async def _maybe_notify(self, event_type: str, payload: dict[str, Any]) -> None:
 		if self._notify is not None:
 			try:
 				await self._notify.send(event_type, payload)
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 	def _enforce(self, context: dict[str, Any]) -> None:
 		result = self.evaluate(context)

@@ -42,6 +42,15 @@ from pydantic import Field
 
 from ..base_connector import BaseConnector, ConnectorConfiguration
 
+try:
+    import sys as _sys, os as _os
+    _sys.path.insert(0, str(__import__('pathlib').Path(__file__).parent.parent.parent.parent.parent))
+    from capabilities.common.reliability.circuit_breaker import get_circuit_breaker as _get_cb, CircuitOpenError
+    _HAS_CB = True
+except Exception:
+    _HAS_CB = False
+    CircuitOpenError = RuntimeError
+
 _log = logging.getLogger(__name__)
 
 _TIMEOUT = 30.0

@@ -589,8 +589,8 @@ class DigitalWalletsService:
 		if wallet and wallet.available_balance > 0:
 			try:
 				self.place_hold(f"freeze-hold-{wallet_id}", self.tenant_id, wallet_id, wallet.available_balance, reason)
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 		self._audit(self.tenant_id, "wallet_frozen", wallet_id)
 		return {"wallet_id": wallet_id, "frozen": True, "reason": reason, "frozen_at": _iso()}

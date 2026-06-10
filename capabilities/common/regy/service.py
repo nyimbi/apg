@@ -1287,8 +1287,8 @@ class ServiceRegistryService:
 			try:
 				result = await self.register_service(svc_copy, federated_by)
 				federated.append(result.id if hasattr(result, "id") else str(result))
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		return {"remote_tenant_id": remote_tenant_id, "federated_count": len(federated), "federated_ids": federated}
 
 	async def namespace_manage(

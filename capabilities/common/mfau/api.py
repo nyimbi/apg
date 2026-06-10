@@ -43,8 +43,8 @@ def _resolve_current_user_id() -> str:
 		q = request.args.get("user_id")
 		if q:
 			return q
-	except Exception:
-		pass
+	except Exception as _exc:
+		_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 	return os.getenv("APG_DEFAULT_USER_ID", "anonymous")
 
 
@@ -75,8 +75,8 @@ def _resolve_current_tenant_id() -> str:
 		q = request.args.get("tenant_id") or request.args.get("tenant")
 		if q:
 			return q
-	except Exception:
-		pass
+	except Exception as _exc:
+		_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 	return os.getenv("APG_DEFAULT_TENANT_ID", "default")
 
 

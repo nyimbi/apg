@@ -89,8 +89,8 @@ class TimeSeriesService:
 		if self._audit_adapter:
 			try:
 				self._audit_adapter.log(entry)
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 	def _enforce(self, ctx: dict[str, Any]) -> None:
 		r = evaluate_capability_rules(ctx)

@@ -12,6 +12,8 @@ from decimal import Decimal
 from typing import Any
 from uuid import uuid4
 
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
+
 _log = logging.getLogger(__name__)
 
 SUPPORTED_STATUSES = {"draft", "active", "lapsed", "cancelled", "expired", "reinstated", "pending_renewal"}

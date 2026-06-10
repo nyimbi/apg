@@ -816,8 +816,8 @@ class FacialRecognitionService:
 			if expiry.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
 				consent["status"] = "expired"
 				return {"has_consent": False, "reason": "consent_expired"}
-		except (ValueError, TypeError):
-			pass
+		except (ValueError, TypeError) as _exc:
+			_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		return {"has_consent": True, "purpose": purpose, "obtained_by": consent["obtained_by"],
 				"expiry": consent["expiry"]}
 

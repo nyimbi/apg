@@ -787,8 +787,8 @@ class UsrmService:
 					f"User {user.display_name} added to group {group_id}", actor,
 					metadata={"group_id": group_id})
 				assigned.append(user.id)
-			except KeyError:
-				pass
+			except KeyError as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		return {"group_id": group_id, "assigned_count": len(assigned), "assigned": assigned}
 
 	async def audit_user_activity(

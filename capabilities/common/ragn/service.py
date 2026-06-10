@@ -1182,28 +1182,28 @@ class RAGService:
 		if not self.config.processing_config:
 			try:
 				self.config.processing_config = ProcessingConfig()
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		if not self.config.vector_config:
 			try:
 				self.config.vector_config = VectorIndexConfig()
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		if not self.config.retrieval_config:
 			try:
 				self.config.retrieval_config = RetrievalConfig()
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		if not self.config.generation_config:
 			try:
 				self.config.generation_config = GenerationConfig()
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		if not self.config.conversation_config:
 			try:
 				self.config.conversation_config = ConversationConfig()
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 	async def _initialize_components(self) -> None:
 		if not self.db_pool:

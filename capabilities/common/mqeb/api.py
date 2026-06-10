@@ -284,14 +284,14 @@ def parse_message_filters(args: dict) -> Dict[str, Any]:
 	if 'since' in args:
 		try:
 			filters['since'] = datetime.fromisoformat(args['since'].replace('Z', '+00:00'))
-		except ValueError:
-			pass
+		except ValueError as _exc:
+			_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 	
 	if 'until' in args:
 		try:
 			filters['until'] = datetime.fromisoformat(args['until'].replace('Z', '+00:00'))
-		except ValueError:
-			pass
+		except ValueError as _exc:
+			_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 	
 	return filters
 

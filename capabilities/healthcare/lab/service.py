@@ -2072,8 +2072,8 @@ class LaboratoryInformationService:
 								"reference_range": fields[5] if len(fields) > 5 else "",
 								"abnormal_flag": fields[6] if len(fields) > 6 else "",
 							})
-					except IndexError:
-						pass
+					except IndexError as _exc:
+						_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 		error: str | None = None
 		processed = len(parsed_results) > 0

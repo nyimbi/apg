@@ -659,15 +659,15 @@ class LoyService:
 			if all(k in t for k in ("id", "tenant_id", "member_id", "transaction_type", "points")):
 				try:
 					loy_txns.append(t)
-				except Exception:
-					pass
+				except Exception as _exc:
+					_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		loy_txns.sort(key=lambda x: x.get("created_at", ""), reverse=True)
 		results: list[LoyTransactionResponse] = []
 		for t in loy_txns[:limit]:
 			try:
 				results.append(LoyTransactionResponse(**t))
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		return results
 
 	# ------------------------------------------------------------------

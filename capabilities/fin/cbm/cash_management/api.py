@@ -51,8 +51,8 @@ def _decode_bearer_claims(credentials: _Any) -> dict[str, _Any]:
 		if len(parts) >= 2:
 			padded = parts[1] + "=" * (4 - len(parts[1]) % 4)
 			return _j.loads(_b64.urlsafe_b64decode(padded))
-	except Exception:
-		pass
+	except Exception as _exc:
+		_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 	return {}
 
 
@@ -101,8 +101,8 @@ async def get_current_user(request: _Any, credentials: _Any = None) -> _Dict[str
 		try:
 			query = getattr(request, "query_params", {}) or {}
 			q_tenant = _mapping_value(query, "tenant_id") or _mapping_value(query, "tenant")
-		except Exception:
-			pass
+		except Exception as _exc:
+			_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		resolved_tenant = q_tenant or header_tenant or _os.getenv("APG_DEFAULT_TENANT_ID", _os.getenv("APG_TENANT_ID", "default"))
 		if header_perms_raw:
 			perms: list = [p.strip() for p in header_perms_raw.split() if p.strip()]
@@ -125,8 +125,8 @@ async def get_current_user(request: _Any, credentials: _Any = None) -> _Dict[str
 				"tenant_id": q_tenant or _os.getenv("APG_DEFAULT_TENANT_ID", _os.getenv("APG_TENANT_ID", "default")),
 				"permissions": ["user"],
 			}
-	except Exception:
-		pass
+	except Exception as _exc:
+		_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 	# 5. Env vars
 	env_user = _os.getenv("APG_USER_ID") or _os.getenv("APG_DEFAULT_USER_ID")
@@ -153,8 +153,8 @@ def _resolve_tenant_from_request(request: _Any = None) -> str:
 	try:
 		from capabilities.common.request_context import get_tenant_id_from_context
 		return get_tenant_id_from_context()
-	except Exception:
-		pass
+	except Exception as _exc:
+		_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 	if request is not None:
 		headers = getattr(request, "headers", {})
 		t = _mapping_value(headers, "X-APG-Tenant-ID") or _mapping_value(headers, "X-Tenant-ID")

@@ -178,8 +178,8 @@ class ProfileEventEmitter:
                 self.event_handlers[event_type].remove(handler)
                 self.logger.debug(f"Unregistered handler for event type {event_type}")
                 return True
-            except ValueError:
-                pass
+            except ValueError as _exc:
+                _log.debug("%s: %s", type(_exc).__name__, _exc)
         
         return False
     

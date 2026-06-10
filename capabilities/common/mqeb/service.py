@@ -1566,15 +1566,15 @@ class MQEBService:
 				if message.topic in self.message_queues:
 					try:
 						self.message_queues[message.topic].remove(message_id)
-					except ValueError:
-						pass
+					except ValueError as _exc:
+						_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 				
 				# Remove from subscription queues
 				for subscription_queue in self.subscription_queues.values():
 					try:
 						subscription_queue.remove(message_id)
-					except ValueError:
-						pass
+					except ValueError as _exc:
+						_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 	
 	async def _process_dead_letter_queues(self) -> None:
 		"""Process messages in dead letter queues"""

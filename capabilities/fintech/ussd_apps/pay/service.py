@@ -718,8 +718,8 @@ class PayUssdService:
 					if amt >= SEND_MONEY_CONFIRMATION_THRESHOLD and level == 3:
 						# Pending confirmation step
 						pending_transaction_id = f"pending-{session_id}"
-				except Exception:
-					pass
+				except Exception as _exc:
+					_log.debug("Handled exception: %s", _exc)
 		response_text, continues = self._build_ussd_menu(min(level, 2) if level > 1 else min(level, 1), context)
 		session["menu_level"] = level
 		session["inputs"] = inputs

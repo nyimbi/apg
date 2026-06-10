@@ -1161,14 +1161,14 @@ class APGMetadataService:
 				try:
 					await self.health_check_task
 				except asyncio.CancelledError:
-					pass
+					raise  # CancelledError must propagate for proper task cancellation
 			
 			if self.maintenance_task and not self.maintenance_task.done():
 				self.maintenance_task.cancel()
 				try:
 					await self.maintenance_task
 				except asyncio.CancelledError:
-					pass
+					raise  # CancelledError must propagate for proper task cancellation
 			
 			# Shutdown components in reverse order
 			if self.search_engine:
@@ -1570,8 +1570,8 @@ class APGMetadataService:
 						)
 						result = await session.execute(stmt)
 						self.health.total_assets = result.scalar() or 0
-				except Exception:
-					pass
+				except Exception as _exc:
+					_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 			
 			# Calculate average response time
 			if self.request_count > 0:

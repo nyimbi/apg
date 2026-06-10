@@ -123,8 +123,8 @@ def get_user_id(payload: dict | None = None) -> str:
 		identity = get_jwt_identity()
 		if identity:
 			return str(identity)
-	except Exception:
-		pass
+	except Exception as _exc:
+		_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 	# Check request JSON body when no explicit payload provided
 	if payload is None:
 		try:
@@ -132,8 +132,8 @@ def get_user_id(payload: dict | None = None) -> str:
 			uid = json_body.get("user_id")
 			if uid:
 				return str(uid)
-		except Exception:
-			pass
+		except Exception as _exc:
+			_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 	return get_current_user_id(payload)
 
 

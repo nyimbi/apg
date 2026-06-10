@@ -400,8 +400,8 @@ class FintechComplianceService:
 					effective_date=_utcnow()[:10],
 				)
 				created_obligations.append(oblig_id)
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		programme: dict[str, Any] = {
 			"programme_id": programme_id,
 			"entity_id": entity_id,

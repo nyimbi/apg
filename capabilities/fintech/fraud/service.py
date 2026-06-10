@@ -1071,8 +1071,8 @@ class FraudDetectionService:
 		if self._notify is not None:
 			try:
 				await self._notify.send(alert)
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 		self._audit(self.tenant_id, "real_time_alert_raised", transaction_id)
 		return alert

@@ -508,8 +508,8 @@ class DVRLLifecycleService:
 		cost = 1.0
 		try:
 			cost = estimate_query_cost(sql)
-		except Exception:
-			pass
+		except Exception as _exc:
+			_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		return self.execute_query(tenant_id=tenant_id, query_id=query_id, sql=sql, actor=actor, source_ids=source_ids, data_classification=data_classification, rbac_authorized=rbac_authorized, parameterized=True, write_query=False, lineage_capture_enabled=True, estimated_query_cost=cost, cost_review_recorded=True, join_source_count=max(1, len(source_ids)), join_review_recorded=len(source_ids) > 1, requested_rows=requested_rows, result_contains_sensitive_data=data_classification in {"confidential", "restricted"}, cache_requested=True)
 
 	# ------------------------------------------------------------------

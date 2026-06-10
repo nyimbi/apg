@@ -1019,8 +1019,8 @@ def bulk_device_register_ztna(self, devices_list, tenant_id="default"):
 		try:
 			result=self.register_device(d.get("device_id",str(__import__("uuid").uuid4())),d.get("name",""),d.get("platform","unknown"),d.get("identity_id",""),tenant_id)
 			registered.append(result.get("id",""))
-		except Exception:
-			pass
+		except Exception as _exc:
+			_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 	return {"registered":registered,"count":len(registered)}
 
 ZtnaService.bulk_device_register_ztna = bulk_device_register_ztna  # type: ignore[attr-defined]

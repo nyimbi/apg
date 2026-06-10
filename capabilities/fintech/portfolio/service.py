@@ -1269,15 +1269,15 @@ class PortfolioManagementService:
 		if self._audit_adapter is not None:
 			try:
 				await self._audit_adapter.record(record)
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 	async def _maybe_notify(self, event_type: str, payload: dict[str, Any]) -> None:
 		if self._notify is not None:
 			try:
 				await self._notify.send(event_type, payload)
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 	def _count(self, items: dict[str, Any], tenant_id: str) -> int:
 		return sum(1 for item in items.values() if item.tenant_id == tenant_id)

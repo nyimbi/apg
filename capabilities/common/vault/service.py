@@ -251,8 +251,8 @@ class TokenizationService:
 			if conn is not None:
 				try:
 					await conn.disconnect()
-				except Exception:
-					pass
+				except Exception as _exc:
+					_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 	async def _publish_detokenization_event(self, token: str, requester_id: str) -> None:
 		if not os.environ.get("NATS_URL"):
@@ -271,8 +271,8 @@ class TokenizationService:
 			if conn is not None:
 				try:
 					await conn.disconnect()
-				except Exception:
-					pass
+				except Exception as _exc:
+					_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────

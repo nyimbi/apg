@@ -884,7 +884,7 @@ class EventConsumptionService:
             try:
                 await task
             except asyncio.CancelledError:
-                pass
+                raise  # CancelledError must propagate for proper task cancellation
             del self.consumer_tasks[subscription_id]
         
         # Stop consumer
@@ -1269,7 +1269,7 @@ class StreamProcessingService:
         try:
             await task
         except asyncio.CancelledError:
-            pass
+            raise  # CancelledError must propagate for proper task cancellation
         
         del self.processors[processor_id]
         

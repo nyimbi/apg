@@ -430,8 +430,8 @@ Respond ONLY with valid JSON where keys match exactly the field names:
 								chunk = _json.loads(line)
 								if chunk.get("response"):
 									yield chunk["response"]
-							except Exception:
-								pass
+							except Exception as _exc:
+								_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		except Exception as exc:
 			yield f"[ERROR: {exc}]"
 
@@ -449,8 +449,8 @@ Respond ONLY with valid JSON where keys match exactly the field names:
 								content = chunk.get("message", {}).get("content", "")
 								if content:
 									yield content
-							except Exception:
-								pass
+							except Exception as _exc:
+								_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		except Exception as exc:
 			yield f"[ERROR: {exc}]"
 

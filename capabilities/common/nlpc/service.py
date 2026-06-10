@@ -327,8 +327,8 @@ class NLPCoreService:
 					confidence = float(best.prob)
 					candidates = [{"code": r.lang, "probability": float(r.prob)} for r in raw]
 				model_used = "langdetect"
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 		# African language refinement
 		detected_code = self._refine_african_language(text, detected_code)
@@ -443,8 +443,8 @@ class NLPCoreService:
 				nlp = _spacy.load(model_name)
 				self._spacy_models[lang] = nlp
 				return nlp
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		try:
 			nlp = _spacy.blank(lang)
 			self._spacy_models[lang] = nlp
@@ -798,8 +798,8 @@ class NLPCoreService:
 				translated = await self._ollama_translate(text, str(source_lang), str(target_lang))
 				confidence = 0.8
 				model_used = "ollama/llama3"
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 		create = NLPTranslationCreate(
 			tenant_id=self._tenant_id,
@@ -1094,8 +1094,8 @@ class NLPCoreService:
 								)
 								self._put("nlpc_relations", rel.model_dump())
 								results.append(rel)
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		else:
 			# SVO regex stub
 			for m in re.finditer(

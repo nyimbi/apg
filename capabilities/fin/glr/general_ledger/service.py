@@ -2868,8 +2868,8 @@ class GeneralLedgerService:
 						"entity_b": sub,
 						"difference": ic_rec["difference"],
 					})
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 		# Apply group adjustments
 		for adj in group_adjustments:
@@ -3387,8 +3387,8 @@ class GeneralLedgerService:
 					currency=acct.get("currency", "USD"),
 				)
 				accounts_created += 1
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 		return {
 			"tenant_id": tenant_id,

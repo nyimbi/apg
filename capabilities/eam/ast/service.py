@@ -483,8 +483,8 @@ class EnterpriseAssetManagementService:
 			expiry_date = datetime.strptime(warranty_expiry, "%Y-%m-%d").date()
 			today_date = datetime.now(timezone.utc).date()
 			days_remaining = (expiry_date - today_date).days
-		except ValueError:
-			pass
+		except ValueError as _exc:
+			_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		w_key = f"{tenant_id}:{asset_id}"
 		record = {
 			"asset_id": asset_id,

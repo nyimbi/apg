@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-06-10T18:35:08.305Z",
+  "updatedAt": "2026-06-10T18:45:14.816Z",
   "missions": [
     {
       "id": "session:c7e42fb1-1448-4c68-9e62-5c4c11611a56:none",
@@ -7,7 +7,7 @@
       "name": "none",
       "objective": "Session mission",
       "createdAt": "2026-06-10T06:16:25.596Z",
-      "updatedAt": "2026-06-10T18:35:08.305Z",
+      "updatedAt": "2026-06-10T18:45:14.816Z",
       "status": "running",
       "workerCount": 28,
       "taskCounts": {
@@ -27,7 +27,7 @@
           "currentStep": null,
           "latestUpdate": "completed",
           "completedSummary": null,
-          "updatedAt": "2026-06-10T17:55:56.653Z"
+          "updatedAt": "2026-06-10T18:45:14.816Z"
         },
         {
           "name": "workflow-subagent:ad0bbcf",
@@ -324,6 +324,14 @@
           "agent": "workflow-subagent:a554777",
           "detail": "started workflow-subagent:a554777",
           "sourceKey": "session-start:a55477719cc75a397"
+        },
+        {
+          "id": "session-stop:a7078272dd2d0b062:2026-06-10T18:45:14.816Z",
+          "at": "2026-06-10T18:45:14.816Z",
+          "kind": "completion",
+          "agent": "Explore:aba6084",
+          "detail": "completed",
+          "sourceKey": "session-stop:a7078272dd2d0b062"
         }
       ]
     }

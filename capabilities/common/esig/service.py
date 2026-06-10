@@ -276,8 +276,8 @@ class ESignatureService:
 			if connector is not None:
 				try:
 					await connector.disconnect()
-				except Exception:
-					pass
+				except Exception as _exc:
+					_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 	async def revoke(self, signature_id: str, *, reason: str = "") -> dict[str, Any]:
 		"""Mark a signature as revoked."""

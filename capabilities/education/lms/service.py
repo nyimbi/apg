@@ -367,8 +367,8 @@ class LmsService:
 						focus=f"educational feedback for score {score}/100",
 					)
 					feedback = ml_result.summary or feedback
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 		merged = item.model_copy(update={
 			"score": score, "feedback": feedback, "graded_by": graded_by,

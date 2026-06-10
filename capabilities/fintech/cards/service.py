@@ -521,8 +521,8 @@ class DigitalCardsService:
 		if self._notify is not None:
 			try:
 				await self._notify.send({"type": "card_blocked", "card_id": card_id, "reason": reason})
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		return {"card_id": card_id, "status": "blocked", "reason": reason, "blocked_at": _iso(), "evidence": block_record}
 
 	async def unblock_card(self, card_id: str, approved_by: str) -> dict[str, Any]:

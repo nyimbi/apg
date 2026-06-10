@@ -657,7 +657,7 @@ def report_incident_mttr():
 			created = datetime.fromisoformat(r["created_at"])
 			resolved_at = datetime.fromisoformat(r["resolved_at"])
 			durations.append((resolved_at - created).total_seconds() / 60)
-		except Exception:
-			pass
+		except Exception as _exc:
+			_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 	mttr = sum(durations) / len(durations) if durations else None
 	return _ok({"mttr_minutes": mttr, "sample_size": len(durations)})
