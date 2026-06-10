@@ -256,11 +256,17 @@ def test_connector_registry_unknown_raises():
 
 
 def test_connector_registry_all_six_connectors_available():
-	"""All 6 connector implementations are now available (no more planned stubs)."""
+	"""All original 6 connectors are available; 5 new Africa connectors were added."""
 	from capabilities.composition.orchestration.connectors.connector_registry import ConnectorRegistry
 	registry = ConnectorRegistry()
 	installed = set(registry.list_installed())
-	assert installed == {"mpesa", "stripe", "equity_bank", "kcb", "salesforce", "whatsapp"}
+	# Original 6 connectors must still be present
+	original_six = {"mpesa", "stripe", "equity_bank", "kcb", "salesforce", "whatsapp"}
+	assert original_six.issubset(installed), f"Missing original connectors: {original_six - installed}"
+	# New Africa connectors added
+	new_connectors = {"mtn_momo", "airtel_money", "orange_money", "wave", "mshwari"}
+	assert new_connectors.issubset(installed), f"Missing new connectors: {new_connectors - installed}"
+	assert len(installed) >= 11, f"Expected at least 11 connectors, got {len(installed)}"
 
 
 def test_connector_registry_get_metadata():
