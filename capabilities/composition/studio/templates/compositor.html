@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>APG Studio — Compositor</title>
+<link rel="stylesheet" href="/studio/static/css/studio.css">
+<!-- CodeMirror 6 via CDN -->
+<script type="module">
+import { EditorView, basicSetup } from "https://esm.sh/@codemirror/basic-setup@0.20.0";
+import { EditorState } from "https://esm.sh/@codemirror/state@6.4.1";
+import { StreamLanguage } from "https://esm.sh/@codemirror/language@6.10.2";
+import { oneDark } from "https://esm.sh/@codemirror/theme-one-dark@6.1.2";
+import { keymap } from "https://esm.sh/@codemirror/view@6.26.3";
+import { defaultKeymap, indentWithTab } from "https://esm.sh/@codemirror/commands@6.6.0";
+import { javascript } from "https://esm.sh/@codemirror/lang-javascript@6.2.2";
+
+// Minimal APG syntax highlighting using stream language
+const apgLanguage = StreamLanguage.define({
+  name: "apg",
+  token(stream) {
+    if (stream.match(/\/\/.*/)) return "comment";
+    if (stream.match(/\/\*[\s\S]*?\*\//)) return "comment";
+    if (stream.match(/"[^"]*"/)) return "string";
+    if (stream.match(/'[^']*'/)) return "string";
+    if (stream.match(/\b(capability|entity|workflow|screen|connector|marketplace|use|uses|domain|contract|governance|operations|compliance|provides|requires|description|version|state|transition|guard|human_task|sla|table|field|form|list|detail|dashboard|agent|team|flow|rule|on|from|to|when|emit|if|else|import|module)\b/)) return "keyword";
+    if (stream.match(/\b(string|int|float|bool|date|datetime|uuid|text|list|dict|enum|optional|required)\b/)) return "typeName";
+    if (stream.match(/\b[A-Z][A-Za-z0-9_]*\b/)) return "className";
+    if (stream.match(/\b\d+(\.\d+)?\b/)) return "number";
+    if (stream.match(/[{}[\]();,]/)) return "punctuation";
+    if (stream.match(/[:=<>!+\-*\/|&^%]/)) return "operator";
+    if (stream.match(/\b[a-z_][a-z0-9_]*(?=\s*:)/)) return "propertyName";
+    stream.next();
+    return null;
+  }
+});
+
+const INITIAL_SOURCE = `// APG Studio — compose your application
+// Press ⌘↵ to compile. Browse capabilities on the left.
+
+application EastAfricaPayments {
+  description: "Mobile money & card payment platform for East Africa";
+  version: "1.0.0";
+  author: "Datacraft";
+
+  // Compose from existing world-class capabilities
+  capabilities: [
+    fintech_gwy,   // Payment gateway (MPESA, Stripe, Equity, KCB)
+    fintech_frd,   // Fraud detection with ML scoring
+    fintech_aml,   // Anti-money laundering pattern detection
+    vault,         // PCI DSS PAN tokenization
+    nats,          // Durable event bus
+    temporal       // Crash-resilient workflow execution
+  ];
+
+  // Platform configuration
+  configuration: {
+    tenant_model: multi_tenant;
+    auth: jwt;
+    audit: append_only;
+    compliance: [PCI_DSS, KYC, AML];
+  };
+
+  // Infrastructure
+  infrastructure: {
+    database: postgresql;
+    cache: redis;
+    message_bus: nats_jetstream;
+    workflow_engine: temporal;
+    ml_inference: ollama;
+  };
+}
+`;
+
+window.APG_STUDIO = {
+  editor: null,
+  outputFiles: {},
+  activeOutputTab: null,
+  capabilities: [],
+  examples: [],
+};
+
+function initEditor(container) {
+  const state = EditorState.create({
+    doc: INITIAL_SOURCE,
+    extensions: [
+      basicSetup,
+      oneDark,
+      apgLanguage,
+      keymap.of([...defaultKeymap, indentWithTab]),
+      EditorView.updateListener.of(update => {
+        if (update.docChanged) {
+          document.querySelector('.toolbar-filename').textContent = 'untitled.apg*';
+          window.APG_STUDIO.isDirty = true;
+        }
+      }),
+    ],
+  });
+
+  window.APG_STUDIO.editor = new EditorView({
+    state,
+    parent: container,
+  });
+}
+
+function getEditorContent() {
+  return window.APG_STUDIO.editor?.state?.doc?.toString() || '';
+}
+
+function setEditorContent(content, filename) {
+  const editor = window.APG_STUDIO.editor;
+  if (!editor) return;
+  editor.dispatch({
+    changes: { from: 0, to: editor.state.doc.length, insert: content }
+  });
+  document.querySelector('.toolbar-filename').textContent = filename || 'untitled.apg';
+  window.APG_STUDIO.isDirty = false;
+}
+
+window.setEditorContent = setEditorContent;
+window.getEditorContent = getEditorContent;
+
+// Initialize when DOM ready
+document.addEventListener('DOMContentLoaded', () => {
+  const container = document.getElementById('cm-editor');
+  if (container) {
+    initEditor(container);
+    document.getElementById('editor-welcome')?.remove();
+  }
+});
+
+// Keyboard shortcut: Ctrl/Cmd+Enter to compile
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    window.compileSource?.();
+  }
+});
+</script>
+</head>
+<body style="overflow:hidden">
+
+<div class="compositor">
+
+  <!-- TOOLBAR -->
+  <div class="compositor-toolbar">
+    <a href="/studio/" class="toolbar-btn landing">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+      APG
+    </a>
+    <div class="toolbar-divider"></div>
+    <div class="toolbar-brand">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+      Studio
+    </div>
+    <div class="toolbar-divider"></div>
+    <span class="toolbar-filename">untitled.apg</span>
+    <div class="toolbar-spacer"></div>
+    <button class="toolbar-btn compile" id="compile-btn" onclick="window.compileSource()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      Compile <kbd style="opacity:0.6;font-size:0.7rem;margin-left:4px">⌘↵</kbd>
+    </button>
+    <button class="toolbar-btn download" id="download-btn" onclick="window.downloadOutput()" disabled>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download
+    </button>
+  </div>
+
+  <!-- SIDEBAR: capability browser -->
+  <aside class="compositor-sidebar">
+    <div class="sidebar-header">
+      Capabilities
+      <span id="cap-count" style="color:var(--accent);font-size:0.7rem"></span>
+    </div>
+    <div class="sidebar-search">
+      <input type="text" id="cap-search" placeholder="Search capabilities…" oninput="window.filterCaps(this.value)">
+    </div>
+    <!-- Tabs: Capabilities / Examples -->
+    <div style="display:flex;border-bottom:1px solid var(--border);">
+      <button class="sidebar-tab active" data-panel="caps" onclick="window.switchSidebarTab('caps', this)" style="flex:1;padding:7px;background:transparent;border:none;color:var(--text-secondary);font-size:0.75rem;cursor:pointer;border-bottom:2px solid var(--accent);">Capabilities</button>
+      <button class="sidebar-tab" data-panel="examples" onclick="window.switchSidebarTab('examples', this)" style="flex:1;padding:7px;background:transparent;border:none;color:var(--text-dim);font-size:0.75rem;cursor:pointer;">Examples</button>
+      <button class="sidebar-tab" data-panel="templates" onclick="window.switchSidebarTab('templates', this)" style="flex:1;padding:7px;background:transparent;border:none;color:var(--text-dim);font-size:0.75rem;cursor:pointer;">Templates</button>
+    </div>
+    <div class="cap-tree" id="cap-tree-panel">
+      <div style="padding:1rem;color:var(--text-dim);font-size:0.78rem;">Loading capabilities…</div>
+    </div>
+    <div class="cap-tree" id="examples-panel" style="display:none">
+      <div class="examples-panel" id="examples-list">
+        <div style="padding:1rem;color:var(--text-dim);font-size:0.78rem;">Loading examples…</div>
+      </div>
+    </div>
+    <div class="cap-tree" id="templates-panel" style="display:none">
+      <div class="examples-panel" id="templates-list">
+        <div style="padding:1rem;color:var(--text-dim);font-size:0.78rem;">Loading templates…</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- EDITOR -->
+  <div class="compositor-editor">
+    <div class="editor-tabs" id="editor-tabs">
+      <div class="editor-tab active" data-file="untitled.apg">untitled.apg</div>
+    </div>
+    <div class="editor-wrapper">
+      <div id="cm-editor" style="height:100%;"></div>
+    </div>
+  </div>
+
+  <!-- OUTPUT -->
+  <div class="compositor-output">
+    <div class="output-header">
+      Output
+      <button class="copy-btn" id="copy-btn" onclick="window.copyOutput()" style="display:none">Copy</button>
+    </div>
+    <div class="output-tabs" id="output-tabs">
+      <div class="output-tab active" data-file="_errors" onclick="window.switchOutputTab('_errors', this)">⚠ Errors</div>
+    </div>
+    <div id="output-content" class="output-content">
+      <div class="output-empty">
+        <div class="icon">⟩_</div>
+        <p>Compile your APG source to see<br>generated Python files here.</p>
+        <p style="margin-top:0.5rem;opacity:0.5">Press <kbd>⌘↵</kbd> or click Compile</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATUSBAR -->
+  <div class="compositor-statusbar">
+    <div class="status-item">
+      <div class="status-dot green" id="status-dot"></div>
+      <span id="status-text">Ready</span>
+    </div>
+    <div class="status-item">
+      <span id="status-lines">0 lines</span>
+    </div>
+    <div class="status-item right">
+      <span id="status-caps">265 capabilities available</span>
+    </div>
+    <div class="status-item">APG Studio 1.0</div>
+  </div>
+
+</div>
+
+<script>
+// ── Studio JavaScript Engine ────────────────────────────────────
+
+const STUDIO = window.APG_STUDIO;
+
+// Load capabilities from API
+async function loadCapabilities() {
+  try {
+    const r = await fetch('/studio/api/capabilities');
+    const data = await r.json();
+    STUDIO.capabilities = data.capabilities || [];
+    renderCapabilityTree(STUDIO.capabilities);
+    document.getElementById('cap-count').textContent = `(${STUDIO.capabilities.length})`;
+    document.getElementById('status-caps').textContent = `${STUDIO.capabilities.length} capabilities available`;
+  } catch (e) {
+    document.getElementById('cap-tree-panel').innerHTML =
+      '<div style="padding:1rem;color:var(--red);font-size:0.78rem;">Failed to load capabilities</div>';
+  }
+}
+
+async function loadExamples() {
+  try {
+    const r = await fetch('/studio/api/examples');
+    const data = await r.json();
+    STUDIO.examples = data.examples || [];
+    renderExamples(STUDIO.examples);
+  } catch (e) {}
+}
+
+async function loadTemplates() {
+  try {
+    const r = await fetch('/studio/api/templates');
+    const data = await r.json();
+    renderTemplates(data.templates || []);
+  } catch (e) {}
+}
+
+function renderCapabilityTree(caps) {
+  const grouped = {};
+  caps.forEach(c => {
+    const d = c.domain || 'other';
+    if (!grouped[d]) grouped[d] = [];
+    grouped[d].push(c);
+  });
+  const domains = Object.entries(grouped).sort((a, b) => b[1].length - a[1].length);
+  const el = document.getElementById('cap-tree-panel');
+  el.innerHTML = domains.map(([domain, items]) => `
+    <div class="cap-domain-group" data-domain="${domain}">
+      <div class="cap-domain-label" onclick="toggleDomain(this)">
+        ${domainIcon(domain)} ${domain}
+        <span style="color:var(--accent);font-size:0.7rem;">${items.length}</span>
+      </div>
+      <div class="cap-domain-items" ${items.length > 6 ? 'style="display:none"' : ''}>
+        ${items.map(c => `
+          <div class="cap-item" onclick="insertCapabilityRef('${c.id}')" title="${c.description || c.id}">
+            <span class="cap-id">${c.id}</span>
+            <span class="cap-name">${c.display_name || c.id}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleDomain(el) {
+  const items = el.nextElementSibling;
+  if (items) items.style.display = items.style.display === 'none' ? '' : 'none';
+}
+
+function domainIcon(d) {
+  const icons = {
+    fintech: '🏦', intel: '🕵', healthcare: '🏥', pharma: '💊',
+    common: '⚙', composition: '🔗', bia: '📊', government: '🏛',
+    realestate: '🏠', telecom: '📡', transport: '🚚', retail: '🛍',
+    education: '🎓', energy: '⚡', mining: '⛏', crm: '👥',
+    grc: '🛡', hcm: '👔', fin: '💰', loc: '📍', mob: '📱',
+  };
+  return icons[d] || '📦';
+}
+
+window.filterCaps = function(query) {
+  query = query.toLowerCase();
+  const tree = document.getElementById('cap-tree-panel');
+  if (!query) { renderCapabilityTree(STUDIO.capabilities); return; }
+  const filtered = STUDIO.capabilities.filter(c =>
+    c.id.toLowerCase().includes(query) ||
+    (c.display_name || '').toLowerCase().includes(query) ||
+    (c.description || '').toLowerCase().includes(query)
+  );
+  tree.innerHTML = filtered.length === 0
+    ? '<div style="padding:1rem;color:var(--text-dim);font-size:0.78rem;">No results</div>'
+    : filtered.map(c => `
+      <div class="cap-item" onclick="insertCapabilityRef('${c.id}')" title="${c.description || c.id}">
+        <span class="cap-id">${c.id}</span>
+        <span class="cap-name">${c.display_name || c.id}</span>
+      </div>
+    `).join('');
+}
+
+function renderExamples(examples) {
+  const el = document.getElementById('examples-list');
+  el.innerHTML = examples.map(ex => `
+    <div class="example-item" onclick="loadExample('${ex.name}')">
+      <span class="ex-icon">${ex.icon || '📄'}</span>
+      <span>${ex.title}</span>
+    </div>
+  `).join('') || '<div style="padding:1rem;color:var(--text-dim);font-size:0.78rem;">No examples found</div>';
+}
+
+function renderTemplates(templates) {
+  const el = document.getElementById('templates-list');
+  el.innerHTML = templates.map(t => `
+    <div class="example-item" onclick="loadTemplate('${t.name}')">
+      <span class="ex-icon">${t.icon || '🗂'}</span>
+      <span>${t.title}</span>
+    </div>
+  `).join('') || '<div style="padding:1rem;color:var(--text-dim);font-size:0.78rem;">No templates</div>';
+}
+
+window.switchSidebarTab = function(panel, btn) {
+  document.querySelectorAll('.sidebar-tab').forEach(b => {
+    b.style.borderBottom = 'none';
+    b.style.color = 'var(--text-dim)';
+  });
+  btn.style.borderBottom = '2px solid var(--accent)';
+  btn.style.color = 'var(--text-secondary)';
+  ['cap-tree-panel', 'examples-panel', 'templates-panel'].forEach(id => {
+    document.getElementById(id).style.display = 'none';
+  });
+  const panelMap = { caps: 'cap-tree-panel', examples: 'examples-panel', templates: 'templates-panel' };
+  document.getElementById(panelMap[panel]).style.display = '';
+};
+
+function insertCapabilityRef(capId) {
+  const editor = window.APG_STUDIO.editor;
+  if (!editor) return;
+  const snippet = `\n// Reference: ${capId}\nuses: [${capId}];\n`;
+  const pos = editor.state.selection.main.head;
+  editor.dispatch({ changes: { from: pos, insert: snippet } });
+}
+
+async function loadExample(name) {
+  try {
+    const r = await fetch(`/studio/api/examples/${encodeURIComponent(name)}`);
+    const data = await r.json();
+    if (data.source) {
+      window.setEditorContent(data.source, data.filename || name + '.apg');
+      document.querySelector('.toolbar-filename').textContent = data.filename || name + '.apg';
+    }
+  } catch (e) { setStatus('Failed to load example', 'error'); }
+}
+
+async function loadTemplate(name) {
+  try {
+    const r = await fetch(`/studio/api/templates/${encodeURIComponent(name)}`);
+    const data = await r.json();
+    if (data.source) window.setEditorContent(data.source, 'new_capability.apg');
+  } catch (e) { setStatus('Failed to load template', 'error'); }
+}
+
+// ── Compile ─────────────────────────────────────────────────────
+
+window.compileSource = async function() {
+  const btn = document.getElementById('compile-btn');
+  const source = window.getEditorContent?.();
+  if (!source?.trim()) { setStatus('No source to compile', 'error'); return; }
+
+  btn.classList.add('loading');
+  btn.textContent = ' Compiling…';
+  setStatus('Compiling…', 'working');
+
+  const t0 = performance.now();
+  try {
+    const r = await fetch('/studio/api/compile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source, filename: document.querySelector('.toolbar-filename').textContent.replace('*','') || 'untitled.apg' }),
+    });
+    const data = await r.json();
+    const elapsed = ((performance.now() - t0) / 1000).toFixed(2);
+
+    if (data.success) {
+      setStatus(`Compiled in ${elapsed}s — ${Object.keys(data.files || {}).length} files generated`, 'ok');
+      renderOutput(data);
+      document.getElementById('download-btn').disabled = false;
+      STUDIO.outputFiles = data.files || {};
+    } else {
+      setStatus(`Compile failed — ${(data.errors || []).length} error(s)`, 'error');
+      renderErrors(data.errors || [], data.warnings || []);
+      STUDIO.outputFiles = {};
+      document.getElementById('download-btn').disabled = true;
+    }
+  } catch (e) {
+    setStatus('Network error: ' + e.message, 'error');
+    renderErrors([{ message: e.message, line: null }], []);
+  } finally {
+    btn.classList.remove('loading');
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Compile <kbd style="opacity:0.6;font-size:0.7rem;margin-left:4px">⌘↵</kbd>`;
+  }
+};
+
+function renderOutput(data) {
+  const files = data.files || {};
+  const warnings = data.warnings || [];
+  const tabsEl = document.getElementById('output-tabs');
+
+  const fileNames = Object.keys(files);
+  const tabs = ['_errors', ...fileNames];
+
+  tabsEl.innerHTML = tabs.map((name, i) => {
+    const label = name === '_errors'
+      ? (warnings.length ? `⚠ ${warnings.length} warning(s)` : '✓ No errors')
+      : name;
+    return `<div class="output-tab${i === 0 ? '' : ''}" data-file="${name}" onclick="window.switchOutputTab('${name}', this)">${label}</div>`;
+  }).join('');
+
+  // Show success in errors tab
+  switchOutputTabDirect(fileNames[0] || '_errors', data, warnings);
+
+  // Update status bar
+  document.getElementById('status-lines').textContent =
+    `${fileNames.length} files generated`;
+}
+
+function renderErrors(errors, warnings) {
+  const tabsEl = document.getElementById('output-tabs');
+  tabsEl.innerHTML = `<div class="output-tab active" data-file="_errors" onclick="window.switchOutputTab('_errors', this)">⚠ ${errors.length} error(s)</div>`;
+  const content = document.getElementById('output-content');
+  document.getElementById('copy-btn').style.display = 'none';
+  content.innerHTML = `<div class="error-list">` +
+    errors.map(e => `<div class="error-item error"><span>${e.line ? `L${e.line}` : '?'}</span><span>${escHtml(e.message || String(e))}</span></div>`).join('') +
+    warnings.map(w => `<div class="error-item warning"><span>${w.line ? `L${w.line}` : '?'}</span><span>${escHtml(w.message || String(w))}</span></div>`).join('') +
+    `</div>`;
+}
+
+window.switchOutputTab = function(fileName, el) {
+  document.querySelectorAll('.output-tab').forEach(t => t.classList.remove('active'));
+  if (el) el.classList.add('active');
+  switchOutputTabDirect(fileName, { files: STUDIO.outputFiles }, []);
+};
+
+function switchOutputTabDirect(fileName, data, warnings) {
+  const content = document.getElementById('output-content');
+  STUDIO.activeOutputTab = fileName;
+
+  if (fileName === '_errors') {
+    document.getElementById('copy-btn').style.display = 'none';
+    if (!warnings?.length) {
+      content.innerHTML = `<div class="compile-success"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Compilation successful — ${Object.keys(data.files||{}).length} files generated</div>`;
+    } else {
+      content.innerHTML = `<div class="error-list">` +
+        warnings.map(w => `<div class="error-item warning"><span>${w.line ? `L${w.line}` : '⚠'}</span><span>${escHtml(w.message||String(w))}</span></div>`).join('') +
+        `</div>`;
+    }
+    return;
+  }
+
+  const fileContent = data.files?.[fileName] || STUDIO.outputFiles?.[fileName];
+  if (!fileContent) { content.innerHTML = '<div class="output-empty"><div class="icon">∅</div><p>No content</p></div>'; return; }
+  document.getElementById('copy-btn').style.display = 'block';
+  content.innerHTML = `<pre style="white-space:pre-wrap;word-break:break-all;">${escHtml(fileContent)}</pre>`;
+}
+
+window.copyOutput = function() {
+  const tab = STUDIO.activeOutputTab;
+  const text = STUDIO.outputFiles?.[tab] || '';
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+};
+
+window.downloadOutput = async function() {
+  const files = STUDIO.outputFiles;
+  if (!Object.keys(files).length) return;
+  try {
+    const r = await fetch('/studio/api/download', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files }),
+    });
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'apg_generated.zip'; a.click();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    // Fallback: download first file as text
+    const firstName = Object.keys(files)[0];
+    const blob = new Blob([files[firstName]], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = firstName; a.click();
+    URL.revokeObjectURL(url);
+  }
+};
+
+// ── Utilities ────────────────────────────────────────────────────
+
+function setStatus(msg, level) {
+  const dot = document.getElementById('status-dot');
+  const text = document.getElementById('status-text');
+  text.textContent = msg;
+  dot.className = 'status-dot ' + (level === 'ok' ? 'green' : level === 'error' ? 'red' : '');
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Track editor line count
+setInterval(() => {
+  const editor = window.APG_STUDIO?.editor;
+  if (editor) {
+    const lines = editor.state.doc.lines;
+    document.getElementById('status-lines').textContent = `${lines} lines`;
+  }
+}, 1000);
+
+// Init
+document.addEventListener('DOMContentLoaded', () => {
+  loadCapabilities();
+  loadExamples();
+  loadTemplates();
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>APG — Application Programming Generation Platform</title>
+<link rel="stylesheet" href="/studio/static/css/studio.css">
+<style>
+/* Extra landing-only styles */
+.lp-hero-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4rem;
+  align-items: center;
+  max-width: 1200px;
+  margin: 0 auto;
+  text-align: left;
+}
+.lp-hero-text .lp-hero-actions { justify-content: flex-start; }
+.lp-hero-text p { margin: 0 0 2.5rem; }
+.lp-divider { border: none; border-top: 1px solid var(--border); margin: 0; }
+.lp-timeline { display: flex; flex-direction: column; gap: 0; }
+.lp-timeline-item {
+  display: flex; gap: 1rem; padding: 1.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.lp-timeline-item:last-child { border-bottom: none; }
+.lp-timeline-num {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--accent-glow); border: 1px solid rgba(99,102,241,0.3);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--accent); font-weight: 700; font-size: 0.85rem; flex-shrink: 0;
+}
+.lp-timeline-content h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 4px; }
+.lp-timeline-content p { font-size: 0.85rem; color: var(--text-secondary); }
+.arch-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+.arch-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1.5rem; text-align: center;
+}
+.arch-card .arch-icon { font-size: 2rem; margin-bottom: 0.75rem; }
+.arch-card h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; }
+.arch-card p { font-size: 0.8rem; color: var(--text-secondary); }
+.arch-layer {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1rem 1.5rem;
+  display: flex; align-items: center; gap: 1rem; margin-bottom: 8px;
+}
+.arch-layer-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; min-width: 120px; }
+.arch-layer-caps { display: flex; flex-wrap: wrap; gap: 6px; }
+.arch-cap-chip {
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: 4px; padding: 2px 8px; font-size: 0.7rem;
+  font-family: var(--font-mono); color: var(--text-secondary);
+}
+.interop-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; }
+.interop-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1.5rem;
+}
+.interop-card h4 { font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 8px; }
+.interop-card ul { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.interop-card li { font-size: 0.85rem; color: var(--text-secondary); display: flex; align-items: center; gap: 8px; }
+.interop-card li::before { content: '→'; color: var(--accent); font-weight: bold; }
+@media (max-width: 900px) {
+  .lp-hero-grid { grid-template-columns: 1fr; }
+  .arch-grid { grid-template-columns: 1fr; }
+  .interop-grid { grid-template-columns: 1fr; }
+  .lp-nav-links { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="lp-nav">
+  <a href="/" class="lp-logo">
+    <div class="lp-logo-mark">APG</div>
+    Application Programming Generation
+  </a>
+  <ul class="lp-nav-links">
+    <li><a href="#capabilities">Capabilities</a></li>
+    <li><a href="#architecture">Architecture</a></li>
+    <li><a href="#interop">Interoperability</a></li>
+    <li><a href="#howto">How It Works</a></li>
+  </ul>
+  <div class="lp-nav-cta">
+    <a href="/studio/compositor" class="btn btn-primary">Open Studio →</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="lp-hero" id="hero">
+  <div class="lp-hero-glow"></div>
+  <div class="lp-hero-grid">
+    <div class="lp-hero-text">
+      <div class="lp-hero-badge">
+        <span>✦</span> Now with Temporal · NATS · OPA · Local ML
+      </div>
+      <h1>Build Any Business App<br>in <span class="gradient">APG</span></h1>
+      <p style="font-size:1.1rem;color:var(--text-secondary);max-width:500px;margin:0 0 2.5rem;">
+        265 world-class capabilities. One composable language. Generate complete, production-ready
+        Python services from a high-level domain description in seconds.
+      </p>
+      <div class="lp-hero-actions">
+        <a href="/studio/compositor" class="btn btn-primary btn-lg">Open Compositor</a>
+        <a href="#capabilities" class="btn btn-ghost btn-lg">Explore Capabilities</a>
+      </div>
+    </div>
+    <div class="lp-code-preview">
+      <div class="lp-code-bar">
+        <div class="code-dot red"></div>
+        <div class="code-dot amber"></div>
+        <div class="code-dot green"></div>
+        <span class="code-filename">payment_gateway.apg</span>
+      </div>
+      <pre><code><span class="token-comment">// APG — one file, full microservice</span>
+<span class="token-keyword">capability</span> <span class="token-type">PaymentGateway</span> {
+  <span class="token-prop">description:</span> <span class="token-string">"Multi-rail payment processing"</span>;
+  <span class="token-prop">domain:</span> <span class="token-value">fintech</span>;
+
+  <span class="token-prop">contract:</span> {
+    <span class="token-prop">operations:</span> [
+      <span class="token-value">process_payment</span>, <span class="token-value">mpesa_stk_push</span>,
+      <span class="token-value">stripe_charge</span>, <span class="token-value">reconcile</span>
+    ];
+    <span class="token-prop">governance:</span> [
+      <span class="token-value">tenant_context_required</span>,
+      <span class="token-value">pci_scope_enforced</span>,
+      <span class="token-value">amount_positive</span>
+    ];
+    <span class="token-prop">compliance:</span> [<span class="token-value">PCI_DSS</span>, <span class="token-value">KYC</span>];
+  };
+
+  <span class="token-prop">uses:</span> [<span class="token-value">vault</span>, <span class="token-value">nats</span>, <span class="token-value">fintech_frd</span>];
+}</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<div style="max-width:1200px;margin:0 auto;padding:0 2rem;">
+  <div class="lp-stats">
+    <div class="lp-stat">
+      <div class="lp-stat-value accent" data-target="{{ stats.capabilities }}">{{ stats.capabilities }}</div>
+      <div class="lp-stat-label">Capabilities</div>
+    </div>
+    <div class="lp-stat">
+      <div class="lp-stat-value cyan">{{ stats.domains }}</div>
+      <div class="lp-stat-label">Domains</div>
+    </div>
+    <div class="lp-stat">
+      <div class="lp-stat-value green">{{ stats.tests }}</div>
+      <div class="lp-stat-label">Tests Passing</div>
+    </div>
+    <div class="lp-stat">
+      <div class="lp-stat-value amber">{{ stats.methods }}</div>
+      <div class="lp-stat-label">Avg. Service Methods</div>
+    </div>
+    <div class="lp-stat">
+      <div class="lp-stat-value" style="color:var(--accent-2)">{{ stats.connectors }}</div>
+      <div class="lp-stat-label">Connectors</div>
+    </div>
+  </div>
+</div>
+
+<!-- CAPABILITY DOMAINS -->
+<section id="capabilities" style="padding:4rem 2rem;max-width:1200px;margin:0 auto;">
+  <div class="lp-section-header">
+    <h2>{{ stats.capabilities }} World-Class Capabilities</h2>
+    <p>Every capability ships with models, views, API, service logic, documentation, and tutorials. Pick any, compose freely.</p>
+  </div>
+  <div class="lp-domains">
+    {% for domain in domains %}
+    <div class="lp-domain-card">
+      <div class="lp-domain-icon">{{ domain.icon }}</div>
+      <div class="lp-domain-info">
+        <h4>{{ domain.label }}</h4>
+        <span>{{ domain.sample }}</span>
+      </div>
+      <div class="lp-domain-badge">{{ domain.count }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<!-- ARCHITECTURE -->
+<section id="architecture" style="padding:4rem 2rem;background:var(--bg-surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border);">
+  <div style="max-width:1200px;margin:0 auto;">
+    <div class="lp-section-header">
+      <h2>Layered Architecture</h2>
+      <p>Every APG application is a composition of capability layers — from infrastructure to domain to UI.</p>
+    </div>
+    <div style="margin-bottom:2rem;">
+      <div class="arch-layer" style="border-color:rgba(99,102,241,0.4);">
+        <div class="arch-layer-label" style="color:var(--accent)">🖥 UI / API</div>
+        <div class="arch-layer-caps">
+          <span class="arch-cap-chip">views.py</span>
+          <span class="arch-cap-chip">api.py</span>
+          <span class="arch-cap-chip">blueprint.py</span>
+          <span class="arch-cap-chip">Flask-AppBuilder</span>
+          <span class="arch-cap-chip">REST / WebSocket</span>
+        </div>
+      </div>
+      <div class="arch-layer" style="border-color:rgba(6,182,212,0.4);">
+        <div class="arch-layer-label" style="color:var(--cyan)">⚙ Domain Services</div>
+        <div class="arch-layer-caps">
+          <span class="arch-cap-chip">service.py</span>
+          <span class="arch-cap-chip">models.py</span>
+          <span class="arch-cap-chip">capability_contract.py</span>
+          <span class="arch-cap-chip">domain/rules.py</span>
+        </div>
+      </div>
+      <div class="arch-layer" style="border-color:rgba(16,185,129,0.4);">
+        <div class="arch-layer-label" style="color:var(--green)">🔌 Infrastructure</div>
+        <div class="arch-layer-caps">
+          <span class="arch-cap-chip">NATS JetStream</span>
+          <span class="arch-cap-chip">Temporal.io</span>
+          <span class="arch-cap-chip">OPA Policy</span>
+          <span class="arch-cap-chip">Ollama ML</span>
+          <span class="arch-cap-chip">PostgreSQL</span>
+        </div>
+      </div>
+      <div class="arch-layer" style="border-color:rgba(245,158,11,0.4);">
+        <div class="arch-layer-label" style="color:var(--amber)">🌐 Connectors</div>
+        <div class="arch-layer-caps">
+          <span class="arch-cap-chip">MPESA Daraja</span>
+          <span class="arch-cap-chip">Equity Bank</span>
+          <span class="arch-cap-chip">KCB Bank</span>
+          <span class="arch-cap-chip">Stripe</span>
+          <span class="arch-cap-chip">WhatsApp</span>
+          <span class="arch-cap-chip">Salesforce</span>
+        </div>
+      </div>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-card">
+        <div class="arch-icon">⚡</div>
+        <h4>Durable Execution</h4>
+        <p>Temporal.io workflows survive crashes. Human tasks, approval gates, SLA timers — all crash-resilient.</p>
+      </div>
+      <div class="arch-card">
+        <div class="arch-icon">📡</div>
+        <h4>Event-Driven</h4>
+        <p>NATS JetStream as the durable event bus. Every domain event is publish-subscribe, exactly-once, cross-service.</p>
+      </div>
+      <div class="arch-card">
+        <div class="arch-icon">🛡</div>
+        <h4>Policy-as-Code</h4>
+        <p>OPA Rego governs every capability boundary. HIPAA, PCI DSS, FDA 21 CFR Part 11 rules enforced declaratively.</p>
+      </div>
+      <div class="arch-card">
+        <div class="arch-icon">🧠</div>
+        <h4>Local AI/ML</h4>
+        <p>Ollama-backed inference. Score, classify, predict, summarize — 100% data sovereignty, no cloud calls required.</p>
+      </div>
+      <div class="arch-card">
+        <div class="arch-icon">🔐</div>
+        <h4>Regulatory Certifications</h4>
+        <p>SOC 2, HIPAA, PCI DSS, and FDA 21 CFR Part 11 foundations built-in. PHI classifier, PAN tokenization, e-signatures.</p>
+      </div>
+      <div class="arch-card">
+        <div class="arch-icon">🧩</div>
+        <h4>True Composability</h4>
+        <p>Capabilities declare <code>provides</code> and <code>requires</code>. The composition engine resolves the graph automatically.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- INTEROPERABILITY -->
+<section id="interop" style="padding:4rem 2rem;max-width:1200px;margin:0 auto;">
+  <div class="lp-section-header">
+    <h2>Built to Interoperate</h2>
+    <p>Every capability speaks the same protocol. Composing two capabilities is as simple as declaring <code>uses: [other_cap]</code>.</p>
+  </div>
+  <div class="interop-grid">
+    <div class="interop-card">
+      <h4>🏦 Fintech Stack</h4>
+      <ul>
+        <li>MPESA → <code>fintech_gwy</code> → <code>vault</code> → audit via NATS</li>
+        <li>AML pattern detection + MLX risk scoring</li>
+        <li>Blockchain audit trail for all transactions</li>
+        <li>PCI DSS PAN tokenization — cardholder data never stored</li>
+      </ul>
+    </div>
+    <div class="interop-card">
+      <h4>🏥 Healthcare Stack</h4>
+      <ul>
+        <li>FHIR R4 patient records via <code>healthcare_emr</code></li>
+        <li>PHI auto-redaction on all data exports</li>
+        <li>Readmission prediction via MLX + healthcare_ana</li>
+        <li>HIPAA minimum-necessary OPA policy enforcement</li>
+      </ul>
+    </div>
+    <div class="interop-card">
+      <h4>💊 Pharma / GxP Stack</h4>
+      <ul>
+        <li>FDA 21 CFR Part 11 e-signatures on batch records</li>
+        <li>Temporal workflows for change control approval chains</li>
+        <li>LIMS results → QMS → electronic signature → audit</li>
+        <li>10-year audit retention in JetStream pharma stream</li>
+      </ul>
+    </div>
+    <div class="interop-card">
+      <h4>🕵 Intelligence Stack</h4>
+      <ul>
+        <li>OSINT + HUMINT + SIGINT feeds into intel_fusion</li>
+        <li>GEOINT spatial analysis with intel_geoint</li>
+        <li>Threat correlation + ML prediction in real-time</li>
+        <li>Alerts routed via NATS → ckm_not notifications</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="howto" style="padding:4rem 2rem;background:var(--bg-surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border);">
+  <div style="max-width:800px;margin:0 auto;">
+    <div class="lp-section-header">
+      <h2>How It Works</h2>
+      <p>From business intent to running code in four steps.</p>
+    </div>
+    <div class="lp-timeline">
+      <div class="lp-timeline-item">
+        <div class="lp-timeline-num">1</div>
+        <div class="lp-timeline-content">
+          <h4>Describe your domain in APG</h4>
+          <p>Write a <code>.apg</code> file describing capabilities, entities, workflows, governance rules, and UI screens. No boilerplate.</p>
+        </div>
+      </div>
+      <div class="lp-timeline-item">
+        <div class="lp-timeline-num">2</div>
+        <div class="lp-timeline-content">
+          <h4>Compile to Python</h4>
+          <p>The APG compiler generates <code>service.py</code>, <code>models.py</code>, <code>api.py</code>, <code>views.py</code>, migration SQL, tests, and OpenAPI spec.</p>
+        </div>
+      </div>
+      <div class="lp-timeline-item">
+        <div class="lp-timeline-num">3</div>
+        <div class="lp-timeline-content">
+          <h4>Compose with other capabilities</h4>
+          <p>Declare <code>uses: [nats, vault, fintech_frd]</code> and the composition engine wires adapters, event routing, and OPA policies automatically.</p>
+        </div>
+      </div>
+      <div class="lp-timeline-item">
+        <div class="lp-timeline-num">4</div>
+        <div class="lp-timeline-content">
+          <h4>Deploy anywhere</h4>
+          <p>Helm chart for Kubernetes, Docker Compose for local dev. Temporal + NATS + OPA start with <code>docker compose up</code>.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<div class="lp-cta">
+  <h2>Start building in APG today</h2>
+  <p>Open the compositor, write your first capability, and compile it in seconds.</p>
+  <a href="/studio/compositor" class="btn btn-primary btn-lg">Open APG Studio →</a>
+</div>
+
+<!-- FOOTER -->
+<footer class="lp-footer">
+  © 2025 Datacraft · <a href="mailto:nyimbi@gmail.com" style="color:var(--text-dim);text-decoration:none;">nyimbi@gmail.com</a> · <a href="https://www.datacraft.co.ke" style="color:var(--text-dim);text-decoration:none;">www.datacraft.co.ke</a>
+</footer>
+
+<script>
+// Animate stat counters on scroll
+function animateCounters() {
+  document.querySelectorAll('.lp-stat-value[data-target]').forEach(el => {
+    const target = parseInt(el.dataset.target);
+    let current = 0;
+    const step = Math.ceil(target / 60);
+    const timer = setInterval(() => {
+      current = Math.min(current + step, target);
+      el.textContent = current;
+      if (current >= target) clearInterval(timer);
+    }, 16);
+  });
+}
+
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) { animateCounters(); observer.disconnect(); } });
+}, { threshold: 0.3 });
+
+const statsEl = document.querySelector('.lp-stats');
+if (statsEl) observer.observe(statsEl);
+</script>
+</body>
+</html>
