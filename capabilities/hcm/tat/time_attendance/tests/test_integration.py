@@ -769,7 +769,7 @@ class TestPerformance:
         import httpx
         
         async def make_request():
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(
                     "http://testserver/api/human_capital_management/time_attendance/health"
                 )

@@ -70,6 +70,13 @@ class NATSService:
 		actor_id: str = "system",
 	) -> dict[str, Any]:
 		"""Publish a domain event to JetStream."""
+		# Precondition: validate inputs before touching external state
+		if not capability_id or not capability_id.strip():
+			raise ValueError("capability_id must be a non-empty string")
+		if not event_type or not event_type.strip():
+			raise ValueError("event_type must be a non-empty string")
+		if not isinstance(payload, dict):
+			raise TypeError(f"payload must be a dict, got {type(payload).__name__}")
 		adapter = self._require_connected()
 		event_id = uuid7str()
 		await adapter.log_event(

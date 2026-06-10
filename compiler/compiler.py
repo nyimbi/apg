@@ -161,15 +161,24 @@ class APGCompiler:
 			# Phase 4: Code Generation
 			generated_files = self._generate_code(ast, result.target_language)
 			result.generated_files = generated_files
-			
-			# Phase 5: Write output files if directory specified
+
+			# Phase 5: Validate all generated Python parses cleanly
+			import ast as _ast
+			for fname, content in generated_files.items():
+				if fname.endswith('.py') and content:
+					try:
+						_ast.parse(content, filename=fname)
+					except SyntaxError as syn_err:
+						result.warnings.append(f"Generated code syntax warning {fname}:{syn_err.lineno}: {syn_err.msg}")
+
+			# Phase 6: Write output files if directory specified
 			if result.output_directory:
 				self._write_output_files(generated_files, result.output_directory)
-			
+
 			result.success = True
 			result.compilation_time = time.time() - start_time
 			self.last_result = result
-			
+
 			self.logger.info(f"Compilation successful: {len(generated_files)} files generated")
 			return result
 			
@@ -230,6 +239,22 @@ class APGCompiler:
 			# Phase 4: Code Generation (including deployment-bundle artefacts)
 			generated_files = self._generate_code(ast, result.target_language)
 			result.generated_files = generated_files
+
+			# Phase 5: Correctness verification — validate all generated Python parses cleanly
+			import ast as _ast
+			syntax_errors = []
+			for fname, content in generated_files.items():
+				if fname.endswith('.py') and content:
+					try:
+						_ast.parse(content, filename=fname)
+					except SyntaxError as syn_err:
+						syntax_errors.append(
+							f"{fname}:{syn_err.lineno}: {syn_err.msg}"
+						)
+			if syntax_errors:
+				for err in syntax_errors:
+					self.logger.error("Generated code has syntax error: %s", err)
+					result.warnings.append(f"Generated code syntax warning: {err}")
 
 			result.success = True
 			result.compilation_time = time.time() - start_time

@@ -509,7 +509,7 @@ class APGPerformanceOptimizer:
 					self._simulate_analytics_operation()
 				]
 				
-				await asyncio.gather(*tasks)
+				await asyncio.gather(*tasks, return_exceptions=True)
 				
 				end_time = time.time()
 				response_time = end_time - start_time

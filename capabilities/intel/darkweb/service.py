@@ -703,7 +703,7 @@ class DarkWebMonitoringService:
 				"content_fingerprint": _fingerprint(site, *hits) if hits else None,
 			}
 
-		site_results = await asyncio.gather(*[check_site(s) for s in _PASTE_SITES])
+		site_results = await asyncio.gather(*[check_site(s) for s in _PASTE_SITES], return_exceptions=True)
 		sites_with_hits = [r for r in site_results if r["hit_count"] > 0]
 
 		monitor_id = _fingerprint(*keywords, _utcnow())

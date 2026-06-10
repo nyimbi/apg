@@ -66,6 +66,10 @@ class TemporalService:
 		task_queue: str = "apg-workflows",
 		execution_timeout_seconds: int = 3600,
 	) -> dict[str, Any]:
+		if not workflow_type or not workflow_type.strip():
+			raise ValueError("workflow_type must be a non-empty string")
+		if execution_timeout_seconds <= 0:
+			raise ValueError("execution_timeout_seconds must be positive")
 		wf_id = workflow_id or uuid7str()
 		if self._adapter:
 			return await self._adapter.start_workflow(

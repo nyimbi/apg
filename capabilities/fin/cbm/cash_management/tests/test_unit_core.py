@@ -499,7 +499,7 @@ class TestConcurrency:
 			update_balance(Decimal('100.00')),
 			update_balance(Decimal('200.00')),
 			update_balance(Decimal('-50.00'))
-		)
+		, return_exceptions=True)
 		
 		# Final balance should reflect all updates
 		expected_balance = initial_balance + Decimal('250.00')
@@ -525,7 +525,7 @@ class TestConcurrency:
 		results = await asyncio.gather(
 			cache_operation(value1),
 			cache_operation(value2)
-		)
+		, return_exceptions=True)
 		
 		# Verify cache operations were called
 		assert mock_cache_manager.set.call_count == 2

@@ -1103,7 +1103,7 @@ class SIGINTService:
 			)
 			for s in signals
 		]
-		return list(await asyncio.gather(*tasks))
+		return list(await asyncio.gather(*tasks), return_exceptions=True)
 
 	async def spectrum_sweep(
 		self,

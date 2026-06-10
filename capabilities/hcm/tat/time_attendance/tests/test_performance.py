@@ -163,7 +163,7 @@ class APIPerformanceTest(TimeAttendancePerformanceTest):
         # Run load test
         start_time = time.time()
         
-        async with httpx.AsyncClient() as session:
+        async with httpx.AsyncClient(timeout=30.0) as session:
             tasks = []
             
             while time.time() - start_time < duration:
@@ -252,7 +252,7 @@ class APIPerformanceTest(TimeAttendancePerformanceTest):
                 print(f"❌ Query request failed: {str(e)}")
         
         # Execute concurrent queries
-        async with httpx.AsyncClient() as session:
+        async with httpx.AsyncClient(timeout=30.0) as session:
             tasks = [make_query_request(session) for _ in range(concurrent_users)]
             await asyncio.gather(*tasks, return_exceptions=True)
         

@@ -987,6 +987,7 @@ class StripeReportingService:
         charges, disputes = await asyncio.gather(
             self._get_charges_data(filters),
             self._get_disputes_data(filters),
+            return_exceptions=True,
         )
         successful_charges = [charge for charge in charges if self._attr(charge, "status") == "succeeded"]
         return len(disputes) / len(successful_charges) if successful_charges else 0.0
@@ -1036,6 +1037,7 @@ class StripeReportingService:
         current_payments, previous_payments = await asyncio.gather(
             self._get_payment_intents_data(filters),
             self._get_payment_intents_data(previous_filters),
+            return_exceptions=True,
         )
         current_customers = {
             self._attr(payment, "customer")
@@ -1140,6 +1142,7 @@ class StripeReportingService:
         current_subscriptions, previous_subscriptions = await asyncio.gather(
             self._get_subscriptions_data(filters),
             self._get_subscriptions_data(previous_filters),
+            return_exceptions=True,
         )
         current_active = len([s for s in current_subscriptions if self._attr(s, "status") == "active"])
         previous_active = len([s for s in previous_subscriptions if self._attr(s, "status") == "active"])

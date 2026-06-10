@@ -1088,7 +1088,7 @@ class PaymentOrchestrationService:
 			# Process batch concurrently
 			batch_results = await asyncio.gather(*[
 				self.calculate_optimal_route(tx) for tx in batch
-			])
+			], return_exceptions=True)
 			
 			for decision in batch_results:
 				# Update distribution tracking
@@ -1147,7 +1147,7 @@ class PaymentOrchestrationService:
 			# Process transactions with failed provider
 			fallback_decisions = await asyncio.gather(*[
 				self.calculate_optimal_route(tx) for tx in sample_transactions
-			])
+			], return_exceptions=True)
 			
 			# Analyze fallback behavior
 			for decision in fallback_decisions:
@@ -1200,7 +1200,7 @@ class PaymentOrchestrationService:
 				try:
 					decisions = await asyncio.gather(*[
 						self.calculate_optimal_route(tx) for tx in transactions
-					])
+					], return_exceptions=True)
 					
 					total_cost = sum(d.estimated_cost for d in decisions)
 					avg_success_rate = sum(d.estimated_success_rate for d in decisions) / len(decisions)

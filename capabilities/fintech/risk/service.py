@@ -883,7 +883,7 @@ class FintechRiskService:
 
 		credit, appetite, capital, operational = await asyncio.gather(
 			credit_task, appetite_task, capital_task, op_task
-		)
+		, return_exceptions=True)
 
 		summary = self.dashboard_summary(self.tenant_id)
 

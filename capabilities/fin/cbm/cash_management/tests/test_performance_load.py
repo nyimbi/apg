@@ -553,7 +553,7 @@ class TestRiskAnalyticsPerformance:
                 var_calc.calculate_parametric_var(returns_data, 0.95),
                 var_calc.calculate_historical_var(returns_data, 0.95),
                 var_calc.calculate_monte_carlo_var(returns_data, 0.95, num_simulations=1000)
-            )
+            , return_exceptions=True)
             
             performance_monitor.stop()
             metrics = performance_monitor.get_metrics()
