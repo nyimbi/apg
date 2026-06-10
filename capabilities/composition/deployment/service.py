@@ -1241,7 +1241,7 @@ http {{
     async def _perform_health_check(self, url: str) -> Dict[str, Any]:
         """Perform HTTP health check."""
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(url, timeout=10.0)
                 
                 return {

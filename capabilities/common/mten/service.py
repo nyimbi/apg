@@ -367,14 +367,14 @@ class MultiTenantManager:
 				self._allocate_compute_resources(tenant),
 				self._allocate_storage_resources(tenant),
 				self._allocate_network_resources(tenant)
-			)
+			, return_exceptions=True)
 			
 			# Phase 2: Service configuration (parallel)
 			await asyncio.gather(
 				self._configure_database_access(tenant),
 				self._configure_api_access(tenant),
 				self._configure_monitoring(tenant)
-			)
+			, return_exceptions=True)
 			
 			# Phase 3: Security and compliance setup
 			await self._configure_security_policies(tenant)

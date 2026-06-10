@@ -541,7 +541,7 @@ class SingerTapManager:
 			# Real discovery from Meltano Hub API
 			import httpx
 			
-			async with httpx.AsyncClient() as client:
+			async with httpx.AsyncClient(timeout=30.0) as client:
 				response = await client.get(
 					'https://hub.meltano.com/api/v1/plugins/extractors',
 					timeout=30

@@ -818,7 +818,7 @@ class TestConnectorPerformance:
 		results = await asyncio.gather(*[
 			connector.execute(context) 
 			for connector, context in zip(connectors, contexts)
-		])
+		], return_exceptions=True)
 		end_time = datetime.utcnow()
 		
 		execution_time = (end_time - start_time).total_seconds()

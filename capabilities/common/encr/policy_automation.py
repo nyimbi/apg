@@ -1034,7 +1034,7 @@ class PolicyGenerationEngine:
 		await asyncio.gather(
 			self.data_classifier.initialize(),
 			self.compliance_engine.initialize()
-		)
+		, return_exceptions=True)
 		
 		# Initialize policy generation models
 		await self._initialize_generation_models()

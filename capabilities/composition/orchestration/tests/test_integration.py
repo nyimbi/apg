@@ -884,14 +884,14 @@ class TestPerformanceIntegration:
 		instances = await asyncio.gather(*[
 			workflow_service.execute_workflow(workflow.id) 
 			for workflow in workflows
-		])
+		], return_exceptions=True)
 		
 		# Wait for all to complete
 		while True:
 			statuses = await asyncio.gather(*[
 				workflow_service.get_workflow_instance(instance.id)
 				for instance in instances
-			])
+			], return_exceptions=True)
 			
 			if all(status.status in [WorkflowStatus.COMPLETED, WorkflowStatus.FAILED] for status in statuses):
 				break

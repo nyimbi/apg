@@ -187,7 +187,7 @@ async def safe_gather(
 ) -> list[Any]:
     """asyncio.gather with mandatory exception safety.
 
-    Unlike raw asyncio.gather(), this NEVER silently swallows errors:
+    Unlike raw asyncio.gather(return_exceptions=True), this NEVER silently swallows errors:
     - With return_exceptions=True (default): exceptions are returned as values
     - Logs each exception found in results
     - With suppress_exceptions=False (default): re-raises if any exception in results

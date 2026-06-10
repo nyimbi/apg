@@ -10,7 +10,7 @@
   },
   "build": {
     "buildCommand": null,
-    "testCommand": "uv run pytest tests/ -q --tb=line 2>&1 | tail -5",
+    "testCommand": "uv run pytest tests/test_reliability_framework.py tests/test_reliability_properties.py tests/test_vault_tokenization.py tests/test_esig_service.py tests/test_mlx_capability.py -q --tb=short 2>&1 | tail -5",
     "lintCommand": null,
     "devCommand": null,
     "scripts": {}

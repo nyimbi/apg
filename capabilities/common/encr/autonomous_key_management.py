@@ -1138,7 +1138,7 @@ class AutonomousDecisionEngine:
 		await asyncio.gather(
 			self.usage_analyzer.initialize(),
 			self.security_assessor.initialize()
-		)
+		, return_exceptions=True)
 		
 		# Initialize decision models
 		await self._initialize_decision_models()

@@ -112,7 +112,7 @@ class ProductionValidator:
 		start_time = time.time()
 		
 		try:
-			async with httpx.AsyncClient() as client:
+			async with httpx.AsyncClient(timeout=30.0) as client:
 				# Health check
 				response = await client.get(f"{self.base_url}/health")
 				if response.status_code != 200:
@@ -203,7 +203,7 @@ class ProductionValidator:
 	
 	async def _test_authentication_security(self) -> Dict[str, Any]:
 		"""Test authentication security."""
-		async with httpx.AsyncClient() as client:
+		async with httpx.AsyncClient(timeout=30.0) as client:
 			# Test unauthenticated access
 			response = await client.get(f"{self.base_url}/api/accounts")
 			if response.status_code != 401:
@@ -225,7 +225,7 @@ class ProductionValidator:
 	
 	async def _test_input_validation(self) -> Dict[str, Any]:
 		"""Test input validation."""
-		async with httpx.AsyncClient() as client:
+		async with httpx.AsyncClient(timeout=30.0) as client:
 			# Test SQL injection attempts
 			malicious_payloads = [
 				"'; DROP TABLE accounts; --",
@@ -246,7 +246,7 @@ class ProductionValidator:
 	
 	async def _test_rate_limiting(self) -> Dict[str, Any]:
 		"""Test rate limiting controls."""
-		async with httpx.AsyncClient() as client:
+		async with httpx.AsyncClient(timeout=30.0) as client:
 			# Make many requests quickly
 			tasks = []
 			for _ in range(20):
@@ -278,7 +278,7 @@ class ProductionValidator:
 		"""Validate performance under normal load."""
 		start_time = time.time()
 		
-		async with httpx.AsyncClient() as client:
+		async with httpx.AsyncClient(timeout=30.0) as client:
 			# Test response times for key endpoints
 			endpoints = [
 				"/health",
@@ -368,7 +368,7 @@ class ProductionValidator:
 	
 	async def _test_natural_language_processing(self) -> Dict[str, Any]:
 		"""Test natural language processing capabilities."""
-		async with httpx.AsyncClient() as client:
+		async with httpx.AsyncClient(timeout=30.0) as client:
 			test_descriptions = [
 				"Paid $5000 rent for January office space",
 				"Received $25000 payment from customer ABC Corp",
@@ -495,7 +495,7 @@ class ProductionValidator:
 		
 		async def simulate_user():
 			"""Simulate a user session."""
-			async with httpx.AsyncClient() as client:
+			async with httpx.AsyncClient(timeout=30.0) as client:
 				user_start = time.time()
 				response_times = []
 				

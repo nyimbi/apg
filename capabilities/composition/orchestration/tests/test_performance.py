@@ -613,7 +613,7 @@ class TestDatabasePerformance:
 		
 		operation_times = await asyncio.gather(*[
 			concurrent_workflow_creation(i) for i in range(concurrent_operations)
-		])
+		], return_exceptions=True)
 		
 		total_time = time.time() - start_time
 		

@@ -1010,7 +1010,7 @@ class CentralConfigurationSecurity:
 	
 	async def _get_oauth2_user_info(self, access_token: str, provider_config: OAuth2Configuration) -> Dict[str, Any]:
 		"""Get user information from OAuth2 provider."""
-		async with httpx.AsyncClient() as client:
+		async with httpx.AsyncClient(timeout=30.0) as client:
 			headers = {
 				"Authorization": f"Bearer {access_token}",
 				"Accept": "application/json"
@@ -1036,7 +1036,7 @@ class CentralConfigurationSecurity:
 		"""Validate OpenID Connect ID token."""
 		try:
 			# Get JWKS (JSON Web Key Set) from provider
-			async with httpx.AsyncClient() as client:
+			async with httpx.AsyncClient(timeout=30.0) as client:
 				jwks_response = await client.get(provider_config.jwks_endpoint, timeout=10.0)
 				if jwks_response.status_code != 200:
 					raise ValueError(f"Failed to get JWKS: HTTP {jwks_response.status_code}")
@@ -1268,7 +1268,7 @@ class CentralConfigurationSecurity:
 		code_verifier: Optional[str] = None
 	) -> OAuth2TokenResponse:
 		"""Exchange authorization code for access tokens."""
-		async with httpx.AsyncClient() as client:
+		async with httpx.AsyncClient(timeout=30.0) as client:
 			data = {
 				"grant_type": "authorization_code",
 				"client_id": provider_config.client_id,

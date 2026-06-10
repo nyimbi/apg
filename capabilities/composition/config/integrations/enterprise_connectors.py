@@ -456,7 +456,7 @@ class SlackConnector(BaseConnector):
 		message = self._format_slack_message(event)
 
 		# Send to Slack
-		async with httpx.AsyncClient() as client:
+		async with httpx.AsyncClient(timeout=30.0) as client:
 			response = await client.post(
 				webhook_url,
 				json=message,
@@ -528,7 +528,7 @@ class MicrosoftTeamsConnector(BaseConnector):
 		message = self._format_teams_message(event)
 
 		# Send to Teams
-		async with httpx.AsyncClient() as client:
+		async with httpx.AsyncClient(timeout=30.0) as client:
 			response = await client.post(
 				webhook_url,
 				json=message,
@@ -603,7 +603,7 @@ class JiraConnector(BaseConnector):
 		auth = (username, api_token)
 		url = f"{base_url}/rest/api/2/issue"
 
-		async with httpx.AsyncClient() as client:
+		async with httpx.AsyncClient(timeout=30.0) as client:
 			response = await client.post(
 				url,
 				json=ticket_data,
@@ -640,7 +640,7 @@ class ServiceNowConnector(BaseConnector):
 			auth = (username, password)
 			url = f"{base_url}/api/now/table/incident"
 
-			async with httpx.AsyncClient() as client:
+			async with httpx.AsyncClient(timeout=30.0) as client:
 				response = await client.post(
 					url,
 					json=incident_data,
@@ -676,7 +676,7 @@ class DatadogConnector(BaseConnector):
 		headers = {"DD-API-KEY": api_key}
 		url = "https://api.datadoghq.com/api/v1/events"
 
-		async with httpx.AsyncClient() as client:
+		async with httpx.AsyncClient(timeout=30.0) as client:
 			response = await client.post(
 				url,
 				json=event_data,

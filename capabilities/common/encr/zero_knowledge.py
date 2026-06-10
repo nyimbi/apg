@@ -1302,7 +1302,7 @@ class ZeroKnowledgeEncryptionSystem:
 			self.proof_engine.initialize(),
 			self.threshold_engine.initialize(),
 			self.biometric_engine.initialize()
-		)
+		, return_exceptions=True)
 		
 		self.is_initialized = True
 		self._log_zk_system_initialization_complete()

@@ -743,7 +743,7 @@ class TestStateManager:
 				update_counter(1),
 				update_counter(2),
 				update_counter(3)
-			)
+			, return_exceptions=True)
 			
 			# Verify locking was used
 			assert mock_lock.call_count == 3

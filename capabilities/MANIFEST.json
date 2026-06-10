@@ -65866,7 +65866,7 @@
         "IdempotencyRegistry.stats",
         "TIMEOUTS"
       ],
-      "service_method_count": 42,
+      "service_method_count": 55,
       "governance_rules": [
         "tenant_context_required",
         "operation_type_required",

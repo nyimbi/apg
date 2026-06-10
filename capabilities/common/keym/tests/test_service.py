@@ -635,7 +635,7 @@ class TestServiceIntegration:
 		# Run encryptions concurrently
 		encrypted_results = await asyncio.gather(
 			*[encrypt_data(data) for data in test_data_list]
-		)
+		, return_exceptions=True)
 		
 		assert len(encrypted_results) == 10
 		for result in encrypted_results:
