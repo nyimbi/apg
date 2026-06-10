@@ -10,7 +10,7 @@
   },
   "build": {
     "buildCommand": null,
-    "testCommand": "uv run pytest tests/ -q --tb=line 2>&1 | tail -6",
+    "testCommand": "uv run pytest tests/ -q --tb=line 2>&1 | tail -5",
     "lintCommand": null,
     "devCommand": null,
     "scripts": {}
@@ -392,8 +392,8 @@
   "hotPaths": [
     {
       "path": "capabilities/common/mlx/service.py",
-      "accessCount": 15,
-      "lastAccessed": 1781111803947,
+      "accessCount": 16,
+      "lastAccessed": 1781112045748,
       "type": "file"
     },
     {
@@ -416,8 +416,8 @@
     },
     {
       "path": "capabilities/common/esig/service.py",
-      "accessCount": 7,
-      "lastAccessed": 1781111017754,
+      "accessCount": 8,
+      "lastAccessed": 1781112110941,
       "type": "file"
     },
     {

@@ -254,6 +254,7 @@ class ESignatureService:
 	async def _publish_to_nats(self, record: ESignatureRecord) -> None:
 		if not os.environ.get("NATS_URL"):
 			return
+		connector = None
 		try:
 			from capabilities.common.nats.nats_adapter import NATSConnector
 			connector = NATSConnector("esig")
@@ -271,6 +272,12 @@ class ESignatureService:
 			)
 		except Exception as exc:
 			_log.debug("ESignature NATS publish failed: %s", exc)
+		finally:
+			if connector is not None:
+				try:
+					await connector.disconnect()
+				except Exception:
+					pass
 
 	async def revoke(self, signature_id: str, *, reason: str = "") -> dict[str, Any]:
 		"""Mark a signature as revoked."""

@@ -21,6 +21,7 @@ from .guards import (
     guard_bounded_list,
     safe_gather,
     BoundedCache,
+    create_tracked_task,
 )
 
 __all__ = [
@@ -30,5 +31,5 @@ __all__ = [
     "IdempotencyRegistry", "idempotent",
     "DeepHealthCheck", "HealthStatus", "ComponentHealth",
     "guard_tenant_id", "guard_positive_amount", "guard_non_empty_string",
-    "guard_bounded_list", "safe_gather", "BoundedCache",
+    "guard_bounded_list", "safe_gather", "BoundedCache", "create_tracked_task",
 ]

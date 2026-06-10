@@ -24,6 +24,58 @@ _log = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
+# ── Tracked task creation ─────────────────────────────────────────
+
+def create_tracked_task(
+    coro: Any,
+    *,
+    task_set: "set[asyncio.Task[Any]] | None" = None,
+    name: str | None = None,
+    log_errors: bool = True,
+) -> "asyncio.Task[Any]":
+    """Create an asyncio.Task and track it to prevent silent failure.
+
+    Unlike bare `asyncio.create_task()`, this:
+    1. Stores the task in `task_set` (if provided) to prevent GC
+    2. Attaches a done callback that logs unhandled exceptions
+    3. Removes the task from `task_set` when done
+
+    Usage:
+        self._tasks: set[asyncio.Task] = set()
+
+        create_tracked_task(
+            self._background_loop(),
+            task_set=self._tasks,
+            name="background_loop",
+        )
+
+    Args:
+        coro: Coroutine to wrap in a Task.
+        task_set: Set to store the task in (prevents GC + enables cancellation).
+        name: Task name for logging.
+        log_errors: If True, log any unhandled exception at ERROR level.
+    """
+    task: asyncio.Task[Any] = asyncio.create_task(coro, name=name)
+
+    def _done_callback(t: "asyncio.Task[Any]") -> None:
+        if task_set is not None:
+            task_set.discard(t)
+        if t.cancelled():
+            return
+        exc = t.exception()
+        if exc is not None and log_errors:
+            task_name = t.get_name() if hasattr(t, "get_name") else str(t)
+            _log.error(
+                "Unhandled exception in background task %r: %s: %s",
+                task_name, type(exc).__name__, exc,
+            )
+
+    task.add_done_callback(_done_callback)
+    if task_set is not None:
+        task_set.add(task)
+    return task
+
+
 # ── Input guards ──────────────────────────────────────────────────
 
 def guard_tenant_id(tenant_id: str | None, field: str = "tenant_id") -> None:

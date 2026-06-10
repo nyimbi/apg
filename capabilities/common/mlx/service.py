@@ -55,8 +55,10 @@ class MLCapability:
 		ollama_url: str | None = None,
 	) -> None:
 		self._model = model or os.environ.get("OLLAMA_MODEL", _DEFAULT_MODEL)
-		self._base_url = (ollama_url or os.environ.get("OLLAMA_BASE_URL", _DEFAULT_OLLAMA_URL)).rstrip("/")
-		self._client = httpx.AsyncClient(base_url=self._base_url, timeout=_TIMEOUT)
+		# NOTE: use _ollama_url throughout — _base_url alias kept for backward compat
+		self._ollama_url = (ollama_url or os.environ.get("OLLAMA_BASE_URL", _DEFAULT_OLLAMA_URL)).rstrip("/")
+		self._base_url = self._ollama_url  # backward-compat alias
+		self._client = httpx.AsyncClient(base_url=self._ollama_url, timeout=_TIMEOUT)
 
 	async def score(
 		self,

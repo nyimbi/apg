@@ -288,6 +288,7 @@ class EntityService:
 		self.quality_service = None  # Will be injected
 		self.matching_service = None  # Will be injected
 		self.audit_service = None  # Will be injected
+		self._background_tasks: set[asyncio.Task] = set()
 	
 	async def create_entity(self, entity_data: MdEntityCreate, 
 						   context: MDMOperationContext) -> Dict[str, Any]:
@@ -340,9 +341,15 @@ class EntityService:
 				
 				# Trigger duplicate detection asynchronously
 				if self.matching_service:
-					asyncio.create_task(
-						self.matching_service.detect_duplicates(entity_id, context.tenant_id)
-					)
+					try:
+						from capabilities.common.reliability import create_tracked_task
+						create_tracked_task(
+							self.matching_service.detect_duplicates(entity_id, context.tenant_id),
+							task_set=self._background_tasks,
+							name='detect_duplicates',
+						)
+					except Exception as exc:
+						import logging; logging.getLogger(__name__).warning('create_tracked_task failed: %s', exc)
 				
 				return {
 					'status': 'success',
@@ -451,9 +458,15 @@ class EntityService:
 				
 				# Trigger duplicate re-detection if significant changes
 				if 'attributes' in changed_fields and self.matching_service:
-					asyncio.create_task(
-						self.matching_service.detect_duplicates(entity_id, context.tenant_id)
-					)
+					try:
+						from capabilities.common.reliability import create_tracked_task
+						create_tracked_task(
+							self.matching_service.detect_duplicates(entity_id, context.tenant_id),
+							task_set=self._background_tasks,
+							name='detect_duplicates',
+						)
+					except Exception as exc:
+						import logging; logging.getLogger(__name__).warning('create_tracked_task failed: %s', exc)
 				
 				return {
 					'status': 'success',

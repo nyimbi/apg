@@ -670,3 +670,4 @@
 {"t":0,"agent":"aa1a4b7","agent_type":"workflow-subagent","event":"agent_start","parent_mode":"none"}
 {"t":0,"agent":"aa1a4b7","agent_type":"workflow-subagent","event":"agent_stop","success":true,"duration_ms":174570}
 {"t":0,"agent":"a230b10","agent_type":"workflow-subagent","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a230b10","agent_type":"workflow-subagent","event":"agent_stop","success":true,"duration_ms":236944}

@@ -45,9 +45,9 @@ class IdempotencyEntry:
 
 
 class IdempotencyContext:
-    """Context object for manual idempotency handling."""
+    """Context object for manual idempotency handling (cached hit — no lock held)."""
 
-    def __init__(self, entry: IdempotencyEntry, lock: asyncio.Lock) -> None:
+    def __init__(self, entry: IdempotencyEntry, lock: asyncio.Lock | None) -> None:
         self._entry = entry
         self._lock = lock
 
@@ -72,6 +72,37 @@ class IdempotencyContext:
         return self
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
+        return False
+
+
+class _LockedIdempotencyContext(IdempotencyContext):
+    """IdempotencyContext that holds a per-key lock for fresh (non-cached) executions.
+
+    The lock is released when:
+    - set_result() is called (success)
+    - set_error() is called (failure — allows retry)
+    - The context manager exits
+    """
+
+    def __init__(self, entry: IdempotencyEntry, lock: asyncio.Lock) -> None:
+        super().__init__(entry, lock)
+        self._lock_released = False
+
+    def _release_lock(self) -> None:
+        if not self._lock_released and self._lock is not None and self._lock.locked():
+            self._lock.release()
+            self._lock_released = True
+
+    def set_result(self, result: Any) -> None:
+        super().set_result(result)
+        self._release_lock()
+
+    def set_error(self, error: str) -> None:
+        super().set_error(error)
+        self._release_lock()
+
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
+        self._release_lock()  # safety release on any exit
         return False
 
 
@@ -108,18 +139,36 @@ class IdempotencyRegistry:
         return hashlib.sha256(raw.encode()).hexdigest()[:32]
 
     async def once(self, key: str) -> IdempotencyContext:
-        """Return an IdempotencyContext for manual flow control."""
+        """Return an IdempotencyContext for manual flow control.
+
+        For concurrent calls with the same key:
+        - The FIRST call sees already_done=False and must execute + call set_result()
+        - SUBSEQUENT calls wait on the per-key lock until the first completes,
+          then see already_done=True and return the cached result immediately.
+
+        This prevents double-execution even under concurrent async pressure.
+        """
+        # Ensure per-key lock exists before acquiring global lock
+        async with self._global_lock:
+            if key not in self._locks:
+                self._locks[key] = asyncio.Lock()
+            key_lock = self._locks[key]
+
+        # Serialize on the per-key lock — only one caller executes at a time
+        await key_lock.acquire()
+
         async with self._global_lock:
             entry = self._store.get(key)
             now = time.monotonic()
 
             if entry is not None:
                 age = now - entry.started_at
-                # Completed and within TTL — return cached result
+                # Completed and within TTL — return cached result (hit path)
                 if entry.completed and (self._ttl == 0 or age < self._ttl):
                     _log.debug("Idempotency HIT: %s (%.1fs old)", key[:16], age)
                     self._store.move_to_end(key)
-                    return IdempotencyContext(entry, asyncio.Lock())
+                    key_lock.release()  # Release immediately — no work to do
+                    return IdempotencyContext(entry, None)
                 # Completed but TTL expired — allow fresh execution
                 if entry.completed and self._ttl > 0 and age >= self._ttl:
                     _log.debug("Idempotency TTL expired: %s — re-executing", key[:16])
@@ -130,7 +179,6 @@ class IdempotencyRegistry:
                         "Idempotency: in-flight op %s timed out after %.0fs — retrying",
                         key[:16], age,
                     )
-                    # Allow retry by removing stale entry
                     del self._store[key]
                     entry = None
 
@@ -138,15 +186,13 @@ class IdempotencyRegistry:
                 entry = IdempotencyEntry(key=key)
                 self._store[key] = entry
                 self._store.move_to_end(key)
-                # Evict oldest if over limit
                 while len(self._store) > self._max_size:
                     self._store.popitem(last=False)
             else:
                 entry.attempt_count += 1
 
-            lock = self._locks.setdefault(key, asyncio.Lock())
-
-        return IdempotencyContext(entry, lock)
+        # Return context that holds the per-key lock — caller must release via set_result/set_error
+        return _LockedIdempotencyContext(entry, key_lock)
 
     async def get_result(self, key: str) -> Any | None:
         """Return cached result for key, or None if not found/expired."""
@@ -211,13 +257,14 @@ def idempotent(
                 _log.debug("idempotent: returning cached result for %s", key[:32])
                 return ctx.result
 
-            try:
-                result = await fn(*args, **kwargs)
-                ctx.set_result(result)
-                return result
-            except Exception as exc:
-                ctx.set_error(str(exc))
-                raise
+            async with ctx:  # ensures lock is released on any exit
+                try:
+                    result = await fn(*args, **kwargs)
+                    ctx.set_result(result)
+                    return result
+                except Exception as exc:
+                    ctx.set_error(str(exc))
+                    raise
 
         return wrapper
 

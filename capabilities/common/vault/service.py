@@ -184,19 +184,24 @@ class TokenizationService:
 						"context": {"tenant_id": self._tenant_id},
 					}
 				}
-				resp = httpx.post(
-					f"{opa_url.rstrip('/')}/v1/data/apg/capabilities/fintech",
-					json=ctx,
-					timeout=2.0,
-				)
+				# MUST be async — sync httpx.post blocks the entire event loop
+				async with httpx.AsyncClient(timeout=2.0) as client:
+					resp = await client.post(
+						f"{opa_url.rstrip('/')}/v1/data/apg/capabilities/fintech",
+						json=ctx,
+					)
 				result = resp.json().get("result", {})
 				if not result.get("pci_access_allowed"):
 					raise PermissionError(f"PCI DSS: role '{role}' not authorized to detokenize")
 				return
 			except PermissionError:
 				raise
-			except Exception:
-				pass  # OPA unavailable — fall through to local check
+			except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout) as exc:
+				# OPA unreachable — degrade gracefully to local role check
+				_log.warning("OPA unreachable for PCI DSS authorization, using local check: %s", exc)
+			except Exception as exc:
+				# Unexpected OPA error — log and degrade (do NOT silently pass)
+				_log.error("OPA authorization error for detokenize: %s: %s", type(exc).__name__, exc)
 
 		if role not in _PCI_AUTHORIZED_ROLES:
 			raise PermissionError(f"PCI DSS: role '{role}' not authorized to detokenize")
@@ -232,6 +237,7 @@ class TokenizationService:
 	async def _publish_tokenization_event(self, token: str, card_type: str) -> None:
 		if not os.environ.get("NATS_URL"):
 			return
+		conn = None
 		try:
 			from capabilities.common.nats.nats_adapter import NATSConnector
 			conn = NATSConnector("vault")
@@ -239,12 +245,19 @@ class TokenizationService:
 			await conn.publish("pan_tokenized", self._tenant_id, {
 				"token_prefix": token[:6], "card_type": card_type,
 			})
-		except Exception:
-			pass
+		except Exception as exc:
+			_log.debug("NATS tokenization event publish failed: %s", exc)
+		finally:
+			if conn is not None:
+				try:
+					await conn.disconnect()
+				except Exception:
+					pass
 
 	async def _publish_detokenization_event(self, token: str, requester_id: str) -> None:
 		if not os.environ.get("NATS_URL"):
 			return
+		conn = None
 		try:
 			from capabilities.common.nats.nats_adapter import NATSConnector
 			conn = NATSConnector("vault")
@@ -252,8 +265,14 @@ class TokenizationService:
 			await conn.publish("pan_detokenized", self._tenant_id, {
 				"token_prefix": token[:6], "requester_id": requester_id,
 			})
-		except Exception:
-			pass
+		except Exception as exc:
+			_log.debug("NATS detokenization event publish failed: %s", exc)
+		finally:
+			if conn is not None:
+				try:
+					await conn.disconnect()
+				except Exception:
+					pass
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────

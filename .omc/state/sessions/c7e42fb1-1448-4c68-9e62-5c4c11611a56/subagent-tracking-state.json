@@ -77,11 +77,13 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-10T17:16:21.917Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "completed",
+      "completed_at": "2026-06-10T17:20:18.861Z",
+      "duration_ms": 236944
     }
   ],
   "total_spawned": 6,
-  "total_completed": 8,
+  "total_completed": 9,
   "total_failed": 0,
-  "last_updated": "2026-06-10T17:16:22.020Z"
+  "last_updated": "2026-06-10T17:20:18.963Z"
 }
