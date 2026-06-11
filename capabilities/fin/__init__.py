@@ -17,7 +17,7 @@ CAPABILITY_META = {
 	'subcapabilities': [
 		'glr',  # General Ledger
 		'apy',  # Accounts Payable
-		'arc',  # Accounts Receivable  
+		'arc',  # Accounts Receivable
 		'cbm',  # Cash & Bank Management
 		'fam',  # Fixed Asset Management
 		'bfc',  # Budgeting & Forecasting
@@ -30,6 +30,9 @@ CAPABILITY_META = {
 		'exm',  # Expense Management
 		'fco',  # Financial Consolidation
 		'fed',  # Federated Learning
+		'dep',  # Deposit Products Engine
+		'acct', # Bank Account Management
+		'eod',  # EOD/BOD Processing Engine
 	],
 	'implemented_subcapabilities': [
 		'glr',  # General Ledger
@@ -47,6 +50,9 @@ CAPABILITY_META = {
 		'exm',  # Expense Management
 		'fco',  # Financial Consolidation
 		'fed',  # Federated Learning
+		'dep',  # Deposit Products Engine
+		'acct', # Bank Account Management
+		'eod',  # EOD/BOD Processing Engine
 	],
 	'database_prefix': 'cf_',
 	'menu_category': 'Financials',
@@ -69,6 +75,18 @@ from . import txm  # Tax Management
 from . import exm  # Expense Management
 from . import fco  # Financial Consolidation
 from . import fed  # Federated Learning
+try:
+	from . import dep  # Deposit Products Engine
+except Exception:
+	pass
+try:
+	from . import acct  # Bank Account Management
+except Exception:
+	pass
+try:
+	from . import eod   # EOD/BOD Processing Engine
+except Exception:
+	pass
 
 def get_capability_info() -> Dict[str, Any]:
 	"""Get capability information"""
