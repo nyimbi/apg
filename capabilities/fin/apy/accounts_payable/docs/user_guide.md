@@ -169,6 +169,182 @@ When `OLLAMA_BASE_URL` is set, questions are routed through a local LLM (default
 
 ---
 
+## New Features (2026-Q2)
+
+### Peppol / UBL 2.1 E-Invoice Ingest
+
+Accept supplier invoices in Peppol BIS 3.0 / UBL 2.1 XML format directly — zero manual data entry.
+
+```python
+with open("invoice.xml", "rb") as f:
+    xml_bytes = f.read()
+
+result = await service.ingest_peppol_invoice(xml_bytes, tenant_id)
+if result["peppol_valid"]:
+    print(f"Ingested: {result['invoice_number']}  Amount: {result['amount']}  {result['currency']}")
+else:
+    print(f"Validation errors: {result['parse_errors']}")
+    # result["requires_review"] == True — route to AP clerk queue
+```
+
+The ingestor uses `lxml` when available and falls back to stdlib `ElementTree`.  Extracted fields: invoice number, issue date, due date, currency, supplier name, supplier tax ID, line totals, and tax totals.  Missing mandatory fields set `requires_review=True`.
+
+### Dual-Control Vendor Bank Account Change
+
+Enforce two-person integrity (TPI) for every bank account change — blocks Business Email Compromise (BEC) fraud.
+
+```python
+# Step 1 — AP Clerk proposes the change
+proposal = await service.propose_vendor_bank_change(
+    vendor["id"], tenant_id,
+    new_bank_account="KCB-001122334",
+    new_iban="GB29NWBK60161331926819",
+    proposed_by="alice",
+)
+# proposal["status"] == "pending_confirmation"
+# proposal["iban_valid"] == True  (ISO 7064 MOD 97-10 check digit verified)
+
+# Step 2 — AP Controller confirms (must be a different user)
+confirmed = await service.confirm_vendor_bank_change(
+    proposal["change_id"], tenant_id, confirmed_by="bob"
+)
+# confirmed["status"] == "confirmed"
+# Vendor bank_account updated atomically; audit event emitted
+```
+
+Any attempt by the same user to both propose and confirm raises `PermissionError: separation of duties violation`.  Payment runs against vendors with pending (unconfirmed) changes are automatically flagged `bank_change_pending=True`.
+
+### Payment Schedule Optimisation
+
+Maximise working capital by ranking early-payment discount opportunities against your cost of capital.
+
+```python
+schedule = await service.optimise_payment_schedule(
+    tenant_id,
+    available_cash=1_000_000.0,
+    cost_of_capital_pct=12.0,  # annual %
+)
+print(f"Invoices scheduled early: {schedule['scheduled_early']}")
+print(f"Projected savings: {schedule['total_projected_savings']}")
+for item in schedule["schedule"]:
+    print(f"  {item['invoice_id']}: ROI {item['annualised_roi']}% p.a. — save {item['discount_pct']}%")
+```
+
+The optimiser computes `annualised_roi = discount_pct / days_saved * 365` for each eligible invoice, subtracts cost of capital, and greedily allocates cash to highest-ROI opportunities first.  Invoices where ROI advantage ≤ 0 are deferred to standard terms.
+
+### KRA WHT Certificate Generation (P9A / P9B)
+
+Issue withholding tax certificates to suppliers as required by the Kenya Income Tax Act Cap 470.
+
+```python
+# First, ensure tax has been computed
+await service.compute_invoice_tax(invoice["id"], tenant_id, "standard")
+
+# Then issue the certificate
+cert = await service.generate_wht_certificate(invoice["id"], tenant_id, certificate_type="P9A")
+print(f"Certificate: {cert['certificate_number']}")
+print(f"WHT Amount: {cert['wht_amount']}  Net Payment: {cert['net_payment']}")
+# cert["issued_at"] — timestamp for the 30-day KRA deadline
+```
+
+`P9A` is for resident suppliers; `P9B` for non-residents (royalties, dividends, management fees).  Certificate numbers are tenant-scoped sequential (e.g. `P9A-TENANT-202606-0001`).  Requires `compute_invoice_tax` to have run on the invoice first.
+
+### Supplier KYB (Know Your Business) Onboarding
+
+Automated due diligence before activating a new supplier — sanctions screening, registration format, KRA PIN validation.
+
+```python
+kyb = await service.initiate_supplier_kyb(
+    tenant_id,
+    {
+        "legal_name": "Savanna Supplies Ltd",
+        "registration_number": "PVT/2021/123456",
+        "tax_pin": "P051234567A",
+        "director_names": ["John Kamau"],
+        "beneficial_owners": ["Jane Wanjiku"],
+    },
+    requested_by="procurement-officer",
+)
+print(f"KYB score: {kyb['kyb_risk_score']}/100  Decision: {kyb['decision']}")
+for check in kyb["checks"]:
+    status = "PASS" if check["passed"] else "FAIL"
+    print(f"  [{status}] {check['check']}")
+```
+
+Auto-approved when score < 30.  Escalated for manual review when score ≥ 70.  Set `SANCTIONS_API_URL` to integrate a live sanctions screening endpoint; falls back to a keyword blocklist.
+
+### Match Exception Triage
+
+Priority-rank open match exceptions so your team resolves the highest-impact issues first.
+
+```python
+triage = await service.triage_match_exceptions(tenant_id, top_n=10)
+print(f"Total open exceptions: {triage['total_open']}")
+print(f"Average age: {triage['avg_age_days']} days")
+for exc in triage["triaged"]:
+    print(f"  [{exc['priority_score']:.0f}] {exc['invoice_id']} — "
+          f"{exc['exception_type']} — Action: {exc['recommended_action']} — "
+          f"SLA: {exc['sla_hours']}h")
+```
+
+Priority score (0–100) combines: financial weight (outstanding / total AP × 40), age weight (days open / 90 × 40), vendor risk weight (20).  `recommended_action` is derived from `exception_type`; `sla_hours` gives the target resolution window.
+
+### Cash Flow What-If Scenarios
+
+Model the AP impact of different payment strategies before committing to treasury.
+
+```python
+scenarios = [
+    {"name": "baseline",       "payment_offset_days": 0,   "held_fraction": 0.0, "discount_capture_pct": 0},
+    {"name": "pay_early_10d",  "payment_offset_days": -10, "held_fraction": 0.0, "discount_capture_pct": 80},
+    {"name": "dispute_20pct",  "payment_offset_days": 0,   "held_fraction": 0.2, "discount_capture_pct": 0},
+]
+analysis = await service.cash_flow_sensitivity(tenant_id, scenarios)
+for row in analysis["comparison"]:
+    print(f"  {row['name']:20s}  Cash out: {row['total_cash_out']}  "
+          f"Delta: {row['delta_vs_baseline']}  ({row['delta_pct']}%)")
+```
+
+Scenarios run concurrently via `asyncio.gather`.  `payment_offset_days` shifts all due dates (negative = earlier payment); `held_fraction` defers a random fraction of invoices; `discount_capture_pct` models how many eligible discounts are captured.
+
+### Dormant Vendor Identification
+
+Clean vendor master records and reduce fraud surface by deactivating suppliers with no recent activity.
+
+```python
+result = await service.identify_dormant_vendors(
+    tenant_id,
+    inactive_days=365,
+    auto_deactivate=False,  # set True to deactivate automatically
+)
+print(f"Dormant vendors: {result['dormant_count']} / {result['total_vendors']}")
+for v in result["dormant_vendors"]:
+    print(f"  {v['vendor_name']:30s}  Last activity: {v['last_activity_date']}  "
+          f"({v['days_since_last_activity']} days)")
+```
+
+When `auto_deactivate=True`, vendors are set to `status=inactive` and a `vendor_deactivated` audit event is emitted.  Records are never deleted — the status change is reversible by updating the vendor record.
+
+### AP Compliance Scorecard
+
+Continuous monitoring of 10 AP controls — replaces sample-based periodic audit.
+
+```python
+scorecard = await service.compute_compliance_scorecard(
+    tenant_id, {"start": "2026-01-01", "end": "2026-06-30"}
+)
+print(f"Compliance grade: {scorecard['grade']}  Score: {scorecard['composite_score']}/100")
+for control in scorecard["controls"]:
+    print(f"  {control['control']:40s}  {control['score']:3d}/100")
+print("Remediation items:")
+for item in scorecard["remediation_items"]:
+    print(f"  - {item}")
+```
+
+Ten controls evaluated (10 pts each): segregation of duties, PO coverage, three-way match rate, exception aging, WHT certificate issuance, duplicate rate, bank change review compliance, expense receipt coverage, payment fraud indicators, and accounting period completeness.  Grade: A (≥90), B (≥75), C (≥60), D (≥45), F (<45).
+
+---
+
 ## Configuring AI Features
 
 ```bash
@@ -177,6 +353,9 @@ export OLLAMA_BASE_URL=http://localhost:11434
 
 # Override the NL query model (optional)
 export OLLAMA_AP_MODEL=llama3.1:8b
+
+# Sanctions screening API for supplier KYB (optional)
+export SANCTIONS_API_URL=http://localhost:8080/screen
 ```
 
 All AI features are opt-in and fail safe. When `OLLAMA_BASE_URL` is not set, every async method falls back to a deterministic rule-based equivalent. The `ml_enhanced` field in every response indicates whether the ML path executed.

@@ -5,150 +5,90 @@
 
 ---
 
-## Improvement 1 — Temporal Smoothing Pipeline
+### I1. Temporal Keypoint Smoothing Pipeline
 
-**Problem**: Raw keypoint estimates are noisy frame-to-frame. Jitter propagates into downstream biomechanical metrics, gait analysis, and rep-counting, producing artefacts that erode trust in the system.
-
-**Improvement**: Add an async `smooth_keypoint_track()` method that applies a configurable Savitzky-Golay or exponential moving average filter over a skeletal track's keypoint time-series. Parameters: `window_size`, `polynomial_order`, and `filter_type`. Returns per-keypoint smoothed trajectories alongside residual noise scores.
-
-**Impact**: Downstream metrics become stable. Gait symmetry scores and rep counts are reproducible across repeated calls on the same track. Eliminates the need for callers to implement filtering externally.
+**Category**: Signal Processing | **Justification**: Raw keypoint estimates are noisy frame-to-frame; jitter propagates into gait analysis, rep counting, and biomechanical metrics producing clinically unreliable output — Savitzky-Golay filtering eliminates this at source, matching Kinovea and DARI Motion pre-analytics. | **Implementation**: `smooth_keypoint_track(smoothed_id, tenant_id, track_id, window_size, filter_type)` where filter_type is `ema` or `boxcar`; per-keypoint 1D filter over time axis; return smoothed trajectories and residual noise RMS per keypoint. | **Competitor**: Kinovea (built-in smoothing), DARI Motion (Butterworth filter on every joint)
 
 ---
 
-## Improvement 2 — Velocity and Acceleration Fields
+### I2. Velocity and Acceleration Kinematics
 
-**Problem**: The service stores static keypoint positions but exposes no kinematic derivatives. Velocity and acceleration are the primary biomechanical signals for sports science, physical therapy, and fall prediction — yet callers must reinvent the finite-difference logic themselves.
-
-**Improvement**: Add async `compute_kinematics()` that takes a skeletal track and returns per-keypoint velocity (px/frame) and acceleration (px/frame²) time-series. Include peak-velocity timestamps and energy-expenditure proxies.
-
-**Impact**: Enables high-fidelity movement analytics directly from the service layer. ST-GCN and Transformer-based action classifiers can consume these derivatives without pre-processing.
+**Category**: Biomechanical Analytics | **Justification**: Velocity and acceleration are the primary signals for sports science and fall prediction yet callers must reinvent finite-difference logic — exposing them directly collapses an entire preprocessing layer that every biomechanics platform provides natively. | **Implementation**: `compute_kinematics(report_id, tenant_id, track_id, fps)` — second-order finite differences per keypoint; return velocity in units/frame and units/second, acceleration, peak-velocity frame index, and kinetic energy proxy. | **Competitor**: Vicon Nexus (6-DOF kinematics auto-computed), OpenPose velocity extension
 
 ---
 
-## Improvement 3 — Joint Angle Extraction
+### I3. Pose-to-Text LLM Narration
 
-**Problem**: Joint angles (knee flexion, elbow bend, hip rotation) are the universal currency of biomechanics, physical therapy, and ergonomics — yet the current service only exposes raw 2D/3D coordinates.
-
-**Improvement**: Add async `extract_joint_angles()` that computes anatomical angles from connected keypoint triples (e.g. hip-knee-ankle) using the law of cosines. Return results in degrees with bilateral symmetry deltas.
-
-**Impact**: Direct input into RULA/REBA ergonomics scoring, physical therapy ROM measurement, and sports performance analysis without downstream geometry work.
+**Category**: Accessibility / Generative AI | **Justification**: Non-technical stakeholders cannot consume raw keypoint data — a locally hosted LLM closes the last-mile gap without cloud egress, directly aligned with APG's Ollama-first generative AI strategy. | **Implementation**: `narrate_pose_analysis(narration_id, tenant_id, analysis_id, role, model)` — build structured prompt from joint angles, risk score, session metadata; route to local Ollama; return plain-English narrative with confidence caveat. | **Competitor**: Move.ai (AI movement descriptions), Tempus (LLM radiology narratives)
 
 ---
 
-## Improvement 4 — Confidence-Weighted Consensus Fusion
+### I4. Streaming Pose Ring Buffer
 
-**Problem**: `multi_person_pose()` simply registers independent per-person estimates. When multiple overlapping camera angles or model variants are available, there is no mechanism to fuse their outputs into a higher-accuracy consensus estimate.
-
-**Improvement**: Add async `fuse_estimates()` that accepts a list of estimate IDs (from the same frame, potentially from different models or cameras) and returns a single consensus keypoint set. Use confidence-weighted averaging with outlier rejection (Tukey fence or IQR).
-
-**Impact**: Accuracy improvement of 5-15% on occluded subjects. Enables multi-model ensembling without coordinating fusion logic in the caller.
+**Category**: Real-Time Infrastructure | **Justification**: `real_time_pose()` processes one frame at a time with no buffering abstraction; callers managing 30fps streams duplicate buffering logic with memory leak risk — a service-native ring buffer removes this and feeds action recognition directly. | **Implementation**: `push_to_stream_buffer(tenant_id, session_id, estimate_id, capacity)` and `drain_stream_buffer(tenant_id, session_id)` — circular buffer evicting oldest on overflow; track head/tail pointers and fill ratio in audit metadata. | **Competitor**: AWS Kinesis Video Streams (ring buffer built-in), Azure Percept (edge stream buffer)
 
 ---
 
-## Improvement 5 — Anomaly / Outlier Keypoint Flagging
+### I5. Activity Spatial Heat Map
 
-**Problem**: Estimates with anatomically impossible keypoint configurations (e.g. left knee above left hip, elbow behind shoulder plane) silently propagate through the pipeline and corrupt biomechanical analyses.
-
-**Improvement**: Add async `flag_anatomical_anomalies()` that validates keypoint topology against a configurable human skeleton DAG. Returns per-keypoint anomaly flags and a record-level anomaly severity score.
-
-**Impact**: Catches inference failures and occlusion artefacts before they reach analysis or training pipelines. Reduces false positives in downstream classifiers.
+**Category**: Spatial Analytics | **Justification**: There is no surface for understanding which body regions are kinematically active across a session — coaching and therapy applications need this to identify compensatory movement patterns without external preprocessing. | **Implementation**: `generate_activity_heatmap(heatmap_id, tenant_id, session_id, resolution)` — accumulate per-keypoint positional deltas into normalised 2D density grid (default 64×64); return grid with per-keypoint contribution weights and dominant motion zone labels. | **Competitor**: Dartfish (activity overlay heatmaps), Hudl Sportscode (spatial density maps)
 
 ---
 
-## Improvement 6 — Privacy-Preserving Anonymisation
+### I6. Cross-Session Longitudinal Comparison
 
-**Problem**: Pose data can be re-identified from gait signatures alone. There is no built-in mechanism to strip or perturb identity-correlating features before data leaves the tenant boundary.
-
-**Improvement**: Add async `anonymise_estimate()` that applies configurable k-anonymisation noise to keypoint coordinates (Laplace mechanism), removes biometric-correlating metadata, and records the anonymisation parameters in the audit trail.
-
-**Impact**: Enables sharing of pose datasets across tenant boundaries without re-identification risk. Required for GDPR article 89 research exemptions and cross-organisational training data pipelines.
+**Category**: Progress Tracking | **Justification**: `pose_compare()` compares two individual estimates but there is no mechanism to compare movement quality across sessions over time — the core use case for physical therapy progress and athletic periodisation. | **Implementation**: `longitudinal_compare(report_id, tenant_id, session_ids)` — per-session aggregate confidence distributions; pairwise cosine similarity matrix; trend vectors (improving / stable / declining) per session relative to baseline. | **Competitor**: PhysiTrack (longitudinal ROM tracking), Hudl IQ (multi-session trend analysis)
 
 ---
 
-## Improvement 7 — Streaming Pose Buffer
+### I7. Batch Frame Ingestion with Concurrency Control
 
-**Problem**: `real_time_pose()` processes one frame at a time but provides no ring-buffer or sliding-window abstraction. Callers managing a 30fps stream must implement their own buffering to feed action recognition or gait analysis, leading to duplicate logic and potential memory leaks.
-
-**Improvement**: Add async `push_to_stream_buffer()` and `drain_stream_buffer()` methods implementing a tenant-scoped, session-scoped circular buffer of configurable capacity. Buffer automatically evicts the oldest frame on overflow and tracks head/tail pointers.
-
-**Impact**: Real-time consumers get a production-grade buffering primitive. Buffer drain returns a ready-to-use estimate sequence for immediate action recognition or gait analysis.
+**Category**: Throughput / DX | **Justification**: Processing long video requires hundreds of sequential `record_frame()` + `estimate_pose()` calls; absence of a batch interface forces callers to manage concurrency, partial failures, and progress independently, multiplying integration cost. | **Implementation**: `ingest_frame_batch(batch_id, tenant_id, session_id, model_id, frames, max_concurrency)` — asyncio semaphore-bounded gather; return per-frame success/failure status, total latency, and progress summary. | **Competitor**: MediaPipe Batch (async frame pipeline), AWS Rekognition Video (batch job API)
 
 ---
 
-## Improvement 8 — Activity Heat Map Generation
+### I8. Range-of-Motion (ROM) Clinical Measurement
 
-**Problem**: There is no spatial analytics surface for understanding which regions of the frame (or body) are most kinematically active across a session. Physical therapy and sports coaching applications need this to identify compensatory movement patterns.
-
-**Improvement**: Add async `generate_activity_heatmap()` that accumulates keypoint positional deltas across a session and returns a normalised 2D density grid (configurable resolution). Output includes per-keypoint contribution weights.
-
-**Impact**: Direct input for coaching overlays, physical therapy progress reports, and ergonomics risk maps without requiring separate visualisation preprocessing.
+**Category**: Rehabilitation / Clinical | **Justification**: ROM is the standard clinical metric for joint injury assessment yet the service has no dedicated ROM interface — therapists must manually compare angle values across sessions without normal-range context. | **Implementation**: `measure_rom(rom_id, tenant_id, estimate_id_start, estimate_id_end, joint)` — compute angular delta; compare against ISO 8551 / AAOS normal ranges; return ROM degrees, percent of normal, and clinical classification (normal / restricted / hypermobile). | **Competitor**: Sword Health (digital ROM), MooveCare (automated ROM tracking)
 
 ---
 
-## Improvement 9 — Pose Interpolation for Dropped Frames
+### I9. Bilateral Movement Asymmetry Detection
 
-**Problem**: Real-world video streams have dropped frames, occlusions, and network gaps. Temporal gaps in a skeletal track break downstream analytics that assume uniform frame spacing.
-
-**Improvement**: Add async `interpolate_missing_frames()` that detects gaps in a skeletal track's frame number sequence and fills them using linear or cubic spline interpolation of keypoint positions. Mark interpolated frames with a `synthetic: true` flag.
-
-**Impact**: Continuous skeletal tracks for downstream analytics even on imperfect streams. Reduces false falls/action triggers caused by keypoint discontinuities.
+**Category**: Injury Prevention | **Justification**: Left-right asymmetry above 10-15% is a validated injury precursor in running biomechanics; the service has no proactive asymmetry alerting so coaches miss the injury window completely. | **Implementation**: `detect_asymmetry(report_id, tenant_id, track_id, mild_threshold_pct, severe_threshold_pct)` — bilateral joint-pair speed ratios from keypoint velocities; classify as symmetric / mild / severe; raise high-severity audit on breach. | **Competitor**: Sparta Science (movement quality asymmetry), Catapult Sports (bilateral load asymmetry)
 
 ---
 
-## Improvement 10 — Pose-to-Text Narration via LLM
+### I10. Posture Alignment Index Scoring
 
-**Problem**: Non-technical stakeholders (coaches, physiotherapists, HR compliance officers) cannot consume raw keypoint data. There is no bridge between the quantitative pose output and human-readable insight.
-
-**Improvement**: Add async `narrate_pose_analysis()` that takes an analysis record and routes a structured prompt to a locally-hosted Ollama model (e.g. `llama3`) to produce a plain-English movement description, risk summary, or coaching cue.
-
-**Impact**: Closes the last-mile accessibility gap. Stakeholders receive interpretable reports without requiring technical mediators. Consistent with the APG strategy of using local Ollama models for generative tasks.
+**Category**: Occupational Health | **Justification**: Spinal alignment scores are the primary deliverable in occupational health risk assessments; a single normalised score is more actionable than raw joint angles and enables dashboard trending against ISO 11226. | **Implementation**: `compute_posture_score(score_id, tenant_id, estimate_id)` — evaluate head forward position, shoulder level, spinal vertical alignment, pelvic tilt; compute PAI 0-100; traffic-light bands green/amber/red. | **Competitor**: PostureScreen (posture score), Dorsavi (wearable posture index), Upright Go (real-time score)
 
 ---
 
-## Improvement 11 — Cross-Session Longitudinal Comparison
+### I11. Biomechanical Injury Risk Rules Engine
 
-**Problem**: `pose_compare()` compares two individual estimates. There is no mechanism to compare a subject's movement quality across sessions over time — the core use case for physical therapy progress tracking and athletic periodisation.
-
-**Improvement**: Add async `longitudinal_compare()` that accepts a list of session IDs, computes per-session aggregate keypoint distributions, and returns a time-ordered similarity matrix alongside trend vectors (improving/stable/declining) per joint group.
-
-**Impact**: Enables longitudinal patient monitoring and athlete progression tracking directly in the service layer. Trend vectors feed dashboards and alert triggers without external statistical processing.
+**Category**: Predictive Health | **Justification**: Clinical evidence links specific joint angle patterns (knee valgus, hip drop, trunk lean > 15°) to injury risk — a lightweight rules engine closes the gap between raw kinematics and actionable clinical insight without requiring an ML model. | **Implementation**: `score_injury_risk(risk_id, tenant_id, joint_angles_report_id, rules)` — evaluate configurable rules (operator, threshold, evidence level, weight); composite score 0-10; corrective cues mapped to triggered rules. | **Competitor**: Fusionetics (injury risk), Sparta Science (Load/Explode/Drive signature), Zone7 (AI injury prediction)
 
 ---
 
-## Improvement 12 — Batch Frame Ingestion with Progress Tracking
+### I12. Skeleton-to-BVH Motion Capture Export
 
-**Problem**: Processing long video segments requires calling `record_frame()` + `estimate_pose()` hundreds or thousands of times. There is no batch interface, so callers must manage concurrency, partial failures, and progress reporting themselves.
-
-**Improvement**: Add async `ingest_frame_batch()` that accepts a list of frame payloads (with pre-computed keypoints), processes them concurrently using `asyncio.gather()` with configurable concurrency limits, and returns a batch result with per-frame success/failure status and a final progress summary.
-
-**Impact**: Order-of-magnitude throughput increase for video processing workloads. Callers get atomic batch semantics with partial-failure isolation.
+**Category**: Interoperability | **Justification**: BVH is the universal interchange format for motion capture used by every 3D animation tool and biomechanics lab — without a BVH exporter, pose data is stranded in the APG ecosystem and cannot reach Blender, Unity, or Qualisys. | **Implementation**: `export_to_bvh(export_id, tenant_id, track_id, fps)` — HIERARCHY block from COCO-17 topology with joint offsets; MOTION block from per-frame Euler angles via `extract_joint_angles()`; return BVH string. | **Competitor**: Xsens MVN (BVH export), Qualisys (BVH/C3D), Vicon (native BVH)
 
 ---
 
-## Improvement 13 — Pose Quality Certification
+### I13. Differential Privacy Budget Accounting
 
-**Problem**: The current quality system blocks low-confidence estimates but provides no positive certification for high-quality estimates suitable for use in medical-grade or legal-evidence contexts.
-
-**Improvement**: Add async `certify_estimate_quality()` that evaluates an estimate against a configurable certification rubric (minimum confidence, keypoint completeness, anatomical validity, reviewer sign-off) and issues a tamper-evident quality certificate stored in the audit trail with a SHA-256 content hash.
-
-**Impact**: Enables legal-grade evidence chains for occupational health incidents, clinical rehabilitation records, and athlete injury documentation.
+**Category**: Privacy Engineering | **Justification**: `anonymise_estimate()` applies per-call noise but has no epsilon budget tracker — repeated queries exhaust budget and allow reconstruction attacks; proper DP accounting is required for GDPR article 89 research exemptions. | **Implementation**: `track_privacy_budget(tenant_id, subject_ref, epsilon_used, delta)` — maintain per-tenant/subject RDP composition ledger; reject anonymisation when remaining budget falls below floor; expose composition history in audit. | **Competitor**: Google DP Library (epsilon tracking), Apple DP (per-day budget enforcement)
 
 ---
 
-## Improvement 14 — Model Drift Detection
+### I14. Model Latency Profiling and SLA Alerting
 
-**Problem**: Pose model inference quality degrades over time due to distribution shift (camera drift, subject population changes, model version skew). There is no built-in mechanism to detect when a model's output quality has statistically degraded.
-
-**Improvement**: Add async `detect_model_drift()` that computes a rolling confidence baseline per model, applies a CUSUM or EWMA control chart to recent estimate confidence scores, and raises an audit event when drift exceeds a configurable threshold.
-
-**Impact**: Proactive model quality monitoring without external observability infrastructure. Prevents silent accuracy degradation in production streams.
+**Category**: Performance Operations | **Justification**: Cold-start latency for Ollama/ONNX models can exceed 500ms; without profiling, SLA violations at session start go undetected until production incidents — proactive P99 tracking closes this gap. | **Implementation**: `profile_model_latency(profile_id, tenant_id, model_id, rounds, sla_p99_ms)` — synthetic inference rounds; record P50/P95/P99 latency, fps, memory delta; persist in `_latency_profiles`; raise high audit if P99 exceeds SLA. | **Competitor**: NVIDIA Triton (built-in profiling), TorchServe (latency benchmarking API)
 
 ---
 
-## Improvement 15 — Pose Skeleton Visualisation Data
+### I15. Pose Re-Identification Risk Assessment
 
-**Problem**: Generating visualisation overlays for pose data requires callers to manually reconstruct skeleton topology from keypoints. There is no service-level abstraction for producing display-ready skeleton edge data.
-
-**Improvement**: Add async `build_skeleton_overlay()` that takes an estimate and a configurable skeleton topology definition (COCO-17, Halpe-26, custom) and returns an ordered list of edge segments (start keypoint, end keypoint, colour, confidence) suitable for direct consumption by a canvas renderer or video annotation pipeline.
-
-**Impact**: Decouples visualisation concerns from inference. Rendering clients (web, mobile, video pipeline) receive standardised display data without reimplementing skeleton topology logic.
+**Category**: Identity / Security | **Justification**: Gait signatures derived from pose data can re-identify subjects across sessions even after PII removal; without an explicit biometric linkage control, unintentional re-identification attacks are possible through data aggregation. | **Implementation**: `assess_reidentification_risk(report_id, tenant_id, session_id)` — compute gait signature vector (stride length, cadence, keypoint covariance fingerprint); cosine similarity against stored tenant signatures; return risk score and recommended anonymisation parameters. | **Competitor**: NIST PRTM (biometric risk framework), Socure (identity risk scoring)

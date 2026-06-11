@@ -148,26 +148,43 @@ Supported roles:
 
 Register an agent with `register_ap_agent()` and validate privileged proposals with `validate_agent_ap_action()`.
 
-## New Features (2026)
+## Async AI and Analytics Methods
 
-### Async AI and Analytics Extensions
+All async methods are awaitable and degrade gracefully when external services (Ollama, sanctions APIs) are unavailable.
 
-The following async methods have been added to `AccountsPayableService`:
+### Original Async Extensions (2026-Q1)
 
 | Method | Category | Description |
 |---|---|---|
-| `ml_duplicate_invoice_detect(invoice_id, tenant_id)` | Fraud Prevention | Ollama embedding-based cosine similarity duplicate detection with exact-match fallback |
-| `forecast_cash_outflows(tenant_id, horizon_weeks)` | Treasury | 13-week rolling AP cash outflow forecast with P10/P50/P90 bands derived from historical payment velocity |
-| `compute_invoice_tax(invoice_record_id, tenant_id, tax_profile)` | Compliance | VAT (16%) and withholding tax computation with iTax-compatible output |
-| `generate_vat_schedule(tenant_id, period)` | Compliance | KRA iTax input VAT schedule aggregated from all invoices in period |
-| `score_vendor_risk(vendor_record_id, tenant_id)` | Risk | 0–100 composite vendor risk score from exception rate, dispute rate, price variance, and bank-change flags |
-| `straight_through_process(invoice_record_id, tenant_id)` | Automation | Full STP pipeline: validate → duplicate check → PO match → auto-approve; aborts and escalates on any failure |
-| `compute_vendor_scorecard(vendor_record_id, tenant_id, period)` | Analytics | Vendor performance scorecard (accuracy, match pass, on-time submission, dispute score) with composite index |
-| `score_payment_fraud_risk(payment_record_id, tenant_id)` | Security | Real-time payment fraud scoring: new bank account, amount anomaly, weekend payment, bank-change proximity |
-| `compute_accruals(tenant_id, period)` | Accounting | Period-end RNI and service accrual journal entries from GRNs and POs with no matching invoice |
-| `nl_query(question, tenant_id)` | UX / AI | Natural language AP query via Ollama LLM (llama3.1:8b) with keyword-router fallback |
+| `ml_duplicate_invoice_detect(invoice_id, tenant_id)` | Fraud Prevention | Ollama embedding cosine-similarity duplicate detection with exact-match fallback |
+| `forecast_cash_outflows(tenant_id, horizon_weeks)` | Treasury | 13-week rolling AP cash outflow forecast with P10/P50/P90 bands |
+| `compute_invoice_tax(invoice_record_id, tenant_id, tax_profile)` | Compliance | VAT (16%) and WHT computation with iTax-compatible output |
+| `generate_vat_schedule(tenant_id, period)` | Compliance | KRA iTax input VAT schedule aggregated from all period invoices |
+| `score_vendor_risk(vendor_record_id, tenant_id)` | Risk | 0–100 composite vendor risk score: exceptions, disputes, price variance, bank-change |
+| `straight_through_process(invoice_record_id, tenant_id)` | Automation | Full STP pipeline: validate → duplicate check → PO match → auto-approve |
+| `compute_vendor_scorecard(vendor_record_id, tenant_id, period)` | Analytics | Vendor performance index: accuracy, match pass, on-time submission, dispute score |
+| `score_payment_fraud_risk(payment_record_id, tenant_id)` | Security | Real-time fraud scoring: new bank account, amount anomaly, weekend payment, proximity |
+| `compute_accruals(tenant_id, period)` | Accounting | Period-end RNI and service accrual journal entries from unmatched GRNs/POs |
+| `nl_query(question, tenant_id)` | UX / AI | Natural language AP query via Ollama LLM with keyword-router fallback |
 
-### Usage Examples
+### New Async Extensions (2026-Q2)
+
+| Method | Category | Description |
+|---|---|---|
+| `ingest_peppol_invoice(xml_bytes, tenant_id)` | E-Invoicing | Parse Peppol BIS 3.0 / UBL 2.1 XML invoices; validate structure, extract line items and tax totals |
+| `propose_vendor_bank_change(vendor_record_id, tenant_id, new_bank_account, new_iban, proposed_by)` | Fraud Prevention | Initiate dual-control bank account change; validates IBAN check digit (ISO 7064 MOD 97-10) |
+| `confirm_vendor_bank_change(change_id, tenant_id, confirmed_by)` | Fraud Prevention | Confirm pending bank change; enforces SoD (confirmed_by != proposed_by), atomically updates vendor |
+| `optimise_payment_schedule(tenant_id, available_cash, cost_of_capital_pct)` | Working Capital | Rank invoices by NPV of early-pay discount vs cost of capital; greedy allocation of available cash |
+| `generate_wht_certificate(invoice_record_id, tenant_id, certificate_type)` | Tax Compliance | Issue KRA P9A/P9B withholding tax certificate with sequential cert number and audit event |
+| `initiate_supplier_kyb(tenant_id, supplier_data, requested_by)` | Supplier Risk | KYB due diligence: registration format, KRA PIN, sanctions screening, beneficial owner check |
+| `triage_match_exceptions(tenant_id, top_n)` | AP Operations | Priority-score open exceptions by financial impact, age, and vendor risk; return top-N with recommended action |
+| `cash_flow_sensitivity(tenant_id, scenarios)` | Treasury | What-if cash flow modelling: shift payment dates, hold fraction, discount capture — parallel via asyncio.gather |
+| `identify_dormant_vendors(tenant_id, inactive_days, auto_deactivate)` | Vendor Governance | Detect and optionally deactivate vendors with no AP activity for N days |
+| `compute_compliance_scorecard(tenant_id, period)` | Compliance | 10-control AP compliance scorecard (SoD, PO coverage, WHT certs, exceptions, fraud indicators) with A–F grade |
+
+## Usage Examples
+
+### Core Workflow
 
 ```python
 import asyncio
@@ -181,6 +198,10 @@ invoice = service.record_invoice("inv-1", "tenant-a", vendor["id"], "INV-2026-00
 tax = asyncio.run(service.compute_invoice_tax(invoice["id"], "tenant-a", "standard"))
 # -> {"vat_amount": "8000.00", "wht_amount": "2500.00", "net_payable": "55500.00", ...}
 
+# Issue WHT certificate
+cert = asyncio.run(service.generate_wht_certificate(invoice["id"], "tenant-a", "P9A"))
+# -> {"certificate_number": "P9A-TENANT-202606-0001", "wht_amount": "2500.00", ...}
+
 # STP pipeline
 result = asyncio.run(service.straight_through_process(invoice["id"], "tenant-a"))
 # -> {"passed": True, "steps": [...], "completed_at": "..."}
@@ -188,13 +209,93 @@ result = asyncio.run(service.straight_through_process(invoice["id"], "tenant-a")
 # Cash flow forecast
 forecast = asyncio.run(service.forecast_cash_outflows("tenant-a", horizon_weeks=4))
 # -> {"total_projected_outflow": "50000.00", "weekly_buckets": [...], ...}
-
-# Natural language query
-answer = asyncio.run(service.nl_query("Which invoices are overdue?", "tenant-a"))
-# -> {"answer": "AP aging: 1 open invoice...", "data": {...}, ...}
 ```
 
-### OLLAMA Integration
+### Dual-Control Bank Account Change
+
+```python
+# Proposer initiates change
+proposal = asyncio.run(
+    service.propose_vendor_bank_change(vendor["id"], "tenant-a", "KCB-001122", "GB29NWBK60161331926819", "alice")
+)
+# proposal["status"] == "pending_confirmation"
+
+# A different user confirms (enforces SoD)
+confirmed = asyncio.run(
+    service.confirm_vendor_bank_change(proposal["change_id"], "tenant-a", "bob")
+)
+# confirmed["status"] == "confirmed"
+```
+
+### Payment Schedule Optimisation
+
+```python
+# Maximise early-pay discount capture within available cash
+schedule = asyncio.run(
+    service.optimise_payment_schedule("tenant-a", available_cash=500000, cost_of_capital_pct=12.0)
+)
+# -> {"scheduled_early": 5, "total_projected_savings": "3420.00", "schedule": [...], ...}
+```
+
+### Compliance Scorecard
+
+```python
+scorecard = asyncio.run(
+    service.compute_compliance_scorecard("tenant-a", {"start": "2026-01-01", "end": "2026-06-30"})
+)
+# -> {"composite_score": 82.0, "grade": "B", "controls": [...], "remediation_items": [...], ...}
+```
+
+### Cash Flow What-If Scenarios
+
+```python
+scenarios = [
+    {"name": "baseline", "payment_offset_days": 0, "held_fraction": 0.0, "discount_capture_pct": 0},
+    {"name": "pay_early_10d", "payment_offset_days": -10, "held_fraction": 0.0, "discount_capture_pct": 100},
+    {"name": "dispute_20pct", "payment_offset_days": 0, "held_fraction": 0.2, "discount_capture_pct": 0},
+]
+analysis = asyncio.run(service.cash_flow_sensitivity("tenant-a", scenarios))
+# -> {"comparison": [{"name": "pay_early_10d", "delta_vs_baseline": "-45000.00", ...}, ...], ...}
+```
+
+### Supplier KYB Onboarding
+
+```python
+kyb = asyncio.run(service.initiate_supplier_kyb(
+    "tenant-a",
+    {
+        "legal_name": "Savanna Supplies Ltd",
+        "registration_number": "PVT/2021/123456",
+        "tax_pin": "P051234567A",
+        "director_names": ["John Kamau", "Jane Wanjiku"],
+    },
+    requested_by="procurement-officer",
+))
+# -> {"kyb_risk_score": 0, "decision": "approved", "checks": [...], ...}
+```
+
+### Peppol E-Invoice Ingest
+
+```python
+ubl_xml = b"""<?xml version="1.0"?>
+<Invoice xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"
+         xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2">
+  <cbc:ID>INV-2026-0042</cbc:ID>
+  <cbc:DocumentCurrencyCode>KES</cbc:DocumentCurrencyCode>
+  <cac:LegalMonetaryTotal><cbc:PayableAmount>125000.00</cbc:PayableAmount></cac:LegalMonetaryTotal>
+</Invoice>"""
+result = asyncio.run(service.ingest_peppol_invoice(ubl_xml, "tenant-a"))
+# -> {"invoice_number": "INV-2026-0042", "amount": 125000.0, "peppol_valid": True, ...}
+```
+
+### Natural Language Query
+
+```python
+answer = asyncio.run(service.nl_query("Which invoices are overdue?", "tenant-a"))
+# -> {"answer": "AP aging: 1 open invoice...", "data": {...}, "ml_enhanced": False, ...}
+```
+
+## OLLAMA Integration
 
 Set `OLLAMA_BASE_URL` to enable ML-enhanced features:
 
@@ -204,6 +305,12 @@ export OLLAMA_AP_MODEL=llama3.1:8b   # default model for nl_query
 ```
 
 All ML-enhanced methods degrade gracefully to rule-based fallbacks when Ollama is unavailable. The `ml_enhanced` field in every response indicates which execution path was taken.
+
+Optional — sanctions screening API:
+
+```bash
+export SANCTIONS_API_URL=http://localhost:8080/screen  # POST {name} -> {match: bool}
+```
 
 ## Verification
 

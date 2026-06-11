@@ -2964,5 +2964,1002 @@ class AccountsPayableService:
 			}
 
 
+	# -----------------------------------------------------------------------
+	# New async extensions — I1/I2/I3/I5/I6/I8/I12/I13/I14/I15
+	# -----------------------------------------------------------------------
+
+	async def ingest_peppol_invoice(
+		self,
+		xml_bytes: bytes,
+		tenant_id: str,
+	) -> dict[str, Any]:
+		"""Parse and ingest a Peppol BIS 3.0 / UBL 2.1 XML invoice (I1).
+
+		Validates required UBL elements, extracts line items and tax totals,
+		auto-creates a raw invoice record, and triggers rule evaluation.
+		Degrades gracefully when lxml is unavailable by attempting stdlib
+		ElementTree on well-formed XML.
+
+		Returns a normalised invoice dict plus `peppol_valid` and
+		`requires_review` flags (True when OCR confidence < 0.85 equivalent,
+		i.e. any non-mandatory field is missing).
+		"""
+		guard_tenant_id(tenant_id)
+
+		ns = {
+			"cbc": "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2",
+			"cac": "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2",
+		}
+
+		parse_errors: list[str] = []
+		extracted: dict[str, Any] = {}
+
+		try:
+			try:
+				from lxml import etree as _et  # type: ignore[import]
+				root = _et.fromstring(xml_bytes)
+				def _find(xpath: str) -> str | None:
+					el = root.find(xpath, ns)
+					return el.text.strip() if el is not None and el.text else None
+			except ImportError:
+				import xml.etree.ElementTree as _et2  # noqa: PLC0415
+				root = _et2.fromstring(xml_bytes.decode("utf-8"))
+				def _find(xpath: str) -> str | None:  # type: ignore[misc]
+					el = root.find(xpath, ns)
+					return el.text.strip() if el is not None and el.text else None
+
+			extracted = {
+				"invoice_number":  _find(".//cbc:ID"),
+				"invoice_date":    _find(".//cbc:IssueDate"),
+				"due_date":        _find(".//cbc:DueDate"),
+				"currency":        _find(".//cbc:DocumentCurrencyCode"),
+				"supplier_name":   _find(".//cac:AccountingSupplierParty//cbc:Name"),
+				"supplier_tax_id": _find(".//cac:AccountingSupplierParty//cbc:CompanyID"),
+				"amount":          _find(".//cac:LegalMonetaryTotal/cbc:PayableAmount"),
+				"tax_amount":      _find(".//cac:TaxTotal/cbc:TaxAmount"),
+				"peppol_format":   "UBL_2_1",
+			}
+
+			for required in ("invoice_number", "currency", "amount"):
+				if not extracted.get(required):
+					parse_errors.append(f"missing required field: {required}")
+
+		except Exception as exc:
+			parse_errors.append(f"xml_parse_error: {exc}")
+
+		peppol_valid = len(parse_errors) == 0
+		requires_review = not peppol_valid or not extracted.get("supplier_tax_id")
+
+		invoice_record: dict[str, Any] = {
+			"source":        "peppol",
+			"tenant_id":     tenant_id,
+			"invoice_number": extracted.get("invoice_number", "UNKNOWN"),
+			"amount":        float(_d(extracted.get("amount", "0") or "0")),
+			"currency":      extracted.get("currency", "KES"),
+			"due_date":      extracted.get("due_date"),
+			"tax_amount":    float(_d(extracted.get("tax_amount", "0") or "0")),
+			"supplier_name": extracted.get("supplier_name"),
+			"supplier_tax_id": extracted.get("supplier_tax_id"),
+			"peppol_valid":  peppol_valid,
+			"requires_review": requires_review,
+			"parse_errors":  parse_errors,
+			"ingested_at":   _now(),
+		}
+		self._emit("peppol_invoice_ingested", tenant_id, extracted.get("invoice_number", "unknown"), {
+			"valid": peppol_valid, "requires_review": requires_review,
+		})
+		return invoice_record
+
+	async def propose_vendor_bank_change(
+		self,
+		vendor_record_id: str,
+		tenant_id: str,
+		new_bank_account: str,
+		new_iban: str | None,
+		proposed_by: str,
+	) -> dict[str, Any]:
+		"""Initiate dual-control vendor bank account change workflow (I2).
+
+		Stores the proposal in `_pending_bank_changes` with status `pending_confirmation`.
+		Validates IBAN check digit (ISO 7064 MOD 97-10) when provided.
+		The change is NOT applied until `confirm_vendor_bank_change` is called
+		by a different principal.
+
+		Any active payment run against this vendor is flagged `bank_change_pending`.
+		"""
+		guard_tenant_id(tenant_id)
+		guard_non_empty_string(proposed_by, "proposed_by")
+		guard_non_empty_string(new_bank_account, "new_bank_account")
+
+		vendor = self._require_vendor(vendor_record_id, tenant_id)
+
+		# IBAN check-digit validation (ISO 7064 MOD 97-10)
+		iban_valid: bool | None = None
+		if new_iban:
+			cleaned = new_iban.replace(" ", "").upper()
+			rearranged = cleaned[4:] + cleaned[:4]
+			numeric = "".join(str(ord(c) - 55) if c.isalpha() else c for c in rearranged)
+			iban_valid = int(numeric) % 97 == 1
+
+		if not hasattr(self, "_pending_bank_changes"):
+			self._pending_bank_changes: dict[str, dict[str, Any]] = {}
+
+		change_id = f"bchg_{vendor['vendor_id']}_{_now()[:10].replace('-', '')}"
+		proposal: dict[str, Any] = {
+			"change_id":         change_id,
+			"vendor_record_id":  vendor_record_id,
+			"vendor_id":         vendor["vendor_id"],
+			"tenant_id":         tenant_id,
+			"old_bank_account":  vendor.get("bank_account"),
+			"new_bank_account":  new_bank_account,
+			"new_iban":          new_iban,
+			"iban_valid":        iban_valid,
+			"proposed_by":       proposed_by,
+			"status":            "pending_confirmation",
+			"proposed_at":       _now(),
+		}
+		self._pending_bank_changes[change_id] = proposal
+
+		# Flag affected payment runs
+		for run in self._payment_runs.values():
+			for entry in run.get("invoices", []):
+				if entry.get("vendor_id") == vendor["vendor_id"]:
+					run["bank_change_pending"] = True
+					break
+
+		self._emit("vendor_bank_change_proposed", tenant_id, vendor_record_id, {
+			"change_id": change_id, "proposed_by": proposed_by, "iban_valid": iban_valid,
+		})
+		return deepcopy(proposal)
+
+	async def confirm_vendor_bank_change(
+		self,
+		change_id: str,
+		tenant_id: str,
+		confirmed_by: str,
+	) -> dict[str, Any]:
+		"""Confirm (or reject) a pending vendor bank account change (I2).
+
+		Enforces separation of duties: `confirmed_by` must differ from `proposed_by`.
+		On confirmation, atomically updates the vendor record and clears the pending
+		`bank_change_pending` flag from payment runs.
+		"""
+		guard_tenant_id(tenant_id)
+		guard_non_empty_string(confirmed_by, "confirmed_by")
+
+		if not hasattr(self, "_pending_bank_changes"):
+			self._pending_bank_changes = {}
+
+		proposal = self._pending_bank_changes.get(change_id)
+		if proposal is None:
+			raise KeyError(f"Bank change proposal {change_id} not found")
+		if proposal["tenant_id"] != tenant_id:
+			raise PermissionError("tenant mismatch on bank change proposal")
+		if proposal["proposed_by"] == confirmed_by:
+			raise PermissionError("separation of duties violation: confirmed_by must differ from proposed_by")
+
+		vendor = self._require_vendor(proposal["vendor_record_id"], tenant_id)
+		vendor["bank_account"] = proposal["new_bank_account"]
+		vendor["bank_change"] = True
+		vendor["bank_change_confirmed_by"] = confirmed_by
+		vendor["bank_change_confirmed_at"] = _now()
+		vendor["updated_at"] = _now()
+
+		proposal["status"] = "confirmed"
+		proposal["confirmed_by"] = confirmed_by
+		proposal["confirmed_at"] = _now()
+
+		# Clear bank_change_pending flag on payment runs
+		for run in self._payment_runs.values():
+			if run.get("bank_change_pending"):
+				still_pending = any(
+					e.get("vendor_id") == vendor["vendor_id"]
+					and self._pending_bank_changes.get(change_id, {}).get("status") == "pending_confirmation"
+					for e in run.get("invoices", [])
+				)
+				if not still_pending:
+					run.pop("bank_change_pending", None)
+
+		self._emit("vendor_bank_change_confirmed", tenant_id, proposal["vendor_record_id"], {
+			"change_id": change_id, "confirmed_by": confirmed_by,
+		})
+		return deepcopy(proposal)
+
+	async def optimise_payment_schedule(
+		self,
+		tenant_id: str,
+		available_cash: float,
+		cost_of_capital_pct: float = 12.0,
+	) -> dict[str, Any]:
+		"""Rank invoices by NPV benefit of early-payment discount vs cost of capital (I5).
+
+		For each eligible invoice computes:
+		  annualised_roi = discount_pct / (net_days - discount_days) * 365
+		  roi_advantage  = annualised_roi - cost_of_capital_pct
+		  npv_benefit    = outstanding * (roi_advantage / 100) * (days_saved / 365)
+
+		Allocates `available_cash` greedily to invoices ranked by `roi_advantage`
+		(highest first).  Invoices where `roi_advantage <= 0` are skipped.
+
+		Returns an ordered payment schedule, total projected savings, and invoices
+		deferred to standard terms.
+		"""
+		guard_tenant_id(tenant_id)
+		assert available_cash > 0, "available_cash must be positive"
+		assert cost_of_capital_pct >= 0, "cost_of_capital_pct must be >= 0"
+
+		today = date.today()
+		candidates: list[dict[str, Any]] = []
+
+		for inv in self._invoices.values():
+			if inv.get("tenant_id") != tenant_id:
+				continue
+			if inv.get("status") not in {"approved", "matched"}:
+				continue
+			if inv.get("held"):
+				continue
+			outstanding = _d(inv.get("amount", 0)) - _d(inv.get("paid_amount", 0))
+			if outstanding <= 0:
+				continue
+
+			discount_pct = _d(inv.get("discount_pct", 0))
+			discount_days = int(inv.get("discount_days", 0))
+			net_days = int(inv.get("payment_terms_days", 30))
+
+			if discount_pct <= 0 or discount_days <= 0:
+				continue
+
+			days_saved = max(1, net_days - discount_days)
+			annualised_roi = float(discount_pct) / days_saved * 365
+			roi_advantage = annualised_roi - cost_of_capital_pct
+			if roi_advantage <= 0:
+				continue
+
+			npv_benefit = float(outstanding) * (roi_advantage / 100) * (days_saved / 365)
+
+			due_date = inv.get("due_date")
+			days_to_deadline = (
+				max(0, (date.fromisoformat(due_date[:10]) - today).days - (net_days - discount_days))
+				if due_date else 0
+			)
+
+			candidates.append({
+				"invoice_id":       inv["invoice_id"],
+				"vendor_id":        inv.get("vendor_id"),
+				"outstanding":      float(outstanding),
+				"discount_pct":     float(discount_pct),
+				"discount_days":    discount_days,
+				"net_days":         net_days,
+				"days_saved":       days_saved,
+				"annualised_roi":   round(annualised_roi, 2),
+				"roi_advantage":    round(roi_advantage, 2),
+				"npv_benefit":      round(npv_benefit, 2),
+				"days_to_deadline": days_to_deadline,
+				"currency":         inv.get("currency", "KES"),
+			})
+
+		candidates.sort(key=lambda x: x["roi_advantage"], reverse=True)
+
+		scheduled: list[dict[str, Any]] = []
+		deferred: list[dict[str, Any]] = []
+		remaining_cash = Decimal(str(available_cash))
+		total_savings = Decimal("0")
+
+		for item in candidates:
+			cost = _d(item["outstanding"])
+			savings = _d(item["npv_benefit"])
+			if remaining_cash >= cost:
+				scheduled.append({**item, "action": "pay_early", "cash_used": float(cost)})
+				remaining_cash -= cost
+				total_savings += savings
+			else:
+				deferred.append({**item, "action": "standard_terms"})
+
+		return {
+			"tenant_id":             tenant_id,
+			"available_cash":        available_cash,
+			"cost_of_capital_pct":   cost_of_capital_pct,
+			"invoices_evaluated":    len(candidates),
+			"scheduled_early":       len(scheduled),
+			"deferred_to_standard":  len(deferred),
+			"cash_allocated":        float(Decimal(str(available_cash)) - remaining_cash),
+			"cash_remaining":        float(remaining_cash),
+			"total_projected_savings": str(total_savings),
+			"schedule":              scheduled,
+			"deferred":              deferred,
+			"currency":              "KES",
+			"optimised_at":          _now(),
+		}
+
+	async def generate_wht_certificate(
+		self,
+		invoice_record_id: str,
+		tenant_id: str,
+		certificate_type: str = "P9A",
+	) -> dict[str, Any]:
+		"""Generate a KRA WHT certificate (P9A/P9B) for a processed invoice (I6).
+
+		certificate_type:
+		  P9A — resident supplier (standard WHT deduction)
+		  P9B — non-resident supplier (higher WHT, applies to royalties/dividends)
+
+		Requires `compute_invoice_tax` to have been run on the invoice first
+		(i.e., `wht_amount` must be set).  Assigns a sequential certificate number
+		(tenant-scoped) and emits `wht_certificate_issued` audit event.
+
+		Returns the certificate dict; in production this feeds a PDF renderer.
+		"""
+		guard_tenant_id(tenant_id)
+		assert certificate_type in {"P9A", "P9B"}, "certificate_type must be P9A or P9B"
+
+		invoice = self._require_invoice(invoice_record_id, tenant_id)
+		wht_amount = _d(invoice.get("wht_amount", 0))
+		if wht_amount <= 0:
+			raise ValueError(
+				f"Invoice {invoice_record_id} has no WHT computed. "
+				"Run compute_invoice_tax first."
+			)
+
+		vendor_id = invoice.get("vendor_id", "")
+		vendor = next(
+			(v for v in self._vendors.values()
+			 if v.get("vendor_id") == vendor_id and v.get("tenant_id") == tenant_id),
+			None,
+		)
+
+		if not hasattr(self, "_wht_cert_counter"):
+			self._wht_cert_counter: dict[str, int] = {}
+		seq = self._wht_cert_counter.get(tenant_id, 0) + 1
+		self._wht_cert_counter[tenant_id] = seq
+
+		cert_number = f"{certificate_type}-{tenant_id[:6].upper()}-{_today()[:7].replace('-', '')}-{seq:04d}"
+
+		certificate: dict[str, Any] = {
+			"certificate_number":  cert_number,
+			"certificate_type":    certificate_type,
+			"tenant_id":           tenant_id,
+			"invoice_record_id":   invoice_record_id,
+			"invoice_number":      invoice.get("invoice_number"),
+			"invoice_date":        invoice.get("updated_at", "")[:10],
+			"vendor_id":           vendor_id,
+			"vendor_name":         vendor["name"] if vendor else "Unknown",
+			"vendor_tax_id":       vendor.get("tax_profile", "N/A") if vendor else "N/A",
+			"gross_payment":       str(_d(invoice.get("amount", 0))),
+			"wht_rate_pct":        str(_d(invoice.get("wht_amount", 0)) / _d(invoice.get("amount", 1)) * 100),
+			"wht_amount":          str(wht_amount),
+			"net_payment":         str(_d(invoice.get("net_payable", invoice.get("amount", 0)))),
+			"currency":            invoice.get("currency", "KES"),
+			"period":              invoice.get("updated_at", "")[:7],
+			"issued_at":           _now(),
+			"kra_pin_payer":       f"TENANT-{tenant_id[:8].upper()}",
+		}
+
+		if not hasattr(self, "_wht_certificates"):
+			self._wht_certificates: dict[str, dict[str, Any]] = {}
+		self._wht_certificates[cert_number] = certificate
+
+		invoice["wht_certificate_ref"] = cert_number
+		invoice["updated_at"] = _now()
+
+		self._emit("wht_certificate_issued", tenant_id, invoice_record_id, {
+			"certificate_number": cert_number, "certificate_type": certificate_type,
+			"wht_amount": str(wht_amount),
+		})
+		return deepcopy(certificate)
+
+	async def initiate_supplier_kyb(
+		self,
+		tenant_id: str,
+		supplier_data: dict[str, Any],
+		requested_by: str,
+	) -> dict[str, Any]:
+		"""Run automated KYB (Know Your Business) due diligence on a new supplier (I8).
+
+		Checks performed:
+		  1. Company registration number format (Kenya: CPR/YYYY/NNNNNN)
+		  2. KRA PIN format (P/A + 9 digits + letter)
+		  3. Sanctions list name-matching (configurable via SANCTIONS_API_URL env var;
+		     falls back to a keyword blocklist)
+		  4. Beneficial owner completeness
+
+		Computes `kyb_risk_score` 0–100:
+		  - format_errors:   +30 per failed format check
+		  - sanctions_hit:   +50
+		  - no_beneficial_owner: +20
+
+		Auto-approves when score < 30; escalates when score >= 70.
+		"""
+		import os
+		guard_tenant_id(tenant_id)
+		guard_non_empty_string(requested_by, "requested_by")
+
+		required = ["legal_name", "registration_number", "tax_pin"]
+		for f in required:
+			if not supplier_data.get(f):
+				raise ValueError(f"supplier_data.{f} is required for KYB")
+
+		risk_score = 0
+		checks: list[dict[str, Any]] = []
+		warnings: list[str] = []
+
+		# Check 1: company registration format
+		import re
+		reg_no = str(supplier_data.get("registration_number", ""))
+		reg_valid = bool(re.match(r"^(CPR|PVT|LTD|NGO)/\d{4}/\d+$", reg_no, re.IGNORECASE))
+		checks.append({"check": "registration_number_format", "passed": reg_valid, "value": reg_no})
+		if not reg_valid:
+			risk_score += 30
+			warnings.append(f"registration_number '{reg_no}' does not match Kenya CPR format")
+
+		# Check 2: KRA PIN format
+		tax_pin = str(supplier_data.get("tax_pin", ""))
+		pin_valid = bool(re.match(r"^[PA]\d{9}[A-Z]$", tax_pin.upper()))
+		checks.append({"check": "kra_pin_format", "passed": pin_valid, "value": tax_pin})
+		if not pin_valid:
+			risk_score += 30
+			warnings.append(f"tax_pin '{tax_pin}' does not match KRA PIN format")
+
+		# Check 3: sanctions screening (name-based keyword blocklist fallback)
+		blocked_keywords = {"arms", "weapons", "sanctioned", "embargoed", "ofac", "terrorist"}
+		legal_name_lower = supplier_data.get("legal_name", "").lower()
+		sanctions_hit = any(kw in legal_name_lower for kw in blocked_keywords)
+		if os.environ.get("SANCTIONS_API_URL"):
+			try:
+				import json as _json
+				import urllib.request as _req
+				payload = _json.dumps({"name": supplier_data["legal_name"]}).encode()
+				with _req.urlopen(
+					_req.Request(
+						os.environ["SANCTIONS_API_URL"],
+						data=payload,
+						headers={"Content-Type": "application/json"},
+					),
+					timeout=5,
+				) as resp:
+					api_result = _json.loads(resp.read())
+					sanctions_hit = api_result.get("match", sanctions_hit)
+			except Exception:
+				pass  # fall through to keyword result
+		checks.append({"check": "sanctions_screening", "passed": not sanctions_hit, "value": legal_name_lower[:40]})
+		if sanctions_hit:
+			risk_score += 50
+			warnings.append("potential sanctions match — manual review required")
+
+		# Check 4: beneficial owner completeness
+		has_bo = bool(supplier_data.get("beneficial_owners") or supplier_data.get("director_names"))
+		checks.append({"check": "beneficial_owner_present", "passed": has_bo})
+		if not has_bo:
+			risk_score += 20
+			warnings.append("no beneficial owner information provided")
+
+		risk_score = min(100, risk_score)
+
+		if risk_score < 30:
+			status = "auto_approved"
+			decision = "approved"
+		elif risk_score >= 70:
+			status = "escalated"
+			decision = "pending_review"
+		else:
+			status = "pending_review"
+			decision = "pending_review"
+
+		if not hasattr(self, "_kyb_requests"):
+			self._kyb_requests: dict[str, dict[str, Any]] = {}
+
+		kyb_id = f"kyb_{tenant_id[:6]}_{supplier_data['registration_number'][:12].replace('/', '_')}_{_now()[:10].replace('-', '')}"
+		kyb_record: dict[str, Any] = {
+			"kyb_id":          kyb_id,
+			"tenant_id":       tenant_id,
+			"supplier_data":   supplier_data,
+			"requested_by":    requested_by,
+			"kyb_risk_score":  risk_score,
+			"status":          status,
+			"decision":        decision,
+			"checks":          checks,
+			"warnings":        warnings,
+			"initiated_at":    _now(),
+		}
+		self._kyb_requests[kyb_id] = kyb_record
+
+		self._emit("supplier_kyb_initiated", tenant_id, kyb_id, {
+			"kyb_risk_score": risk_score, "decision": decision, "warnings": len(warnings),
+		})
+		return deepcopy(kyb_record)
+
+	async def triage_match_exceptions(
+		self,
+		tenant_id: str,
+		top_n: int = 20,
+	) -> dict[str, Any]:
+		"""Priority-rank open match exceptions by financial impact and age (I12).
+
+		Priority score (0–100):
+		  - Financial weight:  outstanding_amount / total_ap_outstanding * 40
+		  - Age weight:        min(days_open, 90) / 90 * 40
+		  - Vendor risk:       vendor_risk_score / 100 * 20
+
+		For each exception, derives `recommended_action` from exception_type:
+		  price_mismatch      → price_override or reject
+		  quantity_mismatch   → qty_correction
+		  no_po_reference     → obtain_po_or_reject
+		  three/two_way_fail  → review_and_override
+
+		Returns top_n exceptions sorted by priority_score descending, plus
+		aggregate stats (total_open, total_outstanding, avg_age_days).
+		"""
+		guard_tenant_id(tenant_id)
+		assert top_n >= 1, "top_n must be >= 1"
+
+		open_exceptions = [
+			ex for ex in self._match_exceptions.values()
+			if not ex.get("resolved") and ex.get("tenant_id") == tenant_id
+		]
+
+		total_ap_outstanding = sum(
+			float(_d(inv.get("amount", 0)) - _d(inv.get("paid_amount", 0)))
+			for inv in self._invoices.values()
+			if inv.get("tenant_id") == tenant_id
+			and inv.get("status") not in {"paid", "cancelled", "rejected"}
+		) or 1.0  # guard divide-by-zero
+
+		today = _today()
+		triaged: list[dict[str, Any]] = []
+
+		action_map: dict[str, str] = {
+			"price_mismatch":         "price_override_or_reject",
+			"quantity_mismatch":      "qty_correction",
+			"no_po_reference":        "obtain_po_or_reject",
+			"three_way_match_failure": "review_and_override",
+			"two_way_match_failure":  "review_and_override",
+		}
+		sla_map: dict[str, int] = {
+			"price_mismatch":         4,
+			"quantity_mismatch":      8,
+			"no_po_reference":        24,
+			"three_way_match_failure": 4,
+			"two_way_match_failure":  8,
+		}
+
+		for ex in open_exceptions:
+			inv = self._find_invoice_by_public_id(ex["invoice_id"])
+			outstanding = float(
+				_d(inv.get("amount", 0)) - _d(inv.get("paid_amount", 0))
+			) if inv else 0.0
+
+			days_open = max(0, _days_between(ex.get("created_at", today)[:10], today))
+
+			# Vendor risk contribution
+			vendor_risk = 0.0
+			if inv:
+				vendor_id = inv.get("vendor_id", "")
+				v_rec = next(
+					(v for v in self._vendors.values()
+					 if v.get("vendor_id") == vendor_id and v.get("tenant_id") == tenant_id),
+					None,
+				)
+				if v_rec:
+					v_exceptions = sum(
+						1 for i in self._invoices.values()
+						if i.get("vendor_id") == vendor_id and i.get("status") == "match_exception"
+					)
+					v_total = sum(1 for i in self._invoices.values() if i.get("vendor_id") == vendor_id) or 1
+					vendor_risk = min(100.0, (v_exceptions / v_total) * 100)
+
+			financial_weight = (outstanding / total_ap_outstanding) * 40
+			age_weight = (min(days_open, 90) / 90) * 40
+			risk_weight = (vendor_risk / 100) * 20
+			priority_score = min(100.0, financial_weight + age_weight + risk_weight)
+
+			exc_type = ex.get("exception_type", "")
+			triaged.append({
+				"invoice_id":              ex["invoice_id"],
+				"exception_type":          exc_type,
+				"outstanding_amount":      outstanding,
+				"days_open":               days_open,
+				"vendor_risk_score":       round(vendor_risk, 1),
+				"priority_score":          round(priority_score, 1),
+				"recommended_action":      action_map.get(exc_type, "manual_review"),
+				"sla_hours":               sla_map.get(exc_type, 24),
+				"failures":                ex.get("failures", []),
+				"tenant_id":               tenant_id,
+			})
+
+		triaged.sort(key=lambda x: x["priority_score"], reverse=True)
+
+		return {
+			"tenant_id":          tenant_id,
+			"total_open":         len(open_exceptions),
+			"total_outstanding":  round(total_ap_outstanding, 2),
+			"avg_age_days":       round(
+				sum(t["days_open"] for t in triaged) / len(triaged) if triaged else 0.0, 1
+			),
+			"top_n":              top_n,
+			"triaged":            triaged[:top_n],
+			"triaged_at":         _now(),
+			"currency":           "KES",
+		}
+
+	async def cash_flow_sensitivity(
+		self,
+		tenant_id: str,
+		scenarios: list[dict[str, Any]],
+	) -> dict[str, Any]:
+		"""Model AP cash flow under multiple what-if payment scenarios (I13).
+
+		Each scenario dict:
+		  name                  : str — scenario label
+		  payment_offset_days   : int — shift all due dates by N days (negative = earlier)
+		  held_fraction         : float 0–1 — fraction of invoices held/delayed
+		  discount_capture_pct  : float 0–100 — % of eligible discounts captured
+
+		Returns per-scenario weekly forecast buckets (4 weeks) and a comparison
+		table showing delta_vs_baseline for total cash out in each scenario.
+		Scenarios run via asyncio.gather (simulated sequentially here to avoid
+		event-loop complications in sync context, but structured for gather).
+		"""
+		import asyncio
+		guard_tenant_id(tenant_id)
+		assert len(scenarios) >= 1, "at least one scenario required"
+
+		async def _run_scenario(scenario: dict[str, Any]) -> dict[str, Any]:
+			name = scenario.get("name", "unnamed")
+			offset = int(scenario.get("payment_offset_days", 0))
+			held_frac = float(scenario.get("held_fraction", 0.0))
+			disc_pct = float(scenario.get("discount_capture_pct", 0.0))
+
+			today = date.today()
+			buckets: list[Decimal] = [Decimal("0")] * 4
+			savings = Decimal("0")
+
+			approved_invs = [
+				inv for inv in self._invoices.values()
+				if inv.get("tenant_id") == tenant_id
+				and inv.get("status") in {"approved", "matched"}
+				and not inv.get("held")
+			]
+
+			import random as _rng
+			_rng.seed(42)  # deterministic for reproducibility
+			held_set = set(
+				inv["invoice_id"]
+				for inv in _rng.sample(approved_invs, int(len(approved_invs) * held_frac))
+			) if held_frac > 0 and approved_invs else set()
+
+			for inv in approved_invs:
+				if inv["invoice_id"] in held_set:
+					continue
+				outstanding = _d(inv.get("amount", 0)) - _d(inv.get("paid_amount", 0))
+				if outstanding <= 0:
+					continue
+
+				# Apply discount savings
+				disc_pct_inv = _d(inv.get("discount_pct", 0))
+				if disc_pct_inv > 0 and disc_pct > 0:
+					disc_saving = outstanding * disc_pct_inv / Decimal("100") * Decimal(str(disc_pct / 100))
+					savings += disc_saving
+					outstanding -= disc_saving
+
+				due = inv.get("due_date")
+				if due:
+					try:
+						adjusted_due = date.fromisoformat(due[:10]) + timedelta(days=offset)
+						week_idx = (adjusted_due - today).days // 7
+						if 0 <= week_idx < 4:
+							buckets[week_idx] += outstanding
+					except Exception:
+						buckets[3] += outstanding
+				else:
+					buckets[3] += outstanding
+
+			return {
+				"name": name,
+				"total_cash_out": str(sum(buckets)),
+				"total_discount_savings": str(savings),
+				"weekly_buckets": [
+					{"week": i + 1, "amount": str(b)}
+					for i, b in enumerate(buckets)
+				],
+			}
+
+		results = await asyncio.gather(*[_run_scenario(s) for s in scenarios])
+
+		baseline = results[0]
+		comparison: list[dict[str, Any]] = []
+		baseline_total = Decimal(baseline["total_cash_out"])
+		for r in results:
+			delta = Decimal(r["total_cash_out"]) - baseline_total
+			comparison.append({
+				"name":             r["name"],
+				"total_cash_out":   r["total_cash_out"],
+				"delta_vs_baseline": str(delta),
+				"delta_pct":         str(
+					(delta / baseline_total * 100).quantize(Decimal("0.01"), ROUND_HALF_UP)
+					if baseline_total != 0 else Decimal("0")
+				),
+				"discount_savings":  r["total_discount_savings"],
+				"weekly_buckets":    r["weekly_buckets"],
+			})
+
+		return {
+			"tenant_id":   tenant_id,
+			"baseline":    baseline["name"],
+			"scenarios":   len(scenarios),
+			"comparison":  comparison,
+			"analysed_at": _now(),
+			"currency":    "KES",
+		}
+
+	async def identify_dormant_vendors(
+		self,
+		tenant_id: str,
+		inactive_days: int = 365,
+		auto_deactivate: bool = False,
+	) -> dict[str, Any]:
+		"""Flag or deactivate vendors with no AP activity in the last N days (I14).
+
+		A vendor is dormant when:
+		  - last invoice date AND last payment date are both > inactive_days ago
+		  - OR no invoices and no payments have ever been recorded
+
+		When auto_deactivate=True, sets vendor status to 'inactive' and emits
+		`vendor_deactivated` audit event. Does NOT delete the record.
+
+		Returns dormant_count, auto_deactivated_count, and full dormant list
+		with days_since_last_activity.
+		"""
+		guard_tenant_id(tenant_id)
+		assert inactive_days >= 1, "inactive_days must be >= 1"
+
+		today = _today()
+		cutoff = (date.today() - timedelta(days=inactive_days)).isoformat()
+
+		vendors = [v for v in self._vendors.values() if v.get("tenant_id") == tenant_id]
+		dormant: list[dict[str, Any]] = []
+		auto_deactivated_count = 0
+
+		for vendor in vendors:
+			vid = vendor["vendor_id"]
+
+			# Last invoice date
+			vendor_invoices = [
+				inv for inv in self._invoices.values()
+				if inv.get("vendor_id") == vid and inv.get("tenant_id") == tenant_id
+			]
+			last_invoice_date = max(
+				(inv.get("updated_at", "")[:10] for inv in vendor_invoices),
+				default="",
+			)
+
+			# Last payment date
+			vendor_payments = [
+				p for p in self._payments.values()
+				if p.get("vendor_id") == vid and p.get("tenant_id") == tenant_id
+			]
+			last_payment_date = max(
+				(p.get("updated_at", "")[:10] for p in vendor_payments),
+				default="",
+			)
+
+			last_activity = max(last_invoice_date, last_payment_date) or ""
+
+			is_dormant = (not last_activity) or (last_activity < cutoff)
+			if not is_dormant:
+				continue
+
+			days_inactive = _days_between(last_activity, today) if last_activity else inactive_days + 1
+
+			dormant_entry: dict[str, Any] = {
+				"vendor_id":              vid,
+				"vendor_name":            vendor.get("name"),
+				"last_invoice_date":      last_invoice_date or None,
+				"last_payment_date":      last_payment_date or None,
+				"last_activity_date":     last_activity or None,
+				"days_since_last_activity": days_inactive,
+				"invoice_count":          len(vendor_invoices),
+				"status_before":          vendor.get("status", "active"),
+			}
+
+			if auto_deactivate and vendor.get("status") != "inactive":
+				vendor["status"] = "inactive"
+				vendor["deactivated_at"] = _now()
+				vendor["deactivation_reason"] = f"auto_deactivated: no activity for {days_inactive} days"
+				vendor["updated_at"] = _now()
+				dormant_entry["status_after"] = "inactive"
+				auto_deactivated_count += 1
+				self._emit("vendor_deactivated", tenant_id, vendor["id"], {
+					"reason": "dormant", "days_inactive": days_inactive,
+				})
+			else:
+				dormant_entry["status_after"] = vendor.get("status", "active")
+
+			dormant.append(dormant_entry)
+
+		return {
+			"tenant_id":              tenant_id,
+			"inactive_threshold_days": inactive_days,
+			"total_vendors":          len(vendors),
+			"dormant_count":          len(dormant),
+			"auto_deactivated_count": auto_deactivated_count,
+			"dormant_vendors":        dormant,
+			"auto_deactivate":        auto_deactivate,
+			"identified_at":          _now(),
+		}
+
+	async def compute_compliance_scorecard(
+		self,
+		tenant_id: str,
+		period: dict[str, str] | None = None,
+	) -> dict[str, Any]:
+		"""Evaluate 10 AP compliance controls and return a graded scorecard (I15).
+
+		Controls and weights:
+		  1.  Segregation of duties on approvals        (10 pts)
+		  2.  PO coverage rate                          (10 pts)
+		  3.  Three-way match rate on goods invoices    (10 pts)
+		  4.  Open exceptions over 30 days              (10 pts)
+		  5.  WHT certificate issuance rate             (10 pts)
+		  6.  Duplicate invoice rate (inverse)          (10 pts)
+		  7.  Bank account change review compliance     (10 pts)
+		  8.  Expense receipt coverage                  (10 pts)
+		  9.  Payment fraud score distribution          (10 pts)
+		 10.  Approved invoices with valid period code  (10 pts)
+
+		Composite score 0–100.
+		Grade: A (>=90), B (>=75), C (>=60), D (>=45), F (<45).
+
+		Returns per-control scores, overall grade, and remediation recommendations.
+		"""
+		guard_tenant_id(tenant_id)
+		period = period or {}
+		period_start = period.get("start", "")
+		period_end = period.get("end", "")
+
+		invoices = [
+			inv for inv in self._invoices.values()
+			if inv.get("tenant_id") == tenant_id
+			and (not period_start or inv.get("updated_at", "")[:10] >= period_start[:10])
+			and (not period_end or inv.get("updated_at", "")[:10] <= period_end[:10])
+		]
+		total_inv = len(invoices) or 1
+
+		expenses = [e for e in self._expenses.values() if e.get("tenant_id") == tenant_id]
+		total_exp = len(expenses) or 1
+
+		controls: list[dict[str, Any]] = []
+		remediation: list[str] = []
+
+		# Control 1: SoD — approved_by != requested_by
+		sod_passed = sum(
+			1 for inv in invoices
+			if inv.get("approved") and inv.get("approved_by") and inv.get("requested_by")
+			and inv.get("approved_by") != inv.get("requested_by")
+		)
+		sod_total = sum(1 for inv in invoices if inv.get("approved")) or 1
+		sod_score = round(sod_passed / sod_total * 100)
+		controls.append({"control": "segregation_of_duties", "score": sod_score, "weight": 10})
+		if sod_score < 80:
+			remediation.append("Enforce SoD: ensure approver != requestor on all invoices")
+
+		# Control 2: PO coverage
+		po_backed = sum(1 for inv in invoices if inv.get("po_id"))
+		po_score = round(po_backed / total_inv * 100)
+		controls.append({"control": "po_coverage_rate", "score": po_score, "weight": 10})
+		if po_score < 70:
+			remediation.append(f"PO coverage at {po_score}% — enforce PO requirement for goods purchases")
+
+		# Control 3: three-way match rate
+		three_way = sum(1 for inv in invoices if inv.get("match_type") == "three_way")
+		goods_inv = sum(1 for inv in invoices if inv.get("po_id") and inv.get("grn_id")) or 1
+		three_way_score = round(three_way / goods_inv * 100)
+		controls.append({"control": "three_way_match_rate", "score": three_way_score, "weight": 10})
+		if three_way_score < 80:
+			remediation.append("Improve three-way match rate — ensure GRNs are recorded before invoice approval")
+
+		# Control 4: exceptions over 30 days (inverse: fewer old exceptions = higher score)
+		old_exceptions = sum(
+			1 for ex in self._match_exceptions.values()
+			if ex.get("tenant_id") == tenant_id
+			and not ex.get("resolved")
+			and _days_between(ex.get("created_at", _today())[:10], _today()) > 30
+		)
+		total_exceptions = sum(
+			1 for ex in self._match_exceptions.values()
+			if ex.get("tenant_id") == tenant_id
+		) or 1
+		old_exc_rate = old_exceptions / total_exceptions
+		exc_age_score = round(max(0, 100 - old_exc_rate * 100))
+		controls.append({"control": "exception_aging", "score": exc_age_score, "weight": 10})
+		if exc_age_score < 80:
+			remediation.append(f"{old_exceptions} exceptions >30 days old — implement exception SLA monitoring")
+
+		# Control 5: WHT certificate issuance rate
+		wht_invoices = sum(1 for inv in invoices if _d(inv.get("wht_amount", 0)) > 0)
+		wht_certs_issued = sum(1 for inv in invoices if inv.get("wht_certificate_ref"))
+		wht_cert_rate = round(wht_certs_issued / (wht_invoices or 1) * 100)
+		controls.append({"control": "wht_certificate_rate", "score": wht_cert_rate, "weight": 10})
+		if wht_cert_rate < 95 and wht_invoices > 0:
+			remediation.append(f"WHT certificates issued for {wht_cert_rate}% — run generate_wht_certificate for all WHT invoices")
+
+		# Control 6: duplicate invoice rate (inverse)
+		duplicates = sum(1 for inv in invoices if inv.get("duplicate_detected"))
+		dup_rate = duplicates / total_inv
+		dup_score = round(max(0, 100 - dup_rate * 200))  # penalise hard
+		controls.append({"control": "duplicate_rate", "score": dup_score, "weight": 10})
+		if dup_score < 80:
+			remediation.append(f"{duplicates} duplicate invoices detected — enable ml_duplicate_invoice_detect in STP")
+
+		# Control 7: bank account change review compliance
+		bank_changes = sum(1 for v in self._vendors.values()
+			if v.get("tenant_id") == tenant_id and v.get("bank_change"))
+		bank_reviewed = sum(1 for v in self._vendors.values()
+			if v.get("tenant_id") == tenant_id and v.get("bank_change")
+			and (v.get("bank_reviewed_by") or v.get("bank_change_confirmed_by")))
+		bank_score = round(bank_reviewed / (bank_changes or 1) * 100)
+		controls.append({"control": "bank_change_review", "score": bank_score, "weight": 10})
+		if bank_score < 100 and bank_changes > 0:
+			remediation.append("Not all bank changes have documented review — enforce dual-control via propose/confirm workflow")
+
+		# Control 8: expense receipt coverage
+		receipts_covered = sum(1 for exp in expenses if exp.get("receipt_reference"))
+		exp_score = round(receipts_covered / total_exp * 100)
+		controls.append({"control": "expense_receipt_coverage", "score": exp_score, "weight": 10})
+		if exp_score < 95:
+			remediation.append(f"Receipt coverage at {exp_score}% — require receipt for all expense claims")
+
+		# Control 9: payments not in high fraud-risk tier (proxy: no weekend payments)
+		payments = [p for p in self._payments.values() if p.get("tenant_id") == tenant_id]
+		total_pmts = len(payments) or 1
+		weekend_pmts = 0
+		for p in payments:
+			try:
+				d = date.fromisoformat(p.get("scheduled_date", _today())[:10])
+				if d.weekday() >= 5:
+					weekend_pmts += 1
+			except Exception:
+				pass
+		fraud_score = round(max(0, 100 - (weekend_pmts / total_pmts) * 100))
+		controls.append({"control": "payment_fraud_indicators", "score": fraud_score, "weight": 10})
+		if fraud_score < 90:
+			remediation.append(f"{weekend_pmts} weekend payments detected — review and score via score_payment_fraud_risk")
+
+		# Control 10: approved invoices with accounting_period / document_reference
+		period_coded = sum(1 for inv in invoices if inv.get("approved") and inv.get("document_reference"))
+		approved_total = sum(1 for inv in invoices if inv.get("approved")) or 1
+		period_score = round(period_coded / approved_total * 100)
+		controls.append({"control": "accounting_period_completeness", "score": period_score, "weight": 10})
+		if period_score < 95:
+			remediation.append("Some approved invoices lack document_reference — enforce at capture stage")
+
+		composite = sum(c["score"] * c["weight"] / 100 for c in controls)
+		composite = round(composite, 1)
+
+		if composite >= 90:
+			grade = "A"
+		elif composite >= 75:
+			grade = "B"
+		elif composite >= 60:
+			grade = "C"
+		elif composite >= 45:
+			grade = "D"
+		else:
+			grade = "F"
+
+		self._emit("compliance_scorecard_computed", tenant_id, "scorecard", {
+			"composite_score": composite, "grade": grade, "control_count": len(controls),
+		})
+
+		return {
+			"tenant_id":         tenant_id,
+			"period":            period,
+			"composite_score":   composite,
+			"grade":             grade,
+			"controls":          controls,
+			"remediation_items": remediation,
+			"invoices_evaluated": len(invoices),
+			"computed_at":       _now(),
+		}
+
+
 # Back-compat alias
 APService = AccountsPayableService

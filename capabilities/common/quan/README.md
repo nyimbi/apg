@@ -3,7 +3,8 @@
 QUAN gives APG applications a tenant-scoped quantum lab runtime: backend
 registry, provider credentials posture, quota policies, circuit library, job
 submission, deterministic result capture, experiment workbench, quantum agents,
-UI metadata, theme tokens, audit evidence, and Bytewax-backed lifecycle events.
+noise modelling, fidelity monitoring, Grover search, async execution, and
+Decimal-precision cost accounting.
 
 The package stays dependency-light. Production quantum providers, provider
 credential vaults, encryption systems, cost controls, monitoring systems,
@@ -16,14 +17,38 @@ adapters in the executable contract and are bound by the host application.
   approval state, credential references, simulator fallback, and metadata.
 - Quota policies for shots per job, jobs per day, cost limit, and retry policy.
 - Circuit library with owners, versions, qubit requirements, gates, sensitive
-  input encryption, and experiment metadata.
-- Job queue with submitter identity, quota checks, shot limits, cost
-  estimation, retry posture, review gates, and Bytewax stream validation.
+  input encryption, experiment metadata, and structural complexity metrics.
+- Job queue with submitter identity, quota checks, shot limits,
+  Decimal-precision cost estimation, retry posture, review gates, and
+  Bytewax stream validation.
 - Result capture with deterministic measurement counts, confidence, retention,
   and summaries for generated-application proof.
-- Experiment workbench with post-quantum review guardrails.
-- First-class AI quantum agents with runtime, role, scope, registration, and
-  contribution-disclosure guardrails.
+- Quantum error mitigation: zero-noise extrapolation, probabilistic error
+  cancellation, Clifford data regression, symmetry verification.
+- Variational Quantum Eigensolver (VQE) with configurable ansatz and optimiser.
+- Quantum Approximate Optimisation Algorithm (QAOA) for max-cut, graph
+  colouring, portfolio optimisation, TSP, and vertex cover.
+- Quantum Key Distribution (QKD) simulation: BB84, E91, B92, SARG04.
+- Post-quantum encryption: Kyber, Dilithium, Falcon, SPHINCS+, NTRU.
+- Quantum simulation of Ising, Hubbard, transverse-field, Heisenberg, and
+  Bose-Hubbard systems via Trotter decomposition.
+- Grover's search oracle with optimal iteration count and quadratic speedup
+  ratio vs. classical brute force.
+- Noise model registry: depolarising, thermal relaxation, readout error,
+  crosstalk — apply to results for NISQ device fidelity estimation.
+- Fidelity snapshot recording and drift detection with EMA-based alerting
+  and automatic FIDELITY_DRIFT_ALERT audit events.
+- Circuit complexity metrics: gate counts by type, two-qubit fraction,
+  depth estimate, T-gate count, Meyer-Wallach entanglement proxy.
+- Decimal-precision cost accounting via `quantum_cost_estimate_decimal`.
+- Async execution: `async_submit_quantum_job`, `async_batch_submit_jobs`,
+  `async_vqe_solve`, `async_qaoa_solve`, `async_quantum_simulation`,
+  `async_quantum_analytics`.
+- Quantum-inspired random number generation with QRNG audit trail.
+- Circuit optimisation (depth/gate-count reduction at levels 0–3).
+- Backend status with queue depth, availability, and calibration age.
+- First-class AI quantum agents with runtime, role, scope, registration,
+  and contribution-disclosure guardrails.
 - UI route, API, view-model, theme, semantic-model, package-manifest, and
   release-report evidence.
 
@@ -31,6 +56,7 @@ adapters in the executable contract and are bound by the host application.
 
 - `SPECIFICATION.md` defines the normative capability behavior.
 - `PLAN.md` records the implementation packet plan.
+- `WORLD_CLASS_IMPROVEMENTS.md` documents 15 prioritised enhancement paths.
 - `capability_contract.py` is the executable source of configuration, rules,
   routes, theme, adapters, provides/requires, and Bytewax stream metadata.
 - `models.py` defines tenant-scoped backends, circuits, quotas, jobs, results,
@@ -38,7 +64,7 @@ adapters in the executable contract and are bound by the host application.
 - `quantum_runtime.py` contains deterministic IDs, provider normalization,
   retry policy normalization, cost estimation, measurement generation, and
   result summaries.
-- `service.py` implements the runtime facade.
+- `service.py` implements the runtime facade with 50+ methods.
 - `api.py` exposes package-safe helper functions.
 - `views.py` exposes UI view models.
 - `test_capability_contract.py` proves lifecycle behavior and generated
@@ -88,6 +114,95 @@ job = service.submit_job(
 result = service.complete_job("result-001", "tenant-demo", job["id"])
 ```
 
+## Async Batch Execution
+
+```python
+import asyncio
+from capabilities.common.quan import QuanService
+
+service = QuanService()
+# ... register backend + circuits as above ...
+
+jobs = [
+    {"circuit_definition": {"name": "ghz", "qubits": 3, "gates": ["h", "cx", "cx"]},
+     "backend": "local-sim", "shots": 512},
+    {"circuit_definition": {"name": "bell", "qubits": 2, "gates": ["h", "cx"]},
+     "backend": "local-sim", "shots": 1024},
+]
+results = asyncio.run(
+    service.async_batch_submit_jobs(jobs, tenant_id="tenant-demo", submitted_by="researcher")
+)
+```
+
+## Grover's Search
+
+```python
+result = service.grover_search(
+    oracle_spec={"function_description": "3-SAT with 6 clauses"},
+    n_qubits=8,
+    marked_items=4,
+    tenant_id="tenant-demo",
+    shots=2048,
+)
+print(result["optimal_iterations"])    # 12
+print(result["quantum_speedup_ratio"]) # 10.67x vs brute force
+```
+
+## Noise Modelling
+
+```python
+noise_model = service.noise_model_register(
+    model_id="ibm-nairobi-approx",
+    tenant_id="tenant-demo",
+    model_type="depolarising",
+    params={"gate_error_rate": 0.001, "two_qubit_error_rate": 0.01},
+)
+noisy = service.noise_model_apply(
+    result_id="result-001",
+    noise_model_id=noise_model["noise_model_id"],
+    tenant_id="tenant-demo",
+)
+```
+
+## Fidelity Drift Detection
+
+```python
+# Record calibration snapshots periodically
+service.fidelity_snapshot_record(
+    backend_id="qpu-01", tenant_id="tenant-demo",
+    gate_fidelity=0.998, readout_fidelity=0.995,
+    t1_us=120.0, t2_us=80.0,
+)
+# ... record more snapshots over time ...
+
+alert = service.fidelity_drift_detect(
+    backend_id="qpu-01", tenant_id="tenant-demo", drift_threshold=0.02,
+)
+if alert["drift_detected"]:
+    print(alert["recommendation"])  # "halt_jobs_and_recalibrate"
+```
+
+## Decimal-Precision Cost Estimation
+
+```python
+cost = service.quantum_cost_estimate_decimal(
+    tenant_id="tenant-demo",
+    backend_id="local-sim",
+    circuit_id="bell-v1",
+    shot_count=1_000_000,
+)
+print(cost["estimated_cost"])  # "0.100000"  (string, 6 dp, no float error)
+```
+
+## Circuit Metrics
+
+```python
+metrics = service.circuit_metrics(circuit_id="bell-v1", tenant_id="tenant-demo")
+print(metrics["two_qubit_fraction"])   # 0.5
+print(metrics["circuit_depth_estimate"])  # 2
+print(metrics["complexity_tier"])     # "high"
+```
+
 ## AI Quantum Agents
 
 Register AI agents before they assist with quantum governance:
@@ -102,7 +217,7 @@ agent = service.register_quan_agent(
 )
 ```
 
-Supported runtimes are `codex`, `claude_code`, `opencode`, and `pi`.
+Supported runtimes: `codex`, `claude_code`, `opencode`, `pi`.
 Supported roles cover backend, circuit, job, result, cost, and post-quantum
 review.
 
@@ -121,8 +236,6 @@ Batch quantum mutation and quantum job lifecycle events must use the `bytewax`
 event-stream adapter.
 
 ## Verification
-
-Focused verification for this packet:
 
 ```bash
 ./.venv/bin/python -m py_compile capabilities/common/quan/__init__.py capabilities/common/quan/capability_contract.py capabilities/common/quan/models.py capabilities/common/quan/quantum_runtime.py capabilities/common/quan/service.py capabilities/common/quan/api.py capabilities/common/quan/views.py capabilities/common/quan/app.py capabilities/common/quan/test_capability_contract.py

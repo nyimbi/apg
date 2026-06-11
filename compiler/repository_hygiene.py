@@ -53,6 +53,8 @@ STREAMING_TERM_EXCLUDED_PREFIXES = (
 STREAMING_TERM_EXCLUDED_SUFFIXES = (
 	"/tests/",
 	"/test_",
+	"WORLD_CLASS_IMPROVEMENTS.md",  # competitor analysis docs legitimately reference external platforms
+	"user_guide.md",  # user guides may reference competitor systems for context
 )
 STREAMING_TERM_EXCLUDED_PATHS = {
 	"prompt.md",

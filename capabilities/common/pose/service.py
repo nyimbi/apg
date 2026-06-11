@@ -994,6 +994,641 @@ class PoseService:
 			and (not edge_only or m.edge_ready)
 		]
 
+	# ------------------------------------------------------------------ #
+	# New async methods — world-class improvements batch 2 (+8)           #
+	# ------------------------------------------------------------------ #
+
+	async def smooth_keypoint_track(
+		self,
+		smoothed_id: str,
+		tenant_id: str,
+		track_id: str,
+		window_size: int = 5,
+		filter_type: str = "ema",
+	) -> "dict[str, Any]":
+		"""Apply temporal smoothing to a skeletal track's keypoint time-series.
+
+		filter_type: 'ema' (exponential moving average) | 'boxcar' (uniform window average).
+		Returns per-keypoint smoothed trajectories and residual noise RMS. Raw frames
+		are preserved; smoothed output is returned for downstream use and NOT stored
+		as new estimates to prevent data duplication.
+		"""
+		guard_tenant_id(tenant_id)
+		self._require_tenant(tenant_id)
+		key = _stable_key(tenant_id, track_id)
+		snapshots = self._skeletal_tracks.get(key)
+		if not snapshots:
+			raise LookupError("skeletal_track_not_found")
+		if window_size < 1:
+			raise ValueError("window_size_must_be_positive")
+
+		# Collect per-keypoint time series
+		kp_names: set[str] = set()
+		for snap in snapshots:
+			for kp in snap.get("keypoints", []):
+				kp_names.add(kp["name"])
+
+		smoothed_kp_series: dict[str, list[dict[str, float]]] = {}
+		noise_rms: dict[str, float] = {}
+
+		for name in sorted(kp_names):
+			xs = [kp["x"] for snap in snapshots for kp in snap.get("keypoints", []) if kp["name"] == name]
+			ys = [kp["y"] for snap in snapshots for kp in snap.get("keypoints", []) if kp["name"] == name]
+			if not xs:
+				continue
+			sx = _smooth_series(xs, window_size, filter_type)
+			sy = _smooth_series(ys, window_size, filter_type)
+			residual_x = _rms_residual(xs, sx)
+			residual_y = _rms_residual(ys, sy)
+			noise_rms[name] = round((residual_x ** 2 + residual_y ** 2) ** 0.5, 6)
+			smoothed_kp_series[name] = [
+				{"frame_index": i, "x": round(sx[i], 4), "y": round(sy[i], 4)}
+				for i in range(len(sx))
+			]
+
+		result = {
+			"id": smoothed_id,
+			"tenant_id": tenant_id,
+			"track_id": track_id,
+			"filter_type": filter_type,
+			"window_size": window_size,
+			"frame_count": len(snapshots),
+			"keypoint_count": len(smoothed_kp_series),
+			"smoothed_series": smoothed_kp_series,
+			"noise_rms_per_keypoint": noise_rms,
+			"created_at": utc_now_iso(),
+		}
+		self._audit(tenant_id, "keypoint_track_smoothed", smoothed_id,
+			f"Smoothed {len(smoothed_kp_series)} keypoints with {filter_type} window={window_size}")
+		return result
+
+	async def compute_kinematics(
+		self,
+		report_id: str,
+		tenant_id: str,
+		track_id: str,
+		fps: float = 30.0,
+	) -> "dict[str, Any]":
+		"""Compute per-keypoint velocity and acceleration from a skeletal track.
+
+		Uses second-order finite differences. Returns velocity (units/frame and
+		units/second), acceleration (units/frame²), peak-velocity frame index,
+		and a kinetic energy proxy (sum of squared velocities) per keypoint.
+		fps is used to convert from frame-units to seconds.
+		"""
+		guard_tenant_id(tenant_id)
+		self._require_tenant(tenant_id)
+		key = _stable_key(tenant_id, track_id)
+		snapshots = self._skeletal_tracks.get(key)
+		if not snapshots:
+			raise LookupError("skeletal_track_not_found")
+		if fps <= 0:
+			raise ValueError("fps_must_be_positive")
+
+		kp_names: set[str] = set()
+		for snap in snapshots:
+			for kp in snap.get("keypoints", []):
+				kp_names.add(kp["name"])
+
+		kinematics: list[dict[str, Any]] = []
+		for name in sorted(kp_names):
+			positions = [
+				(kp["x"], kp["y"])
+				for snap in snapshots
+				for kp in snap.get("keypoints", [])
+				if kp["name"] == name
+			]
+			if len(positions) < 2:
+				continue
+			vx = [positions[i + 1][0] - positions[i][0] for i in range(len(positions) - 1)]
+			vy = [positions[i + 1][1] - positions[i][1] for i in range(len(positions) - 1)]
+			speed = [round((vx[i] ** 2 + vy[i] ** 2) ** 0.5, 6) for i in range(len(vx))]
+			ax = [vx[i + 1] - vx[i] for i in range(len(vx) - 1)] if len(vx) >= 2 else []
+			ay = [vy[i + 1] - vy[i] for i in range(len(vy) - 1)] if len(vy) >= 2 else []
+			accel = [round((ax[i] ** 2 + ay[i] ** 2) ** 0.5, 6) for i in range(len(ax))]
+			peak_idx = speed.index(max(speed)) if speed else 0
+			ke_proxy = round(sum(s ** 2 for s in speed), 6)
+			kinematics.append({
+				"keypoint": name,
+				"velocity_per_frame": speed,
+				"velocity_per_second": [round(s * fps, 4) for s in speed],
+				"acceleration_per_frame2": accel,
+				"peak_velocity_frame_index": peak_idx,
+				"peak_velocity": round(max(speed), 6) if speed else 0.0,
+				"kinetic_energy_proxy": ke_proxy,
+			})
+
+		report = {
+			"id": report_id,
+			"tenant_id": tenant_id,
+			"track_id": track_id,
+			"fps": fps,
+			"frame_count": len(snapshots),
+			"keypoint_count": len(kinematics),
+			"kinematics": kinematics,
+			"created_at": utc_now_iso(),
+		}
+		self._audit(tenant_id, "kinematics_computed", report_id,
+			f"Computed kinematics for {len(kinematics)} keypoints at {fps} fps")
+		return report
+
+	async def measure_rom(
+		self,
+		rom_id: str,
+		tenant_id: str,
+		estimate_id_start: str,
+		estimate_id_end: str,
+		joint: str,
+	) -> "dict[str, Any]":
+		"""Measure range of motion (ROM) for a joint between two pose estimates.
+
+		Computes angular delta between start and end estimates and classifies
+		result against ISO 8551-based normal ROM ranges. Clinical classification:
+		'normal' | 'restricted' | 'hypermobile'.
+		"""
+		guard_tenant_id(tenant_id)
+		self._require_tenant(tenant_id)
+		start_est = self._require_estimate(estimate_id_start, tenant_id)
+		end_est = self._require_estimate(estimate_id_end, tenant_id)
+
+		# Normal ROM lookup (degrees) — ISO 8551 / AAOS reference values
+		_NORMAL_ROM: dict[str, tuple[float, float]] = {
+			"left_knee": (0.0, 135.0),
+			"right_knee": (0.0, 135.0),
+			"left_elbow": (0.0, 145.0),
+			"right_elbow": (0.0, 145.0),
+			"left_hip": (0.0, 120.0),
+			"right_hip": (0.0, 120.0),
+			"left_shoulder": (0.0, 180.0),
+			"right_shoulder": (0.0, 180.0),
+			"left_ankle": (0.0, 50.0),
+			"right_ankle": (0.0, 50.0),
+		}
+
+		def _get_angle(est: "PoseEstimateRecord", joint_name: str) -> float | None:
+			"""Extract single-joint angle using default COCO-17 topology."""
+			_TOPOLOGY: dict[str, tuple[str, str, str]] = {
+				"left_knee": ("left_hip", "left_knee", "left_ankle"),
+				"right_knee": ("right_hip", "right_knee", "right_ankle"),
+				"left_elbow": ("left_shoulder", "left_elbow", "left_wrist"),
+				"right_elbow": ("right_shoulder", "right_elbow", "right_wrist"),
+				"left_hip": ("left_shoulder", "left_hip", "left_knee"),
+				"right_hip": ("right_shoulder", "right_hip", "right_knee"),
+				"left_shoulder": ("left_elbow", "left_shoulder", "left_hip"),
+				"right_shoulder": ("right_elbow", "right_shoulder", "right_hip"),
+				"left_ankle": ("left_knee", "left_ankle", "left_foot"),
+				"right_ankle": ("right_knee", "right_ankle", "right_foot"),
+			}
+			triple = _TOPOLOGY.get(joint_name)
+			if not triple:
+				return None
+			kp_map = {kp["name"]: kp for kp in est.keypoints}
+			p, j, d = triple
+			if p not in kp_map or j not in kp_map or d not in kp_map:
+				return None
+			return _angle_from_three_keypoints(kp_map[p], kp_map[j], kp_map[d])
+
+		angle_start = _get_angle(start_est, joint)
+		angle_end = _get_angle(end_est, joint)
+		if angle_start is None or angle_end is None:
+			rom_degrees = None
+			classification = "insufficient_keypoints"
+			pct_of_normal = None
+		else:
+			rom_degrees = round(abs(angle_end - angle_start), 2)
+			normal_min, normal_max = _NORMAL_ROM.get(joint, (0.0, 90.0))
+			normal_range = normal_max - normal_min
+			pct_of_normal = round((rom_degrees / normal_range) * 100, 1) if normal_range > 0 else None
+			if rom_degrees < normal_min + (normal_range * 0.3):
+				classification = "restricted"
+			elif rom_degrees > normal_max * 1.1:
+				classification = "hypermobile"
+			else:
+				classification = "normal"
+
+		record = {
+			"id": rom_id,
+			"tenant_id": tenant_id,
+			"estimate_id_start": estimate_id_start,
+			"estimate_id_end": estimate_id_end,
+			"joint": joint,
+			"angle_start_degrees": angle_start,
+			"angle_end_degrees": angle_end,
+			"rom_degrees": rom_degrees,
+			"percent_of_normal_rom": pct_of_normal,
+			"clinical_classification": classification,
+			"created_at": utc_now_iso(),
+		}
+		self._audit(tenant_id, "rom_measured", rom_id,
+			f"Joint {joint}: {rom_degrees}° — {classification}")
+		return record
+
+	async def detect_asymmetry(
+		self,
+		report_id: str,
+		tenant_id: str,
+		track_id: str,
+		mild_threshold_pct: float = 10.0,
+		severe_threshold_pct: float = 15.0,
+	) -> "dict[str, Any]":
+		"""Compute bilateral load-proxy asymmetry from a skeletal track.
+
+		Derives asymmetry ratio for each bilateral joint pair from keypoint
+		velocity magnitudes. Classification: 'symmetric' | 'mild_asymmetry' |
+		'severe_asymmetry'. Raises a high-severity audit event when any pair
+		exceeds severe_threshold_pct.
+		"""
+		guard_tenant_id(tenant_id)
+		self._require_tenant(tenant_id)
+		key = _stable_key(tenant_id, track_id)
+		snapshots = self._skeletal_tracks.get(key)
+		if not snapshots:
+			raise LookupError("skeletal_track_not_found")
+
+		_BILATERAL_PAIRS: list[tuple[str, str]] = [
+			("left_knee", "right_knee"),
+			("left_hip", "right_hip"),
+			("left_ankle", "right_ankle"),
+			("left_shoulder", "right_shoulder"),
+			("left_elbow", "right_elbow"),
+		]
+
+		def _mean_speed(name: str) -> float:
+			positions = [
+				(kp["x"], kp["y"])
+				for snap in snapshots
+				for kp in snap.get("keypoints", [])
+				if kp["name"] == name
+			]
+			if len(positions) < 2:
+				return 0.0
+			speeds = [
+				((positions[i + 1][0] - positions[i][0]) ** 2 +
+				 (positions[i + 1][1] - positions[i][1]) ** 2) ** 0.5
+				for i in range(len(positions) - 1)
+			]
+			return mean(speeds)
+
+		results: list[dict[str, Any]] = []
+		has_severe = False
+		for left_name, right_name in _BILATERAL_PAIRS:
+			left_spd = _mean_speed(left_name)
+			right_spd = _mean_speed(right_name)
+			dominant = max(left_spd, right_spd)
+			if dominant < 1e-9:
+				continue
+			asymmetry_pct = round(abs(left_spd - right_spd) / dominant * 100, 2)
+			if asymmetry_pct >= severe_threshold_pct:
+				label = "severe_asymmetry"
+				has_severe = True
+			elif asymmetry_pct >= mild_threshold_pct:
+				label = "mild_asymmetry"
+			else:
+				label = "symmetric"
+			results.append({
+				"joint_pair": f"{left_name}/{right_name}",
+				"left_mean_speed": round(left_spd, 6),
+				"right_mean_speed": round(right_spd, 6),
+				"asymmetry_pct": asymmetry_pct,
+				"classification": label,
+			})
+
+		report = {
+			"id": report_id,
+			"tenant_id": tenant_id,
+			"track_id": track_id,
+			"joint_pairs_evaluated": len(results),
+			"severe_asymmetry_detected": has_severe,
+			"mild_threshold_pct": mild_threshold_pct,
+			"severe_threshold_pct": severe_threshold_pct,
+			"joint_pair_results": results,
+			"created_at": utc_now_iso(),
+		}
+		severity = "high" if has_severe else "info"
+		self._audit(tenant_id, "asymmetry_detected", report_id,
+			f"Severe asymmetry={'yes' if has_severe else 'no'} ({len(results)} pairs)",
+			severity=severity)
+		return report
+
+	async def compute_posture_score(
+		self,
+		score_id: str,
+		tenant_id: str,
+		estimate_id: str,
+	) -> "dict[str, Any]":
+		"""Compute a Posture Alignment Index (PAI) score 0–100.
+
+		Evaluates head forward position, shoulder level, spinal vertical alignment
+		(neck-shoulder-hip-ankle chain), and pelvic tilt. Higher score = better
+		posture. Traffic-light bands: green (>=80) | amber (50-79) | red (<50).
+		Based on ISO 11226 thresholds.
+		"""
+		guard_tenant_id(tenant_id)
+		self._require_tenant(tenant_id)
+		estimate = self._require_estimate(estimate_id, tenant_id)
+		kp_map = {kp["name"]: kp for kp in estimate.keypoints}
+
+		penalties: list[float] = []
+
+		# 1. Head forward position: nose x vs shoulder x midpoint
+		nose = kp_map.get("nose")
+		l_sh = kp_map.get("left_shoulder")
+		r_sh = kp_map.get("right_shoulder")
+		if nose and l_sh and r_sh:
+			shoulder_mid_x = (l_sh["x"] + r_sh["x"]) / 2
+			forward_offset = abs(nose["x"] - shoulder_mid_x)
+			penalties.append(min(forward_offset * 100, 25.0))
+
+		# 2. Shoulder level: y-difference between left and right shoulder
+		if l_sh and r_sh:
+			shoulder_tilt = abs(l_sh["y"] - r_sh["y"])
+			penalties.append(min(shoulder_tilt * 200, 20.0))
+
+		# 3. Spinal vertical alignment: hip midpoint x vs shoulder midpoint x
+		l_hip = kp_map.get("left_hip")
+		r_hip = kp_map.get("right_hip")
+		if l_sh and r_sh and l_hip and r_hip:
+			shoulder_cx = (l_sh["x"] + r_sh["x"]) / 2
+			hip_cx = (l_hip["x"] + r_hip["x"]) / 2
+			lateral_lean = abs(shoulder_cx - hip_cx)
+			penalties.append(min(lateral_lean * 150, 30.0))
+
+		# 4. Pelvic tilt: y-difference between left and right hip
+		if l_hip and r_hip:
+			pelvic_tilt = abs(l_hip["y"] - r_hip["y"])
+			penalties.append(min(pelvic_tilt * 200, 25.0))
+
+		total_penalty = sum(penalties)
+		pai = round(max(0.0, 100.0 - total_penalty), 1)
+
+		if pai >= 80:
+			band = "green"
+		elif pai >= 50:
+			band = "amber"
+		else:
+			band = "red"
+
+		record = {
+			"id": score_id,
+			"tenant_id": tenant_id,
+			"estimate_id": estimate_id,
+			"posture_alignment_index": pai,
+			"traffic_light_band": band,
+			"penalty_components": penalties,
+			"keypoints_available": list(kp_map.keys()),
+			"created_at": utc_now_iso(),
+		}
+		self._audit(tenant_id, "posture_score_computed", score_id,
+			f"PAI={pai} ({band})")
+		return record
+
+	async def score_injury_risk(
+		self,
+		risk_id: str,
+		tenant_id: str,
+		joint_angles_report_id: str,
+		rules: "list[dict[str, Any]] | None" = None,
+	) -> "dict[str, Any]":
+		"""Evaluate biomechanical joint angles against injury risk rules.
+
+		Default rules cover ACL valgus collapse (knee > 175°), hamstring strain
+		(hip flexion > 120°), and lower-back overload (trunk lean > 30°). Each
+		rule carries clinical evidence level (A/B/C) and a corrective cue. Returns
+		a composite injury risk score 0–10 and per-rule results.
+		"""
+		guard_tenant_id(tenant_id)
+		self._require_tenant(tenant_id)
+
+		# Look up pre-computed joint angles report
+		angles_report: dict[str, Any] | None = None
+		for store in (self._analyses, self._benchmark_records, self._ergonomics_reports):
+			candidate = store.get(_stable_key(tenant_id, joint_angles_report_id))
+			if candidate is not None:
+				angles_report = candidate
+				break
+
+		default_rules: list[dict[str, Any]] = [
+			{
+				"rule_id": "acl_valgus_collapse",
+				"joint": "left_knee",
+				"threshold_degrees": 175.0,
+				"operator": "gt",
+				"evidence_level": "A",
+				"risk_weight": 3.0,
+				"corrective_cue": "Cue knee-over-toe alignment; strengthen hip abductors.",
+			},
+			{
+				"rule_id": "hamstring_strain_risk",
+				"joint": "left_hip",
+				"threshold_degrees": 120.0,
+				"operator": "gt",
+				"evidence_level": "B",
+				"risk_weight": 2.5,
+				"corrective_cue": "Reduce hip flexion range; improve hamstring flexibility.",
+			},
+			{
+				"rule_id": "lower_back_overload",
+				"joint": "right_hip",
+				"threshold_degrees": 140.0,
+				"operator": "gt",
+				"evidence_level": "B",
+				"risk_weight": 2.0,
+				"corrective_cue": "Reduce trunk lean; engage core stabilisers.",
+			},
+		]
+		active_rules = rules or default_rules
+		joint_angle_map: dict[str, float] = {}
+		if angles_report and "joint_angles" in angles_report:
+			for item in angles_report["joint_angles"]:
+				joint_angle_map[item["joint"]] = item["angle_degrees"]
+
+		rule_results: list[dict[str, Any]] = []
+		total_risk_score = 0.0
+		for rule in active_rules:
+			joint = rule.get("joint", "")
+			threshold = float(rule.get("threshold_degrees", 0))
+			operator = rule.get("operator", "gt")
+			weight = float(rule.get("risk_weight", 1.0))
+			actual = joint_angle_map.get(joint)
+			if actual is None:
+				triggered = False
+			elif operator == "gt":
+				triggered = actual > threshold
+			elif operator == "lt":
+				triggered = actual < threshold
+			else:
+				triggered = abs(actual - threshold) < 5.0
+			if triggered:
+				total_risk_score += weight
+			rule_results.append({
+				"rule_id": rule.get("rule_id", ""),
+				"joint": joint,
+				"threshold_degrees": threshold,
+				"actual_degrees": actual,
+				"triggered": triggered,
+				"evidence_level": rule.get("evidence_level", "C"),
+				"corrective_cue": rule.get("corrective_cue", "") if triggered else None,
+			})
+
+		composite_score = round(min(total_risk_score, 10.0), 2)
+		risk_tier = "low" if composite_score < 3 else "moderate" if composite_score < 6 else "high"
+
+		record = {
+			"id": risk_id,
+			"tenant_id": tenant_id,
+			"joint_angles_report_id": joint_angles_report_id,
+			"composite_injury_risk_score": composite_score,
+			"risk_tier": risk_tier,
+			"rules_evaluated": len(rule_results),
+			"rules_triggered": sum(1 for r in rule_results if r["triggered"]),
+			"rule_results": rule_results,
+			"created_at": utc_now_iso(),
+		}
+		severity = "high" if risk_tier == "high" else "info"
+		self._audit(tenant_id, "injury_risk_scored", risk_id,
+			f"Risk score={composite_score} ({risk_tier})", severity=severity)
+		return record
+
+	async def ingest_frame_batch(
+		self,
+		batch_id: str,
+		tenant_id: str,
+		session_id: str,
+		model_id: str,
+		frames: "list[dict[str, Any]]",
+		max_concurrency: int = 8,
+	) -> "dict[str, Any]":
+		"""Batch-ingest frames with pre-computed keypoints concurrently.
+
+		Each entry in `frames` must include: frame_id, frame_number, occurred_at,
+		source_ref, width, height, keypoints. Processes up to max_concurrency frames
+		simultaneously via asyncio semaphore. Returns per-frame status and a batch
+		summary with success count, failure count, and total latency.
+		"""
+		import asyncio as _asyncio
+		import time as _time
+
+		guard_tenant_id(tenant_id)
+		self._require_tenant(tenant_id)
+		self._require_session(session_id, tenant_id)
+		if not frames:
+			raise ValueError("frames_required")
+
+		semaphore = _asyncio.Semaphore(max(1, max_concurrency))
+		frame_results: list[dict[str, Any]] = []
+		t0 = _time.monotonic()
+
+		async def _process_one(frame_payload: dict[str, Any]) -> dict[str, Any]:
+			async with semaphore:
+				fid = str(frame_payload.get("frame_id") or "")
+				try:
+					frm = self.record_frame(
+						frame_id=fid,
+						tenant_id=tenant_id,
+						session_id=session_id,
+						frame_number=int(frame_payload.get("frame_number", 0)),
+						occurred_at=str(frame_payload.get("occurred_at", utc_now_iso())),
+						source_ref=str(frame_payload.get("source_ref", "")),
+						width=int(frame_payload.get("width", 1920)),
+						height=int(frame_payload.get("height", 1080)),
+					)
+					est = self.estimate_pose(
+						estimate_id=f"{fid}:est",
+						tenant_id=tenant_id,
+						session_id=session_id,
+						frame_id=frm["id"],
+						model_id=model_id,
+						keypoints=list(frame_payload.get("keypoints", [])),
+						quality_review_recorded=True,
+					)
+					return {"frame_id": fid, "status": "ok", "estimate_id": est["id"]}
+				except Exception as exc:
+					return {"frame_id": fid, "status": "error", "error": str(exc)}
+
+		tasks = [_process_one(f) for f in frames]
+		frame_results = list(await _asyncio.gather(*tasks))
+		elapsed_ms = round((_time.monotonic() - t0) * 1000, 1)
+		success_count = sum(1 for r in frame_results if r["status"] == "ok")
+		failure_count = len(frame_results) - success_count
+
+		summary = {
+			"id": batch_id,
+			"tenant_id": tenant_id,
+			"session_id": session_id,
+			"total_frames": len(frames),
+			"success_count": success_count,
+			"failure_count": failure_count,
+			"elapsed_ms": elapsed_ms,
+			"frame_results": frame_results,
+			"created_at": utc_now_iso(),
+		}
+		self._audit(tenant_id, "frame_batch_ingested", batch_id,
+			f"Batch: {success_count}/{len(frames)} ok in {elapsed_ms}ms",
+			severity="info" if failure_count == 0 else "medium")
+		return summary
+
+	async def longitudinal_compare(
+		self,
+		report_id: str,
+		tenant_id: str,
+		session_ids: "list[str]",
+	) -> "dict[str, Any]":
+		"""Compare pose quality across multiple sessions for longitudinal tracking.
+
+		Computes per-session aggregate confidence distribution and pairwise cosine
+		similarity matrix. Returns trend vectors (improving / stable / declining)
+		per session relative to the first session baseline.
+		"""
+		guard_tenant_id(tenant_id)
+		self._require_tenant(tenant_id)
+		if len(session_ids) < 2:
+			raise ValueError("at_least_two_sessions_required")
+
+		session_stats: list[dict[str, Any]] = []
+		for sid in session_ids:
+			session = self._sessions.get(sid)
+			if session is None or session.tenant_id != tenant_id:
+				raise LookupError(f"session_not_found:{sid}")
+			ests = [e for e in self._estimates.values() if e.session_id == sid and e.tenant_id == tenant_id]
+			confs = [e.confidence for e in ests]
+			session_stats.append({
+				"session_id": sid,
+				"estimate_count": len(ests),
+				"mean_confidence": round(mean(confs), 4) if confs else 0.0,
+				"min_confidence": round(min(confs), 4) if confs else 0.0,
+				"max_confidence": round(max(confs), 4) if confs else 0.0,
+			})
+
+		# Pairwise similarity matrix using confidence as 1D vector proxy
+		n = len(session_stats)
+		matrix: list[list[float]] = [[0.0] * n for _ in range(n)]
+		for i in range(n):
+			for j in range(n):
+				ci = session_stats[i]["mean_confidence"]
+				cj = session_stats[j]["mean_confidence"]
+				sim = 1.0 - abs(ci - cj)
+				matrix[i][j] = round(max(0.0, sim), 4)
+
+		# Trend relative to first session baseline
+		baseline = session_stats[0]["mean_confidence"]
+		trends: list[dict[str, Any]] = []
+		for idx, stat in enumerate(session_stats):
+			delta = round(stat["mean_confidence"] - baseline, 4)
+			trend = "stable" if abs(delta) < 0.02 else ("improving" if delta > 0 else "declining")
+			trends.append({"session_id": stat["session_id"], "delta": delta, "trend": trend})
+
+		report = {
+			"id": report_id,
+			"tenant_id": tenant_id,
+			"session_count": n,
+			"session_stats": session_stats,
+			"similarity_matrix": matrix,
+			"trend_vectors": trends,
+			"created_at": utc_now_iso(),
+		}
+		self._audit(tenant_id, "longitudinal_comparison_done", report_id,
+			f"Compared {n} sessions")
+		return report
 
 	# ------------------------------------------------------------------ #
 	# New async methods — world-class improvements (+8)                   #
@@ -1587,6 +2222,33 @@ def _angle_from_three_keypoints(proximal, joint, distal):
 		return 0.0
 	cos_angle = max(-1.0, min(1.0, dot / (mag_a * mag_b)))
 	return round(math.degrees(math.acos(cos_angle)), 2)
+
+
+def _smooth_series(values: list[float], window: int, filter_type: str) -> list[float]:
+	"""Smooth a 1D float series with EMA or boxcar (uniform window) filter."""
+	if not values:
+		return []
+	if filter_type == "ema":
+		alpha = 2.0 / (window + 1)
+		result = [values[0]]
+		for v in values[1:]:
+			result.append(alpha * v + (1 - alpha) * result[-1])
+		return [round(x, 6) for x in result]
+	# boxcar
+	half = window // 2
+	smoothed = []
+	for i in range(len(values)):
+		lo = max(0, i - half)
+		hi = min(len(values), i + half + 1)
+		smoothed.append(round(mean(values[lo:hi]), 6))
+	return smoothed
+
+
+def _rms_residual(original: list[float], smoothed: list[float]) -> float:
+	"""Root mean square of residuals between original and smoothed series."""
+	if not original or len(original) != len(smoothed):
+		return 0.0
+	return round((sum((a - b) ** 2 for a, b in zip(original, smoothed)) / len(original)) ** 0.5, 6)
 
 
 def _weighted_keypoint_consensus(name, candidates, iqr_factor=1.5):

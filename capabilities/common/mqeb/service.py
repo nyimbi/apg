@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-
-from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 """
 APG Message Queue Event Bus (MQEB) - Core Service
 Main service implementation with APG integration
@@ -11,18 +9,37 @@ Copyright: © 2025 Datacraft
 
 import asyncio
 import hashlib
+import hmac
 import json
 import logging
 from datetime import datetime, timedelta
+from decimal import Decimal
 from typing import Dict, List, Any, Optional, Tuple, Set, AsyncGenerator
 from dataclasses import dataclass, field, asdict
 import uuid
-from uuid_extensions import uuid7str
+
+try:
+	from uuid6 import uuid7
+	def uuid7str() -> str:
+		return str(uuid7())
+except ImportError:
+	try:
+		from uuid_extensions import uuid7str
+	except ImportError:
+		import uuid as _uuid
+		def uuid7str() -> str:  # type: ignore[misc]
+			return str(_uuid.uuid4())
 
 from .models import (
 	MQMessage, TopicConfiguration, Subscription, MessageEvent, BrokerNode,
 	MessagePriority, DeliveryMode, ProtocolType, MessageStatus, RetryPolicy
 )
+
+
+def guard_tenant_id(tenant_id: str) -> None:
+	"""Raise PermissionError when tenant_id is absent or blank."""
+	if not str(tenant_id or "").strip():
+		raise PermissionError("tenant_context_required")
 
 
 TOPIC_CLASSIFICATIONS = {"public", "internal", "restricted", "regulated"}
@@ -270,6 +287,16 @@ class MqebService:
 		self.event_agents: dict[str, MqebAgentRecord] = {}
 		self.lifecycle_batches: dict[str, EventLifecycleBatchRecord] = {}
 		self.audit_events: dict[str, MqebAuditEventRecord] = {}
+
+		# I5: scheduled message store — keyed by stable_id
+		self.scheduled_messages: dict[str, dict[str, Any]] = {}
+
+		# I6: idempotency cache — (tenant_id|idempotency_key) -> (message_id, expires_at)
+		self._idempotency_cache: dict[str, tuple[str, datetime]] = {}
+
+		# I12: tenant quota configs and sliding-window counters
+		self._tenant_quotas: dict[str, dict[str, Any]] = {}
+		self._tenant_quota_counters: dict[str, dict[str, Any]] = {}
 
 	def describe(self, tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 		return self._get_contract(tenant_id, overrides)
@@ -814,6 +841,474 @@ class MqebService:
 			"recent_events": self.list_audit_events(tenant_id)[-5:],
 		}
 
+	# ------------------------------------------------------------------
+	# I6 — Idempotency deduplication
+	# ------------------------------------------------------------------
+	async def async_publish_message(
+		self,
+		tenant_id: str,
+		message_id: str,
+		topic_id: str,
+		producer: str,
+		priority: str = "normal",
+		delivery_mode: str | None = None,
+		encrypted: bool | None = None,
+		schema_ref: str = "",
+		idempotency_key: str = "",
+		payload_size: int = 1,
+		priority_messages_per_minute: int = 0,
+		cross_tenant_publish: bool = False,
+		trace_context: dict[str, str] | None = None,
+	) -> dict[str, Any]:
+		"""Async publish with idempotency deduplication (I6) and trace propagation (I15).
+
+		Returns the existing message record immediately when an idempotency_key
+		collision is detected within the topic retention window.
+		"""
+		guard_tenant_id(tenant_id)
+		idem_key = str(idempotency_key or "").strip()
+		if idem_key:
+			cache_key = f"{tenant_id}|{idem_key}"
+			cached = self._idempotency_cache.get(cache_key)
+			if cached is not None:
+				msg_id, expires_at = cached
+				if datetime.utcnow() < expires_at:
+					record = self.messages.get(msg_id)
+					if record is not None:
+						return record.to_dict()
+		result = self.publish_message(
+			tenant_id=tenant_id,
+			message_id=message_id,
+			topic_id=topic_id,
+			producer=producer,
+			priority=priority,
+			delivery_mode=delivery_mode,
+			encrypted=encrypted,
+			schema_ref=schema_ref,
+			idempotency_key=idem_key,
+			payload_size=payload_size,
+			priority_messages_per_minute=priority_messages_per_minute,
+			cross_tenant_publish=cross_tenant_publish,
+		)
+		if idem_key and result.get("status") != "denied":
+			topic = self._get_topic(tenant_id, topic_id)
+			expires_at = datetime.utcnow() + timedelta(days=topic.retention_days)
+			self._idempotency_cache[f"{tenant_id}|{idem_key}"] = (result["id"], expires_at)
+		# I15: attach trace context to the stored record
+		if trace_context and result.get("id") in self.messages:
+			self.messages[result["id"]].review_evidence["trace_context"] = dict(trace_context)
+			result["trace_context"] = dict(trace_context)
+		return result
+
+	# ------------------------------------------------------------------
+	# I5 — Time-based message scheduling
+	# ------------------------------------------------------------------
+	async def schedule_message(
+		self,
+		tenant_id: str,
+		message_id: str,
+		topic_id: str,
+		producer: str,
+		scheduled_at_iso: str,
+		priority: str = "normal",
+		delivery_mode: str | None = None,
+		encrypted: bool | None = None,
+		schema_ref: str = "",
+		idempotency_key: str = "",
+		payload_size: int = 1,
+	) -> dict[str, Any]:
+		"""Schedule a message for future delivery at *scheduled_at_iso* (ISO-8601 UTC).
+
+		The message is held in `scheduled_messages` and transferred to
+		`message_queues` by `drain_scheduled_messages` when its delivery
+		timestamp arrives.
+		"""
+		guard_tenant_id(tenant_id)
+		if not str(message_id or "").strip():
+			raise ValueError("message_id_required")
+		try:
+			deliver_at = datetime.fromisoformat(scheduled_at_iso.rstrip("Z"))
+		except (ValueError, AttributeError):
+			raise ValueError(f"scheduled_at_invalid_iso:{scheduled_at_iso}")
+		if deliver_at <= datetime.utcnow():
+			raise ValueError("scheduled_at_must_be_future")
+		# validate topic exists
+		topic = self._get_topic(tenant_id, topic_id)
+		record_id = _stable_id("mqeb_scheduled", tenant_id, message_id)
+		if record_id in self.scheduled_messages:
+			raise ValueError(f"scheduled_message_already_exists:{message_id}")
+		record = {
+			"id": record_id,
+			"tenant_id": tenant_id,
+			"topic_id": topic.id,
+			"message_id": str(message_id).strip(),
+			"producer": str(producer or "").strip(),
+			"priority": str(priority or "normal").strip().lower(),
+			"delivery_mode": delivery_mode or topic.delivery_mode,
+			"encrypted": topic.encrypted if encrypted is None else bool(encrypted),
+			"schema_ref": str(schema_ref or topic.schema_ref or "").strip(),
+			"idempotency_key": str(idempotency_key or "").strip(),
+			"payload_size": int(payload_size),
+			"scheduled_at": deliver_at.isoformat() + "Z",
+			"status": "scheduled",
+			"created_at": _utc_now(),
+		}
+		self.scheduled_messages[record_id] = record
+		self._record_event(
+			tenant_id,
+			"message_scheduled",
+			record_id,
+			f"Message scheduled at {deliver_at.isoformat()}Z on {topic.name}",
+			str(producer or "system"),
+		)
+		return record
+
+	async def cancel_scheduled_message(
+		self,
+		tenant_id: str,
+		message_id: str,
+		actor: str,
+		reason: str,
+	) -> dict[str, Any]:
+		"""Cancel a pending scheduled message before its delivery window arrives."""
+		guard_tenant_id(tenant_id)
+		if not str(actor or "").strip():
+			raise ValueError("cancel_actor_required")
+		if not str(reason or "").strip():
+			raise ValueError("cancel_reason_required")
+		record_id = _stable_id("mqeb_scheduled", tenant_id, message_id)
+		record = self.scheduled_messages.get(record_id)
+		if record is None:
+			raise KeyError(f"scheduled_message_not_found:{message_id}")
+		if record["tenant_id"] != tenant_id:
+			raise PermissionError("tenant_mismatch")
+		if record["status"] != "scheduled":
+			raise ValueError(f"scheduled_message_already_{record['status']}")
+		record["status"] = "cancelled"
+		self._record_event(
+			tenant_id,
+			"scheduled_message_cancelled",
+			record_id,
+			reason,
+			str(actor).strip(),
+			"medium",
+		)
+		return record
+
+	async def drain_scheduled_messages(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		"""Transfer all due scheduled messages into their topic queues.
+
+		Returns list of message dicts that were drained. Called from the
+		background processing loop or directly in tests.
+		"""
+		now = datetime.utcnow()
+		drained: list[dict[str, Any]] = []
+		for record in list(self.scheduled_messages.values()):
+			if tenant_id is not None and record["tenant_id"] != tenant_id:
+				continue
+			if record["status"] != "scheduled":
+				continue
+			deliver_at_str = record["scheduled_at"].rstrip("Z")
+			deliver_at = datetime.fromisoformat(deliver_at_str)
+			if deliver_at > now:
+				continue
+			# publish now
+			try:
+				published = self.publish_message(
+					tenant_id=record["tenant_id"],
+					message_id=record["message_id"],
+					topic_id=record["topic_id"],
+					producer=record["producer"],
+					priority=record["priority"],
+					delivery_mode=record["delivery_mode"],
+					encrypted=record["encrypted"],
+					schema_ref=record["schema_ref"],
+					idempotency_key=record["idempotency_key"],
+					payload_size=record["payload_size"],
+				)
+				record["status"] = "delivered"
+				drained.append(published)
+			except Exception:
+				record["status"] = "failed"
+		return drained
+
+	# ------------------------------------------------------------------
+	# I8 — Priority queue stats
+	# ------------------------------------------------------------------
+	async def get_priority_queue_stats(
+		self, tenant_id: str, topic_id: str
+	) -> dict[str, Any]:
+		"""Return per-priority-tier message counts for a topic.
+
+		Scans `messages` for the topic and buckets by priority field so
+		operators can observe tier depths without draining the queue.
+		"""
+		guard_tenant_id(tenant_id)
+		topic = self._get_topic(tenant_id, topic_id)
+		tiers: dict[str, int] = {"critical": 0, "high": 0, "normal": 0, "low": 0}
+		total = 0
+		for msg in self.messages.values():
+			if msg.tenant_id != tenant_id or msg.topic_id != topic.id:
+				continue
+			if msg.status not in {"published", "review_required"}:
+				continue
+			tier = str(msg.priority or "normal").lower()
+			tiers[tier] = tiers.get(tier, 0) + 1
+			total += 1
+		return {
+			"tenant_id": tenant_id,
+			"topic_id": topic.id,
+			"topic_name": topic.name,
+			"total_pending": total,
+			"by_priority": tiers,
+		}
+
+	# ------------------------------------------------------------------
+	# I12 — Tenant quota enforcement
+	# ------------------------------------------------------------------
+	async def set_tenant_quota(
+		self,
+		tenant_id: str,
+		max_messages_per_minute: int,
+		max_bytes_per_minute: int,
+		max_topics: int,
+		actor: str,
+	) -> dict[str, Any]:
+		"""Configure per-tenant publish quotas.
+
+		Quota values are stored in `_tenant_quotas` and consulted on each
+		`publish_message` call. Use `Decimal` for byte budget arithmetic to
+		avoid floating-point drift on large values.
+		"""
+		guard_tenant_id(tenant_id)
+		if not str(actor or "").strip():
+			raise ValueError("quota_actor_required")
+		if int(max_messages_per_minute) <= 0:
+			raise ValueError("quota_max_messages_per_minute_positive")
+		if int(max_bytes_per_minute) <= 0:
+			raise ValueError("quota_max_bytes_per_minute_positive")
+		if int(max_topics) <= 0:
+			raise ValueError("quota_max_topics_positive")
+		record = {
+			"tenant_id": tenant_id,
+			"max_messages_per_minute": int(max_messages_per_minute),
+			"max_bytes_per_minute": Decimal(max_bytes_per_minute),
+			"max_topics": int(max_topics),
+			"set_by": str(actor).strip(),
+			"updated_at": _utc_now(),
+		}
+		self._tenant_quotas[tenant_id] = record
+		self._record_event(
+			tenant_id,
+			"tenant_quota_set",
+			tenant_id,
+			f"Quota set: {max_messages_per_minute} msg/min, {max_bytes_per_minute} bytes/min",
+			str(actor).strip(),
+		)
+		return record
+
+	async def get_tenant_quota_status(self, tenant_id: str) -> dict[str, Any]:
+		"""Return current quota configuration and utilisation ratios for a tenant.
+
+		Sliding-window counters are stored in `_tenant_quota_counters` as
+		`{tenant_id: {"messages": int, "bytes": Decimal, "window_start": str}}`.
+		"""
+		guard_tenant_id(tenant_id)
+		quota = self._tenant_quotas.get(tenant_id)
+		counters = self._tenant_quota_counters.get(tenant_id, {"messages": 0, "bytes": Decimal(0)})
+		if quota is None:
+			return {
+				"tenant_id": tenant_id,
+				"quota_configured": False,
+				"used_messages": counters["messages"],
+				"used_bytes": str(counters["bytes"]),
+			}
+		used_msg = counters["messages"]
+		used_bytes = counters["bytes"]
+		max_msg = quota["max_messages_per_minute"]
+		max_bytes = Decimal(str(quota["max_bytes_per_minute"]))
+		return {
+			"tenant_id": tenant_id,
+			"quota_configured": True,
+			"max_messages_per_minute": max_msg,
+			"max_bytes_per_minute": str(max_bytes),
+			"max_topics": quota["max_topics"],
+			"used_messages": used_msg,
+			"used_bytes": str(used_bytes),
+			"message_utilization_ratio": round(used_msg / max(1, max_msg), 4),
+			"bytes_utilization_ratio": round(float(used_bytes / max(Decimal(1), max_bytes)), 4),
+			"topics_used": sum(1 for t in self.topics.values() if t.tenant_id == tenant_id),
+		}
+
+	# ------------------------------------------------------------------
+	# I9 — Append-only audit log streaming
+	# ------------------------------------------------------------------
+	async def stream_audit_events(
+		self,
+		tenant_id: str,
+		since_id: str | None = None,
+		batch_size: int = 50,
+	) -> AsyncGenerator[dict[str, Any], None]:
+		"""Tail the append-only audit log for *tenant_id* as an async generator.
+
+		Yields dicts in insertion order. Pass *since_id* to resume from a
+		known position. Each yielded record includes `integrity_sig` (HMAC-SHA256
+		over the record JSON) so consumers can detect tampering.
+		"""
+		guard_tenant_id(tenant_id)
+		events = sorted(
+			(e for e in self.audit_events.values() if e.tenant_id == tenant_id),
+			key=lambda e: e.created_at,
+		)
+		emit = since_id is None
+		count = 0
+		for event in events:
+			if not emit:
+				if event.id == since_id:
+					emit = True
+				continue
+			record = event.to_dict()
+			# compute HMAC using a deterministic tenant secret derived from tenant_id
+			secret = hashlib.sha256(tenant_id.encode()).digest()
+			sig = hmac.new(secret, json.dumps(record, sort_keys=True).encode(), hashlib.sha256).hexdigest()
+			record["integrity_sig"] = sig
+			yield record
+			count += 1
+			if count >= batch_size:
+				return
+
+	# ------------------------------------------------------------------
+	# I14 — Dead-letter queue lifecycle
+	# ------------------------------------------------------------------
+	async def inspect_dead_letter_queue(
+		self, tenant_id: str, dlq_topic_id: str
+	) -> dict[str, Any]:
+		"""Return all messages currently in dead-letter status for *dlq_topic_id*."""
+		guard_tenant_id(tenant_id)
+		topic = self._get_topic(tenant_id, dlq_topic_id)
+		dead_messages = [
+			m.to_dict()
+			for m in self.messages.values()
+			if m.tenant_id == tenant_id
+			and m.topic_id == topic.id
+			and m.status == "dead_letter"
+		]
+		dead_attempts = [
+			a.to_dict()
+			for a in self.delivery_attempts.values()
+			if a.tenant_id == tenant_id
+			and a.outcome == "dead_letter"
+		]
+		return {
+			"tenant_id": tenant_id,
+			"dlq_topic_id": topic.id,
+			"dlq_topic_name": topic.name,
+			"dead_letter_message_count": len(dead_messages),
+			"dead_letter_attempt_count": len(dead_attempts),
+			"messages": dead_messages,
+			"delivery_attempts": dead_attempts,
+		}
+
+	async def redrive_dead_letter_messages(
+		self,
+		tenant_id: str,
+		dlq_topic_id: str,
+		target_topic_id: str,
+		reviewer: str,
+		evidence: str,
+		max_count: int = 10,
+	) -> dict[str, Any]:
+		"""Redrive up to *max_count* dead-letter messages to *target_topic_id*.
+
+		Requires reviewer identity and evidence. Each redriven message is
+		re-published with `status` reset to `published` and an audit event
+		recording the redrive evidence.
+		"""
+		guard_tenant_id(tenant_id)
+		if not str(reviewer or "").strip():
+			raise ValueError("redrive_reviewer_required")
+		if not str(evidence or "").strip():
+			raise ValueError("redrive_evidence_required")
+		if int(max_count) <= 0:
+			raise ValueError("redrive_max_count_positive")
+		dlq_topic = self._get_topic(tenant_id, dlq_topic_id)
+		target_topic = self._get_topic(tenant_id, target_topic_id)
+		candidates = [
+			m for m in self.messages.values()
+			if m.tenant_id == tenant_id
+			and m.topic_id == dlq_topic.id
+			and m.status == "dead_letter"
+		][:int(max_count)]
+		redriven_ids: list[str] = []
+		for msg in candidates:
+			msg.status = "published"
+			msg.topic_id = target_topic.id
+			msg.decision = "allow"
+			msg.policy_decision = "allow"
+			msg.review_evidence["redrive_reviewer"] = str(reviewer).strip()
+			msg.review_evidence["redrive_evidence"] = str(evidence).strip()
+			msg.review_evidence["redriven_at"] = _utc_now()
+			redriven_ids.append(msg.id)
+			self._record_event(
+				tenant_id,
+				"dead_letter_redriven",
+				msg.id,
+				f"Redriven to {target_topic.name}: {evidence}",
+				str(reviewer).strip(),
+				"medium",
+			)
+		return {
+			"tenant_id": tenant_id,
+			"dlq_topic_id": dlq_topic.id,
+			"target_topic_id": target_topic.id,
+			"redriven_count": len(redriven_ids),
+			"redriven_message_ids": redriven_ids,
+		}
+
+	async def purge_dead_letter_queue(
+		self,
+		tenant_id: str,
+		dlq_topic_id: str,
+		reviewer: str,
+		reason: str,
+	) -> dict[str, Any]:
+		"""Permanently discard all dead-letter messages for *dlq_topic_id*.
+
+		Requires reviewer identity and reason. Emits a single audit event
+		with the count of purged messages as evidence.
+		"""
+		guard_tenant_id(tenant_id)
+		if not str(reviewer or "").strip():
+			raise ValueError("purge_reviewer_required")
+		if not str(reason or "").strip():
+			raise ValueError("purge_reason_required")
+		topic = self._get_topic(tenant_id, dlq_topic_id)
+		purge_ids = [
+			mid for mid, m in self.messages.items()
+			if m.tenant_id == tenant_id
+			and m.topic_id == topic.id
+			and m.status == "dead_letter"
+		]
+		for mid in purge_ids:
+			del self.messages[mid]
+		self._record_event(
+			tenant_id,
+			"dead_letter_queue_purged",
+			topic.id,
+			f"Purged {len(purge_ids)} dead-letter messages: {reason}",
+			str(reviewer).strip(),
+			"high",
+		)
+		return {
+			"tenant_id": tenant_id,
+			"dlq_topic_id": topic.id,
+			"purged_count": len(purge_ids),
+			"purged_by": str(reviewer).strip(),
+		}
+
+	# ------------------------------------------------------------------
+	# Private helpers
+	# ------------------------------------------------------------------
 	def _require_tenant(self, tenant_id: str) -> None:
 		if not str(tenant_id or "").strip():
 			raise PermissionError("tenant_context_required")

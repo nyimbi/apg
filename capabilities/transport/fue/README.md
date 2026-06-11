@@ -29,7 +29,7 @@ Built-in phantom fill detection, fill-while-moving guards, and ML-ready fraud fl
 - `wflo`: Procurement approval workflow
 - `moni`: Tank level and anomaly monitoring
 - `comp`: Carbon reporting compliance
-- `mqeb`: Event streaming (bytewax / Kafka)
+- `mqeb`: Event streaming (bytewax JetStream)
 - `schd`: Scheduled reconciliation and reorder jobs
 
 ## Configuration

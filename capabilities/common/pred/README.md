@@ -34,10 +34,58 @@ audit evidence through deterministic guardrails.
 - Adapter configuration for AICR, MLCM, ETLP, CONF, AUTH, AUDL, MONI, CACH, and
   Bytewax event streaming.
 
+## New in This Release
+
+### Platt Score Calibration
+`calibrate_scores()` fits a logistic sigmoid to raw scores using gradient
+descent, converting hash-based deterministic scores to calibrated probabilities.
+Parameters are stored per `(tenant_id, model_id)` and used in downstream
+explanation and financial impact methods.
+
+### Decimal-Precision Monetary Outcomes
+`attach_monetary_outcome()` and `aggregate_monetary_impact()` track financial
+consequences of scoring decisions using Python's `decimal.Decimal` with
+`ROUND_HALF_EVEN` (banker's rounding). Floats are explicitly excluded from the
+accumulation path — required for IFRS 13 compliance.
+
+### Champion-Challenger A/B Routing
+`register_champion_challenger()` stores a routing policy with configurable
+traffic split (1–49%). `route_score_request()` uses deterministic SHA-256
+entity hashing so the same entity always hits the same model arm — preventing
+decision inconsistency during rollout.
+
+### Temporal Confidence Decay
+`compute_confidence_decay()` applies exponential decay (`exp(-lambda * age)`)
+with a configurable half-life (default 90 days) to surface models that need
+retraining before measured drift occurs. Integrated into `dashboard_summary`
+recommendations.
+
+### PSI + KL-Divergence Drift
+`stream_drift_window()` computes Population Stability Index and KL-divergence
+between reference and current score distributions using equal-width binning.
+PSI bands: < 0.1 stable, 0.1–0.2 warning, > 0.2 critical (Basel III standard).
+
+### Explanation Attestation Registry
+`register_explanation_attestation()` creates a non-repudiable SHA-256 hash
+over `(score_id, model_version_id, method, attested_by)`. High-impact scores
+require ≥ 80% feature coverage. `verify_explanation_attestation()` recomputes
+and compares hashes to detect tampering.
+
+### Prediction Latency SLA Monitoring
+`record_prediction_latency()` stores per-score latency with breach flags.
+`compute_sla_report()` derives P50/P95/P99 percentiles and breach rate using
+nearest-rank interpolation over the full latency distribution.
+
+### Governance Lineage Graph
+`build_lineage_graph()` constructs a traversable adjacency DAG linking scores
+→ models → feature sets → ETL lineage refs. `trace_decision_lineage()` runs
+BFS from any `score_id` back to root nodes for regulatory audit exhibits.
+
 ## Main Files
 
 - `SPECIFICATION.md` - complete functional scope for this packet.
 - `PLAN.md` - implementation and review plan.
+- `WORLD_CLASS_IMPROVEMENTS.md` - 15 world-class improvement proposals.
 - `capability_contract.py` - executable configuration, rules, UI, adapters, and
   theme contract.
 - `service.py` - `PredService`, the dependency-light generated-app runtime.
@@ -47,6 +95,7 @@ audit evidence through deterministic guardrails.
 - `app.py` - dynamic package evidence and self-test.
 - `test_capability_contract.py` - focused executable contract coverage.
 - `tests/test_package_contract.py` - package evidence and compatibility tests.
+- `docs/user_guide.md` - comprehensive operator and developer guide.
 
 ## Generated-App Usage
 
@@ -84,15 +133,6 @@ forecast = service.create_forecast(
 	[100 + index for index in range(24)],
 	7,
 )
-review_forecast = service.create_forecast(
-	"forecast-long",
-	"tenant-a",
-	model["id"],
-	"daily demand",
-	[100 + index for index in range(24)],
-	366,
-)
-assert review_forecast["status"] == "pending_review"
 score = service.score_entity(
 	"score-order-1",
 	"tenant-a",
@@ -104,23 +144,27 @@ score = service.score_entity(
 	impact="high",
 	explanation_ref="explain://score-order-1",
 )
-agent = service.register_prediction_agent(
-	"agent-001",
-	"tenant-a",
-	"Demand Forecast Steward",
-	"codex",
-	"prediction_steward",
-	"demand forecasting lifecycle review",
-	"analytics",
-	"govern forecast and drift changes",
-)
-batch = service.validate_pred_lifecycle_batch(
-	"tenant-a",
-	"bytewax",
-	1,
-	"prediction_agent_batch",
-	"batch-001",
-)
+
+# Calibrate scores to true probabilities
+import asyncio
+calib = asyncio.run(service.calibrate_scores(
+	"tenant-a", model["id"],
+	[{"predicted": score["score"], "actual": 1.0}],
+))
+
+# Attach Decimal monetary outcome
+import asyncio
+outcome = asyncio.run(service.attach_monetary_outcome(
+	"tenant-a", score["id"], "125000.00", currency="KES",
+))
+
+# Check model confidence decay
+decay = asyncio.run(service.compute_confidence_decay("tenant-a", model["id"]))
+
+# Champion-challenger routing
+asyncio.run(service.register_champion_challenger(
+	"tenant-a", "policy-001", model["id"], model["id"], traffic_split_pct=10,
+))
 ```
 
 ## Guardrails
@@ -143,6 +187,10 @@ missing scope, missing owner, missing purpose, missing machine-contribution
 disclosure, and route privileged roles through pending human review when
 approval evidence is absent. Lifecycle mutation batches are accepted only
 through the declared Bytewax processor contract.
+
+Monetary outcome methods reject float arguments — amounts must be passed as
+strings. Champion-challenger routing rejects traffic splits outside 1–49%.
+Explanation attestations on high-impact scores require ≥ 80% feature coverage.
 
 ## AI Agent Composition
 

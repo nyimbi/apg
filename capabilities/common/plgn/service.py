@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Any
 
 from .capability_contract import (
@@ -1407,6 +1408,371 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 			"permission_review_count":  len(self.list_permission_reviews(tenant_id)),
 			"generated_at":             _ts(),
 		}
+
+	# ------------------------------------------------------------------
+	# Guard helpers
+	# ------------------------------------------------------------------
+
+	@staticmethod
+	def _guard_tenant_id(tenant_id: str) -> None:
+		"""Raise ValueError if tenant_id is blank or None."""
+		if not tenant_id or not tenant_id.strip():
+			raise ValueError("tenant_id_required")
+
+	@staticmethod
+	def _guard_non_empty_string(value: str, field: str) -> None:
+		"""Raise ValueError if a required string field is blank."""
+		if not value or not value.strip():
+			raise ValueError(f"{field}_required")
+
+	# ------------------------------------------------------------------
+	# New async methods — batch 2 (world-class extension surface)
+	# ------------------------------------------------------------------
+
+	async def async_plugin_update(
+		self,
+		tenant_id: str,
+		plugin_id: str,
+		new_version: str,
+		new_artifact_uri: str = "",
+		updated_by: str = "system",
+	) -> dict[str, Any]:
+		"""
+		Async plugin version bump.
+
+		Yields to the event loop before and after the update so that remote
+		artifact integrity checks and signature re-verification can be awaited
+		in a production adapter without blocking the host's event loop.
+
+		Returns the updated plugin manifest dict with ``old_version`` appended.
+		"""
+		self._guard_tenant_id(tenant_id)
+		self._guard_non_empty_string(new_version, "new_version")
+		await asyncio.sleep(0)
+		result = self.plugin_update(
+			tenant_id=tenant_id,
+			plugin_id=plugin_id,
+			new_version=new_version,
+			new_artifact_uri=new_artifact_uri,
+			updated_by=updated_by,
+		)
+		await asyncio.sleep(0)
+		return result
+
+	async def async_plugin_disable(
+		self,
+		tenant_id: str,
+		installation_id: str,
+		actor: str = "system",
+		reason: str = "",
+	) -> dict[str, Any]:
+		"""
+		Async plugin disable.
+
+		Yields before and after disable so that notification and rate-limiter
+		adapters can be awaited. Disabling is non-destructive: the installation
+		record is retained and the plugin can be re-enabled without reinstalling.
+		"""
+		self._guard_tenant_id(tenant_id)
+		self._guard_non_empty_string(installation_id, "installation_id")
+		await asyncio.sleep(0)
+		result = self.plugin_disable(
+			tenant_id=tenant_id,
+			installation_id=installation_id,
+			actor=actor,
+			reason=reason,
+		)
+		await asyncio.sleep(0)
+		return result
+
+	async def async_review_permissions(
+		self,
+		review_id: str,
+		tenant_id: str,
+		plugin_id: str,
+		reviewer: str,
+		approved_scopes: list[str],
+		denied_scopes: list[str] | None = None,
+		secret_access_allowed: bool = False,
+		notes: str = "",
+	) -> dict[str, Any]:
+		"""
+		Async permission review.
+
+		The yield points model awaiting a remote IAM/policy service that
+		validates reviewer identity and records the review in a durable audit
+		sink before returning to the caller.
+		"""
+		self._guard_tenant_id(tenant_id)
+		self._guard_non_empty_string(reviewer, "reviewer")
+		await asyncio.sleep(0)
+		result = self.review_permissions(
+			review_id=review_id,
+			tenant_id=tenant_id,
+			plugin_id=plugin_id,
+			reviewer=reviewer,
+			approved_scopes=approved_scopes,
+			denied_scopes=denied_scopes,
+			secret_access_allowed=secret_access_allowed,
+			notes=notes,
+		)
+		await asyncio.sleep(0)
+		return result
+
+	async def async_attach_sandbox_policy(
+		self,
+		policy_id: str,
+		tenant_id: str,
+		plugin_id: str,
+		policy_name: str,
+		network_access: str = "deny",
+		filesystem_access: str = "read_only",
+		secret_access: str = "deny",
+		tool_allowlist: list[str] | None = None,
+	) -> dict[str, Any]:
+		"""
+		Async sandbox policy attachment.
+
+		Yields to the event loop so that a remote policy-store write and
+		a notification to running sandbox workers can be awaited before
+		returning the stored policy record.
+		"""
+		self._guard_tenant_id(tenant_id)
+		self._guard_non_empty_string(policy_name, "policy_name")
+		await asyncio.sleep(0)
+		result = self.attach_sandbox_policy(
+			policy_id=policy_id,
+			tenant_id=tenant_id,
+			plugin_id=plugin_id,
+			policy_name=policy_name,
+			network_access=network_access,
+			filesystem_access=filesystem_access,
+			secret_access=secret_access,
+			tool_allowlist=tool_allowlist,
+		)
+		await asyncio.sleep(0)
+		return result
+
+	async def async_create_release(
+		self,
+		release_id: str,
+		tenant_id: str,
+		plugin_id: str,
+		version: str,
+		channel: str,
+		signature_ref: str,
+		event_stream: str = "bytewax",
+	) -> dict[str, Any]:
+		"""
+		Async release creation with readiness gate.
+
+		The yield points are where the release pipeline would await:
+		- Remote supply-chain scan confirmation
+		- Signing service signature finalisation
+		- Marketplace listing synchronisation
+
+		Raises ``PermissionError`` if any readiness gate is not met.
+		"""
+		self._guard_tenant_id(tenant_id)
+		self._guard_non_empty_string(signature_ref, "signature_ref")
+		await asyncio.sleep(0)
+		result = self.create_release(
+			release_id=release_id,
+			tenant_id=tenant_id,
+			plugin_id=plugin_id,
+			version=version,
+			channel=channel,
+			signature_ref=signature_ref,
+			event_stream=event_stream,
+		)
+		await asyncio.sleep(0)
+		return result
+
+	async def async_publish_listing(
+		self,
+		listing_id: str,
+		tenant_id: str,
+		plugin_id: str,
+		title: str,
+		publisher_verified: bool = True,
+		curated: bool = True,
+		install_policy: str = "tenant_allowed",
+	) -> dict[str, Any]:
+		"""
+		Async marketplace listing publication.
+
+		Yields before and after so that a remote CDN cache invalidation and
+		search-index update (Meilisearch/pgvector) can be awaited before the
+		listing is considered visible to search consumers.
+		"""
+		self._guard_tenant_id(tenant_id)
+		self._guard_non_empty_string(title, "title")
+		await asyncio.sleep(0)
+		result = self.publish_listing(
+			listing_id=listing_id,
+			tenant_id=tenant_id,
+			plugin_id=plugin_id,
+			title=title,
+			publisher_verified=publisher_verified,
+			curated=curated,
+			install_policy=install_policy,
+		)
+		await asyncio.sleep(0)
+		return result
+
+	async def async_plugin_permission_check(
+		self,
+		plugin_id: str,
+		permission: str,
+		tenant_id: str = "default",
+		context: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""
+		Async per-scope permission check.
+
+		Yields before the check so that a remote policy-engine evaluation
+		(OPA / Cedar) can be awaited in place of the in-process rule table.
+		Returns a structured grant/deny decision with source attribution.
+		"""
+		self._guard_tenant_id(tenant_id)
+		self._guard_non_empty_string(permission, "permission")
+		await asyncio.sleep(0)
+		return self.plugin_permission_check(
+			plugin_id=plugin_id,
+			permission=permission,
+			tenant_id=tenant_id,
+			context=context,
+		)
+
+	async def async_dashboard_summary(
+		self,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""
+		Async dashboard summary aggregation.
+
+		Yields before aggregating counts so that a remote read-replica or
+		materialised-view query can be awaited without blocking the host's
+		event loop. Returns the same shape as ``dashboard_summary``.
+		"""
+		self._guard_tenant_id(tenant_id)
+		await asyncio.sleep(0)
+		return self.dashboard_summary(tenant_id)
+
+	async def async_register_plgn_agent(
+		self,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		contribution_disclosed: bool = True,
+		agent_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Async AI plugin governance agent registration.
+
+		Yields before registration so that a remote identity-service call
+		(verifying the agent runtime's OIDC token) can be awaited. After
+		registration yields again for the audit-sink write.
+		"""
+		self._guard_tenant_id(tenant_id)
+		self._guard_non_empty_string(name, "name")
+		self._guard_non_empty_string(runtime, "runtime")
+		self._guard_non_empty_string(role, "role")
+		self._guard_non_empty_string(scope, "scope")
+		await asyncio.sleep(0)
+		result = self.register_plgn_agent(
+			tenant_id=tenant_id,
+			name=name,
+			runtime=runtime,
+			role=role,
+			scope=scope,
+			contribution_disclosed=contribution_disclosed,
+			agent_id=agent_id,
+		)
+		await asyncio.sleep(0)
+		return result
+
+	async def async_plugin_marketplace_billing(
+		self,
+		tenant_id: str,
+		plugin_id: str,
+		quantity: int = 1,
+		unit_price: str = "0.00",
+		currency: str = "USD",
+		billed_by: str = "system",
+	) -> dict[str, Any]:
+		"""
+		Async marketplace billing record for a paid plugin install.
+
+		Uses ``Decimal`` arithmetic throughout to avoid floating-point rounding
+		errors on monetary values. Yields before and after to allow a remote
+		billing adapter (Stripe, M-Pesa, etc.) to be awaited in production.
+
+		Args:
+			tenant_id: Owning tenant.
+			plugin_id: Plugin being billed.
+			quantity: Number of units (e.g. seats or invocations).
+			unit_price: Decimal string price per unit (e.g. ``"4.99"``).
+			currency: ISO 4217 currency code.
+			billed_by: Actor initiating the billing event.
+
+		Returns:
+			Billing record dict with ``total_amount`` as a Decimal-accurate string.
+		"""
+		self._guard_tenant_id(tenant_id)
+		self._guard_non_empty_string(plugin_id, "plugin_id")
+		if quantity < 1:
+			raise ValueError("quantity_must_be_positive")
+		unit = Decimal(unit_price)
+		if unit < Decimal("0"):
+			raise ValueError("unit_price_must_be_non_negative")
+		total = unit * Decimal(quantity)
+		await asyncio.sleep(0)
+		plugin = self._require_plugin(plugin_id, tenant_id)
+		self._record_audit(
+			tenant_id, plugin_id, "marketplace_billing_recorded", billed_by, "allow",
+			metadata={"total_amount": str(total), "currency": currency.upper()},
+		)
+		await asyncio.sleep(0)
+		return {
+			"tenant_id":    tenant_id,
+			"plugin_id":    plugin_id,
+			"plugin_name":  plugin.name,
+			"quantity":     quantity,
+			"unit_price":   str(unit),
+			"total_amount": str(total),
+			"currency":     currency.upper(),
+			"billed_by":    billed_by,
+			"billed_at":    _ts(),
+		}
+
+	async def async_uninstall_plugin(
+		self,
+		plugin_id: str,
+		tenant_id: str,
+		uninstalled_by: str = "system",
+		reason: str = "",
+	) -> dict[str, Any]:
+		"""
+		Async plugin uninstall.
+
+		Yields before and after so that sandbox worker teardown and
+		webhook notifications to the plugin publisher can be awaited
+		without blocking the host event loop.
+		"""
+		self._guard_tenant_id(tenant_id)
+		self._guard_non_empty_string(plugin_id, "plugin_id")
+		await asyncio.sleep(0)
+		result = self.uninstall_plugin(
+			plugin_id=plugin_id,
+			tenant_id=tenant_id,
+			uninstalled_by=uninstalled_by,
+			reason=reason,
+		)
+		await asyncio.sleep(0)
+		return result
 
 
 # Alias

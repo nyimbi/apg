@@ -107,7 +107,7 @@ def semantic_model() -> dict[str, Any]:
 				"pred_forecast_governance": {
 					"roles": contract["agents"]["supported_roles"],
 					"runtimes": contract["agents"]["supported_runtimes"],
-					"stream": contract["streaming"]["lifecycle_stream"],
+					"stream": contract["streaming"].get("lifecycle_stream") or contract["streaming"].get("stream", ""),
 				}
 			},
 		},

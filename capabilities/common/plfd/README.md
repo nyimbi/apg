@@ -37,7 +37,9 @@ APG adapters in the executable contract and are bound by the host application.
 | Method | Purpose |
 |--------|---------|
 | `async_federated_token_exchange` | OAuth2 RFC 8693 token exchange between tenants |
+| `async_revoke_federated_token` | Revoke an issued assertion token with bounded LRU revocation list |
 | `async_negotiate_capability_share` | Runtime capability-sharing negotiation with reciprocal offers |
+| `async_federated_inventory_reconcile` | Diff agreed capability contract against live shares; detect drift |
 | `async_health_check_all_services` | Concurrent fan-out health probing via `asyncio.gather` |
 | `async_probe_dependency_health` | Active single-dependency liveness probe with pluggable probe_fn |
 | `async_probe_all_dependencies` | Parallel fan-out across all tenant dependencies |
@@ -48,6 +50,13 @@ APG adapters in the executable contract and are bound by the host application.
 | `async_canary_release_start` | Start a canary release with configurable traffic split |
 | `async_canary_release_advance` | Advance canary traffic; promotes at 100% |
 | `async_canary_release_abort` | Abort canary and roll back to baseline |
+| `async_cost_budget_gate` | Decimal-precision cumulative cost gate with ISO 4217 currency |
+| `async_chaos_fault_inject` | Inject latency/error/crash/partial faults for chaos engineering |
+| `async_chaos_fault_remove` | Remove an active chaos fault, restoring normal operation |
+| `async_service_discover_nearest` | Topology-aware nearest-endpoint discovery with weighted selection |
+| `async_verify_audit_chain` | Verify Merkle-chained audit log integrity; detect tampered events |
+| `async_predict_readiness_trajectory` | OLS linear-regression readiness velocity and predicted-ready date |
+| `async_trace_context_propagate` | W3C traceparent propagation across tenant boundaries |
 
 ## Main Files
 

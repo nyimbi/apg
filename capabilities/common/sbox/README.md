@@ -126,6 +126,8 @@ asyncio.run(run_parallel_tests())
 
 ## Async Method Reference
 
+### Core async methods
+
 | Method | Description |
 |--------|-------------|
 | `async_create_sandbox(...)` | Non-blocking sandbox provisioning |
@@ -137,7 +139,22 @@ asyncio.run(run_parallel_tests())
 | `async_load_and_validate_dataset(..., strict)` | Load and schema-validate records |
 | `async_snapshot_and_restore(...)` | Snapshot/reset/restore isolation primitive |
 | `async_security_posture_report(...)` | Multi-dimension security scoring |
-| `async_quota_check(...)` | Resource quota enforcement |
+| `async_quota_check(...)` | Resource usage vs. configurable limits |
+
+### New async methods (world-class improvements)
+
+| Method | Category | Description |
+|--------|----------|-------------|
+| `async_guard_tenant(tenant_id)` | Security | Tenant validation guard — call at any async entry point |
+| `async_cost_tracking_decimal(...)` | FinOps | Decimal-precise cost recording with budget alert threshold |
+| `async_subscribe_events(sandbox_id, event_types)` | Events | Subscribe to sandbox events via `asyncio.Queue` |
+| `async_unsubscribe_events(token)` | Events | Unsubscribe and drain a subscription |
+| `async_define_scenario(scenario_id, steps)` | Test DSL | Define a structured scenario with typed steps and per-step assertions |
+| `async_execute_scenario(sandbox_id, scenario_id)` | Test DSL | Execute a defined scenario step-by-step with abort/continue control |
+| `async_dataset_diff(sandbox_id, name_a, name_b)` | Data Quality | Structural diff of two loaded datasets: added/removed keys, changed values, schema drift |
+| `async_flakiness_score(scenario_id)` | Reliability | Variance-based flakiness score (0–1) with quarantine recommendation |
+| `async_register_wasm_module(name, bytes, signer_id)` | Security | SHA-256–verified WASM artifact registry with trust flag |
+| `async_simulate_policy(context)` | Governance | Dry-run policy evaluation — no side effects |
 
 ## AI Sandbox Agents
 

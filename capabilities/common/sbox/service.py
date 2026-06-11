@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
+import time
 from datetime import datetime, timezone
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
 from .capability_contract import (
@@ -72,6 +75,9 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 		self._test_scenarios: dict[str, dict[str, Any]] = {}
 		self._scenario_results: list[dict[str, Any]] = []
 		self._cost_records: list[dict[str, Any]] = []
+		# New stores for world-class improvements
+		self._event_subscribers: dict[str, dict[str, Any]] = {}
+		self._wasm_modules: dict[str, dict[str, Any]] = {}
 
 	# ------------------------------------------------------------------
 	# Contract / evaluate
@@ -277,6 +283,7 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 			"dataset_name": dataset_name,
 			"record_count": record_count or len(data or {}),
 			"inline_data": bool(data),
+			"_data_payload": dict(data) if isinstance(data, dict) else {},
 			"loaded_by": loaded_by,
 			"loaded_at": _ts(),
 		}
@@ -350,6 +357,14 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 			"simulated_at": _ts(),
 		}
 		self._simulated_events.append(record)
+		# Broadcast to any registered async subscribers
+		for sub in self._event_subscribers.values():
+			if sub.get("sandbox_id") == sandbox_id and sub.get("tenant_id") == tenant_id:
+				subscribed_types: list[str] = sub.get("event_types") or []
+				if not subscribed_types or event_type in subscribed_types:
+					q: asyncio.Queue = sub["queue"]  # type: ignore[type-arg]
+					if not q.full():
+						q.put_nowait(record)
 		self._record_event(tenant_id, "event_simulated", sandbox_id, f"Event {event_type} simulated.", triggered_by)
 		return record
 
@@ -1468,6 +1483,461 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 			},
 			"breaches": breaches,
 			"checked_at": _ts(),
+		}
+
+	# ------------------------------------------------------------------
+	# New async methods — world-class improvements I4–I15
+	# ------------------------------------------------------------------
+
+	async def async_guard_tenant(self, tenant_id: str) -> None:
+		"""
+		Async tenant guard: validate tenant_id is non-empty and resolves
+		to an allowed policy context.
+
+		Raises PermissionError with summarised reason on denial.
+		Use at the top of any async entry point that must be tenant-scoped.
+		"""
+		assert isinstance(tenant_id, str) and tenant_id.strip(), "tenant_id must be a non-empty string"
+		await asyncio.sleep(0)
+		self._require_tenant(tenant_id)
+
+	async def async_cost_tracking_decimal(
+		self,
+		sandbox_id: str,
+		tenant_id: str = "default",
+		period: str = "",
+		resource_costs: dict[str, str] | None = None,
+		currency: str = "USD",
+		monthly_budget: str | None = None,
+		alert_threshold: float = 0.8,
+		recorded_by: str = "system",
+	) -> dict[str, Any]:
+		"""
+		Record sandbox costs using Decimal arithmetic to eliminate float rounding error.
+
+		resource_costs: dict mapping resource label -> cost string (e.g. "0.05").
+		monthly_budget: optional Decimal-parseable budget ceiling string.
+		alert_threshold: fraction of budget (0–1) that triggers a budget_alert audit event.
+
+		Returns exact Decimal totals serialised as strings to avoid JSON precision loss.
+		"""
+		await self.async_guard_tenant(tenant_id)
+		sandbox = self._require_owned(self._sandboxes, sandbox_id, tenant_id, "sandbox_not_found")
+		TWO = Decimal("0.01")
+		costs_dec: dict[str, Decimal] = {}
+		if resource_costs:
+			for label, amount in resource_costs.items():
+				costs_dec[label] = Decimal(str(amount)).quantize(TWO, rounding=ROUND_HALF_UP)
+		else:
+			costs_dec = {
+				"compute": (Decimal(str(sandbox.ttl_hours)) * Decimal("0.05")).quantize(TWO, rounding=ROUND_HALF_UP),
+				"storage": Decimal("0.01"),
+			}
+		total = sum(costs_dec.values(), Decimal("0.00")).quantize(TWO, rounding=ROUND_HALF_UP)
+		period_key = period or _ts()[:7]
+		# Check budget breach
+		budget_status = "ok"
+		if monthly_budget is not None:
+			budget_dec = Decimal(str(monthly_budget)).quantize(TWO, rounding=ROUND_HALF_UP)
+			prior_spend = sum(
+				Decimal(str(c.get("total_cost", "0"))).quantize(TWO, rounding=ROUND_HALF_UP)
+				for c in self._cost_records
+				if c.get("tenant_id") == tenant_id and c.get("period") == period_key
+			)
+			cumulative = (prior_spend + total).quantize(TWO, rounding=ROUND_HALF_UP)
+			if budget_dec > Decimal("0") and cumulative / budget_dec >= Decimal(str(alert_threshold)):
+				budget_status = "alert"
+				self._record_event(
+					tenant_id, "budget_alert", sandbox_id,
+					f"Cumulative spend {cumulative} {currency} >= {int(alert_threshold*100)}% of budget {budget_dec}",
+					recorded_by, "warning",
+				)
+		record: dict[str, Any] = {
+			"sandbox_id": sandbox_id,
+			"sandbox_name": sandbox.name,
+			"tenant_id": tenant_id,
+			"period": period_key,
+			"currency": currency,
+			"resource_costs": {k: str(v) for k, v in costs_dec.items()},
+			"total_cost": str(total),
+			"budget_status": budget_status,
+			"monthly_budget": monthly_budget,
+			"recorded_by": recorded_by,
+			"recorded_at": _ts(),
+		}
+		# Also push to float cost_records for backward compat with analytics
+		self._cost_records.append({**record, "total_cost": float(total)})
+		self._record_event(tenant_id, "sandbox_cost_recorded_decimal", sandbox_id, f"Cost {total} {currency}", recorded_by)
+		return record
+
+	async def async_subscribe_events(
+		self,
+		sandbox_id: str,
+		event_types: list[str],
+		tenant_id: str = "default",
+		max_queue_size: int = 100,
+	) -> tuple[str, asyncio.Queue]:  # type: ignore[type-arg]
+		"""
+		Subscribe to simulated events for a sandbox.
+
+		Returns a (subscription_token, asyncio.Queue) pair.
+		The queue receives event dicts as `simulate_event` broadcasts them.
+		Call `async_unsubscribe_events(token)` when done.
+		"""
+		await self.async_guard_tenant(tenant_id)
+		self._require_owned(self._sandboxes, sandbox_id, tenant_id, "sandbox_not_found")
+		token = stable_id("sub", tenant_id, sandbox_id, str(len(self._event_subscribers)))
+		queue: asyncio.Queue = asyncio.Queue(maxsize=max_queue_size)  # type: ignore[type-arg]
+		self._event_subscribers[token] = {
+			"token": token,
+			"sandbox_id": sandbox_id,
+			"tenant_id": tenant_id,
+			"event_types": list(event_types),
+			"queue": queue,
+			"subscribed_at": _ts(),
+		}
+		return token, queue
+
+	async def async_unsubscribe_events(self, token: str) -> dict[str, Any]:
+		"""
+		Unsubscribe a previously registered event subscription.
+
+		Returns the subscription metadata.
+		"""
+		await asyncio.sleep(0)
+		sub = self._event_subscribers.pop(token, None)
+		if sub is None:
+			raise KeyError(f"subscription_not_found:{token}")
+		result = {k: v for k, v in sub.items() if k != "queue"}
+		result["unsubscribed_at"] = _ts()
+		return result
+
+	async def async_define_scenario(
+		self,
+		scenario_id: str,
+		steps: list[dict[str, Any]],
+		tenant_id: str = "default",
+		description: str = "",
+	) -> dict[str, Any]:
+		"""
+		Define a structured test scenario with explicit steps.
+
+		Each step dict supports keys:
+		  action: str — e.g. 'simulate_event', 'load_data', 'assert'
+		  target: str — service or dataset name
+		  params: dict — action parameters
+		  assertion: dict | None — optional assertion run after action
+		  on_failure: str — 'abort' | 'continue' | 'retry'
+
+		Performs static validation: duplicate step indices, missing action,
+		unknown on_failure values are all rejected.
+		"""
+		await self.async_guard_tenant(tenant_id)
+		assert scenario_id, "scenario_id required"
+		assert steps, "steps list must be non-empty"
+		valid_on_failure = {"abort", "continue", "retry"}
+		validated_steps: list[dict[str, Any]] = []
+		for idx, step in enumerate(steps):
+			action = step.get("action", "")
+			if not action:
+				raise ValueError(f"step[{idx}] missing required 'action' key")
+			on_failure = step.get("on_failure", "abort")
+			if on_failure not in valid_on_failure:
+				raise ValueError(f"step[{idx}] on_failure={on_failure!r} not in {valid_on_failure}")
+			validated_steps.append({
+				"index": idx,
+				"action": action,
+				"target": step.get("target", ""),
+				"params": dict(step.get("params") or {}),
+				"assertion": step.get("assertion"),
+				"on_failure": on_failure,
+			})
+		record: dict[str, Any] = {
+			"id": scenario_id,
+			"tenant_id": tenant_id,
+			"description": description or f"Scenario {scenario_id}",
+			"step_count": len(validated_steps),
+			"steps": validated_steps,
+			"created_at": _ts(),
+		}
+		self._test_scenarios[_state_key(tenant_id, scenario_id)] = record
+		return record
+
+	async def async_execute_scenario(
+		self,
+		sandbox_id: str,
+		scenario_id: str,
+		tenant_id: str = "default",
+		requested_by: str = "system",
+	) -> dict[str, Any]:
+		"""
+		Execute a defined scenario step-by-step within a sandbox.
+
+		Each step is processed in order:
+		  - 'simulate_event': calls simulate_event with step params
+		  - 'load_data': calls load_test_data with step params
+		  - 'assert': evaluates step assertion dict against last result
+		  - other actions: recorded as no-op with a skipped status
+
+		on_failure='abort' stops execution and marks the scenario failed.
+		on_failure='continue' records the step as failed but continues.
+		Returns per-step results and aggregate pass/fail summary.
+		"""
+		await self.async_guard_tenant(tenant_id)
+		self._require_owned(self._sandboxes, sandbox_id, tenant_id, "sandbox_not_found")
+		scenario = self._test_scenarios.get(_state_key(tenant_id, scenario_id))
+		if scenario is None:
+			raise KeyError(f"scenario_not_found:{scenario_id}")
+		step_results: list[dict[str, Any]] = []
+		scenario_passed = True
+		last_result: dict[str, Any] = {}
+		for step in scenario.get("steps", []):
+			await asyncio.sleep(0)
+			action = step["action"]
+			params = dict(step.get("params") or {})
+			step_passed = True
+			step_output: dict[str, Any] = {}
+			try:
+				if action == "simulate_event":
+					step_output = self.simulate_event(
+						sandbox_id=sandbox_id,
+						event_type=params.get("event_type", "test.event"),
+						payload=params.get("payload", {}),
+						tenant_id=tenant_id,
+						triggered_by=requested_by,
+					)
+				elif action == "load_data":
+					step_output = self.load_test_data(
+						sandbox_id=sandbox_id,
+						dataset_name=params.get("dataset_name", "step-data"),
+						tenant_id=tenant_id,
+						data=params.get("data"),
+						record_count=int(params.get("record_count", 0)),
+						loaded_by=requested_by,
+					)
+				elif action == "assert":
+					assertion = step.get("assertion") or {}
+					field = assertion.get("field", "status")
+					expected = assertion.get("expected")
+					actual = last_result.get(field)
+					step_passed = actual == expected
+					step_output = {"field": field, "expected": expected, "actual": actual, "passed": step_passed}
+				else:
+					step_output = {"action": action, "status": "skipped"}
+				last_result = step_output
+			except Exception as exc:
+				step_passed = False
+				step_output = {"error": str(exc)}
+			step_results.append({
+				"index": step["index"],
+				"action": action,
+				"passed": step_passed,
+				"output": step_output,
+			})
+			if not step_passed:
+				scenario_passed = False
+				if step.get("on_failure", "abort") == "abort":
+					break
+		record = {
+			"scenario_id": scenario_id,
+			"sandbox_id": sandbox_id,
+			"tenant_id": tenant_id,
+			"total_steps": len(scenario.get("steps", [])),
+			"executed_steps": len(step_results),
+			"passed": scenario_passed,
+			"step_results": step_results,
+			"requested_by": requested_by,
+			"executed_at": _ts(),
+		}
+		self._scenario_results.append(record)
+		self._record_event(
+			tenant_id, "scenario_executed", sandbox_id,
+			f"Scenario {scenario_id}: {'passed' if scenario_passed else 'failed'}",
+			requested_by, "info" if scenario_passed else "warning",
+		)
+		return record
+
+	async def async_dataset_diff(
+		self,
+		sandbox_id: str,
+		dataset_name_a: str,
+		dataset_name_b: str,
+		tenant_id: str = "default",
+		tolerance_record_count_pct: float = 0.0,
+	) -> dict[str, Any]:
+		"""
+		Compare two named datasets loaded into a sandbox.
+
+		Produces a structured diff of inline_data dicts:
+		  added_keys: keys present in b but not a
+		  removed_keys: keys present in a but not b
+		  changed_values: keys whose values differ
+		  schema_drift: fields whose Python type changed
+		  record_count_delta: difference in record counts
+		  within_tolerance: True if record_count_delta / max(a,1) <= tolerance_record_count_pct
+
+		Returns the diff record — integrate with assertion_check via field '__dataset_diff__'.
+		"""
+		await self.async_guard_tenant(tenant_id)
+		self._require_owned(self._sandboxes, sandbox_id, tenant_id, "sandbox_not_found")
+		id_a = stable_id("data", tenant_id, sandbox_id, dataset_name_a)
+		id_b = stable_id("data", tenant_id, sandbox_id, dataset_name_b)
+		rec_a = self._test_data.get(id_a) or {}
+		rec_b = self._test_data.get(id_b) or {}
+		data_a: dict[str, Any] = rec_a.get("_data_payload") or {}
+		data_b: dict[str, Any] = rec_b.get("_data_payload") or {}
+		keys_a = set(data_a.keys()) if isinstance(data_a, dict) else set()
+		keys_b = set(data_b.keys()) if isinstance(data_b, dict) else set()
+		added_keys = sorted(keys_b - keys_a)
+		removed_keys = sorted(keys_a - keys_b)
+		changed_values: list[dict[str, Any]] = []
+		schema_drift: list[dict[str, Any]] = []
+		for key in keys_a & keys_b:
+			val_a = data_a[key]
+			val_b = data_b[key]
+			if val_a != val_b:
+				changed_values.append({"key": key, "a": val_a, "b": val_b})
+			if type(val_a) is not type(val_b):
+				schema_drift.append({"key": key, "type_a": type(val_a).__name__, "type_b": type(val_b).__name__})
+		count_a = rec_a.get("record_count", 0) or 0
+		count_b = rec_b.get("record_count", 0) or 0
+		delta = abs(count_b - count_a)
+		within_tol = (delta / max(count_a, 1)) <= tolerance_record_count_pct if tolerance_record_count_pct > 0 else delta == 0
+		diff = {
+			"sandbox_id": sandbox_id,
+			"tenant_id": tenant_id,
+			"dataset_a": dataset_name_a,
+			"dataset_b": dataset_name_b,
+			"added_keys": added_keys,
+			"removed_keys": removed_keys,
+			"changed_values": changed_values,
+			"schema_drift": schema_drift,
+			"record_count_a": count_a,
+			"record_count_b": count_b,
+			"record_count_delta": delta,
+			"within_tolerance": within_tol,
+			"diff_at": _ts(),
+		}
+		self._record_event(tenant_id, "dataset_diff", sandbox_id, f"Diff {dataset_name_a} vs {dataset_name_b}", "system")
+		return diff
+
+	async def async_flakiness_score(
+		self,
+		scenario_id: str,
+		tenant_id: str = "default",
+		window: int = 20,
+	) -> dict[str, Any]:
+		"""
+		Compute a flakiness score (0.0–1.0) for a scenario based on its recent run history.
+
+		window: number of most-recent scenario results to consider.
+		Score = variance of pass/fail (0=perfectly stable, 1=maximally flaky).
+
+		A score >= 0.3 is considered flaky; >= 0.5 triggers a quarantine recommendation.
+		"""
+		await self.async_guard_tenant(tenant_id)
+		recent = [
+			r for r in self._scenario_results
+			if r.get("scenario_id") == scenario_id and r.get("tenant_id") == tenant_id
+		][-window:]
+		if not recent:
+			return {
+				"scenario_id": scenario_id,
+				"tenant_id": tenant_id,
+				"run_count": 0,
+				"flakiness_score": 0.0,
+				"recommendation": "no_history",
+				"evaluated_at": _ts(),
+			}
+		pass_flags = [1 if r.get("passed") else 0 for r in recent]
+		mean = sum(pass_flags) / len(pass_flags)
+		variance = sum((x - mean) ** 2 for x in pass_flags) / len(pass_flags)
+		# Normalize: max variance is 0.25 (50/50 split) — scale to 0–1
+		score = round(min(variance / 0.25, 1.0), 4)
+		if score >= 0.5:
+			recommendation = "quarantine"
+		elif score >= 0.3:
+			recommendation = "monitor"
+		else:
+			recommendation = "stable"
+		return {
+			"scenario_id": scenario_id,
+			"tenant_id": tenant_id,
+			"run_count": len(recent),
+			"pass_count": sum(pass_flags),
+			"fail_count": len(pass_flags) - sum(pass_flags),
+			"flakiness_score": score,
+			"recommendation": recommendation,
+			"evaluated_at": _ts(),
+		}
+
+	async def async_register_wasm_module(
+		self,
+		name: str,
+		module_bytes: bytes,
+		signer_id: str,
+		tenant_id: str = "default",
+		version: str = "1.0.0",
+		trusted: bool = False,
+	) -> dict[str, Any]:
+		"""
+		Register a WASM module in the tenant's artifact registry with SHA-256 integrity verification.
+
+		Computes SHA-256 over module_bytes and stores it alongside signer metadata.
+		`trusted` must be set by an admin after out-of-band signature verification.
+		Only trusted modules may be passed to execute_wasm (enforcement point TBD by host).
+
+		Returns the module record including hash and registration timestamp.
+		"""
+		await self.async_guard_tenant(tenant_id)
+		assert name, "name required"
+		assert module_bytes, "module_bytes required"
+		assert signer_id, "signer_id required"
+		import hashlib as _hashlib
+		sha256_hex = _hashlib.sha256(module_bytes).hexdigest()
+		module_id = stable_id("wasm", tenant_id, name, sha256_hex[:16])
+		record: dict[str, Any] = {
+			"id": module_id,
+			"tenant_id": tenant_id,
+			"name": name,
+			"version": version,
+			"size_bytes": len(module_bytes),
+			"hash_sha256": sha256_hex,
+			"signer_id": signer_id,
+			"trusted": trusted,
+			"registered_at": _ts(),
+		}
+		self._wasm_modules[_state_key(tenant_id, module_id)] = record
+		self._record_event(
+			tenant_id, "wasm_module_registered", module_id,
+			f"WASM module {name} v{version} registered by {signer_id}",
+			signer_id, "warning" if not trusted else "info",
+		)
+		return record
+
+	async def async_simulate_policy(
+		self,
+		context: dict[str, Any],
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""
+		Dry-run policy evaluation against a given context without side effects.
+
+		Useful for pre-flight checks: 'will this sandbox creation be allowed?'
+		Returns the full evaluation result plus a human-readable summary.
+		Adds tenant_context_present=True to context if not already present.
+		"""
+		await self.async_guard_tenant(tenant_id)
+		full_context = {"tenant_context_present": True, **context}
+		await asyncio.sleep(0)
+		result = self.evaluate(full_context)
+		return {
+			"tenant_id": tenant_id,
+			"context": full_context,
+			"decision": result.get("decision"),
+			"summary": summarize_decision(result),
+			"actions": result.get("actions", []),
+			"simulated_at": _ts(),
 		}
 
 	def create_record(self, record_id: str, tenant_id: str, metadata: dict[str, Any] | None = None, status: str = "active") -> dict[str, Any]:

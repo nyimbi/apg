@@ -32,6 +32,14 @@ deployment, and medical/ergonomic engines attach through explicit APG adapters.
 - Linear frame interpolation for dropped-frame gap filling.
 - EWMA-based model confidence drift detection.
 - Display-ready skeleton overlay segment generation (COCO-17, Halpe-26, minimal).
+- Temporal keypoint smoothing (EMA / boxcar) with residual noise RMS.
+- Per-keypoint velocity and acceleration kinematics from skeletal tracks.
+- ISO 8551 / AAOS range-of-motion measurement with clinical classification.
+- Bilateral movement asymmetry detection with injury-severity audit events.
+- ISO 11226 Posture Alignment Index (0-100) with traffic-light band.
+- Evidence-based biomechanical injury risk rules engine with corrective cues.
+- Concurrent batch frame + estimate ingestion with asyncio semaphore control.
+- Cross-session longitudinal comparison with pairwise similarity matrix and trend vectors.
 
 ## Minimal Usage
 
@@ -96,6 +104,14 @@ analysis = service.analyze_pose("analysis-001", tenant_id, estimate["id"], "biom
 | `interpolate_missing_frames()` | Linear fill for dropped-frame gaps |
 | `detect_model_drift()` | EWMA confidence drift detection |
 | `build_skeleton_overlay()` | Display-ready edge segments for rendering |
+| `smooth_keypoint_track()` | EMA/boxcar temporal noise filtering over a skeletal track |
+| `compute_kinematics()` | Per-keypoint velocity, acceleration, and peak-velocity from a track |
+| `measure_rom()` | ISO 8551 range-of-motion with clinical classification |
+| `detect_asymmetry()` | Bilateral joint-pair asymmetry with injury-risk severity audit |
+| `compute_posture_score()` | ISO 11226 Posture Alignment Index (0-100) with traffic-light band |
+| `score_injury_risk()` | Evidence-based biomechanical injury risk rules engine (0-10 score) |
+| `ingest_frame_batch()` | Concurrent batch frame + estimate ingestion with semaphore control |
+| `longitudinal_compare()` | Cross-session similarity matrix and trend vectors |
 
 ## Guardrail Summary
 

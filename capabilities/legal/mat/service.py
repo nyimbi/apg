@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 from copy import deepcopy
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 from uuid import uuid4
 
@@ -17,6 +19,49 @@ PRIORITY_LEVELS = {"low", "normal", "high", "urgent"}
 MATTER_STATUSES = {"open", "active", "on_hold", "closed", "archived"}
 TASK_STATUSES = {"pending", "in_progress", "completed", "cancelled"}
 DEADLINE_TYPES = {"court", "filing", "statute_of_limitations", "contractual", "regulatory", "internal"}
+
+# FSM: allowed status transitions
+MATTER_TRANSITIONS: dict[str, set[str]] = {
+	"open":     {"active", "on_hold", "archived"},
+	"active":   {"on_hold", "closed", "archived"},
+	"on_hold":  {"active", "closed", "archived"},
+	"closed":   {"active"},
+	"archived": set(),
+}
+
+# Matter-type → default task templates [{title, task_type, relative_due_days, priority}]
+MATTER_TEMPLATES: dict[str, list[dict[str, Any]]] = {
+	"litigation": [
+		{"title": "File initial pleadings", "task_type": "filing", "relative_due_days": 14, "priority": "high"},
+		{"title": "Serve process on defendants", "task_type": "service", "relative_due_days": 30, "priority": "high"},
+		{"title": "Prepare initial disclosures", "task_type": "discovery", "relative_due_days": 42, "priority": "normal"},
+		{"title": "Attend scheduling conference", "task_type": "court_appearance", "relative_due_days": 60, "priority": "high"},
+	],
+	"transactional": [
+		{"title": "Draft term sheet", "task_type": "drafting", "relative_due_days": 7, "priority": "high"},
+		{"title": "Due diligence review", "task_type": "review", "relative_due_days": 21, "priority": "normal"},
+		{"title": "Draft definitive agreement", "task_type": "drafting", "relative_due_days": 35, "priority": "high"},
+		{"title": "Regulatory filings", "task_type": "filing", "relative_due_days": 45, "priority": "normal"},
+	],
+	"advisory": [
+		{"title": "Initial client briefing", "task_type": "meeting", "relative_due_days": 3, "priority": "normal"},
+		{"title": "Research and analysis", "task_type": "research", "relative_due_days": 14, "priority": "normal"},
+		{"title": "Draft opinion letter", "task_type": "drafting", "relative_due_days": 21, "priority": "normal"},
+	],
+}
+
+# Deadline chain rules: trigger_event → derived deadlines with offsets
+DEADLINE_CHAIN_RULES: dict[str, list[dict[str, Any]]] = {
+	"complaint_filed": [
+		{"title": "Defendant response deadline", "offset_days": 21, "deadline_type": "court", "reminder_days": [14, 7, 2, 1]},
+		{"title": "Initial scheduling conference", "offset_days": 60, "deadline_type": "court", "reminder_days": [7, 2]},
+		{"title": "Initial disclosures due", "offset_days": 42, "deadline_type": "filing", "reminder_days": [14, 7]},
+	],
+	"defence_filed": [
+		{"title": "Plaintiff reply deadline", "offset_days": 14, "deadline_type": "court", "reminder_days": [7, 2, 1]},
+		{"title": "Discovery cutoff", "offset_days": 120, "deadline_type": "court", "reminder_days": [30, 14, 7]},
+	],
+}
 
 
 class MatterManagementService:
@@ -31,6 +76,10 @@ class MatterManagementService:
 		self.team_assignments: dict[str, dict[str, Any]] = {}
 		self.notes: dict[str, dict[str, Any]] = {}
 		self.time_budgets: dict[str, dict[str, Any]] = {}
+		self.time_entries: dict[str, dict[str, Any]] = {}
+		self.invoices: dict[str, dict[str, Any]] = {}
+		self.conflict_checks: dict[str, dict[str, Any]] = {}
+		self.attorney_profiles: dict[str, dict[str, Any]] = {}
 		self._audit_events: list[dict[str, Any]] = []
 
 	def _now(self) -> str:
@@ -740,3 +789,598 @@ class MatterManagementService:
 			"notes": notes if isinstance(notes, list) else [],
 			"exported_at": self._now(),
 		}
+
+	# ── Matter FSM Transition ────────────────────────────────────────────────
+
+	async def transition_matter_status(
+		self,
+		tenant_id: str,
+		matter_id: str,
+		new_status: str,
+		actor_id: str,
+		reason: str = "",
+	) -> dict[str, Any]:
+		"""Validate and apply a matter status transition via the FSM.
+
+		Guards enforced:
+		- Transition must be allowed by MATTER_TRANSITIONS.
+		- Transitioning to 'closed' requires zero open tasks.
+		- Transitioning to 'archived' requires status is already 'closed'.
+		"""
+		guard_non_empty_string(actor_id, "actor_id")
+		tenant = self._tenant(tenant_id)
+		matter = self.matters.get(matter_id)
+		if not matter or matter["tenant_id"] != tenant:
+			raise KeyError(f"matter {matter_id} not found")
+		current = matter["status"]
+		allowed = MATTER_TRANSITIONS.get(current, set())
+		if new_status not in allowed:
+			raise ValueError(
+				f"transition '{current}' → '{new_status}' is not permitted; "
+				f"allowed: {sorted(allowed) or 'none'}"
+			)
+		if new_status == "closed":
+			open_tasks = [
+				t for t in self.tasks.values()
+				if t["matter_id"] == matter_id and t["status"] in {"pending", "in_progress"}
+			]
+			if open_tasks:
+				raise ValueError(
+					f"cannot close matter with {len(open_tasks)} open task(s); complete or cancel them first"
+				)
+		matter["status"] = new_status
+		if new_status == "closed":
+			matter["closed_date"] = date.today().isoformat()
+		matter["updated_at"] = self._now()
+		self._emit(tenant, "matter_status_transitioned", matter_id, {
+			"from_status": current,
+			"to_status": new_status,
+			"actor_id": actor_id,
+			"reason": reason,
+		})
+		_log.info(
+			"matter status transition tenant=%s id=%s %s→%s actor=%s",
+			tenant, matter_id, current, new_status, actor_id,
+		)
+		return deepcopy(matter)
+
+	# ── Time Entry Logging ───────────────────────────────────────────────────
+
+	async def log_time_entry(
+		self,
+		tenant_id: str,
+		matter_id: str,
+		attorney_id: str,
+		hours: str,
+		narrative: str,
+		rate: str,
+		entry_date: str | None = None,
+		billable: bool = True,
+		task_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Record a time entry against a matter.
+
+		Args:
+			hours:  Decimal string, e.g. '1.5' — stored as Decimal for precision.
+			rate:   Hourly rate as Decimal string, e.g. '350.00'.
+		"""
+		guard_non_empty_string(attorney_id, "attorney_id")
+		guard_non_empty_string(narrative, "narrative")
+		tenant = self._tenant(tenant_id)
+		matter = self.matters.get(matter_id)
+		if not matter or matter["tenant_id"] != tenant:
+			raise KeyError(f"matter {matter_id} not found")
+		d_hours = Decimal(hours).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+		d_rate = Decimal(rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+		if d_hours <= 0:
+			raise ValueError("hours must be positive")
+		if d_rate < 0:
+			raise ValueError("rate cannot be negative")
+		amount = (d_hours * d_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+		entry: dict[str, Any] = {
+			"id": self._id("te-"),
+			"tenant_id": tenant,
+			"matter_id": matter_id,
+			"attorney_id": attorney_id,
+			"hours": str(d_hours),
+			"rate": str(d_rate),
+			"amount": str(amount),
+			"narrative": narrative,
+			"billable": billable,
+			"task_id": task_id,
+			"entry_date": entry_date or date.today().isoformat(),
+			"created_at": self._now(),
+		}
+		self.time_entries[entry["id"]] = entry
+		# Update budget used_hours if a budget exists
+		budget = self.time_budgets.get(matter_id)
+		if budget and budget["tenant_id"] == tenant:
+			used = Decimal(str(budget["used_hours"])) + d_hours
+			budget["used_hours"] = float(used)
+		self._emit(tenant, "time_entry_logged", entry["id"], {
+			"matter_id": matter_id,
+			"attorney_id": attorney_id,
+			"hours": str(d_hours),
+			"billable": billable,
+		})
+		return deepcopy(entry)
+
+	async def list_time_entries(
+		self,
+		tenant_id: str,
+		matter_id: str | None = None,
+		attorney_id: str | None = None,
+		billable_only: bool = False,
+	) -> list[dict[str, Any]]:
+		"""List time entries with optional filters."""
+		tenant = self._tenant(tenant_id)
+		items = [deepcopy(e) for e in self.time_entries.values() if e["tenant_id"] == tenant]
+		if matter_id:
+			items = [e for e in items if e["matter_id"] == matter_id]
+		if attorney_id:
+			items = [e for e in items if e["attorney_id"] == attorney_id]
+		if billable_only:
+			items = [e for e in items if e["billable"]]
+		return sorted(items, key=lambda e: e["entry_date"])
+
+	# ── Budget Burn Report ───────────────────────────────────────────────────
+
+	async def get_budget_burn_report(self, tenant_id: str, matter_id: str) -> dict[str, Any]:
+		"""Return budget burn analysis with projected overrun date.
+
+		Uses simple linear projection based on daily burn rate over the last
+		30 days of time entries.  All monetary values returned as strings to
+		preserve Decimal precision.
+		"""
+		tenant = self._tenant(tenant_id)
+		matter = self.matters.get(matter_id)
+		if not matter or matter["tenant_id"] != tenant:
+			raise KeyError(f"matter {matter_id} not found")
+		budget = self.time_budgets.get(matter_id)
+		entries = [
+			e for e in self.time_entries.values()
+			if e["tenant_id"] == tenant and e["matter_id"] == matter_id and e["billable"]
+		]
+		total_hours = Decimal("0")
+		total_amount = Decimal("0")
+		for e in entries:
+			total_hours += Decimal(e["hours"])
+			total_amount += Decimal(e["amount"])
+		report: dict[str, Any] = {
+			"matter_id": matter_id,
+			"total_billable_hours": str(total_hours),
+			"total_billed_amount": str(total_amount),
+			"budget_total_hours": None,
+			"budget_remaining_hours": None,
+			"burn_pct": None,
+			"projected_overrun_date": None,
+		}
+		if budget:
+			budget_hours = Decimal(str(budget["total_hours"]))
+			remaining = (budget_hours - total_hours).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+			burn_pct = (total_hours / budget_hours * 100).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP) if budget_hours else Decimal("0")
+			report["budget_total_hours"] = str(budget_hours)
+			report["budget_remaining_hours"] = str(remaining)
+			report["burn_pct"] = str(burn_pct)
+			# Daily burn rate from last 30 days
+			cutoff = (date.today() - timedelta(days=30)).isoformat()
+			recent = [e for e in entries if e["entry_date"] >= cutoff]
+			if recent and remaining > 0:
+				daily_hours = total_hours / Decimal("30")
+				if daily_hours > 0:
+					days_left = int(remaining / daily_hours)
+					overrun_date = (date.today() + timedelta(days=days_left)).isoformat()
+					report["projected_overrun_date"] = overrun_date
+		report["generated_at"] = self._now()
+		return report
+
+	# ── Conflict Check ───────────────────────────────────────────────────────
+
+	async def run_conflict_check(
+		self,
+		tenant_id: str,
+		matter_id: str,
+		party_names: list[str],
+	) -> dict[str, Any]:
+		"""Run a conflict-of-interest check against all existing matters.
+
+		Uses exact and substring matching against existing matter titles,
+		client IDs, and metadata party lists.  Flags any matches for review.
+		"""
+		guard_non_empty_string(matter_id, "matter_id")
+		tenant = self._tenant(tenant_id)
+		matter = self.matters.get(matter_id)
+		if not matter or matter["tenant_id"] != tenant:
+			raise KeyError(f"matter {matter_id} not found")
+		if not party_names:
+			raise ValueError("party_names must be a non-empty list")
+		candidates: list[dict[str, Any]] = []
+		normalised = [p.lower().strip() for p in party_names]
+		for mid, m in self.matters.items():
+			if mid == matter_id or m["tenant_id"] != tenant:
+				continue
+			hit_reasons: list[str] = []
+			title_lower = m["title"].lower()
+			for name in normalised:
+				if name in title_lower:
+					hit_reasons.append(f"party '{name}' found in matter title '{m['title']}'")
+			meta_parties: list[str] = m.get("metadata", {}).get("parties", [])
+			for mp in meta_parties:
+				for name in normalised:
+					if name in mp.lower():
+						hit_reasons.append(f"party '{name}' matches existing party '{mp}' on {mid}")
+			if hit_reasons:
+				candidates.append({
+					"conflicting_matter_id": mid,
+					"conflicting_matter_title": m["title"],
+					"reasons": hit_reasons,
+				})
+		status = "flagged" if candidates else "clear"
+		check: dict[str, Any] = {
+			"id": self._id("cf-"),
+			"tenant_id": tenant,
+			"matter_id": matter_id,
+			"party_names": party_names,
+			"status": status,
+			"candidates": candidates,
+			"checked_at": self._now(),
+		}
+		self.conflict_checks[check["id"]] = check
+		self._emit(tenant, "conflict_check_run", matter_id, {
+			"status": status,
+			"candidate_count": len(candidates),
+		})
+		_log.info("conflict check tenant=%s matter=%s status=%s hits=%d", tenant, matter_id, status, len(candidates))
+		return deepcopy(check)
+
+	# ── Deadline Chaining ────────────────────────────────────────────────────
+
+	async def create_chained_deadlines(
+		self,
+		tenant_id: str,
+		matter_id: str,
+		trigger_event: str,
+		trigger_date: str,
+	) -> list[dict[str, Any]]:
+		"""Create a chain of derived deadlines from a trigger event.
+
+		Uses DEADLINE_CHAIN_RULES to compute offsets from trigger_date.
+		Each created deadline is linked via 'parent_trigger_event'.
+		"""
+		tenant = self._tenant(tenant_id)
+		matter = self.matters.get(matter_id)
+		if not matter or matter["tenant_id"] != tenant:
+			raise KeyError(f"matter {matter_id} not found")
+		rules = DEADLINE_CHAIN_RULES.get(trigger_event)
+		if not rules:
+			raise ValueError(
+				f"no chain rules defined for trigger_event '{trigger_event}'; "
+				f"known: {sorted(DEADLINE_CHAIN_RULES)}"
+			)
+		base = date.fromisoformat(trigger_date)
+		created: list[dict[str, Any]] = []
+		for rule in rules:
+			derived_date = (base + timedelta(days=rule["offset_days"])).isoformat()
+			dl = await self.create_deadline(
+				tenant_id=tenant_id,
+				matter_id=matter_id,
+				title=rule["title"],
+				deadline_date=derived_date,
+				deadline_type=rule["deadline_type"],
+				description=f"Derived from trigger '{trigger_event}' on {trigger_date}",
+				reminder_days=rule.get("reminder_days", [7, 1]),
+			)
+			dl["parent_trigger_event"] = trigger_event
+			dl["offset_days"] = rule["offset_days"]
+			self.deadlines[dl["id"]]["parent_trigger_event"] = trigger_event
+			created.append(dl)
+		self._emit(tenant, "deadline_chain_created", matter_id, {
+			"trigger_event": trigger_event,
+			"count": len(created),
+		})
+		return created
+
+	# ── Matter Template Application ──────────────────────────────────────────
+
+	async def apply_matter_template(
+		self,
+		tenant_id: str,
+		matter_id: str,
+		template_name: str,
+		start_date: str,
+		assigned_to_id: str,
+	) -> list[dict[str, Any]]:
+		"""Bulk-create tasks from a predefined matter template.
+
+		Args:
+			template_name:  Key in MATTER_TEMPLATES (e.g. 'litigation').
+			start_date:     ISO date string; task due dates = start + relative_due_days.
+			assigned_to_id: Default assignee for all generated tasks.
+
+		Returns list of created task records.
+		"""
+		guard_non_empty_string(assigned_to_id, "assigned_to_id")
+		tenant = self._tenant(tenant_id)
+		matter = self.matters.get(matter_id)
+		if not matter or matter["tenant_id"] != tenant:
+			raise KeyError(f"matter {matter_id} not found")
+		templates = MATTER_TEMPLATES.get(template_name)
+		if not templates:
+			raise ValueError(
+				f"template '{template_name}' not found; "
+				f"available: {sorted(MATTER_TEMPLATES)}"
+			)
+		base = date.fromisoformat(start_date)
+		sem = asyncio.Semaphore(8)
+		created: list[dict[str, Any]] = []
+
+		async def _create_one(tmpl: dict[str, Any]) -> dict[str, Any]:
+			async with sem:
+				due = (base + timedelta(days=tmpl["relative_due_days"])).isoformat()
+				return await self.create_task(
+					tenant_id=tenant_id,
+					matter_id=matter_id,
+					title=tmpl["title"],
+					assigned_to_id=assigned_to_id,
+					due_date=due,
+					priority=tmpl.get("priority", "normal"),
+					task_type=tmpl.get("task_type", "general"),
+				)
+
+		results = await asyncio.gather(*[_create_one(t) for t in templates], return_exceptions=True)
+		for r in results:
+			if isinstance(r, dict):
+				created.append(r)
+			else:
+				_log.warning("template task creation failed: %s", r)
+		self._emit(tenant, "matter_template_applied", matter_id, {
+			"template": template_name,
+			"tasks_created": len(created),
+		})
+		return created
+
+	# ── Risk Scoring ─────────────────────────────────────────────────────────
+
+	async def compute_matter_risk_score(self, tenant_id: str, matter_id: str) -> dict[str, Any]:
+		"""Compute a composite risk score (0–100) for a matter.
+
+		Scoring components:
+		- Overdue tasks           × 10 per task  (max 30)
+		- Overdue deadlines       × 15 per deadline (max 30)
+		- SoL deadline within 30d × 20 (once)
+		- Budget burn > 80%       × 15
+		- Unresolved conflicts    × 25 (once)
+		- Inactivity > 30 days    × 10
+
+		Risk levels: low (0–29), medium (30–59), high (60–79), critical (80+).
+		"""
+		tenant = self._tenant(tenant_id)
+		matter = self.matters.get(matter_id)
+		if not matter or matter["tenant_id"] != tenant:
+			raise KeyError(f"matter {matter_id} not found")
+		today = date.today().isoformat()
+		score = 0
+		factors: list[str] = []
+
+		# Overdue tasks
+		overdue_tasks = [
+			t for t in self.tasks.values()
+			if t["tenant_id"] == tenant
+			and t["matter_id"] == matter_id
+			and t["status"] in {"pending", "in_progress"}
+			and t["due_date"] < today
+		]
+		task_pts = min(len(overdue_tasks) * 10, 30)
+		if task_pts:
+			score += task_pts
+			factors.append(f"{len(overdue_tasks)} overdue task(s) (+{task_pts})")
+
+		# Overdue deadlines
+		overdue_dl = [
+			d for d in self.deadlines.values()
+			if d["tenant_id"] == tenant
+			and d["matter_id"] == matter_id
+			and d["status"] == "pending"
+			and d["deadline_date"] < today
+		]
+		dl_pts = min(len(overdue_dl) * 15, 30)
+		if dl_pts:
+			score += dl_pts
+			factors.append(f"{len(overdue_dl)} overdue deadline(s) (+{dl_pts})")
+
+		# SoL within 30 days
+		sol_cutoff = (date.today() + timedelta(days=30)).isoformat()
+		sol_near = any(
+			d["deadline_type"] == "statute_of_limitations"
+			and d["status"] == "pending"
+			and d["deadline_date"] <= sol_cutoff
+			for d in self.deadlines.values()
+			if d["tenant_id"] == tenant and d["matter_id"] == matter_id
+		)
+		if sol_near:
+			score += 20
+			factors.append("statute of limitations within 30 days (+20)")
+
+		# Budget burn > 80%
+		budget = self.time_budgets.get(matter_id)
+		if budget and budget["tenant_id"] == tenant:
+			used = Decimal(str(budget["used_hours"]))
+			total = Decimal(str(budget["total_hours"]))
+			if total > 0 and used / total > Decimal("0.80"):
+				score += 15
+				factors.append(f"budget burn {(used/total*100).quantize(Decimal('0.1'))}% (+15)")
+
+		# Unresolved conflicts
+		unresolved = any(
+			c["matter_id"] == matter_id and c["status"] == "flagged"
+			for c in self.conflict_checks.values()
+			if c["tenant_id"] == tenant
+		)
+		if unresolved:
+			score += 25
+			factors.append("unresolved conflict flag (+25)")
+
+		# Inactivity > 30 days
+		last_event = next(
+			(e["created_at"] for e in reversed(self._audit_events)
+			 if e["tenant_id"] == tenant and e["entity_id"] == matter_id),
+			None,
+		)
+		if last_event:
+			last_dt = datetime.fromisoformat(last_event.rstrip("Z"))
+			inactive_days = (datetime.utcnow() - last_dt).days
+			if inactive_days > 30:
+				score += 10
+				factors.append(f"inactive {inactive_days} days (+10)")
+
+		score = min(score, 100)
+		if score < 30:
+			risk_level = "low"
+		elif score < 60:
+			risk_level = "medium"
+		elif score < 80:
+			risk_level = "high"
+		else:
+			risk_level = "critical"
+
+		result: dict[str, Any] = {
+			"matter_id": matter_id,
+			"score": score,
+			"risk_level": risk_level,
+			"contributing_factors": factors,
+			"computed_at": self._now(),
+		}
+		self._emit(tenant, "risk_score_computed", matter_id, {"score": score, "risk_level": risk_level})
+		return result
+
+	async def batch_risk_scores(self, tenant_id: str) -> list[dict[str, Any]]:
+		"""Compute risk scores for all active matters and return sorted by score descending."""
+		tenant = self._tenant(tenant_id)
+		active_matters = [
+			m for m in self.matters.values()
+			if m["tenant_id"] == tenant and m["status"] in {"open", "active"}
+		]
+		sem = asyncio.Semaphore(16)
+
+		async def _score(m: dict[str, Any]) -> dict[str, Any]:
+			async with sem:
+				return await self.compute_matter_risk_score(tenant_id, m["id"])
+
+		results = await asyncio.gather(*[_score(m) for m in active_matters], return_exceptions=True)
+		scores = [r for r in results if isinstance(r, dict)]
+		return sorted(scores, key=lambda r: r["score"], reverse=True)
+
+	# ── Privilege Log ────────────────────────────────────────────────────────
+
+	async def generate_privilege_log(
+		self,
+		tenant_id: str,
+		matter_id: str,
+	) -> dict[str, Any]:
+		"""Generate a privilege log from all privileged notes on a matter.
+
+		Returns structured log entries conforming to FRCP 26(b)(5) fields plus
+		a SHA-256 hash of the sorted entries for tamper detection.
+		"""
+		tenant = self._tenant(tenant_id)
+		matter = self.matters.get(matter_id)
+		if not matter or matter["tenant_id"] != tenant:
+			raise KeyError(f"matter {matter_id} not found")
+		privileged_notes = [
+			n for n in self.notes.values()
+			if n["tenant_id"] == tenant
+			and n["matter_id"] == matter_id
+			and n["is_privileged"]
+			and n["status"] == "active"
+		]
+		entries: list[dict[str, Any]] = []
+		for n in sorted(privileged_notes, key=lambda x: x["created_at"]):
+			entries.append({
+				"entry_id": n["id"],
+				"date": n["created_at"][:10],
+				"author_id": n["author_id"],
+				"note_type": n["note_type"],
+				"description": n["content"][:120] + ("..." if len(n["content"]) > 120 else ""),
+				"privilege_basis": n.get("privilege_basis", "attorney-client privilege"),
+				"recipients": n.get("recipients", []),
+			})
+		# SHA-256 for tamper detection
+		canonical = str(sorted(str(e) for e in entries)).encode()
+		log_hash = hashlib.sha256(canonical).hexdigest()
+		return {
+			"matter_id": matter_id,
+			"matter_title": matter["title"],
+			"jurisdiction": matter["jurisdiction"],
+			"entries": entries,
+			"entry_count": len(entries),
+			"log_hash": log_hash,
+			"generated_at": self._now(),
+		}
+
+	# ── Team Capacity Planning ───────────────────────────────────────────────
+
+	async def get_team_capacity_report(
+		self,
+		tenant_id: str,
+		attorney_ids: list[str] | None = None,
+	) -> list[dict[str, Any]]:
+		"""Return capacity summary for one or more attorneys.
+
+		Aggregates: active matter count, pending task count, overdue task count,
+		upcoming deadline count (next 14 days), and load_score (0–100).
+		"""
+		tenant = self._tenant(tenant_id)
+		today = date.today().isoformat()
+		cutoff_14 = (date.today() + timedelta(days=14)).isoformat()
+		# Determine attorney set
+		if attorney_ids:
+			atty_set = set(attorney_ids)
+		else:
+			atty_set = set()
+			for m in self.matters.values():
+				if m["tenant_id"] == tenant:
+					atty_set.update(m["team_ids"])
+		reports: list[dict[str, Any]] = []
+		for atty in sorted(atty_set):
+			active_matters = sum(
+				1 for m in self.matters.values()
+				if m["tenant_id"] == tenant
+				and atty in m["team_ids"]
+				and m["status"] in {"open", "active"}
+			)
+			pending_tasks = [
+				t for t in self.tasks.values()
+				if t["tenant_id"] == tenant
+				and t["assigned_to_id"] == atty
+				and t["status"] in {"pending", "in_progress"}
+			]
+			overdue_tasks = sum(1 for t in pending_tasks if t["due_date"] < today)
+			upcoming_deadlines = sum(
+				1 for d in self.deadlines.values()
+				if d["tenant_id"] == tenant
+				and d["status"] == "pending"
+				and today <= d["deadline_date"] <= cutoff_14
+				and any(
+					t["matter_id"] == d["matter_id"] and t["assigned_to_id"] == atty
+					for t in self.tasks.values()
+					if t["tenant_id"] == tenant
+				)
+			)
+			# load_score: normalised heuristic (0–100)
+			load_score = min(
+				int(active_matters * 5 + len(pending_tasks) * 3 + overdue_tasks * 10 + upcoming_deadlines * 4),
+				100,
+			)
+			profile = self.attorney_profiles.get(f"{tenant}:{atty}", {})
+			reports.append({
+				"attorney_id": atty,
+				"active_matters": active_matters,
+				"pending_tasks": len(pending_tasks),
+				"overdue_tasks": overdue_tasks,
+				"upcoming_deadlines_14d": upcoming_deadlines,
+				"load_score": load_score,
+				"max_hours_per_week": profile.get("max_hours_per_week"),
+				"out_of_office_until": profile.get("out_of_office_until"),
+				"generated_at": self._now(),
+			})
+		return sorted(reports, key=lambda r: r["load_score"], reverse=True)

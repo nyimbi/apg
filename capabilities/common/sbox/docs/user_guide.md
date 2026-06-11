@@ -1,6 +1,6 @@
 # Sandbox/Testing Environment — User Guide
 
-**Capability ID**: `sbox` | **Domain**: `common` | **Version**: `1.1.0`
+**Capability ID**: `sbox` | **Domain**: `common` | **Version**: `1.2.0`
 **Author**: Nyimbi Odero — Datacraft (c) 2025
 
 ---
@@ -456,6 +456,147 @@ svc.destroy_sandbox(
 
 ---
 
+## New Features (v1.2.0)
+
+### Decimal-Precise Cost Tracking with Budget Alerts
+
+```python
+cost = await svc.async_cost_tracking_decimal(
+    sandbox_id=sandbox["id"],
+    tenant_id="tenant-a",
+    resource_costs={"compute": "0.12", "storage": "0.03"},
+    monthly_budget="1.00",
+    alert_threshold=0.8,   # fire budget_alert at 80% of budget
+    currency="USD",
+)
+print(cost["total_cost"])       # "0.15" (exact Decimal arithmetic)
+print(cost["budget_status"])    # "ok" or "alert"
+```
+
+### Real-Time Event Subscriptions
+
+```python
+token, queue = await svc.async_subscribe_events(
+    sandbox_id=sandbox["id"],
+    event_types=["order.created", "payment.failed"],
+    tenant_id="tenant-a",
+)
+# simulate_event now broadcasts to all matching queues
+svc.simulate_event(sandbox["id"], "order.created", {"id": "o-1"}, "tenant-a")
+event = await asyncio.wait_for(queue.get(), timeout=1.0)
+assert event["event_type"] == "order.created"
+await svc.async_unsubscribe_events(token)
+```
+
+### Structured Test Scenario DSL
+
+```python
+await svc.async_define_scenario(
+    "checkout-flow",
+    steps=[
+        {
+            "action": "simulate_event",
+            "target": "order-bus",
+            "params": {"event_type": "order.created", "payload": {"id": "o-1"}},
+            "on_failure": "abort",
+        },
+        {
+            "action": "assert",
+            "params": {},
+            "assertion": {"field": "event_type", "expected": "order.created"},
+            "on_failure": "continue",
+        },
+    ],
+    tenant_id="tenant-a",
+    description="Full checkout event flow",
+)
+
+result = await svc.async_execute_scenario(
+    sandbox_id=sandbox["id"],
+    scenario_id="checkout-flow",
+    tenant_id="tenant-a",
+    requested_by="ci-bot",
+)
+print(result["passed"])         # True / False
+print(result["step_results"])   # per-step pass/fail detail
+```
+
+### Dataset Diff
+
+```python
+diff = await svc.async_dataset_diff(
+    sandbox_id=sandbox["id"],
+    dataset_name_a="baseline",
+    dataset_name_b="after-migration",
+    tenant_id="tenant-a",
+    tolerance_record_count_pct=0.05,  # allow 5% count drift
+)
+print(diff["added_keys"])       # keys present in b but not a
+print(diff["removed_keys"])     # keys present in a but not b
+print(diff["schema_drift"])     # fields whose Python type changed
+print(diff["within_tolerance"]) # True if record count delta within threshold
+```
+
+### Flakiness Detection
+
+```python
+score = await svc.async_flakiness_score(
+    scenario_id="checkout-flow",
+    tenant_id="tenant-a",
+    window=20,              # consider last 20 runs
+)
+print(score["flakiness_score"])     # 0.0 (stable) – 1.0 (maximally flaky)
+print(score["recommendation"])      # "stable" | "monitor" | "quarantine"
+```
+
+### WASM Module Registry
+
+```python
+with open("my_module.wasm", "rb") as f:
+    module_bytes = f.read()
+
+record = await svc.async_register_wasm_module(
+    name="data-validator",
+    module_bytes=module_bytes,
+    signer_id="platform-team",
+    tenant_id="tenant-a",
+    version="2.1.0",
+    trusted=False,          # set True after out-of-band signature verification
+)
+print(record["hash_sha256"])    # 64-char hex SHA-256
+print(record["trusted"])        # False until admin approves
+```
+
+### Policy Dry-Run
+
+```python
+result = await svc.async_simulate_policy(
+    context={
+        "operation": "create_sandbox",
+        "sandbox_owner_assigned": True,
+        "ttl_hours": 168,
+        "secret_access_requested": True,
+        "secret_redaction_enabled": False,
+    },
+    tenant_id="tenant-a",
+)
+print(result["decision"])   # "allow" | "deny" | "require_review"
+print(result["summary"])    # human-readable reason
+```
+
+### Tenant Guard
+
+Use `async_guard_tenant` at the top of any custom async handler to get uniform
+tenant validation and early PermissionError before touching state:
+
+```python
+async def my_handler(tenant_id: str, sandbox_id: str) -> dict:
+    await svc.async_guard_tenant(tenant_id)
+    ...
+```
+
+---
+
 ## Complete Async Method Reference
 
 | Method | Description |
@@ -470,6 +611,16 @@ svc.destroy_sandbox(
 | `async_snapshot_and_restore(...)` | Snapshot/reset/restore primitive |
 | `async_security_posture_report(...)` | Multi-dimension security scoring |
 | `async_quota_check(...)` | Resource usage vs. limits |
+| `async_guard_tenant(tenant_id)` | Tenant validation guard |
+| `async_cost_tracking_decimal(...)` | Decimal-precise costs with budget alerts |
+| `async_subscribe_events(sandbox_id, event_types)` | Subscribe to sandbox events via asyncio.Queue |
+| `async_unsubscribe_events(token)` | Unsubscribe and drain a subscription |
+| `async_define_scenario(scenario_id, steps)` | Define typed scenario with per-step assertions |
+| `async_execute_scenario(sandbox_id, scenario_id)` | Execute scenario step-by-step |
+| `async_dataset_diff(sandbox_id, name_a, name_b)` | Structural diff of two datasets |
+| `async_flakiness_score(scenario_id)` | Variance-based flakiness score with recommendation |
+| `async_register_wasm_module(name, bytes, signer_id)` | SHA-256–verified WASM artifact registry |
+| `async_simulate_policy(context)` | Dry-run policy evaluation without side effects |
 
 ---
 

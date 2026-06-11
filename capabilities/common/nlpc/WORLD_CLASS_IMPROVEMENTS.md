@@ -1,146 +1,139 @@
-# NLPC — World-Class Improvement Catalogue
+# NLP Core (nlpc) — World-Class Improvements
 
-**Capability**: NLP Core (nlpc)
-**Author**: Nyimbi Odero — Datacraft
-**Date**: 2026-06-11
-
----
-
-## 1. Streaming Inference via Ollama `/api/generate` SSE
-
-Current `_ollama_summarise` and `_ollama_translate` accumulate the full response before returning.
-Replace with Server-Sent Events streaming so callers receive incremental tokens for long texts.
-Expose an `async_generator` variant on `text_summarisation` and `translate` that `yield`s token
-chunks, enabling real-time UI streaming without buffering the entire model output.
+**Capability**: NLP Core | **Path**: capabilities/common/nlpc | **Domain**: common
+**Copyright**: © 2025 Datacraft | **Author**: Nyimbi Odero
 
 ---
 
-## 2. Semantic Chunking Before Embedding
+### I1. Streaming Incremental NLP via Server-Sent Events
 
-`embed_text` sends up to 4000 raw characters to Ollama.  For documents longer than the model
-context window this silently truncates, producing low-quality embeddings.  Add
-`chunk_and_embed(text, chunk_size, overlap)` that splits text into semantically coherent
-sentence-boundary chunks, embeds each independently, then mean-pools or stores the chunks
-separately with a parent document reference.  This is the prerequisite for production RAG.
-
----
-
-## 3. Cosine Nearest-Neighbour Search Over Stored Embeddings
-
-`_STORE` holds embeddings but there is no retrieval path.  Add
-`semantic_search(query, top_k, threshold)` that embeds the query then scans stored vectors
-with cosine similarity, returning the top-k document IDs and scores.  Wire in an optional
-`faiss`/`usearch` index when the package is present for sub-millisecond retrieval at scale.
+**Category**: Throughput / UX
+**Justification**: Latency-to-first-token dominates perceived performance. Current `_ollama_summarise` and `_ollama_translate` block the caller until the full Ollama response arrives. SSE streaming lets the UI render tokens as they arrive, cutting perceived latency 5-10x for long-form generation — matching ChatGPT UX and outperforming any batch-only NLP endpoint.
+**Implementation**: Add `stream=True` to Ollama `/api/generate` requests; yield `data:` SSE frames from an async generator `stream_summarise`. Flask route layer wraps the generator in `Response(stream_with_context(...))`.
+**Competitor**: OpenAI Streaming API, Cohere Streaming, Anthropic SSE
 
 ---
 
-## 4. PII Detection and Redaction
+### I2. Cross-Lingual Semantic Search with Multilingual Embeddings
 
-The model schema includes `NLPTask.PII_DETECTION` but the service has no implementation.
-Add `detect_pii(text)` using a regex battery (email, phone, national ID, IBAN, credit card, IP)
-plus spaCy PERSON/ORG labels, and `redact_pii(text, strategy)` that replaces detected spans
-with `[REDACTED]`, `[TYPE]`, or a random substitute.  Required for GDPR compliance before
-any text leaves the tenant boundary.
-
----
-
-## 5. Dependency Parsing and Constituency Tree
-
-`NLPTask.DEPENDENCY_PARSING` is defined but not implemented.  Add
-`dependency_parse(text)` that returns token-level head/dep/pos triples from spaCy (or a
-rule-based fallback), and a lightweight constituency approximation using noun-phrase chunking.
-This unblocks grammar-error detection, argument mining, and structured relation extraction.
+**Category**: Search / Multilingual
+**Justification**: Current `semantic_search` only embeds in the query language; a Swahili document cannot be retrieved by an English query. Multilingual embeddings collapse 100+ languages into a shared vector space, enabling 40+ African-language corpora to be searched in English — a feature no incumbent NLP API exposes for Swahili/Kikuyu/Amharic at this depth.
+**Implementation**: Add `multilingual_embed_text` using `sentence-transformers` `paraphrase-multilingual-mpnet-base-v2`; expose `cross_lingual_search(query, query_lang, target_lang)` that cosine-ranks stored multilingual embeddings.
+**Competitor**: Cohere Multilingual, Azure AI Search, Weaviate hybrid search
 
 ---
 
-## 6. Temporal Expression Extraction (TIMEX3)
+### I3. Readability and Complexity Scoring (Flesch-Kincaid + Gunning Fog)
 
-Named entity recognition skips temporal expressions beyond DATE/TIME labels.
-Add `extract_temporal_expressions(text)` that normalises date/time strings to ISO-8601 using
-`dateutil.parser` (available in most Python envs) and attaches TIMEX3-style attributes
-(type: DATE|TIME|DURATION|SET, value, anchor).  Essential for event timelines in legal and
-financial documents.
-
----
-
-## 7. Multi-Label Document Classification
-
-`classify_document` returns a single best label (argmax over scores).  Add
-`multi_label_classify(text, taxonomy, threshold)` that returns all labels whose score exceeds
-`threshold`, supporting overlapping categories (e.g. a document that is both LEGAL and
-FINANCIAL).  Also expose a calibrated Platt-scaling post-processor for transformer logits.
+**Category**: Text Quality / Compliance Analytics
+**Justification**: Legal, financial, and health communications require measurable readability. Flesch-Kincaid Grade Level, Gunning Fog, and Coleman-Liau are pure arithmetic over syllable/word/sentence counts — zero model dependency, sub-millisecond, delivering compliance-grade evidence for regulatory content reviews. Grammarly charges enterprise licences for this; implemented here as `score_readability`.
+**Implementation**: Pure-Python `score_readability(text)` computing FK grade, Fog, CL index, and composite plain-language score. Syllable counting via vowel-cluster heuristic; no external dependencies. Already implemented in service.py.
+**Competitor**: Grammarly Business, Microsoft Editor, ProWritingAid
 
 ---
 
-## 8. Cross-Lingual NER via mBERT/XLM-R
+### I4. Fine-Grained Emotion Detection (Ekman 8-class)
 
-`extract_entities` only loads English spaCy models.  Add
-`multilingual_ner(text, language)` that selects the appropriate spaCy language model (if
-installed) or falls back to an Ollama prompt in the detected language.  For African languages
-without spaCy coverage, use a few-shot Ollama prompt with Swahili/Amharic/Hausa exemplars.
-
----
-
-## 9. Argument Mining and Claim Detection
-
-Add `extract_arguments(text)` that identifies claims, premises, and evidence spans using
-sentence-level zero-shot classification with labels ["claim", "premise", "evidence",
-"background"].  Output includes an argument graph: each claim linked to its supporting
-premises, enabling fact-checking pipelines and debate analysis.
+**Category**: Sentiment / Emotion Intelligence
+**Justification**: Binary pos/neg sentiment is table-stakes. B2B platforms offer 8 Ekman emotion axes (joy, anger, fear, disgust, surprise, sadness, anticipation, trust). Routing a support ticket tagged `anger+fear` vs `frustration+trust` produces materially different CX outcomes. Current `sentiment_analysis` only returns pos/neg/neutral.
+**Implementation**: `detect_emotions(text)` — zero-shot classify against 8-label Ekman set via `facebook/bart-large-mnli`; fallback to NRC Emotion Lexicon word lists embedded as Python dict. Returns per-emotion scores + dominant emotion + VAD axes. Already implemented in service.py.
+**Competitor**: IBM Watson Tone Analyzer, AWS Comprehend, Symanto Emotion
 
 ---
 
-## 10. Confidence-Aware Caching with TTL
+### I5. Concept Extraction and Ontology Grounding
 
-Every hot path (sentiment, entity, language) recomputes results for the same text on every
-call.  Add a `BoundedCache` (already imported from `capabilities.common.reliability`) keyed on
-`sha256(text + method + model_params)` with a configurable TTL (default 5 minutes).  Cache
-misses transparently invoke the real backend; cache hits skip inference and log a cache-hit
-event.  This will eliminate >80% of redundant model calls in typical usage patterns.
-
----
-
-## 11. Async Batch Parallelism via `asyncio.gather`
-
-`run_batch_job` iterates documents sequentially.  Replace the inner loop with
-`asyncio.gather(*[self._dispatch_task(task, doc) for doc in docs])` with a configurable
-concurrency semaphore (`asyncio.Semaphore(max_concurrent)`).  For 100 documents this reduces
-wall-clock batch time by 10-50x depending on Ollama throughput.
+**Category**: Knowledge Graph / NLP
+**Justification**: Named entities resolve to Wikipedia slugs (current NEL). Concepts are broader — "machine learning" is a concept, not a named entity. Concept extraction enables knowledge-graph construction and content recommendation without curating entity lists.
+**Implementation**: `extract_concepts(text)` — spaCy noun-chunk pipeline + Wikidata Qnode resolution via `httpx` against `wikidata.org/w/api.php`. Falls back to noun-phrase TF-IDF with BM25 ranking. Returns `{concept, qnode, category, confidence}` per concept.
+**Competitor**: Google Natural Language API, Aylien, Dandelion API
 
 ---
 
-## 12. Grammatical Error Correction
+### I6. Automatic Document Structure Detection
 
-Add `correct_grammar(text, language)` using a LanguageTool REST API call (self-hosted via
-Docker) with httpx, falling back to a rule-based heuristic that catches common error classes
-(double spaces, missing capitalisation after period, repeated words, common homophone swaps).
-Store corrections as a diff structure (offset, original, corrected, rule_id).
-
----
-
-## 13. Discourse and Coherence Scoring
-
-Add `score_coherence(text)` that measures local coherence (entity-grid model: proportion of
-entity-grid transitions that are CONTINUATIONs vs SHIFTs) and global coherence (sentence
-embedding cosine similarity with adjacent-sentence smoothing).  Returns a scalar [0, 1] and a
-per-sentence coherence breakdown.  Enables document quality scoring for generated content.
+**Category**: Document Intelligence
+**Justification**: Unstructured text from PDFs or HTML has implicit structure (headings, bullet lists, tables). Current `create_document` stores raw content with no structural metadata. Structural awareness unlocks segment-level NLP and improves search precision. Matches AWS Textract without a cloud dependency.
+**Implementation**: `detect_document_structure(text)` — regex + indentation heuristics classify spans as `heading`, `paragraph`, `list_item`, `table_row`, `code_block`. Returns `{segments, structure_score, heading_count, list_item_count}`. Already implemented in service.py.
+**Competitor**: AWS Textract, Google Document AI, unstructured.io
 
 ---
 
-## 14. African Language Model Registry
+### I7. Hallucination Detection for Generated Text
 
-`_refine_african_language` covers Swahili via a fixed word list.  Replace with a full
-character-n-gram classifier trained on 40+ African language corpora (Kinyarwanda, Amharic,
-Hausa, Yoruba, Zulu, etc.) stored as a compact serialised sklearn `LinearSVC` or a
-`fasttext` model.  This lifts African language detection F1 from ~40% (langdetect) to >90%
-on benchmarks like AfriSenti/MasakhaNER.
+**Category**: AI Safety / Governance
+**Justification**: When `text_generation` or `_ollama_summarise` produces output, there is no faithfulness check against the source document. RAG deployments need a faithfulness signal before surfacing generated text to users. Multi-billion-dollar problem — Microsoft Copilot, Google NotebookLM invest here.
+**Implementation**: `score_faithfulness(source, generated)` — NLI entailment score via `cross-encoder/nli-deberta-v3-small`; falls back to token-overlap ROUGE-L. Returns `{entailment_score, contradiction_score, faithfulness_label, rouge_l}`. Already implemented in service.py.
+**Competitor**: Vectara HHEM, Galileo Hallucination Index, Azure AI Content Safety
 
 ---
 
-## 15. Audit-Trail Event Bus Integration
+### I8. Document Deduplication with MinHash LSH
 
-Currently `_emit_event` appends to `self._events` (in-memory list, lost on service restart).
-Wire events to a lightweight async publisher that writes to a PostgreSQL `nlpc_domain_events`
-table (or a Redis Streams key) using an `asyncpg` pool.  Events should include `event_id`,
-`tenant_id`, `actor_id`, `event_type`, `payload` (JSONB), `created_at`, and `correlation_id`.
-This is the prerequisite for AUDL adapter compliance and replay-based debugging.
+**Category**: Data Quality / Scalability
+**Justification**: In high-volume ingestion pipelines (news feeds, customer emails), near-duplicate content degrades model training and biases analytics. MinHash LSH detects near-duplicates in O(n) amortised vs. O(n^2) pairwise Jaccard. Current service has zero deduplication logic.
+**Implementation**: `find_near_duplicates(document_ids, threshold=0.8)` — char 3-gram shingle sets, 128-band MinHash signatures, LSH bucketing, returns candidate pairs with estimated and exact Jaccard. Pure Python using `hashlib`. Already implemented in service.py.
+**Competitor**: DataRobot Data Prep, AWS Glue dedup, Dedupe.io
+
+---
+
+### I9. Adaptive Confidence Calibration via Temperature Scaling
+
+**Category**: ML Ops / Model Reliability
+**Justification**: Raw model softmax probabilities are miscalibrated (ECE > 0.1 for most transformers). The service exposes raw scores as `confidence` without calibration — a compliance liability in regulated use cases. Temperature scaling reduces ECE by ~5x with no accuracy loss, making confidence scores legally defensible.
+**Implementation**: `calibrate_confidence(raw_score, task, n_buckets=10)` — stored temperature parameters per task type in `model_registry.py` as constants; calibrated scores replace raw scores in response models.
+**Competitor**: Google AutoML Tables calibration, Platt scaling in scikit-learn
+
+---
+
+### I10. Caching Layer with Content-Addressed Results (SHA-256 + TTL)
+
+**Category**: Performance / Cost Reduction
+**Justification**: `detect_language`, `sentiment_analysis`, and `embed_text` are pure functions of input text. Re-running on identical text wastes compute. A content-addressed cache keyed on `sha256(tenant_id + task + text)` eliminates redundant inference. At 60% cache hit rate (realistic for support corpora), this halves infrastructure costs.
+**Implementation**: Wrap the five most expensive methods with a `@cached_nlp_result` decorator reading/writing `BoundedCache` (imported from `capabilities.common.reliability`) keyed on SHA-256 of (tenant_id, task_name, text[:4096]).
+**Competitor**: Cohere caching, OpenAI prompt caching, Anthropic prompt cache
+
+---
+
+### I11. Discourse Segmentation and Rhetorical Structure Theory (RST)
+
+**Category**: Discourse Analysis
+**Justification**: RST provides a tree structure that enables structured summarisation respecting document intent — nucleus-satellite, elaboration, contrast. Current `extract_arguments` uses sentence-level zero-shot classification. RST is the foundation for document-level QA and structured summarisation of legal and academic documents.
+**Implementation**: `segment_discourse(text)` — hierarchical EDU segmentation using cue-phrase detection + dependency parse head chains. Returns `{edus, depth, root_relation}`. Integrates with `dependency_parse` output.
+**Competitor**: RST-DT parsers (CODRA, DPLP), AllenNLP discourse
+
+---
+
+### I12. Privacy-Preserving Federated NLP Analytics
+
+**Category**: Privacy / Multi-Tenant Governance
+**Justification**: Enterprise tenants are blocked from pooling data for model improvement by data-residency laws. Federated learning aggregates model updates (not raw text) across tenants, providing better language models without cross-tenant data exposure — differentiator for GDPR/CCPA markets.
+**Implementation**: `aggregate_federated_lexicon(tenant_updates: list[dict])` — weighted averaging of per-tenant term frequency deltas into a global pseudo-IDF corpus. Each tenant submits `{term: count}` dicts (no raw text). Improves TF-IDF scoring across `extract_key_phrases` and `score_coherence`.
+**Competitor**: Google Federated Learning, PySyft, TensorFlow Federated
+
+---
+
+### I13. Semantic Role Labelling (SRL) for Predicate-Argument Structures
+
+**Category**: Deep Linguistics / Event Extraction
+**Justification**: Relation extraction captures binary SVO triples. SRL captures full predicate frames: agent, patient, instrument, location, time — enabling structured event extraction for intelligence and compliance use cases. AllenNLP SRL is the industry reference.
+**Implementation**: `label_semantic_roles(text)` — spaCy dependency parse + VerbNet-style argument mapping heuristics. PropBank-style frames `{predicate, args: [{role, text, start, end}]}`. Falls back to SVO regex when spaCy parser unavailable. Already implemented in service.py.
+**Competitor**: AllenNLP SRL, Hugging Face SRL models, SENNA
+
+---
+
+### I14. Adaptive Batch Scheduler with Priority Queuing and Back-Pressure
+
+**Category**: Scalability / Operations
+**Justification**: Current `run_batch_job` is sequential. A priority-queue scheduler with async semaphore-bounded workers and exponential-backoff retry converts batch throughput from O(docs x tasks) serial to O(max_concurrent) parallel. Critical for SLAs on large corpora (10k+ documents).
+**Implementation**: `run_batch_job_scheduled(job_id, max_workers=8, retry_limit=3)` — `asyncio.PriorityQueue` keyed on `(priority, enqueue_time)`; workers claim one (doc, task) pair at a time; failed tasks re-enqueue with backoff; progress updates after each worker cycle. Already implemented in service.py.
+**Competitor**: Celery, Prefect, Apache Airflow task scheduling
+
+---
+
+### I15. Multi-Hop Question Answering with Evidence Chain
+
+**Category**: Information Retrieval / QA
+**Justification**: Current `question_answering` is single-hop extractive QA over a single context. Complex questions require chaining evidence across multiple retrieved passages. Multi-hop QA powers Google MUM and Microsoft Sydney. For intelligence and legal domains, a traceable evidence chain is a compliance requirement.
+**Implementation**: `multi_hop_qa(question, document_ids, max_hops=3)` — (1) embed question, retrieve top-k passages via `semantic_search`; (2) extract answer span; (3) if answer contains a named entity, re-embed as follow-up query and repeat up to `max_hops`; (4) return `{answer, evidence_chain, confidence}`. Already implemented in service.py.
+**Competitor**: HotpotQA systems, DeepMind REALM, ColBERT multi-hop

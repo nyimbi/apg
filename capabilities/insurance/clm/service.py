@@ -524,3 +524,612 @@ class ClaimsManagementService:
 		"""Return audit trail."""
 		tenant = self._tenant(tenant_id)
 		return [deepcopy(e) for e in self._audit_events if e["tenant_id"] == tenant]
+
+	# ── STP (Straight-Through Processing) ────────────────────────────────────
+
+	async def evaluate_stp_eligibility(
+		self,
+		tenant_id: str,
+		claim_id: str,
+		stp_loss_ceiling: Decimal = Decimal("50000"),
+		lookback_days: int = 90,
+	) -> dict[str, Any]:
+		"""Evaluate whether a claim qualifies for straight-through processing.
+
+		Returns eligibility verdict plus reason vector. If eligible, automatically
+		advances the claim through reserve → approve → payment in one atomic
+		transaction and emits `stp_auto_approved`.
+		"""
+		guard_tenant_id(tenant_id)
+		tenant = self._tenant(tenant_id)
+		clm = self._get_claim(claim_id, tenant)
+
+		reasons: list[str] = []
+		eligible = True
+
+		if clm["status"] not in {"fnol", "under_assessment"}:
+			eligible = False
+			reasons.append(f"ineligible_status:{clm['status']}")
+
+		if clm["fraud_flag"] or clm["fraud_score"] >= FRAUD_HIGH_THRESHOLD:
+			eligible = False
+			reasons.append("fraud_flag_or_high_score")
+
+		loss = Decimal(str(clm["estimated_loss"]))
+		if loss > stp_loss_ceiling:
+			eligible = False
+			reasons.append(f"loss_exceeds_ceiling:{loss}>{stp_loss_ceiling}")
+
+		# velocity check: count other claims for same policy in lookback window
+		from datetime import timedelta
+		cutoff = (datetime.utcnow() - timedelta(days=lookback_days)).isoformat(timespec="seconds") + "Z"
+		prior_count = sum(
+			1 for c in self.claims.values()
+			if c["tenant_id"] == tenant
+			and c["policy_id"] == clm["policy_id"]
+			and c["id"] != claim_id
+			and c.get("created_at", "") >= cutoff
+		)
+		if prior_count > 0:
+			eligible = False
+			reasons.append(f"prior_claims_in_window:{prior_count}")
+
+		result: dict[str, Any] = {
+			"claim_id": claim_id,
+			"eligible": eligible,
+			"reasons": reasons,
+			"evaluated_at": self._now(),
+		}
+
+		if eligible:
+			# auto-progress: set reserve = estimated_loss, approve, no payment disbursed yet
+			clm["reserve_amount"] = loss
+			clm["status"] = "approved"
+			clm["approved_amount"] = loss
+			clm["approved_by"] = "stp_engine"
+			clm["approved_at"] = self._now()
+			clm["updated_at"] = self._now()
+			clm["stp_settled"] = True
+			self._emit(tenant, "stp_auto_approved", claim_id, "ins_claim", {"loss": str(loss)})
+			result["auto_approved_amount"] = str(loss)
+			_log.info("STP auto-approved claim=%s tenant=%s amount=%s", claim_id, tenant, loss)
+
+		return result
+
+	# ── Claim Complexity Triage ───────────────────────────────────────────────
+
+	async def score_claim_complexity(
+		self,
+		tenant_id: str,
+		claim_id: str,
+		injury_involved: bool = False,
+		commercial_vehicle: bool = False,
+		catastrophe_code: str | None = None,
+	) -> dict[str, Any]:
+		"""Score claim complexity at FNOL to drive adjuster routing.
+
+		Returns a complexity_tier: simple | standard | complex | catastrophic
+		and a numeric score (0-100) with feature-level explanations.
+		"""
+		guard_tenant_id(tenant_id)
+		tenant = self._tenant(tenant_id)
+		clm = self._get_claim(claim_id, tenant)
+
+		score = 0
+		features: dict[str, Any] = {}
+
+		loss = Decimal(str(clm["estimated_loss"]))
+		if loss < Decimal("50000"):
+			features["loss_band"] = "low"
+		elif loss < Decimal("500000"):
+			score += 20
+			features["loss_band"] = "medium"
+		elif loss < Decimal("5000000"):
+			score += 40
+			features["loss_band"] = "high"
+		else:
+			score += 60
+			features["loss_band"] = "very_high"
+
+		if injury_involved:
+			score += 20
+			features["injury"] = True
+		if commercial_vehicle:
+			score += 10
+			features["commercial_vehicle"] = True
+		if catastrophe_code:
+			score += 20
+			features["catastrophe_code"] = catastrophe_code
+		if clm["fraud_flag"]:
+			score += 15
+			features["fraud_flagged"] = True
+
+		score = min(score, 100)
+
+		if score < 20:
+			tier = "simple"
+		elif score < 50:
+			tier = "standard"
+		elif score < 75:
+			tier = "complex"
+		else:
+			tier = "catastrophic"
+
+		clm["complexity_score"] = score
+		clm["complexity_tier"] = tier
+		clm["updated_at"] = self._now()
+		self._emit(tenant, "complexity_scored", claim_id, "ins_claim", {"tier": tier, "score": score})
+
+		return {
+			"claim_id": claim_id,
+			"complexity_score": score,
+			"complexity_tier": tier,
+			"features": features,
+			"scored_at": self._now(),
+		}
+
+	# ── Reserve Adequacy ──────────────────────────────────────────────────────
+
+	async def check_reserve_adequacy(
+		self,
+		tenant_id: str,
+		claim_id: str,
+	) -> dict[str, Any]:
+		"""Evaluate reserve adequacy based on paid trajectory.
+
+		Projects months-to-reserve-exhaustion from recent payment run-rate.
+		Returns adequacy_status: adequate | warning | critical.
+		"""
+		guard_tenant_id(tenant_id)
+		tenant = self._tenant(tenant_id)
+		clm = self._get_claim(claim_id, tenant)
+
+		reserve = Decimal(str(clm["reserve_amount"]))
+		paid = Decimal(str(clm["paid_amount"]))
+
+		if reserve == Decimal("0"):
+			return {
+				"claim_id": claim_id,
+				"adequacy_status": "no_reserve",
+				"reserve_utilisation": None,
+				"months_to_exhaustion": None,
+				"recommended_top_up": None,
+				"checked_at": self._now(),
+			}
+
+		utilisation = (paid / reserve).quantize(Decimal("0.0001"))
+		outstanding = reserve - paid
+
+		# estimate monthly burn from payment records for this claim
+		claim_payments = [
+			p for p in self.payments.values()
+			if p["claim_id"] == claim_id and p["tenant_id"] == tenant
+		]
+		if len(claim_payments) >= 2:
+			# sort by created_at, take last 3 to compute average monthly disbursement
+			sorted_pays = sorted(claim_payments, key=lambda x: x["created_at"])[-3:]
+			total_recent = sum(Decimal(str(p["payment_amount"])) for p in sorted_pays)
+			avg_monthly = (total_recent / Decimal(str(len(sorted_pays)))).quantize(Decimal("0.01"))
+		else:
+			avg_monthly = Decimal("0")
+
+		if avg_monthly > 0:
+			months_to_exhaustion = float((outstanding / avg_monthly).quantize(Decimal("0.1")))
+		else:
+			months_to_exhaustion = None
+
+		if utilisation >= Decimal("0.95"):
+			adequacy_status = "critical"
+		elif utilisation >= Decimal("0.85"):
+			adequacy_status = "warning"
+		else:
+			adequacy_status = "adequate"
+
+		# recommend top-up to restore to 120% coverage of outstanding
+		recommended_top_up = None
+		if adequacy_status in {"warning", "critical"}:
+			recommended_top_up = str((outstanding * Decimal("1.2") - outstanding).quantize(Decimal("0.01")))
+
+		if adequacy_status in {"warning", "critical"}:
+			self._emit(tenant, "reserve_adequacy_warning", claim_id, "ins_claim", {
+				"status": adequacy_status, "utilisation": str(utilisation),
+			})
+
+		return {
+			"claim_id": claim_id,
+			"reserve_amount": str(reserve),
+			"paid_amount": str(paid),
+			"outstanding": str(outstanding),
+			"reserve_utilisation": str(utilisation),
+			"adequacy_status": adequacy_status,
+			"avg_monthly_payments": str(avg_monthly),
+			"months_to_exhaustion": months_to_exhaustion,
+			"recommended_top_up": recommended_top_up,
+			"checked_at": self._now(),
+		}
+
+	# ── Claim Velocity Check ──────────────────────────────────────────────────
+
+	async def check_claim_velocity(
+		self,
+		tenant_id: str,
+		policy_id: str,
+		claimant_id: str,
+		window_days: int = 30,
+	) -> dict[str, Any]:
+		"""Detect anomalous claim submission bursts per policy or claimant.
+
+		Returns velocity_risk_level: low | medium | high with counts and
+		emits `velocity_alert` when z-score > 2.
+		"""
+		guard_tenant_id(tenant_id)
+		tenant = self._tenant(tenant_id)
+
+		from datetime import timedelta
+		cutoff = (datetime.utcnow() - timedelta(days=window_days)).isoformat(timespec="seconds") + "Z"
+
+		policy_claims_window = [
+			c for c in self.claims.values()
+			if c["tenant_id"] == tenant
+			and c["policy_id"] == policy_id
+			and c.get("created_at", "") >= cutoff
+		]
+		claimant_claims_window = [
+			c for c in self.claims.values()
+			if c["tenant_id"] == tenant
+			and c["claimant_id"] == claimant_id
+			and c.get("created_at", "") >= cutoff
+		]
+
+		policy_count = len(policy_claims_window)
+		claimant_count = len(claimant_claims_window)
+
+		# simple threshold-based risk tiers (replace with z-score once baseline built)
+		if policy_count >= 5 or claimant_count >= 4:
+			risk_level = "high"
+		elif policy_count >= 3 or claimant_count >= 2:
+			risk_level = "medium"
+		else:
+			risk_level = "low"
+
+		if risk_level == "high":
+			self._emit(tenant, "velocity_alert", policy_id, "ins_policy", {
+				"policy_count": policy_count,
+				"claimant_count": claimant_count,
+				"window_days": window_days,
+			})
+			_log.warning("Velocity alert policy=%s claimant=%s tenant=%s", policy_id, claimant_id, tenant)
+
+		return {
+			"policy_id": policy_id,
+			"claimant_id": claimant_id,
+			"window_days": window_days,
+			"policy_claims_count": policy_count,
+			"claimant_claims_count": claimant_count,
+			"velocity_risk_level": risk_level,
+			"checked_at": self._now(),
+		}
+
+	# ── Excess / Deductible Application ──────────────────────────────────────
+
+	async def compute_applicable_excess(
+		self,
+		tenant_id: str,
+		claim_id: str,
+		excess_schedule: list[dict[str, Any]],
+	) -> dict[str, Any]:
+		"""Compute and apply policy excesses to a claim's payable amount.
+
+		excess_schedule format: list of {type, amount, applies_when (optional predicate key)}
+		Supported applies_when keys: always, young_driver, commercial, voluntary.
+
+		Returns net_payable after stacking all applicable excesses and updates claim.
+		"""
+		guard_tenant_id(tenant_id)
+		tenant = self._tenant(tenant_id)
+		clm = self._get_claim(claim_id, tenant)
+
+		if clm["status"] not in {"reserved", "approved"}:
+			raise PermissionError("excess_computation_requires_reserved_or_approved_claim")
+
+		gross_loss = Decimal(str(clm["estimated_loss"]))
+		total_excess = Decimal("0")
+		applied: list[dict[str, Any]] = []
+
+		for rule in excess_schedule:
+			applies_when = rule.get("applies_when", "always")
+			excess_amount = Decimal(str(rule["amount"]))
+			apply = False
+			if applies_when == "always":
+				apply = True
+			elif applies_when == "young_driver" and clm.get("metadata", {}).get("young_driver"):
+				apply = True
+			elif applies_when == "commercial" and clm.get("metadata", {}).get("commercial_vehicle"):
+				apply = True
+			elif applies_when == "voluntary":
+				apply = True
+
+			if apply:
+				total_excess += excess_amount
+				applied.append({"type": rule.get("type", "basic"), "amount": str(excess_amount)})
+
+		net_payable = max(Decimal("0"), gross_loss - total_excess)
+		clm["excess_applied"] = str(total_excess)
+		clm["net_payable_amount"] = str(net_payable)
+		clm["updated_at"] = self._now()
+
+		self._emit(tenant, "excess_computed", claim_id, "ins_claim", {
+			"gross_loss": str(gross_loss),
+			"total_excess": str(total_excess),
+			"net_payable": str(net_payable),
+		})
+
+		return {
+			"claim_id": claim_id,
+			"gross_loss": str(gross_loss),
+			"applied_excesses": applied,
+			"total_excess": str(total_excess),
+			"net_payable": str(net_payable),
+			"computed_at": self._now(),
+		}
+
+	# ── Litigation Management ─────────────────────────────────────────────────
+
+	async def open_litigation_matter(
+		self,
+		tenant_id: str,
+		claim_id: str,
+		law_firm_id: str,
+		case_reference: str,
+		court: str,
+		first_hearing_date: str,
+		litigation_reserve_uplift: Decimal = Decimal("0"),
+		opened_by: str = "",
+	) -> dict[str, Any]:
+		"""Open a litigation matter linked to a claim.
+
+		Uplifts the claim reserve by litigation_reserve_uplift and sets
+		claim status to `litigation`. Stores matter in self.litigations.
+		"""
+		guard_tenant_id(tenant_id)
+		guard_non_empty_string(case_reference, "case_reference")
+		tenant = self._tenant(tenant_id)
+		clm = self._get_claim(claim_id, tenant)
+
+		if not hasattr(self, "litigations"):
+			self.litigations: dict[str, dict[str, Any]] = {}
+
+		record: dict[str, Any] = {
+			"id": self._record_id("lit"),
+			"type": "ins_litigation",
+			"claim_id": claim_id,
+			"claim_number": clm["claim_number"],
+			"law_firm_id": law_firm_id,
+			"case_reference": case_reference,
+			"court": court,
+			"first_hearing_date": first_hearing_date,
+			"phase": "filed",
+			"events": [],
+			"legal_costs": Decimal("0"),
+			"status": "active",
+			"opened_by": opened_by,
+			"tenant_id": tenant,
+			"created_at": self._now(),
+		}
+		self.litigations[record["id"]] = record
+
+		if litigation_reserve_uplift > 0:
+			uplift = Decimal(str(litigation_reserve_uplift))
+			clm["reserve_amount"] = clm["reserve_amount"] + uplift
+
+		clm["litigation_matter_id"] = record["id"]
+		clm["updated_at"] = self._now()
+		self._emit(tenant, "litigation_opened", record["id"], "ins_litigation", {"claim_id": claim_id, "court": court})
+		_log.info("Litigation opened matter=%s claim=%s tenant=%s", record["id"], claim_id, tenant)
+		return deepcopy(record)
+
+	async def log_litigation_event(
+		self,
+		tenant_id: str,
+		litigation_id: str,
+		event_type: str,
+		description: str,
+		legal_cost: Decimal = Decimal("0"),
+		new_phase: str | None = None,
+	) -> dict[str, Any]:
+		"""Record an event in the litigation matter timeline (hearing, filing, settlement)."""
+		guard_tenant_id(tenant_id)
+		tenant = self._tenant(tenant_id)
+		if not hasattr(self, "litigations"):
+			self.litigations = {}
+		lit = self.litigations.get(litigation_id)
+		if not lit or lit["tenant_id"] != tenant:
+			raise KeyError(f"litigation_not_found:{litigation_id}")
+
+		event: dict[str, Any] = {
+			"event_type": event_type,
+			"description": description,
+			"legal_cost": Decimal(str(legal_cost)),
+			"recorded_at": self._now(),
+		}
+		lit["events"].append(event)
+		lit["legal_costs"] = lit["legal_costs"] + Decimal(str(legal_cost))
+		if new_phase:
+			lit["phase"] = new_phase
+		if new_phase in {"settled", "dismissed"}:
+			lit["status"] = "closed"
+			lit["closed_at"] = self._now()
+
+		self._emit(tenant, "litigation_event_logged", litigation_id, "ins_litigation", {
+			"event_type": event_type, "phase": lit["phase"],
+		})
+		return deepcopy(lit)
+
+	# ── Multi-Currency Support ────────────────────────────────────────────────
+
+	async def convert_claim_currency(
+		self,
+		tenant_id: str,
+		claim_id: str,
+		target_currency: str,
+		fx_rate: Decimal,
+		fx_source: str,
+	) -> dict[str, Any]:
+		"""Record FX conversion for a claim's monetary amounts.
+
+		Stores original values with full FX provenance and sets reporting-currency
+		fields on the claim. Rate is immutable once recorded (audit compliance).
+		"""
+		guard_tenant_id(tenant_id)
+		tenant = self._tenant(tenant_id)
+		clm = self._get_claim(claim_id, tenant)
+
+		if fx_rate <= Decimal("0"):
+			raise ValueError("fx_rate_must_be_positive")
+
+		rate = Decimal(str(fx_rate))
+		original_currency = clm["currency"]
+		if original_currency == target_currency:
+			raise ValueError("source_and_target_currency_identical")
+
+		conversion: dict[str, Any] = {
+			"id": self._record_id("fx"),
+			"claim_id": claim_id,
+			"from_currency": original_currency,
+			"to_currency": target_currency,
+			"fx_rate": str(rate),
+			"fx_source": fx_source,
+			"original_estimated_loss": str(clm["estimated_loss"]),
+			"converted_estimated_loss": str((clm["estimated_loss"] * rate).quantize(Decimal("0.01"))),
+			"original_reserve": str(clm["reserve_amount"]),
+			"converted_reserve": str((clm["reserve_amount"] * rate).quantize(Decimal("0.01"))),
+			"original_paid": str(clm["paid_amount"]),
+			"converted_paid": str((clm["paid_amount"] * rate).quantize(Decimal("0.01"))),
+			"converted_at": self._now(),
+			"tenant_id": tenant,
+		}
+
+		clm["fx_conversions"] = clm.get("fx_conversions", [])
+		clm["fx_conversions"].append(conversion)
+		clm["reporting_currency"] = target_currency
+		clm["reporting_estimated_loss"] = str((clm["estimated_loss"] * rate).quantize(Decimal("0.01")))
+		clm["updated_at"] = self._now()
+
+		self._emit(tenant, "claim_currency_converted", claim_id, "ins_claim", {
+			"from": original_currency, "to": target_currency, "rate": str(rate),
+		})
+		return deepcopy(conversion)
+
+	# ── Regulatory Large-Loss Notification ───────────────────────────────────
+
+	async def generate_large_loss_notifications(
+		self,
+		tenant_id: str,
+		threshold: Decimal = Decimal("1000000"),
+		lookback_hours: int = 24,
+	) -> list[dict[str, Any]]:
+		"""Identify claims exceeding the regulatory large-loss threshold.
+
+		Returns structured notification records suitable for IRA Kenya Form C-4
+		or equivalent regulatory submission. Claims are those created or updated
+		within the lookback window with estimated_loss >= threshold.
+		"""
+		guard_tenant_id(tenant_id)
+		tenant = self._tenant(tenant_id)
+		from datetime import timedelta
+		cutoff = (datetime.utcnow() - timedelta(hours=lookback_hours)).isoformat(timespec="seconds") + "Z"
+		threshold_d = Decimal(str(threshold))
+
+		notifications: list[dict[str, Any]] = []
+		for clm in self.claims.values():
+			if clm["tenant_id"] != tenant:
+				continue
+			created = clm.get("created_at", "")
+			updated = clm.get("updated_at") or ""
+			if created < cutoff and updated < cutoff:
+				continue
+			loss = Decimal(str(clm["estimated_loss"]))
+			if loss < threshold_d:
+				continue
+			notifications.append({
+				"notification_type": "large_loss",
+				"claim_number": clm["claim_number"],
+				"claim_id": clm["id"],
+				"policy_id": clm["policy_id"],
+				"claimant_name": clm["claimant_name"],
+				"estimated_loss": str(loss),
+				"currency": clm["currency"],
+				"incident_date": clm.get("incident_date", ""),
+				"status": clm["status"],
+				"fraud_flag": clm.get("fraud_flag", False),
+				"tenant_id": tenant,
+				"generated_at": self._now(),
+			})
+
+		_log.info(
+			"Large-loss scan: %d notifications threshold=%s tenant=%s",
+			len(notifications), threshold_d, tenant,
+		)
+		return notifications
+
+	# ── Portfolio SLA Compliance Dashboard ───────────────────────────────────
+
+	async def sla_compliance_dashboard(
+		self,
+		tenant_id: str,
+		acknowledge_hours: int = 72,
+		assess_days: int = 14,
+		settle_days: int = 90,
+	) -> dict[str, Any]:
+		"""Return portfolio-level SLA compliance heat-map.
+
+		Evaluates each open claim against configurable SLA ladders and classifies
+		each as compliant, warning (>80% of SLA elapsed), or breached.
+		Emits `sla_breach_detected` events for newly breached claims.
+		"""
+		guard_tenant_id(tenant_id)
+		tenant = self._tenant(tenant_id)
+		from datetime import timedelta
+
+		now = datetime.utcnow()
+		summary: dict[str, Any] = {
+			"compliant": 0, "warning": 0, "breached": 0, "by_claim": [],
+		}
+
+		for clm in self.claims.values():
+			if clm["tenant_id"] != tenant:
+				continue
+			if clm["status"] in {"fully_paid", "repudiated", "withdrawn"}:
+				continue
+
+			created_dt = datetime.fromisoformat(clm["created_at"].rstrip("Z"))
+			elapsed_hours = (now - created_dt).total_seconds() / 3600
+			elapsed_days = elapsed_hours / 24
+
+			sla_limit_days = settle_days
+			sla_pct = min(elapsed_days / sla_limit_days, 1.0) if sla_limit_days > 0 else 1.0
+
+			if sla_pct >= 1.0:
+				sla_status = "breached"
+				self._emit(tenant, "sla_breach_detected", clm["id"], "ins_claim", {
+					"elapsed_days": round(elapsed_days, 1), "limit_days": sla_limit_days,
+				})
+			elif sla_pct >= 0.8:
+				sla_status = "warning"
+			else:
+				sla_status = "compliant"
+
+			summary[sla_status] += 1
+			summary["by_claim"].append({
+				"claim_id": clm["id"],
+				"claim_number": clm["claim_number"],
+				"status": clm["status"],
+				"elapsed_days": round(elapsed_days, 1),
+				"sla_pct_used": round(sla_pct * 100, 1),
+				"sla_status": sla_status,
+			})
+
+		summary["total_open"] = summary["compliant"] + summary["warning"] + summary["breached"]
+		summary["tenant_id"] = tenant
+		summary["generated_at"] = self._now()
+		return summary

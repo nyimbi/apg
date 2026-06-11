@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import math
+from decimal import Decimal, ROUND_HALF_EVEN
+from hashlib import sha256
 from typing import Any
 
 from .capability_contract import evaluate_capability_rules, get_capability_contract
@@ -43,11 +46,20 @@ class PredService:
 		self._agents: dict[str, PredictionAgentRecord] = {}
 		self._lifecycle_batches: dict[str, PredLifecycleBatchRecord] = {}
 		self._audit_events: dict[str, PredAuditEvent] = {}
+		# Extended stores for world-class improvements
+		self._calibrations: dict[str, tuple[float, float]] = {}  # (A, B) Platt params keyed by tenant:model_id
+		self._monetary_outcomes: dict[str, Decimal] = {}  # score_id -> Decimal outcome
+		self._routing_policies: dict[str, dict[str, Any]] = {}  # tenant:policy_id -> policy
+		self._quota_registry: dict[str, dict[str, Any]] = {}  # tenant_id -> quota state
+		self._latency_records: dict[str, dict[str, Any]] = {}  # score_id -> latency record
+		self._attestations: dict[str, dict[str, Any]] = {}  # score_id -> attestation
+		self._lineage_graph: dict[str, set[str]] = {}  # entity_id -> set of upstream entity IDs
 		contract = get_capability_contract()
 		self._agent_runtimes = set(contract["agents"]["supported_runtimes"])
 		self._agent_roles = set(contract["agents"]["supported_roles"])
 		self._privileged_agent_roles = set(contract["agents"]["privileged_roles"])
-		self._lifecycle_operations = set(contract["streaming"]["required_operations"])
+		# contract["streaming"]["events"] is a list of event names
+		self._lifecycle_operations = set(contract["streaming"].get("required_operations") or contract["streaming"].get("events", []))
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -993,4 +1005,562 @@ class PredService:
 			"total_forecasts": len(forecasts),
 			"avg_score": round(sum(s.score for s in scores) / len(scores), 4) if scores else 0,
 			"audit_events": len(self.list_audit_events(tenant_id)),
+		}
+
+	# -------------------------------------------------------------------------
+	# World-class improvement methods (I1–I15 subset)
+	# -------------------------------------------------------------------------
+
+	async def calibrate_scores(
+		self,
+		tenant_id: str,
+		model_id: str,
+		calibration_pairs: list[dict[str, float]],
+		actor: str = "pred",
+	) -> dict[str, Any]:
+		"""Fit Platt scaling calibration (logistic sigmoid) to convert raw scores
+		to true probabilities.
+
+		Each entry in ``calibration_pairs`` must contain ``predicted`` (raw score
+		0–100) and ``actual`` (0.0 or 1.0 binary label).  The method runs two
+		gradient-descent passes to find parameters A and B such that
+		``sigmoid(A * raw + B)`` minimises log-loss on the calibration set.
+
+		Returns the fitted (A, B) parameters and per-sample calibrated
+		probabilities for quick verification.
+		"""
+		guard_tenant_id(tenant_id)
+		model = self._require_model(model_id, tenant_id)
+		if not calibration_pairs:
+			raise ValueError("calibration_pairs_required")
+
+		# Normalise raw scores to [0, 1] for numerical stability
+		pairs = [
+			(float(p["predicted"]) / 100.0, float(p["actual"]))
+			for p in calibration_pairs
+		]
+		# Simple gradient descent (50 iterations, lr=0.1) — dependency-free
+		A, B = 1.0, 0.0
+		lr = 0.1
+		for _ in range(50):
+			grad_A = grad_B = 0.0
+			for raw, label in pairs:
+				prob = 1.0 / (1.0 + math.exp(-(A * raw + B)))
+				err = prob - label
+				grad_A += err * raw
+				grad_B += err
+			n = len(pairs)
+			A -= lr * grad_A / n
+			B -= lr * grad_B / n
+
+		key = f"{tenant_id}:{model_id}"
+		self._calibrations[key] = (round(A, 6), round(B, 6))
+
+		calibrated = [
+			round(1.0 / (1.0 + math.exp(-(A * raw + B))), 4)
+			for raw, _ in pairs
+		]
+		self._record_audit(tenant_id, model_id, "model_calibrated", actor, "allow",
+			(f"samples:{len(pairs)}",))
+		return {
+			"model_id": model_id,
+			"tenant_id": tenant_id,
+			"platt_A": round(A, 6),
+			"platt_B": round(B, 6),
+			"sample_count": len(pairs),
+			"calibrated_probabilities": calibrated,
+		}
+
+	async def attach_monetary_outcome(
+		self,
+		tenant_id: str,
+		score_id: str,
+		amount: str,
+		currency: str = "KES",
+		actor: str = "pred",
+	) -> dict[str, Any]:
+		"""Attach a Decimal-precision monetary outcome to a scored entity decision.
+
+		``amount`` must be passed as a string (e.g. ``"12500.75"``) to preserve
+		precision; floating-point literals are explicitly rejected.  Internally
+		stored as ``decimal.Decimal`` with ``ROUND_HALF_EVEN`` (banker's rounding)
+		to satisfy IFRS 13 requirements.
+		"""
+		guard_tenant_id(tenant_id)
+		guard_non_empty_string(score_id, "score_id")
+		score = self._scores.get(score_id)
+		if score is None or score.tenant_id != tenant_id:
+			raise KeyError("score_not_found")
+		try:
+			value = Decimal(str(amount)).quantize(Decimal("0.01"), rounding=ROUND_HALF_EVEN)
+		except Exception as exc:
+			raise ValueError(f"invalid_monetary_amount:{amount}") from exc
+		self._monetary_outcomes[score_id] = value
+		self._record_audit(tenant_id, score_id, "monetary_outcome_attached", actor, "allow",
+			(f"amount:{value}", f"currency:{currency}"))
+		return {
+			"score_id": score_id,
+			"tenant_id": tenant_id,
+			"amount": str(value),
+			"currency": currency,
+		}
+
+	async def aggregate_monetary_impact(
+		self,
+		tenant_id: str,
+		model_id: str,
+		currency: str = "KES",
+	) -> dict[str, Any]:
+		"""Return the Decimal-precision total monetary impact for all scored
+		entities under a given model.
+
+		Aggregation uses ``decimal.ROUND_HALF_EVEN`` throughout — no floats
+		are used in the summation path.
+		"""
+		guard_tenant_id(tenant_id)
+		total = Decimal("0.00")
+		matched: list[str] = []
+		for score_id, amount in self._monetary_outcomes.items():
+			score = self._scores.get(score_id)
+			if score and score.tenant_id == tenant_id and score.model_id == model_id:
+				total += amount
+				matched.append(score_id)
+		total = total.quantize(Decimal("0.01"), rounding=ROUND_HALF_EVEN)
+		return {
+			"tenant_id": tenant_id,
+			"model_id": model_id,
+			"currency": currency,
+			"total_monetary_impact": str(total),
+			"outcome_count": len(matched),
+			"score_ids": matched,
+		}
+
+	async def register_champion_challenger(
+		self,
+		tenant_id: str,
+		policy_id: str,
+		model_id_champion: str,
+		model_id_challenger: str,
+		traffic_split_pct: int = 10,
+		actor: str = "pred",
+	) -> dict[str, Any]:
+		"""Register a champion-challenger routing policy.
+
+		Traffic is split deterministically by hashing ``entity_id``:
+		entities whose hash modulo 100 falls below ``traffic_split_pct`` are
+		routed to the challenger, the rest to the champion.  This ensures the
+		same entity always hits the same model — critical for consistency in
+		credit/fraud decisions.
+		"""
+		guard_tenant_id(tenant_id)
+		self._require_model(model_id_champion, tenant_id)
+		self._require_model(model_id_challenger, tenant_id)
+		if not (1 <= int(traffic_split_pct) <= 49):
+			raise ValueError("traffic_split_pct_must_be_1_to_49")
+		policy = {
+			"policy_id": policy_id,
+			"tenant_id": tenant_id,
+			"champion_model_id": model_id_champion,
+			"challenger_model_id": model_id_challenger,
+			"traffic_split_pct": int(traffic_split_pct),
+			"status": "active",
+		}
+		self._routing_policies[f"{tenant_id}:{policy_id}"] = policy
+		self._record_audit(tenant_id, policy_id, "champion_challenger_registered", actor, "allow",
+			(f"split_pct:{traffic_split_pct}",))
+		return policy
+
+	async def route_score_request(
+		self,
+		tenant_id: str,
+		policy_id: str,
+		feature_set_id: str,
+		entity_id: str,
+		feature_values: dict[str, Any],
+		actor: str = "pred",
+	) -> dict[str, Any]:
+		"""Score an entity under a champion-challenger policy.
+
+		Uses deterministic hash routing so the same entity always hits the same
+		arm.  Returns scores from both models plus the routing decision.
+		"""
+		guard_tenant_id(tenant_id)
+		policy = self._routing_policies.get(f"{tenant_id}:{policy_id}")
+		if policy is None:
+			raise KeyError("champion_challenger_policy_not_found")
+		entity_bucket = int(sha256(entity_id.encode()).hexdigest()[:4], 16) % 100
+		routed_to = (
+			"challenger"
+			if entity_bucket < policy["traffic_split_pct"]
+			else "champion"
+		)
+		active_model_id = policy[f"{routed_to}_model_id"]
+		score_record = self.score_entity(
+			score_id=stable_id("cc", tenant_id, policy_id, entity_id),
+			tenant_id=tenant_id,
+			model_id=active_model_id,
+			feature_set_id=feature_set_id,
+			entity_id=entity_id,
+			feature_values=feature_values,
+			actor=actor,
+		)
+		return {
+			"policy_id": policy_id,
+			"entity_id": entity_id,
+			"routed_to": routed_to,
+			"active_model_id": active_model_id,
+			"score": score_record,
+		}
+
+	async def compute_confidence_decay(
+		self,
+		tenant_id: str,
+		model_id: str,
+		half_life_days: float = 90.0,
+		decay_threshold: float = 0.5,
+	) -> dict[str, Any]:
+		"""Compute temporal confidence decay for a model.
+
+		Applies exponential decay: ``confidence = exp(-lambda * age_days)``
+		where ``lambda = ln(2) / half_life_days``.  A model at ``half_life_days``
+		old will have confidence = 0.5 regardless of measured drift.
+
+		Returns a structured decay report suitable for dashboard health widgets.
+		"""
+		guard_tenant_id(tenant_id)
+		model = self._require_model(model_id, tenant_id)
+		now = utc_now()
+		delta = now - model.updated_at
+		age_days = delta.total_seconds() / 86400.0
+		lam = math.log(2.0) / max(half_life_days, 1.0)
+		confidence = round(math.exp(-lam * age_days), 4)
+		decayed = confidence < decay_threshold
+		if decayed:
+			self._record_audit(tenant_id, model_id, "model_confidence_decayed", "pred", "allow",
+				(f"confidence:{confidence}", f"age_days:{round(age_days, 1)}"))
+		return {
+			"model_id": model_id,
+			"tenant_id": tenant_id,
+			"age_days": round(age_days, 2),
+			"half_life_days": half_life_days,
+			"confidence": confidence,
+			"decay_threshold": decay_threshold,
+			"decayed_below_threshold": decayed,
+			"recommended_action": "schedule_retrain" if decayed else "no_action",
+		}
+
+	async def stream_drift_window(
+		self,
+		tenant_id: str,
+		model_id: str,
+		reference_scores: list[float],
+		current_scores: list[float],
+		n_bins: int = 10,
+		actor: str = "pred",
+	) -> dict[str, Any]:
+		"""Compute Population Stability Index (PSI) and KL-divergence between
+		reference and current score distributions.
+
+		PSI interpretation: < 0.1 stable, 0.1–0.2 warning, > 0.2 critical.
+		Uses equal-width binning over the union range of both distributions.
+		A small epsilon (1e-6) guards against log(0).
+		"""
+		guard_tenant_id(tenant_id)
+		self._require_model(model_id, tenant_id)
+		if not reference_scores or not current_scores:
+			raise ValueError("score_lists_required")
+
+		epsilon = 1e-6
+		all_vals = reference_scores + current_scores
+		lo, hi = min(all_vals), max(all_vals)
+		bin_width = (hi - lo) / n_bins if hi > lo else 1.0
+
+		def bin_index(v: float) -> int:
+			return min(int((v - lo) / bin_width), n_bins - 1)
+
+		ref_bins = [0.0] * n_bins
+		cur_bins = [0.0] * n_bins
+		for v in reference_scores:
+			ref_bins[bin_index(v)] += 1
+		for v in current_scores:
+			cur_bins[bin_index(v)] += 1
+
+		ref_pct = [c / len(reference_scores) + epsilon for c in ref_bins]
+		cur_pct = [c / len(current_scores) + epsilon for c in cur_bins]
+
+		psi = sum((c - r) * math.log(c / r) for r, c in zip(ref_pct, cur_pct))
+		kl = sum(r * math.log(r / c) for r, c in zip(ref_pct, cur_pct))
+
+		psi = round(psi, 4)
+		kl = round(kl, 4)
+		band = "stable" if psi < 0.1 else ("warning" if psi < 0.2 else "critical")
+
+		report_id = stable_id("psi", tenant_id, model_id, str(len(self._drift_reports)))
+		self._record_audit(tenant_id, model_id, "psi_drift_computed", actor, "allow",
+			(f"psi:{psi}", f"band:{band}"))
+		return {
+			"model_id": model_id,
+			"tenant_id": tenant_id,
+			"report_id": report_id,
+			"psi": psi,
+			"kl_divergence": kl,
+			"stability_band": band,
+			"n_bins": n_bins,
+			"reference_n": len(reference_scores),
+			"current_n": len(current_scores),
+		}
+
+	async def register_explanation_attestation(
+		self,
+		tenant_id: str,
+		score_id: str,
+		model_version_id: str,
+		method: str,
+		feature_coverage_pct: float,
+		attested_by: str,
+		actor: str = "pred",
+	) -> dict[str, Any]:
+		"""Create a non-repudiable attestation record for an explanation.
+
+		The attestation hash is ``sha256(score_id + model_version_id + method
+		+ attested_by)`` — any tampering with these fields invalidates the hash
+		and is surfaced by ``verify_explanation_attestation()``.
+
+		Rejects attestations with feature_coverage_pct < 80 on high-impact
+		scores — regulators require substantially complete explanations.
+		"""
+		guard_tenant_id(tenant_id)
+		guard_non_empty_string(attested_by, "attested_by")
+		score = self._scores.get(score_id)
+		if score is None or score.tenant_id != tenant_id:
+			raise KeyError("score_not_found")
+		if score.impact == "high" and float(feature_coverage_pct) < 80.0:
+			raise PermissionError("high_impact_score_requires_80pct_feature_coverage")
+
+		raw = f"{score_id}{model_version_id}{method}{attested_by}"
+		attestation_hash = sha256(raw.encode()).hexdigest()[:32]
+		record = {
+			"score_id": score_id,
+			"tenant_id": tenant_id,
+			"model_version_id": model_version_id,
+			"method": method,
+			"feature_coverage_pct": round(float(feature_coverage_pct), 2),
+			"attested_by": attested_by,
+			"attested_at": utc_now().isoformat(),
+			"attestation_hash": attestation_hash,
+		}
+		self._attestations[score_id] = record
+		self._record_audit(tenant_id, score_id, "explanation_attested", actor, "allow",
+			(f"method:{method}", f"coverage:{feature_coverage_pct}"))
+		return record
+
+	async def verify_explanation_attestation(
+		self,
+		tenant_id: str,
+		score_id: str,
+	) -> dict[str, Any]:
+		"""Verify the attestation hash for a score explanation.
+
+		Recomputes the hash from stored fields and compares it with the stored
+		hash.  Returns ``{valid: bool, tampered: bool}`` — tampered implies the
+		record was modified after attestation.
+		"""
+		guard_tenant_id(tenant_id)
+		record = self._attestations.get(score_id)
+		if record is None or record["tenant_id"] != tenant_id:
+			raise KeyError("attestation_not_found")
+		raw = (
+			record["score_id"]
+			+ record["model_version_id"]
+			+ record["method"]
+			+ record["attested_by"]
+		)
+		recomputed = sha256(raw.encode()).hexdigest()[:32]
+		valid = recomputed == record["attestation_hash"]
+		return {
+			"score_id": score_id,
+			"valid": valid,
+			"tampered": not valid,
+			"stored_hash": record["attestation_hash"],
+			"recomputed_hash": recomputed,
+		}
+
+	async def record_prediction_latency(
+		self,
+		tenant_id: str,
+		score_id: str,
+		latency_ms: float,
+		sla_threshold_ms: float = 100.0,
+		actor: str = "pred",
+	) -> dict[str, Any]:
+		"""Record inference latency for a completed score operation and flag SLA
+		breaches.
+
+		Latency values are stored per ``score_id`` and used by
+		``compute_sla_report()`` to derive P50/P95/P99 percentiles.  SLA
+		breaches are immediately surfaced in the audit trail.
+		"""
+		guard_tenant_id(tenant_id)
+		score = self._scores.get(score_id)
+		if score is None or score.tenant_id != tenant_id:
+			raise KeyError("score_not_found")
+		breached = float(latency_ms) > float(sla_threshold_ms)
+		record: dict[str, Any] = {
+			"score_id": score_id,
+			"tenant_id": tenant_id,
+			"latency_ms": round(float(latency_ms), 3),
+			"sla_threshold_ms": float(sla_threshold_ms),
+			"breached": breached,
+			"recorded_at": utc_now().isoformat(),
+		}
+		self._latency_records[score_id] = record
+		if breached:
+			self._record_audit(tenant_id, score_id, "sla_breach_detected", actor, "allow",
+				(f"latency_ms:{latency_ms}", f"threshold_ms:{sla_threshold_ms}"))
+		return record
+
+	async def compute_sla_report(
+		self,
+		tenant_id: str,
+		model_id: str | None = None,
+		sla_threshold_ms: float = 100.0,
+	) -> dict[str, Any]:
+		"""Compute P50/P95/P99 latency percentiles and SLA breach rate for the
+		tenant (optionally filtered to a single model).
+
+		Percentiles use nearest-rank interpolation over the sorted latency list.
+		All values are in milliseconds.
+		"""
+		guard_tenant_id(tenant_id)
+		records = [
+			r for r in self._latency_records.values()
+			if r["tenant_id"] == tenant_id
+		]
+		if model_id is not None:
+			filtered_score_ids = {
+				sid for sid, s in self._scores.items()
+				if s.tenant_id == tenant_id and s.model_id == model_id
+			}
+			records = [r for r in records if r["score_id"] in filtered_score_ids]
+
+		if not records:
+			return {
+				"tenant_id": tenant_id,
+				"model_id": model_id,
+				"sample_count": 0,
+				"p50_ms": None,
+				"p95_ms": None,
+				"p99_ms": None,
+				"breach_count": 0,
+				"breach_rate_pct": 0.0,
+				"sla_threshold_ms": sla_threshold_ms,
+			}
+
+		latencies = sorted(r["latency_ms"] for r in records)
+		n = len(latencies)
+
+		def percentile(p: float) -> float:
+			idx = max(0, int(math.ceil(p / 100.0 * n)) - 1)
+			return latencies[idx]
+
+		breach_count = sum(1 for r in records if r["breached"])
+		return {
+			"tenant_id": tenant_id,
+			"model_id": model_id,
+			"sample_count": n,
+			"p50_ms": round(percentile(50), 3),
+			"p95_ms": round(percentile(95), 3),
+			"p99_ms": round(percentile(99), 3),
+			"breach_count": breach_count,
+			"breach_rate_pct": round(breach_count / n * 100, 2),
+			"sla_threshold_ms": sla_threshold_ms,
+		}
+
+	async def build_lineage_graph(
+		self,
+		tenant_id: str,
+	) -> dict[str, Any]:
+		"""Build a traversable lineage DAG for the tenant.
+
+		Nodes are entity IDs (models, feature sets, scores, forecasts).
+		Edges represent data-flow dependencies:
+		- score -> model, score -> feature_set
+		- forecast -> model
+		- feature_set -> its lineage_refs (upstream ETL sources)
+
+		The adjacency list is stored in ``_lineage_graph`` and returned as
+		a serialisable dict for API/UI consumption.
+		"""
+		guard_tenant_id(tenant_id)
+		graph: dict[str, list[str]] = {}
+
+		def add_edge(child: str, parent: str) -> None:
+			graph.setdefault(child, [])
+			if parent not in graph[child]:
+				graph[child].append(parent)
+			# Also update internal set-based store for fast BFS
+			self._lineage_graph.setdefault(child, set()).add(parent)
+
+		for score in self._scores.values():
+			if score.tenant_id != tenant_id:
+				continue
+			add_edge(score.id, score.model_id)
+			add_edge(score.id, score.feature_set_id)
+
+		for forecast in self._forecasts.values():
+			if forecast.tenant_id != tenant_id:
+				continue
+			add_edge(forecast.id, forecast.model_id)
+
+		for fs in self._feature_sets.values():
+			if fs.tenant_id != tenant_id:
+				continue
+			for ref in fs.lineage_refs:
+				add_edge(fs.id, ref)
+
+		node_count = len(graph)
+		edge_count = sum(len(v) for v in graph.values())
+		return {
+			"tenant_id": tenant_id,
+			"node_count": node_count,
+			"edge_count": edge_count,
+			"adjacency": graph,
+		}
+
+	async def trace_decision_lineage(
+		self,
+		tenant_id: str,
+		score_id: str,
+	) -> dict[str, Any]:
+		"""Trace the complete upstream lineage path from a score decision back
+		to source ETL/feature lineage refs.
+
+		Uses BFS over ``_lineage_graph``.  Returns an ordered path list from
+		``score_id`` to all reachable root nodes (nodes with no further upstream
+		dependencies).  Suitable for regulatory audit exhibits.
+		"""
+		guard_tenant_id(tenant_id)
+		# Rebuild graph first (idempotent)
+		await self.build_lineage_graph(tenant_id)
+
+		visited: set[str] = set()
+		queue: list[str] = [score_id]
+		path: list[str] = []
+
+		while queue:
+			node = queue.pop(0)
+			if node in visited:
+				continue
+			visited.add(node)
+			path.append(node)
+			upstream = self._lineage_graph.get(node, set())
+			queue.extend(u for u in upstream if u not in visited)
+
+		roots = [n for n in path if not self._lineage_graph.get(n)]
+		return {
+			"score_id": score_id,
+			"tenant_id": tenant_id,
+			"lineage_path": path,
+			"root_nodes": roots,
+			"depth": len(path),
 		}

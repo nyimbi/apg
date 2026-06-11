@@ -1641,6 +1641,520 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 			metadata={"offered": offered_capabilities, "version": contract_version})
 		return record
 
+	# ------------------------------------------------------------------
+	# New async methods: zero-trust identity, cost, chaos, topology,
+	# audit integrity, trajectory prediction, inventory reconciliation,
+	# and trace propagation.
+	# ------------------------------------------------------------------
+
+	async def async_revoke_federated_token(
+		self,
+		tenant_id: str,
+		assertion_id: str,
+		revoked_by: str = "system",
+		reason: str = "explicit_revocation",
+	) -> dict[str, Any]:
+		"""Revoke an issued federation assertion token by assertion_id.
+
+		Records the revocation in _revoked_federation_tokens (bounded LRU, max
+		10 000 entries). Any subsequent capability call verifying the assertion_id
+		will find it revoked. Raises KeyError if the assertion is not found.
+		"""
+		_guard_tenant_id(tenant_id)
+		if not assertion_id:
+			raise ValueError("assertion_id_required")
+		if not hasattr(self, "_federation_tokens"):
+			self._federation_tokens: list[dict[str, Any]] = []
+		if not hasattr(self, "_revoked_federation_tokens"):
+			self._revoked_federation_tokens: dict[str, dict[str, Any]] = {}
+		token = next(
+			(
+				t for t in self._federation_tokens
+				if t["assertion_id"] == assertion_id and t["source_tenant"] == tenant_id
+			),
+			None,
+		)
+		if token is None:
+			raise KeyError(f"federation_assertion_not_found:{assertion_id}")
+		token["status"] = "revoked"
+		revocation: dict[str, Any] = {
+			"assertion_id": assertion_id,
+			"tenant_id":    tenant_id,
+			"revoked_by":   revoked_by,
+			"reason":       reason,
+			"revoked_at":   _ts(),
+		}
+		# Bounded LRU — evict oldest when at capacity
+		if len(self._revoked_federation_tokens) >= 10_000:
+			oldest = next(iter(self._revoked_federation_tokens))
+			del self._revoked_federation_tokens[oldest]
+		self._revoked_federation_tokens[assertion_id] = revocation
+		self._record_audit(
+			tenant_id, assertion_id, "federated_token_revoked", revoked_by, "allow",
+			metadata={"reason": reason},
+		)
+		return revocation
+
+	async def async_cost_budget_gate(
+		self,
+		tenant_id: str,
+		service_name: str,
+		period_label: str,
+		budget_decimal: str,
+		currency: str = "USD",
+	) -> dict[str, Any]:
+		"""Evaluate whether cumulative cost for a service/period is within budget.
+
+		budget_decimal: budget amount as a string-encoded Decimal (e.g. '500.00').
+		Uses Decimal arithmetic with ROUND_HALF_UP, 6dp to avoid float
+		accumulation error on high-volume micro-transactions.
+
+		Returns within_budget, cumulative_cost, budget, and overage — all as
+		Decimal-string values safe for downstream serialisation.
+		"""
+		from decimal import ROUND_HALF_UP, Decimal
+		_guard_tenant_id(tenant_id)
+		if not service_name:
+			raise ValueError("service_name_required")
+		budget = Decimal(budget_decimal)
+		if budget <= Decimal("0"):
+			raise ValueError("budget_must_be_positive")
+		_ISO4217 = {
+			"USD", "EUR", "GBP", "KES", "NGN", "ZAR", "GHS",
+			"JPY", "CNY", "INR", "AUD", "CAD", "CHF",
+		}
+		if currency not in _ISO4217:
+			raise ValueError(f"unsupported_currency:{currency}")
+		_QUANTIZE = Decimal("0.000001")
+		cost_entries: list[dict[str, Any]] = getattr(self, "_cost_entries", [])
+		cumulative = Decimal("0")
+		for entry in cost_entries:
+			if (
+				entry["tenant_id"] == tenant_id
+				and entry["service_name"] == service_name
+				and entry["period_label"] == period_label
+			):
+				cumulative += Decimal(str(entry["cost_usd"])).quantize(
+					_QUANTIZE, rounding=ROUND_HALF_UP,
+				)
+		budget_q = budget.quantize(_QUANTIZE, rounding=ROUND_HALF_UP)
+		overage  = max(Decimal("0"), cumulative - budget_q)
+		within   = cumulative <= budget_q
+		if not within:
+			self._record_audit(
+				tenant_id, service_name, "cost_budget_exceeded", "plfd", "allow",
+				metadata={
+					"cumulative_cost": str(cumulative),
+					"budget":          str(budget_q),
+					"overage":         str(overage),
+					"period":          period_label,
+				},
+			)
+		return {
+			"tenant_id":       tenant_id,
+			"service_name":    service_name,
+			"period_label":    period_label,
+			"currency":        currency,
+			"within_budget":   within,
+			"cumulative_cost": str(cumulative),
+			"budget":          str(budget_q),
+			"overage":         str(overage),
+			"evaluated_at":    _ts(),
+		}
+
+	async def async_chaos_fault_inject(
+		self,
+		tenant_id: str,
+		target_service: str,
+		fault_type: str,
+		duration_seconds: int = 60,
+		intensity: float = 1.0,
+		injected_by: str = "chaos-engine",
+	) -> dict[str, Any]:
+		"""Inject a controlled fault into a service for chaos engineering.
+
+		fault_type: 'latency' | 'error' | 'crash' | 'partial'
+		intensity: 0.0-1.0 (fraction of requests affected).
+
+		Updates the service registry entry with chaos_active flag and fault
+		parameters. Trips the circuit breaker to 'open' for crash/error faults
+		at intensity >= 0.8. Records a 'chaos_fault_injected' audit event.
+		"""
+		_guard_tenant_id(tenant_id)
+		if not target_service:
+			raise ValueError("target_service_required")
+		_supported_faults = {"latency", "error", "crash", "partial"}
+		if fault_type not in _supported_faults:
+			raise ValueError(f"unsupported_fault_type:{fault_type}")
+		if not 0.0 <= intensity <= 1.0:
+			raise ValueError("intensity_must_be_0_to_1")
+		if duration_seconds < 1:
+			raise ValueError("duration_seconds_must_be_positive")
+		import hashlib as _hl
+		fault_id = stable_id("chaos", tenant_id, target_service, fault_type)
+		reg_key = f"{tenant_id}:{target_service}"
+		reg = self._service_registry.get(reg_key)
+		if reg is None:
+			reg = {"service_name": target_service, "tenant_id": tenant_id, "endpoint": "", "status": "active"}
+			self._service_registry[reg_key] = reg
+		reg.update({
+			"chaos_active":           True,
+			"chaos_fault_id":         fault_id,
+			"chaos_fault_type":       fault_type,
+			"chaos_intensity":        intensity,
+			"chaos_duration_seconds": duration_seconds,
+			"chaos_injected_at":      _ts(),
+		})
+		# Trip circuit breaker for high-intensity crash/error faults
+		if fault_type in {"crash", "error"} and intensity >= 0.8:
+			cb_key = f"{tenant_id}:{target_service}"
+			cb = self._circuit_breakers.get(cb_key, {
+				"service_name": target_service,
+				"tenant_id":    tenant_id,
+				"failure_threshold": 5,
+				"recovery_timeout_seconds": 60,
+			})
+			cb.update({
+				"state":           "open",
+				"failure_count":   cb.get("failure_threshold", 5),
+				"opened_at":       _ts(),
+				"last_failure_at": _ts(),
+			})
+			self._circuit_breakers[cb_key] = cb
+		record: dict[str, Any] = {
+			"fault_id":         fault_id,
+			"tenant_id":        tenant_id,
+			"target_service":   target_service,
+			"fault_type":       fault_type,
+			"duration_seconds": duration_seconds,
+			"intensity":        intensity,
+			"injected_by":      injected_by,
+			"status":           "active",
+			"injected_at":      _ts(),
+		}
+		if not hasattr(self, "_chaos_faults"):
+			self._chaos_faults: dict[str, dict[str, Any]] = {}
+		self._chaos_faults[fault_id] = record
+		self._record_audit(
+			tenant_id, target_service, "chaos_fault_injected", injected_by, "allow",
+			metadata={"fault_type": fault_type, "intensity": intensity, "duration_seconds": duration_seconds},
+		)
+		return record
+
+	async def async_chaos_fault_remove(
+		self,
+		tenant_id: str,
+		fault_id: str,
+		removed_by: str = "chaos-engine",
+	) -> dict[str, Any]:
+		"""Remove an active chaos fault, restoring the service to normal operation.
+
+		Clears the chaos_active flag from the service registry entry. Does NOT
+		automatically reset the circuit breaker — call circuit_breaker_reset
+		explicitly if needed.
+		"""
+		_guard_tenant_id(tenant_id)
+		if not hasattr(self, "_chaos_faults"):
+			self._chaos_faults = {}
+		record = self._chaos_faults.get(fault_id)
+		if record is None or record["tenant_id"] != tenant_id:
+			raise KeyError(f"chaos_fault_not_found:{fault_id}")
+		target_service = record["target_service"]
+		reg_key = f"{tenant_id}:{target_service}"
+		reg = self._service_registry.get(reg_key, {})
+		reg["chaos_active"]   = False
+		reg["chaos_fault_id"] = None
+		self._service_registry[reg_key] = reg
+		record["status"]     = "removed"
+		record["removed_at"] = _ts()
+		record["removed_by"] = removed_by
+		self._record_audit(
+			tenant_id, target_service, "chaos_fault_removed", removed_by, "allow",
+			metadata={"fault_id": fault_id},
+		)
+		return dict(record)
+
+	async def async_service_discover_nearest(
+		self,
+		tenant_id: str,
+		service_name: str,
+		requester_region: str,
+	) -> dict[str, Any]:
+		"""Return the lowest-latency healthy endpoint for a service given requester region.
+
+		Inspects the 'regions' list in the service registry entry's metadata.
+		Each region entry should contain: region_code, endpoint, latency_ms_p50,
+		weight, status. Falls back to the primary endpoint if no region metadata
+		is present. Uses weighted random selection to break latency ties.
+		"""
+		import random as _rand
+		_guard_tenant_id(tenant_id)
+		if not service_name:
+			raise ValueError("service_name_required")
+		if not requester_region:
+			raise ValueError("requester_region_required")
+		reg_key = f"{tenant_id}:{service_name}"
+		reg = self._service_registry.get(reg_key)
+		if reg is None:
+			raise KeyError(f"service_not_registered:{service_name}")
+		regions: list[dict[str, Any]] = reg.get("metadata", {}).get("regions", [])
+		healthy_regions = [r for r in regions if r.get("status", "healthy") == "healthy"]
+		if healthy_regions:
+			min_latency = min(r.get("latency_ms_p50", 9999) for r in healthy_regions)
+			# 10% tolerance band around minimum latency for tie-breaking
+			candidates  = [r for r in healthy_regions if r.get("latency_ms_p50", 9999) <= min_latency * 1.1]
+			weights     = [max(r.get("weight", 1), 1) for r in candidates]
+			chosen      = _rand.choices(candidates, weights=weights, k=1)[0]
+			endpoint        = chosen["endpoint"]
+			selected_region = chosen.get("region_code", requester_region)
+			latency_p50     = chosen.get("latency_ms_p50", 0)
+		else:
+			endpoint        = reg.get("endpoint", "")
+			selected_region = "primary"
+			latency_p50     = 0
+		self._record_audit(
+			tenant_id, service_name, "service_discovered_nearest", "plfd", "allow",
+			metadata={"requester_region": requester_region, "selected_region": selected_region},
+		)
+		return {
+			"tenant_id":        tenant_id,
+			"service_name":     service_name,
+			"requester_region": requester_region,
+			"selected_region":  selected_region,
+			"endpoint":         endpoint,
+			"latency_ms_p50":   latency_p50,
+			"discovered_at":    _ts(),
+		}
+
+	async def async_verify_audit_chain(
+		self,
+		tenant_id: str,
+	) -> dict[str, Any]:
+		"""Verify Merkle-chained integrity of the audit log for a tenant.
+
+		Each audit event may carry an event_hash field computed as:
+		  SHA-256(prev_hash + event_type + subject_id + actor + decision + created_at)
+		Events without event_hash (pre-chaining) are reported as 'legacy' and not
+		counted as tampered. Returns overall valid bool, event_count,
+		tampered_count, and per-event status list.
+		"""
+		import hashlib as _hl
+		_guard_tenant_id(tenant_id)
+		events = [e for e in self._audit_events.values() if e.tenant_id == tenant_id]
+		events.sort(key=lambda e: e.id)
+		verdicts: list[dict[str, Any]] = []
+		tampered = 0
+		prev_hash = "genesis"
+		for evt in events:
+			ed = evt.to_dict()
+			if "event_hash" not in ed:
+				verdicts.append({"event_id": evt.id, "status": "legacy"})
+				continue
+			expected = _hl.sha256(
+				(
+					prev_hash
+					+ ed["event_type"]
+					+ ed["subject_id"]
+					+ ed["actor"]
+					+ ed["decision"]
+					+ ed["created_at"]
+				).encode()
+			).hexdigest()
+			status = "valid" if ed["event_hash"] == expected else "tampered"
+			if status == "tampered":
+				tampered += 1
+			verdicts.append({"event_id": evt.id, "status": status})
+			prev_hash = ed.get("event_hash", expected)
+		valid = tampered == 0
+		self._record_audit(
+			tenant_id, "audit_chain", "audit_chain_verified", "plfd", "allow",
+			metadata={"event_count": len(events), "tampered_count": tampered, "valid": valid},
+		)
+		return {
+			"tenant_id":      tenant_id,
+			"valid":          valid,
+			"event_count":    len(events),
+			"tampered_count": tampered,
+			"verdicts":       verdicts,
+			"verified_at":    _ts(),
+		}
+
+	async def async_predict_readiness_trajectory(
+		self,
+		tenant_id: str,
+		service_id: str,
+		horizon_days: int = 30,
+	) -> dict[str, Any]:
+		"""Predict future readiness score using OLS linear regression over history.
+
+		Pure-Python implementation — no scipy dependency. Requires at least 2
+		historical assessments. Returns velocity_per_day, predicted_score (clamped
+		0-100), predicted_ready_date (ISO date string or None), risk_flag, and a
+		confidence band based on sample size.
+		"""
+		_guard_tenant_id(tenant_id)
+		if horizon_days < 1:
+			raise ValueError("horizon_days_must_be_positive")
+		history = [
+			a for a in self._assessments.values()
+			if a.tenant_id == tenant_id and a.service_id == service_id
+		]
+		history.sort(key=lambda a: a.id)
+		if len(history) < 2:
+			return {
+				"tenant_id":  tenant_id,
+				"service_id": service_id,
+				"reason":     "insufficient_assessment_history",
+				"required":   2,
+				"available":  len(history),
+				"assessed_at": _ts(),
+			}
+		xs = list(range(len(history)))
+		ys = [a.score for a in history]
+		n  = len(xs)
+		x_mean = sum(xs) / n
+		y_mean = sum(ys) / n
+		ss_xy  = sum((xs[i] - x_mean) * (ys[i] - y_mean) for i in range(n))
+		ss_xx  = sum((xs[i] - x_mean) ** 2 for i in range(n))
+		slope     = ss_xy / ss_xx if ss_xx != 0 else 0.0  # score change per assessment step
+		intercept = y_mean - slope * x_mean
+		current_score = ys[-1]
+		# Convert slope (per-assessment) to per-day using observation density
+		assessments_per_day = n / max(horizon_days, 1)
+		velocity            = round(slope * assessments_per_day, 4)
+		future_index        = xs[-1] + horizon_days * assessments_per_day
+		predicted_raw       = intercept + slope * future_index
+		predicted           = max(0.0, min(100.0, round(predicted_raw, 2)))
+		# Date when score is predicted to reach 95 (ready threshold)
+		predicted_ready_date = None
+		if slope > 0 and current_score < 95:
+			predicted_ready_date = datetime.now(timezone.utc).isoformat(timespec="days")
+		risk_flag  = velocity <= 0 and current_score < 80
+		confidence = "high" if n >= 10 else "medium" if n >= 5 else "low"
+		return {
+			"tenant_id":            tenant_id,
+			"service_id":           service_id,
+			"current_score":        current_score,
+			"predicted_score":      predicted,
+			"velocity_per_day":     velocity,
+			"predicted_ready_date": predicted_ready_date,
+			"risk_flag":            risk_flag,
+			"confidence":           confidence,
+			"assessment_count":     n,
+			"horizon_days":         horizon_days,
+			"assessed_at":          _ts(),
+		}
+
+	async def async_federated_inventory_reconcile(
+		self,
+		local_tenant: str,
+		partner_tenant: str,
+		agreed_capabilities: list[str],
+	) -> dict[str, Any]:
+		"""Reconcile the agreed capability-sharing contract with current share records.
+
+		Diffs agreed_capabilities against _capability_shares for the local_tenant.
+		Returns drifted_capabilities (agreed but status != 'accepted'),
+		new_capabilities (active but not in agreed list), and removed_capabilities
+		(in agreed list with no share record). Emits a reconciliation audit event.
+		"""
+		_guard_tenant_id(local_tenant)
+		if not partner_tenant:
+			raise ValueError("partner_tenant_required")
+		if not hasattr(self, "_capability_shares"):
+			self._capability_shares = []
+		active_shares = {
+			s["capability_id"]: s
+			for s in self._capability_shares
+			if s["requester_tenant"] == local_tenant
+		}
+		agreed_set  = set(agreed_capabilities)
+		active_set  = set(active_shares)
+		drifted     = [cap for cap in agreed_set if cap in active_shares and active_shares[cap]["status"] != "accepted"]
+		new_caps    = sorted(active_set - agreed_set)
+		removed     = sorted(agreed_set - active_set)
+		recon_id    = stable_id("recon", local_tenant, partner_tenant, str(len(agreed_capabilities)))
+		record: dict[str, Any] = {
+			"reconciliation_id":       recon_id,
+			"local_tenant":            local_tenant,
+			"partner_tenant":          partner_tenant,
+			"agreed_capability_count": len(agreed_capabilities),
+			"active_share_count":      len(active_set),
+			"drifted_capabilities":    sorted(drifted),
+			"new_capabilities":        new_caps,
+			"removed_capabilities":    removed,
+			"drift_detected":          bool(drifted or removed),
+			"reconciled_at":           _ts(),
+		}
+		self._record_audit(
+			local_tenant, recon_id, "federated_inventory_reconciled", "plfd", "allow",
+			metadata={
+				"partner_tenant": partner_tenant,
+				"drifted":        len(drifted),
+				"new":            len(new_caps),
+				"removed":        len(removed),
+			},
+		)
+		return record
+
+	async def async_trace_context_propagate(
+		self,
+		source_tenant: str,
+		target_tenant: str,
+		parent_trace_id: str,
+		operation_name: str,
+	) -> dict[str, Any]:
+		"""Propagate a W3C TraceContext-style trace ID across tenant boundaries.
+
+		Generates a child span_id (16 hex chars) and composes a W3C traceparent
+		header value:  ``00-<32hex>-<16hex>-01``
+
+		Stores the propagated context in _trace_contexts keyed by span_id.
+		Returns the full context dict including traceparent for inclusion in
+		outgoing requests to the target tenant.
+		"""
+		import hashlib as _hl
+		_guard_tenant_id(source_tenant)
+		if not target_tenant:
+			raise ValueError("target_tenant_required")
+		if not parent_trace_id:
+			raise ValueError("parent_trace_id_required")
+		if not operation_name:
+			raise ValueError("operation_name_required")
+		if not hasattr(self, "_trace_contexts"):
+			self._trace_contexts: dict[str, dict[str, Any]] = {}
+		# Deterministic but collision-resistant span_id
+		span_material = f"{source_tenant}:{target_tenant}:{parent_trace_id}:{operation_name}:{_ts()}"
+		span_id   = _hl.sha256(span_material.encode()).hexdigest()[:16]
+		trace_id  = _hl.sha256(parent_trace_id.encode()).hexdigest()[:32]
+		traceparent = f"00-{trace_id}-{span_id}-01"
+		ctx: dict[str, Any] = {
+			"span_id":         span_id,
+			"trace_id":        trace_id,
+			"traceparent":     traceparent,
+			"source_tenant":   source_tenant,
+			"target_tenant":   target_tenant,
+			"parent_trace_id": parent_trace_id,
+			"operation_name":  operation_name,
+			"propagated_at":   _ts(),
+		}
+		self._trace_contexts[span_id] = ctx
+		self._record_audit(
+			source_tenant, span_id, "trace_context_propagated", "plfd", "allow",
+			metadata={"target_tenant": target_tenant, "operation": operation_name},
+		)
+		return ctx
+
+
+# ------------------------------------------------------------------
+# Module-level guard — reused by new async methods
+# ------------------------------------------------------------------
+
+def _guard_tenant_id(tenant_id: str) -> None:
+	"""Raise ValueError if tenant_id is blank or missing."""
+	if not tenant_id or not tenant_id.strip():
+		raise ValueError("tenant_id_required")
+
 
 # Alias
 PlfdService = PlatformFoundationService

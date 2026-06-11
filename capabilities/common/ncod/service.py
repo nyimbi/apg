@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio as _asyncio
+import json as _json
+from decimal import Decimal as _Decimal
+from hashlib import sha256 as _sha256
 from typing import Any
 
 from .builder_runtime import (
@@ -1523,4 +1527,481 @@ class NcodService:
 			"version_a": snap_a.get("version"), "version_b": snap_b.get("version"),
 			"total_changes": total_changes, "diff": diff,
 			"computed_at": utc_now_iso(),
+		}
+
+	# ------------------------------------------------------------------
+	# Async methods v1.2: permissions, webhooks, federation, bulk ops,
+	# cost estimation, schema export/import, tab summary
+	# ------------------------------------------------------------------
+
+	async def set_page_permissions(
+		self,
+		tenant_id: str,
+		page_id: str,
+		roles_allowed: list[str],
+		roles_denied: list[str] | None = None,
+		conditions: dict[str, Any] | None = None,
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Attach fine-grained RBAC to a single BuilderPage.
+
+		Stores a PagePermission record in _page_permissions keyed by page_id.
+		Guards: tenant isolation, non-empty roles_allowed, no overlap between
+		allowed and denied sets.
+		"""
+		guard_tenant_id(tenant_id)
+		page = self._require_page(page_id, tenant_id)
+		guard_non_empty_string(actor, "actor")
+		assert roles_allowed, "roles_allowed must be non-empty"
+		overlap = set(roles_allowed) & set(roles_denied or [])
+		assert not overlap, f"roles in both allowed and denied: {overlap}"
+		if not hasattr(self, "_page_permissions"):
+			self._page_permissions: dict[str, dict[str, Any]] = {}
+		record: dict[str, Any] = {
+			"page_id": page_id,
+			"app_id": page.app_id,
+			"tenant_id": tenant_id,
+			"roles_allowed": list(roles_allowed),
+			"roles_denied": list(roles_denied or []),
+			"conditions": dict(conditions or {}),
+			"set_by": actor,
+			"set_at": utc_now_iso(),
+		}
+		self._page_permissions[page_id] = record
+		self._audit(tenant_id, "page_permissions_set", page_id, f"Roles: {','.join(roles_allowed)}")
+		await _asyncio.sleep(0)
+		return record
+
+	async def register_webhook(
+		self,
+		tenant_id: str,
+		app_id: str,
+		webhook_id: str,
+		event_types: list[str],
+		target_url: str,
+		secret: str = "",
+		retry_limit: int = 3,
+		enabled: bool = True,
+	) -> dict[str, Any]:
+		"""Register a webhook endpoint to receive lifecycle event notifications.
+
+		Supports wildcard event matching: '*' matches all events; 'app_*'
+		matches any event starting with 'app_'. HMAC-SHA256 signing is enabled
+		when secret is non-empty. Payloads are enqueued in _webhook_queue.
+		"""
+		guard_tenant_id(tenant_id)
+		self._require_app(app_id, tenant_id)
+		guard_non_empty_string(target_url, "target_url")
+		assert event_types, "event_types must be non-empty"
+		assert 0 < retry_limit <= 10, "retry_limit must be 1-10"
+		if not hasattr(self, "_webhooks"):
+			self._webhooks: dict[str, dict[str, Any]] = {}
+		if not hasattr(self, "_webhook_queue"):
+			self._webhook_queue: list[dict[str, Any]] = []
+		if not hasattr(self, "_webhook_secrets"):
+			self._webhook_secrets: dict[str, str] = {}
+		self._webhook_secrets[webhook_id] = secret
+		record: dict[str, Any] = {
+			"webhook_id": webhook_id,
+			"tenant_id": tenant_id,
+			"app_id": app_id,
+			"event_types": list(event_types),
+			"target_url": target_url,
+			"secret_configured": bool(secret),
+			"retry_limit": retry_limit,
+			"enabled": enabled,
+			"registered_at": utc_now_iso(),
+		}
+		self._webhooks[webhook_id] = record
+		self._audit(tenant_id, "webhook_registered", webhook_id, f"Webhook for {event_types}")
+		await _asyncio.sleep(0)
+		return record
+
+	async def federate_app(
+		self,
+		tenant_id: str,
+		host_app_id: str,
+		remote_app_id: str,
+		mount_route: str,
+		remote_tenant_id: str | None = None,
+		policy_ref: str = "policy://federation_default",
+	) -> dict[str, Any]:
+		"""Embed a remote app's route tree under a mount point in the host app.
+
+		Both apps must be in validated/reviewed/published/deployed status. The
+		host and remote may be in the same or different tenant namespaces.
+		Idempotent: re-calling with the same host+remote+route updates the mount.
+		"""
+		guard_tenant_id(tenant_id)
+		host_app = self._require_app(host_app_id, tenant_id)
+		effective_remote_tenant = remote_tenant_id or tenant_id
+		guard_tenant_id(effective_remote_tenant)
+		remote_app = self._require_app(remote_app_id, effective_remote_tenant)
+		valid_statuses = {"validated", "reviewed", "published", "deployed"}
+		assert host_app.status in valid_statuses, f"host_app not validated: {host_app.status}"
+		assert remote_app.status in valid_statuses, f"remote_app not validated: {remote_app.status}"
+		assert policy_ref.strip(), "policy_ref required for federation"
+		normalized_route = normalize_route(mount_route)
+		if not hasattr(self, "_federated_mounts"):
+			self._federated_mounts: dict[str, dict[str, Any]] = {}
+		mount_key = stable_id("ncodfed", tenant_id, host_app_id, remote_app_id, normalized_route)
+		record: dict[str, Any] = {
+			"mount_id": mount_key,
+			"tenant_id": tenant_id,
+			"host_app_id": host_app_id,
+			"remote_app_id": remote_app_id,
+			"remote_tenant_id": effective_remote_tenant,
+			"mount_route": normalized_route,
+			"policy_ref": policy_ref,
+			"host_app_version": host_app.version,
+			"remote_app_version": remote_app.version,
+			"mounted_at": utc_now_iso(),
+		}
+		self._federated_mounts[mount_key] = record
+		self._audit(tenant_id, "app_federated", mount_key, f"Mounted {remote_app_id} at {normalized_route}")
+		await _asyncio.sleep(0)
+		return record
+
+	async def bulk_add_components(
+		self,
+		tenant_id: str,
+		page_id: str,
+		components: list[dict[str, Any]],
+	) -> dict[str, Any]:
+		"""Add multiple components to a page atomically.
+
+		All entries are validated before any are persisted — if one fails the
+		call raises and no components are written. Order values are normalised
+		via Decimal to avoid float precision issues with fractional positions.
+		"""
+		guard_tenant_id(tenant_id)
+		page = self._require_page(page_id, tenant_id)
+		assert isinstance(components, list) and components, "components must be non-empty list"
+		validated: list[dict[str, Any]] = []
+		for idx, entry in enumerate(components):
+			cid = str(entry.get("component_id") or "")
+			ctype = str(entry.get("component_type") or "text")
+			cname = str(entry.get("name") or f"component_{idx}")
+			order = int(_Decimal(str(entry.get("order", idx))))
+			label = str(entry.get("accessibility_label") or cname)
+			guard_non_empty_string(cid, "component_id")
+			validated.append({
+				"component_id": cid, "component_type": ctype,
+				"name": cname, "order": order, "label": label,
+				"props": dict(entry.get("props") or {}),
+				"bindings": dict(entry.get("bindings") or {}),
+			})
+		await _asyncio.sleep(0)
+		created: list[dict[str, Any]] = []
+		for v in validated:
+			comp = self.add_component(
+				component_id=v["component_id"],
+				tenant_id=tenant_id,
+				page_id=page_id,
+				component_type=v["component_type"],
+				name=v["name"],
+				props=v["props"],
+				bindings=v["bindings"],
+				accessibility_label=v["label"],
+				order=v["order"],
+			)
+			created.append(comp)
+		self._audit(tenant_id, "bulk_components_added", page_id, f"Added {len(created)} components to page {page.name}")
+		return {
+			"page_id": page_id, "tenant_id": tenant_id,
+			"components_created": len(created),
+			"components": created,
+			"created_at": utc_now_iso(),
+		}
+
+	async def compute_app_cost_estimate(
+		self,
+		tenant_id: str,
+		app_id: str,
+		unit_cost_per_component: str = "0.10",
+		unit_cost_per_data_binding: str = "0.25",
+		unit_cost_per_connector: str = "1.00",
+		currency: str = "USD",
+	) -> dict[str, Any]:
+		"""Estimate monthly hosting cost using Decimal arithmetic.
+
+		All unit costs are accepted as strings and converted to Decimal to
+		prevent IEEE 754 rounding errors in billing-adjacent code. Workflows
+		and scripts are billed at half the connector rate.
+		"""
+		guard_tenant_id(tenant_id)
+		self._require_app(app_id, tenant_id)
+		await _asyncio.sleep(0)
+		D = _Decimal
+		components = self._component_dicts(app_id, tenant_id)
+		data_bindings = self._data_binding_dicts(app_id, tenant_id)
+		connectors = self._connector_binding_dicts(app_id, tenant_id)
+		workflows = self._workflow_binding_dicts(app_id, tenant_id)
+		scripts = self._script_extension_dicts(app_id, tenant_id)
+		cost_component = D(unit_cost_per_component) * D(len(components))
+		cost_binding = D(unit_cost_per_data_binding) * D(len(data_bindings))
+		cost_connector = D(unit_cost_per_connector) * D(len(connectors))
+		cost_workflow = (D(unit_cost_per_connector) / D("2")) * D(len(workflows))
+		cost_script = (D(unit_cost_per_connector) / D("2")) * D(len(scripts))
+		total = cost_component + cost_binding + cost_connector + cost_workflow + cost_script
+		self._audit(tenant_id, "cost_estimate_computed", app_id, f"Total {total} {currency}/month")
+		return {
+			"app_id": app_id, "tenant_id": tenant_id, "currency": currency,
+			"subtotals": {
+				"components": str(cost_component),
+				"data_bindings": str(cost_binding),
+				"connectors": str(cost_connector),
+				"workflows": str(cost_workflow),
+				"scripts": str(cost_script),
+			},
+			"total": str(total),
+			"resource_counts": {
+				"components": len(components),
+				"data_bindings": len(data_bindings),
+				"connectors": len(connectors),
+				"workflows": len(workflows),
+				"scripts": len(scripts),
+			},
+			"computed_at": utc_now_iso(),
+		}
+
+	async def export_app_schema(
+		self,
+		tenant_id: str,
+		app_id: str,
+		format: str = "json",
+		include_audit: bool = False,
+	) -> dict[str, Any]:
+		"""Export a portable schema bundle for an app.
+
+		Serialises the app and all sub-resources into a single dict with a
+		content_hash for integrity verification. 'summary' format returns
+		only counts and metadata; 'json' returns the full bundle.
+		"""
+		guard_tenant_id(tenant_id)
+		app = self._require_app(app_id, tenant_id)
+		assert format in {"json", "summary"}, f"unsupported export format: {format}"
+		await _asyncio.sleep(0)
+		bundle: dict[str, Any] = {
+			"schema_version": "1.2",
+			"exported_at": utc_now_iso(),
+			"tenant_id": tenant_id,
+			"app": app.to_dict(),
+			"pages": self._page_dicts(app_id, tenant_id),
+			"components": self._component_dicts(app_id, tenant_id),
+			"data_models": self._data_model_dicts(app_id, tenant_id),
+			"data_bindings": self._data_binding_dicts(app_id, tenant_id),
+			"workflow_bindings": self._workflow_binding_dicts(app_id, tenant_id),
+			"script_extensions": self._script_extension_dicts(app_id, tenant_id),
+			"connector_bindings": self._connector_binding_dicts(app_id, tenant_id),
+			"theme_variants": self._theme_variant_dicts(app_id, tenant_id),
+			"builder_agents": self._builder_agent_dicts(app_id, tenant_id),
+		}
+		if include_audit:
+			bundle["audit_events"] = [
+				e.to_dict() for e in self._audit_events.values()
+				if e.tenant_id == tenant_id and e.subject_id.startswith(app_id[:8])
+			]
+		content_hash = _sha256(_json.dumps(bundle, sort_keys=True, default=str).encode()).hexdigest()[:16]
+		if format == "summary":
+			bundle = {
+				"schema_version": bundle["schema_version"],
+				"exported_at": bundle["exported_at"],
+				"app_id": app_id, "app_name": app.name, "app_version": app.version,
+				"resource_counts": {k: len(v) for k, v in bundle.items() if isinstance(v, list)},
+				"content_hash": content_hash,
+			}
+		else:
+			bundle["content_hash"] = content_hash
+		self._audit(tenant_id, "app_schema_exported", app_id, f"Format: {format}, hash: {content_hash}")
+		return bundle
+
+	async def import_app_schema(
+		self,
+		tenant_id: str,
+		bundle: dict[str, Any],
+		owner: str,
+		rbac_policy_ref: str,
+		data_residency_policy_ref: str,
+		overwrite_existing: bool = False,
+	) -> dict[str, Any]:
+		"""Import an app from a schema bundle produced by export_app_schema.
+
+		Verifies schema_version and content_hash before writing any records.
+		IDs are re-derived for the target tenant to prevent collisions. When
+		overwrite_existing=False, existing resources with the same derived ID
+		are skipped and their IDs reported in skipped_ids.
+		"""
+		guard_tenant_id(tenant_id)
+		guard_non_empty_string(owner, "owner")
+		guard_non_empty_string(rbac_policy_ref, "rbac_policy_ref")
+		guard_non_empty_string(data_residency_policy_ref, "data_residency_policy_ref")
+		schema_version = bundle.get("schema_version", "")
+		assert schema_version in {"1.0", "1.1", "1.2"}, f"unsupported schema_version: {schema_version}"
+		bundle_for_hash = {k: v for k, v in bundle.items() if k != "content_hash"}
+		expected_hash = _sha256(_json.dumps(bundle_for_hash, sort_keys=True, default=str).encode()).hexdigest()[:16]
+		provided_hash = bundle.get("content_hash", expected_hash)
+		assert provided_hash == expected_hash, f"content_hash mismatch: {provided_hash} != {expected_hash}"
+		await _asyncio.sleep(0)
+		src_app = bundle.get("app", {})
+		app_name = str(src_app.get("name") or "imported_app")
+		new_app_id = stable_id("ncodimp", tenant_id, app_name, schema_version)
+		import_counts: dict[str, int] = {}
+		skipped_ids: list[str] = []
+		if new_app_id not in self._apps or overwrite_existing:
+			self.create_app(
+				app_id=new_app_id, tenant_id=tenant_id,
+				name=app_name, owner=owner,
+				description=str(src_app.get("description") or ""),
+				theme=str(src_app.get("theme") or "ncod_app_builder"),
+				rbac_policy_ref=rbac_policy_ref,
+				data_residency_policy_ref=data_residency_policy_ref,
+				accessibility_checked=bool(src_app.get("accessibility_checked", False)),
+				metadata={**dict(src_app.get("metadata") or {}), "imported_from": bundle.get("tenant_id"), "schema_version": schema_version},
+			)
+		page_id_map: dict[str, str] = {}
+		for pg in bundle.get("pages", []):
+			new_pg_id = stable_id("ncodipg", tenant_id, new_app_id, pg.get("name", ""))
+			page_id_map[pg["id"]] = new_pg_id
+			if new_pg_id not in self._pages or overwrite_existing:
+				self.add_page(
+					page_id=new_pg_id, tenant_id=tenant_id, app_id=new_app_id,
+					name=str(pg.get("name", "")), route=str(pg.get("route", "/imported")),
+					layout=str(pg.get("layout") or "responsive_grid"),
+					metadata={**dict(pg.get("metadata") or {}), "relationships": True},
+				)
+			else:
+				skipped_ids.append(new_pg_id)
+		import_counts["pages"] = len(bundle.get("pages", []))
+		comp_count = 0
+		for comp in bundle.get("components", []):
+			mapped_pg = page_id_map.get(comp.get("page_id", ""))
+			if not mapped_pg:
+				skipped_ids.append(str(comp.get("id", "")))
+				continue
+			new_comp_id = stable_id("ncodicomp", tenant_id, new_app_id, comp.get("name", ""))
+			if new_comp_id not in self._components or overwrite_existing:
+				try:
+					self.add_component(
+						component_id=new_comp_id, tenant_id=tenant_id, page_id=mapped_pg,
+						component_type=str(comp.get("component_type") or "text"),
+						name=str(comp.get("name", "")),
+						props=dict(comp.get("props") or {}),
+						bindings=dict(comp.get("bindings") or {}),
+						accessibility_label=str(comp.get("accessibility_label") or comp.get("name", "")),
+						order=int(comp.get("order", 0)),
+					)
+					comp_count += 1
+				except Exception:
+					skipped_ids.append(new_comp_id)
+		import_counts["components"] = comp_count
+		dm_count = 0
+		for dm in bundle.get("data_models", []):
+			new_dm_id = stable_id("ncodidm", tenant_id, new_app_id, dm.get("name", ""))
+			if new_dm_id not in self._data_models or overwrite_existing:
+				try:
+					self.define_data_model(
+						model_id=new_dm_id, tenant_id=tenant_id, app_id=new_app_id,
+						name=str(dm.get("name", "")), fields=list(dm.get("fields") or []),
+						policy_ref=str(dm.get("policy_ref") or rbac_policy_ref),
+						metadata=dict(dm.get("metadata") or {}),
+					)
+					dm_count += 1
+				except Exception:
+					skipped_ids.append(new_dm_id)
+		import_counts["data_models"] = dm_count
+		self._audit(tenant_id, "app_schema_imported", new_app_id, f"Imported {sum(import_counts.values())} resources")
+		return {
+			"app_id": new_app_id, "tenant_id": tenant_id,
+			"import_counts": import_counts, "skipped_ids": skipped_ids,
+			"schema_version": schema_version, "imported_at": utc_now_iso(),
+		}
+
+	async def get_app_tab_summary(
+		self,
+		tenant_id: str,
+		app_id: str,
+	) -> dict[str, Any]:
+		"""Return a tabbed domain breakdown for Flask-AppBuilder views and dashboards.
+
+		Produces seven tabs: overview, pages, components, data, workflows,
+		agents, releases — each with counts and top-N previews. Designed for
+		tabbed detail views where each domain is independently scrollable.
+		"""
+		guard_tenant_id(tenant_id)
+		app = self._require_app(app_id, tenant_id)
+		await _asyncio.sleep(0)
+		pages = self._page_dicts(app_id, tenant_id)
+		components = self._component_dicts(app_id, tenant_id)
+		data_models = self._data_model_dicts(app_id, tenant_id)
+		data_bindings = self._data_binding_dicts(app_id, tenant_id)
+		workflows = self._workflow_binding_dicts(app_id, tenant_id)
+		scripts = self._script_extension_dicts(app_id, tenant_id)
+		connectors = self._connector_binding_dicts(app_id, tenant_id)
+		agents = self._builder_agent_dicts(app_id, tenant_id)
+		themes = self._theme_variant_dicts(app_id, tenant_id)
+		releases = [r.to_dict() for r in self._releases.values() if r.app_id == app_id and r.tenant_id == tenant_id]
+		deployments = [d.to_dict() for d in self._deployments.values() if d.app_id == app_id and d.tenant_id == tenant_id]
+		validations = [v.to_dict() for v in self._validations.values() if v.app_id == app_id and v.tenant_id == tenant_id]
+		tabs: dict[str, Any] = {
+			"overview": {
+				"tab": "overview",
+				"app": app.to_dict(),
+				"status": app.status,
+				"version": app.version,
+				"owner": app.owner,
+				"theme": app.theme,
+				"accessibility_checked": app.accessibility_checked,
+			},
+			"pages": {
+				"tab": "pages",
+				"count": len(pages),
+				"items": pages[:10],
+			},
+			"components": {
+				"tab": "components",
+				"count": len(components),
+				"by_type": {
+					ctype: sum(1 for c in components if c["component_type"] == ctype)
+					for ctype in {c["component_type"] for c in components}
+				},
+				"items": components[:10],
+			},
+			"data": {
+				"tab": "data",
+				"data_model_count": len(data_models),
+				"data_binding_count": len(data_bindings),
+				"data_models": data_models[:5],
+				"data_bindings": data_bindings[:5],
+			},
+			"workflows": {
+				"tab": "workflows",
+				"workflow_count": len(workflows),
+				"script_count": len(scripts),
+				"connector_count": len(connectors),
+				"workflows": workflows[:5],
+				"scripts": scripts[:5],
+				"connectors": connectors[:5],
+			},
+			"agents": {
+				"tab": "agents",
+				"count": len(agents),
+				"items": agents,
+				"themes": themes,
+			},
+			"releases": {
+				"tab": "releases",
+				"release_count": len(releases),
+				"deployment_count": len(deployments),
+				"validation_count": len(validations),
+				"latest_release": releases[-1] if releases else None,
+				"latest_deployment": deployments[-1] if deployments else None,
+				"latest_validation": validations[-1] if validations else None,
+			},
+		}
+		self._audit(tenant_id, "tab_summary_generated", app_id, f"Generated {len(tabs)} tabs")
+		return {
+			"app_id": app_id, "tenant_id": tenant_id,
+			"tabs": tabs, "tab_count": len(tabs),
+			"generated_at": utc_now_iso(),
 		}

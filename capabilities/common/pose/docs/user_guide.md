@@ -1,6 +1,6 @@
 # Pose Estimation - User Guide
 
-**Capability ID**: `pose` | **Domain**: `common` | **Version**: `1.1.0`
+**Capability ID**: `pose` | **Domain**: `common` | **Version**: `1.2.0`
 **Copyright**: (c) 2025 Datacraft | **Author**: Nyimbi Odero
 
 ---
@@ -342,6 +342,143 @@ annotations = asyncio.run(svc.annotation_list(T, estimate_id=estimate["id"]))
 
 ---
 
+## Signal Processing and Kinematics
+
+### Temporal Keypoint Smoothing
+
+Build a skeletal track first (`skeletal_track()`), then smooth it to remove
+frame-to-frame jitter. `filter_type` is `ema` (exponential moving average) or
+`boxcar` (uniform window average).
+
+```python
+track = asyncio.run(svc.skeletal_track("track-1", T, session["id"], estimate_ids))
+smoothed = asyncio.run(svc.smooth_keypoint_track(
+    "smooth-1", T, track["id"],
+    window_size=7, filter_type="ema"
+))
+# smoothed["smoothed_series"]          -> per-keypoint frame-indexed x/y
+# smoothed["noise_rms_per_keypoint"]   -> residual noise magnitude per keypoint
+```
+
+### Velocity and Acceleration Kinematics
+
+```python
+kinematics = asyncio.run(svc.compute_kinematics(
+    "kin-1", T, track["id"], fps=30.0
+))
+for kp in kinematics["kinematics"]:
+    print(f"{kp['keypoint']}: peak_v={kp['peak_velocity']:.4f} at frame {kp['peak_velocity_frame_index']}")
+```
+
+---
+
+## Clinical and Rehabilitation Analytics
+
+### Range-of-Motion (ROM) Measurement
+
+Measures joint angular arc between a start and end pose estimate, classified
+against ISO 8551 / AAOS normal ROM ranges.
+
+```python
+rom = asyncio.run(svc.measure_rom(
+    "rom-1", T,
+    estimate_id_start=estimate_start["id"],
+    estimate_id_end=estimate_end["id"],
+    joint="left_knee",
+))
+# rom["rom_degrees"]               -> angular arc in degrees
+# rom["percent_of_normal_rom"]     -> % of ISO 8551 normal range
+# rom["clinical_classification"]   -> "normal" | "restricted" | "hypermobile"
+```
+
+### Bilateral Movement Asymmetry
+
+```python
+asym = asyncio.run(svc.detect_asymmetry(
+    "asym-1", T, track["id"],
+    mild_threshold_pct=10.0,
+    severe_threshold_pct=15.0,
+))
+for pair in asym["joint_pair_results"]:
+    print(f"{pair['joint_pair']}: {pair['asymmetry_pct']}% — {pair['classification']}")
+# Severe asymmetry raises a high-severity audit event automatically
+```
+
+### Posture Alignment Index
+
+```python
+posture = asyncio.run(svc.compute_posture_score("posture-1", T, estimate["id"]))
+# posture["posture_alignment_index"]  -> 0-100 (higher is better)
+# posture["traffic_light_band"]       -> "green" (>=80) | "amber" (50-79) | "red" (<50)
+```
+
+### Injury Risk Rules Engine
+
+```python
+angles = asyncio.run(svc.extract_joint_angles("ang-1", T, estimate["id"]))
+# Store analysis so the risk engine can look it up
+svc._analyses["my-tenant:ang-1"] = type("R", (), {"joint_angles": angles["joint_angles"]})()
+risk = asyncio.run(svc.score_injury_risk("risk-1", T, "ang-1"))
+# risk["composite_injury_risk_score"]  -> 0-10
+# risk["risk_tier"]                    -> "low" | "moderate" | "high"
+# risk["rule_results"]                 -> per-rule triggered/corrective_cue
+```
+
+---
+
+## Batch Ingestion
+
+Process a large video segment in a single call with concurrency control:
+
+```python
+frames_payload = [
+    {
+        "frame_id": f"frm-{i}", "frame_number": i,
+        "occurred_at": f"2026-06-01T10:{i:02d}:00Z",
+        "source_ref": f"frame://{i:04d}",
+        "width": 1920, "height": 1080,
+        "keypoints": keypoints,
+    }
+    for i in range(1, 101)
+]
+batch = asyncio.run(svc.ingest_frame_batch(
+    "batch-1", T, session["id"], model["id"],
+    frames=frames_payload,
+    max_concurrency=16,
+))
+print(f"{batch['success_count']}/{batch['total_frames']} ok in {batch['elapsed_ms']}ms")
+```
+
+---
+
+## Longitudinal Session Comparison
+
+```python
+report = asyncio.run(svc.longitudinal_compare(
+    "long-1", T,
+    session_ids=["sess-jan", "sess-feb", "sess-mar"],
+))
+for trend in report["trend_vectors"]:
+    print(f"{trend['session_id']}: {trend['trend']} ({trend['delta']:+.4f})")
+# report["similarity_matrix"]  -> N×N pairwise similarity scores
+```
+
+---
+
+## Annotation for Training Pipelines
+
+```python
+annotation = asyncio.run(svc.pose_annotate(
+    "ann-1", T, estimate["id"],
+    label="correct_squat_form",
+    notes="Full depth achieved, knees tracking over toes",
+    annotator="coach.jones",
+))
+annotations = asyncio.run(svc.annotation_list(T, estimate_id=estimate["id"]))
+```
+
+---
+
 ## Guardrails Reference
 
 | Guard | Enforced On |
@@ -381,7 +518,7 @@ POSE integrates with:
 
 ## Further Reading
 
-- `service.py` - Complete business logic and all 27 async methods
+- `service.py` - Complete business logic and all 35 async methods
 - `models.py` - Domain dataclasses
 - `api.py` - REST API endpoints
 - `views.py` - Flask-AppBuilder views and Pydantic schemas

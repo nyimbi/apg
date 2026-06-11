@@ -1,6 +1,27 @@
 # Claims Management (ins_clm)
 
-FNOL, claims assessment, reserve management, payment processing, fraud detection, and subrogation.
+End-to-end claims lifecycle: FNOL, loss assessment, reserve management, payment processing,
+fraud detection, subrogation, litigation tracking, STP, SLA compliance, and regulatory reporting.
+
+© 2025 Datacraft | Author: Nyimbi Odero
+
+## Features
+
+- **FNOL Registration** — multi-channel intake with velocity pre-check
+- **Complexity Triage** — deterministic + score-based tier assignment at intake (simple/standard/complex/catastrophic)
+- **Straight-Through Processing (STP)** — auto-approve low-complexity, low-fraud claims in one atomic step
+- **Reserve Management** — OCR, IBNR, ALAE reserve types with adequacy monitoring and auto-warning
+- **Payment Processing** — partial, full, advance, ex-gratia, recoverable-advance disbursements
+- **Excess / Deductible Engine** — stacked multi-rule excess computation with audit trail
+- **Fraud Detection** — score-based and manual flagging; velocity burst alerts
+- **Claim Velocity Check** — rolling-window anomaly detection per policy and claimant
+- **Litigation Management** — matter lifecycle, event log, legal cost tracking
+- **Subrogation** — initiation and incremental recovery recording
+- **Multi-Currency FX** — immutable rate conversion with full provenance
+- **Regulatory Reporting** — large-loss notifications (IRA Kenya C-4 format)
+- **SLA Compliance Dashboard** — portfolio heat-map with breach event emission
+- **Loss Ratio Report** — earned-premium vs. incurred losses analytics
+- **Full Audit Trail** — immutable event log per tenant
 
 ## API Endpoints
 
@@ -18,5 +39,54 @@ FNOL, claims assessment, reserve management, payment processing, fraud detection
 | POST | /api/insurance/clm/claims/{id}/fraud | Fraud assessment |
 | POST | /api/insurance/clm/claims/{id}/approve | Approve claim |
 | POST | /api/insurance/clm/claims/{id}/subrogation | Initiate subrogation |
-| GET | /api/insurance/clm/summary | Claims summary |
+| POST | /api/insurance/clm/claims/{id}/stp | Evaluate STP eligibility |
+| POST | /api/insurance/clm/claims/{id}/complexity | Score claim complexity |
+| GET | /api/insurance/clm/claims/{id}/reserve/adequacy | Reserve adequacy check |
+| POST | /api/insurance/clm/claims/{id}/excess | Compute applicable excess |
+| POST | /api/insurance/clm/claims/{id}/fx | FX currency conversion |
+| POST | /api/insurance/clm/claims/{id}/litigation | Open litigation matter |
+| POST | /api/insurance/clm/litigation/{id}/events | Log litigation event |
+| GET | /api/insurance/clm/velocity | Claim velocity check |
+| GET | /api/insurance/clm/regulatory/large-loss | Large-loss notifications |
+| GET | /api/insurance/clm/sla | SLA compliance dashboard |
+| GET | /api/insurance/clm/summary | Claims portfolio summary |
+| GET | /api/insurance/clm/loss-ratio | Loss ratio report |
 | GET | /api/insurance/clm/audit | Audit trail |
+
+## Quick Start
+
+```python
+from capabilities.insurance.clm.service import ClaimsManagementService
+from decimal import Decimal
+
+svc = ClaimsManagementService(tenant_id="acme_insurance")
+
+# 1. Register FNOL
+claim = await svc.register_fnol(
+    tenant_id="acme_insurance",
+    policy_id="pol-001",
+    policy_number="POL-2026-001",
+    claimant_name="Jane Smith",
+    claimant_id="ID-99999",
+    incident_date="2026-05-20",
+    incident_description="Vehicle rear-ended at intersection",
+    estimated_loss=Decimal("35000"),
+    reported_by="agent_002",
+)
+
+# 2. Score complexity
+complexity = await svc.score_claim_complexity(
+    tenant_id="acme_insurance",
+    claim_id=claim["id"],
+    injury_involved=False,
+)
+
+# 3. STP fast-track for simple claims
+stp = await svc.evaluate_stp_eligibility(
+    tenant_id="acme_insurance",
+    claim_id=claim["id"],
+    stp_loss_ceiling=Decimal("50000"),
+)
+if stp["eligible"]:
+    print("Auto-approved:", stp["auto_approved_amount"])
+```

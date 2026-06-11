@@ -1,36 +1,60 @@
 # APG Natural Language Processing (NLP) Capability - User Guide
 
-**Version**: 1.0.0  
-**Last Updated**: January 29, 2025  
-**Copyright**: © 2025 Datacraft  
-**Author**: Nyimbi Odero  
+**Version**: 2.0.0
+**Last Updated**: June 2026
+**Copyright**: © 2025 Datacraft
+**Author**: Nyimbi Odero
 
 ## Overview
 
-The APG NLP capability provides enterprise-grade natural language processing using on-device models (Ollama, Transformers, spaCy) for maximum security and privacy. This capability includes 11 specialized corporate NLP elements designed to be 10x better than market leaders.
+The APG NLP capability provides enterprise-grade natural language processing using on-device models (Ollama, Transformers, spaCy) for maximum security and privacy. This capability covers text intelligence, AI safety, multi-document reasoning, and compliance analytics.
 
 ## Key Features
 
-### 🧠 **11 Corporate NLP Elements**
-1. **Sentiment Analysis** - Advanced emotion and opinion detection
-2. **Intent Classification** - Customer service and automation intent detection
-3. **Named Entity Recognition (NER)** - Extract people, organizations, locations
-4. **Text Classification** - Categorize documents and content
-5. **Entity Recognition and Linking** - Link entities to knowledge bases
-6. **Topic Modeling** - Discover themes in document collections
-7. **Keyword Extraction** - Extract important terms and phrases
-8. **Text Summarization** - Generate concise summaries
-9. **Document Clustering** - Group similar documents
-10. **Language Detection** - Identify text languages
-11. **Content Generation** - Generate content from prompts
+### Core NLP Elements
 
-### 🚀 **Enterprise Features**
-- **On-Device Processing** - No external API dependencies
-- **Real-Time Streaming** - WebSocket-based live processing
-- **Multi-Tenant Support** - Complete tenant isolation
-- **APG Integration** - Seamless composition with other capabilities
-- **Advanced Analytics** - Comprehensive performance monitoring
-- **Collaborative Annotation** - Team-based data labeling
+1. **Sentiment Analysis** - Pos/neg/neutral with compound score; distilbert-sst2 or lexicon fallback
+2. **Emotion Detection** - Ekman 8-class (joy, anger, fear, disgust, surprise, sadness, anticipation, trust) + VAD axes
+3. **Intent Classification** - Zero-shot or keyword-overlap intent routing
+4. **Named Entity Recognition (NER)** - People, organisations, locations, money, dates; spaCy or regex fallback
+5. **Text Classification** - Single-label and multi-label document taxonomy with threshold gating
+6. **Entity Recognition and Linking** - Wikipedia Qnode resolution for PERSON/ORG/GPE
+7. **Topic Modeling** - Term-frequency topic discovery across document collections
+8. **Keyword Extraction** - TF-IDF ranked key phrases
+9. **Text Summarization** - Extractive (TF-IDF sentence ranking) or abstractive (Ollama/llama3)
+10. **Document Clustering** - Vocabulary-based cluster assignment
+11. **Language Detection** - 40+ African language codes; langdetect + Bantu n-gram heuristic
+12. **Content Generation** - Ollama-backed generation with stub fallback
+
+### Safety and Quality Elements
+
+13. **Faithfulness Scoring** - NLI entailment check for hallucination detection; ROUGE-L fallback
+14. **PII Detection and Redaction** - Email, phone (KE/intl), credit card, IBAN, national ID, IP; spaCy PERSON/ORG
+15. **Readability Scoring** - Flesch-Kincaid, Gunning Fog, Coleman-Liau, plain-language composite; zero model dependency
+
+### Advanced Analysis
+
+16. **Semantic Search** - Cosine nearest-neighbour over stored Ollama/TF-IDF embeddings
+17. **Chunk-and-Embed** - Sentence-boundary overlapping chunks for long-document RAG
+18. **Dependency Parsing** - spaCy token head/dep/POS triples or POS-heuristic fallback
+19. **Temporal Expression Extraction** - TIMEX3 DATE/TIME/DURATION/SET with ISO-8601 normalisation
+20. **Coreference Resolution** - Pronoun-antecedent heuristic chains
+21. **Relation Extraction** - SVO triples via spaCy dependency parse or regex
+22. **Argument Mining** - Claim/premise/evidence/background sentence roles
+23. **Coherence Scoring** - Entity-grid + BoW cosine local and global coherence
+24. **Semantic Role Labelling (SRL)** - PropBank ARG0/ARG1/ARG2/ARGM frames via spaCy or SVO fallback
+25. **Document Structure Detection** - Heading/paragraph/list/table/code segmentation with structure_score
+26. **Multi-Hop Question Answering** - Evidence-chain QA across multiple documents with bridging hops
+27. **Near-Duplicate Detection** - MinHash LSH Jaccard similarity; pure Python, no external LSH library
+28. **Parallel Batch Scheduler** - Priority-queue async workers with semaphore, exponential-backoff retry
+
+### Enterprise Features
+
+- **On-Device Processing** - No external API calls for core NLP functions
+- **Multi-Tenant Isolation** - Complete tenant data separation; cross-tenant access blocked
+- **Graceful Degradation** - Every method has a stub fallback when spaCy/transformers/httpx absent
+- **Domain Event Emission** - Every state mutation emits a `DomainEvent` for audit trail integration
+- **Batch Processing** - Sequential (`run_batch_job`) and parallel (`run_batch_job_scheduled`) modes
 
 ## Getting Started
 
@@ -67,7 +91,7 @@ Each NLP element has a dedicated endpoint:
 # Sentiment Analysis
 curl -X POST /api/nlp/sentiment -d '{"text": "Great product!"}'
 
-# Intent Classification  
+# Intent Classification
 curl -X POST /api/nlp/intent -d '{"text": "I need help with my order"}'
 
 # Named Entity Recognition
@@ -81,6 +105,34 @@ curl -X POST /api/nlp/summarize -d '{"text": "Long document content..."}'
 
 # Content Generation
 curl -X POST /api/nlp/generate -d '{"prompt": "Write about AI benefits"}'
+```
+
+#### 4. New Safety and Quality Endpoints (v2.0)
+
+```bash
+# Emotion Detection (Ekman 8-class)
+curl -X POST /api/nlp/emotions -d '{"text": "I am furious about this delay!"}'
+
+# Readability Scoring
+curl -X POST /api/nlp/readability -d '{"text": "The regulatory framework..."}'
+
+# Faithfulness Check (hallucination detection)
+curl -X POST /api/nlp/faithfulness \
+  -d '{"source": "Original document...", "generated": "Summary text..."}'
+
+# Near-Duplicate Detection
+curl -X POST /api/nlp/duplicates \
+  -d '{"document_ids": ["doc-001", "doc-002", "doc-003"], "threshold": 0.8}'
+
+# Document Structure Detection
+curl -X POST /api/nlp/structure -d '{"text": "# Introduction\nThis report..."}'
+
+# Semantic Role Labelling
+curl -X POST /api/nlp/srl -d '{"text": "Mary gave John the report."}'
+
+# Multi-Hop Question Answering
+curl -X POST /api/nlp/multi-hop-qa \
+  -d '{"question": "Who founded the company?", "document_ids": ["doc-001", "doc-002"]}'
 ```
 
 ## Detailed Feature Guide

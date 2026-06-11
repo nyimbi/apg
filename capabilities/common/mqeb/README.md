@@ -158,6 +158,102 @@ Denied non-Bytewax lifecycle batches are stored through
 `list_lifecycle_batches()` before `PermissionError` is raised, so operators can
 see and remediate routing violations.
 
+## New Async Methods (v1.1)
+
+Eight async methods added to `MqebService` covering five world-class improvement areas:
+
+| Method | Improvement | Description |
+|--------|-------------|-------------|
+| `async_publish_message(...)` | I6 + I15 | Publish with idempotency deduplication and W3C trace context propagation |
+| `schedule_message(...)` | I5 | Queue a message for future delivery at an ISO-8601 UTC timestamp |
+| `cancel_scheduled_message(...)` | I5 | Cancel a pending scheduled message with audit evidence |
+| `drain_scheduled_messages(...)` | I5 | Transfer due scheduled messages into topic queues (used by processing loop) |
+| `get_priority_queue_stats(...)` | I8 | Per-priority-tier message depth for a topic |
+| `set_tenant_quota(...)` | I12 | Configure per-tenant publish rate and topic limits |
+| `get_tenant_quota_status(...)` | I12 | Current quota config and utilisation ratios |
+| `stream_audit_events(...)` | I9 | Async-generator tail of the audit log with HMAC-SHA256 integrity signatures |
+| `inspect_dead_letter_queue(...)` | I14 | List dead-letter messages and delivery attempts for a DLQ topic |
+| `redrive_dead_letter_messages(...)` | I14 | Re-publish dead-letter messages to a target topic with reviewer evidence |
+| `purge_dead_letter_queue(...)` | I14 | Permanently discard all dead-letter messages with audited reviewer sign-off |
+
+### Usage Examples
+
+```python
+import asyncio
+from capabilities.common.mqeb.service import MqebService
+
+svc = MqebService()
+
+# I5 — schedule a message for future delivery
+async def demo_schedule():
+    svc.create_topic(
+        tenant_id="t1", topic_id="orders", name="Orders",
+        owner="commerce", delivery_mode="at_least_once",
+    )
+    scheduled = await svc.schedule_message(
+        tenant_id="t1",
+        message_id="order-999",
+        topic_id="orders",
+        producer="order-service",
+        scheduled_at_iso="2099-01-01T00:00:00Z",
+        payload_size=256,
+    )
+    assert scheduled["status"] == "scheduled"
+
+    cancelled = await svc.cancel_scheduled_message(
+        tenant_id="t1",
+        message_id="order-999",
+        actor="ops-engineer",
+        reason="order voided before delivery window",
+    )
+    assert cancelled["status"] == "cancelled"
+
+# I6 — idempotent publish
+async def demo_idempotency():
+    svc.create_topic(
+        tenant_id="t1", topic_id="payments", name="Payments",
+        owner="fintech", delivery_mode="exactly_once",
+        dead_letter_topic="payments.dlq",
+    )
+    msg1 = await svc.async_publish_message(
+        tenant_id="t1", message_id="pay-001", topic_id="payments",
+        producer="checkout", idempotency_key="txn-abc-123", payload_size=128,
+        delivery_mode="exactly_once", encrypted=True, schema_ref="schema://payments/v1",
+    )
+    msg2 = await svc.async_publish_message(
+        tenant_id="t1", message_id="pay-001b", topic_id="payments",
+        producer="checkout", idempotency_key="txn-abc-123", payload_size=128,
+        delivery_mode="exactly_once", encrypted=True, schema_ref="schema://payments/v1",
+    )
+    # msg2 returns the same record as msg1 — no duplicate
+    assert msg1["id"] == msg2["id"]
+
+# I9 — stream audit events with HMAC integrity
+async def demo_audit_stream():
+    events = []
+    async for event in svc.stream_audit_events("t1", batch_size=20):
+        assert "integrity_sig" in event
+        events.append(event)
+
+# I12 — tenant quota
+async def demo_quota():
+    await svc.set_tenant_quota(
+        tenant_id="t1",
+        max_messages_per_minute=1000,
+        max_bytes_per_minute=10_000_000,
+        max_topics=50,
+        actor="platform-admin",
+    )
+    status = await svc.get_tenant_quota_status("t1")
+    assert status["quota_configured"] is True
+    assert float(status["message_utilization_ratio"]) >= 0.0
+
+asyncio.run(demo_schedule())
+asyncio.run(demo_idempotency())
+asyncio.run(demo_audit_stream())
+asyncio.run(demo_quota())
+```
+
 ## API Helpers
 
 `api.py` exposes dependency-light helpers backed by shared `api.SERVICE`:

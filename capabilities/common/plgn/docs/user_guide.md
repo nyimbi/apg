@@ -151,18 +151,33 @@ Every async method yields to the event loop at I/O boundaries. In a production
 deployment the yield points are where real I/O (remote registries, signing services,
 sandbox workers, time-series stores) would be awaited.
 
+All async methods also run `_guard_tenant_id` and `_guard_non_empty_string`
+checks on critical arguments before yielding, so callers receive `ValueError`
+immediately rather than after the first event-loop yield.
+
 | Method | Description |
 |--------|-------------|
-| `async_register_plugin(...)` | Non-blocking registration |
-| `async_install_plugin(...)` | Non-blocking install |
-| `async_hook_fire(tenant_id, event_name, payload, handler_timeout_ms)` | Concurrent fan-out dispatch |
-| `async_health_check_all(tenant_id, checks, concurrency)` | Parallel health checks across all plugins |
+| `async_register_plugin(...)` | Non-blocking registration; hook for remote signing/scanning |
+| `async_install_plugin(...)` | Non-blocking install; hook for package-registry downloads |
+| `async_uninstall_plugin(plugin_id, tenant_id, ...)` | Non-blocking uninstall; hook for sandbox teardown and publisher webhooks |
+| `async_plugin_update(tenant_id, plugin_id, new_version, ...)` | Non-blocking version bump; hook for artifact integrity re-check |
+| `async_plugin_disable(tenant_id, installation_id, ...)` | Non-destructive deactivation; hook for notification adapters |
+| `async_review_permissions(review_id, tenant_id, plugin_id, ...)` | Non-blocking permission review; hook for remote IAM/policy service |
+| `async_attach_sandbox_policy(policy_id, tenant_id, plugin_id, ...)` | Non-blocking policy attachment; hook for sandbox worker notification |
+| `async_create_release(release_id, tenant_id, plugin_id, ...)` | Non-blocking release with readiness gate; hook for sign/scan pipeline |
+| `async_publish_listing(listing_id, tenant_id, plugin_id, ...)` | Non-blocking listing; hook for CDN invalidation and search-index update |
+| `async_plugin_permission_check(plugin_id, permission, tenant_id, ...)` | Non-blocking per-scope check; hook for OPA/Cedar evaluation |
+| `async_dashboard_summary(tenant_id)` | Non-blocking dashboard counts; hook for read-replica/materialised-view |
+| `async_register_plgn_agent(tenant_id, name, runtime, role, scope, ...)` | Non-blocking agent registration; hook for OIDC token verification |
+| `async_plugin_marketplace_billing(tenant_id, plugin_id, quantity, unit_price, currency, ...)` | Decimal-accurate billing record; hook for Stripe/M-Pesa adapter |
+| `async_hook_fire(tenant_id, event_name, payload, handler_timeout_ms)` | Concurrent fan-out dispatch with per-handler timeout isolation |
+| `async_health_check_all(tenant_id, checks, concurrency)` | Semaphore-bounded parallel health checks |
 | `async_bulk_install(plugin_ids, tenant_id, concurrency, stop_on_first_error)` | Concurrent multi-plugin install |
 | `async_dependency_resolve(plugin_ids, tenant_id)` | Non-blocking dependency resolution |
-| `async_sandboxed_execution(plugin_id, method, parameters, timeout_ms)` | Wall-clock-timeout sandbox call |
-| `async_plugin_analytics(tenant_id, period)` | Non-blocking analytics aggregation |
-| `async_search_marketplace(query, tenant_id, channel, curated_only, limit, offset)` | Paginated search |
-| `async_audit_query(tenant_id, event_type, actor, since, limit)` | Filtered audit retrieval |
+| `async_sandboxed_execution(plugin_id, method, parameters, timeout_ms)` | Wall-clock-timeout sandbox call via `asyncio.wait_for` |
+| `async_plugin_analytics(tenant_id, period)` | Non-blocking analytics; hook for time-series adapters |
+| `async_search_marketplace(query, tenant_id, channel, curated_only, limit, offset)` | Paginated search; hook for full-text/vector index |
+| `async_audit_query(tenant_id, event_type, actor, since, limit)` | Filtered, sorted audit event retrieval |
 
 ---
 
@@ -371,6 +386,112 @@ Batch plugin mutation and release lifecycle events use the `bytewax` stream adap
 
 All keys are tenant-scoped. Set via the `conf` capability or environment variables
 prefixed with `PLGN_`.
+
+---
+
+## Marketplace Billing
+
+Use `async_plugin_marketplace_billing` to record paid plugin installs. All
+monetary values use `Decimal` arithmetic — no floating-point rounding errors.
+
+```python
+import asyncio
+from capabilities.common.plgn import PlgnService
+
+svc = PlgnService()
+
+async def bill_install(tenant_id: str, plugin_id: str):
+    record = await svc.async_plugin_marketplace_billing(
+        tenant_id=tenant_id,
+        plugin_id=plugin_id,
+        quantity=5,          # 5 seats
+        unit_price="4.99",   # Decimal string — exact
+        currency="USD",
+        billed_by="billing-service",
+    )
+    print(f"Billed {record['total_amount']} {record['currency']}")
+    # "Billed 24.95 USD"
+```
+
+---
+
+## Async Permission Review
+
+```python
+async def review(tenant_id: str, plugin_id: str):
+    return await svc.async_review_permissions(
+        review_id="rev-async-001",
+        tenant_id=tenant_id,
+        plugin_id=plugin_id,
+        reviewer="security-lead",
+        approved_scopes=["identity", "network:external"],
+        secret_access_allowed=True,
+        notes="Reviewed 2026-06-11",
+    )
+```
+
+---
+
+## Async Sandbox Policy
+
+```python
+async def configure_sandbox(tenant_id: str, plugin_id: str):
+    return await svc.async_attach_sandbox_policy(
+        policy_id="sbx-async-001",
+        tenant_id=tenant_id,
+        plugin_id=plugin_id,
+        policy_name="strict",
+        network_access="deny",
+        filesystem_access="read_only",
+        secret_access="deny",
+        tool_allowlist=["score_customer"],
+    )
+```
+
+---
+
+## Async Dashboard
+
+```python
+async def dashboard(tenant_id: str):
+    return await svc.async_dashboard_summary(tenant_id)
+```
+
+---
+
+## Async Plugin Governance Agent
+
+```python
+async def register_agent(tenant_id: str):
+    return await svc.async_register_plgn_agent(
+        tenant_id=tenant_id,
+        name="Manifest Reviewer",
+        runtime="claude_code",
+        role="manifest_reviewer",
+        scope="Review plugin manifests for schema, dependency, and permission compliance",
+        contribution_disclosed=True,
+    )
+```
+
+---
+
+## Input Guards
+
+All async methods call `_guard_tenant_id` and `_guard_non_empty_string` before
+the first `await`. Blank or None values raise `ValueError` synchronously, so
+callers can use a plain `try/except ValueError` without needing to `await`
+first:
+
+```python
+try:
+    result = await svc.async_plugin_update(
+        tenant_id="",        # blank — raises immediately
+        plugin_id="p1",
+        new_version="2.0.0",
+    )
+except ValueError as exc:
+    print(exc)  # "tenant_id_required"
+```
 
 ---
 

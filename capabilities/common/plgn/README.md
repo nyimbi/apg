@@ -159,6 +159,17 @@ asyncio.run(main())
 |---|---|
 | `async_register_plugin` | Non-blocking registration; I/O hook for signing/scanning |
 | `async_install_plugin` | Non-blocking install; hook for package-registry downloads |
+| `async_uninstall_plugin` | Non-blocking uninstall; hook for sandbox teardown and publisher webhooks |
+| `async_plugin_update` | Non-blocking version bump; hook for artifact integrity re-check |
+| `async_plugin_disable` | Non-blocking deactivation; hook for notification adapters |
+| `async_review_permissions` | Non-blocking permission review; hook for remote IAM/policy service |
+| `async_attach_sandbox_policy` | Non-blocking policy attachment; hook for sandbox worker notification |
+| `async_create_release` | Non-blocking release creation; hook for signing/scan pipeline |
+| `async_publish_listing` | Non-blocking listing publication; hook for CDN and search-index update |
+| `async_plugin_permission_check` | Non-blocking per-scope check; hook for OPA/Cedar evaluation |
+| `async_dashboard_summary` | Non-blocking dashboard aggregation; hook for read-replica query |
+| `async_register_plgn_agent` | Non-blocking agent registration; hook for OIDC token verification |
+| `async_plugin_marketplace_billing` | Decimal-accurate billing record; hook for Stripe/M-Pesa adapter |
 | `async_hook_fire` | Concurrent fan-out dispatch with per-handler timeout |
 | `async_health_check_all` | Semaphore-bounded parallel health checks |
 | `async_bulk_install` | Concurrent multi-plugin install with stop-on-first-error |
