@@ -64,3 +64,112 @@ def evaluate_capability_rules(config: dict[str, Any]) -> list[str]:
 	if cfg.get("max_overdraft_limit", 0) < 0:
 		violations.append("max_overdraft_limit must be >= 0")
 	return violations
+
+THEME = {
+	"name": "fin_acct_banking",
+	"tokens": {
+		"color.primary": "#1B4F72",
+		"color.accent": "#2874A6",
+		"color.success": "#1E8449",
+		"color.warning": "#B7950B",
+		"color.danger": "#922B21",
+		"surface.canvas": "#F4F6F7",
+		"surface.panel": "#FFFFFF",
+		"text.primary": "#17202A",
+		"text.secondary": "#5D6D7E",
+		"border.radius": "6px",
+		"density": "normal",
+	},
+	"components": {
+		"accounts": {"icon": "account_balance"},
+		"transactions": {"icon": "swap_horiz"},
+	},
+}
+
+configuration_schema = {
+	"type": "object",
+	"required": ["tenant_id", "ui", "theme"],
+	"properties": {
+		"tenant_id": {"type": "string"},
+		"ui": {"type": "object"},
+		"theme": {"type": "object"},
+		"default_currency": {"type": "string", "default": "KES"},
+	},
+}
+
+rule_engine = {
+	"type": "deterministic",
+	"rules": [
+		{"name": "tenant_context_required",
+		 "description": "Account operations require tenant context.",
+		 "condition": {"tenant_context_present": False},
+		 "effect": {"decision": "deny", "reason": "tenant_context_required",
+		            "required_action": "attach_tenant_context"}},
+		{"name": "sufficient_funds_check",
+		 "description": "Debit requires available balance.",
+		 "condition": {"sufficient_funds": False},
+		 "effect": {"decision": "deny", "reason": "insufficient_funds",
+		            "required_action": "reduce_amount"}},
+		{"name": "account_active_required",
+		 "description": "Cannot transact on frozen/closed account.",
+		 "condition": {"account_active": False},
+		 "effect": {"decision": "deny", "reason": "account_not_active",
+		            "required_action": "reactivate_account"}},
+		{"name": "double_entry_required",
+		 "description": "Monetary transactions must post to GL.",
+		 "condition": {"gl_posting_enabled": False},
+		 "effect": {"decision": "deny", "reason": "double_entry_required",
+		            "required_action": "enable_gl_posting"}},
+		{"name": "decimal_precision_enforced",
+		 "description": "Amounts must use Decimal type.",
+		 "condition": {"amount_is_decimal": False},
+		 "effect": {"decision": "deny", "reason": "invalid_precision",
+		            "required_action": "use_decimal_type"}},
+	],
+}
+
+
+def get_capability_contract(tenant_id: str = "default") -> dict:
+	"""Return the capability contract for the given tenant."""
+	return {
+		"capability": CAPABILITY_ID,
+		"display_name": CAPABILITY_NAME,
+		"name": CAPABILITY_ID,
+		"version": CAPABILITY_VERSION,
+		"provides": [
+			"account_lifecycle", "debit_credit_processing",
+			"fund_locking", "balance_inquiry", "statement_generation",
+		],
+		"requires": ["auth", "audl", "mten", "conf"],
+		"configuration": {
+			"tenant_id": tenant_id,
+			"ui": {},
+			"theme": {},
+			**deepcopy(DEFAULT_CONFIGURATION),
+		},
+		"configuration_schema": configuration_schema,
+		"rule_engine": rule_engine,
+		"ui": {
+			"shell": "apg_python",
+			"api_prefix": "/fin/acct/api/v1",
+			"requires_theme": True,
+			"view_module": "views.py",
+			"template_roots": ["templates/", "static/"],
+			"routes": [
+				{"name": "dashboard", "path": "/fin/acct/dashboard",
+				 "component": "AccountDashboard",
+				 "permission": "fin_acct:view", "nav_group": "Overview"},
+				{"name": "accounts", "path": "/fin/acct/accounts",
+				 "component": "AccountList",
+				 "permission": "fin_acct:view", "nav_group": "Accounts"},
+				{"name": "transactions", "path": "/fin/acct/transactions",
+				 "component": "TransactionList",
+				 "permission": "fin_acct:view", "nav_group": "Transactions"},
+				{"name": "statements", "path": "/fin/acct/statements",
+				 "component": "StatementView",
+				 "permission": "fin_acct:view", "nav_group": "Reporting"},
+			],
+		},
+		"theme": THEME,
+		"streaming": {"stream": "apg.fin.acct.lifecycle", "events": []},
+	}

@@ -855,8 +855,8 @@ class CheckOffService:
 			try:
 				emp = await self.get_employer(tenant_id, employer_id)
 				employer_name = emp.name
-			except KeyError:
-				pass
+			except KeyError as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 		entries: list[MemberCheckOffEntry] = []
 		total_loan = Decimal("0")

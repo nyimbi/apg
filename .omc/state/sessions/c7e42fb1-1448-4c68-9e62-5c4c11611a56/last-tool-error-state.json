@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"# Check connectors and gov/scm/hcm stubs\\nls capabilities/composition/orchestration/connectors/africa/ 2>/dev/null\\necho \\\"---\\\"\\nfor d in gov_usd gov_lnd gov_cty; do ls capabilities/gover...",
-  "error": "Exit code 1\n__init__.py\n__pycache__\nairtel_connector.py\nequity_connector.py\nkcb_connector.py\nmpesa_connector.py\nmshwari_connector.py\nmtn_connector.py\norange_connector.py\nwave_connector.py\n---\n[gov_usd]\n[gov_lnd]\n[gov_cty]\n---\n  File \"<string>\", line 13\n    stubs_done.append(f'{stub}:{'✓' if has_svc else '✗'}')\n                                 ^\nSyntaxError: invalid character '✓' (U+2713)",
-  "timestamp": "2026-06-10T18:37:58.008Z",
-  "retry_count": 1
+  "tool_input_preview": "{\"command\":\"python3 << 'PYEOF'\\nimport re, py_compile\\n\\nfp = 'capabilities/fin/acct/capability_contract.py'\\ncontent = open(fp).read()\\n\\n# Determine indent style\\nuses_tabs = '\\\\t' in content[:2000]...",
+  "error": "Exit code 1\nERROR: Sorry: TabError: inconsistent use of tabs and spaces in indentation (capability_contract.py, line 70)\n68: ''\n69: '# Required contract keys,'\n70: '        \"ui\": {\"type\": \"object\"},'\n71: '        \"theme\": {\"type\": \"object\"},'\n72: '        \"default_currency\": {\"type\": \"string\", \"default\": \"KES\"},'",
+  "timestamp": "2026-06-11T05:46:22.082Z",
+  "retry_count": 2
 }

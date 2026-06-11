@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-06-10T19:21:54.241Z",
+  "updatedAt": "2026-06-11T05:32:14.834Z",
   "missions": [
     {
       "id": "session:c7e42fb1-1448-4c68-9e62-5c4c11611a56:none",
@@ -7,15 +7,15 @@
       "name": "none",
       "objective": "Session mission",
       "createdAt": "2026-06-10T06:16:25.596Z",
-      "updatedAt": "2026-06-10T19:21:54.241Z",
+      "updatedAt": "2026-06-11T05:32:14.834Z",
       "status": "running",
-      "workerCount": 28,
+      "workerCount": 51,
       "taskCounts": {
-        "total": 28,
+        "total": 51,
         "pending": 0,
         "blocked": 0,
-        "inProgress": 3,
-        "completed": 25,
+        "inProgress": 14,
+        "completed": 37,
         "failed": 0
       },
       "agents": [
@@ -27,7 +27,7 @@
           "currentStep": null,
           "latestUpdate": "completed",
           "completedSummary": null,
-          "updatedAt": "2026-06-10T19:21:54.241Z"
+          "updatedAt": "2026-06-11T04:32:00.998Z"
         },
         {
           "name": "workflow-subagent:ad0bbcf",
@@ -298,48 +298,270 @@
           "latestUpdate": null,
           "completedSummary": null,
           "updatedAt": "2026-06-10T18:35:08.305Z"
+        },
+        {
+          "name": "workflow-subagent:ac7e85b",
+          "role": "workflow-subagent",
+          "ownership": "ac7e85b64e05083e1",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-06-11T04:28:21.355Z"
+        },
+        {
+          "name": "workflow-subagent:a6cff87",
+          "role": "workflow-subagent",
+          "ownership": "a6cff87f008d0f429",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-06-11T04:28:21.377Z"
+        },
+        {
+          "name": "workflow-subagent:a1281f3",
+          "role": "workflow-subagent",
+          "ownership": "a1281f3c2098108e0",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-06-11T04:42:32.775Z"
+        },
+        {
+          "name": "workflow-subagent:a587c04",
+          "role": "workflow-subagent",
+          "ownership": "a587c04eb84a4710a",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-06-11T04:37:41.534Z"
+        },
+        {
+          "name": "workflow-subagent:ae201f1",
+          "role": "workflow-subagent",
+          "ownership": "ae201f13a6688a00a",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-06-11T04:40:56.061Z"
+        },
+        {
+          "name": "workflow-subagent:a89d253",
+          "role": "workflow-subagent",
+          "ownership": "a89d253ee5082d33a",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-06-11T04:33:11.036Z"
+        },
+        {
+          "name": "workflow-subagent:aa09cce",
+          "role": "workflow-subagent",
+          "ownership": "aa09cce4c705754a7",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-06-11T04:33:15.576Z"
+        },
+        {
+          "name": "workflow-subagent:ab8dcf1",
+          "role": "workflow-subagent",
+          "ownership": "ab8dcf1e3d96a8a7c",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-06-11T04:37:38.415Z"
+        },
+        {
+          "name": "workflow-subagent:a10bb3b",
+          "role": "workflow-subagent",
+          "ownership": "a10bb3b45aede1f6e",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-06-11T04:47:10.606Z"
+        },
+        {
+          "name": "workflow-subagent:a05dcf0",
+          "role": "workflow-subagent",
+          "ownership": "a05dcf0a41143875b",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-06-11T04:41:31.225Z"
+        },
+        {
+          "name": "workflow-subagent:a2c0e77",
+          "role": "workflow-subagent",
+          "ownership": "a2c0e77289e831966",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-06-11T04:45:30.317Z"
+        },
+        {
+          "name": "workflow-subagent:a351329",
+          "role": "workflow-subagent",
+          "ownership": "a3513295ad8cfa34d",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-06-11T04:50:01.005Z"
+        },
+        {
+          "name": "workflow-subagent:a918872",
+          "role": "workflow-subagent",
+          "ownership": "a918872ef91866544",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-06-11T05:02:00.949Z"
+        },
+        {
+          "name": "workflow-subagent:abf3d7c",
+          "role": "workflow-subagent",
+          "ownership": "abf3d7ce083d58847",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-06-11T05:07:42.044Z"
+        },
+        {
+          "name": "workflow-subagent:a99cbbe",
+          "role": "workflow-subagent",
+          "ownership": "a99cbbeb20f2afb5a",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-06-11T05:03:15.744Z"
+        },
+        {
+          "name": "workflow-subagent:a2ee20d",
+          "role": "workflow-subagent",
+          "ownership": "a2ee20dc8d795e2f6",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-06-11T05:05:44.854Z"
+        },
+        {
+          "name": "workflow-subagent:a4c5dba",
+          "role": "workflow-subagent",
+          "ownership": "a4c5dba206e4496a9",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-06-11T05:02:45.557Z"
+        },
+        {
+          "name": "workflow-subagent:a307b77",
+          "role": "workflow-subagent",
+          "ownership": "a307b77f447bb1665",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-06-11T05:05:06.315Z"
+        },
+        {
+          "name": "workflow-subagent:a8071b5",
+          "role": "workflow-subagent",
+          "ownership": "a8071b5c4e274b131",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-06-11T05:11:47.117Z"
+        },
+        {
+          "name": "workflow-subagent:a181feb",
+          "role": "workflow-subagent",
+          "ownership": "a181feb26ebb5c56c",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-06-11T05:11:47.377Z"
+        },
+        {
+          "name": "workflow-subagent:afb261d",
+          "role": "workflow-subagent",
+          "ownership": "afb261d215e518639",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-06-11T05:15:36.424Z"
+        },
+        {
+          "name": "workflow-subagent:a435d12",
+          "role": "workflow-subagent",
+          "ownership": "a435d1298c097c176",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-06-11T05:19:24.984Z"
+        },
+        {
+          "name": "workflow-subagent:af52e4f",
+          "role": "workflow-subagent",
+          "ownership": "af52e4f797ec3ce30",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-06-11T05:32:14.834Z"
         }
       ],
       "timeline": [
         {
-          "id": "session-start:addd87a610ae8c0c2:2026-06-10T18:27:45.581Z",
-          "at": "2026-06-10T18:27:45.581Z",
+          "id": "session-start:afb261d215e518639:2026-06-11T05:15:36.424Z",
+          "at": "2026-06-11T05:15:36.424Z",
           "kind": "update",
-          "agent": "workflow-subagent:addd87a",
-          "detail": "started workflow-subagent:addd87a",
-          "sourceKey": "session-start:addd87a610ae8c0c2"
+          "agent": "workflow-subagent:afb261d",
+          "detail": "started workflow-subagent:afb261d",
+          "sourceKey": "session-start:afb261d215e518639"
         },
         {
-          "id": "session-start:ad979ebbf8ab935eb:2026-06-10T18:31:25.071Z",
-          "at": "2026-06-10T18:31:25.071Z",
+          "id": "session-start:a435d1298c097c176:2026-06-11T05:19:24.984Z",
+          "at": "2026-06-11T05:19:24.984Z",
           "kind": "update",
-          "agent": "workflow-subagent:ad979eb",
-          "detail": "started workflow-subagent:ad979eb",
-          "sourceKey": "session-start:ad979ebbf8ab935eb"
+          "agent": "workflow-subagent:a435d12",
+          "detail": "started workflow-subagent:a435d12",
+          "sourceKey": "session-start:a435d1298c097c176"
         },
         {
-          "id": "session-start:a55477719cc75a397:2026-06-10T18:35:08.305Z",
-          "at": "2026-06-10T18:35:08.305Z",
+          "id": "session-start:af52e4f797ec3ce30:2026-06-11T05:22:56.834Z",
+          "at": "2026-06-11T05:22:56.834Z",
           "kind": "update",
-          "agent": "workflow-subagent:a554777",
-          "detail": "started workflow-subagent:a554777",
-          "sourceKey": "session-start:a55477719cc75a397"
+          "agent": "workflow-subagent:af52e4f",
+          "detail": "started workflow-subagent:af52e4f",
+          "sourceKey": "session-start:af52e4f797ec3ce30"
         },
         {
-          "id": "session-stop:a7078272dd2d0b062:2026-06-10T18:45:14.816Z",
-          "at": "2026-06-10T18:45:14.816Z",
+          "id": "session-stop:af52e4f797ec3ce30:2026-06-11T05:32:14.834Z",
+          "at": "2026-06-11T05:32:14.834Z",
           "kind": "completion",
-          "agent": "Explore:aba6084",
+          "agent": "workflow-subagent:af52e4f",
           "detail": "completed",
-          "sourceKey": "session-stop:a7078272dd2d0b062"
-        },
-        {
-          "id": "session-stop:a46f72558ee2054e8:2026-06-10T19:21:54.241Z",
-          "at": "2026-06-10T19:21:54.241Z",
-          "kind": "completion",
-          "agent": "Explore:aba6084",
-          "detail": "completed",
-          "sourceKey": "session-stop:a46f72558ee2054e8"
+          "sourceKey": "session-stop:af52e4f797ec3ce30"
         }
       ]
     }

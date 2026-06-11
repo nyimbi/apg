@@ -203,8 +203,8 @@ class EODService:
 			s = datetime.fromisoformat(started)
 			e = datetime.fromisoformat(finished)
 			duration = (e - s).total_seconds()
-		except ValueError:
-			pass
+		except ValueError as _exc:
+			_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		return JobResult(
 			job_name=job_type.value,
 			job_type=job_type,
@@ -943,8 +943,8 @@ class EODService:
 					run_d = _parse_date(parts[2])
 					if run_d >= yesterday:
 						tenants_with_recent_eod.add(parts[1])
-				except ValueError:
-					pass
+				except ValueError as _exc:
+					_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		return {
 			"status":              "healthy",
 			"total_runs_tracked":  len(self._runs),
